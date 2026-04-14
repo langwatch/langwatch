@@ -1228,6 +1228,98 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  // --- Platform Trigger/Automation Tools (require API key) ---
+
+  server.tool(
+    "platform_list_triggers",
+    "List all triggers (automations) in the project. Triggers automate actions like sending emails, Slack messages, or adding to datasets when conditions are met.",
+    {
+      format: z.enum(["digest", "json"]).optional().describe("Output format"),
+    },
+    withToolLogging("platform_list_triggers", async (params) => {
+      requireApiKey();
+      const { listTriggers } = await import("./langwatch-api-triggers.js");
+      const triggers = await listTriggers();
+      if (params.format === "json") {
+        return { content: [{ type: "text", text: JSON.stringify(triggers, null, 2) }] };
+      }
+      if (triggers.length === 0) {
+        return { content: [{ type: "text", text: "No triggers found. Use `platform_create_trigger` to create one." }] };
+      }
+      const lines = [`# Triggers (${triggers.length} total)\n`];
+      for (const t of triggers) {
+        lines.push(`## ${t.name}`);
+        lines.push(`**ID**: ${t.id}`);
+        lines.push(`**Action**: ${t.action}`);
+        lines.push(`**Status**: ${t.active ? "active" : "inactive"}`);
+        if (t.alertType) lines.push(`**Alert**: ${t.alertType}`);
+        lines.push("");
+      }
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    })
+  );
+
+  server.tool(
+    "platform_create_trigger",
+    "Create a new trigger (automation) that fires when conditions are met.",
+    {
+      name: z.string().describe("Trigger name"),
+      action: z.enum(["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE"]).describe("Action to take when triggered"),
+      filters: z.string().optional().describe("Filter conditions as JSON string"),
+      message: z.string().optional().describe("Custom alert message"),
+      alertType: z.enum(["CRITICAL", "WARNING", "INFO"]).optional().describe("Alert severity"),
+    },
+    withToolLogging("platform_create_trigger", async (params) => {
+      requireApiKey();
+      const { createTrigger } = await import("./langwatch-api-triggers.js");
+      let filters: Record<string, unknown> = {};
+      if (params.filters) {
+        try { filters = JSON.parse(params.filters) as Record<string, unknown>; }
+        catch { return { content: [{ type: "text", text: "Error: filters must be valid JSON" }] }; }
+      }
+      const trigger = await createTrigger({
+        name: params.name,
+        action: params.action,
+        filters,
+        message: params.message,
+        alertType: params.alertType,
+      });
+      return { content: [{ type: "text", text: `Trigger "${trigger.name}" created (ID: ${trigger.id}, Action: ${trigger.action}).` }] };
+    })
+  );
+
+  server.tool(
+    "platform_update_trigger",
+    "Update a trigger (name, active state, message, alert type).",
+    {
+      id: z.string().describe("The trigger ID"),
+      name: z.string().optional().describe("New name"),
+      active: z.boolean().optional().describe("Enable or disable"),
+      message: z.string().optional().describe("New alert message"),
+      alertType: z.enum(["CRITICAL", "WARNING", "INFO"]).optional().describe("New alert severity"),
+    },
+    withToolLogging("platform_update_trigger", async (params) => {
+      requireApiKey();
+      const { updateTrigger } = await import("./langwatch-api-triggers.js");
+      const trigger = await updateTrigger(params);
+      return { content: [{ type: "text", text: `Trigger "${trigger.name}" updated (active: ${trigger.active}).` }] };
+    })
+  );
+
+  server.tool(
+    "platform_delete_trigger",
+    "Delete a trigger (automation).",
+    {
+      id: z.string().describe("The trigger ID to delete"),
+    },
+    withToolLogging("platform_delete_trigger", async (params) => {
+      requireApiKey();
+      const { deleteTrigger } = await import("./langwatch-api-triggers.js");
+      const result = await deleteTrigger(params.id);
+      return { content: [{ type: "text", text: `Trigger ${result.id} deleted.` }] };
+    })
+  );
+
   // --- Platform Evaluation Execution Tools (require API key) ---
 
   server.tool(

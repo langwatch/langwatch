@@ -14,6 +14,7 @@ import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
+import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
@@ -63,6 +64,8 @@ export default async function execute() {
   const suitesSpec = await generateSpecs(suitesApp);
   console.log("Building traces spec...");
   const tracesSpec = await generateSpecs(tracesApp);
+  console.log("Building triggers spec...");
+  const triggersSpec = await generateSpecs(triggersApp);
   console.log("Building workflows spec...");
   const workflowsSpec = await generateSpecs(workflowsApp);
   console.log("Merging specs...");
@@ -82,6 +85,7 @@ export default async function execute() {
       simulationRunsSpec,
       suitesSpec,
       tracesSpec,
+      triggersSpec,
       workflowsSpec,
       langwatchSpec,
     ],
@@ -103,6 +107,7 @@ export default async function execute() {
           key.includes("/api/simulation-runs") ||
           key.includes("/api/suites") ||
           key.includes("/api/traces") ||
+          key.includes("/api/triggers") ||
           key.includes("/api/workflows")
         ) {
           // Replace with new

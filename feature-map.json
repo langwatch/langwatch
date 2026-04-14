@@ -528,6 +528,33 @@
       "sync": null
     },
     {
+      "id": "triggers",
+      "name": "Triggers (Automations)",
+      "description": "Automated actions triggered by conditions — email alerts, Slack notifications, dataset additions",
+      "surfaces": {
+        "code": {
+          "sdk": null,
+          "cli": ["trigger list", "trigger get", "trigger create", "trigger update", "trigger delete"],
+          "skill": null,
+          "docs": null
+        },
+        "platform": {
+          "ui": "/alerts",
+          "mcp": [
+            "platform_list_triggers",
+            "platform_create_trigger",
+            "platform_update_trigger",
+            "platform_delete_trigger"
+          ],
+          "skill": null,
+          "docs": null
+        },
+        "api": "/api/triggers",
+        "docs": null
+      },
+      "sync": null
+    },
+    {
       "id": "settings",
       "name": "Settings",
       "description": "Platform configuration and administration",

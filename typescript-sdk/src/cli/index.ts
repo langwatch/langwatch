@@ -836,6 +836,65 @@ suiteCmd
     await impl(id);
   });
 
+// Add trigger (automation) command group
+const triggerCmd = program
+  .command("trigger")
+  .description("Manage triggers (automations) — alerts, webhooks, and dataset actions");
+
+triggerCmd
+  .command("list")
+  .description("List all triggers in the project")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
+    const { listTriggersCommand: impl } = await import("./commands/triggers/list.js");
+    await impl(options);
+  });
+
+triggerCmd
+  .command("get <id>")
+  .description("Get trigger details by ID")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
+    const { getTriggerCommand: impl } = await import("./commands/triggers/get.js");
+    await impl(id, options);
+  });
+
+triggerCmd
+  .command("create <name>")
+  .description("Create a new trigger (automation)")
+  .requiredOption("--action <action>", "Trigger action: SEND_EMAIL, ADD_TO_DATASET, ADD_TO_ANNOTATION_QUEUE, SEND_SLACK_MESSAGE")
+  .option("--filters <json>", "Trigger filter conditions as JSON")
+  .option("--message <text>", "Custom alert message")
+  .option("--alert-type <type>", "Alert severity: CRITICAL, WARNING, INFO")
+  .option("--slack-webhook <url>", "Slack webhook URL (for SEND_SLACK_MESSAGE action)")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (name: string, options: { action: string; filters?: string; message?: string; alertType?: string; slackWebhook?: string; format?: string }) => {
+    const { createTriggerCommand: impl } = await import("./commands/triggers/create.js");
+    await impl(name, options);
+  });
+
+triggerCmd
+  .command("update <id>")
+  .description("Update a trigger")
+  .option("--name <name>", "New trigger name")
+  .option("--active <boolean>", "Enable or disable the trigger (true/false)")
+  .option("--message <text>", "New alert message")
+  .option("--alert-type <type>", "New alert severity")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { name?: string; active?: string; message?: string; alertType?: string; format?: string }) => {
+    const { updateTriggerCommand: impl } = await import("./commands/triggers/update.js");
+    await impl(id, options);
+  });
+
+triggerCmd
+  .command("delete <id>")
+  .description("Delete a trigger")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
+    const { deleteTriggerCommand: impl } = await import("./commands/triggers/delete.js");
+    await impl(id, options);
+  });
+
 // Add simulation-run command group
 const simulationRunCmd = program
   .command("simulation-run")
