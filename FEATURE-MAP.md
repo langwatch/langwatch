@@ -11,7 +11,7 @@ Auto-generated from feature-map.json. Shows coverage across all six pillars.
 | &nbsp;&nbsp;&nbsp;&nbsp;**Annotations** | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ |
 | **Evaluations** | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | &nbsp;&nbsp;&nbsp;&nbsp;**Experiments** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| &nbsp;&nbsp;&nbsp;&nbsp;**Online Evaluation** | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
+| &nbsp;&nbsp;&nbsp;&nbsp;**Online Evaluation** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Agent Simulations** | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | &nbsp;&nbsp;&nbsp;&nbsp;**Scenarios** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | &nbsp;&nbsp;&nbsp;&nbsp;**Runs** | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ |
@@ -28,17 +28,16 @@ Auto-generated from feature-map.json. Shows coverage across all six pillars.
 | **Triggers (Automations)** | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ |
 | **Settings** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | &nbsp;&nbsp;&nbsp;&nbsp;**Model Providers** | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ |
+| &nbsp;&nbsp;&nbsp;&nbsp;**Project Secrets** | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ |
 
 ## Coverage Summary
 
-Total leaf features: 18
+| Pillar | Coverage |
+|--------|----------|
+| API | 19/19 (100%) |
+| SDK | 8/19 (42%) |
+| CLI | 17/19 (89%) |
+| MCP | 17/19 (89%) |
+| Skills | 8/19 (42%) |
+| Docs | 14/19 (73%) |
 
-- **API**: 18/18 (100%) ████████████████████
-- **SDK**: 8/18 (44%) █████████░░░░░░░░░░░
-- **CLI**: 15/18 (83%) █████████████████░░░
-- **MCP**: 15/18 (83%) █████████████████░░░
-- **SKILL**: 8/18 (44%) █████████░░░░░░░░░░░
-- **DOCS**: 14/18 (78%) ████████████████░░░░
-
----
-*Generated from feature-map.json*
