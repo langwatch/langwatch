@@ -10,8 +10,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "next/link";
-import { useRouter } from "next/router";
+import NextLink from "~/utils/compat/next-link";
+import { useRouter } from "~/utils/compat/next-router";
 import { Plus, Shield } from "react-feather";
 import type { UseFormReturn } from "react-hook-form";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

@@ -15,7 +15,7 @@ let mockRouterQuery: Record<string, string | string[] | undefined> = {};
 let mockRouterAsPath = "/test-project/messages";
 const mockPush = vi.fn().mockResolvedValue(true);
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
     push: mockPush,

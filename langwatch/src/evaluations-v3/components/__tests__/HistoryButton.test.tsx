@@ -48,7 +48,7 @@ import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3St
 
 // Mock next/router
 const mockPush = vi.fn();
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: mockPush,
     query: { slug: "test-slug" },

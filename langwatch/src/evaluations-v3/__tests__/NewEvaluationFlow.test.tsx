@@ -63,7 +63,7 @@ vi.mock("../../utils/api", () => ({
 let mockRouterQuery = { slug: "existing-slug" };
 const mockRouterReplace = vi.fn();
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
     push: vi.fn(),

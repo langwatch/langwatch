@@ -22,7 +22,7 @@ const mockRouter = {
   events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
 };
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => mockRouter,
 }));
 

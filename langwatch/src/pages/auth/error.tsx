@@ -8,9 +8,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import type { Session } from "~/server/auth";
+import Link from "~/utils/compat/next-link";
+import { useSearchParams } from "~/utils/compat/next-navigation";
+import { useSession } from "~/utils/auth-client";
 import { useEffect } from "react";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
@@ -44,7 +44,8 @@ export const normalizeErrorCode = (
   return error;
 };
 
-export default function Error({ session }: { session: Session | null }) {
+export default function Error() {
+  const { data: session } = useSession();
   const query = useSearchParams();
   const error = normalizeErrorCode(query?.get("error"));
   const publicEnv = usePublicEnv();

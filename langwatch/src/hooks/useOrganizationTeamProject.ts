@@ -1,4 +1,4 @@
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
 import { OrganizationUserRole } from "@prisma/client";

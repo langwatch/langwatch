@@ -7,7 +7,7 @@ import type { Node } from "@xyflow/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 // Mock next/router
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     push: vi.fn(),

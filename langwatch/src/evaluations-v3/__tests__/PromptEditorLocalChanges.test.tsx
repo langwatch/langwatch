@@ -64,7 +64,7 @@ vi.mock("rich-textarea", () => ({
 let mockRouterQuery: Record<string, string> = {};
 const mockPush = vi.fn();
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
     asPath: "/test",

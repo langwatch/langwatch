@@ -45,7 +45,7 @@ import {
 } from "./OnlineEvaluationDrawer.test-helpers.tsx";
 
 // vi.mock() factories are hoisted above imports, so we use async + dynamic import
-vi.mock("next/router", async () =>
+vi.mock("~/utils/compat/next-router", async () =>
   (await import("./OnlineEvaluationDrawer.test-helpers.tsx")).createRouterMock(),
 );
 vi.mock("~/utils/api", async () =>

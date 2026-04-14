@@ -157,7 +157,7 @@ services:
         pnpm -w exec prisma generate &&
         pnpm run types:zod:generate &&
         pnpm run start:prepare:db &&
-        pnpm run start:app
+        pnpm run dev
       "
     ports:
       - "${APP_PORT:-5560}:5560"

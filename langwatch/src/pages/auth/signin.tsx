@@ -11,11 +11,9 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { GetServerSidePropsContext } from "next";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { getServerAuthSession, type Session } from "~/server/auth";
-import { signIn } from "~/utils/auth-client";
+import Link from "~/utils/compat/next-link";
+import { useSearchParams } from "~/utils/compat/next-navigation";
+import { signIn, useSession } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -25,7 +23,8 @@ import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { normalizeErrorCode, SignInError } from "./error";
 
-export default function SignIn({ session }: { session: Session | null }) {
+export default function SignIn() {
+  const { data: session } = useSession();
   const query = useSearchParams();
   const rawError = query?.get("error");
   // Normalize BetterAuth error codes so the auto-redirect gate works.
@@ -71,24 +70,7 @@ export default function SignIn({ session }: { session: Session | null }) {
   return <SignInForm />;
 }
 
-export const getServerSideProps = async (
-  context: GetServerSidePropsContext,
-) => {
-  const session = await getServerAuthSession({ req: context.req });
-
-  if (session) {
-    return {
-      redirect: {
-        destination: "/",
-        permanent: false,
-      },
-    };
-  }
-
-  return {
-    props: { session },
-  };
-};
+// Auth redirect is now handled client-side via useSession() + useEffect in the component
 
 function SignInForm() {
   const query = useSearchParams();

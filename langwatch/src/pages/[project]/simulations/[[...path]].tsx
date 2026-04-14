@@ -15,7 +15,7 @@
  *   /simulations/suites?externalSet=Y → /simulations/Y
  *   /simulations/:setId/:batchId/:runId → redirect + open drawer
  */
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import SimulationsPage from "~/components/suites/SimulationsPage";

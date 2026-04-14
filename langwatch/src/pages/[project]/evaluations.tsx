@@ -15,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import type { ExperimentType } from "@prisma/client";
 import { Plus } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useState } from "react";
 import { Copy, MoreVertical } from "react-feather";
 import {

@@ -15,7 +15,7 @@ import {
   OrganizationUserRole,
   TeamUserRole,
 } from "@prisma/client";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronRight, MoreVertical } from "lucide-react";
 import { LuTrash } from "react-icons/lu";

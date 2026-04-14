@@ -12,7 +12,7 @@ vi.mock("~/optimization_studio/components/code/CodeEditorModal", () => ({
 }));
 
 // Mock next/router
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     push: vi.fn(),

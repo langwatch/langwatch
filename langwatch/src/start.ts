@@ -1,15 +1,17 @@
 import promBundle from "express-prom-bundle";
-import { createServer, type IncomingMessage } from "http";
-import next from "next";
+import { createServer, type IncomingMessage, type ServerResponse } from "http";
+import fs from "fs";
 import path from "path";
 import { register } from "prom-client";
-import type { Duplex } from "stream";
-import { parse } from "url";
 import { getApp } from "./server/app-layer/app";
 import { getWorkerMetricsPort } from "./server/background/config";
 import { createMcpHandler } from "./mcp/handler";
 import { shutdownPostHog } from "./server/posthog";
 import { createLogger } from "./utils/logger/server";
+
+// Hono — unified API router
+import type { Hono } from "hono";
+import { createApiRouter } from "./server/api-router";
 
 const logger = createLogger("langwatch:start");
 
@@ -22,9 +24,7 @@ export const metricsMiddleware = promBundle({
   customLabels: { project_name: "langwatch" },
   bypass: {
     onRequest: (req) => {
-      if (
-        /^\/(api|_next|\[project\]|auth|settings|share|$)/.test(req.url ?? "")
-      ) {
+      if (/^\/(api|assets|auth|settings|share|$)/.test(req.url ?? "")) {
         return false;
       }
       return true;
@@ -32,20 +32,8 @@ export const metricsMiddleware = promBundle({
     onFinish: () => false,
   },
   normalizePath: (req) => {
-    if (req.url?.includes("/_next/static")) {
-      return "/_next/static";
-    }
-    // @ts-ignore
-    const nextMeta = req[Symbol.for("NextInternalRequestMeta")];
-    const nextJsPath = nextMeta?.match?.definition?.pathname;
-    if (nextJsPath) {
-      // Keep trpc request individual if they are not being lumped in together
-      if (req.url?.includes("/trpc") && !req.url?.includes(",")) {
-        return req.url.split("?")[0];
-      }
-      return nextJsPath;
-    }
-    return req.url;
+    if (req.url?.includes("/assets/")) return "/assets/*";
+    return req.url?.split("?")[0] ?? req.url;
   },
 });
 
@@ -62,105 +50,92 @@ const isMetricsAuthorized = (req: IncomingMessage): boolean => {
 
 export const startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
-
   const hostname = "0.0.0.0";
-  const port = parseInt(process.env.PORT ?? "5560");
-  // when using middleware `hostname` and `port` must be provided below
-  const app = next({
-    dev,
-    hostname,
-    port,
-    dir,
-    turbo: !!dev && !process.env.USE_WEBPACK,
-    turbopack: !!dev && !process.env.USE_WEBPACK,
-  });
-  await app.prepare();
 
-  const handle = app.getRequestHandler();
-  const upgradeHandler = app.getUpgradeHandler();
+  // Dev: API server on internal port (API_PORT, default 5565).
+  //      Vite dev server runs separately on 5560 and proxies /api/* here.
+  // Prod: Single server on 5560 serves API routes + static files.
+  const port = parseInt(
+    process.env.PORT ?? (dev ? process.env.API_PORT ?? "5565" : "5560")
+  );
 
   const mcpHandler = createMcpHandler();
+  const honoApp = createApiRouter();
+
+  // In production, resolve the built client assets directory
+  const clientDistDir = dev ? null : path.join(dir, "dist/client");
 
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   const server = createServer(async (req, res) => {
     try {
-      // Be sure to pass `true` as the second argument to `url.parse`.
-      // This tells it to parse the query portion of the URL.
-      const parsedUrl = parse(req.url ?? "", true);
+      const pathname = (req.url ?? "/").split("?")[0] ?? "/";
 
-      // MCP routes must be intercepted BEFORE the metrics middleware
-      // to avoid the request body stream being consumed.
-      if (parsedUrl.pathname && mcpHandler.isMcpRoute(parsedUrl.pathname)) {
+      // MCP routes — intercept before everything
+      if (mcpHandler.isMcpRoute(pathname)) {
         mcpHandler.handleRequest(req, res);
         return;
       }
 
-      if (
-        parsedUrl.pathname === "/metrics" ||
-        parsedUrl.pathname === "/workers/metrics"
-      ) {
+      // Metrics endpoints
+      if (pathname === "/metrics" || pathname === "/workers/metrics") {
         if (!isMetricsAuthorized(req)) {
           res.statusCode = 401;
           res.end("Unauthorized");
           return;
         }
-
-        if (parsedUrl.pathname === "/metrics") {
+        if (pathname === "/metrics") {
           res.setHeader("Content-Type", register.contentType);
           res.end(await register.metrics());
         } else {
           const workersMetricsRes = await fetch(
             `http://0.0.0.0:${getWorkerMetricsPort()}/metrics`
           );
-          const workersMetrics = await workersMetricsRes.text();
           res.setHeader("Content-Type", register.contentType);
-          res.end(workersMetrics);
+          res.end(await workersMetricsRes.text());
         }
-      } else {
-        // Apply metrics middleware
-        await new Promise<void>((resolve) => {
-          void metricsMiddleware(req as any, res as any, resolve as any);
-        });
-
-        // Handle the request with Next.js
-        await handle(req, res, parsedUrl);
+        return;
       }
+
+      // Apply metrics middleware
+      await new Promise<void>((resolve) => {
+        void metricsMiddleware(req as any, res as any, resolve as any);
+      });
+
+      // ---- API Routes (all go through Hono) ----
+      if (pathname.startsWith("/api/")) {
+        const handled = await routeThroughHono(honoApp, req, res, hostname, port);
+        if (handled) return;
+
+        res.statusCode = 404;
+        res.setHeader("Content-Type", "application/json");
+        res.end(JSON.stringify({ error: "Not Found" }));
+        return;
+      }
+
+      // ---- Production: serve static assets + SPA fallback ----
+      if (clientDistDir) {
+        const staticPath = path.join(clientDistDir, pathname);
+        if (fs.existsSync(staticPath) && fs.statSync(staticPath).isFile()) {
+          serveStaticFile(res, staticPath, pathname);
+          return;
+        }
+        // SPA fallback — serve index.html for all non-API routes
+        const indexHtml = path.join(clientDistDir, "index.html");
+        if (fs.existsSync(indexHtml)) {
+          res.setHeader("Content-Type", "text/html");
+          fs.createReadStream(indexHtml).pipe(res);
+          return;
+        }
+      }
+
+      res.statusCode = 404;
+      res.end("Not Found");
     } catch (err) {
-      logger.error(
-        { url: req.url, error: err },
-        "error occurred handling request",
-      );
+      logger.error({ url: req.url, error: err }, "error occurred handling request");
       res.statusCode = 500;
       res.end("internal server error");
     }
   });
-
-  const upgradeListener =
-    (defaultHandler: (req: any, socket: any, head: Buffer) => any) =>
-    (req: IncomingMessage, socket: Duplex, head: Buffer) => {
-      const parsedUrl = parse(req.url ?? "", true);
-
-      // Pass hot module reloading requests to Next.js
-      if (parsedUrl.pathname === "/_next/webpack-hmr") {
-        void defaultHandler(req, socket, head);
-      } else {
-        socket.destroy();
-      }
-    };
-
-  const initialHandler = upgradeListener(upgradeHandler);
-  server.on("upgrade", initialHandler);
-
-  // Workaround because apparently next.js calls .on("upgrade", ...) internally,
-  // overwriting the initialHandler, we need to re - attach it while keeping hmr working
-  const originalOn = server.on.bind(server);
-  server.on = (event, handler) => {
-    if (event === "upgrade") {
-      server.off("upgrade", initialHandler);
-      return originalOn(event, upgradeListener(handler));
-    }
-    return originalOn(event, handler);
-  };
 
   server.once("error", (err) => {
     logger.error({ error: err }, "error occurred on server");
@@ -181,27 +156,21 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
       {
         hostname,
         port,
-        fullUrl: `http://${
-          hostname === "0.0.0.0" ? "localhost" : hostname
-        }:${port}`,
+        fullUrl: `http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${port}`,
+        mode: dev ? "development (API only — Vite on :5560)" : "production",
       },
-      asciiArt,
+      asciiArt
     );
-
-    // Background workers are started separately via start:workers script
   });
 
-  // Graceful shutdown — close App (ES pipelines + CH + Redis + Prisma)
+  // Graceful shutdown
   const shutdown = async (signal: string) => {
     logger.info({ signal }, "Received signal, shutting down...");
-
-    // Force exit if graceful shutdown hangs (must be set before any awaits)
     const forceExitTimer = setTimeout(() => {
       logger.warn("Graceful shutdown timed out after 5s, forcing exit");
       process.exit(1);
     }, 5_000);
     forceExitTimer.unref();
-
     server.close();
     server.closeAllConnections();
     mcpHandler.closeAllSessions();
@@ -215,25 +184,106 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   process.on("SIGTERM", () => void shutdown("SIGTERM"));
   process.on("SIGINT", () => void shutdown("SIGINT"));
 
-  // Global error handlers for uncaught exceptions and unhandled promise rejections
   process.on("uncaughtException", (err) => {
     logger.fatal({ error: err }, "uncaught exception detected");
-    // shutdown the server gracefully
-    server.close(() => {
-      process.exit(1); // then exit
-    });
-
-    // If a graceful shutdown is not achieved after 1 second,
-    // shut down the process completely
-    setTimeout(() => {
-      process.abort(); // exit immediately and generate a core dump file
-    }, 1000).unref();
+    server.close(() => process.exit(1));
+    setTimeout(() => process.abort(), 1000).unref();
   });
 
   process.on("unhandledRejection", (reason, promise) => {
     logger.fatal(
       { reason: reason instanceof Error ? reason : { value: reason }, promise },
-      "unhandled rejection detected",
+      "unhandled rejection detected"
     );
   });
 };
+
+async function routeThroughHono(
+  honoApp: Hono,
+  req: IncomingMessage,
+  res: ServerResponse,
+  hostname: string,
+  port: number
+): Promise<boolean> {
+  const body =
+    req.method !== "GET" && req.method !== "HEAD"
+      ? await readBody(req)
+      : undefined;
+
+  const headers = new Headers();
+  for (const [key, value] of Object.entries(req.headers)) {
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      for (const v of value) headers.append(key, v);
+    } else {
+      headers.set(key, value);
+    }
+  }
+
+  const honoReq = new Request(`http://${hostname}:${port}${req.url}`, {
+    method: req.method,
+    headers,
+    body: body as BodyInit | undefined,
+    // @ts-ignore - duplex needed for streaming bodies
+    duplex: "half",
+  });
+
+  const honoRes = await honoApp.fetch(honoReq);
+
+  if (honoRes.status === 404) {
+    const text = await honoRes.text();
+    if (text === "404 Not Found") return false;
+    res.statusCode = 404;
+    honoRes.headers.forEach((v, k) => res.setHeader(k, v));
+    res.end(text);
+    return true;
+  }
+
+  res.statusCode = honoRes.status;
+  honoRes.headers.forEach((v, k) => res.setHeader(k, v));
+
+  if (honoRes.body) {
+    const reader = honoRes.body.getReader();
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      res.write(value);
+    }
+    res.end();
+  } else {
+    res.end(await honoRes.text());
+  }
+  return true;
+}
+
+function serveStaticFile(res: ServerResponse, filePath: string, pathname: string) {
+  const ext = path.extname(filePath);
+  const mimeTypes: Record<string, string> = {
+    ".js": "application/javascript",
+    ".mjs": "application/javascript",
+    ".css": "text/css",
+    ".html": "text/html",
+    ".json": "application/json",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".svg": "image/svg+xml",
+    ".ico": "image/x-icon",
+    ".woff": "font/woff",
+    ".woff2": "font/woff2",
+    ".wasm": "application/wasm",
+  };
+  res.setHeader("Content-Type", mimeTypes[ext] ?? "application/octet-stream");
+  if (pathname.startsWith("/assets/")) {
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+  }
+  fs.createReadStream(filePath).pipe(res);
+}
+
+function readBody(req: IncomingMessage): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    req.on("data", (chunk: Buffer) => chunks.push(chunk));
+    req.on("end", () => resolve(new Uint8Array(Buffer.concat(chunks))));
+    req.on("error", reject);
+  });
+}

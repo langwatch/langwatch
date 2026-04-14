@@ -1,7 +1,7 @@
 import { Box, Card as ChakraCard } from "@chakra-ui/react";
 import type { Edge, Node } from "@xyflow/react";
-import dynamic from "next/dynamic";
-import { useRouter } from "next/router";
+import dynamic from "~/utils/compat/next-dynamic";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useState } from "react";
 import { FullLogo } from "../../../components/icons/FullLogo";
 import { LoadingScreen } from "../../../components/LoadingScreen";

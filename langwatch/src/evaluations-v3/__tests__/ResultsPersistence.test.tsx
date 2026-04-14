@@ -16,7 +16,7 @@ import { createInitialResults, createInitialState } from "../types";
 import { extractPersistedState } from "../types/persistence";
 
 // Mock router
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { slug: "test-evaluation" },
     replace: vi.fn(),

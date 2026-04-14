@@ -23,7 +23,7 @@ import {
 } from "../hooks/useEvaluationsV3Store";
 
 // Mock next/router
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: {},
     push: vi.fn(),

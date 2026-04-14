@@ -3,7 +3,7 @@ import type { Annotation, User } from "@prisma/client";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import Parse from "papaparse";
 import { Download } from "react-feather";
 import AnnotationsLayout from "~/components/AnnotationsLayout";

@@ -1,7 +1,7 @@
 import { Alert, Box } from "@chakra-ui/react";
 import { ExperimentType } from "@prisma/client";
 
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { BatchEvaluationResults } from "../../../components/batch-evaluation-results";
 import { DashboardLayout } from "../../../components/DashboardLayout";
 import BatchEvaluation from "../../../components/experiments/BatchEvaluation";
