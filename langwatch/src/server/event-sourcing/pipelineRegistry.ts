@@ -645,3 +645,162 @@ export function buildFoldProjections(
 }
 
 export type AppCommands = ReturnType<PipelineRegistry["registerAll"]>;
+
+export interface ProjectionMetadata {
+  projectionName: string;
+  pipelineName: string;
+  aggregateType: string;
+  source: "pipeline" | "global";
+  pauseKey: string;
+  targetTable?: string;
+}
+
+const PROJECTION_METADATA: ProjectionMetadata[] = [
+  {
+    projectionName: "traceSummary",
+    pipelineName: "trace_processing",
+    aggregateType: "trace",
+    source: "pipeline",
+    pauseKey: "trace_processing/projection/traceSummary",
+    targetTable: "trace_summaries",
+  },
+  {
+    projectionName: "evaluationRun",
+    pipelineName: "evaluation_processing",
+    aggregateType: "evaluation",
+    source: "pipeline",
+    pauseKey: "evaluation_processing/projection/evaluationRun",
+    targetTable: "evaluation_runs",
+  },
+  {
+    projectionName: "experimentRunState",
+    pipelineName: "experiment_run_processing",
+    aggregateType: "experiment_run",
+    source: "pipeline",
+    pauseKey: "experiment_run_processing/projection/experimentRunState",
+    targetTable: "experiment_runs",
+  },
+  {
+    projectionName: "simulationRunState",
+    pipelineName: "simulation_processing",
+    aggregateType: "simulation_run",
+    source: "pipeline",
+    pauseKey: "simulation_processing/projection/simulationRunState",
+    targetTable: "simulation_runs",
+  },
+  {
+    projectionName: "suiteRunState",
+    pipelineName: "suite_run_processing",
+    aggregateType: "suite_run",
+    source: "pipeline",
+    pauseKey: "suite_run_processing/projection/suiteRunState",
+    targetTable: "suite_runs",
+  },
+  {
+    projectionName: projectDailySdkUsageProjection.name,
+    pipelineName: "global_projections",
+    aggregateType: "global",
+    source: "global",
+    pauseKey: `global_projections/projection/${projectDailySdkUsageProjection.name}`,
+  },
+];
+
+export function getProjectionMetadata(): ProjectionMetadata[] {
+  return PROJECTION_METADATA;
+}
+
+export interface ReactorMetadata {
+  reactorName: string;
+  pipelineName: string;
+  aggregateType: string;
+  afterProjection: string;
+}
+
+const REACTOR_METADATA: ReactorMetadata[] = [
+  // trace_processing reactors (after traceSummary fold)
+  { reactorName: "originGate", pipelineName: "trace_processing", aggregateType: "trace", afterProjection: "traceSummary" },
+  { reactorName: "evaluationTrigger", pipelineName: "trace_processing", aggregateType: "trace", afterProjection: "traceSummary" },
+  { reactorName: "customEvaluationSync", pipelineName: "trace_processing", aggregateType: "trace", afterProjection: "traceSummary" },
+  { reactorName: "traceUpdateBroadcast", pipelineName: "trace_processing", aggregateType: "trace", afterProjection: "traceSummary" },
+  { reactorName: "projectMetadata", pipelineName: "trace_processing", aggregateType: "trace", afterProjection: "traceSummary" },
+  { reactorName: "simulationMetricsSync", pipelineName: "trace_processing", aggregateType: "trace", afterProjection: "traceSummary" },
+  { reactorName: "spanStorageBroadcast", pipelineName: "trace_processing", aggregateType: "trace", afterProjection: "spanStorage" },
+  // evaluation_processing reactors
+  { reactorName: "evaluationEsSync", pipelineName: "evaluation_processing", aggregateType: "evaluation", afterProjection: "evaluationRun" },
+  // experiment_run_processing reactors
+  { reactorName: "experimentRunEsSync", pipelineName: "experiment_run_processing", aggregateType: "experiment_run", afterProjection: "experimentRunState" },
+  // simulation_processing reactors
+  { reactorName: "snapshotUpdateBroadcast", pipelineName: "simulation_processing", aggregateType: "simulation_run", afterProjection: "simulationRunState" },
+  { reactorName: "cancellationBroadcast", pipelineName: "simulation_processing", aggregateType: "simulation_run", afterProjection: "simulationRunState" },
+  { reactorName: "suiteRunSync", pipelineName: "simulation_processing", aggregateType: "simulation_run", afterProjection: "simulationRunState" },
+  { reactorName: "traceMetricsSync", pipelineName: "simulation_processing", aggregateType: "simulation_run", afterProjection: "simulationRunState" },
+  { reactorName: "scenarioExecution", pipelineName: "simulation_processing", aggregateType: "simulation_run", afterProjection: "simulationRunState" },
+];
+
+export function getReactorMetadata(): ReactorMetadata[] {
+  return REACTOR_METADATA;
+}
+
+const noOpStore: FoldProjectionStore<any> = {
+  store: async () => {},
+  storeBatch: async () => {},
+  get: async () => null,
+};
+
+export interface DejaViewProjection {
+  projectionName: string;
+  eventTypes: readonly string[];
+  init: () => unknown;
+  apply: (state: unknown, event: { type: string }) => unknown;
+}
+
+let dejaViewProjectionsCache: DejaViewProjection[] | null = null;
+
+export function getDejaViewProjections(): DejaViewProjection[] {
+  if (dejaViewProjectionsCache) return dejaViewProjectionsCache;
+
+  const projections: DejaViewProjection[] = [];
+
+  const traceSummary = new TraceSummaryFoldProjection({ store: noOpStore as any });
+  projections.push({
+    projectionName: traceSummary.name,
+    eventTypes: traceSummary.eventTypes,
+    init: () => traceSummary.init(),
+    apply: (state, event) => traceSummary.apply(state as any, event),
+  });
+
+  const evalRun = new EvaluationRunFoldProjection({ store: noOpStore as any });
+  projections.push({
+    projectionName: evalRun.name,
+    eventTypes: evalRun.eventTypes,
+    init: () => evalRun.init(),
+    apply: (state, event) => evalRun.apply(state as any, event),
+  });
+
+  const expRun = new ExperimentRunStateFoldProjection({ store: noOpStore as any });
+  projections.push({
+    projectionName: expRun.name,
+    eventTypes: expRun.eventTypes,
+    init: () => expRun.init(),
+    apply: (state, event) => expRun.apply(state as any, event),
+  });
+
+  const simRun = new SimulationRunStateFoldProjection({ store: noOpStore as any });
+  projections.push({
+    projectionName: simRun.name,
+    eventTypes: simRun.eventTypes,
+    init: () => simRun.init(),
+    apply: (state, event) => simRun.apply(state as any, event),
+  });
+
+  const suiteRun = new SuiteRunStateFoldProjection({ store: noOpStore as any });
+  projections.push({
+    projectionName: suiteRun.name,
+    eventTypes: suiteRun.eventTypes,
+    init: () => suiteRun.init(),
+    apply: (state, event) => suiteRun.apply(state as any, event),
+  });
+
+  dejaViewProjectionsCache = projections;
+  return projections;
+}
