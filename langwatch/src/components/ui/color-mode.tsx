@@ -142,7 +142,7 @@ export function ColorModeProvider(props: ColorModeProviderProps) {
   // Chakra v3 uses ".dark &" selector for dark mode, so we need attribute="class"
   return (
     <>
-      <style jsx global>{`
+      <style>{`
         html {
           transition: background-color 0.3s ease, color 0.3s ease;
         }

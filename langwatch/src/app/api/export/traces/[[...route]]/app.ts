@@ -11,7 +11,7 @@
 
 import { zValidator } from "@hono/zod-validator";
 import { Hono } from "hono";
-import type { NextRequest } from "next/server";
+import type { NextRequest } from "~/types/next-stubs";
 import crypto from "crypto";
 
 import { handleError } from "../../../middleware/error-handler";

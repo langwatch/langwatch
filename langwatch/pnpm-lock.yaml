@@ -395,9 +395,6 @@ importers:
       nanoid:
         specifier: ^5.1.6
         version: 5.1.6
-      next:
-        specifier: ^15.5.10
-        version: 15.5.10(@babel/core@7.29.0)(@opentelemetry/api@1.9.0)(@playwright/test@1.58.0)(babel-plugin-macros@3.1.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(sass@1.97.3)
       next-themes:
         specifier: ^0.4.4
         version: 0.4.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -8341,9 +8338,6 @@ packages:
   camelcase@6.3.0:
     resolution: {integrity: sha512-Gmy6FhYlCY7uOElZUSbxo2UCDH8owEk996gkbrpsgGtrJLM3J7jGxl9Ic7Qwwj4ivOE5AWZWRMecDdF7hqGjFA==}
     engines: {node: '>=10'}
-
-  caniuse-lite@1.0.30001769:
-    resolution: {integrity: sha512-BCfFL1sHijQlBGWBMuJyhZUhzo7wer5sVj9hqekB/7xn0Ypy+pER/edCYQm4exbXj4WiySGp40P8UuTh6w1srg==}
 
   caniuse-lite@1.0.30001777:
     resolution: {integrity: sha512-tmN+fJxroPndC74efCdp12j+0rk0RHwV5Jwa1zWaFVyw2ZxAuPeG8ZgWC3Wz7uSjT3qMRQ5XHZ4COgQmsCMJAQ==}
@@ -18753,7 +18747,8 @@ snapshots:
       '@tybys/wasm-util': 0.10.1
     optional: true
 
-  '@next/env@15.5.10': {}
+  '@next/env@15.5.10':
+    optional: true
 
   '@next/swc-darwin-arm64@15.5.7':
     optional: true
@@ -22097,6 +22092,7 @@ snapshots:
   '@swc/helpers@0.5.15':
     dependencies:
       tslib: 2.8.1
+    optional: true
 
   '@swc/helpers@0.5.18':
     dependencies:
@@ -24282,8 +24278,6 @@ snapshots:
 
   camelcase@6.3.0: {}
 
-  caniuse-lite@1.0.30001769: {}
-
   caniuse-lite@1.0.30001777: {}
 
   cardinal@2.1.1:
@@ -24420,7 +24414,8 @@ snapshots:
 
   cli-width@3.0.0: {}
 
-  client-only@0.0.1: {}
+  client-only@0.0.1:
+    optional: true
 
   cliui@8.0.1:
     dependencies:
@@ -28417,7 +28412,7 @@ snapshots:
     dependencies:
       '@next/env': 15.5.10
       '@swc/helpers': 0.5.15
-      caniuse-lite: 1.0.30001769
+      caniuse-lite: 1.0.30001777
       postcss: 8.4.31
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
@@ -28439,6 +28434,7 @@ snapshots:
     transitivePeerDependencies:
       - '@babel/core'
       - babel-plugin-macros
+    optional: true
 
   nice-grpc-client-middleware-retry@3.1.13:
     dependencies:
@@ -28963,6 +28959,7 @@ snapshots:
       nanoid: 3.3.11
       picocolors: 1.1.1
       source-map-js: 1.2.1
+    optional: true
 
   postcss@8.5.6:
     dependencies:
@@ -30352,6 +30349,7 @@ snapshots:
     optionalDependencies:
       '@babel/core': 7.29.0
       babel-plugin-macros: 3.1.0
+    optional: true
 
   stylis@4.2.0: {}
 
