@@ -6,6 +6,11 @@ import { prisma as defaultPrisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
 import { getVersionMap } from "./getVersionMap";
 
+import {
+  computeOccurredAtRangeForRuns,
+  OCCURRED_AT_BUFFER_MS,
+  WARN_OLD_RUN_AGE_MS,
+} from "./clickhouse-experiment-run.queries";
 import type {
   ClickHouseCostSummaryRow,
   ClickHouseEvaluatorBreakdownRow,
@@ -17,61 +22,6 @@ import {
   mapClickHouseRunToExperimentRun,
 } from "./mappers";
 import type { ExperimentRun, ExperimentRunWithItems } from "./types";
-
-/**
- * Format a Date as a ClickHouse DateTime64(3) string (no timezone).
- * ClickHouse parses this in the table's column timezone (UTC by default).
- */
-function formatClickHouseDateTime(d: Date): string {
-  return d.toISOString().replace("T", " ").replace("Z", "");
-}
-
-/**
- * Parse a ClickHouse DateTime64(3) string (e.g. "2024-01-15 10:30:00.000")
- * into a JS Date. ClickHouse returns these as space-separated strings without
- * a timezone suffix; treat them as UTC.
- */
-function parseClickHouseDateTime(s: string): Date {
-  return new Date(s.replace(" ", "T") + "Z");
-}
-
-/**
- * Buffer applied to OccurredAt range filters, in milliseconds. Items can
- * legitimately land slightly before the run's CreatedAt (clock skew between
- * ClickHouse nodes / SDK clients) and slightly after FinishedAt (late writes
- * from background workers). One hour is generous and still prunes the vast
- * majority of historical partitions (which are weekly).
- */
-const OCCURRED_AT_BUFFER_MS = 60 * 60 * 1000;
-
-/**
- * Derive a tight OccurredAt range for `experiment_run_items` queries from the
- * runs being queried. Items can't be older than the earliest run's CreatedAt
- * or newer than the latest run's UpdatedAt (modulo clock skew / late writes,
- * absorbed by `OCCURRED_AT_BUFFER_MS`). This bound lets ClickHouse prune the
- * weekly partitions that don't overlap the run window.
- *
- * Returns ClickHouse-formatted DateTime64(3) strings ready to pass as query
- * parameters.
- */
-function computeOccurredAtRangeForRuns(
-  runs: Pick<ClickHouseExperimentRunRow, "CreatedAt" | "UpdatedAt">[],
-): { minOccurredAt: string; maxOccurredAt: string } {
-  let minMs = Infinity;
-  let maxMs = -Infinity;
-  for (const r of runs) {
-    minMs = Math.min(minMs, parseClickHouseDateTime(r.CreatedAt).getTime());
-    maxMs = Math.max(maxMs, parseClickHouseDateTime(r.UpdatedAt).getTime());
-  }
-  return {
-    minOccurredAt: formatClickHouseDateTime(
-      new Date(minMs - OCCURRED_AT_BUFFER_MS),
-    ),
-    maxOccurredAt: formatClickHouseDateTime(
-      new Date(maxMs + OCCURRED_AT_BUFFER_MS),
-    ),
-  };
-}
 
 /**
  * ClickHouse backend for experiment run queries.
@@ -98,6 +48,36 @@ export class ClickHouseExperimentRunService {
     prisma: PrismaClient = defaultPrisma,
   ): ClickHouseExperimentRunService {
     return new ClickHouseExperimentRunService(prisma);
+  }
+
+  /**
+   * Emit a warning when the oldest run being queried is older than
+   * `WARN_OLD_RUN_AGE_MS`. Pairs with `OCCURRED_AT_BUFFER_MS`: if old-run
+   * warnings start showing up alongside reports of missing breakdown / cost
+   * rows, the buffer is too tight for the SDK client clock drift in that
+   * environment and should be widened.
+   */
+  private warnIfRunsAreOld({
+    projectId,
+    minMs,
+    runCount,
+  }: {
+    projectId: string;
+    minMs: number;
+    runCount: number;
+  }): void {
+    const ageMs = Date.now() - minMs;
+    if (ageMs > WARN_OLD_RUN_AGE_MS) {
+      this.logger.warn(
+        {
+          projectId,
+          oldestRunAgeDays: Math.floor(ageMs / (24 * 60 * 60 * 1000)),
+          runCount,
+          occurredAtBufferHours: OCCURRED_AT_BUFFER_MS / (60 * 60 * 1000),
+        },
+        "Querying experiment runs with very old CreatedAt; if users report missing items, OCCURRED_AT_BUFFER_MS may need to widen",
+      );
+    }
   }
 
   /**
@@ -186,6 +166,11 @@ export class ClickHouseExperimentRunService {
             (r) => new TupleParam([r.ExperimentId, r.RunId]),
           );
           const occurredAtRange = computeOccurredAtRangeForRuns(runRows);
+          this.warnIfRunsAreOld({
+            projectId,
+            minMs: occurredAtRange.minMs,
+            runCount: runRows.length,
+          });
 
           // Fetch per-evaluator breakdown for all runs.
           //
@@ -436,6 +421,11 @@ export class ClickHouseExperimentRunService {
           // `toYearWeek(OccurredAt)`, so without this bound a query against an
           // older run would scan every partition since the table was created.
           const occurredAtRange = computeOccurredAtRangeForRuns([runRecord]);
+          this.warnIfRunsAreOld({
+            projectId,
+            minMs: occurredAtRange.minMs,
+            runCount: 1,
+          });
 
           // Fetch all items for this run.
           //
