@@ -7,7 +7,7 @@ set -e
 COMPILER="npx tsx skills/_compiler/compile.ts"
 OUT_DIR="skills/_compiled"
 
-SKILLS="tracing evaluations scenarios prompts analytics level-up"
+SKILLS="tracing evaluations scenarios prompts analytics level-up cli"
 
 for skill in $SKILLS; do
   echo "Compiling $skill..."
