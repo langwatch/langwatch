@@ -1,4 +1,4 @@
-import { Box, HStack, Text } from "@chakra-ui/react";
+import { HStack, Text, chakra } from "@chakra-ui/react";
 import React from "react";
 
 interface ImpersonationBannerProps {
@@ -31,12 +31,11 @@ export const ImpersonationBanner = ({ user }: ImpersonationBannerProps) => {
       flexShrink={0}
     >
       <Text fontSize="12px" lineClamp={1}>
-        Impersonating {user.name ?? user.email}
+        Impersonating {user.name ?? user.email ?? "unknown user"}
       </Text>
-      <Box
-        as="a"
+      <chakra.a
         href="#"
-        onClick={async (e: React.MouseEvent) => {
+        onClick={async (e: React.MouseEvent<HTMLAnchorElement>) => {
           e.preventDefault();
           const response = await fetch("/api/admin/impersonate", {
             method: "DELETE",
@@ -56,7 +55,7 @@ export const ImpersonationBanner = ({ user }: ImpersonationBannerProps) => {
         _hover={{ background: "whiteAlpha.400" }}
       >
         Stop
-      </Box>
+      </chakra.a>
     </HStack>
   );
 };
