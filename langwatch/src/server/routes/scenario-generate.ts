@@ -16,7 +16,7 @@ import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { createLogger } from "~/utils/logger/server";
-import type { NextRequest } from "next/server";
+import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:api:scenario:generate");
 
@@ -81,7 +81,7 @@ app.use(tracerMiddleware({ name: "scenario-generate" }));
 app.use(loggerMiddleware());
 
 app.post("/generate", async (c) => {
-  const session = await getServerAuthSession({ req: c.req.raw as NextRequest });
+  const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {
     return c.json(
       { error: "You must be logged in to access this endpoint." },

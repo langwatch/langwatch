@@ -9,7 +9,6 @@
  * requests where procedure names are comma-separated in the path.
  */
 
-import type { NextApiRequest } from "next";
 import type { FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import { Hono } from "hono";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
@@ -38,7 +37,7 @@ export const app = new Hono().basePath("/api");
  * just enough surface area for those consumers to work without pulling in
  * a real Node IncomingMessage.
  */
-function buildReqShim(req: Request): NextApiRequest {
+function buildReqShim(req: Request): any {
   const url = new URL(req.url);
 
   // Convert web Headers to the Node-style { [key]: string | string[] } map
@@ -60,7 +59,7 @@ function buildReqShim(req: Request): NextApiRequest {
     url: url.pathname + url.search,
     query: Object.fromEntries(url.searchParams),
     socket: { remoteAddress: undefined },
-  } as unknown as NextApiRequest;
+  } as any;
 }
 
 /**

@@ -46,7 +46,7 @@ import { fireExperimentRanNurturing } from "../../../ee/billing/nurturing/hooks/
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
-import type { NextRequest } from "next/server";
+import type { NextRequestShim as any } from "./types";
 
 const logger = createLogger("langwatch:evaluations-v3");
 
@@ -121,7 +121,7 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
     "Starting evaluation execution",
   );
 
-  const session = await getServerAuthSession({ req: c.req.raw as NextRequest });
+  const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {
     return c.json(
       { error: "You must be logged in to access this endpoint." },
@@ -252,7 +252,7 @@ app.post("/abort", async (c) => {
     );
   }
 
-  const session = await getServerAuthSession({ req: c.req.raw as NextRequest });
+  const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {
     return c.json(
       { error: "You must be logged in to access this endpoint." },

@@ -19,7 +19,7 @@ import {
 } from "~/server/api/routers/modelProviders.utils";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import type { NextRequest } from "next/server";
+import type { NextRequestShim as any } from "./types";
 
 const errorCache: Record<string, any> = {};
 
@@ -28,7 +28,7 @@ app.use(tracerMiddleware({ name: "playground" }));
 app.use(loggerMiddleware());
 
 app.post("/playground", async (c) => {
-  const session = await getServerAuthSession({ req: c.req.raw as NextRequest });
+  const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {
     return c.json(
       { error: "You must be logged in to access this endpoint." },
