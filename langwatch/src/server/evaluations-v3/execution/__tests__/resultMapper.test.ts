@@ -91,31 +91,32 @@ describe("resultMapper", () => {
 
     describe("when outputs are evaluator-as-target (regression: sticky details)", () => {
       it("excludes details when it is null", () => {
-        const result = extractTargetOutput({
-          passed: true,
-          score: 0.9,
-          details: null,
-        });
+        const result = extractTargetOutput(
+          { passed: true, score: 0.9, details: null },
+          { isEvaluatorAsTarget: true },
+        );
         expect(result).toEqual({ passed: true, score: 0.9 });
         expect(result).not.toHaveProperty("details");
       });
 
       it("excludes details when it is undefined", () => {
-        const result = extractTargetOutput({
-          passed: true,
-          score: 0.9,
-          details: undefined,
-        });
+        const result = extractTargetOutput(
+          { passed: true, score: 0.9, details: undefined },
+          { isEvaluatorAsTarget: true },
+        );
         expect(result).toEqual({ passed: true, score: 0.9 });
         expect(result).not.toHaveProperty("details");
       });
 
       it("includes details when it is a non-empty string", () => {
-        const result = extractTargetOutput({
-          passed: true,
-          score: 0.9,
-          details: "The output matched expectations",
-        });
+        const result = extractTargetOutput(
+          {
+            passed: true,
+            score: 0.9,
+            details: "The output matched expectations",
+          },
+          { isEvaluatorAsTarget: true },
+        );
         expect(result).toEqual({
           passed: true,
           score: 0.9,
@@ -124,18 +125,40 @@ describe("resultMapper", () => {
       });
 
       it("passes through all non-null output fields dynamically", () => {
-        const result = extractTargetOutput({
-          passed: false,
-          score: 0.3,
-          label: "negative",
-          custom_field: "extra data",
-        });
+        const result = extractTargetOutput(
+          {
+            passed: false,
+            score: 0.3,
+            label: "negative",
+            custom_field: "extra data",
+          },
+          { isEvaluatorAsTarget: true },
+        );
         expect(result).toEqual({
           passed: false,
           score: 0.3,
           label: "negative",
           custom_field: "extra data",
         });
+      });
+
+      it("detects evaluator with only custom output fields (no passed/score/label)", () => {
+        const result = extractTargetOutput(
+          { custom_metric: 0.8, reasoning: "good quality" },
+          { isEvaluatorAsTarget: true },
+        );
+        expect(result).toEqual({
+          custom_metric: 0.8,
+          reasoning: "good quality",
+        });
+      });
+
+      it("returns undefined when all values are null/undefined", () => {
+        const result = extractTargetOutput(
+          { details: null, custom_field: undefined },
+          { isEvaluatorAsTarget: true },
+        );
+        expect(result).toBeUndefined();
       });
     });
   });

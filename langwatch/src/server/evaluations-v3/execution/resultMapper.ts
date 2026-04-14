@@ -23,6 +23,11 @@ export type ResultMapperConfig = {
    * and doesn't provide meaningful information beyond the pass/fail status.
    */
   stripScoreEvaluatorIds?: Set<string>;
+  /**
+   * Set of target node IDs that are evaluator-as-target.
+   * Used to detect evaluator outputs without relying on a heuristic.
+   */
+  evaluatorTargetNodeIds?: Set<string>;
 };
 
 /**
@@ -80,20 +85,12 @@ export const coercePassed = (value: unknown): boolean | undefined => {
 };
 
 /**
- * Checks if outputs are from an evaluator (has passed/score/label fields).
- */
-const isEvaluatorOutput = (
-  outputs: Record<string, unknown>,
-): boolean => {
-  return "passed" in outputs || "score" in outputs || "label" in outputs;
-};
-
-/**
  * Extracts target output from execution outputs.
  *
- * Strategy (OCP-compliant - handles new output formats without modification):
- * 1. If outputs look like evaluator output (has passed/score/label) -> return as-is
- *    This handles evaluator-as-target where the evaluator outputs become target output
+ * Strategy:
+ * 1. If isEvaluatorAsTarget -> filter null/undefined values, return undefined if empty
+ *    This handles evaluator-as-target where the evaluator outputs become target output.
+ *    Uses an explicit marker instead of a heuristic so custom-only evaluators are detected.
  * 2. If outputs has exactly one key named "output" -> return its value (backward compatible)
  * 3. Otherwise -> return full outputs object (preserves structure for custom fields)
  *
@@ -102,20 +99,21 @@ const isEvaluatorOutput = (
  */
 export const extractTargetOutput = (
   outputs: Record<string, unknown> | undefined,
+  options?: { isEvaluatorAsTarget?: boolean },
 ): unknown => {
   if (!outputs) return undefined;
 
   // Evaluator-as-target: return all non-null/undefined output fields dynamically.
   // This avoids hardcoding specific field names (like `details`) which can cause
   // "sticky" fields that persist even after removal from the End node.
-  if (isEvaluatorOutput(outputs)) {
+  if (options?.isEvaluatorAsTarget) {
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(outputs)) {
       if (value !== undefined && value !== null) {
         result[key] = value;
       }
     }
-    return result;
+    return Object.keys(result).length > 0 ? result : undefined;
   }
 
   // Empty outputs
@@ -148,6 +146,7 @@ export const mapTargetResult = (
     trace_id?: string;
     error?: string;
   },
+  options?: { isEvaluatorAsTarget?: boolean },
 ): EvaluationV3Event => {
   const { targetId } = parseNodeId(nodeId);
 
@@ -163,7 +162,9 @@ export const mapTargetResult = (
     type: "target_result",
     rowIndex,
     targetId,
-    output: extractTargetOutput(executionState.outputs),
+    output: extractTargetOutput(executionState.outputs, {
+      isEvaluatorAsTarget: options?.isEvaluatorAsTarget,
+    }),
     cost: executionState.cost,
     duration,
     traceId: executionState.trace_id,
@@ -293,13 +294,20 @@ export const mapNlpEvent = (
   // Determine if this is a target or evaluator node
   if (targetNodes.has(component_id)) {
     // Target node
-    return mapTargetResult(component_id, rowIndex, {
-      outputs: execution_state.outputs,
-      cost: execution_state.cost,
-      timestamps: execution_state.timestamps,
-      trace_id: execution_state.trace_id,
-      error: isError ? execution_state.error : undefined,
-    });
+    const isEvaluatorAsTarget =
+      config?.evaluatorTargetNodeIds?.has(component_id) ?? false;
+    return mapTargetResult(
+      component_id,
+      rowIndex,
+      {
+        outputs: execution_state.outputs,
+        cost: execution_state.cost,
+        timestamps: execution_state.timestamps,
+        trace_id: execution_state.trace_id,
+        error: isError ? execution_state.error : undefined,
+      },
+      { isEvaluatorAsTarget },
+    );
   } else if (isEvaluatorNode(component_id)) {
     // Evaluator node - check if score should be stripped
     const { evaluatorId } = parseNodeId(component_id);
