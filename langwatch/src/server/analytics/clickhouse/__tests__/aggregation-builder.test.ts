@@ -237,6 +237,39 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("uniqExact(trace_id)");
     });
 
+    // Verify that page-level filters are applied inside the arrayJoin CTE
+    // when combined with pipeline metrics and groupBy labels.
+    it("applies label filters in arrayJoin groupBy path with pipeline metrics", () => {
+      const input = {
+        ...baseInput,
+        groupBy: "metadata.labels" as const,
+        filters: {
+          "metadata.labels": ["populator", "conversation"],
+        },
+        series: [
+          {
+            metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "trace_id" as const, aggregation: "sum" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must route through arrayJoin CTE path
+      expect(result.sql).toContain("deduped_traces");
+
+      // Filter must be in the CTE WHERE clause
+      expect(result.sql).toContain("hasAny");
+      expect(result.sql).toContain("langwatch.labels");
+
+      // Filter params must be present
+      const paramKeys = Object.keys(result.params);
+      const labelsParam = paramKeys.find((k) => k.startsWith("labels"));
+      expect(labelsParam).toBeDefined();
+      expect(result.params[labelsParam!]).toEqual(["populator", "conversation"]);
+    });
+
     it("does not JOIN stored_spans when metadata.span_type uses cardinality alongside trace-level metrics", () => {
       const input = {
         ...baseInput,

@@ -125,13 +125,12 @@ export const useFilterParams = () => {
   // for shallow navigation, so the push silently does nothing.
   //
   // The (url, as) overload avoids this:
-  //   url  = { pathname, query: { ...router.query, ...parsed } }  →  tells Next.js "same page" with updated params
-  //   as   = currentPath + "?" + newQs                            →  what the browser shows
+  //   url  = { pathname, query: { ...router.query, ...parsed } }
+  //   as   = currentPath + "?" + newQs
   //
-  // IMPORTANT: the url's query MUST include the new params so Next.js detects
-  // a change and re-renders components that use useRouter(). If only the `as`
-  // URL changes, React.memo'd components (like CustomGraph_) won't re-render
-  // because the router context stays the same.
+  // The url's query MUST include the new params so Next.js detects a route
+  // change and updates the router context. Without this, React.memo'd
+  // components using useRouter() won't re-render when filters change.
   const shallowPush = (newQs: string) => {
     const currentPath = router.asPath.split("?")[0] ?? router.asPath;
     const parsed = qs.parse(newQs, {
