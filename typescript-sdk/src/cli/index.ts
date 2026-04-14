@@ -708,6 +708,17 @@ scenarioCmd
   });
 
 scenarioCmd
+  .command("run <id>")
+  .description("Run a scenario against a target (agent or prompt)")
+  .requiredOption("--target <target>", "Target to run against, as <type>:<referenceId> (e.g., http:agent_abc123)")
+  .option("--wait", "Wait for the scenario run to complete")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { target: string; wait?: boolean; format?: string }) => {
+    const { runScenarioCommand: impl } = await import("./commands/scenarios/run.js");
+    await impl(id, options);
+  });
+
+scenarioCmd
   .command("delete <id>")
   .description("Archive (soft-delete) a scenario")
   .action(async (id: string) => {

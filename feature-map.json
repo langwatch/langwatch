@@ -200,7 +200,7 @@
                 "python": "langwatch-scenario",
                 "typescript": "@langwatch/scenario"
               },
-              "cli": ["scenario list", "scenario get", "scenario create", "scenario update", "scenario delete"],
+              "cli": ["scenario list", "scenario get", "scenario create", "scenario update", "scenario run", "scenario delete"],
               "skill": "scenarios",
               "docs": "https://langwatch.ai/scenario/introduction/getting-started.md"
             },
