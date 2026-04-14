@@ -22,18 +22,10 @@ import {
   DrawerTitle,
 } from "~/components/ui/drawer";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
+import { useReplayStatus } from "~/hooks/useReplayStatus";
 import { api } from "~/utils/api";
+import { formatDuration } from "~/components/ops/shared/formatters";
 import { PhaseTimeline, PHASE_ICONS, PHASE_LABELS } from "~/components/ops/shared/PhaseTimeline";
-
-function formatElapsed(startedAt: string | null): string {
-  if (!startedAt) return "—";
-  const ms = Date.now() - new Date(startedAt).getTime();
-  if (ms < 1000) return "< 1s";
-  if (ms < 60000) return `${Math.floor(ms / 1000)}s`;
-  const mins = Math.floor(ms / 60000);
-  const secs = Math.floor((ms % 60000) / 1000);
-  return `${mins}m ${secs}s`;
-}
 
 export function ReplayProgressDrawer({
   open,
@@ -43,9 +35,9 @@ export function ReplayProgressDrawer({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const { scope } = useOpsPermission();
+  const { canManage } = useOpsPermission();
 
-  const statusQuery = api.ops.getReplayStatus.useQuery(undefined, {
+  const statusQuery = useReplayStatus({
     refetchInterval: open ? 1000 : false,
   });
 
@@ -54,8 +46,6 @@ export function ReplayProgressDrawer({
   });
 
   const status = statusQuery.data;
-  const canManage =
-    scope?.kind === "platform" || scope?.kind === "organization";
   const isRunning = status?.state === "running";
 
   const stateColor =
@@ -184,7 +174,7 @@ export function ReplayProgressDrawer({
                 <Stat.Root>
                   <Stat.Label>Elapsed</Stat.Label>
                   <Stat.ValueText textStyle="lg">
-                    {formatElapsed(status.startedAt)}
+                    {status.startedAt ? formatDuration(status.startedAt) : "—"}
                   </Stat.ValueText>
                 </Stat.Root>
               </HStack>

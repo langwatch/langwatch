@@ -14,8 +14,7 @@ import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
 
 export function BlockedCard({ queueNames }: { queueNames: string[] }) {
-  const { scope } = useOpsPermission();
-  const canManage = scope?.kind === "platform" || scope?.kind === "organization";
+  const { canManage } = useOpsPermission();
   const utils = api.useContext();
 
   const blockedQuery = api.ops.getBlockedSummary.useQuery();

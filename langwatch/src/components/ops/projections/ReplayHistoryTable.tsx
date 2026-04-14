@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import { api } from "~/utils/api";
 import { formatDuration } from "~/components/ops/shared/formatters";
 import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
+import type { ReplayHistoryEntry } from "~/server/app-layer/ops/repositories/replay.repository";
 
 export function ReplayHistoryTable() {
   const router = useRouter();
@@ -37,7 +38,7 @@ export function ReplayHistoryTable() {
               </Table.Row>
             </Table.Header>
             <Table.Body>
-              {history.map((run: any) => {
+              {history.map((run: ReplayHistoryEntry) => {
                 const stateColor = replayStateColor(run.state);
 
                 return (

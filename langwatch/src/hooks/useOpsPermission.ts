@@ -7,9 +7,14 @@ export function useOpsPermission() {
     refetchOnWindowFocus: false,
   });
 
+  const scope = (query.data?.scope as OpsScope) ?? null;
+  const canManage =
+    scope?.kind === "platform" || scope?.kind === "organization";
+
   return {
     hasAccess: query.isSuccess,
-    scope: (query.data?.scope as OpsScope) ?? null,
+    scope,
+    canManage,
     isLoading: query.isLoading,
   };
 }

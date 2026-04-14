@@ -9,16 +9,14 @@ import {
 } from "@chakra-ui/react";
 import NextLink from "next/link";
 import type { DashboardData } from "~/server/app-layer/ops/types";
-import { api } from "~/utils/api";
+import { useReplayStatus } from "~/hooks/useReplayStatus";
 
 export function ActiveOperationsSection({
   data,
 }: {
   data: DashboardData;
 }) {
-  const statusQuery = api.ops.getReplayStatus.useQuery(undefined, {
-    refetchInterval: 2000,
-  });
+  const statusQuery = useReplayStatus();
 
   const replayStatus = statusQuery.data;
   const isReplayRunning = replayStatus?.state === "running";

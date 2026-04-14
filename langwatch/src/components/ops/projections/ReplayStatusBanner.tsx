@@ -2,23 +2,19 @@ import { useRouter } from "next/router";
 import { Badge, Button, Card, HStack, Status, Text } from "@chakra-ui/react";
 import { api } from "~/utils/api";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
+import { useReplayStatus } from "~/hooks/useReplayStatus";
 
 export function ReplayStatusBanner() {
   const router = useRouter();
-  const statusQuery = api.ops.getReplayStatus.useQuery(undefined, {
-    refetchInterval: 2000,
-  });
+  const statusQuery = useReplayStatus();
   const cancelMutation = api.ops.cancelReplay.useMutation({
     onSuccess: () => void statusQuery.refetch(),
   });
-  const { scope } = useOpsPermission();
+  const { canManage } = useOpsPermission();
 
   const status = statusQuery.data;
   // Only show banner while actively running
   if (!status || status.state !== "running") return null;
-
-  const canManage =
-    scope?.kind === "platform" || scope?.kind === "organization";
 
   return (
     <Card.Root borderColor="blue.200" borderWidth="1px">

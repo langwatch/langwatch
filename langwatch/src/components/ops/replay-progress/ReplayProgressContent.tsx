@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   Badge,
   Box,
@@ -6,7 +7,9 @@ import {
   Center,
   HStack,
   Progress,
+  SimpleGrid,
   Spinner,
+  Stat,
   Status,
   Text,
   VStack,
@@ -14,6 +17,7 @@ import {
 import { ArrowLeft } from "lucide-react";
 import { api } from "~/utils/api";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
+import { useReplayStatus } from "~/hooks/useReplayStatus";
 import { Link } from "~/components/ui/link";
 import { formatDuration } from "~/components/ops/shared/formatters";
 import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
@@ -21,10 +25,15 @@ import { PhaseTimeline } from "~/components/ops/shared/PhaseTimeline";
 import { CowboyAnimation } from "./CowboyAnimation";
 import type { ReplayStatus, ReplayHistoryEntry } from "~/server/app-layer/ops/repositories/replay.repository";
 
+const MESH_PULSE_CSS = `
+  @keyframes meshPulse {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+`;
+
 export function ReplayProgressContent({ runId }: { runId: string }) {
-  const statusQuery = api.ops.getReplayStatus.useQuery(undefined, {
-    refetchInterval: 1500,
-  });
+  const statusQuery = useReplayStatus();
   const historyQuery = api.ops.getReplayRun.useQuery(
     { runId },
     { refetchInterval: false },
@@ -35,12 +44,10 @@ export function ReplayProgressContent({ runId }: { runId: string }) {
     },
   });
 
-  const { scope } = useOpsPermission();
-  const canManage =
-    scope?.kind === "platform" || scope?.kind === "organization";
+  const { canManage } = useOpsPermission();
 
-  const liveStatus = statusQuery.data as ReplayStatus | undefined;
-  const historyEntry = historyQuery.data as ReplayHistoryEntry | null | undefined;
+  const liveStatus = statusQuery.data;
+  const historyEntry = historyQuery.data;
 
   // Use live status when it matches this run, otherwise fall back to history
   const isLiveRun = liveStatus?.runId === runId && liveStatus.state !== "idle";
@@ -73,12 +80,7 @@ export function ReplayProgressContent({ runId }: { runId: string }) {
 
   return (
     <>
-      <style>{`
-        @keyframes meshPulse {
-          0%, 100% { background-position: 0% 50%; }
-          50% { background-position: 100% 50%; }
-        }
-      `}</style>
+      <style>{MESH_PULSE_CSS}</style>
 
       <Box style={meshGradientStyle} borderRadius="lg" padding={4}>
         <HStack marginBottom={4}>
@@ -145,19 +147,15 @@ function LiveRunView({
   canManage: boolean;
   cancelMutation: { isPending: boolean; mutate: () => void };
 }) {
+  const throughputRate = useMemo(() => {
+    if (!status.startedAt || !status.eventsProcessed) return null;
+    const elapsed = (Date.now() - new Date(status.startedAt).getTime()) / 1000;
+    if (elapsed < 1) return null;
+    return Math.round(status.eventsProcessed / elapsed);
+  }, [status.startedAt, status.eventsProcessed]);
+
   return (
     <VStack align="stretch" gap={4}>
-      {/* Cowboys animation */}
-      <Card.Root overflow="hidden">
-        <Card.Body padding={6}>
-          <Center>
-            <CowboyAnimation
-              phase={isRunning ? status.currentPhase : null}
-            />
-          </Center>
-        </Card.Body>
-      </Card.Root>
-
       {/* Phase timeline */}
       <PhaseTimeline
         currentPhase={status.currentPhase}
@@ -168,7 +166,54 @@ function LiveRunView({
         }
       />
 
-      {/* Status card */}
+      {/* Stat bar */}
+      <SimpleGrid columns={4} gap={1}>
+        <Stat.Root>
+          <Stat.Label>Aggregates</Stat.Label>
+          <Stat.ValueText textStyle="lg">
+            {status.aggregatesProcessed}
+            {status.aggregatesTotal > 0 && ` / ${status.aggregatesTotal}`}
+          </Stat.ValueText>
+        </Stat.Root>
+        <Stat.Root>
+          <Stat.Label>Events</Stat.Label>
+          <Stat.ValueText textStyle="lg">
+            {status.eventsProcessed.toLocaleString()}
+          </Stat.ValueText>
+        </Stat.Root>
+        <Stat.Root>
+          <Stat.Label>Rate</Stat.Label>
+          <Stat.ValueText textStyle="lg">
+            {throughputRate !== null ? `${throughputRate.toLocaleString()}/s` : "\u2014"}
+          </Stat.ValueText>
+        </Stat.Root>
+        <Stat.Root>
+          <Stat.Label>Elapsed</Stat.Label>
+          <Stat.ValueText textStyle="lg">
+            {status.startedAt ? formatDuration(status.startedAt, status.completedAt) : "\u2014"}
+          </Stat.ValueText>
+        </Stat.Root>
+      </SimpleGrid>
+
+      {/* Progress bar */}
+      {isRunning && status.aggregatesTotal > 0 && (
+        <VStack align="stretch" gap={1}>
+          <Progress.Root
+            size="sm"
+            value={progressPercent}
+            colorPalette="orange"
+          >
+            <Progress.Track>
+              <Progress.Range />
+            </Progress.Track>
+          </Progress.Root>
+          <Text textStyle="xs" color="fg.muted" textAlign="end">
+            {progressPercent}%
+          </Text>
+        </VStack>
+      )}
+
+      {/* Status card with compact cowboy */}
       <Card.Root>
         <Card.Body padding={4}>
           <VStack align="stretch" gap={3}>
@@ -186,15 +231,6 @@ function LiveRunView({
                 {status.currentProjection && isRunning && (
                   <Badge size="sm" variant="subtle">
                     {status.currentProjection}
-                  </Badge>
-                )}
-                {status.currentPhase && isRunning && (
-                  <Badge
-                    size="sm"
-                    variant="outline"
-                    colorPalette="orange"
-                  >
-                    {status.currentPhase}
                   </Badge>
                 )}
               </HStack>
@@ -217,48 +253,6 @@ function LiveRunView({
               </Text>
             )}
 
-            {isRunning && (
-              <VStack align="stretch" gap={1}>
-                <Progress.Root
-                  size="sm"
-                  value={progressPercent}
-                  colorPalette="orange"
-                >
-                  <Progress.Track>
-                    <Progress.Range />
-                  </Progress.Track>
-                </Progress.Root>
-                <HStack justify="space-between">
-                  <Text textStyle="xs" color="fg.muted">
-                    {status.aggregatesProcessed} /{" "}
-                    {status.aggregatesTotal} aggregates (
-                    {progressPercent}%)
-                  </Text>
-                  <Text textStyle="xs" color="fg.muted">
-                    {status.eventsProcessed.toLocaleString()} events
-                  </Text>
-                </HStack>
-              </VStack>
-            )}
-
-            {status.state === "completed" && (
-              <HStack gap={4} flexWrap="wrap">
-                <Text textStyle="xs" color="fg.muted">
-                  {status.aggregatesProcessed} aggregates replayed
-                </Text>
-                <Text textStyle="xs" color="fg.muted">
-                  {status.eventsProcessed.toLocaleString()} events
-                  processed
-                </Text>
-                {status.completedAt && (
-                  <Text textStyle="xs" color="fg.muted">
-                    Completed at{" "}
-                    {new Date(status.completedAt).toLocaleString()}
-                  </Text>
-                )}
-              </HStack>
-            )}
-
             {status.state === "failed" && status.error && (
               <Box bg="red.subtle" padding={3} borderRadius="md">
                 <Text textStyle="xs" color="red.500">
@@ -267,10 +261,9 @@ function LiveRunView({
               </Box>
             )}
 
-            {status.startedAt && (
+            {status.startedAt && status.userName && (
               <Text textStyle="xs" color="fg.muted">
-                Duration: {formatDuration(status.startedAt, status.completedAt)}
-                {status.userName && ` | Started by ${status.userName}`}
+                Started by {status.userName}
               </Text>
             )}
 
@@ -281,6 +274,15 @@ function LiveRunView({
                 </Badge>
               ))}
             </HStack>
+
+            {/* Compact cowboy animation */}
+            {isRunning && (
+              <Center overflow="hidden" maxHeight="60px">
+                <Box transform="scale(0.75)" transformOrigin="center">
+                  <CowboyAnimation phase={status.currentPhase} />
+                </Box>
+              </Center>
+            )}
           </VStack>
         </Card.Body>
       </Card.Root>

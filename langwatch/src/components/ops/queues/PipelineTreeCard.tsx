@@ -17,8 +17,7 @@ export function PipelineTreeCard({
   pausedKeys: string[];
   queueNames: string[];
 }) {
-  const { scope } = useOpsPermission();
-  const canManage = scope?.kind === "platform" || scope?.kind === "organization";
+  const { canManage } = useOpsPermission();
   const utils = api.useContext();
   const [filter, setFilter] = useState("");
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set());

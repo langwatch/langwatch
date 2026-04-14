@@ -1,6 +1,6 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import { Activity, Anvil, Film, History, Layers } from "lucide-react";
+import { Activity, Anvil, Film, History } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
 import { useOpsPermission } from "../hooks/useOpsPermission";
@@ -296,14 +296,7 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         icon={Activity}
         label="Dashboard"
         href="/ops"
-        isActive={router.pathname === "/ops"}
-        showLabel={showExpanded}
-      />
-      <SideMenuLink
-        icon={Layers}
-        label="Pipelines"
-        href="/ops/queues"
-        isActive={router.pathname.startsWith("/ops/queues")}
+        isActive={router.pathname === "/ops" || router.pathname.startsWith("/ops/queues")}
         badgeNumber={blockedCount + dlqCount}
         showLabel={showExpanded}
       />

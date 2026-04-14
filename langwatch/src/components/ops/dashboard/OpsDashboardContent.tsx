@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import {
   Box,
   Card,
@@ -7,18 +8,21 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowUpRight } from "lucide-react";
-import NextLink from "next/link";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import {
   formatCount,
   formatMs,
   formatRate,
 } from "~/components/ops/shared/formatters";
+import { api } from "~/utils/api";
 import { ActiveOperationsSection } from "./ActiveOperationsSection";
 import { LinkedStat } from "./LinkedStat";
 import { ReplayHistorySection } from "./ReplayHistorySection";
 import { ThroughputChart } from "./ThroughputChart";
+import { PipelineTreeCard } from "~/components/ops/queues/PipelineTreeCard";
+import { BlockedCard } from "~/components/ops/queues/BlockedCard";
+import { DlqCard } from "~/components/ops/queues/DlqCard";
+import { GroupsCard } from "~/components/ops/queues/GroupsCard";
 
 export function OpsDashboardContent({ data }: { data: DashboardData }) {
   const totalBlocked = data.queues.reduce(
@@ -26,6 +30,14 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
     0,
   );
   const totalDlq = data.queues.reduce((sum, q) => sum + q.dlqCount, 0);
+
+  const queuesQuery = api.ops.listQueues.useQuery(undefined, {
+    refetchInterval: 10000,
+  });
+  const queueNames = useMemo(
+    () => (queuesQuery.data ?? []).map((q) => q.name),
+    [queuesQuery.data],
+  );
 
   return (
     <VStack align="stretch" gap={5} width="full">
@@ -52,7 +64,6 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
           label="Blocked"
           value={totalBlocked.toString()}
           sublabel={`${data.totalGroups} groups`}
-          href="/ops/queues"
           color={totalBlocked > 0 ? "red.500" : undefined}
         />
         <LinkedStat
@@ -69,7 +80,6 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
           label="DLQ"
           value={totalDlq.toString()}
           sublabel={data.redisMemoryUsed}
-          href="/ops/queues"
           color={totalDlq > 0 ? "orange.500" : undefined}
         />
       </SimpleGrid>
@@ -88,22 +98,18 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
         </Card.Body>
       </Card.Root>
 
+      <PipelineTreeCard
+        pipelineTree={data.pipelineTree}
+        pausedKeys={data.pausedKeys}
+        queueNames={queueNames}
+      />
+
       <Card.Root overflow="hidden">
-        <NextLink href="/ops/queues" style={{ textDecoration: "none" }}>
-          <HStack
-            paddingX={4}
-            paddingTop={3}
-            paddingBottom={2}
-            cursor="pointer"
-            _hover={{ color: "orange.500" }}
-            transition="color 0.1s"
-          >
-            <Text textStyle="xs" fontWeight="medium" color="fg.muted">
-              Top Errors
-            </Text>
-            <ArrowUpRight size={10} />
-          </HStack>
-        </NextLink>
+        <HStack paddingX={4} paddingTop={3} paddingBottom={2}>
+          <Text textStyle="xs" fontWeight="medium" color="fg.muted">
+            Top Errors
+          </Text>
+        </HStack>
         {data.topErrors.length > 0 ? (
           <Table.ScrollArea>
             <Table.Root size="sm" variant="line" css={{ "& tr:last-child td": { borderBottom: "none" } }}>
@@ -143,6 +149,10 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
           </Box>
         )}
       </Card.Root>
+
+      <BlockedCard queueNames={queueNames} />
+      <DlqCard queueNames={queueNames} />
+      <GroupsCard queueNames={queueNames} />
 
       <ReplayHistorySection />
     </VStack>

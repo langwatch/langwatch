@@ -1,17 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
-  Button,
-  Card,
   Center,
   EmptyState,
-  HStack,
-  Input,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Eye, Search } from "lucide-react";
+import { Eye } from "lucide-react";
 import { useRouter } from "next/router";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { api } from "~/utils/api";
@@ -201,50 +197,16 @@ export function DejaViewContent() {
   if (!selectedAggregate) {
     return (
       <DashboardLayout>
-        <SearchHeader />
+        <SearchHeader
+          searchQuery={searchQuery}
+          tenantFilter={tenantFilter}
+          onSearchQueryChange={setSearchQuery}
+          onTenantFilterChange={setTenantFilter}
+          onSearch={handleSearch}
+          isLoading={searchResults.isFetching}
+        />
         <Box paddingX={6} paddingY={4} w="full">
           <VStack align="stretch" gap={4}>
-            <Card.Root>
-              <Card.Body padding={4}>
-                <VStack align="stretch" gap={3}>
-                  <Text textStyle="sm" fontWeight="medium">
-                    Search Aggregates
-                  </Text>
-                  <HStack gap={2}>
-                    <Input
-                      size="sm"
-                      placeholder="Search by aggregate ID or tenant ID..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleSearch();
-                      }}
-                      flex={1}
-                    />
-                    <Input
-                      size="sm"
-                      placeholder="Tenant ID filter (optional)"
-                      value={tenantFilter}
-                      onChange={(e) => setTenantFilter(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") handleSearch();
-                      }}
-                      width="250px"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleSearch}
-                      loading={searchResults.isFetching}
-                    >
-                      <Search size={14} />
-                      Search
-                    </Button>
-                  </HStack>
-                </VStack>
-              </Card.Body>
-            </Card.Root>
-
             {searchResults.isFetching && !searchResults.data && (
               <Center paddingY={10}>
                 <Spinner size="lg" />
@@ -252,13 +214,16 @@ export function DejaViewContent() {
             )}
 
             {searchResults.error && (
-              <Card.Root borderColor="red.200" borderWidth="1px">
-                <Card.Body padding={4}>
-                  <Text textStyle="sm" color="red.500">
-                    {searchResults.error.message}
-                  </Text>
-                </Card.Body>
-              </Card.Root>
+              <Box
+                padding={4}
+                borderRadius="md"
+                borderWidth="1px"
+                borderColor="red.200"
+              >
+                <Text textStyle="sm" color="red.500">
+                  {searchResults.error.message}
+                </Text>
+              </Box>
             )}
 
             {hasSearched &&
@@ -280,6 +245,14 @@ export function DejaViewContent() {
                   </EmptyState.Root>
                 </Center>
               )}
+
+            {!hasSearched && (
+              <Center paddingY={10}>
+                <Text textStyle="sm" color="fg.muted">
+                  Search for an aggregate ID to get started.
+                </Text>
+              </Center>
+            )}
 
             {searchResults.data && searchResults.data.length > 0 && (
               <AggregateTable
