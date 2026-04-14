@@ -46,6 +46,10 @@ export default function ExperimentsWorkbenchPage() {
     }));
 
   const createEvaluator = api.evaluators.create.useMutation();
+  const createPrompt = api.prompts.create.useMutation();
+  const updatePrompt = api.prompts.update.useMutation();
+  const upsertDataset = api.dataset.upsert.useMutation();
+  const createDatasetRecords = api.datasetRecord.create.useMutation();
   const utils = api.useContext();
   const { execute: executeEvaluation } = useExecuteEvaluation();
 
@@ -101,8 +105,89 @@ export default function ExperimentsWorkbenchPage() {
         // header.
         void executeEvaluation({ type: "full" });
       },
+      "prompts.create": async (payload) => {
+        const { handle, messages, model, temperature, maxTokens } =
+          payload as {
+            handle: string;
+            messages: { role: "system" | "user" | "assistant"; content: string }[];
+            model?: string;
+            temperature?: number;
+            maxTokens?: number;
+          };
+        await createPrompt.mutateAsync({
+          projectId,
+          data: { handle, messages, model, temperature, maxTokens },
+        });
+        await utils.prompts.getAllPromptsForProject.invalidate({ projectId });
+      },
+      "prompts.update": async (payload) => {
+        const { id, commitMessage, messages, model, temperature, maxTokens } =
+          payload as {
+            id: string;
+            commitMessage: string;
+            messages?: { role: "system" | "user" | "assistant"; content: string }[];
+            model?: string;
+            temperature?: number;
+            maxTokens?: number;
+          };
+        await updatePrompt.mutateAsync({
+          projectId,
+          id,
+          data: {
+            commitMessage,
+            ...(messages ? { messages } : {}),
+            ...(model ? { model } : {}),
+            ...(temperature !== undefined ? { temperature } : {}),
+            ...(maxTokens !== undefined ? { maxTokens } : {}),
+          },
+        });
+        await utils.prompts.getAllPromptsForProject.invalidate({ projectId });
+      },
+      "datasets.create": async (payload) => {
+        const { name, columnTypes, initialRows } = payload as {
+          name: string;
+          columnTypes: { name: string; type: string }[];
+          initialRows?: Record<string, unknown>[];
+        };
+        await upsertDataset.mutateAsync({
+          projectId,
+          name,
+          columnTypes: columnTypes as never,
+          ...(initialRows && initialRows.length > 0
+            ? {
+                datasetRecords: initialRows.map((row) => ({
+                  id: nanoid(),
+                  entry: row,
+                })) as never,
+              }
+            : {}),
+        });
+        await utils.dataset.getAll.invalidate({ projectId });
+      },
+      "datasets.addRows": async (payload) => {
+        const { datasetId, rows } = payload as {
+          datasetId: string;
+          rows: Record<string, unknown>[];
+        };
+        await createDatasetRecords.mutateAsync({
+          projectId,
+          datasetId,
+          entries: rows.map((row) => ({ id: nanoid(), ...row })) as never,
+        });
+        await utils.dataset.getAll.invalidate({ projectId });
+      },
     };
-  }, [project?.id, createEvaluator, utils, addEvaluator, executeEvaluation]);
+  }, [
+    project?.id,
+    createEvaluator,
+    createPrompt,
+    updatePrompt,
+    upsertDataset,
+    createDatasetRecords,
+    utils,
+    addEvaluator,
+    executeEvaluation,
+  ]);
 
   // Warm up lambda instances in the background (invisible to user)
   useLambdaWarmup();

@@ -44,7 +44,7 @@ const SAGE_SYSTEM_PROMPT = `You are Sage, the in-product AI assistant for LangWa
 
 ## What you can do
 - **Read** the project's evaluators, prompts, and datasets. Use these tools autonomously whenever they help you answer.
-- **Propose changes** that the user can apply with one click — creating evaluators, adding them to the workbench, and (later) prompts/datasets. You never mutate state yourself. Every "propose_*" tool returns a card; the user clicks Apply to commit.
+- **Propose changes** that the user can apply with one click — creating/updating evaluators and prompts, creating datasets and appending rows, adding evaluators to the workbench, and running the experiment. You never mutate state yourself. Every "propose_*" tool returns a card; the user clicks Apply to commit.
 
 ## Ground rules
 - Never fabricate names, IDs, or slugs. Only reference entities your tools returned.
@@ -68,6 +68,16 @@ const SAGE_SYSTEM_PROMPT = `You are Sage, the in-product AI assistant for LangWa
 
 ## Running experiments
 - Use **propose_run_workbench** when the user asks to run/evaluate/execute the experiment. Before proposing, call get_workbench_state and sanity-check that there's at least one target and at least one evaluator. If mappings look missing, note that in your reply so the user knows a run might fail validation.
+
+## Prompts
+- Call get_prompt_details before proposing an update so you know which fields are already set. Only include fields you actually want to change.
+- propose_update_prompt requires a commitMessage — make it specific ("add safety system message" beats "updated prompt").
+- When proposing a brand-new prompt, pick a handle that reflects intent and slug-conventions (kebab-case).
+
+## Datasets
+- Before propose_add_dataset_rows, call get_dataset_details so your row values line up with the declared column types — mismatches will fail validation.
+- propose_create_dataset can include initialRows so the dataset lands with seed data in a single Apply.
+- When the user asks for "N examples", generate the actual row values inline in the tool call. Don't ask them to specify each one unless the domain is ambiguous.
 
 ## Evaluator models
 - propose_create_evaluator auto-fills settings from the evaluator's defaults, using the **project's default model** for any \`model\` field. You do NOT need to pass settings.model unless the user explicitly asked for a specific one.
@@ -443,6 +453,269 @@ app.post("/sage/chat", async (c) => {
               evaluatorType,
               settings: mergedSettings,
             },
+          },
+        };
+      },
+    }),
+
+    get_prompt_details: tool({
+      description:
+        "Fetch the full config for a single prompt by handle or id: model, temperature, maxTokens, message templates, and declared inputs/outputs.",
+      inputSchema: z.object({
+        idOrHandle: z
+          .string()
+          .describe("The prompt id or handle, as returned by list_prompts."),
+      }),
+      execute: async ({ idOrHandle }) => {
+        const prompt = await promptService.getPromptByIdOrHandle({
+          idOrHandle,
+          projectId,
+        });
+        if (!prompt) {
+          return { error: `No prompt found with id or handle '${idOrHandle}'.` };
+        }
+        const p = prompt as Record<string, unknown>;
+        return {
+          id: p.id,
+          handle: p.handle,
+          scope: p.scope,
+          model: p.model,
+          temperature: p.temperature,
+          maxTokens: p.maxTokens,
+          messages: p.messages,
+          inputs: p.inputs,
+          outputs: p.outputs,
+          version: p.version,
+        };
+      },
+    }),
+
+    get_dataset_details: tool({
+      description:
+        "Fetch a dataset's schema and a sample of its rows so you can understand its content before proposing additions or changes.",
+      inputSchema: z.object({
+        datasetId: z
+          .string()
+          .describe("The dataset id as returned by list_datasets."),
+        sampleRowLimit: z.number().int().min(0).max(20).default(5),
+      }),
+      execute: async ({ datasetId, sampleRowLimit }) => {
+        const dataset = await prisma.dataset.findFirst({
+          where: { id: datasetId, projectId, archivedAt: null },
+          include: { _count: { select: { datasetRecords: true } } },
+        });
+        if (!dataset) {
+          return { error: `No dataset found with id '${datasetId}'.` };
+        }
+        const sampleRows =
+          sampleRowLimit > 0
+            ? await prisma.datasetRecord.findMany({
+                where: { datasetId, projectId },
+                orderBy: { createdAt: "asc" },
+                take: sampleRowLimit,
+                select: { id: true, entry: true },
+              })
+            : [];
+        return {
+          id: dataset.id,
+          slug: dataset.slug,
+          name: dataset.name,
+          columnTypes: dataset.columnTypes,
+          rowCount: dataset._count.datasetRecords,
+          sampleRows,
+        };
+      },
+    }),
+
+    propose_create_prompt: tool({
+      description:
+        "Propose creating a new prompt in the project. Returns a card the user approves to commit. The handle must be unique within the project; use kebab-case or snake_case.",
+      inputSchema: z.object({
+        handle: z
+          .string()
+          .min(1)
+          .max(80)
+          .describe(
+            "Unique, URL-safe prompt handle (e.g. 'rag-qa', 'support-triage').",
+          ),
+        messages: z
+          .array(
+            z.object({
+              role: z.enum(["system", "user", "assistant"]),
+              content: z.string(),
+            }),
+          )
+          .min(1)
+          .describe("Chat-style message templates that define the prompt."),
+        model: z
+          .string()
+          .optional()
+          .describe(
+            "Optional model override (e.g. 'openai/gpt-4.1-mini'). Omit to fall back to the project default.",
+          ),
+        temperature: z.number().min(0).max(2).optional(),
+        maxTokens: z.number().int().positive().optional(),
+        rationale: z
+          .string()
+          .describe(
+            "One short sentence explaining why this prompt fits the user's goal.",
+          ),
+      }),
+      execute: async ({
+        handle,
+        messages,
+        model,
+        temperature,
+        maxTokens,
+        rationale,
+      }) => {
+        return {
+          sageProposal: true,
+          kind: "prompts.create",
+          summary: `Create prompt "${handle}"`,
+          rationale,
+          payload: {
+            handle,
+            messages,
+            model,
+            temperature,
+            maxTokens,
+          },
+        };
+      },
+    }),
+
+    propose_update_prompt: tool({
+      description:
+        "Propose updating an existing prompt by creating a new version. A commitMessage is required. Call get_prompt_details first so you only send fields you actually want to change.",
+      inputSchema: z.object({
+        id: z
+          .string()
+          .describe("The prompt id (not handle), as returned by list_prompts."),
+        commitMessage: z
+          .string()
+          .min(1)
+          .describe("Short description of what this revision changes."),
+        messages: z
+          .array(
+            z.object({
+              role: z.enum(["system", "user", "assistant"]),
+              content: z.string(),
+            }),
+          )
+          .optional(),
+        model: z.string().optional(),
+        temperature: z.number().min(0).max(2).optional(),
+        maxTokens: z.number().int().positive().optional(),
+        rationale: z.string(),
+      }),
+      execute: async ({
+        id,
+        commitMessage,
+        messages,
+        model,
+        temperature,
+        maxTokens,
+        rationale,
+      }) => {
+        const existing = await promptService.getPromptByIdOrHandle({
+          idOrHandle: id,
+          projectId,
+        });
+        if (!existing) {
+          return { error: `No prompt found with id '${id}'.` };
+        }
+        return {
+          sageProposal: true,
+          kind: "prompts.update",
+          summary: `Update prompt "${(existing as { handle?: string }).handle ?? id}"`,
+          rationale,
+          payload: {
+            id,
+            commitMessage,
+            messages,
+            model,
+            temperature,
+            maxTokens,
+          },
+        };
+      },
+    }),
+
+    propose_create_dataset: tool({
+      description:
+        "Propose creating a new dataset with a schema (column names + types) and optional seed rows you author inline. Use this before propose_add_dataset_rows if the dataset does not yet exist.",
+      inputSchema: z.object({
+        name: z.string().min(1).max(120),
+        columns: z
+          .array(
+            z.object({
+              name: z.string().min(1),
+              type: z.enum([
+                "string",
+                "boolean",
+                "number",
+                "date",
+                "list",
+                "json",
+              ]),
+            }),
+          )
+          .min(1)
+          .describe("Schema: column name + value type."),
+        initialRows: z
+          .array(z.record(z.unknown()))
+          .optional()
+          .describe(
+            "Optional seed rows. Each row is an object mapping column name to value. Keep values consistent with declared column types.",
+          ),
+        rationale: z.string(),
+      }),
+      execute: async ({ name, columns, initialRows, rationale }) => {
+        return {
+          sageProposal: true,
+          kind: "datasets.create",
+          summary: `Create dataset "${name}"${
+            initialRows?.length ? ` with ${initialRows.length} row(s)` : ""
+          }`,
+          rationale,
+          payload: {
+            name,
+            columnTypes: columns,
+            initialRows: initialRows ?? [],
+          },
+        };
+      },
+    }),
+
+    propose_add_dataset_rows: tool({
+      description:
+        "Propose appending rows to an existing dataset. Each row is an object mapping column name to value. Values must be consistent with the dataset's column types (call get_dataset_details first to confirm).",
+      inputSchema: z.object({
+        datasetId: z.string(),
+        rows: z
+          .array(z.record(z.unknown()))
+          .min(1)
+          .max(50)
+          .describe("Up to 50 rows; each row is { columnName: value }."),
+        rationale: z.string(),
+      }),
+      execute: async ({ datasetId, rows, rationale }) => {
+        const dataset = await prisma.dataset.findFirst({
+          where: { id: datasetId, projectId, archivedAt: null },
+          select: { id: true, name: true, slug: true },
+        });
+        if (!dataset) {
+          return { error: `No dataset found with id '${datasetId}'.` };
+        }
+        return {
+          sageProposal: true,
+          kind: "datasets.addRows",
+          summary: `Add ${rows.length} row(s) to "${dataset.name}"`,
+          rationale,
+          payload: {
+            datasetId,
+            rows,
           },
         };
       },
