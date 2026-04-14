@@ -34,7 +34,20 @@ export default defineConfig({
     sourcemap: true,
   },
   server: {
+    watch: {
+      ignored: [
+        "**/.git/**",
+        "**/node_modules/.pnpm/**",
+        "**/.pnpm-store/**",
+        "**/dist/**",
+        "**/.next/**",
+        "**/coverage/**",
+        "**/server.log",
+      ],
+    },
     // Frontend always on 5560 — same port as with Next.js
+    host: true,
+    allowedHosts: true,
     port: 5560,
     strictPort: true,
     // Proxy API requests to the Hono backend (internal port)
