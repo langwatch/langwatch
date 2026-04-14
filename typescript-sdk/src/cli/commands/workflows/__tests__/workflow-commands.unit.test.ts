@@ -25,6 +25,7 @@ import { WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-a
 import { listWorkflowsCommand } from "../list";
 import { getWorkflowCommand } from "../get";
 import { deleteWorkflowCommand } from "../delete";
+import { updateWorkflowCommand } from "../update";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -190,6 +191,62 @@ describe("deleteWorkflowCommand()", () => {
 
       await expect(deleteWorkflowCommand("nonexistent")).rejects.toThrow(ProcessExitError);
       expect(mockDelete).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("updateWorkflowCommand()", () => {
+  let mockFetch: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFetch = vi.fn();
+    global.fetch = mockFetch;
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+    process.env.LANGWATCH_API_KEY = "test-key";
+    process.env.LANGWATCH_ENDPOINT = "http://localhost:5560";
+  });
+
+  describe("when update succeeds", () => {
+    it("sends PATCH request with the updated fields", async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => makeWorkflow({ name: "New Name" }),
+      });
+
+      await updateWorkflowCommand("workflow_abc123", { name: "New Name" });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "http://localhost:5560/api/workflows/workflow_abc123",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ name: "New Name" }),
+        }),
+      );
+    });
+  });
+
+  describe("when no fields are provided", () => {
+    it("exits with code 1", async () => {
+      await expect(
+        updateWorkflowCommand("workflow_abc123", {}),
+      ).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when API returns 404", () => {
+    it("exits with code 1", async () => {
+      mockFetch.mockResolvedValue({
+        ok: false,
+        status: 404,
+        text: async () => '{"error":"Workflow not found"}',
+      });
+
+      await expect(
+        updateWorkflowCommand("nonexistent", { name: "X" }),
+      ).rejects.toThrow(ProcessExitError);
     });
   });
 });
