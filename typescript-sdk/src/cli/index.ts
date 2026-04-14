@@ -836,6 +836,41 @@ suiteCmd
     await impl(id);
   });
 
+// Add graph command group
+const graphCmd = program
+  .command("graph")
+  .description("Manage custom graphs on dashboards");
+
+graphCmd
+  .command("list")
+  .description("List all custom graphs (optionally filter by dashboard)")
+  .option("--dashboard-id <id>", "Filter by dashboard ID")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { dashboardId?: string; format?: string }) => {
+    const { listGraphsCommand: impl } = await import("./commands/graphs/list.js");
+    await impl(options);
+  });
+
+graphCmd
+  .command("create <name>")
+  .description("Create a custom graph")
+  .option("--dashboard-id <id>", "Dashboard to add the graph to")
+  .option("--graph <json>", "Graph definition as JSON")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (name: string, options: { dashboardId?: string; graph?: string; format?: string }) => {
+    const { createGraphCommand: impl } = await import("./commands/graphs/create.js");
+    await impl(name, options);
+  });
+
+graphCmd
+  .command("delete <id>")
+  .description("Delete a custom graph")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
+    const { deleteGraphCommand: impl } = await import("./commands/graphs/delete.js");
+    await impl(id, options);
+  });
+
 // Add trigger (automation) command group
 const triggerCmd = program
   .command("trigger")
