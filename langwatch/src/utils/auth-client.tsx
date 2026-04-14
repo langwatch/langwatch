@@ -5,6 +5,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactElement,
   type ReactNode,
@@ -350,9 +351,6 @@ export const SessionProvider = ({
   children,
 }: {
   children: ReactNode;
-  session?: unknown;
-  refetchInterval?: number;
-  refetchOnWindowFocus?: boolean;
 }): ReactElement => {
   const [data, setData] = useState<CompatSession | null>(null);
   const [isPending, setIsPending] = useState(true);
@@ -383,8 +381,13 @@ export const SessionProvider = ({
       ? "authenticated"
       : "unauthenticated";
 
+  const value = useMemo(
+    () => ({ data, status, update: fetchSession }),
+    [data, status, fetchSession],
+  );
+
   return (
-    <SessionContext.Provider value={{ data, status, update: fetchSession }}>
+    <SessionContext.Provider value={value}>
       {children}
     </SessionContext.Provider>
   );

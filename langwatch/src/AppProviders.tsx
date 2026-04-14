@@ -19,7 +19,7 @@ import { TRPCProvider } from "./utils/api";
  */
 export function OuterProviders({ children }: { children: ReactNode }) {
   return (
-    <SessionProvider refetchInterval={0} refetchOnWindowFocus={false}>
+    <SessionProvider>
       <TRPCProvider>
         <ChakraProvider value={system}>
           <ColorModeProvider>
