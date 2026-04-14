@@ -117,12 +117,11 @@ vi.mock("~/utils/compat/next-navigation", () => ({
 }));
 
 // Mock Link components that use React Router (requires Router context).
-// Must support forwardRef for Chakra's `asChild` pattern.
-vi.mock("~/utils/compat/next-link", async () => {
-  const React = await import("react");
+vi.mock("~/utils/compat/next-link", () => {
+  const React = require("react");
   return {
     default: React.forwardRef(function MockLink(
-      { children, href, as: _as, replace: _replace, scroll: _scroll, shallow: _shallow, passHref: _passHref, prefetch: _prefetch, locale: _locale, legacyBehavior: _legacyBehavior, ...props }: any,
+      { children, href, ...props }: any,
       ref: any
     ) {
       return React.createElement("a", { ref, href: typeof href === "string" ? href : href?.pathname ?? "/", ...props }, children);
@@ -130,8 +129,8 @@ vi.mock("~/utils/compat/next-link", async () => {
   };
 });
 
-vi.mock("next/link", async () => {
-  const React = await import("react");
+vi.mock("next/link", () => {
+  const React = require("react");
   return {
     default: React.forwardRef(function MockLink(
       { children, href, ...props }: any,
