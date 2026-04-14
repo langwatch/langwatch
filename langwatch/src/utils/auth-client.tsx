@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState, type ReactElement, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import { createAuthClient } from "better-auth/react";
 
 /**
@@ -68,6 +76,20 @@ interface UseSessionOptions {
   onUnauthenticated?: () => void;
 }
 
+// ---------------------------------------------------------------------------
+// Shared session context — fetched once by SessionProvider, consumed by all
+// useSession() callers. Replaces the per-component fetch that caused a
+// polling storm (~10 req/s) when multiple components mounted simultaneously.
+// ---------------------------------------------------------------------------
+
+interface SessionContextValue {
+  data: CompatSession | null;
+  status: SessionStatus;
+  update: () => Promise<void>;
+}
+
+const SessionContext = createContext<SessionContextValue | null>(null);
+
 /**
  * Fetches the impersonation-aware session from our custom endpoint.
  *
@@ -85,54 +107,22 @@ export const useSession = (
   status: SessionStatus;
   update: () => Promise<void>;
 } => {
-  const [data, setData] = useState<CompatSession | null>(null);
-  const [isPending, setIsPending] = useState(true);
-
-  const fetchSession = useCallback(async () => {
-    try {
-      const res = await fetch("/api/auth/session", { credentials: "include" });
-      if (!res.ok) {
-        // Network succeeded but server returned an error (5xx, etc.).
-        // Don't treat this as "unauthenticated" — keep the previous state
-        // so transient server errors don't flash the user as logged out.
-        setIsPending(false);
-        return;
-      }
-      const json = await res.json();
-      setData(adaptSession(json));
-    } catch {
-      // Network error — keep previous state, don't flash as logged out.
-      setIsPending(false);
-      return;
-    }
-    setIsPending(false);
-  }, []);
-
-  useEffect(() => {
-    void fetchSession();
-  }, [fetchSession]);
-
-  const status: SessionStatus = isPending
-    ? "loading"
-    : data
-      ? "authenticated"
-      : "unauthenticated";
+  const ctx = useContext(SessionContext);
+  if (!ctx) {
+    throw new Error("useSession must be used within a <SessionProvider>");
+  }
 
   useEffect(() => {
     if (
       options?.required &&
-      status === "unauthenticated" &&
+      ctx.status === "unauthenticated" &&
       options.onUnauthenticated
     ) {
       options.onUnauthenticated();
     }
-  }, [options?.required, options?.onUnauthenticated, status]);
+  }, [options?.required, options?.onUnauthenticated, ctx.status]);
 
-  return {
-    data,
-    status,
-    update: fetchSession,
-  };
+  return ctx;
 };
 
 export const signIn = async (
@@ -351,21 +341,53 @@ export const getSession = async (): Promise<CompatSession | null> => {
 };
 
 /**
- * Drop-in replacement for NextAuth's SessionProvider. BetterAuth does not
- * require a provider — `useSession` fetches directly. This is a no-op
- * component so callers can keep their JSX unchanged during the migration.
+ * Provides session state to the entire component tree. Fetches
+ * `/api/auth/session` once on mount and shares the result via React context.
+ * All `useSession()` consumers read from this single fetch — no per-component
+ * polling.
  */
 export const SessionProvider = ({
   children,
 }: {
   children: ReactNode;
   session?: unknown;
-  /** NextAuth-compat — ignored by BetterAuth's push-based client. */
   refetchInterval?: number;
-  /** NextAuth-compat — ignored by BetterAuth's push-based client. */
   refetchOnWindowFocus?: boolean;
 }): ReactElement => {
-  return <>{children}</>;
+  const [data, setData] = useState<CompatSession | null>(null);
+  const [isPending, setIsPending] = useState(true);
+
+  const fetchSession = useCallback(async () => {
+    try {
+      const res = await fetch("/api/auth/session", { credentials: "include" });
+      if (!res.ok) {
+        setIsPending(false);
+        return;
+      }
+      const json = await res.json();
+      setData(adaptSession(json));
+    } catch {
+      setIsPending(false);
+      return;
+    }
+    setIsPending(false);
+  }, []);
+
+  useEffect(() => {
+    void fetchSession();
+  }, [fetchSession]);
+
+  const status: SessionStatus = isPending
+    ? "loading"
+    : data
+      ? "authenticated"
+      : "unauthenticated";
+
+  return (
+    <SessionContext.Provider value={{ data, status, update: fetchSession }}>
+      {children}
+    </SessionContext.Provider>
+  );
 };
 
 export type { CompatSession as Session };
