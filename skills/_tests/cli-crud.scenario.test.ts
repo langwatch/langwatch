@@ -14,14 +14,14 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
 
 describe("LangWatch CLI CRUD — Agent Usability", () => {
   it.skipIf(isCI)(
-    "agent uses CLI to list, create, and manage scenarios",
+    "agent uses CLI to list and create scenarios",
     async () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-cli-scenarios-"),
@@ -32,31 +32,45 @@ describe("LangWatch CLI CRUD — Agent Usability", () => {
         `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
 
+      // Guide Claude Code to use the CLI directly - NOT MCP
+      fs.writeFileSync(
+        path.join(tempFolder, "CLAUDE.md"),
+        `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
+DO NOT use any MCP tools (mcp__claude_ai_LangWatch__*). Use ONLY the Bash tool to run the \`langwatch\` CLI.
+
+First, load the API key: \`export $(grep LANGWATCH_API_KEY .env)\`
+
+Then run CLI commands directly:
+- \`langwatch scenario list\`
+- \`langwatch scenario create "Name" --situation "..." --criteria "..."\`
+- \`langwatch --help\` for all commands
+`,
+      );
+
       const result = await scenario.run({
         name: "CLI scenario CRUD",
         description:
-          "Developer wants to manage agent test scenarios using the LangWatch CLI.",
+          "Developer wants to manage agent test scenarios using the LangWatch CLI (not MCP).",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createClaudeCodeAgent({ workingDirectory: tempFolder, skipMcp: true }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent used langwatch scenario list to view existing scenarios",
-              "Agent used langwatch scenario create to create a new scenario with a situation and criteria",
-              "Agent successfully created at least one scenario (received confirmation with an ID)",
+              "Agent ran `langwatch scenario list` via the Bash tool to list scenarios",
+              "Agent ran `langwatch scenario create` via the Bash tool to create a new scenario",
+              "Agent received confirmation with a scenario ID after creation",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "Use the langwatch CLI to manage scenarios. First list any existing scenarios, then create a new scenario called 'Customer Support Flow' with the situation 'Customer asks for a refund on a damaged product' and criteria 'Agent shows empathy,Agent offers refund or replacement,Agent confirms resolution'. The langwatch CLI is already installed globally. You have LANGWATCH_API_KEY in the .env file.",
+            "Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch scenario list`\n3. `langwatch scenario create 'Customer Support Flow' --situation 'Customer asks for a refund on a damaged product' --criteria 'Agent shows empathy,Agent offers refund or replacement'`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
 
-            // Verify the agent used CLI commands (not MCP or API directly)
             const allText = state.messages
               .map((m) =>
                 typeof m.content === "string"
@@ -77,7 +91,7 @@ describe("LangWatch CLI CRUD — Agent Usability", () => {
   );
 
   it.skipIf(isCI)(
-    "agent uses CLI to manage datasets end-to-end",
+    "agent uses CLI to upload a dataset and list records",
     async () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-cli-datasets-"),
@@ -88,31 +102,41 @@ describe("LangWatch CLI CRUD — Agent Usability", () => {
         `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
 
-      // Create a sample CSV file for upload
       fs.writeFileSync(
         path.join(tempFolder, "test-data.csv"),
         "input,expected_output\nWhat is 2+2?,4\nWhat is the capital of France?,Paris\nTranslate hello to Spanish,Hola\n",
       );
 
+      fs.writeFileSync(
+        path.join(tempFolder, "CLAUDE.md"),
+        `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
+DO NOT use any MCP tools. Use ONLY the Bash tool to run the \`langwatch\` CLI.
+
+First: \`export $(grep LANGWATCH_API_KEY .env)\`
+Then: \`langwatch dataset upload qa-test-set test-data.csv\`
+Then: \`langwatch dataset records list qa-test-set\`
+`,
+      );
+
       const result = await scenario.run({
-        name: "CLI dataset management",
+        name: "CLI dataset upload",
         description:
-          "Developer wants to create a dataset, upload test data, and verify the records using the LangWatch CLI.",
+          "Developer wants to upload a CSV dataset using the LangWatch CLI via Bash (not MCP).",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createClaudeCodeAgent({ workingDirectory: tempFolder, skipMcp: true }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent used langwatch dataset commands to manage datasets",
-              "Agent created or uploaded a dataset with the test CSV data",
-              "Agent listed or verified the dataset records were uploaded correctly",
+              "Agent ran `langwatch dataset upload` or `langwatch dataset create` via the Bash tool",
+              "Agent uploaded or created a dataset with the test CSV data",
+              "Agent ran `langwatch dataset records list` or `langwatch dataset get` to verify records",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "Use the langwatch CLI to work with datasets. Create a dataset called 'qa-test-set', upload the test-data.csv file I've placed in the current directory, then list the records to verify they were uploaded. The langwatch CLI is already installed globally. You have LANGWATCH_API_KEY in the .env file.",
+            "Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch dataset upload qa-test-set test-data.csv`\n3. `langwatch dataset records list qa-test-set`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
           ),
           scenario.agent(),
           (state) => {
@@ -138,7 +162,7 @@ describe("LangWatch CLI CRUD — Agent Usability", () => {
   );
 
   it.skipIf(isCI)(
-    "agent uses CLI to query analytics and search traces",
+    "agent uses CLI to query analytics",
     async () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-cli-analytics-"),
@@ -149,25 +173,35 @@ describe("LangWatch CLI CRUD — Agent Usability", () => {
         `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
 
+      fs.writeFileSync(
+        path.join(tempFolder, "CLAUDE.md"),
+        `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
+DO NOT use any MCP tools. Use ONLY the Bash tool to run the \`langwatch\` CLI.
+
+First: \`export $(grep LANGWATCH_API_KEY .env)\`
+Then: \`langwatch analytics query --metric trace-count\`
+Then: \`langwatch trace search --limit 5\`
+`,
+      );
+
       const result = await scenario.run({
-        name: "CLI analytics and traces",
+        name: "CLI analytics query",
         description:
-          "Developer wants to check their LLM application performance using the CLI.",
+          "Developer wants to check analytics using the LangWatch CLI via Bash (not MCP).",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          createClaudeCodeAgent({ workingDirectory: tempFolder, skipMcp: true }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent used langwatch analytics or trace commands to query data",
-              "Agent provided useful information about the project's traces or analytics",
-              "Agent used the CLI (not MCP tools) to get the information",
+              "Agent ran `langwatch analytics query` or `langwatch trace search` via the Bash tool",
+              "Agent reported findings about the project's analytics or traces",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "Use the langwatch CLI to check how my LLM application is doing. Query the analytics for trace count and search for any recent traces. Tell me what you find. The langwatch CLI is already installed globally. You have LANGWATCH_API_KEY in the .env file.",
+            "Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch analytics query --metric trace-count`\n3. `langwatch trace search --limit 5`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
           ),
           scenario.agent(),
           (state) => {
@@ -181,7 +215,6 @@ describe("LangWatch CLI CRUD — Agent Usability", () => {
               )
               .join("\n");
 
-            // Verify agent used CLI commands
             const usedAnalytics = allText.match(/langwatch\s+analytics/);
             const usedTrace = allText.match(/langwatch\s+trace/);
             expect(
