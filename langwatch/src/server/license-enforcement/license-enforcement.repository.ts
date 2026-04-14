@@ -96,12 +96,11 @@ export class LicenseEnforcementRepository
   }
 
   /**
-   * Counts all prompts for license enforcement.
-   * Prompts do not support archival - all prompts count against limits.
+   * Counts active (non-deleted) prompts for license enforcement.
    */
   async getPromptCount(organizationId: string): Promise<number> {
     return this.prisma.llmPromptConfig.count({
-      where: { project: { team: { organizationId } } },
+      where: { project: { team: { organizationId } }, deletedAt: null },
     });
   }
 
