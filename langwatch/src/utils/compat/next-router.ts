@@ -12,9 +12,9 @@
  * - router.asPath (actual URL path + query)
  * - router.isReady (always true in SPA)
  * - router.back()
- * - router.events (no-op, NProgress handled separately)
+ * - router.events (fires routeChangeComplete on navigation for PostHog/activity tracking)
  */
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import {
   useLocation,
   useNavigate,
@@ -105,11 +105,22 @@ interface NextRouterOptions {
 
 type EventHandler = (...args: any[]) => void;
 
-// No-op events emitter — NProgress is handled by AppProviders
-const noopEvents = {
-  on: (_event: string, _handler: EventHandler) => {},
-  off: (_event: string, _handler: EventHandler) => {},
-  emit: (_event: string) => {},
+// Simple event emitter for router.events compat (PostHog, activity tracking)
+const routerEventListeners = new Map<string, Set<EventHandler>>();
+
+const routerEvents = {
+  on: (event: string, handler: EventHandler) => {
+    if (!routerEventListeners.has(event)) {
+      routerEventListeners.set(event, new Set());
+    }
+    routerEventListeners.get(event)!.add(handler);
+  },
+  off: (event: string, handler: EventHandler) => {
+    routerEventListeners.get(event)?.delete(handler);
+  },
+  emit: (event: string, ...args: any[]) => {
+    routerEventListeners.get(event)?.forEach((handler) => handler(...args));
+  },
 };
 
 // Alias for code that imports `NextRouter` type from next/router
@@ -125,7 +136,7 @@ export interface CompatRouter {
   locale?: string;
   locales?: string[];
   defaultLocale?: string;
-  events: typeof noopEvents;
+  events: typeof routerEvents;
   push: (
     url: string | { pathname?: string; query?: Record<string, any> },
     as?: string,
@@ -257,7 +268,7 @@ class RouterSingleton {
   }
 
   get events() {
-    return noopEvents;
+    return routerEvents;
   }
 }
 
@@ -269,6 +280,16 @@ export function useRouter(): CompatRouter {
   const location = useLocation();
   const params = useParams();
   const [searchParams] = useSearchParams();
+
+  // Fire routeChangeComplete when location changes (for PostHog, activity tracking)
+  const prevPathRef = useRef(location.pathname + location.search);
+  useEffect(() => {
+    const currentPath = location.pathname + location.search;
+    if (prevPathRef.current !== currentPath) {
+      prevPathRef.current = currentPath;
+      routerEvents.emit("routeChangeComplete", currentPath);
+    }
+  }, [location.pathname, location.search]);
 
   return useMemo(() => {
     // Merge route params and search params into query object (Next.js style)
@@ -310,7 +331,7 @@ export function useRouter(): CompatRouter {
       isReady: true,
       route: pathname,
       basePath: "",
-      events: noopEvents,
+      events: routerEvents,
       isFallback: false,
       push: (url, _as?, options?) => {
         const target = buildUrl(url, routeParamKeys);
