@@ -272,6 +272,12 @@ export function useRouter(): CompatRouter {
     const query: Record<string, string | string[] | undefined> = {
       ...params,
     };
+    // Convert React Router catch-all (*) to Next.js-style array param (path)
+    if (query["*"] !== undefined) {
+      const catchAll = query["*"] as string;
+      query.path = catchAll ? catchAll.split("/") : [];
+      delete query["*"];
+    }
     searchParams.forEach((value, key) => {
       const existing = query[key];
       if (existing !== undefined) {
