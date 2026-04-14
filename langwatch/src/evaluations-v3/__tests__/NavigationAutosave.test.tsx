@@ -24,7 +24,7 @@ let mockRouterQuery: Record<string, string> = { slug: "existing-evaluation" };
 const mockRouterReplace = vi.fn();
 const mockRouterPush = vi.fn();
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
     push: mockRouterPush,

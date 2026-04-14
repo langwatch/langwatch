@@ -11,7 +11,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 let mockQuery: Record<string, string> = {};
 const mockPush = vi.fn();
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockQuery,
     push: mockPush,

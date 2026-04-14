@@ -32,7 +32,7 @@ vi.mock("~/hooks/useSSESubscription", () => ({
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
 let mockQuery: Record<string, string | string[] | undefined> = { project: "my-project" };
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockQuery,
     pathname: "/[project]/simulations/[[...path]]",

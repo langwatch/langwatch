@@ -1,4 +1,4 @@
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useTheme } from "next-themes";
 import { useSession } from "~/utils/auth-client";
 import { subDays } from "date-fns";
@@ -33,7 +33,7 @@ import {
 } from "./selectHandlers";
 import { findEasterEgg } from "./easterEggs";
 import { useEasterEggEffects } from "./effects/useEasterEggEffects";
-import type { NextRouter } from "next/router";
+import type { NextRouter } from "~/utils/compat/next-router";
 
 /**
  * Handle page-specific commands for the traces page.

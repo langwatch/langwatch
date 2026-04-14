@@ -53,7 +53,7 @@ const {
   };
 });
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { userId: "user-1" },
     push: mockPush,

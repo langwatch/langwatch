@@ -53,7 +53,7 @@ vi.mock(
 );
 
 // Mock Next.js router
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: vi.fn().mockReturnValue({
     query: {},
     pathname: "/test-project/experiments/test-experiment",

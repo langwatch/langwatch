@@ -9,7 +9,7 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import type { inferRouterOutputs } from "@trpc/server";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useState } from "react";
 import {
   Copy,

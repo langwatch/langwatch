@@ -14,7 +14,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { ElasticSearchEvaluation } from "~/server/tracer/types";
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({ query: { project: "test-proj" } }),
 }));
 

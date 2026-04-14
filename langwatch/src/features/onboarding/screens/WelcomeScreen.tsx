@@ -1,6 +1,6 @@
 import { Box, HStack, VStack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";

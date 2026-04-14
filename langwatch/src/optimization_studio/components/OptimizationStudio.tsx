@@ -22,7 +22,7 @@ import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
 import "@xyflow/react/dist/style.css";
-import Head from "next/head";
+import Head from "~/utils/compat/next-head";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart2 } from "react-feather";
 import {

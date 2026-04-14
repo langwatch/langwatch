@@ -9,7 +9,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { BarChart2 } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback } from "react";
 import qs from "qs";
 import {

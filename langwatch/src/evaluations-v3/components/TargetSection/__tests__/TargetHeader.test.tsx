@@ -13,7 +13,7 @@ import { useEvaluationsV3Store } from "../../../hooks/useEvaluationsV3Store";
 import { TargetHeader } from "../../TargetSection/TargetHeader";
 
 // Mock next/router
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     pathname: "/test",

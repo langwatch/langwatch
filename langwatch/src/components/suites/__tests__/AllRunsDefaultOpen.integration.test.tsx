@@ -115,7 +115,7 @@ vi.mock("~/hooks/useDrawer", () => ({
 const mockPush = vi.fn();
 const mockReplace = vi.fn();
 let mockRouterQuery: Record<string, string | string[] | undefined> = { project: "my-project" };
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
     pathname: "/[project]/simulations/[[...path]]",

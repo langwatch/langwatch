@@ -231,6 +231,18 @@ const isBuildTime = !!process.env.BUILD_TIME;
 
 export const auth = betterAuth({
   baseURL: isBuildTime ? "http://localhost" : env.NEXTAUTH_URL,
+  trustedOrigins: isBuildTime
+    ? []
+    : [
+        env.NEXTAUTH_URL,
+        // Behind a reverse proxy (Boxd forks, preview deploys, tunneling
+        // services), BASE_HOST is the external URL while NEXTAUTH_URL may
+        // be the internal one. Accept both so sign-in/sign-up don't fail
+        // with "Invalid origin".
+        ...(env.BASE_HOST && env.BASE_HOST !== env.NEXTAUTH_URL
+          ? [env.BASE_HOST]
+          : []),
+      ],
   secret: isBuildTime ? "build-time-only" : env.NEXTAUTH_SECRET,
   database: prismaAdapter(prisma, { provider: "postgresql" }),
 

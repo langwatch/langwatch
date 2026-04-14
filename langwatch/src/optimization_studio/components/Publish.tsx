@@ -14,7 +14,7 @@ import {
 } from "@chakra-ui/react";
 import type { Dataset, DatasetRecord, Project } from "@prisma/client";
 import type { Edge } from "@xyflow/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useState } from "react";
 import {
   ArrowUp,

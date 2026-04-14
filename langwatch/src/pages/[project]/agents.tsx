@@ -7,7 +7,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Bot, Plus } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useState } from "react";
 import { AgentCard } from "~/components/agents/AgentCard";
 import { CopyAgentDialog } from "~/components/agents/CopyAgentDialog";

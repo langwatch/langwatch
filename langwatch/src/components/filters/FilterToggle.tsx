@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { X } from "react-feather";
 import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";

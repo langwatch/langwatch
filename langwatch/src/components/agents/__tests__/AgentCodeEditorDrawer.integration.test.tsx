@@ -9,7 +9,7 @@ import type { AvailableSource, FieldMapping } from "~/components/variables";
 import { AgentCodeEditorDrawer } from "../AgentCodeEditorDrawer";
 
 // Mock next/router
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: vi.fn(),
     query: { project: "test-project" },

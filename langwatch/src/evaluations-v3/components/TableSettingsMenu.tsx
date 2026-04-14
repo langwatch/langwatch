@@ -26,7 +26,7 @@ import {
   SlidersHorizontal,
   Terminal,
 } from "lucide-react";
-import NextLink from "next/link";
+import NextLink from "~/utils/compat/next-link";
 import React, { useMemo, useState } from "react";
 import { LuGauge } from "react-icons/lu";
 import { RenderCode } from "~/components/code/RenderCode";

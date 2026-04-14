@@ -109,6 +109,8 @@ services:
       - ./langwatch:/app
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
+      - ./typescript-sdk:/typescript-sdk:ro
+      - ./python-sdk:/python-sdk:ro
       - app_modules:/app/node_modules
       - pnpm_store:/root/.local/share/pnpm/store
       - goose_bin:/opt/goose-bin
@@ -148,6 +150,8 @@ services:
       - ./langwatch:/app
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
+      - ./typescript-sdk:/typescript-sdk:ro
+      - ./python-sdk:/python-sdk:ro
       - app_modules:/app/node_modules
       - goose_bin:/opt/goose-bin:ro
     command: >
@@ -157,7 +161,7 @@ services:
         pnpm -w exec prisma generate &&
         pnpm run types:zod:generate &&
         pnpm run start:prepare:db &&
-        pnpm run start:app
+        pnpm run dev
       "
     ports:
       - "${APP_PORT:-5560}:5560"
@@ -208,6 +212,8 @@ services:
       - ./langwatch:/app
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
+      - ./typescript-sdk:/typescript-sdk:ro
+      - ./python-sdk:/python-sdk:ro
       - app_modules:/app/node_modules
       - goose_bin:/opt/goose-bin:ro
     command: sh -c "export PATH=/opt/goose-bin:$$PATH && corepack enable && while true; do pnpm -w exec tsx --tsconfig tsconfig.workers.json src/workers.ts; sleep 1; done"
@@ -297,6 +303,8 @@ services:
       - ./langwatch:/app
       - ./mcp-server:/mcp-server
       - ./langevals:/langevals
+      - ./typescript-sdk:/typescript-sdk:ro
+      - ./python-sdk:/python-sdk:ro
       - app_modules:/app/node_modules
     command: sh -c "corepack enable && pnpm -w exec tsx scripts/ai-server.ts"
     ports:

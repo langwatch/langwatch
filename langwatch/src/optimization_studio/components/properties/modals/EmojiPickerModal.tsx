@@ -1,6 +1,6 @@
 import { type BoxProps, PopoverContent } from "@chakra-ui/react";
 import { EmojiStyle, SkinTonePickerLocation } from "emoji-picker-react";
-import dynamic from "next/dynamic";
+import dynamic from "~/utils/compat/next-dynamic";
 import { ConfigModal } from "./ConfigModal";
 
 const EmojiPicker = dynamic(
@@ -27,7 +27,7 @@ export function EmojiPickerModal({
         <EmojiPicker
           emojiStyle={EmojiStyle.NATIVE}
           skinTonePickerLocation={SkinTonePickerLocation.PREVIEW}
-          onEmojiClick={(emojiData) => {
+          onEmojiClick={(emojiData: any) => {
             onChange(emojiData.emoji);
             onClose();
           }}

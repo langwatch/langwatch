@@ -12,7 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "next/link";
+import NextLink from "~/utils/compat/next-link";
 import type { ReactNode } from "react";
 import { LuBookOpen, LuCircleX } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

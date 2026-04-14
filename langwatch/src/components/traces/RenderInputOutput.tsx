@@ -1,6 +1,6 @@
 import { Box, Button, type ButtonProps, HStack, Text } from "@chakra-ui/react";
 import type { ReactJsonViewProps } from "@microlink/react-json-view";
-import dynamic from "next/dynamic";
+import dynamic from "~/utils/compat/next-dynamic";
 import React, { useState } from "react";
 import type { SpanInputOutput } from "~/server/tracer/types";
 import {
@@ -12,6 +12,12 @@ import { useColorMode } from "../ui/color-mode";
 import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
 
+// Must be outside the component — React.lazy creates a new type on each call,
+// so calling dynamic() inside render causes infinite suspend loops.
+const ReactJson = dynamic(() => import("@microlink/react-json-view"), {
+  loading: () => <div />,
+});
+
 export const RenderInputOutput = React.memo(function RenderInputOutput(
   props: Partial<ReactJsonViewProps> & {
     value: SpanInputOutput["value"] | string | undefined;
@@ -20,9 +26,6 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
 ) {
   let { value } = props;
   const { colorMode } = useColorMode();
-  const ReactJson = dynamic(() => import("@microlink/react-json-view"), {
-    loading: () => <div />,
-  });
 
   let json: object | undefined;
   try {

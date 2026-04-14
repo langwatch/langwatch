@@ -1,4 +1,4 @@
-import { createEnv } from "@t3-oss/env-nextjs";
+import { createEnv } from "@t3-oss/env-core";
 import { z } from "zod";
 
 /** @param {import('zod').ZodTypeAny} schema */
@@ -7,13 +7,17 @@ const optionalIfBuildTime = (schema) => {
 };
 
 // Memoize so double calls (env.mjs root + createAppConfigFromEnv) only validate once
-/** @type {ReturnType<typeof import("@t3-oss/env-nextjs").createEnv> | null} */
+/** @type {any} */
 let _env = null;
 
 export function createEnvConfig() {
   if (_env) return _env;
 
   _env = createEnv({
+    // clientPrefix required by env-core to distinguish client/server vars
+    // (env-nextjs set this to "NEXT_PUBLIC_" automatically)
+    clientPrefix: "VITE_PUBLIC_",
+    client: {},
     server: {
       DATABASE_URL: optionalIfBuildTime(z.string().url()),
       CLICKHOUSE_URL: z.string().url().optional(),
@@ -135,19 +139,8 @@ export function createEnvConfig() {
       AUTH0_SCIM_WEBHOOK_SECRET: z.string().optional(),
     },
 
-    /**
-     * DO NOT USE client-side env vars, they won't work, expose it on `publicEnv.ts` instead
-     * NEXT_PUBLIC_ env vars are injected at build time, but we have to use the same build
-     * for multiple environments before the infra setup, so that won't work.
-     */
-    client: {
-      // DO NOT USE THIS, use `publicEnv.ts` instead
-    },
-
-    /**
-     * You can't destruct `process.env` as a regular object in the Next.js edge runtimes (e.g.
-     * middlewares) or client-side so we need to destruct manually.
-     */
+    // No client-side env vars — use `publicEnv.ts` instead.
+    // Runtime env values — must be destructured explicitly.
     runtimeEnv: {
       DATABASE_URL: process.env.DATABASE_URL,
       CLICKHOUSE_URL: process.env.CLICKHOUSE_URL,

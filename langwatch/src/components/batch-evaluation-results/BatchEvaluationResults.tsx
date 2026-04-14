@@ -18,7 +18,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { type Experiment, ExperimentType, type Project } from "@prisma/client";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { BarChart2, Download, ExternalLink } from "react-feather";
 

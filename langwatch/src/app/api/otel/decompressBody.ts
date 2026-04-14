@@ -1,6 +1,6 @@
 import { brotliDecompress, gunzip, inflate } from "node:zlib";
 import { promisify } from "node:util";
-import type { NextRequest } from "next/server";
+import type { NextRequest } from "~/types/next-stubs";
 
 const gunzipAsync = promisify(gunzip);
 const inflateAsync = promisify(inflate);

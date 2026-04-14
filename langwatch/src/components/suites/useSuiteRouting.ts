@@ -13,7 +13,7 @@
  *   [setSlug, batchId]            → External set + highlight batch
  */
 import { useCallback } from "react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 
 export const ALL_RUNS_ID = "all-runs" as const;
 export const EXTERNAL_SET_PREFIX = "external:" as const;

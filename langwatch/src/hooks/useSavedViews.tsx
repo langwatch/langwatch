@@ -15,7 +15,7 @@
  */
 
 import { differenceInCalendarDays, subDays } from "date-fns";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import React, {
   createContext,
   useCallback,

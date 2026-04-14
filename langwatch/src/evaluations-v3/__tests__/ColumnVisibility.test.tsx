@@ -21,7 +21,7 @@ import { useEvaluationsV3Store } from "../hooks/useEvaluationsV3Store";
 import type { DatasetColumn } from "../types";
 
 // Mock next/router
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: {},
     push: vi.fn(),

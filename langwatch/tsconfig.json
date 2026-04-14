@@ -15,7 +15,7 @@
 		"moduleDetection": "force",
 		"resolveJsonModule": true,
 		"isolatedModules": true,
-		"jsx": "preserve",
+		"jsx": "react-jsx",
 		"incremental": true,
 		"noUncheckedIndexedAccess": true,
 		"verbatimModuleSyntax": true,
@@ -29,22 +29,15 @@
 			],
 			"zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"]
 		},
-		"plugins": [
-			{
-				"name": "next"
-			}
-		]
+		"plugins": []
 	},
 	"include": [
 		// "./src/**/*"
 		".eslintrc.cjs",
-		"next-env.d.ts",
 		"**/*.ts",
 		"**/*.tsx",
 		"**/*.cjs",
-		"**/*.mjs",
-		".next/types/**/*.ts",
-		".next-saas/types/**/*.ts"
+		"**/*.mjs"
 	],
 	"exclude": [
 		"node_modules",

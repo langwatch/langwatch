@@ -46,6 +46,8 @@ prompts/**
 
 # Browser test artifacts (screenshots uploaded to img402.dev, not committed)
 browser-tests/
+**/.claude/screenshots/
+**/.claude/ralph-loop*.md
 
 # Playwright E2E tests
 agentic-e2e-tests/test-results/
