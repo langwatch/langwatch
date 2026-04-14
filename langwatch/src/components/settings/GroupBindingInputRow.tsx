@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { RoleBindingScopeType } from "@prisma/client";
 import { Search } from "lucide-react";
-import { useState } from "react";
+import { forwardRef, useImperativeHandle, useState } from "react";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
@@ -62,17 +62,25 @@ const BASE_ROLE_ITEMS = [
 
 // ── BindingInputRow ───────────────────────────────────────────────────────────
 
-export function BindingInputRow({
+export type BindingInputRowHandle = {
+  /** Return the uncommitted binding if all required fields are filled, otherwise null. Resets the row. */
+  flush: () => PendingBinding | null;
+};
+
+export const BindingInputRow = forwardRef<
+  BindingInputRowHandle,
+  {
+    organizationId: string;
+    onAdd: (binding: PendingBinding) => void;
+    buttonLabel?: string;
+    isPending?: boolean;
+  }
+>(function BindingInputRow({
   organizationId,
   onAdd,
   buttonLabel = "Add",
   isPending = false,
-}: {
-  organizationId: string;
-  onAdd: (binding: PendingBinding) => void;
-  buttonLabel?: string;
-  isPending?: boolean;
-}) {
+}, ref) {
   const [scopeType, setScopeType] = useState<RoleBindingScopeType>(RoleBindingScopeType.TEAM);
   const [scopeId, setScopeId] = useState("");
   const [roleValue, setRoleValue] = useState("MEMBER");
@@ -129,7 +137,10 @@ export function BindingInputRow({
     return undefined;
   }
 
+  const isReady = !scopeId === false || scopeType === RoleBindingScopeType.ORGANIZATION;
+
   function handleAdd() {
+    if (!isReady) return;
     const cid = customRoleId;
     const cname = cid ? customRoles.data?.find((r) => r.id === cid)?.name : undefined;
     onAdd({
@@ -145,6 +156,27 @@ export function BindingInputRow({
     setProjectTeamId("");
     setProjectTeamSearch("");
   }
+
+  useImperativeHandle(ref, () => ({
+    flush() {
+      if (!isReady) return null;
+      const cid = customRoleId;
+      const cname = cid ? customRoles.data?.find((r) => r.id === cid)?.name : undefined;
+      const binding: PendingBinding = {
+        roleValue,
+        role: cid ? "CUSTOM" : roleValue,
+        customRoleId: cid,
+        customRoleName: cname,
+        scopeType,
+        scopeId: scopeType === RoleBindingScopeType.ORGANIZATION ? organizationId : scopeId,
+        scopeName: getScopeName(),
+      };
+      setScopeId("");
+      setProjectTeamId("");
+      setProjectTeamSearch("");
+      return binding;
+    },
+  }));
 
   return (
     <HStack gap={2} mt={2} flexWrap="wrap">
@@ -301,7 +333,7 @@ export function BindingInputRow({
       </Button>
     </HStack>
   );
-}
+});
 
 // ── AddBindingForm ────────────────────────────────────────────────────────────
 

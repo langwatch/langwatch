@@ -11,7 +11,7 @@ import {
 import { RoleBindingScopeType } from "@prisma/client";
 import { X } from "lucide-react";
 import { Link } from "~/components/ui/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
@@ -19,6 +19,7 @@ import {
   BindingInputRow,
   roleBadgeColor,
   scopeTypeLabel,
+  type BindingInputRowHandle,
   type PendingBinding,
 } from "./GroupBindingInputRow";
 
@@ -45,6 +46,8 @@ export function MemberDetailDialog({
   const [pendingBindingRemovals, setPendingBindingRemovals] = useState<Set<string>>(new Set());
   const [pendingBindingAdditions, setPendingBindingAdditions] = useState<PendingBinding[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+
+  const bindingInputRef = useRef<BindingInputRowHandle>(null);
 
   const reset = () => {
     setPendingBindingRemovals(new Set());
@@ -73,13 +76,19 @@ export function MemberDetailDialog({
     pendingBindingAdditions.length > 0;
 
   const handleSave = async () => {
+    // Auto-stage any uncommitted binding row (user selected fields but didn't click Add)
+    const uncommitted = bindingInputRef.current?.flush() ?? null;
+    const allBindingAdditions = uncommitted
+      ? [...pendingBindingAdditions, uncommitted]
+      : pendingBindingAdditions;
+
     setIsSaving(true);
     try {
       await Promise.all([
         ...[...pendingBindingRemovals].map((bindingId) =>
           deleteBinding.mutateAsync({ organizationId, bindingId }),
         ),
-        ...pendingBindingAdditions.map((b) =>
+        ...allBindingAdditions.map((b) =>
           createBinding.mutateAsync({
             organizationId,
             userId: member.userId,
@@ -228,6 +237,7 @@ export function MemberDetailDialog({
                 )}
 
                 <BindingInputRow
+                  ref={bindingInputRef}
                   organizationId={organizationId}
                   onAdd={(b) =>
                     setPendingBindingAdditions((prev) => [...prev, b])

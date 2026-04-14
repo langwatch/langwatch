@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { Dialog } from "~/components/ui/dialog";
 import { InputGroup } from "~/components/ui/input-group";
@@ -25,6 +25,7 @@ import {
   roleBadgeColor,
   scopeTypeLabel,
   SourceBadge,
+  type BindingInputRowHandle,
   type PendingBinding,
 } from "./GroupBindingInputRow";
 
@@ -59,6 +60,8 @@ export function GroupDetailDialog({
   const [addMemberId, setAddMemberId] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  const bindingInputRef = useRef<BindingInputRowHandle>(null);
 
   const reset = () => {
     setPendingName(group.name);
@@ -104,6 +107,12 @@ export function GroupDetailDialog({
 
   // ── save ────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
+    // Auto-stage any uncommitted binding row (user selected fields but didn't click Add)
+    const uncommitted = bindingInputRef.current?.flush() ?? null;
+    const allBindingAdditions = uncommitted
+      ? [...pendingBindingAdditions, uncommitted]
+      : pendingBindingAdditions;
+
     setIsSaving(true);
     try {
       if (nameChanged) {
@@ -118,7 +127,7 @@ export function GroupDetailDialog({
         ...[...pendingBindingRemovals].map((bindingId) =>
           removeBinding.mutateAsync({ organizationId, bindingId }),
         ),
-        ...pendingBindingAdditions.map((b) =>
+        ...allBindingAdditions.map((b) =>
           addBinding.mutateAsync({
             organizationId,
             groupId: group.id,
@@ -294,6 +303,7 @@ export function GroupDetailDialog({
 
                 {canManage && (
                   <BindingInputRow
+                    ref={bindingInputRef}
                     organizationId={organizationId}
                     onAdd={(b) => setPendingBindingAdditions((prev) => [...prev, b])}
                   />
@@ -409,7 +419,7 @@ export function GroupDetailDialog({
           )}
         </Dialog.Body>
 
-        {canManage && !detail.data?.scimSource && (
+        {canManage && (
           <Dialog.Footer>
             <Button variant="outline" onClick={() => { reset(); onClose(); }}>
               Cancel
