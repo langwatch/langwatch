@@ -125,12 +125,28 @@ export const useFilterParams = () => {
   // for shallow navigation, so the push silently does nothing.
   //
   // The (url, as) overload avoids this:
-  //   url  = { pathname, query: router.query }  →  tells Next.js "same page"
-  //   as   = currentPath + "?" + newQs           →  what the browser shows
+  //   url  = { pathname, query: { ...routeParams, ...parsed } }
+  //   as   = currentPath + "?" + newQs
+  //
+  // The url's query is built from parsed newQs + dynamic route params only
+  // (not router.query which may carry stale keys). This ensures:
+  //   - Next.js detects a route change → re-renders components using useRouter()
+  //   - Deleted keys (e.g. cleared filters) are actually removed
   const shallowPush = (newQs: string) => {
     const currentPath = router.asPath.split("?")[0] ?? router.asPath;
+    const pathParamKeys = new Set(
+      (router.pathname.match(/\[(\w+)\]/g) ?? []).map((m) => m.slice(1, -1)),
+    );
+    const routeParams = Object.fromEntries(
+      Object.entries(router.query).filter(([key]) => pathParamKeys.has(key)),
+    );
+    const parsed = qs.parse(newQs, {
+      allowDots: true,
+      comma: true,
+      allowEmptyArrays: true,
+    });
     void router.push(
-      { pathname: router.pathname, query: router.query },
+      { pathname: router.pathname, query: { ...routeParams, ...parsed } },
       currentPath + "?" + newQs,
       { shallow: true, scroll: false },
     );

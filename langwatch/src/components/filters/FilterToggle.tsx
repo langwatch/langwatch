@@ -70,15 +70,23 @@ export const useFilterToggle = (
       allowEmptyArrays: true,
     });
 
-    const nextRouterQuery = { ...router.query };
-    if (showFiltersValue === undefined) {
-      delete nextRouterQuery.show_filters;
-    } else {
-      nextRouterQuery.show_filters = showFiltersValue;
-    }
+    // Build url query from parsed newQs + dynamic route params only.
+    // Using parsed as the base (not spreading over router.query) ensures
+    // deleted keys like show_filters are actually removed.
+    const pathParamKeys = new Set(
+      (router.pathname.match(/\[(\w+)\]/g) ?? []).map((m) => m.slice(1, -1)),
+    );
+    const routeParams = Object.fromEntries(
+      Object.entries(router.query).filter(([key]) => pathParamKeys.has(key)),
+    );
+    const parsed = qs.parse(newQs, {
+      allowDots: true,
+      comma: true,
+      allowEmptyArrays: true,
+    });
 
     void router.push(
-      { pathname: router.pathname, query: nextRouterQuery },
+      { pathname: router.pathname, query: { ...routeParams, ...parsed } },
       newQs ? `${currentPath}?${newQs}` : currentPath,
       { shallow: true, scroll: false },
     );
