@@ -334,12 +334,12 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
     });
 
     describe("when showing dialog controls", () => {
-      it("displays the Save changes button", () => {
+      it("displays the Save button", () => {
         setupQueries();
         renderDialog();
 
         expect(
-          screen.getByRole("button", { name: /save changes/i }),
+          screen.getByRole("button", { name: /^save$/i }),
         ).toBeInTheDocument();
       });
     });
@@ -361,7 +361,7 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
         const prodSelect = screen.getByLabelText("Production version");
         fireEvent.change(prodSelect, { target: { value: "v3-id" } });
 
-        const saveButton = screen.getByRole("button", { name: /save changes/i });
+        const saveButton = screen.getByRole("button", { name: /^save$/i });
         fireEvent.click(saveButton);
 
         await waitFor(() => {
@@ -392,7 +392,7 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
         const stagSelect = screen.getByLabelText("Staging version");
         fireEvent.change(stagSelect, { target: { value: "v2-id" } });
 
-        const saveButton = screen.getByRole("button", { name: /save changes/i });
+        const saveButton = screen.getByRole("button", { name: /^save$/i });
         fireEvent.click(saveButton);
 
         await waitFor(() => {
@@ -427,7 +427,7 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
           target: { value: "v1-id" },
         });
 
-        fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
         await waitFor(() => {
           expect(mockMutateAsync).toHaveBeenCalledTimes(2);
@@ -450,7 +450,7 @@ describe.skip("Feature: Deploy Prompt Dialog", () => {
         });
         renderDialog({ onClose });
 
-        fireEvent.click(screen.getByRole("button", { name: /save changes/i }));
+        fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
 
         await waitFor(() => {
           expect(onClose).toHaveBeenCalled();
