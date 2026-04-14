@@ -36,13 +36,6 @@ interface SkillItem {
 
 const SKILLS: SkillItem[] = [
   {
-    id: "level-up",
-    label: "Level up with everything LangWatch",
-    prompt: PROMPT_LEVEL_UP,
-    installCommand: "npx skills add langwatch/skills/level-up",
-    slashCommand: "/level-up",
-  },
-  {
     id: "evaluations",
     label: "Set up evaluations for your agent",
     prompt: PROMPT_EVALUATIONS,
@@ -76,6 +69,13 @@ const SKILLS: SkillItem[] = [
     prompt: PROMPT_ANALYTICS,
     installCommand: "npx skills add langwatch/skills/analytics",
     slashCommand: "/analytics",
+  },
+  {
+    id: "level-up",
+    label: "All of the above",
+    prompt: PROMPT_LEVEL_UP,
+    installCommand: "npx skills add langwatch/skills/level-up",
+    slashCommand: "/level-up",
   },
 ];
 
