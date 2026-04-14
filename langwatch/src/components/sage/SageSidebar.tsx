@@ -10,7 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { DefaultChatTransport, type UIMessage } from "ai";
-import { useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import {
   LuArrowRight,
   LuCheck,
@@ -51,11 +51,31 @@ interface SageDrawerProps {
 
 export function SageDrawer({ proposalHandlers }: SageDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const handleRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target) return;
+      if (panelRef.current?.contains(target)) return;
+      if (handleRef.current?.contains(target)) return;
+      setIsOpen(false);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    return () => document.removeEventListener("pointerdown", onPointerDown);
+  }, [isOpen]);
 
   return (
     <>
-      <SageHandle isOpen={isOpen} onToggle={() => setIsOpen((v) => !v)} />
+      <SageHandle
+        ref={handleRef}
+        isOpen={isOpen}
+        onToggle={() => setIsOpen((v) => !v)}
+      />
       <SagePanel
+        ref={panelRef}
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         proposalHandlers={proposalHandlers}
@@ -64,15 +84,13 @@ export function SageDrawer({ proposalHandlers }: SageDrawerProps) {
   );
 }
 
-function SageHandle({
-  isOpen,
-  onToggle,
-}: {
-  isOpen: boolean;
-  onToggle: () => void;
-}) {
+const SageHandle = forwardRef<
+  HTMLButtonElement,
+  { isOpen: boolean; onToggle: () => void }
+>(function SageHandle({ isOpen, onToggle }, ref) {
   return (
     <Box
+      ref={ref}
       as="button"
       onClick={onToggle}
       aria-label={isOpen ? "Close Sage" : "Open Sage"}
@@ -117,17 +135,16 @@ function SageHandle({
       </VStack>
     </Box>
   );
-}
+});
 
-function SagePanel({
-  isOpen,
-  onClose,
-  proposalHandlers,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-  proposalHandlers?: ProposalHandlers;
-}) {
+const SagePanel = forwardRef<
+  HTMLDivElement,
+  {
+    isOpen: boolean;
+    onClose: () => void;
+    proposalHandlers?: ProposalHandlers;
+  }
+>(function SagePanel({ isOpen, onClose, proposalHandlers }, ref) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
 
@@ -213,6 +230,7 @@ function SagePanel({
 
   return (
     <Box
+      ref={ref}
       position="fixed"
       top={2}
       right={2}
@@ -230,6 +248,7 @@ function SagePanel({
         isOpen ? "translateX(0)" : `translateX(calc(${DRAWER_WIDTH}px + 16px))`
       }
       opacity={isOpen ? 1 : 0}
+      pointerEvents={isOpen ? "auto" : "none"}
     >
       <VStack gap={0} align="stretch" height="full">
         <PanelHeader onClose={onClose} />
@@ -262,7 +281,7 @@ function SagePanel({
       </VStack>
     </Box>
   );
-}
+});
 
 function PanelHeader({ onClose }: { onClose: () => void }) {
   return (
