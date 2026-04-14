@@ -48,7 +48,7 @@ All list/get commands support `--format json` for machine-readable output.
 - `langwatch workflow run <id> --input <json>` — execute a workflow
 
 ### Observability
-- `langwatch trace search|get` — search and inspect traces
+- `langwatch trace search|get|export` — search, inspect, and export traces
 - `langwatch analytics query --metric <preset>` — query metrics
 - `langwatch simulation-run list|get` — view simulation run results
 

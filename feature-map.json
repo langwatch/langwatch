@@ -20,7 +20,7 @@
                 "python": "langwatch.trace",
                 "typescript": "langwatch"
               },
-              "cli": ["trace search", "trace get"],
+              "cli": ["trace search", "trace get", "trace export"],
               "skill": "tracing",
               "docs": "https://langwatch.ai/docs/integration/overview.md"
             },
