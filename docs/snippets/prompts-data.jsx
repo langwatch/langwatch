@@ -27,10 +27,73 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 
 This skill is code-only — there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation and point them to the LangWatch docs.
 
-## Step 1: Set up the LangWatch MCP
+## Step 1: Set up the LangWatch CLI
 
-First, install the LangWatch MCP server so you have access to framework-specific documentation:
+# Using the LangWatch CLI
 
+The \`langwatch\` CLI gives full access to the LangWatch platform from the terminal. Install with \`npm install -g langwatch\` or use \`npx langwatch\`.
+
+## Setup
+
+Set \`LANGWATCH_API_KEY\` in your \`.env\` file, or run \`langwatch login\` interactively.
+
+\`\`\`bash
+# Load from .env
+export $(grep LANGWATCH_API_KEY .env)
+
+# Or login interactively
+langwatch login
+\`\`\`
+
+## Quick Start
+
+\`\`\`bash
+langwatch status                    # Project overview
+langwatch --help                    # All available commands
+langwatch <command> --help          # Help for any command
+\`\`\`
+
+All list/get commands support \`--format json\` for machine-readable output.
+
+## Key Commands
+
+### Resources (CRUD)
+- \`langwatch scenario list|get|create|update|delete\` — manage test scenarios
+- \`langwatch suite list|get|create|update|duplicate|delete\` — manage suites (run plans)
+- \`langwatch evaluator list|get|create|update|delete\` — manage evaluators
+- \`langwatch dataset list|create|get|update|delete|upload|download\` — manage datasets
+- \`langwatch agent list|get|create|update|delete\` — manage agents
+- \`langwatch workflow list|get|update|delete\` — manage workflows
+- \`langwatch prompt init|create|sync|pull|push|versions|restore\` — manage prompts
+- \`langwatch dashboard list|get|update|create|delete\` — manage dashboards
+- \`langwatch graph list|create|update|delete\` — manage custom graphs on dashboards
+- \`langwatch trigger list|get|create|update|delete\` — manage automations/alerts
+- \`langwatch annotation list|get|create|delete\` — manage annotations
+- \`langwatch secret list|get|create|update|delete\` — manage project secrets (encrypted env vars)
+- \`langwatch monitor list|get|create|update|delete\` — manage online evaluation monitors
+- \`langwatch model-provider list|set\` — manage model providers
+
+### Execution
+- \`langwatch evaluation run <slug> [--wait]\` — run evaluations
+- \`langwatch suite run <id> [--wait]\` — run a suite (scenario x target matrix)
+- \`langwatch scenario run <id> --target <type>:<ref>\` — run a scenario against a target
+- \`langwatch agent run <id> --input <json>\` — execute an agent
+- \`langwatch workflow run <id> --input <json>\` — execute a workflow
+
+### Observability
+- \`langwatch trace search|get|export\` — search, inspect, and export traces
+- \`langwatch analytics query --metric <preset>\` — query metrics
+- \`langwatch simulation-run list|get\` — view simulation run results
+
+**Tip:** Prefer CLI over MCP tools when running in Claude Code or terminal environments. The CLI is useful for verifying traces:
+
+\`\`\`bash
+langwatch trace search --limit 5          # Verify traces arrive
+langwatch trace get <traceId>             # Inspect a specific trace
+langwatch analytics query --metric trace-count  # Check trace volume
+\`\`\`
+
+For documentation access, set up the LangWatch MCP:
 # Installing the LangWatch MCP
 
 ## For Claude Code
@@ -55,7 +118,6 @@ Use the hosted remote MCP server:
 - Get a key at https://app.langwatch.ai/authorize
 
 **Tip:** If \`LANGWATCH_API_KEY\` is already in the project's \`.env\` file, use that same key for the MCP configuration.
-
 If MCP installation fails, see # Fetching LangWatch Docs Without MCP
 
 If the LangWatch MCP cannot be installed, you can fetch docs directly:
@@ -67,7 +129,7 @@ If the LangWatch MCP cannot be installed, you can fetch docs directly:
 Example flow:
 1. Fetch https://langwatch.ai/docs/llms.txt to see available topics
 2. Fetch https://langwatch.ai/docs/integration/python/guide.md for Python instrumentation
-3. Fetch https://langwatch.ai/docs/integration/typescript/guide.md for TypeScript instrumentation to fetch docs directly via URLs.
+3. Fetch https://langwatch.ai/docs/integration/typescript/guide.md for TypeScript instrumentation.
 
 ## Step 2: Get the API Key
 
@@ -127,8 +189,8 @@ Do NOT consider the instrumentation complete without verifying it works. Follow 
 
 1. **Install dependencies** — run \`pip install langwatch\` (or \`uv add langwatch\`) / \`npm install langwatch\` (or \`pnpm add langwatch\`). If the install fails due to peer dependency conflicts, widen the conflicting range and retry — do NOT silently skip this step.
 2. **Run a quick test** — execute the agent with a simple test input to generate at least one trace. For Python, try running the main script. For TypeScript/Mastra, try running with \`npx tsx\` or the framework's dev command. Study how the framework starts to find the right approach; only give up if the framework requires infrastructure you cannot spin up (databases, external services, etc.).
-3. **Check traces arrived** — if the LangWatch MCP is available, wait 5 seconds then call \`search_traces\` to verify the trace appeared. If traces show up, instrumentation is confirmed working.
-4. **If verification isn't possible** (no MCP, can't run the code, missing external services), tell the user exactly what to check: "Run your agent and verify traces appear in your LangWatch dashboard at https://app.langwatch.ai". Be specific about what you couldn't verify and why.
+3. **Check traces arrived** — use the CLI to verify: \`langwatch trace search --limit 5\`. If the CLI is not available but MCP is, call \`search_traces\`. If traces show up, instrumentation is confirmed working.
+4. **If verification isn't possible** (no CLI/MCP, can't run the code, missing external services), tell the user exactly what to check: "Run your agent and verify traces appear in your LangWatch dashboard at https://app.langwatch.ai". Be specific about what you couldn't verify and why.
 
 ## Common Mistakes
 
@@ -232,8 +294,8 @@ If the user's request is **specific** ("add a faithfulness evaluator", "create a
 
 1. Check if you're in a codebase (look for \`package.json\`, \`pyproject.toml\`, \`requirements.txt\`, etc.)
 2. If **YES** → use the **Code approach** for experiments (SDK) and guardrails (code integration)
-3. If **NO** → use the **Platform approach** for evaluators (MCP tools) and monitors (UI guidance)
-4. If ambiguous → ask the user: "Do you want to write evaluation code or set things up on the platform?"
+3. If **NO** → use the **CLI approach** for evaluators, monitors, and datasets (preferred over MCP)
+4. If ambiguous → ask the user: "Do you want to write evaluation code or set things up via CLI?"
 
 Some features are code-only (experiments, guardrails) and some are platform-only (monitors). Evaluators work on both surfaces.
 
@@ -284,7 +346,65 @@ Bad:
 
 ## Prerequisites
 
-Set up the LangWatch MCP for documentation access:
+**Preferred: Use the LangWatch CLI** (see # Using the LangWatch CLI
+
+The \`langwatch\` CLI gives full access to the LangWatch platform from the terminal. Install with \`npm install -g langwatch\` or use \`npx langwatch\`.
+
+## Setup
+
+Set \`LANGWATCH_API_KEY\` in your \`.env\` file, or run \`langwatch login\` interactively.
+
+\`\`\`bash
+# Load from .env
+export $(grep LANGWATCH_API_KEY .env)
+
+# Or login interactively
+langwatch login
+\`\`\`
+
+## Quick Start
+
+\`\`\`bash
+langwatch status                    # Project overview
+langwatch --help                    # All available commands
+langwatch <command> --help          # Help for any command
+\`\`\`
+
+All list/get commands support \`--format json\` for machine-readable output.
+
+## Key Commands
+
+### Resources (CRUD)
+- \`langwatch scenario list|get|create|update|delete\` — manage test scenarios
+- \`langwatch suite list|get|create|update|duplicate|delete\` — manage suites (run plans)
+- \`langwatch evaluator list|get|create|update|delete\` — manage evaluators
+- \`langwatch dataset list|create|get|update|delete|upload|download\` — manage datasets
+- \`langwatch agent list|get|create|update|delete\` — manage agents
+- \`langwatch workflow list|get|update|delete\` — manage workflows
+- \`langwatch prompt init|create|sync|pull|push|versions|restore\` — manage prompts
+- \`langwatch dashboard list|get|update|create|delete\` — manage dashboards
+- \`langwatch graph list|create|update|delete\` — manage custom graphs on dashboards
+- \`langwatch trigger list|get|create|update|delete\` — manage automations/alerts
+- \`langwatch annotation list|get|create|delete\` — manage annotations
+- \`langwatch secret list|get|create|update|delete\` — manage project secrets (encrypted env vars)
+- \`langwatch monitor list|get|create|update|delete\` — manage online evaluation monitors
+- \`langwatch model-provider list|set\` — manage model providers
+
+### Execution
+- \`langwatch evaluation run <slug> [--wait]\` — run evaluations
+- \`langwatch suite run <id> [--wait]\` — run a suite (scenario x target matrix)
+- \`langwatch scenario run <id> --target <type>:<ref>\` — run a scenario against a target
+- \`langwatch agent run <id> --input <json>\` — execute an agent
+- \`langwatch workflow run <id> --input <json>\` — execute a workflow
+
+### Observability
+- \`langwatch trace search|get|export\` — search, inspect, and export traces
+- \`langwatch analytics query --metric <preset>\` — query metrics
+- \`langwatch simulation-run list|get\` — view simulation run results
+
+**Tip:** Prefer CLI over MCP tools when running in Claude Code or terminal environments.)
+
+The CLI is the primary interface for agents. If the CLI is not available, fall back to MCP tools.
 
 # Installing the LangWatch MCP
 
@@ -457,11 +577,17 @@ langwatch evaluation run <slug> --wait                      # Run evaluation and
 langwatch evaluation status <runId>                         # Check run status
 \`\`\`
 
-### Platform Approach (MCP)
+### Platform Approach (CLI preferred)
+\`\`\`bash
+langwatch evaluator list                                      # List evaluators
+langwatch evaluator get <idOrSlug>                            # Get details
+langwatch evaluator create "Name" --type langevals/llm_judge  # Create
+langwatch evaluator update <idOrSlug> --name "New Name"       # Update
+\`\`\`
+
+If the CLI is not available, use MCP tools as a fallback:
 1. Call \`discover_schema\` with category "evaluators" to see available types
 2. Use \`platform_create_evaluator\` to create an evaluator on the platform
-3. Use \`platform_list_evaluators\` to see existing evaluators
-4. Use \`platform_get_evaluator\` and \`platform_update_evaluator\` to review and modify
 
 This is useful for setting up LLM-as-judge evaluators, custom evaluators, or configuring evaluators that will be used in platform experiments and monitors.
 
@@ -510,40 +636,51 @@ NEVER use generic examples like "What is 2+2?", "What is the capital of France?"
 
 ## Platform Approach: Prompts + Evaluators (No Code)
 
-When the user has no codebase and wants to set up evaluation building blocks on the platform:
-
-NOTE: Full UI experiments are not yet available via MCP. This approach sets up the building blocks (prompts + evaluators + datasets) that can then be used in the platform UI.
+When the user has no codebase and wants to set up evaluation building blocks on the platform.
+Use the CLI as the primary interface:
 
 ### Create or Update a Prompt
 
-Use the \`platform_create_prompt\` MCP tool to create a new prompt:
-- Provide a name, model, and messages (system + user)
-- The prompt will appear in your LangWatch project's Prompts section
-
-Or use \`platform_list_prompts\` to find existing prompts and \`platform_update_prompt\` to modify them.
+\`\`\`bash
+langwatch prompt list                             # List existing prompts
+langwatch prompt create my-prompt                 # Create a new prompt YAML
+langwatch prompt push                             # Push to the platform
+langwatch prompt versions my-prompt               # View version history
+langwatch prompt tag assign my-prompt production  # Tag a version
+\`\`\`
 
 ### Check Model Providers
 
-Before creating evaluators on the platform, verify model providers are configured:
+Before creating evaluators, verify model providers are configured:
 
-1. Call \`platform_list_model_providers\` to check existing providers
-2. If no providers are configured, ask the user if they have an LLM API key (OpenAI, Anthropic, etc.)
-3. If they do, set it up with \`platform_set_model_provider\` so evaluators can run
+\`\`\`bash
+langwatch model-provider list                     # Check existing providers
+langwatch model-provider set openai --api-key sk-... # Set up a provider
+\`\`\`
 
 ### Create an Evaluator
 
-Use the \`platform_create_evaluator\` MCP tool to set up evaluation criteria:
-- First call \`discover_schema\` with category "evaluators" to see available evaluator types
-- Create an LLM-as-judge evaluator for quality assessment
-- Or create a specific evaluator type matching your use case
+\`\`\`bash
+langwatch evaluator list                          # See available evaluators
+langwatch evaluator create "Quality Judge" --type langevals/llm_judge
+langwatch evaluator get <idOrSlug> --format json  # View details
+\`\`\`
 
 ### Create a Dataset
 
-Use the \`platform_create_dataset\` MCP tool to create a test dataset:
-- Provide a name and column definitions (e.g., \`input\` string, \`expected_output\` string)
-- Use \`platform_create_dataset_records\` to add records in batch (max 1000 per call)
-- Use \`platform_list_datasets\` to browse existing datasets
-- Use \`platform_get_dataset\` to view dataset contents and metadata
+\`\`\`bash
+langwatch dataset create "Test Data" -c input:string,expected_output:string
+langwatch dataset upload test-data data.csv       # Upload from CSV/JSON/JSONL
+langwatch dataset records list test-data           # View records
+\`\`\`
+
+### Set Up Monitors (Online Evaluation)
+
+\`\`\`bash
+langwatch monitor create "Toxicity Check" --check-type ragas/toxicity
+langwatch monitor create "PII Detection" --check-type presidio/pii_detection --sample 0.5
+langwatch monitor list                            # View all monitors
+\`\`\`
 
 ### Test in the Platform
 
@@ -553,17 +690,17 @@ Go to https://app.langwatch.ai and:
 3. Use the Prompt Playground to test variations
 4. Set up an experiment in the Experiments section using your prompt, evaluator, and dataset
 
-### Current Limitations
+### MCP Fallback
 
-- UI experiments cannot be created via MCP yet — use the platform UI
-- The MCP can create prompts, evaluators, and datasets, which are the building blocks for experiments
+If the CLI is not available, use MCP tools instead (\`platform_create_prompt\`, \`platform_create_evaluator\`, etc.).
 
 ## Common Mistakes
 
 - Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
 - Do NOT use generic/placeholder datasets — generate domain-specific examples
-- Do NOT use \`platform_\` MCP tools for code-based features (experiments, guardrails) — write code
-- Do use \`platform_\` MCP tools for platform-based features (evaluators, monitors) when the user wants no-code
+- Do NOT use MCP tools for code-based features (experiments, guardrails) — write code
+- Prefer the \`langwatch\` CLI over MCP tools for platform features (evaluators, monitors, datasets)
+- Only use MCP tools as a fallback when the CLI is not available
 - Do NOT skip running the experiment to verify it works
 - Monitors **measure** (async), guardrails **act** (sync, via code with \`as_guardrail=True\`) — both are online evaluation
 - Always set up \`LANGWATCH_API_KEY\` in \`.env\`
@@ -579,7 +716,7 @@ First, try to install the LangWatch MCP server for access to documentation and p
 
 # Test Your Agent with Scenarios
 
-NEVER invent your own agent testing framework. Use \`@langwatch/scenario\` (Python: \`langwatch-scenario\`) for code-based tests, or the platform MCP tools for no-code scenarios. The Scenario framework provides user simulation, judge-based evaluation, multi-turn conversation testing, and adversarial red teaming out of the box. Do NOT build these capabilities from scratch.
+NEVER invent your own agent testing framework. Use \`@langwatch/scenario\` (Python: \`langwatch-scenario\`) for code-based tests, or the \`langwatch\` CLI for no-code platform scenarios. The Scenario framework provides user simulation, judge-based evaluation, multi-turn conversation testing, and adversarial red teaming out of the box. Do NOT build these capabilities from scratch.
 
 ## Determine Scope
 
@@ -647,8 +784,8 @@ If the user's request is about **red teaming** ("red team my agent", "find vulne
 
 1. Check if you're in a codebase (look for \`package.json\`, \`pyproject.toml\`, \`requirements.txt\`, etc.)
 2. If **YES** → use the **Code approach** (Scenario SDK — write test files)
-3. If **NO** → use the **Platform approach** (MCP tools — no files needed)
-4. If ambiguous → ask the user: "Do you want to write scenario test code or create scenarios on the platform?"
+3. If **NO** → use the **CLI approach** (preferred) or MCP tools as fallback
+4. If ambiguous → ask the user: "Do you want to write scenario test code or create scenarios via CLI?"
 
 ## The Agent Testing Pyramid
 
@@ -996,56 +1133,88 @@ describe("Agent Security", () => {
 
 ---
 
-## Platform Approach: MCP Tools
+## Platform Approach: CLI (preferred)
 
 Use this when the user has no codebase and wants to create scenarios directly on the platform.
 
 NOTE: If you have a codebase and want to write scenario test code, use the Code Approach above instead.
 
-### Step 1: Set up the LangWatch MCP
+### Step 1: Set up the CLI
 
-The MCP must be configured with your LangWatch API key.
+# Using the LangWatch CLI
 
-# Installing the LangWatch MCP
+The \`langwatch\` CLI gives full access to the LangWatch platform from the terminal. Install with \`npm install -g langwatch\` or use \`npx langwatch\`.
 
-## For Claude Code
-Run:
+## Setup
+
+Set \`LANGWATCH_API_KEY\` in your \`.env\` file, or run \`langwatch login\` interactively.
+
 \`\`\`bash
-claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey ASK_USER_FOR_LANGWATCH_API_KEY
+# Load from .env
+export $(grep LANGWATCH_API_KEY .env)
+
+# Or login interactively
+langwatch login
 \`\`\`
 
-Or add an entry named \`langwatch\` under the \`mcpServers\` object of \`~/.claude.json\` or \`.mcp.json\` with these fields:
-- \`command\`: npx
-- \`args\`: \`-y\`, then the package name on a separate token
-- package to launch: the npm package \`@langwatch/mcp-server\` (scoped)
-- \`env.LANGWATCH_API_KEY\`: the user's LangWatch API key
+## Quick Start
 
-## For other editors
-Add the same \`mcpServers.langwatch\` entry to your editor's MCP settings file. Use the fields listed above.
+\`\`\`bash
+langwatch status                    # Project overview
+langwatch --help                    # All available commands
+langwatch <command> --help          # Help for any command
+\`\`\`
 
-## For ChatGPT, Claude Chat, or other web assistants
-Use the hosted remote MCP server:
-- URL: \`https://mcp.langwatch.ai/sse\`
-- Authentication: Bearer Token with your LangWatch API key
-- Get a key at https://app.langwatch.ai/authorize
+All list/get commands support \`--format json\` for machine-readable output.
 
-**Tip:** If \`LANGWATCH_API_KEY\` is already in the project's \`.env\` file, use that same key for the MCP configuration.
+## Key Commands
 
-### Step 2: Understand the Scenario Schema
+### Resources (CRUD)
+- \`langwatch scenario list|get|create|update|delete\` — manage test scenarios
+- \`langwatch suite list|get|create|update|duplicate|delete\` — manage suites (run plans)
+- \`langwatch evaluator list|get|create|update|delete\` — manage evaluators
+- \`langwatch dataset list|create|get|update|delete|upload|download\` — manage datasets
+- \`langwatch agent list|get|create|update|delete\` — manage agents
+- \`langwatch workflow list|get|update|delete\` — manage workflows
+- \`langwatch prompt init|create|sync|pull|push|versions|restore\` — manage prompts
+- \`langwatch dashboard list|get|update|create|delete\` — manage dashboards
+- \`langwatch graph list|create|update|delete\` — manage custom graphs on dashboards
+- \`langwatch trigger list|get|create|update|delete\` — manage automations/alerts
+- \`langwatch annotation list|get|create|delete\` — manage annotations
+- \`langwatch secret list|get|create|update|delete\` — manage project secrets (encrypted env vars)
+- \`langwatch monitor list|get|create|update|delete\` — manage online evaluation monitors
+- \`langwatch model-provider list|set\` — manage model providers
 
-Call \`discover_schema\` with category "scenarios" to understand:
-- Available fields (name, situation, criteria, labels, etc.)
-- How to structure your scenarios
+### Execution
+- \`langwatch evaluation run <slug> [--wait]\` — run evaluations
+- \`langwatch suite run <id> [--wait]\` — run a suite (scenario x target matrix)
+- \`langwatch scenario run <id> --target <type>:<ref>\` — run a scenario against a target
+- \`langwatch agent run <id> --input <json>\` — execute an agent
+- \`langwatch workflow run <id> --input <json>\` — execute a workflow
 
-### Step 3: Create Scenarios
+### Observability
+- \`langwatch trace search|get|export\` — search, inspect, and export traces
+- \`langwatch analytics query --metric <preset>\` — query metrics
+- \`langwatch simulation-run list|get\` — view simulation run results
 
-Use the \`platform_create_scenario\` MCP tool to create test scenarios:
+**Tip:** Prefer CLI over MCP tools when running in Claude Code or terminal environments. Set \`LANGWATCH_API_KEY\` in your \`.env\` file.
 
-For each scenario, define:
-- **name**: A descriptive name for the test case
-- **situation**: The context and user behavior to simulate
-- **criteria**: What the agent should do (list of success criteria)
-- **labels**: Tags for organization (optional)
+### Step 2: Create Scenarios
+
+\`\`\`bash
+# List existing scenarios
+langwatch scenario list
+
+# Create a scenario with situation and criteria
+langwatch scenario create "Happy Path" \
+  --situation "Customer asks about product availability" \
+  --criteria "Agent checks inventory,Agent provides accurate stock info"
+
+# Create edge case scenarios
+langwatch scenario create "Error Handling" \
+  --situation "Customer sends empty message" \
+  --criteria "Agent asks for clarification,Agent doesn't crash"
+\`\`\`
 
 Create scenarios covering:
 1. **Happy path**: Normal, expected interactions
@@ -1053,13 +1222,27 @@ Create scenarios covering:
 3. **Error handling**: When things go wrong
 4. **Boundary conditions**: Limits of the agent's capabilities
 
-### Step 4: Review and Iterate
+### Step 3: Review and Iterate
 
-Use \`platform_list_scenarios\` to see all your scenarios and \`platform_get_scenario\` to review details. Use \`platform_update_scenario\` to refine them.
+\`\`\`bash
+langwatch scenario list --format json              # List all scenarios
+langwatch scenario get <id>                        # Review details
+langwatch scenario update <id> --criteria "..."    # Refine criteria
+\`\`\`
 
-### Step 5: Run Simulations
+### Step 4: Set Up Suites (Run Plans)
 
-Go to https://app.langwatch.ai and navigate to your project's Simulations section to run the scenarios you created.
+\`\`\`bash
+langwatch agent list --format json                 # Find agent IDs
+langwatch suite create "Regression Test" \
+  --scenarios <id1>,<id2> \
+  --targets http:<agentId>
+langwatch suite run <suiteId> --wait               # Run and wait for results
+\`\`\`
+
+### MCP Fallback
+
+If the CLI is not available, use MCP tools instead (\`platform_create_scenario\`, \`platform_list_scenarios\`, etc.).
 
 ### Verify by Running
 
@@ -1088,7 +1271,7 @@ For TypeScript: \`npx vitest run\`
 - Do NOT forget to set a generous timeout (e.g., \`180_000\` ms) for TypeScript red team tests since they involve many LLM calls across multiple turns
 
 ### Platform Approach
-- This approach uses \`platform_\` MCP tools — do NOT write code files
+- This approach uses the \`langwatch\` CLI (or MCP tools as fallback) — do NOT write code files
 - Do NOT use \`fetch_scenario_docs\` for SDK documentation — that's for code-based testing
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios — each should test one specific behavior
@@ -1118,7 +1301,7 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 
 ## Detect Context
 
-This skill is primarily code-path (CLI + SDK). Platform MCP tools exist for prompt management (\`platform_create_prompt\`, \`platform_update_prompt\`, etc.) but users typically manage prompts directly in the UI. If the user has no codebase and wants to create prompts on the platform, use the \`platform_create_prompt\` MCP tool instead.
+This skill is primarily code-path (CLI + SDK). If the user has no codebase and wants to create prompts on the platform, use the \`langwatch\` CLI (\`langwatch prompt list\`, \`langwatch prompt create\`, etc.). MCP tools are available as a fallback.
 
 ## Plan Limits
 
@@ -1165,10 +1348,79 @@ Bad:
 > "You need to upgrade to continue. Visit https://app.langwatch.ai/settings/subscription"
 > (No value shown first) The free plan has a limited number of prompts. Work within the limits and show value before suggesting an upgrade. Do NOT try to work around limits.
 
-## Step 1: Set up the LangWatch MCP
+## Step 1: Set up the LangWatch CLI
 
-First, install the LangWatch MCP server so you have access to Prompts CLI documentation:
+# Using the LangWatch CLI
 
+The \`langwatch\` CLI gives full access to the LangWatch platform from the terminal. Install with \`npm install -g langwatch\` or use \`npx langwatch\`.
+
+## Setup
+
+Set \`LANGWATCH_API_KEY\` in your \`.env\` file, or run \`langwatch login\` interactively.
+
+\`\`\`bash
+# Load from .env
+export $(grep LANGWATCH_API_KEY .env)
+
+# Or login interactively
+langwatch login
+\`\`\`
+
+## Quick Start
+
+\`\`\`bash
+langwatch status                    # Project overview
+langwatch --help                    # All available commands
+langwatch <command> --help          # Help for any command
+\`\`\`
+
+All list/get commands support \`--format json\` for machine-readable output.
+
+## Key Commands
+
+### Resources (CRUD)
+- \`langwatch scenario list|get|create|update|delete\` — manage test scenarios
+- \`langwatch suite list|get|create|update|duplicate|delete\` — manage suites (run plans)
+- \`langwatch evaluator list|get|create|update|delete\` — manage evaluators
+- \`langwatch dataset list|create|get|update|delete|upload|download\` — manage datasets
+- \`langwatch agent list|get|create|update|delete\` — manage agents
+- \`langwatch workflow list|get|update|delete\` — manage workflows
+- \`langwatch prompt init|create|sync|pull|push|versions|restore\` — manage prompts
+- \`langwatch dashboard list|get|update|create|delete\` — manage dashboards
+- \`langwatch graph list|create|update|delete\` — manage custom graphs on dashboards
+- \`langwatch trigger list|get|create|update|delete\` — manage automations/alerts
+- \`langwatch annotation list|get|create|delete\` — manage annotations
+- \`langwatch secret list|get|create|update|delete\` — manage project secrets (encrypted env vars)
+- \`langwatch monitor list|get|create|update|delete\` — manage online evaluation monitors
+- \`langwatch model-provider list|set\` — manage model providers
+
+### Execution
+- \`langwatch evaluation run <slug> [--wait]\` — run evaluations
+- \`langwatch suite run <id> [--wait]\` — run a suite (scenario x target matrix)
+- \`langwatch scenario run <id> --target <type>:<ref>\` — run a scenario against a target
+- \`langwatch agent run <id> --input <json>\` — execute an agent
+- \`langwatch workflow run <id> --input <json>\` — execute a workflow
+
+### Observability
+- \`langwatch trace search|get|export\` — search, inspect, and export traces
+- \`langwatch analytics query --metric <preset>\` — query metrics
+- \`langwatch simulation-run list|get\` — view simulation run results
+
+**Tip:** Prefer CLI over MCP tools when running in Claude Code or terminal environments. The CLI provides all prompt management commands:
+
+\`\`\`bash
+langwatch prompt list                              # List prompts
+langwatch prompt init                              # Initialize prompts project
+langwatch prompt create <name>                     # Create a prompt YAML
+langwatch prompt sync                              # Sync local ↔ remote
+langwatch prompt push                              # Push local to server
+langwatch prompt pull                              # Pull remote to local
+langwatch prompt versions <handle>                 # View version history
+langwatch prompt restore <handle> <versionId>      # Rollback to a version
+langwatch prompt tag assign <prompt> <tag>         # Tag a version
+\`\`\`
+
+If the CLI is not available, set up the MCP as a fallback:
 # Installing the LangWatch MCP
 
 ## For Claude Code
@@ -1194,7 +1446,12 @@ Use the hosted remote MCP server:
 
 **Tip:** If \`LANGWATCH_API_KEY\` is already in the project's \`.env\` file, use that same key for the MCP configuration.
 
-If MCP installation fails, see # Fetching LangWatch Docs Without MCP
+## Step 2: Read the Prompts CLI Docs
+
+Use \`langwatch prompt --help\` to see all available commands, or fetch documentation:
+
+- Call \`fetch_langwatch_docs\` (MCP) to read the full Prompts CLI documentation
+- Or see # Fetching LangWatch Docs Without MCP
 
 If the LangWatch MCP cannot be installed, you can fetch docs directly:
 
@@ -1205,16 +1462,9 @@ If the LangWatch MCP cannot be installed, you can fetch docs directly:
 Example flow:
 1. Fetch https://langwatch.ai/docs/llms.txt to see available topics
 2. Fetch https://langwatch.ai/docs/integration/python/guide.md for Python instrumentation
-3. Fetch https://langwatch.ai/docs/integration/typescript/guide.md for TypeScript instrumentation to fetch docs directly via URLs.
+3. Fetch https://langwatch.ai/docs/integration/typescript/guide.md for TypeScript instrumentation to fetch docs directly via URLs
 
-## Step 2: Read the Prompts CLI Docs
-
-Use the LangWatch MCP to fetch the Prompts CLI documentation:
-
-- Call \`fetch_langwatch_docs\` with no arguments to see the docs index
-- Find the Prompts CLI page and read it for step-by-step instructions
-
-CRITICAL: Do NOT guess how to use the Prompts CLI. Read the actual documentation first. The CLI has specific commands and workflows that must be followed exactly.
+CRITICAL: Do NOT guess how to use the Prompts CLI. Read the actual documentation or \`--help\` output first.
 
 ## Step 3: Install and Authenticate the LangWatch CLI
 
@@ -1302,7 +1552,7 @@ const prompt = await langwatch.prompts.get("my-agent", { tag: "production" });
 
 ### Assigning Tags
 
-Use the Deploy dialog in the LangWatch UI to assign \`production\` or \`staging\` tags to a version. For programmatic assignment, use the \`platform_assign_prompt_tag\` MCP tool or the REST API:
+Use the Deploy dialog in the LangWatch UI to assign \`production\` or \`staging\` tags to a version. For programmatic assignment, use the CLI or REST API:
 
 \`\`\`bash
 curl -X PUT -H "X-Auth-Token: $LANGWATCH_API_KEY" \
@@ -1317,7 +1567,7 @@ In config files or anywhere a prompt identifier is accepted, you can use shortha
 
 ### Custom Tags
 
-Create custom tags via \`platform_create_prompt_tag\` MCP tool or \`POST /api/prompts/tags\` for workflows like canary releases or blue-green deployments.
+Create custom tags via \`langwatch prompt tag create <name>\` (or \`POST /api/prompts/tags\`) for workflows like canary releases or blue-green deployments.
 
 ## Step 9: Verify
 
@@ -1478,10 +1728,73 @@ If the user's request is **specific** ("add tracing to the payment function", "t
 
 This skill is code-only — there is no platform path for tracing. If the user has no codebase, explain that tracing requires code instrumentation and point them to the LangWatch docs.
 
-## Step 1: Set up the LangWatch MCP
+## Step 1: Set up the LangWatch CLI
 
-First, install the LangWatch MCP server so you have access to framework-specific documentation:
+# Using the LangWatch CLI
 
+The \`langwatch\` CLI gives full access to the LangWatch platform from the terminal. Install with \`npm install -g langwatch\` or use \`npx langwatch\`.
+
+## Setup
+
+Set \`LANGWATCH_API_KEY\` in your \`.env\` file, or run \`langwatch login\` interactively.
+
+\`\`\`bash
+# Load from .env
+export $(grep LANGWATCH_API_KEY .env)
+
+# Or login interactively
+langwatch login
+\`\`\`
+
+## Quick Start
+
+\`\`\`bash
+langwatch status                    # Project overview
+langwatch --help                    # All available commands
+langwatch <command> --help          # Help for any command
+\`\`\`
+
+All list/get commands support \`--format json\` for machine-readable output.
+
+## Key Commands
+
+### Resources (CRUD)
+- \`langwatch scenario list|get|create|update|delete\` — manage test scenarios
+- \`langwatch suite list|get|create|update|duplicate|delete\` — manage suites (run plans)
+- \`langwatch evaluator list|get|create|update|delete\` — manage evaluators
+- \`langwatch dataset list|create|get|update|delete|upload|download\` — manage datasets
+- \`langwatch agent list|get|create|update|delete\` — manage agents
+- \`langwatch workflow list|get|update|delete\` — manage workflows
+- \`langwatch prompt init|create|sync|pull|push|versions|restore\` — manage prompts
+- \`langwatch dashboard list|get|update|create|delete\` — manage dashboards
+- \`langwatch graph list|create|update|delete\` — manage custom graphs on dashboards
+- \`langwatch trigger list|get|create|update|delete\` — manage automations/alerts
+- \`langwatch annotation list|get|create|delete\` — manage annotations
+- \`langwatch secret list|get|create|update|delete\` — manage project secrets (encrypted env vars)
+- \`langwatch monitor list|get|create|update|delete\` — manage online evaluation monitors
+- \`langwatch model-provider list|set\` — manage model providers
+
+### Execution
+- \`langwatch evaluation run <slug> [--wait]\` — run evaluations
+- \`langwatch suite run <id> [--wait]\` — run a suite (scenario x target matrix)
+- \`langwatch scenario run <id> --target <type>:<ref>\` — run a scenario against a target
+- \`langwatch agent run <id> --input <json>\` — execute an agent
+- \`langwatch workflow run <id> --input <json>\` — execute a workflow
+
+### Observability
+- \`langwatch trace search|get|export\` — search, inspect, and export traces
+- \`langwatch analytics query --metric <preset>\` — query metrics
+- \`langwatch simulation-run list|get\` — view simulation run results
+
+**Tip:** Prefer CLI over MCP tools when running in Claude Code or terminal environments. The CLI is useful for verifying traces:
+
+\`\`\`bash
+langwatch trace search --limit 5          # Verify traces arrive
+langwatch trace get <traceId>             # Inspect a specific trace
+langwatch analytics query --metric trace-count  # Check trace volume
+\`\`\`
+
+For documentation access, set up the LangWatch MCP:
 # Installing the LangWatch MCP
 
 ## For Claude Code
@@ -1506,7 +1819,6 @@ Use the hosted remote MCP server:
 - Get a key at https://app.langwatch.ai/authorize
 
 **Tip:** If \`LANGWATCH_API_KEY\` is already in the project's \`.env\` file, use that same key for the MCP configuration.
-
 If MCP installation fails, see # Fetching LangWatch Docs Without MCP
 
 If the LangWatch MCP cannot be installed, you can fetch docs directly:
@@ -1518,7 +1830,7 @@ If the LangWatch MCP cannot be installed, you can fetch docs directly:
 Example flow:
 1. Fetch https://langwatch.ai/docs/llms.txt to see available topics
 2. Fetch https://langwatch.ai/docs/integration/python/guide.md for Python instrumentation
-3. Fetch https://langwatch.ai/docs/integration/typescript/guide.md for TypeScript instrumentation to fetch docs directly via URLs.
+3. Fetch https://langwatch.ai/docs/integration/typescript/guide.md for TypeScript instrumentation.
 
 ## Step 2: Get the API Key
 
@@ -1578,8 +1890,8 @@ Do NOT consider the instrumentation complete without verifying it works. Follow 
 
 1. **Install dependencies** — run \`pip install langwatch\` (or \`uv add langwatch\`) / \`npm install langwatch\` (or \`pnpm add langwatch\`). If the install fails due to peer dependency conflicts, widen the conflicting range and retry — do NOT silently skip this step.
 2. **Run a quick test** — execute the agent with a simple test input to generate at least one trace. For Python, try running the main script. For TypeScript/Mastra, try running with \`npx tsx\` or the framework's dev command. Study how the framework starts to find the right approach; only give up if the framework requires infrastructure you cannot spin up (databases, external services, etc.).
-3. **Check traces arrived** — if the LangWatch MCP is available, wait 5 seconds then call \`search_traces\` to verify the trace appeared. If traces show up, instrumentation is confirmed working.
-4. **If verification isn't possible** (no MCP, can't run the code, missing external services), tell the user exactly what to check: "Run your agent and verify traces appear in your LangWatch dashboard at https://app.langwatch.ai". Be specific about what you couldn't verify and why.
+3. **Check traces arrived** — use the CLI to verify: \`langwatch trace search --limit 5\`. If the CLI is not available but MCP is, call \`search_traces\`. If traces show up, instrumentation is confirmed working.
+4. **If verification isn't possible** (no CLI/MCP, can't run the code, missing external services), tell the user exactly what to check: "Run your agent and verify traces appear in your LangWatch dashboard at https://app.langwatch.ai". Be specific about what you couldn't verify and why.
 
 ## Common Mistakes
 
@@ -1607,7 +1919,7 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 
 ## Detect Context
 
-This skill is primarily code-path (CLI + SDK). Platform MCP tools exist for prompt management (\`platform_create_prompt\`, \`platform_update_prompt\`, etc.) but users typically manage prompts directly in the UI. If the user has no codebase and wants to create prompts on the platform, use the \`platform_create_prompt\` MCP tool instead.
+This skill is primarily code-path (CLI + SDK). If the user has no codebase and wants to create prompts on the platform, use the \`langwatch\` CLI (\`langwatch prompt list\`, \`langwatch prompt create\`, etc.). MCP tools are available as a fallback.
 
 ## Plan Limits
 
@@ -1654,20 +1966,100 @@ Bad:
 > "You need to upgrade to continue. Visit https://app.langwatch.ai/settings/subscription"
 > (No value shown first) The free plan has a limited number of prompts. Work within the limits and show value before suggesting an upgrade. Do NOT try to work around limits.
 
-## Step 1: Set up the LangWatch MCP
+## Step 1: Set up the LangWatch CLI
 
-First, install the LangWatch MCP server so you have access to Prompts CLI documentation:
+# Using the LangWatch CLI
 
+The \`langwatch\` CLI gives full access to the LangWatch platform from the terminal. Install with \`npm install -g langwatch\` or use \`npx langwatch\`.
+
+## Setup
+
+Set \`LANGWATCH_API_KEY\` in your \`.env\` file, or run \`langwatch login\` interactively.
+
+\`\`\`bash
+# Load from .env
+export $(grep LANGWATCH_API_KEY .env)
+
+# Or login interactively
+langwatch login
+\`\`\`
+
+## Quick Start
+
+\`\`\`bash
+langwatch status                    # Project overview
+langwatch --help                    # All available commands
+langwatch <command> --help          # Help for any command
+\`\`\`
+
+All list/get commands support \`--format json\` for machine-readable output.
+
+## Key Commands
+
+### Resources (CRUD)
+- \`langwatch scenario list|get|create|update|delete\` — manage test scenarios
+- \`langwatch suite list|get|create|update|duplicate|delete\` — manage suites (run plans)
+- \`langwatch evaluator list|get|create|update|delete\` — manage evaluators
+- \`langwatch dataset list|create|get|update|delete|upload|download\` — manage datasets
+- \`langwatch agent list|get|create|update|delete\` — manage agents
+- \`langwatch workflow list|get|update|delete\` — manage workflows
+- \`langwatch prompt init|create|sync|pull|push|versions|restore\` — manage prompts
+- \`langwatch dashboard list|get|update|create|delete\` — manage dashboards
+- \`langwatch graph list|create|update|delete\` — manage custom graphs on dashboards
+- \`langwatch trigger list|get|create|update|delete\` — manage automations/alerts
+- \`langwatch annotation list|get|create|delete\` — manage annotations
+- \`langwatch secret list|get|create|update|delete\` — manage project secrets (encrypted env vars)
+- \`langwatch monitor list|get|create|update|delete\` — manage online evaluation monitors
+- \`langwatch model-provider list|set\` — manage model providers
+
+### Execution
+- \`langwatch evaluation run <slug> [--wait]\` — run evaluations
+- \`langwatch suite run <id> [--wait]\` — run a suite (scenario x target matrix)
+- \`langwatch scenario run <id> --target <type>:<ref>\` — run a scenario against a target
+- \`langwatch agent run <id> --input <json>\` — execute an agent
+- \`langwatch workflow run <id> --input <json>\` — execute a workflow
+
+### Observability
+- \`langwatch trace search|get|export\` — search, inspect, and export traces
+- \`langwatch analytics query --metric <preset>\` — query metrics
+- \`langwatch simulation-run list|get\` — view simulation run results
+
+**Tip:** Prefer CLI over MCP tools when running in Claude Code or terminal environments. The CLI provides all prompt management commands:
+
+\`\`\`bash
+langwatch prompt list                              # List prompts
+langwatch prompt init                              # Initialize prompts project
+langwatch prompt create <name>                     # Create a prompt YAML
+langwatch prompt sync                              # Sync local ↔ remote
+langwatch prompt push                              # Push local to server
+langwatch prompt pull                              # Pull remote to local
+langwatch prompt versions <handle>                 # View version history
+langwatch prompt restore <handle> <versionId>      # Rollback to a version
+langwatch prompt tag assign <prompt> <tag>         # Tag a version
+\`\`\`
+
+If the CLI is not available, set up the MCP as a fallback:
 (See MCP/API key setup above)
 
 ## Step 2: Read the Prompts CLI Docs
 
-Use the LangWatch MCP to fetch the Prompts CLI documentation:
+Use \`langwatch prompt --help\` to see all available commands, or fetch documentation:
 
-- Call \`fetch_langwatch_docs\` with no arguments to see the docs index
-- Find the Prompts CLI page and read it for step-by-step instructions
+- Call \`fetch_langwatch_docs\` (MCP) to read the full Prompts CLI documentation
+- Or see # Fetching LangWatch Docs Without MCP
 
-CRITICAL: Do NOT guess how to use the Prompts CLI. Read the actual documentation first. The CLI has specific commands and workflows that must be followed exactly.
+If the LangWatch MCP cannot be installed, you can fetch docs directly:
+
+1. Fetch the index: https://langwatch.ai/docs/llms.txt
+2. Follow links to specific pages, appending \`.md\` extension
+3. For Scenario docs: https://langwatch.ai/scenario/llms.txt
+
+Example flow:
+1. Fetch https://langwatch.ai/docs/llms.txt to see available topics
+2. Fetch https://langwatch.ai/docs/integration/python/guide.md for Python instrumentation
+3. Fetch https://langwatch.ai/docs/integration/typescript/guide.md for TypeScript instrumentation to fetch docs directly via URLs
+
+CRITICAL: Do NOT guess how to use the Prompts CLI. Read the actual documentation or \`--help\` output first.
 
 ## Step 3: Install and Authenticate the LangWatch CLI
 
@@ -1755,7 +2147,7 @@ const prompt = await langwatch.prompts.get("my-agent", { tag: "production" });
 
 ### Assigning Tags
 
-Use the Deploy dialog in the LangWatch UI to assign \`production\` or \`staging\` tags to a version. For programmatic assignment, use the \`platform_assign_prompt_tag\` MCP tool or the REST API:
+Use the Deploy dialog in the LangWatch UI to assign \`production\` or \`staging\` tags to a version. For programmatic assignment, use the CLI or REST API:
 
 \`\`\`bash
 curl -X PUT -H "X-Auth-Token: $LANGWATCH_API_KEY" \
@@ -1770,7 +2162,7 @@ In config files or anywhere a prompt identifier is accepted, you can use shortha
 
 ### Custom Tags
 
-Create custom tags via \`platform_create_prompt_tag\` MCP tool or \`POST /api/prompts/tags\` for workflows like canary releases or blue-green deployments.
+Create custom tags via \`langwatch prompt tag create <name>\` (or \`POST /api/prompts/tags\`) for workflows like canary releases or blue-green deployments.
 
 ## Step 9: Verify
 
@@ -1873,8 +2265,8 @@ If the user's request is **specific** ("add a faithfulness evaluator", "create a
 
 1. Check if you're in a codebase (look for \`package.json\`, \`pyproject.toml\`, \`requirements.txt\`, etc.)
 2. If **YES** → use the **Code approach** for experiments (SDK) and guardrails (code integration)
-3. If **NO** → use the **Platform approach** for evaluators (MCP tools) and monitors (UI guidance)
-4. If ambiguous → ask the user: "Do you want to write evaluation code or set things up on the platform?"
+3. If **NO** → use the **CLI approach** for evaluators, monitors, and datasets (preferred over MCP)
+4. If ambiguous → ask the user: "Do you want to write evaluation code or set things up via CLI?"
 
 Some features are code-only (experiments, guardrails) and some are platform-only (monitors). Evaluators work on both surfaces.
 
@@ -1925,7 +2317,65 @@ Bad:
 
 ## Prerequisites
 
-Set up the LangWatch MCP for documentation access:
+**Preferred: Use the LangWatch CLI** (see # Using the LangWatch CLI
+
+The \`langwatch\` CLI gives full access to the LangWatch platform from the terminal. Install with \`npm install -g langwatch\` or use \`npx langwatch\`.
+
+## Setup
+
+Set \`LANGWATCH_API_KEY\` in your \`.env\` file, or run \`langwatch login\` interactively.
+
+\`\`\`bash
+# Load from .env
+export $(grep LANGWATCH_API_KEY .env)
+
+# Or login interactively
+langwatch login
+\`\`\`
+
+## Quick Start
+
+\`\`\`bash
+langwatch status                    # Project overview
+langwatch --help                    # All available commands
+langwatch <command> --help          # Help for any command
+\`\`\`
+
+All list/get commands support \`--format json\` for machine-readable output.
+
+## Key Commands
+
+### Resources (CRUD)
+- \`langwatch scenario list|get|create|update|delete\` — manage test scenarios
+- \`langwatch suite list|get|create|update|duplicate|delete\` — manage suites (run plans)
+- \`langwatch evaluator list|get|create|update|delete\` — manage evaluators
+- \`langwatch dataset list|create|get|update|delete|upload|download\` — manage datasets
+- \`langwatch agent list|get|create|update|delete\` — manage agents
+- \`langwatch workflow list|get|update|delete\` — manage workflows
+- \`langwatch prompt init|create|sync|pull|push|versions|restore\` — manage prompts
+- \`langwatch dashboard list|get|update|create|delete\` — manage dashboards
+- \`langwatch graph list|create|update|delete\` — manage custom graphs on dashboards
+- \`langwatch trigger list|get|create|update|delete\` — manage automations/alerts
+- \`langwatch annotation list|get|create|delete\` — manage annotations
+- \`langwatch secret list|get|create|update|delete\` — manage project secrets (encrypted env vars)
+- \`langwatch monitor list|get|create|update|delete\` — manage online evaluation monitors
+- \`langwatch model-provider list|set\` — manage model providers
+
+### Execution
+- \`langwatch evaluation run <slug> [--wait]\` — run evaluations
+- \`langwatch suite run <id> [--wait]\` — run a suite (scenario x target matrix)
+- \`langwatch scenario run <id> --target <type>:<ref>\` — run a scenario against a target
+- \`langwatch agent run <id> --input <json>\` — execute an agent
+- \`langwatch workflow run <id> --input <json>\` — execute a workflow
+
+### Observability
+- \`langwatch trace search|get|export\` — search, inspect, and export traces
+- \`langwatch analytics query --metric <preset>\` — query metrics
+- \`langwatch simulation-run list|get\` — view simulation run results
+
+**Tip:** Prefer CLI over MCP tools when running in Claude Code or terminal environments.)
+
+The CLI is the primary interface for agents. If the CLI is not available, fall back to MCP tools.
 
 (See MCP/API key setup above)
 
@@ -2060,11 +2510,17 @@ langwatch evaluation run <slug> --wait                      # Run evaluation and
 langwatch evaluation status <runId>                         # Check run status
 \`\`\`
 
-### Platform Approach (MCP)
+### Platform Approach (CLI preferred)
+\`\`\`bash
+langwatch evaluator list                                      # List evaluators
+langwatch evaluator get <idOrSlug>                            # Get details
+langwatch evaluator create "Name" --type langevals/llm_judge  # Create
+langwatch evaluator update <idOrSlug> --name "New Name"       # Update
+\`\`\`
+
+If the CLI is not available, use MCP tools as a fallback:
 1. Call \`discover_schema\` with category "evaluators" to see available types
 2. Use \`platform_create_evaluator\` to create an evaluator on the platform
-3. Use \`platform_list_evaluators\` to see existing evaluators
-4. Use \`platform_get_evaluator\` and \`platform_update_evaluator\` to review and modify
 
 This is useful for setting up LLM-as-judge evaluators, custom evaluators, or configuring evaluators that will be used in platform experiments and monitors.
 
@@ -2113,40 +2569,51 @@ NEVER use generic examples like "What is 2+2?", "What is the capital of France?"
 
 ## Platform Approach: Prompts + Evaluators (No Code)
 
-When the user has no codebase and wants to set up evaluation building blocks on the platform:
-
-NOTE: Full UI experiments are not yet available via MCP. This approach sets up the building blocks (prompts + evaluators + datasets) that can then be used in the platform UI.
+When the user has no codebase and wants to set up evaluation building blocks on the platform.
+Use the CLI as the primary interface:
 
 ### Create or Update a Prompt
 
-Use the \`platform_create_prompt\` MCP tool to create a new prompt:
-- Provide a name, model, and messages (system + user)
-- The prompt will appear in your LangWatch project's Prompts section
-
-Or use \`platform_list_prompts\` to find existing prompts and \`platform_update_prompt\` to modify them.
+\`\`\`bash
+langwatch prompt list                             # List existing prompts
+langwatch prompt create my-prompt                 # Create a new prompt YAML
+langwatch prompt push                             # Push to the platform
+langwatch prompt versions my-prompt               # View version history
+langwatch prompt tag assign my-prompt production  # Tag a version
+\`\`\`
 
 ### Check Model Providers
 
-Before creating evaluators on the platform, verify model providers are configured:
+Before creating evaluators, verify model providers are configured:
 
-1. Call \`platform_list_model_providers\` to check existing providers
-2. If no providers are configured, ask the user if they have an LLM API key (OpenAI, Anthropic, etc.)
-3. If they do, set it up with \`platform_set_model_provider\` so evaluators can run
+\`\`\`bash
+langwatch model-provider list                     # Check existing providers
+langwatch model-provider set openai --api-key sk-... # Set up a provider
+\`\`\`
 
 ### Create an Evaluator
 
-Use the \`platform_create_evaluator\` MCP tool to set up evaluation criteria:
-- First call \`discover_schema\` with category "evaluators" to see available evaluator types
-- Create an LLM-as-judge evaluator for quality assessment
-- Or create a specific evaluator type matching your use case
+\`\`\`bash
+langwatch evaluator list                          # See available evaluators
+langwatch evaluator create "Quality Judge" --type langevals/llm_judge
+langwatch evaluator get <idOrSlug> --format json  # View details
+\`\`\`
 
 ### Create a Dataset
 
-Use the \`platform_create_dataset\` MCP tool to create a test dataset:
-- Provide a name and column definitions (e.g., \`input\` string, \`expected_output\` string)
-- Use \`platform_create_dataset_records\` to add records in batch (max 1000 per call)
-- Use \`platform_list_datasets\` to browse existing datasets
-- Use \`platform_get_dataset\` to view dataset contents and metadata
+\`\`\`bash
+langwatch dataset create "Test Data" -c input:string,expected_output:string
+langwatch dataset upload test-data data.csv       # Upload from CSV/JSON/JSONL
+langwatch dataset records list test-data           # View records
+\`\`\`
+
+### Set Up Monitors (Online Evaluation)
+
+\`\`\`bash
+langwatch monitor create "Toxicity Check" --check-type ragas/toxicity
+langwatch monitor create "PII Detection" --check-type presidio/pii_detection --sample 0.5
+langwatch monitor list                            # View all monitors
+\`\`\`
 
 ### Test in the Platform
 
@@ -2156,17 +2623,17 @@ Go to https://app.langwatch.ai and:
 3. Use the Prompt Playground to test variations
 4. Set up an experiment in the Experiments section using your prompt, evaluator, and dataset
 
-### Current Limitations
+### MCP Fallback
 
-- UI experiments cannot be created via MCP yet — use the platform UI
-- The MCP can create prompts, evaluators, and datasets, which are the building blocks for experiments
+If the CLI is not available, use MCP tools instead (\`platform_create_prompt\`, \`platform_create_evaluator\`, etc.).
 
 ## Common Mistakes
 
 - Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
 - Do NOT use generic/placeholder datasets — generate domain-specific examples
-- Do NOT use \`platform_\` MCP tools for code-based features (experiments, guardrails) — write code
-- Do use \`platform_\` MCP tools for platform-based features (evaluators, monitors) when the user wants no-code
+- Do NOT use MCP tools for code-based features (experiments, guardrails) — write code
+- Prefer the \`langwatch\` CLI over MCP tools for platform features (evaluators, monitors, datasets)
+- Only use MCP tools as a fallback when the CLI is not available
 - Do NOT skip running the experiment to verify it works
 - Monitors **measure** (async), guardrails **act** (sync, via code with \`as_guardrail=True\`) — both are online evaluation
 - Always set up \`LANGWATCH_API_KEY\` in \`.env\`
@@ -2177,7 +2644,7 @@ Go to https://app.langwatch.ai and:
 
 # Test Your Agent with Scenarios
 
-NEVER invent your own agent testing framework. Use \`@langwatch/scenario\` (Python: \`langwatch-scenario\`) for code-based tests, or the platform MCP tools for no-code scenarios. The Scenario framework provides user simulation, judge-based evaluation, multi-turn conversation testing, and adversarial red teaming out of the box. Do NOT build these capabilities from scratch.
+NEVER invent your own agent testing framework. Use \`@langwatch/scenario\` (Python: \`langwatch-scenario\`) for code-based tests, or the \`langwatch\` CLI for no-code platform scenarios. The Scenario framework provides user simulation, judge-based evaluation, multi-turn conversation testing, and adversarial red teaming out of the box. Do NOT build these capabilities from scratch.
 
 ## Determine Scope
 
@@ -2245,8 +2712,8 @@ If the user's request is about **red teaming** ("red team my agent", "find vulne
 
 1. Check if you're in a codebase (look for \`package.json\`, \`pyproject.toml\`, \`requirements.txt\`, etc.)
 2. If **YES** → use the **Code approach** (Scenario SDK — write test files)
-3. If **NO** → use the **Platform approach** (MCP tools — no files needed)
-4. If ambiguous → ask the user: "Do you want to write scenario test code or create scenarios on the platform?"
+3. If **NO** → use the **CLI approach** (preferred) or MCP tools as fallback
+4. If ambiguous → ask the user: "Do you want to write scenario test code or create scenarios via CLI?"
 
 ## The Agent Testing Pyramid
 
@@ -2551,17 +3018,125 @@ describe("Agent Security", () => {
 
 ---
 
-## Platform Approach: MCP Tools
+## Platform Approach: CLI (preferred)
 
 Use this when the user has no codebase and wants to create scenarios directly on the platform.
 
 NOTE: If you have a codebase and want to write scenario test code, use the Code Approach above instead.
 
-### Step 1: Set up the LangWatch MCP
+### Step 1: Set up the CLI
 
-The MCP must be configured with your LangWatch API key.
+# Using the LangWatch CLI
 
-(See MCP/API key setup above)
+The \`langwatch\` CLI gives full access to the LangWatch platform from the terminal. Install with \`npm install -g langwatch\` or use \`npx langwatch\`.
+
+## Setup
+
+Set \`LANGWATCH_API_KEY\` in your \`.env\` file, or run \`langwatch login\` interactively.
+
+\`\`\`bash
+# Load from .env
+export $(grep LANGWATCH_API_KEY .env)
+
+# Or login interactively
+langwatch login
+\`\`\`
+
+## Quick Start
+
+\`\`\`bash
+langwatch status                    # Project overview
+langwatch --help                    # All available commands
+langwatch <command> --help          # Help for any command
+\`\`\`
+
+All list/get commands support \`--format json\` for machine-readable output.
+
+## Key Commands
+
+### Resources (CRUD)
+- \`langwatch scenario list|get|create|update|delete\` — manage test scenarios
+- \`langwatch suite list|get|create|update|duplicate|delete\` — manage suites (run plans)
+- \`langwatch evaluator list|get|create|update|delete\` — manage evaluators
+- \`langwatch dataset list|create|get|update|delete|upload|download\` — manage datasets
+- \`langwatch agent list|get|create|update|delete\` — manage agents
+- \`langwatch workflow list|get|update|delete\` — manage workflows
+- \`langwatch prompt init|create|sync|pull|push|versions|restore\` — manage prompts
+- \`langwatch dashboard list|get|update|create|delete\` — manage dashboards
+- \`langwatch graph list|create|update|delete\` — manage custom graphs on dashboards
+- \`langwatch trigger list|get|create|update|delete\` — manage automations/alerts
+- \`langwatch annotation list|get|create|delete\` — manage annotations
+- \`langwatch secret list|get|create|update|delete\` — manage project secrets (encrypted env vars)
+- \`langwatch monitor list|get|create|update|delete\` — manage online evaluation monitors
+- \`langwatch model-provider list|set\` — manage model providers
+
+### Execution
+- \`langwatch evaluation run <slug> [--wait]\` — run evaluations
+- \`langwatch suite run <id> [--wait]\` — run a suite (scenario x target matrix)
+- \`langwatch scenario run <id> --target <type>:<ref>\` — run a scenario against a target
+- \`langwatch agent run <id> --input <json>\` — execute an agent
+- \`langwatch workflow run <id> --input <json>\` — execute a workflow
+
+### Observability
+- \`langwatch trace search|get|export\` — search, inspect, and export traces
+- \`langwatch analytics query --metric <preset>\` — query metrics
+- \`langwatch simulation-run list|get\` — view simulation run results
+
+**Tip:** Prefer CLI over MCP tools when running in Claude Code or terminal environments. Set \`LANGWATCH_API_KEY\` in your \`.env\` file.
+
+### Step 2: Create Scenarios
+
+\`\`\`bash
+# List existing scenarios
+langwatch scenario list
+
+# Create a scenario with situation and criteria
+langwatch scenario create "Happy Path" \
+  --situation "Customer asks about product availability" \
+  --criteria "Agent checks inventory,Agent provides accurate stock info"
+
+# Create edge case scenarios
+langwatch scenario create "Error Handling" \
+  --situation "Customer sends empty message" \
+  --criteria "Agent asks for clarification,Agent doesn't crash"
+\`\`\`
+
+Create scenarios covering:
+1. **Happy path**: Normal, expected interactions
+2. **Edge cases**: Unusual inputs, unclear requests
+3. **Error handling**: When things go wrong
+4. **Boundary conditions**: Limits of the agent's capabilities
+
+### Step 3: Review and Iterate
+
+\`\`\`bash
+langwatch scenario list --format json              # List all scenarios
+langwatch scenario get <id>                        # Review details
+langwatch scenario update <id> --criteria "..."    # Refine criteria
+\`\`\`
+
+### Step 4: Set Up Suites (Run Plans)
+
+\`\`\`bash
+langwatch agent list --format json                 # Find agent IDs
+langwatch suite create "Regression Test" \
+  --scenarios <id1>,<id2> \
+  --targets http:<agentId>
+langwatch suite run <suiteId> --wait               # Run and wait for results
+\`\`\`
+
+### MCP Fallback
+
+If the CLI is not available, use MCP tools instead (\`platform_create_scenario\`, \`platform_list_scenarios\`, etc.).
+
+### Verify by Running
+
+ALWAYS run the scenario tests you create. If they fail, debug and fix them. A scenario test that isn't executed is useless.
+
+For Python: \`pytest -s tests/test_scenarios.py\`
+For TypeScript: \`npx vitest run\`
+
+---
 
 ## Common Mistakes
 
@@ -2581,7 +3156,7 @@ The MCP must be configured with your LangWatch API key.
 - Do NOT forget to set a generous timeout (e.g., \`180_000\` ms) for TypeScript red team tests since they involve many LLM calls across multiple turns
 
 ### Platform Approach
-- This approach uses \`platform_\` MCP tools — do NOT write code files
+- This approach uses the \`langwatch\` CLI (or MCP tools as fallback) — do NOT write code files
 - Do NOT use \`fetch_scenario_docs\` for SDK documentation — that's for code-based testing
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios — each should test one specific behavior
@@ -3273,7 +3848,7 @@ First, try to install the LangWatch MCP server for access to documentation and p
 
 # Test Your Agent with Scenarios
 
-NEVER invent your own agent testing framework. Use \`@langwatch/scenario\` (Python: \`langwatch-scenario\`) for code-based tests, or the platform MCP tools for no-code scenarios. The Scenario framework provides user simulation, judge-based evaluation, multi-turn conversation testing, and adversarial red teaming out of the box. Do NOT build these capabilities from scratch.
+NEVER invent your own agent testing framework. Use \`@langwatch/scenario\` (Python: \`langwatch-scenario\`) for code-based tests, or the \`langwatch\` CLI for no-code platform scenarios. The Scenario framework provides user simulation, judge-based evaluation, multi-turn conversation testing, and adversarial red teaming out of the box. Do NOT build these capabilities from scratch.
 
 ## Determine Scope
 
@@ -3341,8 +3916,8 @@ If the user's request is about **red teaming** ("red team my agent", "find vulne
 
 1. Check if you're in a codebase (look for \`package.json\`, \`pyproject.toml\`, \`requirements.txt\`, etc.)
 2. If **YES** → use the **Code approach** (Scenario SDK — write test files)
-3. If **NO** → use the **Platform approach** (MCP tools — no files needed)
-4. If ambiguous → ask the user: "Do you want to write scenario test code or create scenarios on the platform?"
+3. If **NO** → use the **CLI approach** (preferred) or MCP tools as fallback
+4. If ambiguous → ask the user: "Do you want to write scenario test code or create scenarios via CLI?"
 
 ## The Agent Testing Pyramid
 
@@ -3690,56 +4265,88 @@ describe("Agent Security", () => {
 
 ---
 
-## Platform Approach: MCP Tools
+## Platform Approach: CLI (preferred)
 
 Use this when the user has no codebase and wants to create scenarios directly on the platform.
 
 NOTE: If you have a codebase and want to write scenario test code, use the Code Approach above instead.
 
-### Step 1: Set up the LangWatch MCP
+### Step 1: Set up the CLI
 
-The MCP must be configured with your LangWatch API key.
+# Using the LangWatch CLI
 
-# Installing the LangWatch MCP
+The \`langwatch\` CLI gives full access to the LangWatch platform from the terminal. Install with \`npm install -g langwatch\` or use \`npx langwatch\`.
 
-## For Claude Code
-Run:
+## Setup
+
+Set \`LANGWATCH_API_KEY\` in your \`.env\` file, or run \`langwatch login\` interactively.
+
 \`\`\`bash
-claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey {{LANGWATCH_API_KEY}}
+# Load from .env
+export $(grep LANGWATCH_API_KEY .env)
+
+# Or login interactively
+langwatch login
 \`\`\`
 
-Or add an entry named \`langwatch\` under the \`mcpServers\` object of \`~/.claude.json\` or \`.mcp.json\` with these fields:
-- \`command\`: npx
-- \`args\`: \`-y\`, then the package name on a separate token
-- package to launch: the npm package \`@langwatch/mcp-server\` (scoped)
-- \`env.LANGWATCH_API_KEY\`: the user's LangWatch API key
+## Quick Start
 
-## For other editors
-Add the same \`mcpServers.langwatch\` entry to your editor's MCP settings file. Use the fields listed above.
+\`\`\`bash
+langwatch status                    # Project overview
+langwatch --help                    # All available commands
+langwatch <command> --help          # Help for any command
+\`\`\`
 
-## For ChatGPT, Claude Chat, or other web assistants
-Use the hosted remote MCP server:
-- URL: \`https://mcp.langwatch.ai/sse\`
-- Authentication: Bearer Token with your LangWatch API key
-- Get a key at https://app.langwatch.ai/authorize
+All list/get commands support \`--format json\` for machine-readable output.
 
-**Tip:** If \`LANGWATCH_API_KEY\` is already in the project's \`.env\` file, use that same key for the MCP configuration.
+## Key Commands
 
-### Step 2: Understand the Scenario Schema
+### Resources (CRUD)
+- \`langwatch scenario list|get|create|update|delete\` — manage test scenarios
+- \`langwatch suite list|get|create|update|duplicate|delete\` — manage suites (run plans)
+- \`langwatch evaluator list|get|create|update|delete\` — manage evaluators
+- \`langwatch dataset list|create|get|update|delete|upload|download\` — manage datasets
+- \`langwatch agent list|get|create|update|delete\` — manage agents
+- \`langwatch workflow list|get|update|delete\` — manage workflows
+- \`langwatch prompt init|create|sync|pull|push|versions|restore\` — manage prompts
+- \`langwatch dashboard list|get|update|create|delete\` — manage dashboards
+- \`langwatch graph list|create|update|delete\` — manage custom graphs on dashboards
+- \`langwatch trigger list|get|create|update|delete\` — manage automations/alerts
+- \`langwatch annotation list|get|create|delete\` — manage annotations
+- \`langwatch secret list|get|create|update|delete\` — manage project secrets (encrypted env vars)
+- \`langwatch monitor list|get|create|update|delete\` — manage online evaluation monitors
+- \`langwatch model-provider list|set\` — manage model providers
 
-Call \`discover_schema\` with category "scenarios" to understand:
-- Available fields (name, situation, criteria, labels, etc.)
-- How to structure your scenarios
+### Execution
+- \`langwatch evaluation run <slug> [--wait]\` — run evaluations
+- \`langwatch suite run <id> [--wait]\` — run a suite (scenario x target matrix)
+- \`langwatch scenario run <id> --target <type>:<ref>\` — run a scenario against a target
+- \`langwatch agent run <id> --input <json>\` — execute an agent
+- \`langwatch workflow run <id> --input <json>\` — execute a workflow
 
-### Step 3: Create Scenarios
+### Observability
+- \`langwatch trace search|get|export\` — search, inspect, and export traces
+- \`langwatch analytics query --metric <preset>\` — query metrics
+- \`langwatch simulation-run list|get\` — view simulation run results
 
-Use the \`platform_create_scenario\` MCP tool to create test scenarios:
+**Tip:** Prefer CLI over MCP tools when running in Claude Code or terminal environments. Set \`LANGWATCH_API_KEY\` in your \`.env\` file.
 
-For each scenario, define:
-- **name**: A descriptive name for the test case
-- **situation**: The context and user behavior to simulate
-- **criteria**: What the agent should do (list of success criteria)
-- **labels**: Tags for organization (optional)
+### Step 2: Create Scenarios
+
+\`\`\`bash
+# List existing scenarios
+langwatch scenario list
+
+# Create a scenario with situation and criteria
+langwatch scenario create "Happy Path" \
+  --situation "Customer asks about product availability" \
+  --criteria "Agent checks inventory,Agent provides accurate stock info"
+
+# Create edge case scenarios
+langwatch scenario create "Error Handling" \
+  --situation "Customer sends empty message" \
+  --criteria "Agent asks for clarification,Agent doesn't crash"
+\`\`\`
 
 Create scenarios covering:
 1. **Happy path**: Normal, expected interactions
@@ -3747,13 +4354,27 @@ Create scenarios covering:
 3. **Error handling**: When things go wrong
 4. **Boundary conditions**: Limits of the agent's capabilities
 
-### Step 4: Review and Iterate
+### Step 3: Review and Iterate
 
-Use \`platform_list_scenarios\` to see all your scenarios and \`platform_get_scenario\` to review details. Use \`platform_update_scenario\` to refine them.
+\`\`\`bash
+langwatch scenario list --format json              # List all scenarios
+langwatch scenario get <id>                        # Review details
+langwatch scenario update <id> --criteria "..."    # Refine criteria
+\`\`\`
 
-### Step 5: Run Simulations
+### Step 4: Set Up Suites (Run Plans)
 
-Go to https://app.langwatch.ai and navigate to your project's Simulations section to run the scenarios you created.
+\`\`\`bash
+langwatch agent list --format json                 # Find agent IDs
+langwatch suite create "Regression Test" \
+  --scenarios <id1>,<id2> \
+  --targets http:<agentId>
+langwatch suite run <suiteId> --wait               # Run and wait for results
+\`\`\`
+
+### MCP Fallback
+
+If the CLI is not available, use MCP tools instead (\`platform_create_scenario\`, \`platform_list_scenarios\`, etc.).
 
 ### Verify by Running
 
@@ -3782,7 +4403,7 @@ For TypeScript: \`npx vitest run\`
 - Do NOT forget to set a generous timeout (e.g., \`180_000\` ms) for TypeScript red team tests since they involve many LLM calls across multiple turns
 
 ### Platform Approach
-- This approach uses \`platform_\` MCP tools — do NOT write code files
+- This approach uses the \`langwatch\` CLI (or MCP tools as fallback) — do NOT write code files
 - Do NOT use \`fetch_scenario_docs\` for SDK documentation — that's for code-based testing
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios — each should test one specific behavior
@@ -3881,8 +4502,8 @@ If the user's request is **specific** ("add a faithfulness evaluator", "create a
 
 1. Check if you're in a codebase (look for \`package.json\`, \`pyproject.toml\`, \`requirements.txt\`, etc.)
 2. If **YES** → use the **Code approach** for experiments (SDK) and guardrails (code integration)
-3. If **NO** → use the **Platform approach** for evaluators (MCP tools) and monitors (UI guidance)
-4. If ambiguous → ask the user: "Do you want to write evaluation code or set things up on the platform?"
+3. If **NO** → use the **CLI approach** for evaluators, monitors, and datasets (preferred over MCP)
+4. If ambiguous → ask the user: "Do you want to write evaluation code or set things up via CLI?"
 
 Some features are code-only (experiments, guardrails) and some are platform-only (monitors). Evaluators work on both surfaces.
 
@@ -3933,7 +4554,65 @@ Bad:
 
 ## Prerequisites
 
-Set up the LangWatch MCP for documentation access:
+**Preferred: Use the LangWatch CLI** (see # Using the LangWatch CLI
+
+The \`langwatch\` CLI gives full access to the LangWatch platform from the terminal. Install with \`npm install -g langwatch\` or use \`npx langwatch\`.
+
+## Setup
+
+Set \`LANGWATCH_API_KEY\` in your \`.env\` file, or run \`langwatch login\` interactively.
+
+\`\`\`bash
+# Load from .env
+export $(grep LANGWATCH_API_KEY .env)
+
+# Or login interactively
+langwatch login
+\`\`\`
+
+## Quick Start
+
+\`\`\`bash
+langwatch status                    # Project overview
+langwatch --help                    # All available commands
+langwatch <command> --help          # Help for any command
+\`\`\`
+
+All list/get commands support \`--format json\` for machine-readable output.
+
+## Key Commands
+
+### Resources (CRUD)
+- \`langwatch scenario list|get|create|update|delete\` — manage test scenarios
+- \`langwatch suite list|get|create|update|duplicate|delete\` — manage suites (run plans)
+- \`langwatch evaluator list|get|create|update|delete\` — manage evaluators
+- \`langwatch dataset list|create|get|update|delete|upload|download\` — manage datasets
+- \`langwatch agent list|get|create|update|delete\` — manage agents
+- \`langwatch workflow list|get|update|delete\` — manage workflows
+- \`langwatch prompt init|create|sync|pull|push|versions|restore\` — manage prompts
+- \`langwatch dashboard list|get|update|create|delete\` — manage dashboards
+- \`langwatch graph list|create|update|delete\` — manage custom graphs on dashboards
+- \`langwatch trigger list|get|create|update|delete\` — manage automations/alerts
+- \`langwatch annotation list|get|create|delete\` — manage annotations
+- \`langwatch secret list|get|create|update|delete\` — manage project secrets (encrypted env vars)
+- \`langwatch monitor list|get|create|update|delete\` — manage online evaluation monitors
+- \`langwatch model-provider list|set\` — manage model providers
+
+### Execution
+- \`langwatch evaluation run <slug> [--wait]\` — run evaluations
+- \`langwatch suite run <id> [--wait]\` — run a suite (scenario x target matrix)
+- \`langwatch scenario run <id> --target <type>:<ref>\` — run a scenario against a target
+- \`langwatch agent run <id> --input <json>\` — execute an agent
+- \`langwatch workflow run <id> --input <json>\` — execute a workflow
+
+### Observability
+- \`langwatch trace search|get|export\` — search, inspect, and export traces
+- \`langwatch analytics query --metric <preset>\` — query metrics
+- \`langwatch simulation-run list|get\` — view simulation run results
+
+**Tip:** Prefer CLI over MCP tools when running in Claude Code or terminal environments.)
+
+The CLI is the primary interface for agents. If the CLI is not available, fall back to MCP tools.
 
 # Installing the LangWatch MCP
 
@@ -4106,11 +4785,17 @@ langwatch evaluation run <slug> --wait                      # Run evaluation and
 langwatch evaluation status <runId>                         # Check run status
 \`\`\`
 
-### Platform Approach (MCP)
+### Platform Approach (CLI preferred)
+\`\`\`bash
+langwatch evaluator list                                      # List evaluators
+langwatch evaluator get <idOrSlug>                            # Get details
+langwatch evaluator create "Name" --type langevals/llm_judge  # Create
+langwatch evaluator update <idOrSlug> --name "New Name"       # Update
+\`\`\`
+
+If the CLI is not available, use MCP tools as a fallback:
 1. Call \`discover_schema\` with category "evaluators" to see available types
 2. Use \`platform_create_evaluator\` to create an evaluator on the platform
-3. Use \`platform_list_evaluators\` to see existing evaluators
-4. Use \`platform_get_evaluator\` and \`platform_update_evaluator\` to review and modify
 
 This is useful for setting up LLM-as-judge evaluators, custom evaluators, or configuring evaluators that will be used in platform experiments and monitors.
 
@@ -4159,40 +4844,51 @@ NEVER use generic examples like "What is 2+2?", "What is the capital of France?"
 
 ## Platform Approach: Prompts + Evaluators (No Code)
 
-When the user has no codebase and wants to set up evaluation building blocks on the platform:
-
-NOTE: Full UI experiments are not yet available via MCP. This approach sets up the building blocks (prompts + evaluators + datasets) that can then be used in the platform UI.
+When the user has no codebase and wants to set up evaluation building blocks on the platform.
+Use the CLI as the primary interface:
 
 ### Create or Update a Prompt
 
-Use the \`platform_create_prompt\` MCP tool to create a new prompt:
-- Provide a name, model, and messages (system + user)
-- The prompt will appear in your LangWatch project's Prompts section
-
-Or use \`platform_list_prompts\` to find existing prompts and \`platform_update_prompt\` to modify them.
+\`\`\`bash
+langwatch prompt list                             # List existing prompts
+langwatch prompt create my-prompt                 # Create a new prompt YAML
+langwatch prompt push                             # Push to the platform
+langwatch prompt versions my-prompt               # View version history
+langwatch prompt tag assign my-prompt production  # Tag a version
+\`\`\`
 
 ### Check Model Providers
 
-Before creating evaluators on the platform, verify model providers are configured:
+Before creating evaluators, verify model providers are configured:
 
-1. Call \`platform_list_model_providers\` to check existing providers
-2. If no providers are configured, ask the user if they have an LLM API key (OpenAI, Anthropic, etc.)
-3. If they do, set it up with \`platform_set_model_provider\` so evaluators can run
+\`\`\`bash
+langwatch model-provider list                     # Check existing providers
+langwatch model-provider set openai --api-key sk-... # Set up a provider
+\`\`\`
 
 ### Create an Evaluator
 
-Use the \`platform_create_evaluator\` MCP tool to set up evaluation criteria:
-- First call \`discover_schema\` with category "evaluators" to see available evaluator types
-- Create an LLM-as-judge evaluator for quality assessment
-- Or create a specific evaluator type matching your use case
+\`\`\`bash
+langwatch evaluator list                          # See available evaluators
+langwatch evaluator create "Quality Judge" --type langevals/llm_judge
+langwatch evaluator get <idOrSlug> --format json  # View details
+\`\`\`
 
 ### Create a Dataset
 
-Use the \`platform_create_dataset\` MCP tool to create a test dataset:
-- Provide a name and column definitions (e.g., \`input\` string, \`expected_output\` string)
-- Use \`platform_create_dataset_records\` to add records in batch (max 1000 per call)
-- Use \`platform_list_datasets\` to browse existing datasets
-- Use \`platform_get_dataset\` to view dataset contents and metadata
+\`\`\`bash
+langwatch dataset create "Test Data" -c input:string,expected_output:string
+langwatch dataset upload test-data data.csv       # Upload from CSV/JSON/JSONL
+langwatch dataset records list test-data           # View records
+\`\`\`
+
+### Set Up Monitors (Online Evaluation)
+
+\`\`\`bash
+langwatch monitor create "Toxicity Check" --check-type ragas/toxicity
+langwatch monitor create "PII Detection" --check-type presidio/pii_detection --sample 0.5
+langwatch monitor list                            # View all monitors
+\`\`\`
 
 ### Test in the Platform
 
@@ -4202,17 +4898,17 @@ Go to https://app.langwatch.ai and:
 3. Use the Prompt Playground to test variations
 4. Set up an experiment in the Experiments section using your prompt, evaluator, and dataset
 
-### Current Limitations
+### MCP Fallback
 
-- UI experiments cannot be created via MCP yet — use the platform UI
-- The MCP can create prompts, evaluators, and datasets, which are the building blocks for experiments
+If the CLI is not available, use MCP tools instead (\`platform_create_prompt\`, \`platform_create_evaluator\`, etc.).
 
 ## Common Mistakes
 
 - Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
 - Do NOT use generic/placeholder datasets — generate domain-specific examples
-- Do NOT use \`platform_\` MCP tools for code-based features (experiments, guardrails) — write code
-- Do use \`platform_\` MCP tools for platform-based features (evaluators, monitors) when the user wants no-code
+- Do NOT use MCP tools for code-based features (experiments, guardrails) — write code
+- Prefer the \`langwatch\` CLI over MCP tools for platform features (evaluators, monitors, datasets)
+- Only use MCP tools as a fallback when the CLI is not available
 - Do NOT skip running the experiment to verify it works
 - Monitors **measure** (async), guardrails **act** (sync, via code with \`as_guardrail=True\`) — both are online evaluation
 - Always set up \`LANGWATCH_API_KEY\` in \`.env\`
