@@ -160,7 +160,21 @@ export function buildUrl(
   url: string | { pathname?: string; query?: Record<string, any> },
   routeParamKeys?: Set<string>
 ): string {
-  if (typeof url === "string") return url;
+  if (typeof url === "string") {
+    // For query-only strings ("?foo=bar"), strip route param keys that
+    // leaked in from router.query spreads. Components do:
+    //   router.replace("?" + qs.stringify({ ...router.query, newKey: "val" }))
+    // which includes route params like `project` in the query string.
+    if (url.startsWith("?") && routeParamKeys?.size) {
+      const searchParams = new URLSearchParams(url.slice(1));
+      for (const key of routeParamKeys) {
+        searchParams.delete(key);
+      }
+      const cleaned = searchParams.toString();
+      return cleaned ? `?${cleaned}` : window.location.pathname;
+    }
+    return url;
+  }
   // If pathname is omitted, use the current URL path (Next.js behavior)
   let pathname = url.pathname ?? window.location.pathname;
   const { query } = url;

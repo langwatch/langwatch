@@ -4,7 +4,7 @@
  * Next.js `dynamic()` is essentially React.lazy() with optional SSR control
  * and a loading component. Since we no longer have SSR, this is a thin wrapper.
  */
-import { lazy, type ComponentType, type ReactNode } from "react";
+import { lazy, Suspense, createElement, forwardRef, type ComponentType, type ReactNode } from "react";
 
 interface DynamicOptions {
   loading?: () => ReactNode;
@@ -36,7 +36,20 @@ export function resolveModule(mod: any): { default: ComponentType<any> } {
 
 export default function dynamic<P extends Record<string, any>>(
   importFn: () => Promise<any>,
-  _options?: DynamicOptions
+  options?: DynamicOptions
 ): ComponentType<P> {
-  return lazy(async () => resolveModule(await importFn())) as ComponentType<P>;
+  const LazyComponent = lazy(async () => resolveModule(await importFn()));
+  const fallback = options?.loading ? createElement(options.loading) : null;
+
+  // Wrap in Suspense so the lazy component doesn't bubble up to the root
+  // Suspense boundary and flash the entire page gray while loading.
+  const DynamicWrapper = forwardRef<any, P>(function DynamicWrapper(props, ref) {
+    return createElement(
+      Suspense,
+      { fallback },
+      createElement(LazyComponent as any, { ...props, ref })
+    );
+  });
+  DynamicWrapper.displayName = `Dynamic(${(LazyComponent as any).displayName || "Component"})`;
+  return DynamicWrapper as unknown as ComponentType<P>;
 }

@@ -152,6 +152,24 @@ describe("buildUrl()", () => {
     });
   });
 
+  describe("when url is a query-only string with route params", () => {
+    it("strips route param keys from query string", () => {
+      const result = buildUrl(
+        "?project=inbox-narrator&view=table&drawer.open=traceDetails",
+        new Set(["project"])
+      );
+      expect(result).toBe("?view=table&drawer.open=traceDetails");
+    });
+
+    it("strips multiple route param keys", () => {
+      const result = buildUrl(
+        "?project=inbox-narrator&trace=abc&view=table",
+        new Set(["project", "trace"])
+      );
+      expect(result).toBe("?view=table");
+    });
+  });
+
   describe("when no query is provided", () => {
     it("returns just the pathname", () => {
       const result = buildUrl({ pathname: "/foo" });
