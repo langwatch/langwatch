@@ -684,6 +684,20 @@ traceCmd
   });
 
 traceCmd
+  .command("export")
+  .description("Export traces as CSV, JSONL, or JSON")
+  .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
+  .option("--end-date <date>", "End date (ISO string, default: now)")
+  .option("-q, --query <query>", "Text search query to filter traces")
+  .option("-f, --format <format>", "Output format: jsonl (default), csv, or json", "jsonl")
+  .option("-o, --output <file>", "Write output to file instead of stdout")
+  .option("--limit <n>", "Max traces to export (default: 1000)")
+  .action(async (options: { startDate?: string; endDate?: string; query?: string; format?: string; output?: string; limit?: string }) => {
+    const { exportTracesCommand: impl } = await import("./commands/traces/export.js");
+    await impl(options);
+  });
+
+traceCmd
   .command("get <traceId>")
   .description("Get full trace details by ID")
   .option("-f, --format <format>", "Output format: digest (default, human-readable) or json", "digest")
@@ -1041,8 +1055,9 @@ recordsCmd
   .command("add <slugOrId>")
   .description("Add records to a dataset")
   .option("--json <json>", "JSON array of records (inline)")
+  .option("--file <path>", "Read JSON array of records from a file")
   .option("--stdin", "Read JSON array from stdin")
-  .action(async (slugOrId: string, options: { json?: string; stdin?: boolean }) => {
+  .action(async (slugOrId: string, options: { json?: string; file?: string; stdin?: boolean }) => {
     const { recordsAddCommand } = await import("./commands/dataset/records-add.js");
     await recordsAddCommand(slugOrId, options);
   });
