@@ -28,6 +28,7 @@ import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePostHogIdentify } from "../hooks/usePostHogIdentify";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
+import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
 import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../utils/api";
@@ -380,6 +381,17 @@ export const DashboardLayout = ({
             filter="blur(40px)"
           ></Box>
         )}
+        {user?.impersonator && (
+          <Box
+            position="absolute"
+            top={-5}
+            left="-100px"
+            bottom={0}
+            w="400px"
+            background="blue.300"
+            filter="blur(40px)"
+          ></Box>
+        )}
 
         {/* Left side: Logo + Project + Breadcrumbs */}
         <HStack gap={compactMenu ? 3 : 0} flex={1} alignItems="center">
@@ -441,6 +453,7 @@ export const DashboardLayout = ({
               DEV
             </Text>
           )}
+          {user && <ImpersonationBanner user={user} />}
 
           {/* Command bar trigger */}
           {project && <CommandBarTrigger />}
