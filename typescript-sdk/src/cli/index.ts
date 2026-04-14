@@ -436,6 +436,18 @@ workflowCmd
   });
 
 workflowCmd
+  .command("update <id>")
+  .description("Update a workflow's metadata (name, icon, description)")
+  .option("--name <name>", "New workflow name")
+  .option("--icon <icon>", "New workflow icon")
+  .option("--description <desc>", "New workflow description")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { name?: string; icon?: string; description?: string; format?: string }) => {
+    const { updateWorkflowCommand: impl } = await import("./commands/workflows/update.js");
+    await impl(id, options);
+  });
+
+workflowCmd
   .command("run <id>")
   .description("Execute a workflow with JSON input")
   .option("--input <json>", "Input data as JSON string")

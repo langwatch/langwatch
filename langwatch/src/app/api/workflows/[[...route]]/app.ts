@@ -121,6 +121,56 @@ export const app = new Hono<{ Variables: Variables }>()
     },
   )
 
+  .patch(
+    "/:id",
+    describeRoute({
+      description: "Update a workflow's metadata (name, icon, description)",
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Workflow updated",
+          content: {
+            "application/json": {
+              schema: resolver(workflowResponseSchema),
+            },
+          },
+        },
+        404: {
+          description: "Workflow not found",
+          content: {
+            "application/json": { schema: resolver(badRequestSchema) },
+          },
+        },
+      },
+    }),
+    zValidator("json", z.object({
+      name: z.string().min(1).optional(),
+      icon: z.string().optional(),
+      description: z.string().optional(),
+    })),
+    async (c) => {
+      const project = c.get("project");
+      const { id } = c.req.param();
+      const body = c.req.valid("json");
+      logger.info({ projectId: project.id, workflowId: id }, "Updating workflow");
+
+      const workflow = await prisma.workflow.findFirst({
+        where: { id, projectId: project.id, archivedAt: null },
+      });
+
+      if (!workflow) {
+        return c.json({ error: "Workflow not found" }, 404);
+      }
+
+      const updated = await prisma.workflow.update({
+        where: { id },
+        data: body,
+      });
+
+      return c.json(toWorkflowResponse(updated));
+    },
+  )
+
   .delete(
     "/:id",
     describeRoute({
