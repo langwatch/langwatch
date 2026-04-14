@@ -1,4 +1,3 @@
-import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { DrawerType } from "~/components/drawerRegistry";
 import type { Command, RecentItem, SearchResult } from "./types";
 
