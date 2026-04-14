@@ -1,6 +1,6 @@
 "use client";
 
-import NextError from "next/error";
+import NextError from "~/utils/compat/next-error";
 import { useEffect } from "react";
 import { captureException } from "~/utils/posthogErrorCapture";
 

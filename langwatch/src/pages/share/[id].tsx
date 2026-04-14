@@ -1,5 +1,5 @@
 import { Text } from "@chakra-ui/react";
-import ErrorPage from "next/error";
+import ErrorPage from "~/utils/compat/next-error";
 import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "../../components/DashboardLayout";
 import { TraceDetails } from "../../components/traces/TraceDetails";
