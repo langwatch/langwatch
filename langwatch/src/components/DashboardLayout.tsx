@@ -13,7 +13,7 @@ import {
 } from "@chakra-ui/react";
 import type { Organization, Project, Team } from "@prisma/client";
 import { ChevronDown, ChevronRight, KeyRound, Plus } from "lucide-react";
-import ErrorPage from "next/error";
+import ErrorPage from "~/utils/compat/next-error";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 import { signOut } from "~/utils/auth-client";

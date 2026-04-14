@@ -10,7 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import ErrorPage from "next/error";
+import ErrorPage from "~/utils/compat/next-error";
 import { useRouter } from "~/utils/compat/next-router";
 import { forwardRef, useEffect } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
