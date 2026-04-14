@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/workflows/workflows-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 
-export const deleteWorkflowCommand = async (id: string): Promise<void> => {
+export const deleteWorkflowCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = new WorkflowsApiService();
@@ -35,6 +35,10 @@ export const deleteWorkflowCommand = async (id: string): Promise<void> => {
   try {
     await service.delete(id);
     deleteSpinner.succeed(`Archived workflow "${chalk.cyan(workflowName)}"`);
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify({ id, name: workflowName, archived: true }, null, 2));
+    }
   } catch (error) {
     deleteSpinner.fail();
     if (error instanceof WorkflowsApiError) {

@@ -484,9 +484,10 @@ workflowCmd
 workflowCmd
   .command("delete <id>")
   .description("Archive (soft-delete) a workflow")
-  .action(async (id: string) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
     const { deleteWorkflowCommand: impl } = await import("./commands/workflows/delete.js");
-    await impl(id);
+    await impl(id, options);
   });
 
 // Add agent command group
@@ -879,9 +880,10 @@ suiteCmd
 suiteCmd
   .command("delete <id>")
   .description("Archive (soft-delete) a suite")
-  .action(async (id: string) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
     const { deleteSuiteCommand: impl } = await import("./commands/suites/delete.js");
-    await impl(id);
+    await impl(id, options);
   });
 
 // Add graph command group
