@@ -96,7 +96,10 @@ export default function ExperimentsWorkbenchPage() {
         });
       },
       "workbench.run": async () => {
-        await executeEvaluation({ type: "full" });
+        // Fire-and-forget: the eval run can take minutes. Apply should
+        // confirm immediately; progress is visible in the workbench
+        // header.
+        void executeEvaluation({ type: "full" });
       },
     };
   }, [project?.id, createEvaluator, utils, addEvaluator, executeEvaluation]);
