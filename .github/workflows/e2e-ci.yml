@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - "langwatch/**"
+      - "python-sdk/**"
       - "agentic-e2e-tests/**"
       - ".github/workflows/e2e-ci.yml"
   workflow_dispatch:
