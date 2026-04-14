@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { register } from "prom-client";
 import { getApp } from "./server/app-layer/app";
+import { initializeWebApp } from "./server/app-layer/presets";
 import { getWorkerMetricsPort } from "./server/background/config";
 import { createMcpHandler } from "./mcp/handler";
 import { shutdownPostHog } from "./server/posthog";
@@ -51,6 +52,10 @@ const isMetricsAuthorized = (req: IncomingMessage): boolean => {
 export const startApp = async (dir = path.dirname(__dirname)) => {
   const dev = process.env.NODE_ENV !== "production";
   const hostname = "0.0.0.0";
+
+  // Initialize the app-layer (services, repositories, event sourcing, etc.)
+  // This was previously done by Next.js instrumentation hook.
+  initializeWebApp();
 
   // Dev: API server on internal port (API_PORT, default 5565).
   //      Vite dev server runs separately on 5560 and proxies /api/* here.
