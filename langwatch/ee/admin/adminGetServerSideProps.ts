@@ -1,4 +1,4 @@
-import type { GetServerSidePropsContext } from "next";
+import type { GetServerSidePropsContext } from "~/types/next-stubs";
 import { getServerAuthSession } from "~/server/auth";
 import { isAdmin } from "./isAdmin";
 

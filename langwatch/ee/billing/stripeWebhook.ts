@@ -1,5 +1,5 @@
 import { buffer } from "micro";
-import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import type Stripe from "stripe";
 import { Currency } from "@prisma/client";
 import { env } from "../../src/env.mjs";
