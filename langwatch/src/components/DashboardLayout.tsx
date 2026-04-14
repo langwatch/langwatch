@@ -347,7 +347,7 @@ export const DashboardLayout = ({
       width="full"
       minHeight="100vh"
       background="bg.page"
-      overflowX={["auto", "auto", "clip"]}
+      overflowX={["auto", "auto", "hidden"]}
     >
       <Head>
         <title>
@@ -527,15 +527,25 @@ export const DashboardLayout = ({
         <Box
           width="full"
           height="full"
+          background="bg.page"
+          borderTopLeftRadius="xl"
+          boxShadow="-4px -2px 12px 0px rgba(0, 0, 0, 0.06)"
+          _dark={{
+            boxShadow: "-4px -2px 16px 0px rgba(0, 0, 0, 0.4)",
+          }}
+          minHeight="calc(100vh - 56px)"
+          maxHeight="calc(100vh - 56px)"
+          maxWidth={`calc(100vw - ${menuWidth})`}
+        >
+        <Box
+          width="full"
+          height="full"
           background="bg.surface"
           borderTopLeftRadius="xl"
-          outline="1px solid"
-          outlineColor="border"
           overflow="auto"
           display="flex"
           minHeight="calc(100vh - 56px)"
           maxHeight="calc(100vh - 56px)"
-          maxWidth={`calc(100vw - ${menuWidth})`}
         >
           <VStack width="full" gap={0} {...props}>
             {/* Alert banners */}
@@ -742,6 +752,7 @@ export const DashboardLayout = ({
               </Alert.Root>
             )}
           </VStack>
+        </Box>
         </Box>
       </HStack>
       <GlobalUpgradeModal />
