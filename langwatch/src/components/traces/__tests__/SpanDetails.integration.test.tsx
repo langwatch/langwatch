@@ -6,8 +6,10 @@
  *
  * @see specs/prompts/open-existing-prompt-from-trace.feature
  */
+import React from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Project } from "@prisma/client";
 import type { Span } from "../../../server/tracer/types";
@@ -67,6 +69,20 @@ vi.mock("~/utils/api", () => ({
 
 const project = { id: "proj_1", slug: "test-project" } as Project;
 
+// Wrapper providing Router context (Link components need it), ChakraProvider,
+// and Suspense (needed for React.lazy components used by dynamic() compat)
+function TestWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <MemoryRouter>
+      <ChakraProvider value={defaultSystem}>
+        <React.Suspense fallback={<div>Loading...</div>}>
+          {children}
+        </React.Suspense>
+      </ChakraProvider>
+    </MemoryRouter>
+  );
+}
+
 function buildLLMSpan(overrides: Partial<Span> = {}): Span {
   return {
     span_id: "span-123",
@@ -111,9 +127,9 @@ describe("<SpanDetails/>", () => {
       });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails project={project} span={span} />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const button = screen.getByRole("button", {
@@ -128,9 +144,9 @@ describe("<SpanDetails/>", () => {
       const span = buildLLMSpan({ params: null });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails project={project} span={span} />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const link = screen.getByRole("link", {
@@ -143,9 +159,9 @@ describe("<SpanDetails/>", () => {
       const span = buildLLMSpan({ params: null });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails project={project} span={span} />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       expect(mockBuildUrl).toHaveBeenCalledWith("span-123");
@@ -172,13 +188,13 @@ describe("<SpanDetails/>", () => {
       });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails
             project={project}
             span={llmSpan}
             allSpans={[parentSpan, llmSpan]}
           />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const button = screen.getByRole("button", {
@@ -212,13 +228,13 @@ describe("<SpanDetails/>", () => {
       });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails
             project={project}
             span={llmSpan}
             allSpans={[grandparent, parent, llmSpan]}
           />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const button = screen.getByRole("button", {
@@ -240,13 +256,13 @@ describe("<SpanDetails/>", () => {
       });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails
             project={project}
             span={llmSpan}
             allSpans={[parentSpan, llmSpan]}
           />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const link = screen.getByRole("link", {
@@ -286,13 +302,13 @@ describe("<SpanDetails/>", () => {
       });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails
             project={project}
             span={llmSpan}
             allSpans={[parentSpan, siblingSpan, llmSpan]}
           />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const button = screen.getByRole("button", {
@@ -307,9 +323,9 @@ describe("<SpanDetails/>", () => {
       const span = buildLLMSpan({ type: "span" as Span["type"] });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails project={project} span={span} />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const buttons = screen.queryAllByText(/Open in Prompts/i);
@@ -330,9 +346,9 @@ describe("<SpanDetails/>", () => {
       });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails project={project} span={span} />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const button = screen.getByRole("button", {
@@ -362,13 +378,13 @@ describe("<SpanDetails/>", () => {
       });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails
             project={project}
             span={llmSpan}
             allSpans={[parentSpan, llmSpan]}
           />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const button = screen.getByRole("button", {
