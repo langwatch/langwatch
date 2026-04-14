@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.22.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.21.0...typescript-sdk@v0.22.0) (2026-04-14)
+
+
+### Features
+
+* full CLI, API, and MCP coverage for all platform features ([#3168](https://github.com/langwatch/langwatch/issues/3168)) ([921b7b9](https://github.com/langwatch/langwatch/commit/921b7b92d3ccc038556fe2241a3a90302786631e))
+
+
+### Bug Fixes
+
+* **ci:** correct tag ID usage in prompt-tag repository and dataset error assertion ([#3133](https://github.com/langwatch/langwatch/issues/3133)) ([3615826](https://github.com/langwatch/langwatch/commit/3615826993d54fb5562560df7921356c6cea5018))
+* resolve ESLint errors in typescript-sdk CLI ([#3209](https://github.com/langwatch/langwatch/issues/3209)) ([528abb8](https://github.com/langwatch/langwatch/commit/528abb80312b74913ac56b0adc7eb4cd6c6f8c38))
+* **sdk:** extend timeout for agent span naming test ([#3162](https://github.com/langwatch/langwatch/issues/3162)) ([#3166](https://github.com/langwatch/langwatch/issues/3166)) ([8d3c467](https://github.com/langwatch/langwatch/commit/8d3c4675425086903dba5f955e8816c80abf4d2d))
+
 ## [0.21.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.20.0...typescript-sdk@v0.21.0) (2026-04-13)
 
 
