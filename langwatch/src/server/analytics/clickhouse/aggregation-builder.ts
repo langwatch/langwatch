@@ -1067,16 +1067,23 @@ function buildArrayJoinTimeseriesQuery(
   // @regression issue #3088
   const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
 
-  // Pipeline metrics that group by trace_id are redundant in the arrayJoin path
-  // because the CTE already deduplicates by (trace_id, group_key). Re-translate
-  // them as simple metrics so they participate in the outer SELECT instead of
-  // being silently dropped.
+  // Pipeline metrics that group by trace_id with "sum" aggregation are redundant
+  // in the arrayJoin path because the CTE already deduplicates by (trace_id,
+  // group_key). Re-translate them as simple metrics so they participate in the
+  // outer SELECT instead of being silently dropped.
+  //
+  // Only safe for "sum" aggregation: sum(value_per_trace) is equivalent to the
+  // standard aggregation over deduped traces. Other pipeline aggregations
+  // (avg/min/max) have different semantics and cannot be rewritten this way.
   for (let i = 0; i < input.series.length; i++) {
     const series = input.series[i]!;
     const translation = metricTranslations[i]!;
     if (!translation.requiresSubquery || !series.pipeline) continue;
 
-    if (series.pipeline.field === "trace_id") {
+    if (
+      series.pipeline.field === "trace_id" &&
+      series.pipeline.aggregation === "sum"
+    ) {
       const innerTranslation = translateMetric(
         series.metric,
         series.aggregation,
@@ -1084,13 +1091,17 @@ function buildArrayJoinTimeseriesQuery(
         series.key,
         series.subkey,
       );
+      // Swap alias to match the pipeline translation's alias (they're identical
+      // for trace_id pipelines, but be explicit for clarity)
+      const escapedAlias = innerTranslation.alias.replace(
+        /[.*+?^${}()|[\]\\]/g,
+        "\\$&",
+      );
       simpleMetrics.push({
         ...innerTranslation,
         alias: translation.alias,
         selectExpression: innerTranslation.selectExpression.replace(
-          new RegExp(
-            ` AS ${innerTranslation.alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
-          ),
+          new RegExp(` AS ${escapedAlias}$`),
           ` AS ${translation.alias}`,
         ),
       });
@@ -1711,23 +1722,61 @@ function buildDateBucketedPipelineQuery({
 
   // Build a CTE for simple (non-pipeline) metrics so they are not dropped
   // when mixed with pipeline metrics on numeric timeScale.
+  // Quote aliases that start with digits for ClickHouse compatibility.
+  // Use only the joins required by simple metrics (+ groupBy + filters) to
+  // avoid fan-out inflation from evaluation_runs or stored_spans joins that
+  // are only needed by pipeline metrics.
   const hasSimple = simpleMetrics.length > 0;
   if (hasSimple) {
     const simpleSelectExprs = [
       `${periodCase} AS period`,
       `${dateTrunc} AS date`,
       ...(groupKeyExpr ? [groupKeyExpr] : []),
-      ...simpleMetrics.map((m) => m.selectExpression),
+      ...simpleMetrics.map((m) => {
+        const quotedAlias = quoteIdentifier(m.alias);
+        return m.selectExpression.replace(
+          ` AS ${m.alias}`,
+          ` AS ${quotedAlias}`,
+        );
+      }),
     ];
     const simpleGroupByCols = ["period", "date"];
     if (groupByColumn) simpleGroupByCols.push("group_key");
+
+    // Build minimal join clauses: only joins needed by simple metrics, the
+    // groupBy column, and filters — not pipeline metrics.
+    const simpleJoins = new Set<CHTable>();
+    for (const m of simpleMetrics) {
+      for (const j of m.requiredJoins) simpleJoins.add(j);
+    }
+    if (input.groupBy) {
+      const gExpr = getGroupByExpression(input.groupBy, input.groupByKey);
+      for (const j of gExpr.requiredJoins) simpleJoins.add(j);
+    }
+    // Include filter joins by re-translating (idempotent, no side effects
+    // that affect query correctness — param names are already in filterParams)
+    if (input.filters) {
+      const filterJoins = translateAllFilters(input.filters).requiredJoins;
+      for (const j of filterJoins) simpleJoins.add(j);
+    }
+    const allSimpleExprs = [
+      ...simpleMetrics.map((m) => m.selectExpression),
+      fullFilterWhere,
+      groupByColumn ?? "",
+    ];
+    const simpleJoinClauses = Array.from(simpleJoins)
+      .map((table) => {
+        const requiredColumns = resolveRequiredColumns(table, allSimpleExprs);
+        return buildJoinClause(table, requiredColumns);
+      })
+      .join("\n");
 
     ctes.push(`
       simple_metrics AS (
         SELECT
           ${simpleSelectExprs.join(",\n          ")}
         FROM ${dedupedTraceSummaries(ts)}
-        ${joinClauses}
+        ${simpleJoinClauses}
         WHERE ${baseWhere}
           ${fullFilterWhere}
         GROUP BY ${simpleGroupByCols.join(", ")}
