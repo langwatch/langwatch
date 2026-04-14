@@ -1,5 +1,6 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
+import qs from "qs";
 import { X } from "react-feather";
 import { type FilterParam, useFilterParams } from "../../hooks/useFilterParams";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -39,23 +40,40 @@ export const useFilterToggle = (
       : defaultShowFilters;
 
   const setShowFilters = (show: boolean) => {
+    const currentPath = router.asPath.split("?")[0] ?? router.asPath;
+    const queryString = router.asPath.split("?")[1] ?? "";
+    const queryParams = qs.parse(queryString.replaceAll("%2C", ","), {
+      allowDots: true,
+      comma: true,
+      allowEmptyArrays: true,
+    });
+
+    const showFiltersValue = show
+      ? defaultShowFilters
+        ? undefined
+        : "true"
+      : defaultShowFilters
+        ? "false"
+        : undefined;
+
+    const newParams = { ...queryParams };
+    if (showFiltersValue === undefined) {
+      delete newParams.show_filters;
+    } else {
+      newParams.show_filters = showFiltersValue;
+    }
+
+    const newQs = qs.stringify(newParams, {
+      allowDots: true,
+      arrayFormat: "comma" as const,
+      // @ts-ignore
+      allowEmptyArrays: true,
+    });
+
     void router.push(
-      {
-        query: Object.fromEntries(
-          Object.entries({
-            ...router.query,
-            show_filters: show
-              ? defaultShowFilters
-                ? undefined
-                : "true"
-              : defaultShowFilters
-                ? "false"
-                : undefined,
-          }).filter(([, value]) => value !== undefined),
-        ),
-      },
-      undefined,
-      { shallow: true },
+      { pathname: router.pathname, query: router.query },
+      currentPath + "?" + newQs,
+      { shallow: true, scroll: false },
     );
   };
 
