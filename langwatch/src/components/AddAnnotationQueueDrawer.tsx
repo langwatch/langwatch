@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Check, ChevronDown, Plus } from "react-feather";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -125,6 +125,24 @@ export const AddAnnotationQueueDrawer = ({
       name: score.annotationScore.name,
     })) ?? [],
   );
+
+  // Sync local state when queue data loads (edit mode hydration)
+  useEffect(() => {
+    if (!queue.data) return;
+    setParticipants(
+      queue.data.members.map((m) => ({ id: m.user.id, name: m.user.name })),
+    );
+    setScoreTypes(
+      queue.data.AnnotationQueueScores.map((s) => ({
+        id: s.annotationScore.id,
+        name: s.annotationScore.name,
+      })),
+    );
+    reset({
+      name: queue.data.name,
+      description: queue.data.description ?? "",
+    });
+  }, [queue.data, reset]);
 
   const onSubmit = (data: FormData) => {
     if (participants.length === 0 || scoreTypes.length === 0) {
@@ -273,13 +291,15 @@ export const AddAnnotationQueueDrawer = ({
                               (p) => p.id === member.user.id,
                             );
                             return (
-                              <HStack
+                              <Button
                                 key={member.user.id}
-                                cursor="pointer"
+                                variant="ghost"
                                 width="full"
+                                justifyContent="flex-start"
                                 padding={1}
-                                borderRadius="md"
-                                _hover={{ bg: "bg.muted" }}
+                                height="auto"
+                                fontWeight="normal"
+                                aria-pressed={isSelected}
                                 onClick={() =>
                                   toggleParticipant(
                                     member.user.id,
@@ -296,7 +316,7 @@ export const AddAnnotationQueueDrawer = ({
                                   name={member.user.name ?? ""}
                                 />
                                 <Text fontSize="sm">{member.user.name}</Text>
-                              </HStack>
+                              </Button>
                             );
                           })}
                         </VStack>
@@ -367,13 +387,15 @@ export const AddAnnotationQueueDrawer = ({
                                 (s) => s.id === score.id,
                               );
                               return (
-                                <HStack
+                                <Button
                                   key={score.id}
-                                  cursor="pointer"
+                                  variant="ghost"
                                   width="full"
+                                  justifyContent="flex-start"
                                   padding={1}
-                                  borderRadius="md"
-                                  _hover={{ bg: "bg.muted" }}
+                                  height="auto"
+                                  fontWeight="normal"
+                                  aria-pressed={isSelected}
                                   onClick={() =>
                                     toggleScoreType(score.id, score.name)
                                   }
@@ -385,7 +407,7 @@ export const AddAnnotationQueueDrawer = ({
                                     }
                                   />
                                   <Text fontSize="sm">{score.name}</Text>
-                                </HStack>
+                                </Button>
                               );
                             })}
                           </VStack>
