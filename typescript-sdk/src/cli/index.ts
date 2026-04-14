@@ -477,6 +477,17 @@ agentCmd
   });
 
 agentCmd
+  .command("update <id>")
+  .description("Update an agent name, type, or configuration")
+  .option("--name <name>", "New agent name")
+  .option("--type <type>", "New agent type: signature, code, workflow, or http")
+  .option("--config <json>", "Updated configuration as JSON")
+  .action(async (id: string, options: { name?: string; type?: string; config?: string }) => {
+    const { updateAgentCommand: impl } = await import("./commands/agents/update.js");
+    await impl(id, options);
+  });
+
+agentCmd
   .command("delete <id>")
   .description("Archive (soft-delete) an agent")
   .action(async (id: string) => {
