@@ -21,6 +21,16 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
     { key: "workflows", fn: () => apiClient.GET("/api/workflows") },
     { key: "agents", fn: () => apiClient.GET("/api/agents") },
     { key: "dashboards", fn: () => apiClient.GET("/api/dashboards") },
+    { key: "suites", fn: async () => {
+      const apiKey = process.env.LANGWATCH_API_KEY ?? "";
+      const endpoint = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+      const response = await fetch(`${endpoint}/api/suites`, {
+        headers: { "X-Auth-Token": apiKey },
+      });
+      if (!response.ok) return { data: null, error: "fetch failed" };
+      const data = await response.json();
+      return { data, error: undefined };
+    }},
   ];
 
   await Promise.allSettled(
@@ -58,7 +68,7 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
   console.log();
   console.log(chalk.bold("  Resource Counts:"));
 
-  const order = ["evaluators", "scenarios", "datasets", "agents", "workflows", "dashboards"];
+  const order = ["evaluators", "scenarios", "suites", "datasets", "agents", "workflows", "dashboards"];
   for (const key of order) {
     const r = results[key];
     if (!r) continue;
@@ -73,8 +83,10 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
   console.log(chalk.gray("    langwatch evaluator list    langwatch scenario list"));
   console.log(chalk.gray("    langwatch dataset list      langwatch agent list"));
   console.log(chalk.gray("    langwatch workflow list      langwatch dashboard list"));
+  console.log(chalk.gray("    langwatch suite list        langwatch simulation-run list"));
   console.log(chalk.gray("    langwatch trace search      langwatch analytics query"));
   console.log(chalk.gray("    langwatch annotation list   langwatch model-provider list"));
   console.log(chalk.gray("    langwatch evaluation run <slug>"));
+  console.log(chalk.gray("    langwatch suite run <id>    langwatch scenario run <id> --target ..."));
   console.log();
 };
