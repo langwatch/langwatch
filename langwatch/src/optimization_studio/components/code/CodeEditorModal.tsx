@@ -4,6 +4,7 @@ import { Dialog } from "../../../components/ui/dialog";
 
 (typeof global !== "undefined" ? global : window).Prism = Prism;
 // Dynamic import — must happen after Prism is set on globalThis (ESM imports hoist above runtime code)
+// @ts-ignore — prismjs component modules lack type declarations
 void import("prismjs/components/prism-python");
 
 import dynamic from "~/utils/compat/next-dynamic";

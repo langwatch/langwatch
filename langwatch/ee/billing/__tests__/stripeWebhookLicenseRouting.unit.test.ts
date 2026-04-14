@@ -42,7 +42,7 @@ vi.mock("../../../src/server/posthog", () => ({
 import { handleLicensePurchase } from "../services/licensePurchaseHandler";
 import { createStripeWebhookHandlerFactory } from "../stripeWebhook";
 import { prisma } from "../../../src/server/db";
-import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import type Stripe from "stripe";
 
 const mockHandleLicensePurchase = handleLicensePurchase as ReturnType<
