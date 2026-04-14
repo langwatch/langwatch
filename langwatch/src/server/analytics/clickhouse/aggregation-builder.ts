@@ -595,6 +595,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   if (subqueryMetrics.length > 0 && typeof input.timeScale === "number") {
     return buildDateBucketedPipelineQuery({
       input,
+      simpleMetrics,
       pipelineMetrics: subqueryMetrics,
       groupByColumn,
       groupByHandlesUnknown,
@@ -1065,6 +1066,36 @@ function buildArrayJoinTimeseriesQuery(
   //
   // @regression issue #3088
   const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
+
+  // Pipeline metrics that group by trace_id are redundant in the arrayJoin path
+  // because the CTE already deduplicates by (trace_id, group_key). Re-translate
+  // them as simple metrics so they participate in the outer SELECT instead of
+  // being silently dropped.
+  for (let i = 0; i < input.series.length; i++) {
+    const series = input.series[i]!;
+    const translation = metricTranslations[i]!;
+    if (!translation.requiresSubquery || !series.pipeline) continue;
+
+    if (series.pipeline.field === "trace_id") {
+      const innerTranslation = translateMetric(
+        series.metric,
+        series.aggregation,
+        i,
+        series.key,
+        series.subkey,
+      );
+      simpleMetrics.push({
+        ...innerTranslation,
+        alias: translation.alias,
+        selectExpression: innerTranslation.selectExpression.replace(
+          new RegExp(
+            ` AS ${innerTranslation.alias.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`,
+          ),
+          ` AS ${translation.alias}`,
+        ),
+      });
+    }
+  }
   const hasEvalMixWithTrace = hasEvalMixedWithTraceMetrics(simpleMetrics);
 
   // When eval metrics are mixed with trace metrics, switch from SELECT DISTINCT
@@ -1616,6 +1647,7 @@ function buildSubqueryTimeseriesQuery(
  */
 function buildDateBucketedPipelineQuery({
   input,
+  simpleMetrics = [],
   pipelineMetrics,
   groupByColumn,
   groupByHandlesUnknown,
@@ -1626,6 +1658,7 @@ function buildDateBucketedPipelineQuery({
   timeZone,
 }: {
   input: TimeseriesQueryInput;
+  simpleMetrics?: MetricTranslation[];
   pipelineMetrics: MetricTranslation[];
   groupByColumn: string | null;
   groupByHandlesUnknown: boolean;
@@ -1662,7 +1695,7 @@ function buildDateBucketedPipelineQuery({
     groupByKey: input.groupByKey,
   });
 
-  const ctes = pipelineMetrics.map((metric) =>
+  const ctes: string[] = pipelineMetrics.map((metric) =>
     buildPipelineMetricCTE(metric, {
       ts,
       periodCase,
@@ -1676,34 +1709,79 @@ function buildDateBucketedPipelineQuery({
     }),
   );
 
-  // Build final SELECT
-  let finalSelect: string;
-  if (pipelineMetrics.length === 1) {
-    const cteName = `cte_${pipelineMetrics[0]!.alias}`;
-    finalSelect = `SELECT * FROM ${cteName} WHERE period IS NOT NULL ORDER BY period, date`;
-  } else {
-    // Multiple pipeline metrics: FULL OUTER JOIN on (period, date[, group_key])
-    const firstCteName = `cte_${pipelineMetrics[0]!.alias}`;
-    const joinKeys = groupByColumn
-      ? ["period", "date", "group_key"]
-      : ["period", "date"];
-
-    let joinSql = firstCteName;
-    const selectCols = [
-      ...joinKeys.map((k) => `${firstCteName}.${k}`),
-      `${firstCteName}.${quoteIdentifier(pipelineMetrics[0]!.alias)}`,
+  // Build a CTE for simple (non-pipeline) metrics so they are not dropped
+  // when mixed with pipeline metrics on numeric timeScale.
+  const hasSimple = simpleMetrics.length > 0;
+  if (hasSimple) {
+    const simpleSelectExprs = [
+      `${periodCase} AS period`,
+      `${dateTrunc} AS date`,
+      ...(groupKeyExpr ? [groupKeyExpr] : []),
+      ...simpleMetrics.map((m) => m.selectExpression),
     ];
+    const simpleGroupByCols = ["period", "date"];
+    if (groupByColumn) simpleGroupByCols.push("group_key");
 
-    for (let i = 1; i < pipelineMetrics.length; i++) {
-      const cteName = `cte_${pipelineMetrics[i]!.alias}`;
-      const onClause = joinKeys
-        .map((k) => `${firstCteName}.${k} = ${cteName}.${k}`)
-        .join(" AND ");
-      joinSql += `\n    FULL OUTER JOIN ${cteName} ON ${onClause}`;
-      selectCols.push(`${cteName}.${quoteIdentifier(pipelineMetrics[i]!.alias)}`);
+    ctes.push(`
+      simple_metrics AS (
+        SELECT
+          ${simpleSelectExprs.join(",\n          ")}
+        FROM ${dedupedTraceSummaries(ts)}
+        ${joinClauses}
+        WHERE ${baseWhere}
+          ${fullFilterWhere}
+        GROUP BY ${simpleGroupByCols.join(", ")}
+        ${groupKeyHaving}
+      )`);
+  }
+
+  // Build final SELECT — join all CTEs on (period, date[, group_key])
+  const joinKeys = groupByColumn
+    ? ["period", "date", "group_key"]
+    : ["period", "date"];
+
+  // Determine the anchor CTE (first source in the FROM/JOIN chain)
+  const firstPipelineCteName = `cte_${pipelineMetrics[0]!.alias}`;
+  const anchorCte = hasSimple ? "simple_metrics" : firstPipelineCteName;
+
+  let finalSelect: string;
+  if (!hasSimple && pipelineMetrics.length === 1) {
+    // Single pipeline metric, no simple metrics — simple path
+    finalSelect = `SELECT * FROM ${firstPipelineCteName} WHERE period IS NOT NULL ORDER BY period, date`;
+  } else {
+    // Multiple sources: FULL OUTER JOIN on (period, date[, group_key])
+    let joinSql = anchorCte;
+    const selectCols = [...joinKeys.map((k) => `${anchorCte}.${k}`)];
+
+    // Add simple metric columns from anchor
+    if (hasSimple) {
+      for (const m of simpleMetrics) {
+        selectCols.push(`${anchorCte}.${quoteIdentifier(m.alias)}`);
+      }
     }
 
-    finalSelect = `SELECT ${selectCols.join(", ")} FROM ${joinSql} WHERE ${firstCteName}.period IS NOT NULL ORDER BY ${firstCteName}.period, ${firstCteName}.date`;
+    // Determine which pipeline CTEs need joining (skip anchor if it's the first pipeline CTE)
+    const pipelineCTEsToJoin = hasSimple
+      ? pipelineMetrics
+      : pipelineMetrics.slice(1);
+
+    // If anchor is the first pipeline CTE, add its column
+    if (!hasSimple) {
+      selectCols.push(
+        `${firstPipelineCteName}.${quoteIdentifier(pipelineMetrics[0]!.alias)}`,
+      );
+    }
+
+    for (const metric of pipelineCTEsToJoin) {
+      const cteName = `cte_${metric.alias}`;
+      const onClause = joinKeys
+        .map((k) => `${anchorCte}.${k} = ${cteName}.${k}`)
+        .join(" AND ");
+      joinSql += `\n    FULL OUTER JOIN ${cteName} ON ${onClause}`;
+      selectCols.push(`${cteName}.${quoteIdentifier(metric.alias)}`);
+    }
+
+    finalSelect = `SELECT ${selectCols.join(", ")} FROM ${joinSql} WHERE ${anchorCte}.period IS NOT NULL ORDER BY ${anchorCte}.period, ${anchorCte}.date`;
   }
 
   const sql = `

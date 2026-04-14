@@ -207,6 +207,36 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
     });
 
+    // @regression: Pie charts with arrayJoin groupBy (e.g. metadata.labels) add a
+    // pipeline { field: "trace_id", aggregation: "sum" } which sets requiresSubquery.
+    // buildArrayJoinTimeseriesQuery previously dropped all subquery metrics, returning
+    // empty data. The fix re-translates trace_id pipeline metrics as simple metrics
+    // since the CTE already deduplicates by (trace_id, group_key).
+    it("includes pipeline metrics with trace_id field in arrayJoin groupBy path", () => {
+      const input = {
+        ...baseInput,
+        groupBy: "metadata.labels" as const,
+        series: [
+          {
+            metric: "metadata.trace_count" as FlattenAnalyticsMetricsEnum,
+            aggregation: "count" as const,
+            pipeline: { field: "trace_id" as const, aggregation: "sum" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must route through the arrayJoin CTE path
+      expect(result.sql).toContain("arrayJoin");
+      expect(result.sql).toContain("deduped_traces");
+
+      // The metric alias must be present in the outer SELECT (not silently dropped)
+      expect(result.sql).toContain("0__metadata_trace_count__count");
+
+      // The metric should be converted to uniqExact(trace_id) via transformMetricForDedup
+      expect(result.sql).toContain("uniqExact(trace_id)");
+    });
+
     it("does not JOIN stored_spans when metadata.span_type uses cardinality alongside trace-level metrics", () => {
       const input = {
         ...baseInput,
@@ -748,6 +778,32 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("0__performance_total_cost__sum");
       expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
       expect(result.sql).toContain("2__metadata_thread_id__cardinality");
+    });
+
+    // @regression: buildDateBucketedPipelineQuery previously only received pipeline
+    // metrics, silently dropping simple metrics when mixed with pipeline metrics
+    // on numeric timeScale.
+    it("preserves simple metrics alongside pipeline metrics with numeric timeScale", () => {
+      const input = {
+        ...baseInput,
+        timeScale: 60,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          {
+            metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Both metric aliases must be present
+      expect(result.sql).toContain("0__performance_total_cost__sum");
+      expect(result.sql).toContain("1__metadata_thread_id__cardinality");
+
+      // Simple metrics should be in a simple_metrics CTE
+      expect(result.sql).toContain("simple_metrics");
     });
 
     // @regression: count-like trace metrics (count(), uniq(TraceId)) mixed with eval
