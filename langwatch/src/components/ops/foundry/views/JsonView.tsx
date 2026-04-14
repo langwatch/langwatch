@@ -1,4 +1,4 @@
-import { Box, Button, Flex, Text } from "@chakra-ui/react";
+import { Box, Button, Flex } from "@chakra-ui/react";
 import { Copy } from "lucide-react";
 import { useState } from "react";
 import { useTraceStore } from "../traceStore";

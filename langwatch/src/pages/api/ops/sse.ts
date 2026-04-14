@@ -1,51 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { env } from "~/env.mjs";
-import { isAdmin } from "../../../../ee/admin/isAdmin";
+import { resolveOpsScope } from "~/server/api/rbac";
+import type { Permission } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
-
-async function hasOpsAccess(userId: string, userEmail: string | null | undefined): Promise<boolean> {
-  if (isAdmin({ email: userEmail })) return true;
-
-  if (env.IS_SAAS && env.OPS_ORG_ID) {
-    const membership = await prisma.organizationUser.findFirst({
-      where: { userId, organizationId: env.OPS_ORG_ID },
-    });
-    if (membership) return true;
-  }
-
-  const memberships = await prisma.organizationUser.findMany({
-    where: { userId },
-    select: { organizationId: true },
-  });
-
-  for (const membership of memberships) {
-    const bindings = await prisma.roleBinding.findMany({
-      where: {
-        organizationId: membership.organizationId,
-        userId,
-      },
-      select: { customRoleId: true },
-    });
-
-    for (const binding of bindings) {
-      if (!binding.customRoleId) continue;
-      const customRole = await prisma.customRole.findUnique({
-        where: { id: binding.customRoleId },
-      });
-      if (!customRole) continue;
-      const perms = Array.isArray(customRole.permissions)
-        ? (customRole.permissions as string[])
-        : [];
-      if (perms.includes("ops:view") || perms.includes("ops:manage")) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
 
 export default async function handler(
   req: NextApiRequest,
@@ -62,8 +20,13 @@ export default async function handler(
     return;
   }
 
-  const permitted = await hasOpsAccess(session.user.id, session.user.email);
-  if (!permitted) {
+  const opsScope = await resolveOpsScope({
+    userId: session.user.id,
+    userEmail: session.user.email,
+    permission: "ops:view" as Permission,
+    prisma,
+  });
+  if (!opsScope) {
     res.status(403).end();
     return;
   }

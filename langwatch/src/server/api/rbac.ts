@@ -940,6 +940,67 @@ export type OpsScope =
   | { kind: "platform" }
   | { kind: "organization"; organizationId: string };
 
+/**
+ * Resolve the ops scope for a user. Returns null if the user has no ops access.
+ * Shared between tRPC middleware and SSE endpoint.
+ */
+export async function resolveOpsScope({
+  userId,
+  userEmail,
+  permission,
+  prisma,
+}: {
+  userId: string;
+  userEmail: string | null | undefined;
+  permission: Permission;
+  prisma: Parameters<typeof resolveBindingPermission>[3];
+}): Promise<OpsScope | null> {
+  if (isAdmin({ email: userEmail })) {
+    return { kind: "platform" };
+  }
+
+  if (env.IS_SAAS && env.OPS_ORG_ID) {
+    const membership = await prisma.organizationUser.findFirst({
+      where: { userId, organizationId: env.OPS_ORG_ID },
+    });
+    if (membership) {
+      return { kind: "platform" };
+    }
+  }
+
+  const memberships = await prisma.organizationUser.findMany({
+    where: { userId },
+    select: { organizationId: true },
+  });
+
+  for (const membership of memberships) {
+    const bindings = await prisma.roleBinding.findMany({
+      where: {
+        organizationId: membership.organizationId,
+        userId,
+      },
+      select: { role: true, customRoleId: true },
+    });
+
+    for (const binding of bindings) {
+      const permitted = await resolveBindingPermission(
+        binding,
+        null,
+        permission,
+        prisma,
+      );
+      if (permitted) {
+        return {
+          kind: "organization",
+          organizationId: membership.organizationId,
+        };
+      }
+    }
+  }
+
+  return null;
+}
+
 export const checkOpsPermission =
   (permission: Permission) =>
   async ({
@@ -951,54 +1012,12 @@ export const checkOpsPermission =
       throw new TRPCError({ code: "UNAUTHORIZED" });
     }
 
-    let opsScope: OpsScope | undefined;
-
-    if (isAdmin(user)) {
-      opsScope = { kind: "platform" };
-    }
-
-    if (!opsScope && env.IS_SAAS && env.OPS_ORG_ID) {
-      const membership = await ctx.prisma.organizationUser.findFirst({
-        where: { userId: user.id, organizationId: env.OPS_ORG_ID },
-      });
-      if (membership) {
-        opsScope = { kind: "platform" };
-      }
-    }
-
-    if (!opsScope) {
-      const memberships = await ctx.prisma.organizationUser.findMany({
-        where: { userId: user.id },
-        select: { organizationId: true },
-      });
-
-      for (const membership of memberships) {
-        const bindings = await ctx.prisma.roleBinding.findMany({
-          where: {
-            organizationId: membership.organizationId,
-            userId: user.id,
-          },
-          select: { role: true, customRoleId: true },
-        });
-
-        for (const binding of bindings) {
-          const permitted = await resolveBindingPermission(
-            binding,
-            null,
-            permission,
-            ctx.prisma,
-          );
-          if (permitted) {
-            opsScope = {
-              kind: "organization",
-              organizationId: membership.organizationId,
-            };
-            break;
-          }
-        }
-        if (opsScope) break;
-      }
-    }
+    const opsScope = await resolveOpsScope({
+      userId: user.id,
+      userEmail: user.email,
+      permission,
+      prisma: ctx.prisma,
+    });
 
     if (!opsScope) {
       throw new TRPCError({
@@ -1007,7 +1026,7 @@ export const checkOpsPermission =
       });
     }
 
-    (ctx as any).opsScope = opsScope;
+    ctx.opsScope = opsScope;
     ctx.permissionChecked = true;
     return next();
   };

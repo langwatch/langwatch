@@ -3,7 +3,7 @@ import { Box, Button, Flex, Text, Badge } from "@chakra-ui/react";
 import { ChevronDown } from "lucide-react";
 import { useTraceStore } from "./traceStore";
 import { usePresetStore } from "./presetStore";
-import { SPAN_TYPE_ICONS, type SpanConfig } from "./types";
+import type { SpanConfig } from "./types";
 
 function countSpans(spans: SpanConfig[]): number {
   return spans.reduce((acc, s) => acc + 1 + countSpans(s.children), 0);

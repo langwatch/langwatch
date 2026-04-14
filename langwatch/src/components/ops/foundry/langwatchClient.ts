@@ -1,3 +1,4 @@
+import { shortId } from "./types";
 import type { TraceConfig, SpanConfig, SpanType } from "./types";
 
 
@@ -65,12 +66,11 @@ function convertToTraceConfig(trace: LangWatchTrace): TraceConfig {
 
   function buildSpanConfig(lwSpan: LangWatchSpan): SpanConfig {
     const children = (childMap.get(lwSpan.span_id) ?? []).map(buildSpanConfig);
-    const parentStart = lwSpan.timestamps.started_at;
     const duration = lwSpan.timestamps.finished_at - lwSpan.timestamps.started_at;
     const type = (lwSpan.type ?? "span") as SpanType;
 
     const config: SpanConfig = {
-      id: crypto.randomUUID().slice(0, 10),
+      id: shortId(),
       name: lwSpan.name ?? type,
       type,
       durationMs: duration,
@@ -111,7 +111,7 @@ function convertToTraceConfig(trace: LangWatchTrace): TraceConfig {
   }
 
   return {
-    id: crypto.randomUUID().slice(0, 10),
+    id: shortId(),
     name: `Imported: ${trace.trace_id}`,
     description: `Imported from trace ${trace.trace_id}`,
     resourceAttributes: { "service.name": "imported" },

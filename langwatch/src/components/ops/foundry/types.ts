@@ -1,3 +1,8 @@
+let _idCounter = 0;
+export function shortId(): string {
+  return (++_idCounter).toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
 export const SPAN_TYPES = [
   "span",
   "llm",

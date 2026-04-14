@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { shortId } from "./types";
 import type { Preset, TraceConfig } from "./types";
 import { builtInPresets } from "./presets";
 
@@ -38,7 +39,7 @@ export const usePresetStore = create<PresetStore>((set, get) => {
 
     savePreset(name, description, config) {
       const preset: Preset = {
-        id: crypto.randomUUID().slice(0, 10),
+        id: shortId(),
         name,
         description,
         builtIn: false,
@@ -69,7 +70,7 @@ export const usePresetStore = create<PresetStore>((set, get) => {
       const preset = get().allPresets.find((p) => p.id === id);
       if (!preset) return;
       const dup: Preset = {
-        id: crypto.randomUUID().slice(0, 10),
+        id: shortId(),
         name: `${preset.name} (copy)`,
         description: preset.description,
         builtIn: false,
@@ -106,7 +107,7 @@ export const usePresetStore = create<PresetStore>((set, get) => {
     importPreset(json) {
       try {
         const preset = JSON.parse(json) as Preset;
-        preset.id = crypto.randomUUID().slice(0, 10);
+        preset.id = shortId();
         preset.builtIn = false;
         set((state) => {
           const updated = [...state.userPresets, preset];

@@ -1,22 +1,18 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
+import type { PrismaClient } from "@prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
   checkOpsPermission,
   type Permission,
-  type PermissionMiddleware,
   type OpsScope,
 } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
 import { getProjectionMetadata, getReactorMetadata } from "~/server/event-sourcing/pipelineRegistry";
 
-const opsViewPermission = checkOpsPermission(
-  "ops:view" as Permission,
-) as PermissionMiddleware<any>;
+const opsViewPermission = checkOpsPermission("ops:view" as Permission);
 
-const opsManagePermission = checkOpsPermission(
-  "ops:manage" as Permission,
-) as PermissionMiddleware<any>;
+const opsManagePermission = checkOpsPermission("ops:manage" as Permission);
 
 function requireOps() {
   const ops = getApp().ops;
@@ -35,7 +31,7 @@ async function resolveTenantIds({
   requestedTenantIds,
 }: {
   opsScope: OpsScope;
-  prisma: any;
+  prisma: PrismaClient;
   requestedTenantIds?: string[];
 }): Promise<string[]> {
   if (opsScope.kind !== "organization") return requestedTenantIds ?? [];
@@ -74,7 +70,7 @@ async function resolveOrgProjectIds({
   prisma,
 }: {
   opsScope: OpsScope;
-  prisma: any;
+  prisma: PrismaClient;
 }): Promise<Set<string>> {
   if (opsScope.kind !== "organization") return new Set<string>();
   const orgProjects = (await prisma.project.findMany({
@@ -86,7 +82,7 @@ async function resolveOrgProjectIds({
 
 export const opsRouter = createTRPCRouter({
   getScope: protectedProcedure.use(opsViewPermission).query(({ ctx }) => {
-    return { scope: (ctx as any).opsScope as OpsScope };
+    return { scope: ctx.opsScope! };
   }),
 
   getDashboardSnapshot: protectedProcedure
@@ -258,7 +254,7 @@ export const opsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       const ops = requireOps();
-      const opsScope = (ctx as any).opsScope as OpsScope;
+      const opsScope = ctx.opsScope!;
       const tenantIds = await resolveTenantIds({
         opsScope,
         prisma: ctx.prisma,
@@ -276,7 +272,7 @@ export const opsRouter = createTRPCRouter({
     .use(opsViewPermission)
     .input(z.object({ query: z.string() }))
     .query(async ({ input, ctx }) => {
-      const opsScope = (ctx as any).opsScope as OpsScope;
+      const opsScope = ctx.opsScope!;
       const where: Record<string, unknown> = {
         OR: [
           { id: { contains: input.query } },
@@ -341,7 +337,7 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = requireOps();
-      const opsScope = (ctx as any).opsScope as OpsScope;
+      const opsScope = ctx.opsScope!;
       const tenantIds = await resolveTenantIds({
         opsScope,
         prisma: ctx.prisma,
@@ -518,7 +514,7 @@ export const opsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       const ops = requireOps();
-      const opsScope = (ctx as any).opsScope as OpsScope;
+      const opsScope = ctx.opsScope!;
 
       let tenantIds: string[] = [];
       if (input.tenantId) {
@@ -552,7 +548,7 @@ export const opsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       const ops = requireOps();
-      const opsScope = (ctx as any).opsScope as OpsScope;
+      const opsScope = ctx.opsScope!;
       const orgProjectIds = await resolveOrgProjectIds({
         opsScope,
         prisma: ctx.prisma,
@@ -574,7 +570,7 @@ export const opsRouter = createTRPCRouter({
     )
     .query(async ({ input, ctx }) => {
       const ops = requireOps();
-      const opsScope = (ctx as any).opsScope as OpsScope;
+      const opsScope = ctx.opsScope!;
       const orgProjectIds = await resolveOrgProjectIds({
         opsScope,
         prisma: ctx.prisma,

@@ -1,10 +1,11 @@
+import { shortId } from "./types";
 import type { Preset, SpanConfig } from "./types";
 
 function span(
   overrides: Partial<SpanConfig> & { name: string; type: SpanConfig["type"] }
 ): SpanConfig {
   return {
-    id: crypto.randomUUID().slice(0, 10),
+    id: shortId(),
     durationMs: 100,
     offsetMs: 0,
     status: "ok",

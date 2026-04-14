@@ -10,7 +10,7 @@ import type {
   BatchPhase,
   BatchCompleteInfo,
 } from "./types";
-import type { CutoffInfo, DiscoveredAggregate } from "./replayEventLoader";
+import type { CutoffInfo, DiscoveredAggregate, ReplayEvent } from "./replayEventLoader";
 import { isAtOrBeforeCutoff } from "./replayConstants";
 import {
   discoverAffectedAggregates,
@@ -859,7 +859,7 @@ export class ReplayService {
     }
 
     // Load events grouped by tenant (one CH query per tenant)
-    const allEvents = new Map<string, import("./replayEventLoader").ReplayEvent[]>();
+    const allEvents = new Map<string, ReplayEvent[]>();
 
     for (const [tenantId, entries] of byTenant) {
       const client = await this.resolveClient(tenantId);

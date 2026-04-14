@@ -1,12 +1,9 @@
-import { Box, Button, Flex, Text, HStack, VStack, Drawer, Portal, CloseButton } from "@chakra-ui/react";
-import { Play, RotateCcw, ChevronDown } from "lucide-react";
+import { Button, Flex, HStack, Drawer, Portal, CloseButton } from "@chakra-ui/react";
+import { Play, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import { useRouter } from "next/router";
 import { PlaygroundContent } from "./PlaygroundContent";
 import { PresetPicker } from "./PresetPicker";
 import { useTraceStore } from "./traceStore";
-import { useExecutionStore } from "./executionStore";
-import { api } from "~/utils/api";
 
 /**
  * Mini playground that opens in a drawer.

@@ -1,10 +1,11 @@
 import { create } from "zustand";
 
+import { shortId } from "./types";
 import type { SpanConfig, SpanType, TraceConfig } from "./types";
 
 function createDefaultSpan(type: SpanType = "span", name?: string): SpanConfig {
   return {
-    id: crypto.randomUUID().slice(0, 10),
+    id: shortId(),
     name: name ?? type,
     type,
     durationMs: type === "llm" ? 500 : 100,
@@ -54,7 +55,7 @@ function createDefaultSpan(type: SpanType = "span", name?: string): SpanConfig {
 
 function createDefaultTrace(): TraceConfig {
   return {
-    id: crypto.randomUUID().slice(0, 10),
+    id: shortId(),
     name: "New Trace",
     resourceAttributes: { "service.name": "my-service" },
     metadata: {},
@@ -229,7 +230,7 @@ export const useTraceStore = create<TraceStore>((set) => ({
       const original = found.siblings[found.index]!;
       const duplicate = structuredClone(original);
       function reassignIds(span: SpanConfig) {
-        span.id = crypto.randomUUID().slice(0, 10);
+        span.id = shortId();
         span.children.forEach(reassignIds);
       }
       reassignIds(duplicate);
