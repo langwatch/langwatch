@@ -169,6 +169,15 @@ function buildUrl(
  * Mimics Next.js `Router` default export.
  * Must be kept in sync with the current URL state.
  */
+/**
+ * Set by main.tsx after router is created. Enables imperative navigation
+ * from module-level code (e.g. navigateToDrawer in useDrawer.ts).
+ */
+let _routerInstance: { navigate: (to: string) => void } | null = null;
+export function setRouterInstance(r: { navigate: (to: string) => void }) {
+  _routerInstance = r;
+}
+
 class RouterSingleton {
   get query(): Record<string, string | string[] | undefined> {
     const params = new URLSearchParams(window.location.search);
@@ -206,8 +215,12 @@ class RouterSingleton {
     options?: NextRouterOptions
   ): Promise<boolean> {
     const target = buildUrl(url);
-    window.history.pushState({}, "", target);
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    if (_routerInstance) {
+      _routerInstance.navigate(target);
+    } else {
+      window.history.pushState({}, "", target);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
     if (options?.scroll !== false) {
       window.scrollTo(0, 0);
     }
@@ -220,8 +233,12 @@ class RouterSingleton {
     options?: NextRouterOptions
   ): Promise<boolean> {
     const target = buildUrl(url);
-    window.history.replaceState({}, "", target);
-    window.dispatchEvent(new PopStateEvent("popstate"));
+    if (_routerInstance) {
+      _routerInstance.navigate(target);
+    } else {
+      window.history.replaceState({}, "", target);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }
     if (options?.scroll !== false) {
       window.scrollTo(0, 0);
     }
