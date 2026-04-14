@@ -229,7 +229,7 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": null,
+              "cli": ["simulation-run list", "simulation-run get"],
               "skill": null,
               "docs": null
             },
@@ -239,7 +239,7 @@
               "skill": null,
               "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
             },
-            "api": null,
+            "api": "/api/simulation-runs",
             "docs": "https://langwatch.ai/docs/agent-simulations/individual-run.md"
           },
           "sync": null

@@ -805,6 +805,32 @@ suiteCmd
     await impl(id);
   });
 
+// Add simulation-run command group
+const simulationRunCmd = program
+  .command("simulation-run")
+  .description("View simulation run results");
+
+simulationRunCmd
+  .command("list")
+  .description("List simulation runs (optionally filter by scenario set or batch)")
+  .option("--scenario-set-id <id>", "Filter by scenario set ID")
+  .option("--batch-run-id <id>", "Filter by batch run ID (requires --scenario-set-id)")
+  .option("--limit <n>", "Max results (default: 20)")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { scenarioSetId?: string; batchRunId?: string; limit?: string; format?: string }) => {
+    const { listSimulationRunsCommand: impl } = await import("./commands/simulation-runs/list.js");
+    await impl(options);
+  });
+
+simulationRunCmd
+  .command("get <runId>")
+  .description("Get full details of a simulation run (messages, results, costs)")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (runId: string, options: { format?: string }) => {
+    const { getSimulationRunCommand: impl } = await import("./commands/simulation-runs/get.js");
+    await impl(runId, options);
+  });
+
 // Add dataset command group
 const datasetCmd = program
   .command("dataset")

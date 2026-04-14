@@ -14,6 +14,7 @@ import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]
 import { app as scenariosApp } from "../app/api/scenarios/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
+import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
 import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
 
@@ -56,6 +57,8 @@ export default async function execute() {
   const modelProvidersSpec = await generateSpecs(modelProvidersApp);
   console.log("Building scenarios spec...");
   const scenariosSpec = await generateSpecs(scenariosApp);
+  console.log("Building simulation runs spec...");
+  const simulationRunsSpec = await generateSpecs(simulationRunsApp);
   console.log("Building suites spec...");
   const suitesSpec = await generateSpecs(suitesApp);
   console.log("Building traces spec...");
@@ -76,6 +79,7 @@ export default async function execute() {
       modelProvidersSpec,
       scenarioEventsSpec,
       scenariosSpec,
+      simulationRunsSpec,
       suitesSpec,
       tracesSpec,
       workflowsSpec,
@@ -96,6 +100,7 @@ export default async function execute() {
           key.includes("/api/model-providers") ||
           key.includes("/api/scenario-events") ||
           key.includes("/api/scenarios") ||
+          key.includes("/api/simulation-runs") ||
           key.includes("/api/suites") ||
           key.includes("/api/traces") ||
           key.includes("/api/workflows")
