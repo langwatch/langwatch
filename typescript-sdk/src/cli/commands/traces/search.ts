@@ -61,8 +61,10 @@ export const searchTracesCommand = async (options: {
 
     const tableData = traces.map((trace) => {
       const traceId = (trace.traceId ?? trace.trace_id ?? trace.id ?? "—") as string;
-      const input = truncate(String(trace.input ?? trace.ComputedInput ?? "—"), 60);
-      const output = truncate(String(trace.output ?? trace.ComputedOutput ?? "—"), 40);
+      const rawInput = trace.input ?? trace.ComputedInput ?? "—";
+      const rawOutput = trace.output ?? trace.ComputedOutput ?? "—";
+      const input = truncate(typeof rawInput === "string" ? rawInput : JSON.stringify(rawInput), 60);
+      const output = truncate(typeof rawOutput === "string" ? rawOutput : JSON.stringify(rawOutput), 40);
       const timestamps = trace.timestamps as Record<string, unknown> | undefined;
       const startedAt = timestamps?.started_at ?? trace.StartedAt ?? trace.startedAt;
       const timeStr = startedAt ? formatRelativeTime(new Date(startedAt as number).toISOString()) : "—";

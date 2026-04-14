@@ -33,7 +33,9 @@ class ProcessExitError extends Error {
   }
 }
 
-const noop = () => {};
+const noop = () => {
+  // intentionally empty — suppresses output during tests
+};
 
 const mockProcessExit = () => {
   vi.spyOn(process, "exit").mockImplementation((code) => {
