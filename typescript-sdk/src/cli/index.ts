@@ -308,6 +308,16 @@ tagCmd
     }
   });
 
+// Status command - project overview
+program
+  .command("status")
+  .description("Show project resource counts and available commands")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
+    const { statusCommand: impl } = await import("./commands/status.js");
+    await impl(options);
+  });
+
 // Add evaluator command group
 const evaluatorCmd = program
   .command("evaluator")
