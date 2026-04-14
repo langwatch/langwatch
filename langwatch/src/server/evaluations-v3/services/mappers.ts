@@ -4,7 +4,7 @@
  * canonical camelCase service types.
  */
 
-import { parse } from "date-fns";
+import { parseClickHouseDateTimeMs } from "~/server/clickhouse/dateTime";
 import type {
   ESBatchEvaluation,
   ESBatchEvaluationTarget,
@@ -77,6 +77,7 @@ export interface ClickHouseExperimentRunItemRow {
 
 /** Per-evaluator aggregation row from ClickHouse GROUP BY query. */
 export interface ClickHouseEvaluatorBreakdownRow {
+  ExperimentId: string;
   RunId: string;
   EvaluatorId: string;
   EvaluatorName: string | null;
@@ -87,6 +88,7 @@ export interface ClickHouseEvaluatorBreakdownRow {
 
 /** Per-run cost/duration summary from ClickHouse aggregate query. */
 export interface ClickHouseCostSummaryRow {
+  ExperimentId: string;
   RunId: string;
   datasetCost: number | null;
   evaluationsCost: number | null;
@@ -150,13 +152,13 @@ export function mapClickHouseRunToExperimentRun({
     runId: record.RunId,
     workflowVersion: workflowVersion ?? null,
     timestamps: {
-      createdAt: parseClickHouseDateTime(record.CreatedAt),
-      updatedAt: parseClickHouseDateTime(record.UpdatedAt),
+      createdAt: parseClickHouseDateTimeMs(record.CreatedAt),
+      updatedAt: parseClickHouseDateTimeMs(record.UpdatedAt),
       finishedAt: record.FinishedAt
-        ? parseClickHouseDateTime(record.FinishedAt)
+        ? parseClickHouseDateTimeMs(record.FinishedAt)
         : null,
       stoppedAt: record.StoppedAt
-        ? parseClickHouseDateTime(record.StoppedAt)
+        ? parseClickHouseDateTimeMs(record.StoppedAt)
         : null,
     },
     progress: record.Progress,
@@ -262,13 +264,13 @@ export function mapClickHouseItemsToRunWithItems({
     dataset,
     evaluations,
     timestamps: {
-      createdAt: parseClickHouseDateTime(runRecord.CreatedAt),
-      updatedAt: parseClickHouseDateTime(runRecord.UpdatedAt),
+      createdAt: parseClickHouseDateTimeMs(runRecord.CreatedAt),
+      updatedAt: parseClickHouseDateTimeMs(runRecord.UpdatedAt),
       finishedAt: runRecord.FinishedAt
-        ? parseClickHouseDateTime(runRecord.FinishedAt)
+        ? parseClickHouseDateTimeMs(runRecord.FinishedAt)
         : null,
       stoppedAt: runRecord.StoppedAt
-        ? parseClickHouseDateTime(runRecord.StoppedAt)
+        ? parseClickHouseDateTimeMs(runRecord.StoppedAt)
         : null,
     },
   };
@@ -455,17 +457,3 @@ export function mapEsTargetsToTargets(
   }));
 }
 
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Parses a ClickHouse DateTime64(3) string into a Unix timestamp in milliseconds.
- * ClickHouse returns DateTime64(3) as strings like "2024-01-15 10:30:00.000".
- */
-const CLICKHOUSE_DATETIME64_FORMAT = "yyyy-MM-dd HH:mm:ss.SSSX";
-
-function parseClickHouseDateTime(value: string): number {
-  const ms = parse(`${value}Z`, CLICKHOUSE_DATETIME64_FORMAT, new Date(0)).getTime();
-  return isNaN(ms) ? 0 : ms;
-}
