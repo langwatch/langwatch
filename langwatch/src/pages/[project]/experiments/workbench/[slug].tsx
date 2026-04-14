@@ -36,15 +36,23 @@ export default function ExperimentsWorkbenchPage() {
   const { project } = useOrganizationTeamProject();
   const slug = router.query.slug as string | undefined;
 
-  const { name, setName, datasets, reset, autosaveStatus, addEvaluator } =
-    useEvaluationsV3Store((state) => ({
-      name: state.name,
-      setName: state.setName,
-      datasets: state.datasets,
-      reset: state.reset,
-      autosaveStatus: state.ui.autosaveStatus,
-      addEvaluator: state.addEvaluator,
-    }));
+  const {
+    name,
+    setName,
+    datasets,
+    reset,
+    autosaveStatus,
+    addEvaluator,
+    removeEvaluator,
+  } = useEvaluationsV3Store((state) => ({
+    name: state.name,
+    setName: state.setName,
+    datasets: state.datasets,
+    reset: state.reset,
+    autosaveStatus: state.ui.autosaveStatus,
+    addEvaluator: state.addEvaluator,
+    removeEvaluator: state.removeEvaluator,
+  }));
 
   const createEvaluator = api.evaluators.create.useMutation();
   const updateEvaluator = api.evaluators.update.useMutation();
@@ -126,6 +134,14 @@ export default function ExperimentsWorkbenchPage() {
         const { id } = payload as { id: string };
         await deleteEvaluator.mutateAsync({ projectId, id });
         await utils.evaluators.getAll.invalidate({ projectId });
+        // Drop any workbench columns that referenced the archived evaluator
+        // so the table reflects the delete immediately.
+        const current = useEvaluationsV3Store.getState().evaluators;
+        for (const entry of current) {
+          if (entry.dbEvaluatorId === id) {
+            useEvaluationsV3Store.getState().removeEvaluator(entry.id);
+          }
+        }
         return undefined;
       },
       "workbench.addEvaluator": async (payload) => {
@@ -246,6 +262,7 @@ export default function ExperimentsWorkbenchPage() {
     createDatasetRecords,
     utils,
     addEvaluator,
+    removeEvaluator,
     executeEvaluation,
     openDrawer,
   ]);
