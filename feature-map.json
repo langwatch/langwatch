@@ -309,7 +309,12 @@
                 "prompt list",
                 "prompt sync",
                 "prompt pull",
-                "prompt push"
+                "prompt push",
+                "prompt tag list",
+                "prompt tag create",
+                "prompt tag rename",
+                "prompt tag assign",
+                "prompt tag delete"
               ],
               "skill": "prompts",
               "docs": "https://langwatch.ai/docs/prompt-management/cli.md"
@@ -320,7 +325,12 @@
                 "platform_create_prompt",
                 "platform_list_prompts",
                 "platform_get_prompt",
-                "platform_update_prompt"
+                "platform_update_prompt",
+                "platform_list_prompt_tags",
+                "platform_create_prompt_tag",
+                "platform_rename_prompt_tag",
+                "platform_assign_prompt_tag",
+                "platform_delete_prompt_tag"
               ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/prompt-management/getting-started.md"
@@ -366,7 +376,7 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": ["agent list", "agent get", "agent create", "agent delete"],
+              "cli": ["agent list", "agent get", "agent create", "agent run", "agent update", "agent delete"],
               "skill": null,
               "docs": null
             },
@@ -377,6 +387,7 @@
                 "platform_get_agent",
                 "platform_create_agent",
                 "platform_update_agent",
+                "platform_run_agent",
                 "platform_delete_agent"
               ],
               "skill": null,
@@ -394,7 +405,7 @@
           "surfaces": {
             "code": {
               "sdk": null,
-              "cli": ["workflow list", "workflow get", "workflow delete"],
+              "cli": ["workflow list", "workflow get", "workflow run", "workflow delete"],
               "skill": null,
               "docs": null
             },
@@ -403,6 +414,7 @@
               "mcp": [
                 "platform_list_workflows",
                 "platform_get_workflow",
+                "platform_run_workflow",
                 "platform_delete_workflow"
               ],
               "skill": null,

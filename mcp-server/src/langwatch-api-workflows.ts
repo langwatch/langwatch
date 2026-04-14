@@ -22,6 +22,17 @@ export async function getWorkflow(id: string): Promise<WorkflowSummary> {
   ) as Promise<WorkflowSummary>;
 }
 
+export async function runWorkflow(
+  id: string,
+  input?: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  return makeRequest(
+    "POST",
+    `/api/workflows/${encodeURIComponent(id)}/run`,
+    input ?? {},
+  ) as Promise<Record<string, unknown>>;
+}
+
 export async function deleteWorkflow(id: string): Promise<{ id: string; archived: boolean }> {
   return makeRequest(
     "DELETE",

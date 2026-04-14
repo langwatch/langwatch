@@ -59,6 +59,47 @@ export async function updateAgent(params: {
   ) as Promise<AgentSummary>;
 }
 
+/**
+ * Run an agent. For HTTP agents, calls the configured URL directly.
+ * For workflow-linked agents, calls the workflow run endpoint.
+ */
+export async function runAgent(
+  id: string,
+  input?: Record<string, unknown>,
+): Promise<{ agentType: string; result: Record<string, unknown> }> {
+  const agent = await getAgent(id);
+  const config = agent.config ?? {};
+
+  if (agent.type === "http") {
+    const url = (config as Record<string, unknown>).url as string | undefined;
+    if (!url) {
+      throw new Error("HTTP agent has no URL configured");
+    }
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input ?? {}),
+    });
+
+    const result = (await response.json()) as Record<string, unknown>;
+    return { agentType: "http", result };
+  }
+
+  // For workflow-linked agents, use the workflow run endpoint
+  const workflowId = (config as Record<string, unknown>).workflowId as string | undefined;
+  if (!workflowId) {
+    throw new Error(
+      `Agent "${agent.name}" (type: ${agent.type}) cannot be executed directly. ` +
+        `Only HTTP agents and workflow-linked agents can be run.`,
+    );
+  }
+
+  const { runWorkflow } = await import("./langwatch-api-workflows.js");
+  const result = await runWorkflow(workflowId, input);
+  return { agentType: agent.type, result };
+}
+
 export async function deleteAgent(id: string): Promise<{ id: string; name: string }> {
   return makeRequest(
     "DELETE",

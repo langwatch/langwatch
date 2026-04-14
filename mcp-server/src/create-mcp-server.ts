@@ -949,6 +949,22 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  server.tool(
+    "platform_run_agent",
+    "Execute an agent with JSON input. HTTP agents call their configured URL directly; workflow-linked agents execute via the workflow engine.",
+    {
+      id: z.string().describe("The agent ID to run"),
+      input: z.string().optional().describe("Input data as a JSON object string"),
+    },
+    withToolLogging("platform_run_agent", async (params) => {
+      requireApiKey();
+      const { handleRunAgent } = await import("./tools/run-agent.js");
+      return {
+        content: [{ type: "text", text: await handleRunAgent(params) }],
+      };
+    })
+  );
+
   // --- Platform Dashboard Tools (require API key) ---
 
   server.tool(
@@ -1050,6 +1066,22 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       const { handleDeleteWorkflow } = await import("./tools/delete-workflow.js");
       return {
         content: [{ type: "text", text: await handleDeleteWorkflow(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_run_workflow",
+    "Execute a workflow with JSON input. Returns the workflow output.",
+    {
+      id: z.string().describe("The workflow ID to run"),
+      input: z.string().optional().describe("Input data as a JSON object string"),
+    },
+    withToolLogging("platform_run_workflow", async (params) => {
+      requireApiKey();
+      const { handleRunWorkflow } = await import("./tools/run-workflow.js");
+      return {
+        content: [{ type: "text", text: await handleRunWorkflow(params) }],
       };
     })
   );
