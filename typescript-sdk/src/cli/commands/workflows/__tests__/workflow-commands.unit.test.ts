@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { WorkflowsApiError } from "@/client-sdk/services/workflows/workflows-api.service";
 
 vi.mock("@/client-sdk/services/workflows/workflows-api.service", async (importOriginal) => {
-  const actual = await importOriginal();
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
     WorkflowsApiService: vi.fn(),
