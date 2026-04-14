@@ -192,7 +192,17 @@ Create or configure evaluators — the functions that score your agent's outputs
    evaluation.evaluate("ragas/faithfulness", index=idx, data={...})
    ```
 
-### Platform Approach
+### CLI Approach (Preferred for Agents)
+```bash
+langwatch evaluator list                                    # List evaluators
+langwatch evaluator create "My Evaluator" --type langevals/llm_judge
+langwatch evaluator get <idOrSlug>                          # View details
+langwatch evaluator update <idOrSlug> --name "New Name"     # Update
+langwatch evaluation run <slug> --wait                      # Run evaluation and wait
+langwatch evaluation status <runId>                         # Check run status
+```
+
+### Platform Approach (MCP)
 1. Call `discover_schema` with category "evaluators" to see available types
 2. Use `platform_create_evaluator` to create an evaluator on the platform
 3. Use `platform_list_evaluators` to see existing evaluators
@@ -204,6 +214,16 @@ This is useful for setting up LLM-as-judge evaluators, custom evaluators, or con
 
 Create test datasets for experiments.
 
+### CLI Approach (Preferred for Agents)
+```bash
+langwatch dataset list                                      # List datasets
+langwatch dataset create "My Dataset" -c input:string,output:string
+langwatch dataset upload my-dataset data.csv                # Upload CSV/JSON
+langwatch dataset records list my-dataset                   # View records
+langwatch dataset download my-dataset -f csv                # Download
+```
+
+### Docs Approach
 1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/datasets/overview.md`
 2. Generate a dataset tailored to your agent:
 

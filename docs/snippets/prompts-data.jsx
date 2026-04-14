@@ -447,7 +447,17 @@ Create or configure evaluators — the functions that score your agent's outputs
    evaluation.evaluate("ragas/faithfulness", index=idx, data={...})
    \`\`\`
 
-### Platform Approach
+### CLI Approach (Preferred for Agents)
+\`\`\`bash
+langwatch evaluator list                                    # List evaluators
+langwatch evaluator create "My Evaluator" --type langevals/llm_judge
+langwatch evaluator get <idOrSlug>                          # View details
+langwatch evaluator update <idOrSlug> --name "New Name"     # Update
+langwatch evaluation run <slug> --wait                      # Run evaluation and wait
+langwatch evaluation status <runId>                         # Check run status
+\`\`\`
+
+### Platform Approach (MCP)
 1. Call \`discover_schema\` with category "evaluators" to see available types
 2. Use \`platform_create_evaluator\` to create an evaluator on the platform
 3. Use \`platform_list_evaluators\` to see existing evaluators
@@ -459,6 +469,16 @@ This is useful for setting up LLM-as-judge evaluators, custom evaluators, or con
 
 Create test datasets for experiments.
 
+### CLI Approach (Preferred for Agents)
+\`\`\`bash
+langwatch dataset list                                      # List datasets
+langwatch dataset create "My Dataset" -c input:string,output:string
+langwatch dataset upload my-dataset data.csv                # Upload CSV/JSON
+langwatch dataset records list my-dataset                   # View records
+langwatch dataset download my-dataset -f csv                # Download
+\`\`\`
+
+### Docs Approach
 1. Read the docs: call \`fetch_langwatch_docs\` with url \`https://langwatch.ai/docs/datasets/overview.md\`
 2. Generate a dataset tailored to your agent:
 
@@ -1319,11 +1339,39 @@ First, try to install the LangWatch MCP server for access to documentation and p
 
 # Analyze Agent Performance with LangWatch
 
-This skill uses LangWatch MCP tools to query and present analytics. It does NOT write code.
+This skill queries and presents analytics. It does NOT write code.
 
-## Step 1: Set up the LangWatch MCP
+## Preferred: Use the LangWatch CLI
 
-Install the LangWatch MCP server so you have access to analytics and observability tools:
+If the \`langwatch\` CLI is available (check with \`langwatch --help\`), prefer it over MCP tools:
+
+\`\`\`bash
+# Quick project overview
+langwatch status
+
+# Query metrics with presets
+langwatch analytics query --metric trace-count      # Total traces
+langwatch analytics query --metric total-cost       # Total cost
+langwatch analytics query --metric avg-latency      # Average latency
+langwatch analytics query --metric p95-latency      # P95 latency
+langwatch analytics query --metric eval-pass-rate   # Evaluation pass rate
+
+# Search traces
+langwatch trace search -q "error" --limit 10        # Find error traces
+langwatch trace search --start-date 2026-01-01      # Custom date range
+
+# Get trace details
+langwatch trace get <traceId>                       # Human-readable
+langwatch trace get <traceId> -f json               # Raw JSON
+\`\`\`
+
+Set \`LANGWATCH_API_KEY\` in the environment before running CLI commands.
+
+## Alternative: Use MCP Tools
+
+If the CLI is not available, use MCP tools instead.
+
+### Step 1: Set up the LangWatch MCP
 
 # Installing the LangWatch MCP
 
@@ -1350,16 +1398,13 @@ Use the hosted remote MCP server:
 
 **Tip:** If \`LANGWATCH_API_KEY\` is already in the project's \`.env\` file, use that same key for the MCP configuration.
 
-## Step 2: Discover Available Metrics
-
-Before querying, discover what metrics and filters are available:
+### Step 2: Discover Available Metrics
 
 - Call \`discover_schema\` with category \`"all"\` to learn the full set of available metrics, aggregations, and filters
-- Review the returned schema to understand metric names and their supported aggregations
 
 CRITICAL: Always call \`discover_schema\` first. Do NOT hardcode or guess metric names.
 
-## Step 3: Query Analytics
+### Step 3: Query Analytics
 
 Use the appropriate MCP tool based on what the user needs:
 
@@ -2003,7 +2048,17 @@ Create or configure evaluators — the functions that score your agent's outputs
    evaluation.evaluate("ragas/faithfulness", index=idx, data={...})
    \`\`\`
 
-### Platform Approach
+### CLI Approach (Preferred for Agents)
+\`\`\`bash
+langwatch evaluator list                                    # List evaluators
+langwatch evaluator create "My Evaluator" --type langevals/llm_judge
+langwatch evaluator get <idOrSlug>                          # View details
+langwatch evaluator update <idOrSlug> --name "New Name"     # Update
+langwatch evaluation run <slug> --wait                      # Run evaluation and wait
+langwatch evaluation status <runId>                         # Check run status
+\`\`\`
+
+### Platform Approach (MCP)
 1. Call \`discover_schema\` with category "evaluators" to see available types
 2. Use \`platform_create_evaluator\` to create an evaluator on the platform
 3. Use \`platform_list_evaluators\` to see existing evaluators
@@ -2015,6 +2070,16 @@ This is useful for setting up LLM-as-judge evaluators, custom evaluators, or con
 
 Create test datasets for experiments.
 
+### CLI Approach (Preferred for Agents)
+\`\`\`bash
+langwatch dataset list                                      # List datasets
+langwatch dataset create "My Dataset" -c input:string,output:string
+langwatch dataset upload my-dataset data.csv                # Upload CSV/JSON
+langwatch dataset records list my-dataset                   # View records
+langwatch dataset download my-dataset -f csv                # Download
+\`\`\`
+
+### Docs Approach
 1. Read the docs: call \`fetch_langwatch_docs\` with url \`https://langwatch.ai/docs/datasets/overview.md\`
 2. Generate a dataset tailored to your agent:
 
@@ -3085,11 +3150,39 @@ First, try to install the LangWatch MCP server for access to documentation and p
 
 # Analyze Agent Performance with LangWatch
 
-This skill uses LangWatch MCP tools to query and present analytics. It does NOT write code.
+This skill queries and presents analytics. It does NOT write code.
 
-## Step 1: Set up the LangWatch MCP
+## Preferred: Use the LangWatch CLI
 
-Install the LangWatch MCP server so you have access to analytics and observability tools:
+If the \`langwatch\` CLI is available (check with \`langwatch --help\`), prefer it over MCP tools:
+
+\`\`\`bash
+# Quick project overview
+langwatch status
+
+# Query metrics with presets
+langwatch analytics query --metric trace-count      # Total traces
+langwatch analytics query --metric total-cost       # Total cost
+langwatch analytics query --metric avg-latency      # Average latency
+langwatch analytics query --metric p95-latency      # P95 latency
+langwatch analytics query --metric eval-pass-rate   # Evaluation pass rate
+
+# Search traces
+langwatch trace search -q "error" --limit 10        # Find error traces
+langwatch trace search --start-date 2026-01-01      # Custom date range
+
+# Get trace details
+langwatch trace get <traceId>                       # Human-readable
+langwatch trace get <traceId> -f json               # Raw JSON
+\`\`\`
+
+Set \`LANGWATCH_API_KEY\` in the environment before running CLI commands.
+
+## Alternative: Use MCP Tools
+
+If the CLI is not available, use MCP tools instead.
+
+### Step 1: Set up the LangWatch MCP
 
 # Installing the LangWatch MCP
 
@@ -3116,16 +3209,13 @@ Use the hosted remote MCP server:
 
 **Tip:** If \`LANGWATCH_API_KEY\` is already in the project's \`.env\` file, use that same key for the MCP configuration.
 
-## Step 2: Discover Available Metrics
-
-Before querying, discover what metrics and filters are available:
+### Step 2: Discover Available Metrics
 
 - Call \`discover_schema\` with category \`"all"\` to learn the full set of available metrics, aggregations, and filters
-- Review the returned schema to understand metric names and their supported aggregations
 
 CRITICAL: Always call \`discover_schema\` first. Do NOT hardcode or guess metric names.
 
-## Step 3: Query Analytics
+### Step 3: Query Analytics
 
 Use the appropriate MCP tool based on what the user needs:
 
@@ -4002,7 +4092,17 @@ Create or configure evaluators — the functions that score your agent's outputs
    evaluation.evaluate("ragas/faithfulness", index=idx, data={...})
    \`\`\`
 
-### Platform Approach
+### CLI Approach (Preferred for Agents)
+\`\`\`bash
+langwatch evaluator list                                    # List evaluators
+langwatch evaluator create "My Evaluator" --type langevals/llm_judge
+langwatch evaluator get <idOrSlug>                          # View details
+langwatch evaluator update <idOrSlug> --name "New Name"     # Update
+langwatch evaluation run <slug> --wait                      # Run evaluation and wait
+langwatch evaluation status <runId>                         # Check run status
+\`\`\`
+
+### Platform Approach (MCP)
 1. Call \`discover_schema\` with category "evaluators" to see available types
 2. Use \`platform_create_evaluator\` to create an evaluator on the platform
 3. Use \`platform_list_evaluators\` to see existing evaluators
@@ -4014,6 +4114,16 @@ This is useful for setting up LLM-as-judge evaluators, custom evaluators, or con
 
 Create test datasets for experiments.
 
+### CLI Approach (Preferred for Agents)
+\`\`\`bash
+langwatch dataset list                                      # List datasets
+langwatch dataset create "My Dataset" -c input:string,output:string
+langwatch dataset upload my-dataset data.csv                # Upload CSV/JSON
+langwatch dataset records list my-dataset                   # View records
+langwatch dataset download my-dataset -f csv                # Download
+\`\`\`
+
+### Docs Approach
 1. Read the docs: call \`fetch_langwatch_docs\` with url \`https://langwatch.ai/docs/datasets/overview.md\`
 2. Generate a dataset tailored to your agent:
 
