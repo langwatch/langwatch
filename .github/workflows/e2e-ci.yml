@@ -36,7 +36,12 @@ jobs:
       API_TOKEN_JWT_SECRET: "test-jwt-secret-for-e2e"
       SKIP_ENV_VALIDATION: "true"
       DISABLE_PII_REDACTION: "true"
-      NODE_ENV: "development"
+      # Run e2e against the production server path so static SPA files are
+      # served by the Node API process. Post-Vite migration, NODE_ENV=development
+      # puts the server in "API only — Vite on :5560" mode which returns 404 for
+      # `/`, and the e2e global-setup's waitForApp ping fails. The Build step
+      # still overrides with NODE_ENV=test, so only the runtime is affected.
+      NODE_ENV: "production"
       # Test runner configuration
       BASE_URL: "http://localhost:5570"
       CI: "true"
