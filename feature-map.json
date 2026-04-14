@@ -505,7 +505,7 @@
       "surfaces": {
         "code": {
           "sdk": null,
-          "cli": ["dashboard list", "dashboard create", "dashboard delete"],
+          "cli": ["dashboard list", "dashboard get", "dashboard update", "dashboard create", "dashboard delete"],
           "skill": null,
           "docs": null
         },

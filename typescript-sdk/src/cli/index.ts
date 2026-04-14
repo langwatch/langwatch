@@ -542,6 +542,25 @@ dashboardCmd
   });
 
 dashboardCmd
+  .command("get <id>")
+  .description("Get dashboard details by ID")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
+    const { getDashboardCommand: impl } = await import("./commands/dashboards/get.js");
+    await impl(id, options);
+  });
+
+dashboardCmd
+  .command("update <id>")
+  .description("Rename a dashboard")
+  .requiredOption("--name <name>", "New dashboard name")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { name?: string; format?: string }) => {
+    const { updateDashboardCommand: impl } = await import("./commands/dashboards/update.js");
+    await impl(id, options);
+  });
+
+dashboardCmd
   .command("create <name>")
   .description("Create a new dashboard")
   .action(async (name: string) => {
