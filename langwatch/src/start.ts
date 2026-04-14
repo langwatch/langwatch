@@ -149,8 +149,9 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 
       // ---- Production: serve static assets + SPA fallback ----
       if (clientDistDir) {
-        const staticPath = path.join(clientDistDir, pathname);
-        if (fs.existsSync(staticPath) && fs.statSync(staticPath).isFile()) {
+        const staticPath = path.resolve(clientDistDir, pathname.slice(1));
+        // Prevent path traversal — resolved path must stay inside clientDistDir
+        if (staticPath.startsWith(clientDistDir) && fs.existsSync(staticPath) && fs.statSync(staticPath).isFile()) {
           serveStaticFile(res, staticPath, pathname);
           return;
         }
