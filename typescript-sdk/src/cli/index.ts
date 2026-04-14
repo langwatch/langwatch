@@ -653,7 +653,8 @@ annotationCmd
   .option("--thumbs-up", "Mark as thumbs up")
   .option("--thumbs-down", "Mark as thumbs down")
   .option("--email <email>", "Email of the annotator")
-  .action(async (traceId: string, options: { comment?: string; thumbsUp?: boolean; thumbsDown?: boolean; email?: string }) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (traceId: string, options: { comment?: string; thumbsUp?: boolean; thumbsDown?: boolean; email?: string; format?: string }) => {
     const { createAnnotationCommand: impl } = await import("./commands/annotations/create.js");
     await impl(traceId, options);
   });
@@ -661,9 +662,10 @@ annotationCmd
 annotationCmd
   .command("delete <id>")
   .description("Delete an annotation")
-  .action(async (id: string) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
     const { deleteAnnotationCommand: impl } = await import("./commands/annotations/delete.js");
-    await impl(id);
+    await impl(id, options);
   });
 
 // Add analytics command group
@@ -884,6 +886,15 @@ graphCmd
   .action(async (options: { dashboardId?: string; format?: string }) => {
     const { listGraphsCommand: impl } = await import("./commands/graphs/list.js");
     await impl(options);
+  });
+
+graphCmd
+  .command("get <id>")
+  .description("Get a custom graph by ID")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
+    const { getGraphCommand: impl } = await import("./commands/graphs/get.js");
+    await impl(id, options);
   });
 
 graphCmd
@@ -1155,9 +1166,10 @@ datasetCmd
 datasetCmd
   .command("delete <slugOrId>")
   .description("Delete (archive) a dataset")
-  .action(async (slugOrId: string) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (slugOrId: string, options: { format?: string }) => {
     const { deleteCommand: deleteDatasetImpl } = await import("./commands/dataset/delete.js");
-    await deleteDatasetImpl(slugOrId);
+    await deleteDatasetImpl(slugOrId, options);
   });
 
 datasetCmd
@@ -1183,7 +1195,8 @@ datasetCmd
   .description("Update a dataset name or columns")
   .option("--name <name>", "New dataset name")
   .option("--columns <columns>", "New column definitions (e.g. input:string,output:string)")
-  .action(async (slugOrId: string, options: { name?: string; columns?: string }) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (slugOrId: string, options: { name?: string; columns?: string; format?: string }) => {
     const { updateCommand: updateDatasetImpl } = await import("./commands/dataset/update.js");
     await updateDatasetImpl(slugOrId, options);
   });

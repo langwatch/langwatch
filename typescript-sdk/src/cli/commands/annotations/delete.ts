@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 
-export const deleteAnnotationCommand = async (id: string): Promise<void> => {
+export const deleteAnnotationCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = new AnnotationsApiService();
@@ -15,6 +15,10 @@ export const deleteAnnotationCommand = async (id: string): Promise<void> => {
   try {
     await service.delete(id);
     spinner.succeed(`Deleted annotation "${chalk.cyan(id)}"`);
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify({ id, deleted: true }, null, 2));
+    }
   } catch (error) {
     spinner.fail();
     if (error instanceof AnnotationsApiError) {

@@ -8,7 +8,7 @@ import { checkApiKey } from "../../utils/apiKey";
 
 export const createAnnotationCommand = async (
   traceId: string,
-  options: { comment?: string; thumbsUp?: boolean; thumbsDown?: boolean; email?: string },
+  options: { comment?: string; thumbsUp?: boolean; thumbsDown?: boolean; email?: string; format?: string },
 ): Promise<void> => {
   checkApiKey();
 
@@ -35,6 +35,10 @@ export const createAnnotationCommand = async (
     spinner.succeed(
       `Created annotation${ratingStr} ${chalk.gray(`(id: ${annotation.id ?? "—"})`)}`,
     );
+
+    if (options.format === "json") {
+      console.log(JSON.stringify(annotation, null, 2));
+    }
   } catch (error) {
     spinner.fail();
     if (error instanceof AnnotationsApiError) {
