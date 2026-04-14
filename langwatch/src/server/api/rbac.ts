@@ -8,6 +8,7 @@ import { TRPCError } from "@trpc/server";
 import type { Session } from "~/server/auth";
 import { env } from "~/env.mjs";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import { isAdmin } from "../../../ee/admin/isAdmin";
 
 // ============================================================================
 // PERMISSION DEFINITIONS
@@ -46,6 +47,7 @@ export const Resources = {
   PROMPTS: "prompts",
   SECRETS: "secrets",
   PLAYGROUND: "playground",
+  OPS: "ops",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -926,6 +928,86 @@ export const checkPermissionOrPubliclyShared =
       ctx.publiclyShared = true;
     }
 
+    ctx.permissionChecked = true;
+    return next();
+  };
+
+// ============================================================================
+// OPS PERMISSION
+// ============================================================================
+
+export type OpsScope =
+  | { kind: "platform" }
+  | { kind: "organization"; organizationId: string };
+
+export const checkOpsPermission =
+  (permission: Permission) =>
+  async ({
+    ctx,
+    next,
+  }: PermissionMiddlewareParams<Record<string, unknown>>) => {
+    const user = ctx.session?.user;
+    if (!user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    let opsScope: OpsScope | undefined;
+
+    if (isAdmin(user)) {
+      opsScope = { kind: "platform" };
+    }
+
+    if (!opsScope && env.IS_SAAS && env.OPS_ORG_ID) {
+      const membership = await ctx.prisma.organizationUser.findFirst({
+        where: { userId: user.id, organizationId: env.OPS_ORG_ID },
+      });
+      if (membership) {
+        opsScope = { kind: "platform" };
+      }
+    }
+
+    if (!opsScope) {
+      const memberships = await ctx.prisma.organizationUser.findMany({
+        where: { userId: user.id },
+        select: { organizationId: true },
+      });
+
+      for (const membership of memberships) {
+        const bindings = await ctx.prisma.roleBinding.findMany({
+          where: {
+            organizationId: membership.organizationId,
+            userId: user.id,
+          },
+          select: { role: true, customRoleId: true },
+        });
+
+        for (const binding of bindings) {
+          const permitted = await resolveBindingPermission(
+            binding,
+            null,
+            permission,
+            ctx.prisma,
+          );
+          if (permitted) {
+            opsScope = {
+              kind: "organization",
+              organizationId: membership.organizationId,
+            };
+            break;
+          }
+        }
+        if (opsScope) break;
+      }
+    }
+
+    if (!opsScope) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "You do not have permission to access ops resources",
+      });
+    }
+
+    (ctx as any).opsScope = opsScope;
     ctx.permissionChecked = true;
     return next();
   };
