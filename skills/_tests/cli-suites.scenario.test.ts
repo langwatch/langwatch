@@ -16,6 +16,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 dotenv.config({ path: path.resolve(__dirname, ".env") });
+dotenv.config({ path: path.resolve(__dirname, "../../typescript-sdk/.env") });
 
 const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
