@@ -16,6 +16,7 @@ import {
   LuCheck,
   LuSend,
   LuSparkles,
+  LuSquare,
   LuX,
 } from "react-icons/lu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -173,7 +174,7 @@ const SagePanel = forwardRef<
     () => new DefaultChatTransport({ api: "/api/sage/chat" }),
     [],
   );
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, stop, status } = useChat({
     transport,
     onError: (error) => {
       if (isHandledByGlobalHandler(error)) return;
@@ -303,7 +304,9 @@ const SagePanel = forwardRef<
           input={input}
           onInputChange={setInput}
           onSend={() => void send(input)}
-          disabled={isBusy || !projectId}
+          onStop={() => void stop()}
+          isBusy={isBusy}
+          disabled={!projectId}
           canSend={!!input.trim() && !isBusy && !!projectId}
         />
       </VStack>
@@ -385,12 +388,16 @@ function Composer({
   input,
   onInputChange,
   onSend,
+  onStop,
+  isBusy,
   disabled,
   canSend,
 }: {
   input: string;
   onInputChange: (v: string) => void;
   onSend: () => void;
+  onStop: () => void;
+  isBusy: boolean;
   disabled: boolean;
   canSend: boolean;
 }) {
@@ -403,30 +410,44 @@ function Composer({
     >
       <HStack gap={2}>
         <Input
-          placeholder="Ask Sage or describe what you want…"
+          placeholder={
+            isBusy ? "Sage is working…" : "Ask Sage or describe what you want…"
+          }
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
-              onSend();
+              if (!isBusy) onSend();
             }
           }}
-          disabled={disabled}
+          disabled={disabled || isBusy}
           size="sm"
           variant="outline"
           borderColor="border.emphasized"
           background="bg.panel"
         />
-        <IconButton
-          size="sm"
-          colorPalette="blue"
-          aria-label="Send"
-          onClick={onSend}
-          disabled={!canSend}
-        >
-          <LuSend size={14} />
-        </IconButton>
+        {isBusy ? (
+          <IconButton
+            size="sm"
+            colorPalette="red"
+            variant="outline"
+            aria-label="Stop"
+            onClick={onStop}
+          >
+            <LuSquare size={12} />
+          </IconButton>
+        ) : (
+          <IconButton
+            size="sm"
+            colorPalette="blue"
+            aria-label="Send"
+            onClick={onSend}
+            disabled={!canSend}
+          >
+            <LuSend size={14} />
+          </IconButton>
+        )}
       </HStack>
     </Box>
   );
