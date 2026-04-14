@@ -17,11 +17,21 @@ export default function dynamic<P extends Record<string, any>>(
 ): ComponentType<P> {
   return lazy(async () => {
     const mod = await importFn();
-    // Support both { default: Component } and direct function exports
-    if (mod && typeof mod === "object" && "default" in mod) {
-      return mod;
+    // Vite wraps CJS modules as { default: moduleExports }.
+    // The actual component could be:
+    //   1. mod.default (ES module default export — already a function/class)
+    //   2. mod.default.default (CJS module.exports wrapped by Vite, then re-wrapped)
+    //   3. mod itself (direct function export)
+    const resolved = mod?.default ?? mod;
+    // If resolved is a function/class, it's the component
+    if (typeof resolved === "function") {
+      return { default: resolved };
     }
-    // If the module itself is the component
-    return { default: mod };
+    // If resolved is an object with a default that's a function (double-wrapped CJS)
+    if (resolved && typeof resolved === "object" && typeof resolved.default === "function") {
+      return { default: resolved.default };
+    }
+    // Fallback: return as-is and let React error if it's wrong
+    return { default: resolved };
   }) as ComponentType<P>;
 }
