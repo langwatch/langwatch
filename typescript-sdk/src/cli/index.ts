@@ -306,10 +306,10 @@ tagCmd
 tagCmd
   .command("assign <prompt> <tag>")
   .description("Assign a tag to a prompt version")
-  .option("--version <number>", "Version number to assign (defaults to latest)")
-  .action(async (prompt: string, tag: string, options: { version?: string }) => {
+  .option("--prompt-version <number>", "Version number to assign (defaults to latest)")
+  .action(async (prompt: string, tag: string, options: { promptVersion?: string }) => {
     try {
-      await tagAssignCommand(prompt, tag, options);
+      await tagAssignCommand(prompt, tag, { version: options.promptVersion });
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
