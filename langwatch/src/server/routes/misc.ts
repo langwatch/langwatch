@@ -1412,3 +1412,40 @@ function createFakeNextRes(
     },
   };
 }
+
+// =============================================
+// GET /image-proxy — SSRF-safe image proxy
+// =============================================
+app.get("/image-proxy", async (c) => {
+  const url = c.req.query("url");
+  if (!url) {
+    return c.json({ error: "Missing url" }, 400);
+  }
+
+  try {
+    const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+    const response = await ssrfSafeFetch(url);
+
+    if (!response.ok) {
+      return c.json(
+        { error: `Failed to fetch image: ${response.statusText}` },
+        response.status as any
+      );
+    }
+
+    const contentType = response.headers.get("content-type");
+    if (!contentType?.startsWith("image/")) {
+      return c.json({ error: "URL does not point to an image" }, 400);
+    }
+
+    const imageBuffer = await response.arrayBuffer();
+    return new Response(imageBuffer, {
+      headers: {
+        "Content-Type": contentType,
+        "Cache-Control": "public, max-age=31536000",
+      },
+    });
+  } catch {
+    return c.json({ error: "Failed to fetch image" }, 500);
+  }
+});
