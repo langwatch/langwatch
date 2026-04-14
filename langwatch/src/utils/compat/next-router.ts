@@ -85,7 +85,8 @@ const ROUTE_PATTERNS = [
   "/",
 ];
 
-function resolvePathname(path: string): string {
+/** @internal Exported for testing only */
+export function resolvePathname(path: string): string {
   for (const pattern of ROUTE_PATTERNS) {
     if (matchPath(pattern, path)) {
       // Convert React Router params (:param) back to Next.js style ([param])
@@ -154,20 +155,42 @@ export interface CompatRouter {
   isFallback: boolean;
 }
 
-function buildUrl(
+/** @internal Exported for testing only */
+export function buildUrl(
   url: string | { pathname?: string; query?: Record<string, any> },
   routeParamKeys?: Set<string>
 ): string {
   if (typeof url === "string") return url;
   // If pathname is omitted, use the current URL path (Next.js behavior)
-  const pathname = url.pathname ?? window.location.pathname;
+  let pathname = url.pathname ?? window.location.pathname;
   const { query } = url;
+
+  // Resolve Next.js-style [param] and [[...param]] in pathname using query values.
+  // Components do router.push({ pathname: router.pathname, query: {...} }) where
+  // router.pathname is "/[project]/messages". We need to replace [project] with
+  // the actual value from query before navigating.
+  const resolvedKeys = new Set<string>();
+  if (query && pathname.includes("[")) {
+    pathname = pathname
+      .replace(/\[\[\.\.\.(\w+)\]\]/g, (_match, key) => {
+        resolvedKeys.add(key);
+        const val = query[key];
+        if (Array.isArray(val)) return val.join("/");
+        return val != null ? String(val) : "";
+      })
+      .replace(/\[(\w+)\]/g, (_match, key) => {
+        resolvedKeys.add(key);
+        const val = query[key];
+        return val != null ? String(Array.isArray(val) ? val[0] : val) : "";
+      });
+  }
+
   if (!query || Object.keys(query).length === 0) return pathname;
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined || value === null) continue;
-    // Skip route params — they're part of the URL path, not the query string
-    if (routeParamKeys?.has(key)) continue;
+    // Skip route params and resolved [param] keys — they're in the URL path
+    if (routeParamKeys?.has(key) || resolvedKeys.has(key)) continue;
     if (Array.isArray(value)) {
       for (const v of value) params.append(key, String(v));
     } else {

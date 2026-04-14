@@ -11,27 +11,32 @@ interface DynamicOptions {
   ssr?: boolean;
 }
 
+/**
+ * Resolve a dynamically imported module to a { default: Component } shape
+ * that React.lazy expects. Handles ESM, CJS, and double-wrapped modules.
+ * @internal Exported for testing only
+ */
+export function resolveModule(mod: any): { default: ComponentType<any> } {
+  const resolved = mod?.default ?? mod;
+  // If resolved is a function/class, it's the component
+  if (typeof resolved === "function") {
+    return { default: resolved };
+  }
+  // If resolved is an object with a default that's a function (double-wrapped CJS)
+  if (
+    resolved &&
+    typeof resolved === "object" &&
+    typeof resolved.default === "function"
+  ) {
+    return { default: resolved.default };
+  }
+  // Fallback: return as-is and let React error if it's wrong
+  return { default: resolved };
+}
+
 export default function dynamic<P extends Record<string, any>>(
   importFn: () => Promise<any>,
   _options?: DynamicOptions
 ): ComponentType<P> {
-  return lazy(async () => {
-    const mod = await importFn();
-    // Vite wraps CJS modules as { default: moduleExports }.
-    // The actual component could be:
-    //   1. mod.default (ES module default export — already a function/class)
-    //   2. mod.default.default (CJS module.exports wrapped by Vite, then re-wrapped)
-    //   3. mod itself (direct function export)
-    const resolved = mod?.default ?? mod;
-    // If resolved is a function/class, it's the component
-    if (typeof resolved === "function") {
-      return { default: resolved };
-    }
-    // If resolved is an object with a default that's a function (double-wrapped CJS)
-    if (resolved && typeof resolved === "object" && typeof resolved.default === "function") {
-      return { default: resolved.default };
-    }
-    // Fallback: return as-is and let React error if it's wrong
-    return { default: resolved };
-  }) as ComponentType<P>;
+  return lazy(async () => resolveModule(await importFn())) as ComponentType<P>;
 }
