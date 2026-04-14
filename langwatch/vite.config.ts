@@ -16,10 +16,18 @@ export default defineConfig({
     },
   },
   define: {
-    // Ensure process.env references don't crash in the browser
-    "process.env.PINO_LOG_LEVEL": JSON.stringify("info"),
-    // Global process shim for libraries that check process at top level
+    // Literal replacements for process.env references in browser code.
+    // Vite auto-handles NODE_ENV but not arbitrary env vars.
     "process.env.NODE_ENV": JSON.stringify(process.env.NODE_ENV ?? "development"),
+    "process.env.PINO_LOG_LEVEL": JSON.stringify("info"),
+    // Catch-all: prevent ReferenceError for any other process.env.* access
+    // that slips into client code (e.g. dead branches behind typeof window checks)
+    "process.env.BASE_HOST": "undefined",
+    "process.env.PORT": "undefined",
+    "process.env.SKIP_ENV_VALIDATION": "undefined",
+    "process.env.BUILD_TIME": "undefined",
+    "process.env.VERCEL": "undefined",
+    "process.env.VERCEL_URL": "undefined",
   },
   build: {
     outDir: "dist/client",
