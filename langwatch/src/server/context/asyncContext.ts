@@ -26,10 +26,6 @@ export {
 export { createContextFromHono } from "./adapters/hono";
 export { createContextFromTRPC } from "./adapters/trpc";
 export {
-  createContextFromNextRequest,
-  createContextFromNextApiRequest,
-} from "./adapters/nextjs";
-export {
   createContextFromJobData,
   getJobContextMetadata,
   withJobContext,
