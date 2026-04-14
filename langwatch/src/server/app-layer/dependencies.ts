@@ -22,7 +22,18 @@ import type { SubscriptionService } from "./subscription/subscription.service";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
+import type { QueueService } from "./ops/queue.service";
+import type { EventExplorerService } from "./ops/event-explorer.service";
+import type { ReplayService } from "./ops/replay.service";
+import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { UsageService } from "./usage/usage.service";
+
+export interface OpsDependencies {
+  queues: QueueService;
+  eventExplorer: EventExplorerService;
+  replay: ReplayService;
+  metricsCollector: OpsMetricsCollector | null;
+}
 
 export interface AppDependencies {
   config: AppConfig;
@@ -61,6 +72,7 @@ export interface AppDependencies {
   nurturing?: NurturingService;
   usageLimits: UsageLimitService;
   commands: AppCommands;
+  ops?: OpsDependencies;
 
   /** Internal — keeps EventSourcing infrastructure alive for GC. */
   _eventSourcing?: EventSourcing;
