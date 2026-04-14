@@ -706,7 +706,10 @@
           "description": "Manage encrypted environment variables for agents and workflows",
           "surfaces": {
             "code": {
-              "sdk": null,
+              "sdk": {
+                "python": "langwatch.secrets",
+                "typescript": "langwatch.secrets"
+              },
               "cli": [
                 "secret list",
                 "secret get",

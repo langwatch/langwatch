@@ -50,6 +50,8 @@ export { TriggersApiService, TriggersApiError } from "./services/triggers";
 export { GraphsApiService, GraphsApiError } from "./services/graphs";
 export { SimulationRunsApiService, SimulationRunsApiError } from "./services/simulation-runs";
 export { TracesApiService, TracesApiError } from "./services/traces/traces-api.service";
+export { MonitorsApiService, MonitorsApiError } from "./services/monitors";
+export { SecretsApiService, SecretsApiError } from "./services/secrets";
 import { LocalPromptsService } from "./services/prompts/local-prompts.service";
 import { ExperimentsFacade } from "./services/experiments";
 import { DatasetsFacade } from "./services/datasets";
@@ -66,6 +68,8 @@ import { AnalyticsApiService } from "./services/analytics/analytics-api.service"
 import { TriggersApiService } from "./services/triggers";
 import { GraphsApiService } from "./services/graphs";
 import { SimulationRunsApiService } from "./services/simulation-runs";
+import { MonitorsApiService } from "./services/monitors";
+import { SecretsApiService } from "./services/secrets";
 import { type InternalConfig } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
 import { type Logger, NoOpLogger } from "../logger";
@@ -134,6 +138,8 @@ export class LangWatch {
   readonly triggers: TriggersApiService;
   readonly graphs: GraphsApiService;
   readonly simulationRuns: SimulationRunsApiService;
+  readonly monitors: MonitorsApiService;
+  readonly secrets: SecretsApiService;
 
   constructor(options: LangWatchConstructorOptions = {}) {
     const apiKey = options.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -184,6 +190,8 @@ export class LangWatch {
     this.triggers = new TriggersApiService(this.config);
     this.graphs = new GraphsApiService(this.config);
     this.simulationRuns = new SimulationRunsApiService(this.config);
+    this.monitors = new MonitorsApiService({ apiKey, endpoint });
+    this.secrets = new SecretsApiService({ apiKey, endpoint });
   }
 
   get apiClient(): LangwatchApiClient {

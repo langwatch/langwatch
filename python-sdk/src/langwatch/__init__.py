@@ -35,6 +35,8 @@ if TYPE_CHECKING:
     from .model_providers import ModelProvidersFacade
     from .analytics import AnalyticsFacade
     from .traces import TracesFacade
+    from .monitors import MonitorsFacade
+    from .secrets import SecretsFacade
 
     # Type hint for the prompts service specifically
     # required to get the instance typing correct
@@ -51,6 +53,8 @@ if TYPE_CHECKING:
     model_providers: ModelProvidersFacade
     analytics: AnalyticsFacade
     traces: TracesFacade
+    monitors: MonitorsFacade
+    secrets: SecretsFacade
 
 
 @module_property
@@ -89,6 +93,8 @@ _LAZY_FACADES = {
     "model_providers": (".model_providers", "ModelProvidersFacade"),
     "analytics": (".analytics", "AnalyticsFacade"),
     "traces": (".traces", "TracesFacade"),
+    "monitors": (".monitors", "MonitorsFacade"),
+    "secrets": (".secrets", "SecretsFacade"),
 }
 
 
