@@ -47,6 +47,8 @@ export default function ExperimentsWorkbenchPage() {
     }));
 
   const createEvaluator = api.evaluators.create.useMutation();
+  const updateEvaluator = api.evaluators.update.useMutation();
+  const deleteEvaluator = api.evaluators.delete.useMutation();
   const createPrompt = api.prompts.create.useMutation();
   const updatePrompt = api.prompts.update.useMutation();
   const upsertDataset = api.dataset.upsert.useMutation();
@@ -96,6 +98,35 @@ export default function ExperimentsWorkbenchPage() {
               evaluatorType,
             }),
         };
+      },
+      "evaluators.update": async (payload) => {
+        const { id, name, config, evaluatorType } = payload as {
+          id: string;
+          name?: string;
+          config: Record<string, unknown>;
+          evaluatorType?: string;
+        };
+        await updateEvaluator.mutateAsync({
+          projectId,
+          id,
+          ...(name ? { name } : {}),
+          config,
+        });
+        await utils.evaluators.getAll.invalidate({ projectId });
+        return {
+          label: "Edit evaluator",
+          onOpen: () =>
+            openDrawer("evaluatorEditor", {
+              evaluatorId: id,
+              evaluatorType,
+            }),
+        };
+      },
+      "evaluators.delete": async (payload) => {
+        const { id } = payload as { id: string };
+        await deleteEvaluator.mutateAsync({ projectId, id });
+        await utils.evaluators.getAll.invalidate({ projectId });
+        return undefined;
       },
       "workbench.addEvaluator": async (payload) => {
         const { dbEvaluatorId, evaluatorType, name, fields } = payload as {
@@ -207,6 +238,8 @@ export default function ExperimentsWorkbenchPage() {
     project?.id,
     project?.slug,
     createEvaluator,
+    updateEvaluator,
+    deleteEvaluator,
     createPrompt,
     updatePrompt,
     upsertDataset,
