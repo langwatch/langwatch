@@ -302,7 +302,14 @@ export function useRouter(): CompatRouter {
       query.path = catchAll ? catchAll.split("/") : [];
       delete query["*"];
     }
+    // Track which keys come from route params so we don't double-merge them
+    const routeParamKeySet = new Set(Object.keys(params));
     searchParams.forEach((value, key) => {
+      // Skip search params that shadow route params — the route param
+      // already has the canonical value. Without this guard, `project`
+      // (a route param) leaks into the query string and accumulates
+      // on every navigation (`project=x&project[0]=x&project[1]=x`).
+      if (routeParamKeySet.has(key)) return;
       const existing = query[key];
       if (existing !== undefined) {
         if (Array.isArray(existing)) {
