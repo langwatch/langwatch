@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
-import Script from "next/script";
+import Script from "~/utils/compat/next-script";
 
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
