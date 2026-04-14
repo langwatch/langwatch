@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { AnnotationsApiError } from "@/client-sdk/services/annotations/annotations-api.service";
 
 vi.mock("@/client-sdk/services/annotations/annotations-api.service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/client-sdk/services/annotations/annotations-api.service")>();
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
     AnnotationsApiService: vi.fn(),

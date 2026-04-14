@@ -2,7 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SuitesApiError } from "@/client-sdk/services/suites/suites-api.service";
 
 vi.mock("@/client-sdk/services/suites/suites-api.service", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/client-sdk/services/suites/suites-api.service")>();
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+  const actual = (await importOriginal()) as Record<string, unknown>;
   return {
     ...actual,
     SuitesApiService: vi.fn(),

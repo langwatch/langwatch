@@ -58,8 +58,7 @@ export const getGraphCommand = async (
     );
     console.log(`  ${chalk.gray("Size:")}      ${graph.colSpan}x${graph.rowSpan}`);
     if (graph.graph) {
-      const graphType =
-        (graph.graph as Record<string, unknown>).type ?? "custom";
+      const graphType = typeof graph.graph.type === "string" ? graph.graph.type : "custom";
       console.log(`  ${chalk.gray("Type:")}      ${graphType}`);
     }
     console.log(
