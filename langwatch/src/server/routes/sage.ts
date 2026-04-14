@@ -23,6 +23,7 @@ import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { hasProjectPermission } from "~/server/api/rbac";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { persistedEvaluationsV3StateSchema } from "~/evaluations-v3/types/persistence";
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import {
   getEvaluatorDefaultSettings,
@@ -31,6 +32,7 @@ import {
 import { EvaluatorService } from "~/server/evaluators/evaluator.service";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
 import { PromptService } from "~/server/prompt-config/prompt.service";
+import { parseEvaluationResult } from "~/utils/evaluationResults";
 import { createLogger } from "~/utils/logger/server";
 import type { NextRequestShim as any } from "./types";
 
@@ -57,9 +59,15 @@ const SAGE_SYSTEM_PROMPT = `You are Sage, the in-product AI assistant for LangWa
 - When recommending, pick the single best match first, then at most two alternatives, each in one line.
 
 ## Tool use
-- Before talking about the user's evaluators/prompts/datasets, call the matching list_* tool with 'project' scope first.
+- When the user asks about "my experiment", "this experiment", the results, or what's configured in the workbench, call **get_workbench_state** first. That tool is authoritative for what's actually on screen.
+- To investigate failures or underperformance, use **find_failing_rows**. Report the pattern (what inputs fail, which evaluator flagged them) rather than dumping the raw list.
+- Before talking about the user's evaluators/prompts/datasets at the project level (not the workbench), call the matching list_* tool with 'project' scope first.
 - Use list_evaluators 'built_in' or 'all' only when suggesting new evaluators from the catalog.
 - After a tool call, synthesize — don't regurgitate the raw list.
+- Workbench state reflects the last autosave, which usually lags the UI by a second or two. If the user says "I just added X", call get_workbench_state anyway — it'll usually be there.
+
+## Running experiments
+- Use **propose_run_workbench** when the user asks to run/evaluate/execute the experiment. Before proposing, call get_workbench_state and sanity-check that there's at least one target and at least one evaluator. If mappings look missing, note that in your reply so the user knows a run might fail validation.
 
 ## Evaluator models
 - propose_create_evaluator auto-fills settings from the evaluator's defaults, using the **project's default model** for any \`model\` field. You do NOT need to pass settings.model unless the user explicitly asked for a specific one.
@@ -79,9 +87,10 @@ app.post("/sage/chat", async (c) => {
     );
   }
 
-  const { messages, projectId } = (await c.req.json()) as {
+  const { messages, projectId, experimentSlug } = (await c.req.json()) as {
     messages: UIMessage[];
     projectId: string;
+    experimentSlug?: string;
   };
 
   if (!projectId) {
@@ -266,6 +275,108 @@ app.post("/sage/chat", async (c) => {
       },
     }),
 
+    get_workbench_state: tool({
+      description:
+        "Inspect the current experiment workbench: what datasets, targets, and evaluators are configured, plus summary statistics from the last run (pass/fail/error counts per target). Call this before answering any question about the current experiment's setup or results.",
+      inputSchema: z.object({}),
+      execute: async () => {
+        if (!experimentSlug) {
+          return {
+            error:
+              "No experiment is currently open. The caller did not pass experimentSlug.",
+          };
+        }
+        const experiment = await prisma.experiment.findFirst({
+          where: { projectId, slug: experimentSlug },
+        });
+        if (!experiment) {
+          return { error: `No experiment found with slug '${experimentSlug}'.` };
+        }
+        if (!experiment.workbenchState) {
+          return {
+            experimentName: experiment.name ?? experimentSlug,
+            message:
+              "This experiment has no saved workbench state yet. It hasn't been configured or nothing has autosaved.",
+          };
+        }
+        const parsed = persistedEvaluationsV3StateSchema.safeParse(
+          experiment.workbenchState,
+        );
+        if (!parsed.success) {
+          return {
+            error: "Failed to parse workbench state.",
+            details: parsed.error.message,
+          };
+        }
+        const state = parsed.data;
+        return summarizeWorkbenchState(state);
+      },
+    }),
+
+    find_failing_rows: tool({
+      description:
+        "Return rows from the current workbench where an evaluator reported a failed or error status. Use this to investigate why an experiment is underperforming. Returns at most `limit` rows with their input values and which evaluators flagged them.",
+      inputSchema: z.object({
+        evaluatorSlug: z
+          .string()
+          .optional()
+          .describe(
+            "Optional: restrict to a single evaluator by its project slug. Omit to scan all evaluators.",
+          ),
+        targetId: z
+          .string()
+          .optional()
+          .describe("Optional: restrict to a single target id."),
+        limit: z.number().int().min(1).max(20).default(10),
+      }),
+      execute: async ({ evaluatorSlug, targetId, limit }) => {
+        if (!experimentSlug) {
+          return { error: "No experiment is currently open." };
+        }
+        const experiment = await prisma.experiment.findFirst({
+          where: { projectId, slug: experimentSlug },
+        });
+        if (!experiment?.workbenchState) {
+          return {
+            error: `Experiment '${experimentSlug}' has no results yet.`,
+          };
+        }
+        const parsed = persistedEvaluationsV3StateSchema.safeParse(
+          experiment.workbenchState,
+        );
+        if (!parsed.success) {
+          return { error: "Failed to parse workbench state." };
+        }
+        const state = parsed.data;
+        let evaluatorIdFilter: string | undefined;
+        if (evaluatorSlug) {
+          const dbEval = await evaluatorService.getBySlug({
+            slug: evaluatorSlug,
+            projectId,
+          });
+          if (!dbEval) {
+            return {
+              error: `No project evaluator with slug '${evaluatorSlug}'.`,
+            };
+          }
+          const match = state.evaluators.find(
+            (e) => e.dbEvaluatorId === dbEval.id,
+          );
+          if (!match) {
+            return {
+              error: `Evaluator '${evaluatorSlug}' is not in this workbench.`,
+            };
+          }
+          evaluatorIdFilter = match.id;
+        }
+        return findFailingRows(state, {
+          evaluatorIdFilter,
+          targetIdFilter: targetId,
+          limit,
+        });
+      },
+    }),
+
     propose_create_evaluator: tool({
       description:
         "Propose creating a new evaluator in the project. The user will see a preview card and click Apply to commit. Use this when the user asks for a new evaluator that doesn't yet exist.",
@@ -337,6 +448,27 @@ app.post("/sage/chat", async (c) => {
       },
     }),
 
+    propose_run_workbench: tool({
+      description:
+        "Propose running the current experiment (kicks off all target × evaluator cells). Returns a proposal card the user clicks Apply to execute. Use this when the user asks to 'run', 'evaluate', 'execute', or 'kick off' the experiment.",
+      inputSchema: z.object({
+        rationale: z
+          .string()
+          .describe(
+            "One short sentence explaining why running now makes sense (e.g. 'all mappings look configured, ready to run').",
+          ),
+      }),
+      execute: async ({ rationale }) => {
+        return {
+          sageProposal: true,
+          kind: "workbench.run",
+          summary: "Run the evaluation on all targets and evaluators",
+          rationale,
+          payload: {},
+        };
+      },
+    }),
+
     propose_add_evaluator_to_workbench: tool({
       description:
         "Propose adding an existing project evaluator as a column in the current experiment workbench. Only works for evaluators that already exist in the project (use propose_create_evaluator first if needed).",
@@ -402,3 +534,196 @@ app.post("/sage/chat", async (c) => {
     headers: response.headers,
   });
 });
+
+type ParsedState = ReturnType<
+  typeof persistedEvaluationsV3StateSchema.parse
+>;
+
+function summarizeWorkbenchState(state: ParsedState) {
+  const datasets = state.datasets.map((d) => ({
+    id: d.id,
+    type: d.type,
+    columns: (d.columns ?? []).map((c) =>
+      typeof c === "string" ? c : (c as { name?: string }).name,
+    ),
+    ...("datasetId" in d && d.datasetId ? { datasetId: d.datasetId } : {}),
+  }));
+
+  const targets = state.targets.map((t) => {
+    const local = (t as Record<string, unknown>).localTargetConfig as
+      | { name?: string }
+      | undefined;
+    return {
+      id: t.id,
+      type: (t as { type?: string }).type,
+      name: local?.name ?? t.id,
+    };
+  });
+
+  const evaluators = state.evaluators.map((e) => ({
+    id: e.id,
+    evaluatorType: e.evaluatorType,
+    name: e.localEvaluatorConfig?.name ?? e.id,
+    dbEvaluatorId: e.dbEvaluatorId,
+  }));
+
+  const results = state.results
+    ? summarizePerTargetResults(state)
+    : null;
+
+  return {
+    experimentName: state.name,
+    activeDatasetId: state.activeDatasetId,
+    datasets,
+    targets,
+    evaluators,
+    results,
+  };
+}
+
+function summarizePerTargetResults(state: ParsedState) {
+  const results = state.results;
+  if (!results) return null;
+  const summary: Array<{
+    targetId: string;
+    rowsEvaluated: number;
+    errors: number;
+    perEvaluator: Array<{
+      evaluatorId: string;
+      evaluatorName: string;
+      passed: number;
+      failed: number;
+      processed: number;
+      error: number;
+      skipped: number;
+      pending: number;
+    }>;
+  }> = [];
+  const evaluatorNameById = Object.fromEntries(
+    state.evaluators.map((e) => [e.id, e.localEvaluatorConfig?.name ?? e.id]),
+  );
+  for (const [targetId, outputs] of Object.entries(results.targetOutputs)) {
+    const rowCount = outputs.length;
+    const targetErrors = results.errors[targetId] ?? [];
+    const errors = targetErrors.filter(Boolean).length;
+    const perEvaluator: typeof summary[number]["perEvaluator"] = [];
+    const evalResults = results.evaluatorResults[targetId] ?? {};
+    for (const [evaluatorId, cells] of Object.entries(evalResults)) {
+      const counts = {
+        passed: 0,
+        failed: 0,
+        processed: 0,
+        error: 0,
+        skipped: 0,
+        pending: 0,
+      };
+      for (let i = 0; i < rowCount; i++) {
+        const parsed = parseEvaluationResult(cells[i]);
+        if (parsed.status === "running") continue;
+        if (parsed.status in counts) {
+          counts[parsed.status as keyof typeof counts]++;
+        }
+      }
+      perEvaluator.push({
+        evaluatorId,
+        evaluatorName: evaluatorNameById[evaluatorId] ?? evaluatorId,
+        ...counts,
+      });
+    }
+    summary.push({
+      targetId,
+      rowsEvaluated: rowCount,
+      errors,
+      perEvaluator,
+    });
+  }
+  return summary;
+}
+
+function findFailingRows(
+  state: ParsedState,
+  opts: {
+    evaluatorIdFilter?: string;
+    targetIdFilter?: string;
+    limit: number;
+  },
+) {
+  const results = state.results;
+  if (!results) return { rows: [], total: 0 };
+
+  const evaluatorNameById = Object.fromEntries(
+    state.evaluators.map((e) => [e.id, e.localEvaluatorConfig?.name ?? e.id]),
+  );
+  const inlineDatasets = Object.fromEntries(
+    state.datasets
+      .filter((d) => d.type === "inline")
+      .map((d) => [d.id, d as { id: string; columns?: unknown; records?: Record<string, unknown[]> }]),
+  );
+
+  type FailingRow = {
+    targetId: string;
+    rowIndex: number;
+    inputs?: Record<string, unknown>;
+    failingEvaluators: Array<{
+      evaluatorId: string;
+      evaluatorName: string;
+      status: string;
+      details?: string;
+    }>;
+  };
+  const rows: FailingRow[] = [];
+  let total = 0;
+
+  for (const [targetId, evalResults] of Object.entries(
+    results.evaluatorResults,
+  )) {
+    if (opts.targetIdFilter && targetId !== opts.targetIdFilter) continue;
+    const rowCount = results.targetOutputs[targetId]?.length ?? 0;
+    for (let i = 0; i < rowCount; i++) {
+      const failing: FailingRow["failingEvaluators"] = [];
+      for (const [evaluatorId, cells] of Object.entries(evalResults)) {
+        if (opts.evaluatorIdFilter && evaluatorId !== opts.evaluatorIdFilter)
+          continue;
+        const parsed = parseEvaluationResult(cells[i]);
+        if (parsed.status === "failed" || parsed.status === "error") {
+          failing.push({
+            evaluatorId,
+            evaluatorName: evaluatorNameById[evaluatorId] ?? evaluatorId,
+            status: parsed.status,
+            details: parsed.details,
+          });
+        }
+      }
+      if (failing.length === 0) continue;
+      total++;
+      if (rows.length >= opts.limit) continue;
+      // Try to attach input values from an inline dataset if available
+      const inputs = extractRowInputs(inlineDatasets, i);
+      rows.push({ targetId, rowIndex: i, inputs, failingEvaluators: failing });
+    }
+  }
+
+  return { rows, total };
+}
+
+function extractRowInputs(
+  inlineDatasets: Record<
+    string,
+    { records?: Record<string, unknown[]> }
+  >,
+  rowIndex: number,
+): Record<string, unknown> | undefined {
+  for (const dataset of Object.values(inlineDatasets)) {
+    if (!dataset.records) continue;
+    const row: Record<string, unknown> = {};
+    let hasAny = false;
+    for (const [column, cells] of Object.entries(dataset.records)) {
+      if (rowIndex < cells.length) {
+        row[column] = cells[rowIndex];
+        hasAny = true;
+      }
+    }
+    if (hasAny) return row;
+  }
+  return undefined;
+}

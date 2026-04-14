@@ -19,6 +19,7 @@ import { TableSettingsMenu } from "~/evaluations-v3/components/TableSettingsMenu
 import { UndoRedo } from "~/evaluations-v3/components/UndoRedo";
 import { useAutosaveEvaluationsV3 } from "~/evaluations-v3/hooks/useAutosaveEvaluationsV3";
 import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3Store";
+import { useExecuteEvaluation } from "~/evaluations-v3/hooks/useExecuteEvaluation";
 import { useLambdaWarmup } from "~/evaluations-v3/hooks/useLambdaWarmup";
 import { useSavedDatasetLoader } from "~/evaluations-v3/hooks/useSavedDatasetLoader";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -46,6 +47,7 @@ export default function ExperimentsWorkbenchPage() {
 
   const createEvaluator = api.evaluators.create.useMutation();
   const utils = api.useContext();
+  const { execute: executeEvaluation } = useExecuteEvaluation();
 
   // Enable autosave for evaluation state - this also handles loading existing experiments
   const {
@@ -93,8 +95,11 @@ export default function ExperimentsWorkbenchPage() {
           localEvaluatorConfig: { name },
         });
       },
+      "workbench.run": async () => {
+        await executeEvaluation({ type: "full" });
+      },
     };
-  }, [project?.id, createEvaluator, utils, addEvaluator]);
+  }, [project?.id, createEvaluator, utils, addEvaluator, executeEvaluation]);
 
   // Warm up lambda instances in the background (invisible to user)
   useLambdaWarmup();
@@ -214,7 +219,10 @@ export default function ExperimentsWorkbenchPage() {
         </Box>
       </VStack>
 
-      <SageDrawer proposalHandlers={proposalHandlers} />
+      <SageDrawer
+        proposalHandlers={proposalHandlers}
+        experimentSlug={slug}
+      />
 
       {/* Load saved dataset records - renders nothing, just triggers fetches */}
       <SavedDatasetLoaders datasets={datasets} />
