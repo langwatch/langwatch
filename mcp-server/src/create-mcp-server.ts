@@ -852,6 +852,21 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  server.tool(
+    "platform_delete_evaluator",
+    "Archive (soft-delete) an evaluator by ID or slug.",
+    {
+      idOrSlug: z.string().describe("The evaluator ID or slug to archive"),
+    },
+    withToolLogging("platform_delete_evaluator", async (params) => {
+      requireApiKey();
+      const { handleDeleteEvaluator } = await import("./tools/delete-evaluator.js");
+      return {
+        content: [{ type: "text", text: await handleDeleteEvaluator(params) }],
+      };
+    })
+  );
+
   // --- Platform Model Provider Tools (require API key) ---
   // These tools manage model provider API keys on the LangWatch platform.
 
@@ -1058,6 +1073,23 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
       const { handleDeleteDashboard } = await import("./tools/delete-dashboard.js");
       return {
         content: [{ type: "text", text: await handleDeleteDashboard(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_rename_dashboard",
+    "Rename a dashboard.",
+    {
+      id: z.string().describe("The dashboard ID to rename"),
+      name: z.string().describe("The new name for the dashboard"),
+    },
+    withToolLogging("platform_rename_dashboard", async (params) => {
+      requireApiKey();
+      const { renameDashboard } = await import("./langwatch-api-dashboards.js");
+      const result = await renameDashboard(params.id, { name: params.name });
+      return {
+        content: [{ type: "text", text: `Dashboard "${result.name}" renamed successfully (ID: ${result.id}).` }],
       };
     })
   );

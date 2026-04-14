@@ -448,7 +448,8 @@
                 "platform_create_evaluator",
                 "platform_list_evaluators",
                 "platform_get_evaluator",
-                "platform_update_evaluator"
+                "platform_update_evaluator",
+                "platform_delete_evaluator"
               ],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/evaluators/overview.md"
@@ -515,6 +516,7 @@
             "platform_list_dashboards",
             "platform_get_dashboard",
             "platform_create_dashboard",
+            "platform_rename_dashboard",
             "platform_delete_dashboard"
           ],
           "skill": null,
