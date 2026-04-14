@@ -109,7 +109,7 @@ export const IconRadioCardGroup = <T extends string = string>({
             <Text
               textStyle="sm"
               fontWeight="medium"
-              color={{ base: "fg.DEFAULT", _dark: "white" }}
+              color={{ base: "black", _dark: "white" }}
               truncate
             >
               {item.title}
