@@ -5,7 +5,10 @@ import {
   ExperimentType,
   type Prisma,
 } from "@prisma/client";
-import type { JsonValue } from "@prisma/client/runtime/library";
+import {
+  PrismaClientKnownRequestError,
+  type JsonValue,
+} from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
@@ -75,7 +78,7 @@ export const experimentsRouter = createTRPCRouter({
       let workflowId = input.dsl.workflow_id;
       const name =
         input.workbenchState.name ?? (await findNextDraftName(input.projectId));
-      const slug = await generateUniqueExperimentSlug({
+      let slug = await generateUniqueExperimentSlug({
         baseSlug: slugify(name),
         projectId: input.projectId,
         prisma,
@@ -180,17 +183,45 @@ export const experimentsRouter = createTRPCRouter({
         workbenchState: input.workbenchState,
       };
 
-      await prisma.experiment.upsert({
-        where: {
-          id: experimentId,
-          projectId: input.projectId,
-        },
-        update: experimentData,
-        create: {
-          ...experimentData,
-          id: experimentId,
-        },
-      });
+      try {
+        await prisma.experiment.upsert({
+          where: {
+            id: experimentId,
+            projectId: input.projectId,
+          },
+          update: experimentData,
+          create: {
+            ...experimentData,
+            id: experimentId,
+          },
+        });
+      } catch (error) {
+        if (
+          error instanceof PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          slug = await generateUniqueExperimentSlug({
+            baseSlug: slugify(name),
+            projectId: input.projectId,
+            prisma,
+            excludeExperimentId: input.experimentId,
+          });
+          const retryData = { ...experimentData, slug };
+          await prisma.experiment.upsert({
+            where: {
+              id: experimentId,
+              projectId: input.projectId,
+            },
+            update: retryData,
+            create: {
+              ...retryData,
+              id: experimentId,
+            },
+          });
+        } else {
+          throw error;
+        }
+      }
 
       // For some reason, prisma upsert sometimes return not an experiment but {count: 0}, so we need to refetch it
       const updatedExperiment = await prisma.experiment.findUnique({
@@ -264,17 +295,46 @@ export const experimentsRouter = createTRPCRouter({
         workbenchState: workbenchStateJson,
       };
 
-      await prisma.experiment.upsert({
-        where: {
-          id: experimentId,
-          projectId: input.projectId,
-        },
-        update: experimentData,
-        create: {
-          ...experimentData,
-          id: experimentId,
-        },
-      });
+      try {
+        await prisma.experiment.upsert({
+          where: {
+            id: experimentId,
+            projectId: input.projectId,
+          },
+          update: experimentData,
+          create: {
+            ...experimentData,
+            id: experimentId,
+          },
+        });
+      } catch (error) {
+        if (
+          error instanceof PrismaClientKnownRequestError &&
+          error.code === "P2002"
+        ) {
+          const rawSlug =
+            input.state.experimentSlug ?? experimentId.slice(-8);
+          slug = await generateUniqueExperimentSlug({
+            baseSlug: rawSlug,
+            projectId: input.projectId,
+            prisma,
+          });
+          const retryData = { ...experimentData, slug };
+          await prisma.experiment.upsert({
+            where: {
+              id: experimentId,
+              projectId: input.projectId,
+            },
+            update: retryData,
+            create: {
+              ...retryData,
+              id: experimentId,
+            },
+          });
+        } else {
+          throw error;
+        }
+      }
 
       const updatedExperiment = await prisma.experiment.findUnique({
         where: {
@@ -1309,23 +1369,48 @@ const copyEvaluationsV3Experiment = async ({
 
   // Generate unique slug for the new experiment
   const experimentName = experiment.name ?? experiment.slug;
-  const newSlug = await generateUniqueExperimentSlug({
+  let newSlug = await generateUniqueExperimentSlug({
     baseSlug: slugify(experimentName),
     projectId: targetProjectId,
     prisma: ctx.prisma,
   });
 
   // Create the new experiment
-  const newExperiment = await ctx.prisma.experiment.create({
-    data: {
-      id: generate("eval").toString(),
-      name: experimentName,
-      slug: newSlug,
-      projectId: targetProjectId,
-      type: ExperimentType.EVALUATIONS_V3,
-      workbenchState: workbenchState as Prisma.InputJsonValue,
-    },
-  });
+  const experimentCreateData = {
+    id: generate("eval").toString(),
+    name: experimentName,
+    slug: newSlug,
+    projectId: targetProjectId,
+    type: ExperimentType.EVALUATIONS_V3,
+    workbenchState: workbenchState as Prisma.InputJsonValue,
+  };
+
+  let newExperiment;
+  try {
+    newExperiment = await ctx.prisma.experiment.create({
+      data: experimentCreateData,
+    });
+  } catch (error) {
+    if (
+      error instanceof PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      newSlug = await generateUniqueExperimentSlug({
+        baseSlug: slugify(experimentName),
+        projectId: targetProjectId,
+        prisma: ctx.prisma,
+      });
+      newExperiment = await ctx.prisma.experiment.create({
+        data: {
+          ...experimentCreateData,
+          id: generate("eval").toString(),
+          slug: newSlug,
+        },
+      });
+    } else {
+      throw error;
+    }
+  }
 
   return { experiment: newExperiment, workflow: null };
 };

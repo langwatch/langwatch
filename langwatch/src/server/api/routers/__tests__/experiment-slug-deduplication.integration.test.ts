@@ -7,18 +7,26 @@
  * an existing experiment's slug in the same project, the upsert fails with a
  * unique constraint violation on (projectId, slug).
  *
- * These tests exercise the actual database to verify the fix prevents the
- * Prisma unique constraint error at runtime.
+ * These tests exercise the actual router mutations to verify the fix prevents
+ * the Prisma unique constraint error at runtime.
  */
 import { ExperimentType } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { globalForApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
+import { getTestUser } from "../../../../utils/testUtils";
+import { appRouter } from "../../root";
+import { createInnerTRPCContext } from "../../trpc";
 import { prisma } from "../../../db";
 import { generateUniqueExperimentSlug } from "../experiments";
+
+globalForApp.__langwatch_app = createTestApp();
 
 describe("Feature: Experiment slug deduplication", () => {
   const projectId = "test-project-id";
   const createdExperimentIds: string[] = [];
+  let caller: ReturnType<typeof appRouter.createCaller>;
 
   /**
    * Helper to create an experiment directly in the database with a specific slug.
@@ -37,6 +45,17 @@ describe("Feature: Experiment slug deduplication", () => {
     createdExperimentIds.push(id);
     return id;
   };
+
+  beforeAll(async () => {
+    const user = await getTestUser();
+    const ctx = createInnerTRPCContext({
+      session: {
+        user: { id: user.id },
+        expires: "1",
+      },
+    });
+    caller = appRouter.createCaller(ctx);
+  });
 
   afterAll(async () => {
     if (createdExperimentIds.length > 0) {
@@ -126,58 +145,56 @@ describe("Feature: Experiment slug deduplication", () => {
         });
       });
     });
+  });
 
-    describe("given the slug conflict triggers an actual database upsert", () => {
-      it("does not throw a unique constraint violation", async () => {
-        // This is the exact scenario from issue #977:
-        // 1. Create an experiment with a known slug
-        // 2. Try to create a second experiment that would generate the same slug
-        // 3. Without the fix, this would throw P2002 (unique constraint violation)
-        const sharedSlug = `regression-977-${nanoid(6)}`;
-        const firstId = await createExperimentWithSlug(sharedSlug);
+  describe("saveEvaluationsV3 router mutation", () => {
+    describe("given an experiment exists with a specific slug", () => {
+      const sharedName = `Regression 977 ${nanoid(6)}`;
+      let firstExperimentId: string;
 
-        // Generate a unique slug for the second experiment
-        const uniqueSlug = await generateUniqueExperimentSlug({
-          baseSlug: sharedSlug,
+      beforeAll(async () => {
+        // Create the first experiment via the real router mutation
+        const result = await caller.experiments.saveEvaluationsV3({
           projectId,
-          prisma,
+          state: {
+            name: sharedName,
+            datasets: [],
+            activeDatasetId: "dummy",
+            evaluators: [],
+            targets: [],
+          },
         });
+        firstExperimentId = result.id;
+        createdExperimentIds.push(firstExperimentId);
+      });
 
-        // Now create the second experiment with the deduplicated slug
-        const secondId = `experiment_${nanoid()}`;
-        createdExperimentIds.push(secondId);
-
-        // This upsert must NOT throw a unique constraint violation
-        await expect(
-          prisma.experiment.upsert({
-            where: { id: secondId, projectId },
-            update: {
-              name: "Second Experiment",
-              slug: uniqueSlug,
-              projectId,
-              type: ExperimentType.BATCH_EVALUATION_V2,
+      describe("when a new experiment is saved with the same name", () => {
+        it("deduplicates the slug without P2002 error", async () => {
+          const result = await caller.experiments.saveEvaluationsV3({
+            projectId,
+            state: {
+              name: sharedName,
+              experimentSlug: (
+                await prisma.experiment.findUnique({
+                  where: { id: firstExperimentId, projectId },
+                })
+              )!.slug,
+              datasets: [],
+              activeDatasetId: "dummy",
+              evaluators: [],
+              targets: [],
             },
-            create: {
-              id: secondId,
-              name: "Second Experiment",
-              slug: uniqueSlug,
-              projectId,
-              type: ExperimentType.BATCH_EVALUATION_V2,
-            },
-          })
-        ).resolves.toBeDefined();
+          });
 
-        // Verify both experiments exist with different slugs
-        const first = await prisma.experiment.findUnique({
-          where: { id: firstId, projectId },
-        });
-        const second = await prisma.experiment.findUnique({
-          where: { id: secondId, projectId },
-        });
+          createdExperimentIds.push(result.id);
 
-        expect(first!.slug).toBe(sharedSlug);
-        expect(second!.slug).toBe(`${sharedSlug}-2`);
-        expect(first!.slug).not.toBe(second!.slug);
+          const first = await prisma.experiment.findUnique({
+            where: { id: firstExperimentId, projectId },
+          });
+
+          expect(result.slug).toBe(`${first!.slug}-2`);
+          expect(result.slug).not.toBe(first!.slug);
+        });
       });
     });
   });
