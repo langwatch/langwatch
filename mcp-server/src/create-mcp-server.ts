@@ -792,13 +792,14 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     {
       name: z.string().describe("Agent name"),
       type: z.enum(["signature", "code", "workflow", "http"]).describe("Agent type"),
-      config: z.record(z.unknown()).optional().describe("Agent configuration as JSON object"),
+      config: z.string().optional().describe("Agent configuration as JSON string (will be parsed)"),
     },
     withToolLogging("platform_create_agent", async (params) => {
       requireApiKey();
       const { handleCreateAgent } = await import("./tools/create-agent.js");
+      const parsedConfig = params.config ? JSON.parse(params.config) as Record<string, unknown> : undefined;
       return {
-        content: [{ type: "text", text: await handleCreateAgent(params) }],
+        content: [{ type: "text", text: await handleCreateAgent({ ...params, config: parsedConfig }) }],
       };
     })
   );
@@ -809,14 +810,15 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     {
       id: z.string().describe("The agent ID"),
       name: z.string().optional().describe("New agent name"),
-      type: z.enum(["signature", "code", "workflow", "http"]).optional().describe("New agent type"),
-      config: z.record(z.unknown()).optional().describe("Updated configuration"),
+      type: z.string().optional().describe("New agent type: signature, code, workflow, or http"),
+      config: z.string().optional().describe("Updated configuration as JSON string (will be parsed)"),
     },
     withToolLogging("platform_update_agent", async (params) => {
       requireApiKey();
       const { handleUpdateAgent } = await import("./tools/update-agent.js");
+      const parsedConfig = params.config ? JSON.parse(params.config) as Record<string, unknown> : undefined;
       return {
-        content: [{ type: "text", text: await handleUpdateAgent(params) }],
+        content: [{ type: "text", text: await handleUpdateAgent({ ...params, config: parsedConfig }) }],
       };
     })
   );
