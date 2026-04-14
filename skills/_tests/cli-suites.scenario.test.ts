@@ -39,7 +39,7 @@ describe("LangWatch CLI Suites — Agent Usability", () => {
         `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
 DO NOT use any MCP tools (mcp__claude_ai_LangWatch__*). Use ONLY the Bash tool to run the \`langwatch\` CLI.
 
-First, load the API key: \`export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)\`
+First, load the API key: \`export $(grep LANGWATCH_API_KEY .env)\`
 
 Then run these commands:
 1. \`langwatch suite list\` — list existing suites (run plans)
@@ -112,7 +112,7 @@ Then run these commands:
         `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
 DO NOT use any MCP tools. Use ONLY the Bash tool.
 
-First: \`export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)\`
+First: \`export $(grep LANGWATCH_API_KEY .env)\`
 Then: \`langwatch simulation-run list\`
 If runs exist, get details: \`langwatch simulation-run get <runId>\`
 `,
@@ -178,7 +178,7 @@ If runs exist, get details: \`langwatch simulation-run get <runId>\`
         `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
 DO NOT use any MCP tools. Use ONLY the Bash tool.
 
-First: \`export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)\`
+First: \`export $(grep LANGWATCH_API_KEY .env)\`
 Then: \`langwatch trigger list\`
 Then: \`langwatch trigger create "Error Alert" --action SEND_EMAIL --alert-type CRITICAL\`
 Then: \`langwatch trigger list --format json\`

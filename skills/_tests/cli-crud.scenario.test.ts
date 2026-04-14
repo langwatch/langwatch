@@ -119,7 +119,7 @@ Then run CLI commands directly:
         `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
 DO NOT use any MCP tools. Use ONLY the Bash tool to run the \`langwatch\` CLI.
 
-First: \`export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)\`
+First: \`export $(grep LANGWATCH_API_KEY .env)\`
 Then: \`langwatch dataset upload qa-test-set test-data.csv\`
 Then: \`langwatch dataset records list qa-test-set\`
 `,
@@ -186,7 +186,7 @@ Then: \`langwatch dataset records list qa-test-set\`
         `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
 DO NOT use any MCP tools. Use ONLY the Bash tool to run the \`langwatch\` CLI.
 
-First: \`export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)\`
+First: \`export $(grep LANGWATCH_API_KEY .env)\`
 Then: \`langwatch analytics query --metric trace-count\`
 Then: \`langwatch trace search --limit 5\`
 `,

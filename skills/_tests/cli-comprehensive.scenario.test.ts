@@ -39,7 +39,7 @@ describe("LangWatch CLI Comprehensive — Agent Usability", () => {
         `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
 DO NOT use any MCP tools (mcp__claude_ai_LangWatch__*). Use ONLY the Bash tool to run the \`langwatch\` CLI.
 
-First, load the API key: \`export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)\`
+First, load the API key: \`export $(grep LANGWATCH_API_KEY .env)\`
 
 Then run CLI commands:
 - \`langwatch status\` for project overview
@@ -70,7 +70,7 @@ Then run CLI commands:
         ],
         script: [
           scenario.user(
-            "Read the CLAUDE.md file first, then use the Bash tool to:\n1. `export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch status` to see the project overview\n3. `langwatch evaluator list --format json` to get evaluator details\n4. Summarize what you found about this project\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
+            "Read the CLAUDE.md file first, then use the Bash tool to:\n1. `export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch status` to see the project overview\n3. `langwatch evaluator list --format json` to get evaluator details\n4. Summarize what you found about this project\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
           ),
           scenario.agent(),
           (state) => {
@@ -113,7 +113,7 @@ Then run CLI commands:
         `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
 DO NOT use any MCP tools. Use ONLY the Bash tool to run the \`langwatch\` CLI.
 
-First: \`export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)\`
+First: \`export $(grep LANGWATCH_API_KEY .env)\`
 
 Prompt management commands:
 - \`langwatch prompt list --format json\` — list all prompts
@@ -143,7 +143,7 @@ Prompt management commands:
         ],
         script: [
           scenario.user(
-            "Read the CLAUDE.md file first, then use the Bash tool to:\n1. `export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch prompt list --format json` to find prompts\n3. If any prompts exist, run `langwatch prompt versions <handle>` to see the version history\n4. Tell me what you found\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
+            "Read the CLAUDE.md file first, then use the Bash tool to:\n1. `export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch prompt list --format json` to find prompts\n3. If any prompts exist, run `langwatch prompt versions <handle>` to see the version history\n4. Tell me what you found\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
           ),
           scenario.agent(),
           (state) => {
