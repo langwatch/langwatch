@@ -176,4 +176,76 @@ describe("buildUrl()", () => {
       expect(result).toBe("/foo");
     });
   });
+
+  describe("when query contains catch-all 'path' param (renamed from *)", () => {
+    it("strips path array from query string when path is in routeParamKeys", () => {
+      const result = buildUrl(
+        {
+          pathname: "/my-project/simulations/run-plans/great-run-plan",
+          query: {
+            project: "my-project",
+            path: ["run-plans", "great-run-plan"],
+            scenarioId: "scenario_001",
+          },
+        },
+        new Set(["project", "path"])
+      );
+      expect(result).toBe(
+        "/my-project/simulations/run-plans/great-run-plan?scenarioId=scenario_001"
+      );
+    });
+
+    it("does not accumulate path params across navigations", () => {
+      // Simulates what happens when a component does:
+      //   router.push({ query: { ...router.query, newFilter: "value" } })
+      // where router.query includes path from the catch-all route
+      const result = buildUrl(
+        {
+          pathname: "/my-project/simulations/run-plans/great-run-plan",
+          query: {
+            project: "my-project",
+            path: ["run-plans", "great-run-plan"],
+            startDate: "2026-01-14",
+            newFilter: "value",
+          },
+        },
+        new Set(["project", "path"])
+      );
+      expect(result).toBe(
+        "/my-project/simulations/run-plans/great-run-plan?startDate=2026-01-14&newFilter=value"
+      );
+      // path and project should NOT appear in the query string
+      expect(result).not.toContain("path=");
+      expect(result).not.toContain("project=");
+    });
+  });
+
+  describe("when query-only string contains catch-all path param", () => {
+    it("strips path from query string", () => {
+      const result = buildUrl(
+        "?path=run-plans&path=great-run-plan&scenarioId=scenario_001",
+        new Set(["project", "path"])
+      );
+      expect(result).toBe("?scenarioId=scenario_001");
+    });
+  });
+
+  describe("when routeParamKeys contains resolved [param] keys", () => {
+    it("strips all route params even when pathname has no [param] placeholders", () => {
+      // When pathname is the actual URL (not a pattern), route params
+      // should still be filtered from the query string
+      const result = buildUrl(
+        {
+          pathname: "/inbox-narrator/messages",
+          query: {
+            project: "inbox-narrator",
+            trace: "abc-123",
+            view: "table",
+          },
+        },
+        new Set(["project", "trace"])
+      );
+      expect(result).toBe("/inbox-narrator/messages?view=table");
+    });
+  });
 });

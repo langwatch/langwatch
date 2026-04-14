@@ -2,6 +2,9 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
+const FRONTEND_PORT = parseInt(process.env.PORT ?? "5560");
+const API_PORT = FRONTEND_PORT + 1000;
+
 export default defineConfig({
   plugins: [react()],
   resolve: {
@@ -45,15 +48,15 @@ export default defineConfig({
         "**/server.log",
       ],
     },
-    // Frontend always on 5560 — same port as with Next.js
+    // Frontend port (default 5560, configurable via PORT env var)
     host: true,
     allowedHosts: true,
-    port: 5560,
+    port: FRONTEND_PORT,
     strictPort: true,
-    // Proxy API requests to the Hono backend (internal port)
+    // Proxy API requests to the Hono backend (PORT + 1000)
     proxy: {
       "/api": {
-        target: `http://localhost:${process.env.API_PORT ?? "5565"}`,
+        target: `http://localhost:${API_PORT}`,
         changeOrigin: true,
       },
     },

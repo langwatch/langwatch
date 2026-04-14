@@ -57,12 +57,11 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // This was previously done by Next.js instrumentation hook.
   initializeWebApp();
 
-  // Dev: API server on internal port (API_PORT, default 5565).
-  //      Vite dev server runs separately on 5560 and proxies /api/* here.
-  // Prod: Single server on 5560 serves API routes + static files.
-  const port = parseInt(
-    process.env.PORT ?? (dev ? process.env.API_PORT ?? "5565" : "5560")
-  );
+  // Dev: API server on PORT+1000 (default 6560).
+  //      Vite dev server runs separately on PORT (default 5560) and proxies /api/* here.
+  // Prod: Single server on PORT (default 5560) serves API routes + static files.
+  const basePort = parseInt(process.env.PORT ?? "5560");
+  const port = dev ? basePort + 1000 : basePort;
 
   const mcpHandler = createMcpHandler();
   const honoApp = createApiRouter();
@@ -199,7 +198,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
         hostname,
         port,
         fullUrl: `http://${hostname === "0.0.0.0" ? "localhost" : hostname}:${port}`,
-        mode: dev ? "development (API only — Vite on :5560)" : "production",
+        mode: dev ? `development (API only — Vite on :${basePort})` : "production",
       },
       asciiArt
     );
