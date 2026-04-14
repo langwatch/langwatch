@@ -218,11 +218,20 @@ export const app = new Hono<{ Variables: Variables }>()
 
       const encryptedValue = encrypt(body.value);
 
+      // API key auth has no user context — use first team member as owner
+      const teamMember = await prisma.teamMember.findFirst({
+        where: { teamId: project.teamId },
+        select: { userId: true },
+      });
+      const userId = teamMember?.userId ?? "system";
+
       const secret = await prisma.projectSecret.create({
         data: {
-          project: { connect: { id: project.id } },
+          projectId: project.id,
           name: body.name,
           encryptedValue,
+          createdById: userId,
+          updatedById: userId,
         },
         select: {
           id: true,
