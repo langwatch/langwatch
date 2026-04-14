@@ -17,7 +17,7 @@ export const deleteCommand = async (slugOrId: string, options?: { format?: strin
     const dataset = await service.deleteDataset(slugOrId);
 
     spinner.succeed(
-      `Dataset "${chalk.cyan(dataset.name)}" (${dataset.slug}) has been archived`,
+      `Dataset "${chalk.cyan(dataset.name ?? slugOrId)}" (${dataset.slug ?? slugOrId}) has been archived`,
     );
 
     if (options?.format === "json") {
