@@ -220,7 +220,7 @@ export const app = new Hono<{ Variables: Variables }>()
 
       const secret = await prisma.projectSecret.create({
         data: {
-          projectId: project.id,
+          project: { connect: { id: project.id } },
           name: body.name,
           encryptedValue,
         },
