@@ -164,17 +164,23 @@
                 "python": "langwatch.evaluation",
                 "typescript": null
               },
-              "cli": null,
+              "cli": ["monitor list", "monitor get", "monitor create", "monitor update", "monitor delete"],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/guardrails/code-integration.md"
             },
             "platform": {
               "ui": "/evaluations",
-              "mcp": null,
+              "mcp": [
+                "platform_list_monitors",
+                "platform_get_monitor",
+                "platform_create_monitor",
+                "platform_update_monitor",
+                "platform_delete_monitor"
+              ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/evaluations/online-evaluation/overview.md"
             },
-            "api": "/api/evaluations",
+            "api": "/api/monitors",
             "docs": "https://langwatch.ai/docs/evaluations/online-evaluation/overview.md"
           },
           "sync": null,

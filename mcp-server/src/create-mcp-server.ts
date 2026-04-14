@@ -1320,6 +1320,142 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  // --- Platform Monitor Tools (require API key) ---
+
+  server.tool(
+    "platform_list_monitors",
+    "List all online evaluation monitors for the project.",
+    {},
+    withToolLogging("platform_list_monitors", async () => {
+      requireApiKey();
+      const { listMonitors } = await import("./langwatch-api-monitors.js");
+      const monitors = await listMonitors();
+      if (monitors.length === 0) {
+        return { content: [{ type: "text", text: "No monitors found." }] };
+      }
+      const lines = monitors.map(
+        (m) =>
+          `• ${m.name} (id: ${m.id}, type: ${m.checkType}, ${m.enabled ? "enabled" : "disabled"}, mode: ${m.executionMode}, sample: ${Math.round(m.sample * 100)}%)`
+      );
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Found ${monitors.length} monitor(s):\n${lines.join("\n")}`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_get_monitor",
+    "Get details of a specific online evaluation monitor.",
+    {
+      id: z.string().describe("The monitor ID"),
+    },
+    withToolLogging("platform_get_monitor", async (params) => {
+      requireApiKey();
+      const { getMonitor } = await import("./langwatch-api-monitors.js");
+      const m = await getMonitor(params.id);
+      const lines = [
+        `**${m.name}** (${m.id})`,
+        `- Type: ${m.checkType}`,
+        `- Status: ${m.enabled ? "enabled" : "disabled"}`,
+        `- Mode: ${m.executionMode}`,
+        `- Sample: ${Math.round(m.sample * 100)}%`,
+        `- Level: ${m.level}`,
+        m.evaluatorId ? `- Evaluator: ${m.evaluatorId}` : null,
+        `- Created: ${m.createdAt}`,
+      ].filter(Boolean);
+      return { content: [{ type: "text", text: lines.join("\n") }] };
+    })
+  );
+
+  server.tool(
+    "platform_create_monitor",
+    "Create a new online evaluation monitor that runs an evaluator on incoming traces.",
+    {
+      name: z.string().describe("Monitor name"),
+      checkType: z
+        .string()
+        .describe("Evaluator check type (e.g. ragas/toxicity, custom/my-eval)"),
+      executionMode: z
+        .enum(["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"])
+        .optional()
+        .describe("When to run: ON_MESSAGE (default), AS_GUARDRAIL, or MANUALLY"),
+      sample: z
+        .number()
+        .min(0)
+        .max(1)
+        .optional()
+        .describe("Sampling rate 0.0-1.0 (default: 1.0)"),
+      evaluatorId: z
+        .string()
+        .optional()
+        .describe("Link to a saved evaluator by ID"),
+    },
+    withToolLogging("platform_create_monitor", async (params) => {
+      requireApiKey();
+      const { createMonitor } = await import("./langwatch-api-monitors.js");
+      const monitor = await createMonitor(params);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Monitor "${monitor.name}" created (id: ${monitor.id}, type: ${monitor.checkType}).`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_update_monitor",
+    "Update an existing online evaluation monitor.",
+    {
+      id: z.string().describe("The monitor ID to update"),
+      name: z.string().optional().describe("New monitor name"),
+      enabled: z.boolean().optional().describe("Enable or disable the monitor"),
+      executionMode: z
+        .enum(["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"])
+        .optional()
+        .describe("New execution mode"),
+      sample: z.number().min(0).max(1).optional().describe("New sampling rate"),
+    },
+    withToolLogging("platform_update_monitor", async (params) => {
+      requireApiKey();
+      const { updateMonitor } = await import("./langwatch-api-monitors.js");
+      const monitor = await updateMonitor(params);
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Monitor "${monitor.name}" updated (${monitor.enabled ? "enabled" : "disabled"}).`,
+          },
+        ],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_delete_monitor",
+    "Delete an online evaluation monitor.",
+    {
+      id: z.string().describe("The monitor ID to delete"),
+    },
+    withToolLogging("platform_delete_monitor", async (params) => {
+      requireApiKey();
+      const { deleteMonitor } = await import("./langwatch-api-monitors.js");
+      const result = await deleteMonitor(params.id);
+      return {
+        content: [
+          { type: "text", text: `Monitor ${result.id} deleted.` },
+        ],
+      };
+    })
+  );
+
   // --- Platform Secret Tools (require API key) ---
 
   server.tool(

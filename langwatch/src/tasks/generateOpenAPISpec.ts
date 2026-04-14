@@ -18,6 +18,7 @@ import { app as tracesApp } from "../app/api/traces/[[...route]]/app";
 import { app as triggersApp } from "../app/api/triggers/[[...route]]/app";
 import { app as simulationRunsApp } from "../app/api/simulation-runs/[[...route]]/app";
 import { app as suitesApp } from "../app/api/suites/[[...route]]/app";
+import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
 import { app as secretsApp } from "../app/api/secrets/[[...route]]/app";
 import { app as workflowsApp } from "../app/api/workflows/[[...route]]/app";
 
@@ -58,6 +59,8 @@ export default async function execute() {
   const llmConfigsSpec = await generateSpecs(llmConfigsApp);
   console.log("Building scenario events spec...");
   const scenarioEventsSpec = await generateSpecs(scenarioEventsApp);
+  console.log("Building monitors spec...");
+  const monitorsSpec = await generateSpecs(monitorsApp);
   console.log("Building model providers spec...");
   const modelProvidersSpec = await generateSpecs(modelProvidersApp);
   console.log("Building secrets spec...");
@@ -87,6 +90,7 @@ export default async function execute() {
       graphsSpec,
       llmConfigsSpec,
       modelProvidersSpec,
+      monitorsSpec,
       scenarioEventsSpec,
       scenariosSpec,
       secretsSpec,
@@ -111,6 +115,7 @@ export default async function execute() {
           key.includes("/api/prompts") ||
           key.includes("/api/dataset") ||
           key.includes("/api/model-providers") ||
+          key.includes("/api/monitors") ||
           key.includes("/api/scenario-events") ||
           key.includes("/api/scenarios") ||
           key.includes("/api/secrets") ||

@@ -1029,6 +1029,67 @@ secretCmd
     await impl(id, options);
   });
 
+// Add monitor (online evaluation) command group
+const monitorCmd = program
+  .command("monitor")
+  .description("Manage online evaluation monitors — evaluators running on incoming traces");
+
+monitorCmd
+  .command("list")
+  .description("List all monitors in the project")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
+    const { listMonitorsCommand: impl } = await import("./commands/monitors/list.js");
+    await impl(options);
+  });
+
+monitorCmd
+  .command("get <id>")
+  .description("Get monitor details by ID")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
+    const { getMonitorCommand: impl } = await import("./commands/monitors/get.js");
+    await impl(id, options);
+  });
+
+monitorCmd
+  .command("create <name>")
+  .description("Create a new online evaluation monitor")
+  .requiredOption("--check-type <type>", "Evaluator check type (e.g. ragas/toxicity, custom/my-eval)")
+  .option("--execution-mode <mode>", "Execution mode: ON_MESSAGE (default), AS_GUARDRAIL, MANUALLY", "ON_MESSAGE")
+  .option("--sample <rate>", "Sampling rate 0.0-1.0 (default: 1.0)")
+  .option("--evaluator-id <id>", "Link to a saved evaluator")
+  .option("--level <level>", "Evaluation level: trace (default) or thread")
+  .option("--parameters <json>", "Evaluator settings as JSON")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (name: string, options: { checkType: string; executionMode?: string; sample?: string; evaluatorId?: string; level?: string; parameters?: string; format?: string }) => {
+    const { createMonitorCommand: impl } = await import("./commands/monitors/create.js");
+    await impl(name, options);
+  });
+
+monitorCmd
+  .command("update <id>")
+  .description("Update a monitor")
+  .option("--name <name>", "New monitor name")
+  .option("--enabled <boolean>", "Enable or disable the monitor (true/false)")
+  .option("--execution-mode <mode>", "Execution mode: ON_MESSAGE, AS_GUARDRAIL, MANUALLY")
+  .option("--sample <rate>", "Sampling rate 0.0-1.0")
+  .option("--parameters <json>", "Updated evaluator settings as JSON")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { name?: string; enabled?: string; executionMode?: string; sample?: string; parameters?: string; format?: string }) => {
+    const { updateMonitorCommand: impl } = await import("./commands/monitors/update.js");
+    await impl(id, options);
+  });
+
+monitorCmd
+  .command("delete <id>")
+  .description("Delete a monitor")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
+    const { deleteMonitorCommand: impl } = await import("./commands/monitors/delete.js");
+    await impl(id, options);
+  });
+
 // Add simulation-run command group
 const simulationRunCmd = program
   .command("simulation-run")

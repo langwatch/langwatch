@@ -556,6 +556,30 @@ function createMockServer(): Server {
         res.writeHead(200);
         res.end(JSON.stringify({ id: "wf_abc", archived: true }));
       }
+      // --- Monitor endpoints ---
+      else if (url === "/api/monitors" && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify([
+          { id: "mon_abc", name: "Toxicity Check", slug: "toxicity-check-x1y2z", checkType: "ragas/toxicity", enabled: true, executionMode: "ON_MESSAGE", sample: 1.0, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
+        ]));
+      } else if (url === "/api/monitors" && method === "POST") {
+        res.writeHead(201);
+        res.end(JSON.stringify({ id: "mon_new", name: "New Monitor", slug: "new-monitor-abc12", checkType: "ragas/toxicity", enabled: true, executionMode: "ON_MESSAGE", sample: 1.0, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }));
+      } else if (url?.match(/^\/api\/monitors\/[^/]+\/toggle$/) && method === "POST") {
+        const monitorId = url?.split("/")[3];
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: monitorId, enabled: true }));
+      } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: "mon_abc", name: "Toxicity Check", slug: "toxicity-check-x1y2z", checkType: "ragas/toxicity", enabled: true, executionMode: "ON_MESSAGE", sample: 1.0, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }));
+      } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "PATCH") {
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: "mon_abc", name: "Updated Monitor", slug: "toxicity-check-x1y2z", checkType: "ragas/toxicity", enabled: false, executionMode: "ON_MESSAGE", sample: 0.5, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z" }));
+      } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "DELETE") {
+        const monitorId = url?.split("/").pop();
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: monitorId, deleted: true }));
+      }
       // --- Secret endpoints ---
       else if (url === "/api/secrets" && method === "GET") {
         res.writeHead(200);
@@ -1550,6 +1574,56 @@ describe("All MCP tools integration", () => {
       expect(result).toContain("Login Flow");
       expect(result).toContain("passed");
       expect(result).toContain("Hello");
+    });
+  });
+
+  // =====================
+  // Monitor Tools
+  // =====================
+  describe("platform_list_monitors", () => {
+    it("returns formatted monitor list", async () => {
+      const { listMonitors } = await import("../langwatch-api-monitors.js");
+      const monitors = await listMonitors();
+      expect(monitors).toHaveLength(1);
+      expect(monitors[0]!.name).toBe("Toxicity Check");
+      expect(monitors[0]!.checkType).toBe("ragas/toxicity");
+    });
+  });
+
+  describe("platform_get_monitor", () => {
+    it("returns monitor details", async () => {
+      const { getMonitor } = await import("../langwatch-api-monitors.js");
+      const monitor = await getMonitor("mon_abc");
+      expect(monitor.id).toBe("mon_abc");
+      expect(monitor.name).toBe("Toxicity Check");
+      expect(monitor.enabled).toBe(true);
+    });
+  });
+
+  describe("platform_create_monitor", () => {
+    it("creates a monitor and returns metadata", async () => {
+      const { createMonitor } = await import("../langwatch-api-monitors.js");
+      const monitor = await createMonitor({ name: "New Monitor", checkType: "ragas/toxicity" });
+      expect(monitor.id).toBe("mon_new");
+      expect(monitor.name).toBe("New Monitor");
+    });
+  });
+
+  describe("platform_update_monitor", () => {
+    it("updates a monitor", async () => {
+      const { updateMonitor } = await import("../langwatch-api-monitors.js");
+      const monitor = await updateMonitor({ id: "mon_abc", enabled: false });
+      expect(monitor.id).toBe("mon_abc");
+      expect(monitor.enabled).toBe(false);
+    });
+  });
+
+  describe("platform_delete_monitor", () => {
+    it("deletes a monitor", async () => {
+      const { deleteMonitor } = await import("../langwatch-api-monitors.js");
+      const result = await deleteMonitor("mon_abc");
+      expect(result.id).toBe("mon_abc");
+      expect(result.deleted).toBe(true);
     });
   });
 

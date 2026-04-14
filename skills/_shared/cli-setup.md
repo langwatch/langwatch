@@ -39,6 +39,7 @@ All list/get commands support `--format json` for machine-readable output.
 - `langwatch trigger list|get|create|update|delete` — manage automations/alerts
 - `langwatch annotation list|get|create|delete` — manage annotations
 - `langwatch secret list|get|create|update|delete` — manage project secrets (encrypted env vars)
+- `langwatch monitor list|get|create|update|delete` — manage online evaluation monitors
 - `langwatch model-provider list|set` — manage model providers
 
 ### Execution
