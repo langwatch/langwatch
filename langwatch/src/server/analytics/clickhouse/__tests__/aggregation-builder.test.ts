@@ -218,8 +218,8 @@ describe("aggregation-builder", () => {
         groupBy: "metadata.labels" as const,
         series: [
           {
-            metric: "metadata.trace_count" as FlattenAnalyticsMetricsEnum,
-            aggregation: "count" as const,
+            metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
             pipeline: { field: "trace_id" as const, aggregation: "sum" as const },
           },
         ],
@@ -231,7 +231,7 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("deduped_traces");
 
       // The metric alias must be present in the outer SELECT (not silently dropped)
-      expect(result.sql).toContain("0__metadata_trace_count__count");
+      expect(result.sql).toContain("0__metadata_trace_id__cardinality");
 
       // The metric should be converted to uniqExact(trace_id) via transformMetricForDedup
       expect(result.sql).toContain("uniqExact(trace_id)");
