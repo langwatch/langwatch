@@ -1,8 +1,3 @@
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
-import type { InternalConfig } from "@/client-sdk/types";
 
 export interface SuiteTarget {
   type: "prompt" | "http" | "code" | "workflow";
@@ -72,7 +67,7 @@ export class SuitesApiService {
   private readonly apiKey: string;
   private readonly endpoint: string;
 
-  constructor(config?: Pick<InternalConfig, "langwatchApiClient">) {
+  constructor() {
     this.apiKey = process.env.LANGWATCH_API_KEY ?? "";
     this.endpoint = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
   }

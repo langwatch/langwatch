@@ -1,8 +1,5 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  createLangWatchApiClient,
-} from "@/internal/api/client";
 import { checkApiKey } from "../../utils/apiKey";
 
 export const runWorkflowCommand = async (
