@@ -37,10 +37,35 @@ export {
   EvaluatorNotFoundError,
   EvaluationsApiError,
 } from "./services/evaluations";
+export { EvaluatorsApiService, EvaluatorsApiError } from "./services/evaluators";
+export { ScenariosApiService, ScenariosApiError } from "./services/scenarios";
+export { SuitesApiService, SuitesApiError } from "./services/suites";
+export { WorkflowsApiService, WorkflowsApiError } from "./services/workflows/workflows-api.service";
+export { AgentsApiService, AgentsApiError } from "./services/agents/agents-api.service";
+export { AnnotationsApiService, AnnotationsApiError } from "./services/annotations/annotations-api.service";
+export { DashboardsApiService, DashboardsApiError } from "./services/dashboards/dashboards-api.service";
+export { ModelProvidersApiService, ModelProvidersApiError } from "./services/model-providers/model-providers-api.service";
+export { AnalyticsApiService, AnalyticsApiError } from "./services/analytics/analytics-api.service";
+export { TriggersApiService, TriggersApiError } from "./services/triggers";
+export { GraphsApiService, GraphsApiError } from "./services/graphs";
+export { SimulationRunsApiService, SimulationRunsApiError } from "./services/simulation-runs";
+export { TracesApiService, TracesApiError } from "./services/traces/traces-api.service";
 import { LocalPromptsService } from "./services/prompts/local-prompts.service";
 import { ExperimentsFacade } from "./services/experiments";
 import { DatasetsFacade } from "./services/datasets";
 import { EvaluationsFacade } from "./services/evaluations";
+import { EvaluatorsApiService } from "./services/evaluators";
+import { ScenariosApiService } from "./services/scenarios";
+import { SuitesApiService } from "./services/suites";
+import { WorkflowsApiService } from "./services/workflows/workflows-api.service";
+import { AgentsApiService } from "./services/agents/agents-api.service";
+import { AnnotationsApiService } from "./services/annotations/annotations-api.service";
+import { DashboardsApiService } from "./services/dashboards/dashboards-api.service";
+import { ModelProvidersApiService } from "./services/model-providers/model-providers-api.service";
+import { AnalyticsApiService } from "./services/analytics/analytics-api.service";
+import { TriggersApiService } from "./services/triggers";
+import { GraphsApiService } from "./services/graphs";
+import { SimulationRunsApiService } from "./services/simulation-runs";
 import { type InternalConfig } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
 import { type Logger, NoOpLogger } from "../logger";
@@ -84,7 +109,6 @@ export class LangWatch {
    *
    * @example
    * ```typescript
-   * // Run a guardrail
    * const guardrail = await langwatch.evaluations.evaluate("presidio/pii_detection", {
    *   data: { input: userInput, output: generatedResponse },
    *   name: "PII Detection",
@@ -97,6 +121,19 @@ export class LangWatch {
    * ```
    */
   readonly evaluations: EvaluationsFacade;
+
+  readonly evaluators: EvaluatorsApiService;
+  readonly scenarios: ScenariosApiService;
+  readonly suites: SuitesApiService;
+  readonly workflows: WorkflowsApiService;
+  readonly agents: AgentsApiService;
+  readonly annotations: AnnotationsApiService;
+  readonly dashboards: DashboardsApiService;
+  readonly modelProviders: ModelProvidersApiService;
+  readonly analytics: AnalyticsApiService;
+  readonly triggers: TriggersApiService;
+  readonly graphs: GraphsApiService;
+  readonly simulationRuns: SimulationRunsApiService;
 
   constructor(options: LangWatchConstructorOptions = {}) {
     const apiKey = options.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -134,6 +171,19 @@ export class LangWatch {
       apiKey: this.config.apiKey,
       logger: this.config.logger,
     });
+
+    this.evaluators = new EvaluatorsApiService(this.config);
+    this.scenarios = new ScenariosApiService(this.config);
+    this.suites = new SuitesApiService(this.config);
+    this.workflows = new WorkflowsApiService(this.config);
+    this.agents = new AgentsApiService(this.config);
+    this.annotations = new AnnotationsApiService(this.config);
+    this.dashboards = new DashboardsApiService(this.config);
+    this.modelProviders = new ModelProvidersApiService(this.config);
+    this.analytics = new AnalyticsApiService(this.config);
+    this.triggers = new TriggersApiService(this.config);
+    this.graphs = new GraphsApiService(this.config);
+    this.simulationRuns = new SimulationRunsApiService(this.config);
   }
 
   get apiClient(): LangwatchApiClient {
