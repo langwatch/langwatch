@@ -291,6 +291,7 @@ export class ReplayService {
           state: "failed",
           aggregatesProcessed: current.aggregatesProcessed,
           eventsProcessed: current.eventsProcessed,
+          error: params.errorMessage,
         },
       });
     }

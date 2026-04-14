@@ -28,6 +28,7 @@ export interface ReplayHistoryEntry {
   userName: string;
   aggregatesProcessed: number;
   eventsProcessed: number;
+  error?: string | null;
 }
 
 export const IDLE_STATUS: ReplayStatus = {

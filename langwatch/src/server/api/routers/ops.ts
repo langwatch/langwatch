@@ -325,6 +325,15 @@ export const opsRouter = createTRPCRouter({
       return ops.replay.getHistory();
     }),
 
+  getReplayRun: protectedProcedure
+    .use(opsViewPermission)
+    .input(z.object({ runId: z.string() }))
+    .query(async ({ input }) => {
+      const ops = requireOps();
+      const history = await ops.replay.getHistory();
+      return history.find((entry) => entry.runId === input.runId) ?? null;
+    }),
+
   startReplay: protectedProcedure
     .use(opsManagePermission)
     .input(

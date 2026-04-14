@@ -23,30 +23,7 @@ import {
 } from "~/components/ui/drawer";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
-
-const PHASE_ICONS: Record<string, string> = {
-  mark: "\u2691",
-  pause: "\u23F8",
-  drain: "\u2248",
-  cutoff: "\u2702",
-  replay: "\u25B6",
-  write: "\u270E",
-  unmark: "\u2713",
-  discover: "\uD83D\uDD0D",
-  complete: "\u2714",
-};
-
-const PHASE_LABELS: Record<string, string> = {
-  mark: "Marking aggregates",
-  pause: "Pausing projections",
-  drain: "Draining active jobs",
-  cutoff: "Recording cutoff points",
-  replay: "Replaying events",
-  write: "Writing projection states",
-  unmark: "Unmarking & resuming",
-  discover: "Discovering aggregates",
-  complete: "Complete",
-};
+import { PhaseTimeline, PHASE_ICONS, PHASE_LABELS } from "~/components/ops/shared/PhaseTimeline";
 
 function formatElapsed(startedAt: string | null): string {
   if (!startedAt) return "—";
@@ -56,42 +33,6 @@ function formatElapsed(startedAt: string | null): string {
   const mins = Math.floor(ms / 60000);
   const secs = Math.floor((ms % 60000) / 1000);
   return `${mins}m ${secs}s`;
-}
-
-function PhaseTimeline({ currentPhase }: { currentPhase: string | null }) {
-  const phases = ["discover", "mark", "pause", "drain", "cutoff", "replay", "write", "unmark"];
-  const currentIdx = currentPhase ? phases.indexOf(currentPhase) : -1;
-
-  return (
-    <HStack gap={1} flexWrap="wrap">
-      {phases.map((phase, i) => {
-        const isDone = i < currentIdx;
-        const isCurrent = i === currentIdx;
-        const icon = PHASE_ICONS[phase] ?? "·";
-
-        return (
-          <HStack
-            key={phase}
-            gap={1}
-            paddingX={1.5}
-            paddingY={0.5}
-            borderRadius="sm"
-            bg={isCurrent ? "orange.subtle" : isDone ? "green.subtle" : "bg.muted"}
-            opacity={isDone || isCurrent ? 1 : 0.4}
-          >
-            <Text textStyle="xs">{icon}</Text>
-            <Text
-              textStyle="xs"
-              fontWeight={isCurrent ? "semibold" : "normal"}
-              color={isCurrent ? "orange.fg" : isDone ? "green.fg" : "fg.muted"}
-            >
-              {phase}
-            </Text>
-          </HStack>
-        );
-      })}
-    </HStack>
-  );
 }
 
 export function ReplayProgressDrawer({
@@ -169,7 +110,10 @@ export function ReplayProgressDrawer({
           ) : (
             <VStack align="stretch" gap={4}>
               {/* Phase timeline */}
-              <PhaseTimeline currentPhase={status.currentPhase} />
+              <PhaseTimeline
+                currentPhase={status.currentPhase}
+                completedState={status.state !== "running" ? status.state as "completed" | "failed" | "cancelled" : null}
+              />
 
               {/* Current phase detail */}
               {status.currentPhase && (
