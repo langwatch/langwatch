@@ -254,7 +254,7 @@ export const app = new Hono<{ Variables: Variables }>()
       if (body.actionParams !== undefined) data.actionParams = body.actionParams;
 
       const updated = await prisma.trigger.update({
-        where: { id },
+        where: { id, projectId: project.id },
         data,
       });
 
@@ -299,7 +299,7 @@ export const app = new Hono<{ Variables: Variables }>()
       }
 
       await prisma.trigger.update({
-        where: { id },
+        where: { id, projectId: project.id },
         data: { deleted: true, active: false },
       });
 

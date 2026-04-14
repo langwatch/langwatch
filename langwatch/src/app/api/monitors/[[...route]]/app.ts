@@ -326,7 +326,7 @@ export const app = new Hono<{ Variables: Variables }>()
         data.threadIdleTimeout = body.threadIdleTimeout;
 
       const monitor = await prisma.monitor.update({
-        where: { id },
+        where: { id, projectId: project.id },
         data,
       });
 
@@ -378,7 +378,7 @@ export const app = new Hono<{ Variables: Variables }>()
       }
 
       await prisma.monitor.update({
-        where: { id },
+        where: { id, projectId: project.id },
         data: { enabled },
       });
 
@@ -428,7 +428,7 @@ export const app = new Hono<{ Variables: Variables }>()
       }
 
       await prisma.monitor.delete({
-        where: { id },
+        where: { id, projectId: project.id },
       });
 
       return c.json({ id, deleted: true });
