@@ -8,7 +8,7 @@ import { checkApiKey } from "../../utils/apiKey";
 
 export const setModelProviderCommand = async (
   provider: string,
-  options: { enabled?: boolean; apiKey?: string; defaultModel?: string },
+  options: { enabled?: boolean; apiKey?: string; defaultModel?: string; format?: string },
 ): Promise<void> => {
   checkApiKey();
 
@@ -40,6 +40,10 @@ export const setModelProviderCommand = async (
     spinner.succeed(
       `Configured model provider "${chalk.cyan(provider)}"`,
     );
+
+    if (options.format === "json") {
+      console.log(JSON.stringify({ provider, enabled: options.enabled ?? true, defaultModel: options.defaultModel ?? null }, null, 2));
+    }
   } catch (error) {
     spinner.fail();
     if (error instanceof ModelProvidersApiError) {

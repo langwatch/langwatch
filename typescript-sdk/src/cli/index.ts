@@ -626,7 +626,8 @@ modelProviderCmd
   .option("--enabled <boolean>", "Enable or disable the provider", (v) => v === "true")
   .option("--api-key <key>", "API key for the provider")
   .option("--default-model <model>", "Default model to use (e.g. gpt-4o)")
-  .action(async (provider: string, options: { enabled?: boolean; apiKey?: string; defaultModel?: string }) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (provider: string, options: { enabled?: boolean; apiKey?: string; defaultModel?: string; format?: string }) => {
     const { setModelProviderCommand: impl } = await import("./commands/model-providers/set.js");
     await impl(provider, options);
   });
