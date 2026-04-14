@@ -163,7 +163,7 @@ export const app = new Hono<{ Variables: Variables }>()
       }
 
       const updated = await prisma.workflow.update({
-        where: { id },
+        where: { id, projectId: project.id },
         data: body,
       });
 
@@ -207,7 +207,7 @@ export const app = new Hono<{ Variables: Variables }>()
       }
 
       await prisma.workflow.update({
-        where: { id },
+        where: { id, projectId: project.id },
         data: { archivedAt: new Date() },
       });
 

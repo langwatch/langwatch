@@ -244,7 +244,7 @@ export const app = new Hono<{ Variables: Variables }>()
       }
 
       const updated = await prisma.customGraph.update({
-        where: { id },
+        where: { id, projectId: project.id },
         data: {
           ...(body.name !== undefined ? { name: body.name } : {}),
           ...(body.graph !== undefined ? { graph: body.graph as Prisma.InputJsonValue } : {}),
@@ -292,7 +292,7 @@ export const app = new Hono<{ Variables: Variables }>()
       }
 
       await prisma.customGraph.delete({
-        where: { id },
+        where: { id, projectId: project.id },
       });
 
       return c.json({ id, deleted: true });
