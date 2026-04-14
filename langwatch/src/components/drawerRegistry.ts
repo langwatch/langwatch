@@ -38,6 +38,7 @@ import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
 import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
+import { FoundryDrawer } from "./ops/foundry/FoundryDrawer";
 import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
 import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { PromptListDrawer } from "./prompts/PromptListDrawer";
@@ -102,6 +103,8 @@ export const drawers = {
   guardrails: GuardrailsDrawer,
   // SDK Radar
   sdkRadar: SdkRadarDrawer,
+  // Ops
+  foundry: FoundryDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 /**
