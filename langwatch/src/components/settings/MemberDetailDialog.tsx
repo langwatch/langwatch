@@ -10,6 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { RoleBindingScopeType } from "@prisma/client";
 import { X } from "lucide-react";
+import { Link } from "~/components/ui/link";
 import { useEffect, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { toaster } from "~/components/ui/toaster";
@@ -249,7 +250,24 @@ export function MemberDetailDialog({
               ) : (
                 <VStack gap={2} align="stretch">
                   {memberGroups.data.map((group) =>
-                    group.bindings.length === 0 ? null : group.bindings.map((b) => (
+                    group.bindings.length === 0 ? (
+                      <HStack
+                        key={group.id}
+                        px={3}
+                        py={2}
+                        bg="bg.muted"
+                        borderRadius="md"
+                        fontSize="sm"
+                        justifyContent="space-between"
+                      >
+                        <Text fontSize="sm" color="fg.muted">
+                          {group.name}
+                        </Text>
+                        <Link href="/settings/groups" fontSize="xs" color="blue.400">
+                          No access configured
+                        </Link>
+                      </HStack>
+                    ) : group.bindings.map((b) => (
                       <HStack
                         key={b.id}
                         px={3}
