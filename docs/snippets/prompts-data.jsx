@@ -1363,6 +1363,8 @@ langwatch trace search --start-date 2026-01-01      # Custom date range
 # Get trace details
 langwatch trace get <traceId>                       # Human-readable
 langwatch trace get <traceId> -f json               # Raw JSON
+langwatch trace export --format csv -o traces.csv   # Export as CSV
+langwatch trace export --format jsonl --limit 500   # Export as JSONL
 \`\`\`
 
 Set \`LANGWATCH_API_KEY\` in the environment before running CLI commands.
@@ -3174,6 +3176,8 @@ langwatch trace search --start-date 2026-01-01      # Custom date range
 # Get trace details
 langwatch trace get <traceId>                       # Human-readable
 langwatch trace get <traceId> -f json               # Raw JSON
+langwatch trace export --format csv -o traces.csv   # Export as CSV
+langwatch trace export --format jsonl --limit 500   # Export as JSONL
 \`\`\`
 
 Set \`LANGWATCH_API_KEY\` in the environment before running CLI commands.
