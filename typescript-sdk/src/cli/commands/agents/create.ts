@@ -8,7 +8,7 @@ import { checkApiKey } from "../../utils/apiKey";
 
 export const createAgentCommand = async (
   name: string,
-  options: { type: string; config?: string },
+  options: { type: string; config?: string; format?: string },
 ): Promise<void> => {
   checkApiKey();
 
@@ -29,6 +29,10 @@ export const createAgentCommand = async (
     spinner.succeed(
       `Created agent "${chalk.cyan(agent.name)}" ${chalk.gray(`(id: ${agent.id})`)}`,
     );
+
+    if (options.format === "json") {
+      console.log(JSON.stringify(agent, null, 2));
+    }
   } catch (error) {
     spinner.fail();
     if (error instanceof SyntaxError) {

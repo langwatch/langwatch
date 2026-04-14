@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
 
-export const deleteScenarioCommand = async (id: string): Promise<void> => {
+export const deleteScenarioCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = new ScenariosApiService();
@@ -39,6 +39,10 @@ export const deleteScenarioCommand = async (id: string): Promise<void> => {
     deleteSpinner.succeed(
       `Archived scenario "${chalk.cyan(scenarioName)}"`,
     );
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify({ id, name: scenarioName, archived: true }, null, 2));
+    }
   } catch (error) {
     deleteSpinner.fail();
     if (error instanceof ScenariosApiError) {

@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 
-export const deleteDashboardCommand = async (id: string): Promise<void> => {
+export const deleteDashboardCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = new DashboardsApiService();
@@ -15,6 +15,10 @@ export const deleteDashboardCommand = async (id: string): Promise<void> => {
   try {
     const result = await service.delete(id);
     spinner.succeed(`Deleted dashboard "${chalk.cyan(result.name)}" ${chalk.gray(`(id: ${result.id})`)}`);
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify(result, null, 2));
+    }
   } catch (error) {
     spinner.fail();
     if (error instanceof DashboardsApiError) {

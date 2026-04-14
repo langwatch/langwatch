@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 
-export const createDashboardCommand = async (name: string): Promise<void> => {
+export const createDashboardCommand = async (name: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = new DashboardsApiService();
@@ -18,6 +18,10 @@ export const createDashboardCommand = async (name: string): Promise<void> => {
     spinner.succeed(
       `Created dashboard "${chalk.cyan(dashboard.name)}" ${chalk.gray(`(id: ${dashboard.id})`)}`,
     );
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify(dashboard, null, 2));
+    }
   } catch (error) {
     spinner.fail();
     if (error instanceof DashboardsApiError) {

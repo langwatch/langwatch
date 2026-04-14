@@ -92,19 +92,19 @@ const getEvaluatorCommand = async (idOrSlug: string, options?: { format?: string
   return impl(idOrSlug, options);
 };
 
-const createEvaluatorCommand = async (name: string, options: { type: string }): Promise<void> => {
+const createEvaluatorCommand = async (name: string, options: { type: string; format?: string }): Promise<void> => {
   const { createEvaluatorCommand: impl } = await import("./commands/evaluators/create.js");
   return impl(name, options);
 };
 
-const updateEvaluatorCommand = async (idOrSlug: string, options: { name?: string; settings?: string }): Promise<void> => {
+const updateEvaluatorCommand = async (idOrSlug: string, options: { name?: string; settings?: string; format?: string }): Promise<void> => {
   const { updateEvaluatorCommand: impl } = await import("./commands/evaluators/update.js");
   return impl(idOrSlug, options);
 };
 
-const deleteEvaluatorCommand = async (idOrSlug: string): Promise<void> => {
+const deleteEvaluatorCommand = async (idOrSlug: string, options?: { format?: string }): Promise<void> => {
   const { deleteEvaluatorCommand: impl } = await import("./commands/evaluators/delete.js");
-  return impl(idOrSlug);
+  return impl(idOrSlug, options);
 };
 
 const program = new Command();
@@ -374,7 +374,8 @@ evaluatorCmd
   .command("create <name>")
   .description("Create a new evaluator")
   .requiredOption("--type <evaluatorType>", "Evaluator type (e.g. langevals/llm_judge)")
-  .action(async (name: string, options: { type: string }) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (name: string, options: { type: string; format?: string }) => {
     try {
       await createEvaluatorCommand(name, options);
     } catch (error) {
@@ -388,7 +389,8 @@ evaluatorCmd
   .description("Update an evaluator name or settings")
   .option("--name <name>", "New evaluator name")
   .option("--settings <json>", "Evaluator config settings as JSON")
-  .action(async (idOrSlug: string, options: { name?: string; settings?: string }) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (idOrSlug: string, options: { name?: string; settings?: string; format?: string }) => {
     try {
       await updateEvaluatorCommand(idOrSlug, options);
     } catch (error) {
@@ -400,9 +402,10 @@ evaluatorCmd
 evaluatorCmd
   .command("delete <idOrSlug>")
   .description("Archive (soft-delete) an evaluator")
-  .action(async (idOrSlug: string) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (idOrSlug: string, options: { format?: string }) => {
     try {
-      await deleteEvaluatorCommand(idOrSlug);
+      await deleteEvaluatorCommand(idOrSlug, options);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
@@ -514,7 +517,8 @@ agentCmd
   .description("Create a new agent")
   .requiredOption("--type <type>", "Agent type: signature, code, workflow, or http")
   .option("--config <json>", "Agent config as JSON")
-  .action(async (name: string, options: { type: string; config?: string }) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (name: string, options: { type: string; config?: string; format?: string }) => {
     const { createAgentCommand: impl } = await import("./commands/agents/create.js");
     await impl(name, options);
   });
@@ -535,7 +539,8 @@ agentCmd
   .option("--name <name>", "New agent name")
   .option("--type <type>", "New agent type: signature, code, workflow, or http")
   .option("--config <json>", "Updated configuration as JSON")
-  .action(async (id: string, options: { name?: string; type?: string; config?: string }) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { name?: string; type?: string; config?: string; format?: string }) => {
     const { updateAgentCommand: impl } = await import("./commands/agents/update.js");
     await impl(id, options);
   });
@@ -543,9 +548,10 @@ agentCmd
 agentCmd
   .command("delete <id>")
   .description("Archive (soft-delete) an agent")
-  .action(async (id: string) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
     const { deleteAgentCommand: impl } = await import("./commands/agents/delete.js");
-    await impl(id);
+    await impl(id, options);
   });
 
 // Add dashboard command group
@@ -584,17 +590,19 @@ dashboardCmd
 dashboardCmd
   .command("create <name>")
   .description("Create a new dashboard")
-  .action(async (name: string) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (name: string, options: { format?: string }) => {
     const { createDashboardCommand: impl } = await import("./commands/dashboards/create.js");
-    await impl(name);
+    await impl(name, options);
   });
 
 dashboardCmd
   .command("delete <id>")
   .description("Delete a dashboard and its graphs")
-  .action(async (id: string) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
     const { deleteDashboardCommand: impl } = await import("./commands/dashboards/delete.js");
-    await impl(id);
+    await impl(id, options);
   });
 
 // Add model-provider command group
@@ -758,7 +766,8 @@ scenarioCmd
   .requiredOption("--situation <situation>", "The situation/context for the scenario")
   .option("--criteria <criteria>", "Comma-separated list of evaluation criteria")
   .option("--labels <labels>", "Comma-separated list of labels")
-  .action(async (name: string, options: { situation: string; criteria?: string; labels?: string }) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (name: string, options: { situation: string; criteria?: string; labels?: string; format?: string }) => {
     const { createScenarioCommand: impl } = await import("./commands/scenarios/create.js");
     await impl(name, options);
   });
@@ -770,7 +779,8 @@ scenarioCmd
   .option("--situation <situation>", "New situation/context")
   .option("--criteria <criteria>", "New comma-separated list of criteria (replaces existing)")
   .option("--labels <labels>", "New comma-separated list of labels (replaces existing)")
-  .action(async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string }) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { name?: string; situation?: string; criteria?: string; labels?: string; format?: string }) => {
     const { updateScenarioCommand: impl } = await import("./commands/scenarios/update.js");
     await impl(id, options);
   });
@@ -789,9 +799,10 @@ scenarioCmd
 scenarioCmd
   .command("delete <id>")
   .description("Archive (soft-delete) a scenario")
-  .action(async (id: string) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (id: string, options: { format?: string }) => {
     const { deleteScenarioCommand: impl } = await import("./commands/scenarios/delete.js");
-    await impl(id);
+    await impl(id, options);
   });
 
 // Add suite (run plan) command group

@@ -9,7 +9,7 @@ import { checkApiKey } from "../../utils/apiKey";
 
 export const updateEvaluatorCommand = async (
   idOrSlug: string,
-  options: { name?: string; settings?: string },
+  options: { name?: string; settings?: string; format?: string },
 ): Promise<void> => {
   checkApiKey();
 
@@ -51,6 +51,10 @@ export const updateEvaluatorCommand = async (
     updateSpinner.succeed(
       `Updated evaluator "${chalk.cyan(updated.name)}" ${chalk.gray(`(slug: ${updated.slug ?? "—"})`)}`,
     );
+
+    if (options.format === "json") {
+      console.log(JSON.stringify(updated, null, 2));
+    }
   } catch (error) {
     updateSpinner.fail();
     if (error instanceof SyntaxError) {

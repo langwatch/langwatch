@@ -8,6 +8,7 @@ import { checkApiKey } from "../../utils/apiKey";
 
 export const deleteEvaluatorCommand = async (
   idOrSlug: string,
+  options?: { format?: string },
 ): Promise<void> => {
   checkApiKey();
 
@@ -43,6 +44,10 @@ export const deleteEvaluatorCommand = async (
     deleteSpinner.succeed(
       `Archived evaluator "${chalk.cyan(evaluatorName)}"`,
     );
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify({ id: evaluatorId, name: evaluatorName, archived: true }, null, 2));
+    }
   } catch (error) {
     deleteSpinner.fail();
     if (error instanceof EvaluatorsApiError) {

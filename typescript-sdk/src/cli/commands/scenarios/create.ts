@@ -8,7 +8,7 @@ import { checkApiKey } from "../../utils/apiKey";
 
 export const createScenarioCommand = async (
   name: string,
-  options: { situation: string; criteria?: string; labels?: string },
+  options: { situation: string; criteria?: string; labels?: string; format?: string },
 ): Promise<void> => {
   checkApiKey();
 
@@ -33,6 +33,10 @@ export const createScenarioCommand = async (
     spinner.succeed(
       `Created scenario "${chalk.cyan(scenario.name)}" ${chalk.gray(`(id: ${scenario.id})`)}`,
     );
+
+    if (options.format === "json") {
+      console.log(JSON.stringify(scenario, null, 2));
+    }
   } catch (error) {
     spinner.fail();
     if (error instanceof ScenariosApiError) {

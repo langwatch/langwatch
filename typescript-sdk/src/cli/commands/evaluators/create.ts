@@ -8,7 +8,7 @@ import { checkApiKey } from "../../utils/apiKey";
 
 export const createEvaluatorCommand = async (
   name: string,
-  options: { type: string },
+  options: { type: string; format?: string },
 ): Promise<void> => {
   checkApiKey();
 
@@ -26,6 +26,10 @@ export const createEvaluatorCommand = async (
     spinner.succeed(
       `Created evaluator "${chalk.cyan(evaluator.name)}" ${chalk.gray(`(slug: ${evaluator.slug ?? "—"})`)}`,
     );
+
+    if (options.format === "json") {
+      console.log(JSON.stringify(evaluator, null, 2));
+    }
   } catch (error) {
     spinner.fail();
     if (error instanceof EvaluatorsApiError) {

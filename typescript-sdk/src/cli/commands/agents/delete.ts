@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 
-export const deleteAgentCommand = async (id: string): Promise<void> => {
+export const deleteAgentCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = new AgentsApiService();
@@ -17,6 +17,10 @@ export const deleteAgentCommand = async (id: string): Promise<void> => {
     spinner.succeed(
       `Archived agent "${chalk.cyan(result.name)}" ${chalk.gray(`(id: ${result.id})`)}`,
     );
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify(result, null, 2));
+    }
   } catch (error) {
     spinner.fail();
     if (error instanceof AgentsApiError) {
