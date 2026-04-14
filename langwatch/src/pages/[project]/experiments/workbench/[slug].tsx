@@ -22,6 +22,7 @@ import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3St
 import { useExecuteEvaluation } from "~/evaluations-v3/hooks/useExecuteEvaluation";
 import { useLambdaWarmup } from "~/evaluations-v3/hooks/useLambdaWarmup";
 import { useSavedDatasetLoader } from "~/evaluations-v3/hooks/useSavedDatasetLoader";
+import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -52,6 +53,7 @@ export default function ExperimentsWorkbenchPage() {
   const createDatasetRecords = api.datasetRecord.create.useMutation();
   const utils = api.useContext();
   const { execute: executeEvaluation } = useExecuteEvaluation();
+  const { openDrawer } = useDrawer();
 
   // Enable autosave for evaluation state - this also handles loading existing experiments
   const {
@@ -76,19 +78,24 @@ export default function ExperimentsWorkbenchPage() {
           type: "evaluator" | "workflow";
           config: Record<string, unknown>;
         };
-        await createEvaluator.mutateAsync({
+        const created = await createEvaluator.mutateAsync({
           projectId,
           name,
           type,
           config,
         });
         await utils.evaluators.getAll.invalidate({ projectId });
-        return projectSlug
-          ? {
-              href: `/${projectSlug}/evaluations`,
-              label: "Open evaluators",
-            }
-          : undefined;
+        const evaluatorType = (created?.config as {
+          evaluatorType?: string;
+        } | null)?.evaluatorType;
+        return {
+          label: "Edit evaluator",
+          onOpen: () =>
+            openDrawer("evaluatorEditor", {
+              evaluatorId: created.id,
+              evaluatorType,
+            }),
+        };
       },
       "workbench.addEvaluator": async (payload) => {
         const { dbEvaluatorId, evaluatorType, name, fields } = payload as {
@@ -198,6 +205,7 @@ export default function ExperimentsWorkbenchPage() {
     };
   }, [
     project?.id,
+    project?.slug,
     createEvaluator,
     createPrompt,
     updatePrompt,
@@ -206,6 +214,7 @@ export default function ExperimentsWorkbenchPage() {
     utils,
     addEvaluator,
     executeEvaluation,
+    openDrawer,
   ]);
 
   // Warm up lambda instances in the background (invisible to user)
