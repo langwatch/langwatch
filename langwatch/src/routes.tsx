@@ -91,9 +91,6 @@ const SettingsAuthentication = lazy(
 const SettingsGroups = lazy(() => import("./pages/settings/groups"));
 const SettingsLicense = lazy(() => import("./pages/settings/license"));
 const SettingsMembers = lazy(() => import("./pages/settings/members"));
-const SettingsMemberDetail = lazy(
-  () => import("./pages/settings/members/[userId]")
-);
 const SettingsModelCosts = lazy(
   () => import("./pages/settings/model-costs")
 );
@@ -280,7 +277,6 @@ const routes: RouteObject[] = [
   { path: "/settings/groups", Component: SettingsGroups },
   { path: "/settings/license", Component: SettingsLicense },
   { path: "/settings/members", Component: SettingsMembers },
-  { path: "/settings/members/:userId", Component: SettingsMemberDetail },
   { path: "/settings/model-costs", Component: SettingsModelCosts },
   { path: "/settings/model-providers", Component: SettingsModelProviders },
   { path: "/settings/plans", Component: SettingsPlans },
