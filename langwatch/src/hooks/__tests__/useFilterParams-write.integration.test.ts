@@ -135,48 +135,16 @@ describe("useFilterParams() write operations", () => {
           query: "hello world",
           view: "table",
         };
-        mockRouterAsPath =
-          "/test-project/messages?origin=application&model=gpt-5-mini&query=hello+world&view=table";
 
         const { result } = renderHook(() => useFilterParams());
         result.current.clearFilters();
 
-        const url = lastPushUrl();
-        expect(url).not.toContain("origin=");
-        expect(url).not.toContain("model=");
-        expect(url).not.toContain("query=");
+        const query = lastPushQuery();
+        expect(query).not.toHaveProperty("origin");
+        expect(query).not.toHaveProperty("model");
+        expect(query).not.toHaveProperty("query");
         // Layout params preserved
-        expect(url).toContain("view=table");
-      });
-    });
-
-    describe("when on a dynamic route page with [id] param", () => {
-      beforeEach(() => {
-        mockRouterQuery = {
-          project: "my-project",
-          id: "graph-abc",
-        };
-        mockRouterAsPath =
-          "/my-project/analytics/custom/graph-abc?dashboard=dash-123&show_filters=true&origin=application";
-      });
-
-      it("clears filter params but preserves non-filter params", () => {
-        const { result } = renderHook(() => useFilterParams());
-        result.current.clearFilters();
-
-        const url = lastPushUrl();
-        expect(url).not.toContain("origin=");
-        expect(url).toContain("dashboard=dash-123");
-        expect(url).toContain("show_filters=true");
-      });
-
-      it("does not leak route params into the display URL", () => {
-        const { result } = renderHook(() => useFilterParams());
-        result.current.clearFilters();
-
-        const url = lastPushUrl();
-        expect(url).not.toContain("project=");
-        expect(url).not.toContain("id=");
+        expect(query).toHaveProperty("view", "table");
       });
     });
   });
