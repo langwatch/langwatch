@@ -116,20 +116,31 @@ vi.mock("~/utils/compat/next-navigation", () => ({
   notFound: vi.fn(),
 }));
 
-// Mock Link components that use React Router (requires Router context)
-vi.mock("~/utils/compat/next-link", () => ({
-  default: ({ children, href, ...props }: any) => {
-    const React = require("react");
-    return React.createElement("a", { href: typeof href === "string" ? href : href?.pathname ?? "/", ...props }, children);
-  },
-}));
+// Mock Link components that use React Router (requires Router context).
+// Must support forwardRef for Chakra's `asChild` pattern.
+vi.mock("~/utils/compat/next-link", async () => {
+  const React = await import("react");
+  return {
+    default: React.forwardRef(function MockLink(
+      { children, href, as: _as, replace: _replace, scroll: _scroll, shallow: _shallow, passHref: _passHref, prefetch: _prefetch, locale: _locale, legacyBehavior: _legacyBehavior, ...props }: any,
+      ref: any
+    ) {
+      return React.createElement("a", { ref, href: typeof href === "string" ? href : href?.pathname ?? "/", ...props }, children);
+    }),
+  };
+});
 
-vi.mock("next/link", () => ({
-  default: ({ children, href, ...props }: any) => {
-    const React = require("react");
-    return React.createElement("a", { href: typeof href === "string" ? href : href?.pathname ?? "/", ...props }, children);
-  },
-}));
+vi.mock("next/link", async () => {
+  const React = await import("react");
+  return {
+    default: React.forwardRef(function MockLink(
+      { children, href, ...props }: any,
+      ref: any
+    ) {
+      return React.createElement("a", { ref, href: typeof href === "string" ? href : href?.pathname ?? "/", ...props }, children);
+    }),
+  };
+});
 
 // Mock ResizeObserver for tests using floating-ui/popper (Chakra menus, tooltips, etc.)
 globalThis.ResizeObserver = class ResizeObserver {
