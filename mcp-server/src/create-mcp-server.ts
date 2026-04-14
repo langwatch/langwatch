@@ -1205,6 +1205,29 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  server.tool(
+    "platform_get_annotation",
+    "Get annotation details by ID.",
+    {
+      id: z.string().describe("The annotation ID"),
+    },
+    withToolLogging("platform_get_annotation", async (params) => {
+      requireApiKey();
+      const { getAnnotation } = await import("./langwatch-api-annotations.js");
+      const annotation = await getAnnotation(params.id);
+      const lines = [
+        `**ID**: ${annotation.id}`,
+        `**Trace ID**: ${annotation.traceId}`,
+        `**Comment**: ${annotation.comment ?? "—"}`,
+        `**Score**: ${annotation.isThumbsUp ? "Thumbs Up" : "—"}`,
+        `**Created**: ${annotation.createdAt}`,
+      ];
+      return {
+        content: [{ type: "text", text: lines.join("\n") }],
+      };
+    })
+  );
+
   // --- Platform Evaluation Execution Tools (require API key) ---
 
   server.tool(
