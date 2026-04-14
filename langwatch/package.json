@@ -22,7 +22,7 @@
     "format": "pnpm exec biome format src/ --write",
     "postinstall": "make -C .. setup-hooks 2>/dev/null || true",
     "dev": "pnpm run start:prepare:files && NODE_ENV=development START_WORKERS=true FORCE_COLOR=1 pnpm start 2>&1 | tee server.log",
-    "dev:vite": "vite --port 5560",
+    "dev:vite": "vite",
     "start": "./scripts/start.sh",
     "start:app": "tsx src/server.mts",
     "start:quickwit": "cd quickwit && ./quickwit run",
