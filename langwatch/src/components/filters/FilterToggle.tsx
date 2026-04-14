@@ -70,9 +70,16 @@ export const useFilterToggle = (
       allowEmptyArrays: true,
     });
 
+    const nextRouterQuery = { ...router.query };
+    if (showFiltersValue === undefined) {
+      delete nextRouterQuery.show_filters;
+    } else {
+      nextRouterQuery.show_filters = showFiltersValue;
+    }
+
     void router.push(
-      { pathname: router.pathname, query: router.query },
-      currentPath + "?" + newQs,
+      { pathname: router.pathname, query: nextRouterQuery },
+      newQs ? `${currentPath}?${newQs}` : currentPath,
       { shallow: true, scroll: false },
     );
   };
