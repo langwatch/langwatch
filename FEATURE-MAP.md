@@ -10,7 +10,7 @@ Auto-generated from feature-map.json. Shows coverage across all six pillars.
 | &nbsp;&nbsp;&nbsp;&nbsp;**User Events** | ✅ | ✅ | ❌ | ❌ | ❌ | ✅ |
 | &nbsp;&nbsp;&nbsp;&nbsp;**Annotations** | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ |
 | **Evaluations** | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| &nbsp;&nbsp;&nbsp;&nbsp;**Experiments** | ✅ | ✅ | ✅ | ❌ | ✅ | ✅ |
+| &nbsp;&nbsp;&nbsp;&nbsp;**Experiments** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | &nbsp;&nbsp;&nbsp;&nbsp;**Online Evaluation** | ✅ | ✅ | ❌ | ❌ | ✅ | ✅ |
 | **Agent Simulations** | ❌ | ❌ | ❌ | ❌ | ❌ | ✅ |
 | &nbsp;&nbsp;&nbsp;&nbsp;**Scenarios** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
@@ -34,7 +34,7 @@ Total features: 15
 - **API**: 15/15 (100%) ████████████████████
 - **SDK**: 8/15 (53%) ██████████░░░░░░░░░░
 - **CLI**: 12/15 (80%) ████████████████░░░░
-- **MCP**: 11/15 (73%) ██████████████░░░░░░
+- **MCP**: 12/15 (80%) ████████████████░░░░
 - **SKILL**: 8/15 (53%) ██████████░░░░░░░░░░
 - **DOCS**: 13/15 (86%) █████████████████░░░
 

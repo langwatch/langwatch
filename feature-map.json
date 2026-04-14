@@ -142,7 +142,10 @@
             },
             "platform": {
               "ui": "/evaluations",
-              "mcp": null,
+              "mcp": [
+                "platform_run_evaluation",
+                "platform_evaluation_status"
+              ],
               "skill": null,
               "docs": "https://langwatch.ai/docs/evaluations/experiments/overview.md"
             },

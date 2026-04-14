@@ -993,6 +993,38 @@ NOTE: Scenarios can be created two ways. Determine which approach the user needs
     })
   );
 
+  // --- Platform Evaluation Execution Tools (require API key) ---
+
+  server.tool(
+    "platform_run_evaluation",
+    "Start an evaluation run by slug. Returns a run ID for polling status.",
+    {
+      slug: z.string().describe("The evaluation slug to run"),
+    },
+    withToolLogging("platform_run_evaluation", async (params) => {
+      requireApiKey();
+      const { handleRunEvaluation } = await import("./tools/run-evaluation.js");
+      return {
+        content: [{ type: "text", text: await handleRunEvaluation(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "platform_evaluation_status",
+    "Check the status of an evaluation run. Returns progress and summary when completed.",
+    {
+      runId: z.string().describe("The run ID returned from platform_run_evaluation"),
+    },
+    withToolLogging("platform_evaluation_status", async (params) => {
+      requireApiKey();
+      const { handleEvaluationStatus } = await import("./tools/run-evaluation.js");
+      return {
+        content: [{ type: "text", text: await handleEvaluationStatus(params) }],
+      };
+    })
+  );
+
   // --- Platform Dataset Tools (require API key) ---
   // These tools manage datasets on the LangWatch platform via API.
 
