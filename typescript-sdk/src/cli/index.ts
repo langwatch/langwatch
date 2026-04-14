@@ -1137,7 +1137,8 @@ datasetCmd
   .command("create <name>")
   .description("Create a new dataset")
   .option("-c, --columns <columns>", "Column definitions (e.g. input:string,output:string)")
-  .action(async (name: string, options: { columns?: string }) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (name: string, options: { columns?: string; format?: string }) => {
     const { createCommand: createDatasetImpl } = await import("./commands/dataset/create.js");
     await createDatasetImpl(name, options);
   });
@@ -1145,9 +1146,10 @@ datasetCmd
 datasetCmd
   .command("get <slugOrId>")
   .description("Get dataset details and preview records")
-  .action(async (slugOrId: string) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (slugOrId: string, options: { format?: string }) => {
     const { getCommand: getDatasetImpl } = await import("./commands/dataset/get.js");
-    await getDatasetImpl(slugOrId);
+    await getDatasetImpl(slugOrId, options);
   });
 
 datasetCmd
@@ -1196,7 +1198,8 @@ recordsCmd
   .description("List records in a dataset")
   .option("--page <n>", "Page number (default: 1)")
   .option("--limit <n>", "Records per page (default: 20)")
-  .action(async (slugOrId: string, options: { page?: string; limit?: string }) => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (slugOrId: string, options: { page?: string; limit?: string; format?: string }) => {
     const { recordsListCommand } = await import("./commands/dataset/records-list.js");
     await recordsListCommand(slugOrId, options);
   });
