@@ -25,14 +25,14 @@ const initCommand = async (): Promise<void> => {
   return initCommandImpl();
 };
 
-const loginCommand = async (): Promise<void> => {
+const loginCommand = async (options?: { apiKey?: string }): Promise<void> => {
   const { loginCommand: loginCommandImpl } = await import("./commands/login.js");
-  return loginCommandImpl();
+  return loginCommandImpl(options);
 };
 
-const listCommand = async (): Promise<void> => {
+const listCommand = async (options?: { format?: string }): Promise<void> => {
   const { listCommand: listCommandImpl } = await import("./commands/list.js");
-  return listCommandImpl();
+  return listCommandImpl(options);
 };
 
 const syncCommand = async (): Promise<void> => {
@@ -46,9 +46,9 @@ const pullCommand = async (options?: { tag?: string }): Promise<void> => {
 };
 
 // Tag commands
-const tagListCommand = async (): Promise<void> => {
+const tagListCommand = async (options?: { format?: string }): Promise<void> => {
   const { tagListCommand: impl } = await import("./commands/tag/list.js");
-  return impl();
+  return impl(options);
 };
 
 const tagCreateCommand = async (name: string): Promise<void> => {
@@ -123,9 +123,10 @@ program
 program
   .command("login")
   .description("Login to LangWatch and save API key")
-  .action(async () => {
+  .option("--api-key <key>", "Set API key non-interactively (for CI/CD and agents)")
+  .action(async (options: { apiKey?: string }) => {
     try {
-      await loginCommand();
+      await loginCommand(options);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
@@ -193,9 +194,10 @@ promptCmd
 promptCmd
   .command("list")
   .description("List all available prompts on the server")
-  .action(async () => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
     try {
-      await listCommand();
+      await listCommand(options);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
@@ -267,9 +269,10 @@ const tagCmd = promptCmd
 tagCmd
   .command("list")
   .description("List all tag definitions for the organization")
-  .action(async () => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
     try {
-      await tagListCommand();
+      await tagListCommand(options);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
@@ -1124,9 +1127,10 @@ const datasetCmd = program
 datasetCmd
   .command("list")
   .description("List all datasets")
-  .action(async () => {
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
     const { listCommand: listDatasetsImpl } = await import("./commands/dataset/list.js");
-    await listDatasetsImpl();
+    await listDatasetsImpl(options);
   });
 
 datasetCmd

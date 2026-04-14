@@ -4,7 +4,7 @@ import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { checkApiKey } from "../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../utils/formatting";
 
-export const listCommand = async (): Promise<void> => {
+export const listCommand = async (options?: { format?: string }): Promise<void> => {
   try {
     // Check API key before doing anything else
     checkApiKey();
@@ -30,6 +30,11 @@ export const listCommand = async (): Promise<void> => {
             })`,
           ),
       );
+
+      if (options?.format === "json") {
+        console.log(JSON.stringify(allPrompts, null, 2));
+        return;
+      }
 
       if (prompts.length === 0) {
         console.log();
