@@ -8,6 +8,7 @@ import { fileURLToPath } from "url";
 import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
+  setupLocalCli,
   toolCallFix,
 } from "./helpers/claude-code-adapter";
 
@@ -31,6 +32,7 @@ describe("LangWatch CLI CRUD — Agent Usability", () => {
         path.join(tempFolder, ".env"),
         `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
+      setupLocalCli(tempFolder);
 
       // Guide Claude Code to use the CLI directly - NOT MCP
       fs.writeFileSync(
@@ -38,7 +40,11 @@ describe("LangWatch CLI CRUD — Agent Usability", () => {
         `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
 DO NOT use any MCP tools (mcp__claude_ai_LangWatch__*). Use ONLY the Bash tool to run the \`langwatch\` CLI.
 
-First, load the API key: \`export $(grep LANGWATCH_API_KEY .env)\`
+First, set up the environment:
+\`\`\`bash
+export PATH="./bin:$PATH"
+export $(grep LANGWATCH_API_KEY .env)
+\`\`\`
 
 Then run CLI commands directly:
 - \`langwatch scenario list\`
@@ -65,7 +71,7 @@ Then run CLI commands directly:
         ],
         script: [
           scenario.user(
-            "Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch scenario list`\n3. `langwatch scenario create 'Customer Support Flow' --situation 'Customer asks for a refund on a damaged product' --criteria 'Agent shows empathy,Agent offers refund or replacement'`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
+            "Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH=\"./bin:$PATH\" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch scenario list`\n3. `langwatch scenario create 'Customer Support Flow' --situation 'Customer asks for a refund on a damaged product' --criteria 'Agent shows empathy,Agent offers refund or replacement'`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
           ),
           scenario.agent(),
           (state) => {
@@ -101,6 +107,7 @@ Then run CLI commands directly:
         path.join(tempFolder, ".env"),
         `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
+      setupLocalCli(tempFolder);
 
       fs.writeFileSync(
         path.join(tempFolder, "test-data.csv"),
@@ -112,7 +119,7 @@ Then run CLI commands directly:
         `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
 DO NOT use any MCP tools. Use ONLY the Bash tool to run the \`langwatch\` CLI.
 
-First: \`export $(grep LANGWATCH_API_KEY .env)\`
+First: \`export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)\`
 Then: \`langwatch dataset upload qa-test-set test-data.csv\`
 Then: \`langwatch dataset records list qa-test-set\`
 `,
@@ -136,7 +143,7 @@ Then: \`langwatch dataset records list qa-test-set\`
         ],
         script: [
           scenario.user(
-            "Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch dataset upload qa-test-set test-data.csv`\n3. `langwatch dataset records list qa-test-set`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
+            "Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH=\"./bin:$PATH\" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch dataset upload qa-test-set test-data.csv`\n3. `langwatch dataset records list qa-test-set`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
           ),
           scenario.agent(),
           (state) => {
@@ -172,13 +179,14 @@ Then: \`langwatch dataset records list qa-test-set\`
         path.join(tempFolder, ".env"),
         `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
+      setupLocalCli(tempFolder);
 
       fs.writeFileSync(
         path.join(tempFolder, "CLAUDE.md"),
         `# IMPORTANT: Use the langwatch CLI via Bash, NOT MCP tools
 DO NOT use any MCP tools. Use ONLY the Bash tool to run the \`langwatch\` CLI.
 
-First: \`export $(grep LANGWATCH_API_KEY .env)\`
+First: \`export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)\`
 Then: \`langwatch analytics query --metric trace-count\`
 Then: \`langwatch trace search --limit 5\`
 `,
@@ -201,7 +209,7 @@ Then: \`langwatch trace search --limit 5\`
         ],
         script: [
           scenario.user(
-            "Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch analytics query --metric trace-count`\n3. `langwatch trace search --limit 5`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
+            "Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH=\"./bin:$PATH\" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch analytics query --metric trace-count`\n3. `langwatch trace search --limit 5`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
           ),
           scenario.agent(),
           (state) => {
