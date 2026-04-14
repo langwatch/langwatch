@@ -30,7 +30,7 @@ describe("LangWatch CLI Suites — Agent Usability", () => {
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n${process.env.LANGWATCH_ENDPOINT ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n` : ""}`,
       );
       setupLocalCli(tempFolder);
 
@@ -103,7 +103,7 @@ Then run these commands:
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n${process.env.LANGWATCH_ENDPOINT ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n` : ""}`,
       );
       setupLocalCli(tempFolder);
 
@@ -169,7 +169,7 @@ If runs exist, get details: \`langwatch simulation-run get <runId>\`
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n${process.env.LANGWATCH_ENDPOINT ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n` : ""}`,
       );
       setupLocalCli(tempFolder);
 

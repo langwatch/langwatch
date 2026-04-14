@@ -30,7 +30,7 @@ describe("LangWatch CLI CRUD — Agent Usability", () => {
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n${process.env.LANGWATCH_ENDPOINT ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n` : ""}`,
       );
       setupLocalCli(tempFolder);
 
@@ -105,7 +105,7 @@ Then run CLI commands directly:
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n${process.env.LANGWATCH_ENDPOINT ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n` : ""}`,
       );
       setupLocalCli(tempFolder);
 
@@ -177,7 +177,7 @@ Then: \`langwatch dataset records list qa-test-set\`
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n${process.env.LANGWATCH_ENDPOINT ? `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}\n` : ""}`,
       );
       setupLocalCli(tempFolder);
 
