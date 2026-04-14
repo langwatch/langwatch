@@ -144,7 +144,8 @@ export interface CompatRouter {
 }
 
 function buildUrl(
-  url: string | { pathname?: string; query?: Record<string, any> }
+  url: string | { pathname?: string; query?: Record<string, any> },
+  routeParamKeys?: Set<string>
 ): string {
   if (typeof url === "string") return url;
   // If pathname is omitted, use the current URL path (Next.js behavior)
@@ -154,6 +155,8 @@ function buildUrl(
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined || value === null) continue;
+    // Skip route params — they're part of the URL path, not the query string
+    if (routeParamKeys?.has(key)) continue;
     if (Array.isArray(value)) {
       for (const v of value) params.append(key, String(v));
     } else {
@@ -297,6 +300,9 @@ export function useRouter(): CompatRouter {
       (location.search ? location.search : "") +
       (location.hash ? location.hash : "");
 
+    // Track which keys are route params (vs query string params)
+    const routeParamKeys = new Set(Object.keys(params));
+
     return {
       query,
       pathname,
@@ -307,7 +313,7 @@ export function useRouter(): CompatRouter {
       events: noopEvents,
       isFallback: false,
       push: (url, _as?, options?) => {
-        const target = buildUrl(url);
+        const target = buildUrl(url, routeParamKeys);
         navigate(target, { replace: false });
         if (options?.scroll !== false) {
           window.scrollTo(0, 0);
@@ -315,7 +321,7 @@ export function useRouter(): CompatRouter {
         return Promise.resolve(true);
       },
       replace: (url, _as?, options?) => {
-        const target = buildUrl(url);
+        const target = buildUrl(url, routeParamKeys);
         navigate(target, { replace: true });
         if (options?.scroll !== false) {
           window.scrollTo(0, 0);
