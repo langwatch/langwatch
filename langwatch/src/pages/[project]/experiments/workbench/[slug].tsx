@@ -1,8 +1,13 @@
 import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
+import { nanoid } from "nanoid";
 import { useRouter } from "~/utils/compat/next-router";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
+import {
+  SageDrawer,
+  type ProposalHandlers,
+} from "~/components/sage/SageSidebar";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { AutosaveStatus } from "~/evaluations-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/evaluations-v3/components/EditableHeading";
@@ -17,6 +22,7 @@ import { useEvaluationsV3Store } from "~/evaluations-v3/hooks/useEvaluationsV3St
 import { useLambdaWarmup } from "~/evaluations-v3/hooks/useLambdaWarmup";
 import { useSavedDatasetLoader } from "~/evaluations-v3/hooks/useSavedDatasetLoader";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
 
 /**
  * Experiments Workbench Page
@@ -28,14 +34,18 @@ export default function ExperimentsWorkbenchPage() {
   const { project } = useOrganizationTeamProject();
   const slug = router.query.slug as string | undefined;
 
-  const { name, setName, datasets, reset, autosaveStatus } =
+  const { name, setName, datasets, reset, autosaveStatus, addEvaluator } =
     useEvaluationsV3Store((state) => ({
       name: state.name,
       setName: state.setName,
       datasets: state.datasets,
       reset: state.reset,
       autosaveStatus: state.ui.autosaveStatus,
+      addEvaluator: state.addEvaluator,
     }));
+
+  const createEvaluator = api.evaluators.create.useMutation();
+  const utils = api.useContext();
 
   // Enable autosave for evaluation state - this also handles loading existing experiments
   const {
@@ -48,6 +58,43 @@ export default function ExperimentsWorkbenchPage() {
 
   // Track loading state for saved datasets
   const { isLoading: isLoadingDatasets } = useSavedDatasetLoader();
+
+  const proposalHandlers = useMemo<ProposalHandlers>(() => {
+    const projectId = project?.id;
+    if (!projectId) return {} as ProposalHandlers;
+    return {
+      "evaluators.create": async (payload) => {
+        const { name, type, config } = payload as {
+          name: string;
+          type: "evaluator" | "workflow";
+          config: Record<string, unknown>;
+        };
+        await createEvaluator.mutateAsync({
+          projectId,
+          name,
+          type,
+          config,
+        });
+        await utils.evaluators.getAll.invalidate({ projectId });
+      },
+      "workbench.addEvaluator": async (payload) => {
+        const { dbEvaluatorId, evaluatorType, name, fields } = payload as {
+          dbEvaluatorId: string;
+          evaluatorType: string;
+          name: string;
+          fields: { identifier: string; type: string; optional?: boolean }[];
+        };
+        addEvaluator({
+          id: `evaluator_${nanoid()}`,
+          evaluatorType: evaluatorType as never,
+          inputs: fields as never,
+          dbEvaluatorId,
+          mappings: {},
+          localEvaluatorConfig: { name },
+        });
+      },
+    };
+  }, [project?.id, createEvaluator, utils, addEvaluator]);
 
   // Warm up lambda instances in the background (invisible to user)
   useLambdaWarmup();
@@ -166,6 +213,8 @@ export default function ExperimentsWorkbenchPage() {
           </Box>
         </Box>
       </VStack>
+
+      <SageDrawer proposalHandlers={proposalHandlers} />
 
       {/* Load saved dataset records - renders nothing, just triggers fetches */}
       <SavedDatasetLoaders datasets={datasets} />
