@@ -27,9 +27,9 @@ const DRAWER_WIDTH = 420;
 const HANDLE_WIDTH = 26;
 
 const SAMPLE_PROMPTS = [
-  "What evaluators do I have available?",
-  "Suggest an evaluator for measuring RAG hallucinations and add it to my workbench",
-  "List my prompts and datasets",
+  "Summarize my current experiment",
+  "Which rows are failing and why?",
+  "Suggest an evaluator for measuring RAG hallucinations",
 ];
 
 export interface SageProposal {
@@ -47,9 +47,13 @@ export type ProposalHandlers = Record<
 
 interface SageDrawerProps {
   proposalHandlers?: ProposalHandlers;
+  experimentSlug?: string;
 }
 
-export function SageDrawer({ proposalHandlers }: SageDrawerProps) {
+export function SageDrawer({
+  proposalHandlers,
+  experimentSlug,
+}: SageDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLButtonElement>(null);
@@ -79,6 +83,7 @@ export function SageDrawer({ proposalHandlers }: SageDrawerProps) {
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         proposalHandlers={proposalHandlers}
+        experimentSlug={experimentSlug}
       />
     </>
   );
@@ -143,8 +148,12 @@ const SagePanel = forwardRef<
     isOpen: boolean;
     onClose: () => void;
     proposalHandlers?: ProposalHandlers;
+    experimentSlug?: string;
   }
->(function SagePanel({ isOpen, onClose, proposalHandlers }, ref) {
+>(function SagePanel(
+  { isOpen, onClose, proposalHandlers, experimentSlug },
+  ref,
+) {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
 
@@ -183,7 +192,7 @@ const SagePanel = forwardRef<
     setInput("");
     await sendMessage(
       { role: "user", parts: [{ type: "text", text }] },
-      { body: { projectId } },
+      { body: { projectId, experimentSlug } },
     );
   };
 
