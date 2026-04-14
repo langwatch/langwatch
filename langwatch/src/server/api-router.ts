@@ -55,6 +55,20 @@ import { app as trpcApp } from "./routes/trpc";
 export function createApiRouter() {
   const api = new Hono();
 
+  // ---- URL Rewrites (migrated from next.config.mjs) ----
+  // Legacy OAuth callback paths → BetterAuth paths.
+  // Customer IdPs are registered with the old URLs.
+  api.all("/api/auth/callback/auth0", (c) => {
+    const url = new URL(c.req.url);
+    url.pathname = "/api/auth/oauth2/callback/auth0";
+    return api.fetch(new Request(url.toString(), c.req.raw));
+  });
+  api.all("/api/auth/callback/okta", (c) => {
+    const url = new URL(c.req.url);
+    url.pathname = "/api/auth/oauth2/callback/okta";
+    return api.fetch(new Request(url.toString(), c.req.raw));
+  });
+
   // Mount all Hono sub-apps. Each already has basePath like "/api/traces"
   // so we mount at "/" and they handle their own path matching.
   //

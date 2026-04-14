@@ -65,10 +65,22 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // In production, resolve the built client assets directory
   const clientDistDir = dev ? null : path.join(dir, "dist/client");
 
+  // Security headers (migrated from next.config.mjs)
+  const securityHeaders: Record<string, string> = {
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    ...(dev ? {} : { "Strict-Transport-Security": "max-age=31536000; includeSubDomains" }),
+  };
+
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   const server = createServer(async (req, res) => {
     try {
       const pathname = (req.url ?? "/").split("?")[0] ?? "/";
+
+      // Apply security headers to all responses
+      for (const [key, value] of Object.entries(securityHeaders)) {
+        res.setHeader(key, value);
+      }
 
       // MCP routes — intercept before everything
       if (mcpHandler.isMcpRoute(pathname)) {
