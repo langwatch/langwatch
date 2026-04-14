@@ -64,6 +64,13 @@ import { useFilterParams } from "../useFilterParams";
 // Helpers
 // ---------------------------------------------------------------------------
 
+/** Sets both mockRouterAsPath and window.location so parseCurrentQuery()
+ *  (which reads window.location.search) sees the same URL as the mock router. */
+function setMockUrl(path: string) {
+  mockRouterAsPath = path;
+  window.history.pushState({}, "", path);
+}
+
 function lastPushUrl(): string {
   const lastCall = mockPush.mock.lastCall;
   if (!lastCall) throw new Error("router.push was not called");
@@ -100,7 +107,7 @@ describe("useFilterParams() write operations", () => {
     describe("when setting metadata.value filter", () => {
       it("does not strip metadata_key from URL", () => {
         mockRouterQuery = { metadata_key: "env" };
-        mockRouterAsPath = "/test-project/messages?metadata_key=env";
+        setMockUrl("/test-project/messages?metadata_key=env");
 
         const { result } = renderHook(() => useFilterParams());
         result.current.setFilter("metadata.value", { env: ["prod"] });
@@ -114,8 +121,9 @@ describe("useFilterParams() write operations", () => {
     describe("when setting event_metric filter", () => {
       it("does not strip event_metric_value from URL", () => {
         mockRouterQuery = { "event_metric_value.click.count": "0,100" };
-        mockRouterAsPath =
-          "/test-project/messages?event_metric_value.click.count=0,100";
+        setMockUrl(
+          "/test-project/messages?event_metric_value.click.count=0,100",
+        );
 
         const { result } = renderHook(() => useFilterParams());
         result.current.setFilter("events.metrics.key", ["count"]);
@@ -135,8 +143,9 @@ describe("useFilterParams() write operations", () => {
           query: "hello world",
           view: "table",
         };
-        mockRouterAsPath =
-          "/test-project/messages?origin=application&model=gpt-5-mini&query=hello+world&view=table";
+        setMockUrl(
+          "/test-project/messages?origin=application&model=gpt-5-mini&query=hello+world&view=table",
+        );
 
         const { result } = renderHook(() => useFilterParams());
         result.current.clearFilters();
@@ -156,8 +165,9 @@ describe("useFilterParams() write operations", () => {
           project: "my-project",
           id: "graph-abc",
         };
-        mockRouterAsPath =
-          "/my-project/analytics/custom/graph-abc?dashboard=dash-123&show_filters=true&origin=application";
+        setMockUrl(
+          "/my-project/analytics/custom/graph-abc?dashboard=dash-123&show_filters=true&origin=application",
+        );
       });
 
       it("clears filter params but preserves non-filter params", () => {
@@ -192,8 +202,9 @@ describe("useFilterParams() write operations", () => {
           dashboard: "dash-123",
           show_filters: "true",
         };
-        mockRouterAsPath =
-          "/my-project/analytics/custom/graph-abc?dashboard=dash-123&show_filters=true";
+        setMockUrl(
+          "/my-project/analytics/custom/graph-abc?dashboard=dash-123&show_filters=true",
+        );
       });
 
       it("uses the (url, as) overload so Next.js resolves the route correctly", () => {
@@ -237,8 +248,9 @@ describe("useFilterParams() write operations", () => {
           id: "graph-abc",
           dashboard: "dash-123",
         };
-        mockRouterAsPath =
-          "/my-project/analytics/custom/graph-abc?dashboard=dash-123";
+        setMockUrl(
+          "/my-project/analytics/custom/graph-abc?dashboard=dash-123",
+        );
       });
 
       it("does not leak route params into the query string", () => {
@@ -275,8 +287,9 @@ describe("useFilterParams() write operations", () => {
           "metadata.env": "prod",
           origin: "application",
         };
-        mockRouterAsPath =
-          "/test-project/messages?metadata.env=prod&origin=application";
+        setMockUrl(
+          "/test-project/messages?metadata.env=prod&origin=application",
+        );
 
         const { result } = renderHook(() => useFilterParams());
         result.current.setNegateFilters(true);
