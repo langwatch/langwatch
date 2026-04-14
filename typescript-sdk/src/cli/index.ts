@@ -113,6 +113,8 @@ program
   .name("langwatch")
   .description("LangWatch CLI - Manage prompts, datasets, evaluators, scenarios, suites, and more")
   .version(__CLI_VERSION__, "-v, --version", "Display the current version")
+  .enablePositionalOptions()
+  .passThroughOptions()
   .configureHelp({
     showGlobalOptions: true,
   })
@@ -306,10 +308,10 @@ tagCmd
 tagCmd
   .command("assign <prompt> <tag>")
   .description("Assign a tag to a prompt version")
-  .option("--prompt-version <number>", "Version number to assign (defaults to latest)")
-  .action(async (prompt: string, tag: string, options: { promptVersion?: string }) => {
+  .option("--version <number>", "Version number to assign (defaults to latest)")
+  .action(async (prompt: string, tag: string, options: { version?: string }) => {
     try {
-      await tagAssignCommand(prompt, tag, { version: options.promptVersion });
+      await tagAssignCommand(prompt, tag, options);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
