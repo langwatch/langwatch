@@ -25,19 +25,20 @@ Auto-generated from feature-map.json. Shows coverage across all six pillars.
 | &nbsp;&nbsp;&nbsp;&nbsp;**Evaluators** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | &nbsp;&nbsp;&nbsp;&nbsp;**Datasets** | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
 | **Dashboards** | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ |
+| **Triggers (Automations)** | ✅ | ❌ | ✅ | ✅ | ❌ | ❌ |
 | **Settings** | ❌ | ❌ | ❌ | ❌ | ❌ | ❌ |
 | &nbsp;&nbsp;&nbsp;&nbsp;**Model Providers** | ✅ | ❌ | ✅ | ✅ | ❌ | ✅ |
 
 ## Coverage Summary
 
-Total leaf features: 17
+Total leaf features: 18
 
-- **API**: 17/17 (100%) ████████████████████
-- **SDK**: 8/17 (47%) █████████░░░░░░░░░░░
-- **CLI**: 14/17 (82%) ████████████████░░░░
-- **MCP**: 14/17 (82%) ████████████████░░░░
-- **SKILL**: 8/17 (47%) █████████░░░░░░░░░░░
-- **DOCS**: 14/17 (82%) ████████████████░░░░
+- **API**: 18/18 (100%) ████████████████████
+- **SDK**: 8/18 (44%) █████████░░░░░░░░░░░
+- **CLI**: 15/18 (83%) █████████████████░░░
+- **MCP**: 15/18 (83%) █████████████████░░░
+- **SKILL**: 8/18 (44%) █████████░░░░░░░░░░░
+- **DOCS**: 14/18 (78%) ████████████████░░░░
 
 ---
 *Generated from feature-map.json*
