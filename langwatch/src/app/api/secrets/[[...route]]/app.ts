@@ -297,7 +297,7 @@ export const app = new Hono<{ Variables: Variables }>()
       const encryptedValue = encrypt(body.value);
 
       const secret = await prisma.projectSecret.update({
-        where: { id },
+        where: { id, projectId: project.id },
         data: { encryptedValue },
         select: {
           id: true,
@@ -358,7 +358,7 @@ export const app = new Hono<{ Variables: Variables }>()
       }
 
       await prisma.projectSecret.delete({
-        where: { id },
+        where: { id, projectId: project.id },
       });
 
       return c.json({ id, deleted: true });
