@@ -9,7 +9,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import numeral from "numeral";
-import { ArrowDown, ArrowUp, HelpCircle } from "react-feather";
+import { HelpCircle } from "react-feather";
 import { Delayed } from "../Delayed";
 import { Tooltip } from "../ui/tooltip";
 
@@ -20,6 +20,7 @@ export function SummaryMetric({
   format,
   tooltip,
   increaseIs,
+  noDataUrl,
   titleProps,
 }: {
   label: string;
@@ -28,8 +29,10 @@ export function SummaryMetric({
   format?: ((value: number) => string) | ((value: string) => string) | string;
   tooltip?: string;
   increaseIs?: "good" | "bad" | "neutral";
+  noDataUrl?: string;
   titleProps?: {
     fontSize?: SystemStyleObject["fontSize"];
+    textStyle?: SystemStyleObject["textStyle"];
     color?: SystemStyleObject["color"];
     fontWeight?: SystemStyleObject["fontWeight"];
   };
@@ -37,7 +40,7 @@ export function SummaryMetric({
   return (
     <VStack
       minWidth="92px"
-      maxWidth="192px"
+      flex={1}
       gap={2}
       align="start"
       justifyContent="space-between"
@@ -47,11 +50,10 @@ export function SummaryMetric({
       _first={{ paddingLeft: 0, borderLeft: "none" }}
     >
       <Heading
-        fontSize="12px"
+        textStyle="xs"
         color="fg.muted"
         fontWeight="normal"
-        lineHeight="1.5em"
-        lineClamp={3}
+        lineClamp={2}
         wordBreak="break-word"
         title={label}
         {...(titleProps ?? {})}
@@ -76,6 +78,7 @@ export function SummaryMetric({
         previous={previous}
         format={format}
         increaseIs={increaseIs}
+        noDataUrl={noDataUrl}
       />
     </VStack>
   );
@@ -86,15 +89,78 @@ export function SummaryMetricValue({
   previous,
   format,
   increaseIs = "good",
+  noDataUrl,
 }: {
   current?: number | string;
   previous?: number;
   format?: ((value: number) => string) | ((value: string) => string) | string;
   increaseIs?: "good" | "bad" | "neutral";
+  noDataUrl?: string;
 }) {
+  const isZeroZero =
+    current !== undefined &&
+    (current === 0 || current === "0") &&
+    (previous === undefined || previous === 0);
+
+  if (isZeroZero) {
+    return (
+      <VStack align="start" gap={1}>
+        <Box textStyle="2xl" fontWeight="600" color="fg.muted">
+          -
+        </Box>
+        <Text textStyle="xs" color="fg.subtle">
+          No data yet
+          {noDataUrl && (
+            <>
+              {" · "}
+              <a
+                href={noDataUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ textDecoration: "underline" }}
+              >
+                Set up
+              </a>
+            </>
+          )}
+        </Text>
+      </VStack>
+    );
+  }
+
+  const change =
+    typeof current === "number" && typeof previous === "number"
+      ? Math.round(((current - previous) / (previous || 1)) * 100) / 100
+      : undefined;
+  const increaseReversal =
+    increaseIs == "neutral" ? 0 : increaseIs === "bad" ? -1 : 1;
+
+  const formatChangeValue = (value: number) => {
+    const abs = Math.abs(value);
+    if (abs > 9.99) return "999%+";
+    return numeral(abs).format("0%");
+  };
+
+  const formatPreviousValue = (value: number) => {
+    if (typeof format === "function") {
+      // @ts-ignore
+      return format(value);
+    }
+    return numeral(value).format(format ?? "0a");
+  };
+
+  const changeColor =
+    change === undefined || change === 0
+      ? "gray.500"
+      : increaseReversal === 0
+        ? "fg.muted"
+        : change * increaseReversal > 0
+          ? "green.500"
+          : "red.500";
+
   return (
-    <VStack align="start" gap={2}>
-      <Box fontSize="24px" fontWeight="600">
+    <VStack align="start" gap={1}>
+      <Box textStyle="2xl" fontWeight="600">
         {current !== undefined ? (
           typeof format === "function" ? (
             //@ts-ignore
@@ -104,56 +170,25 @@ export function SummaryMetricValue({
           )
         ) : (
           <Delayed takeSpace>
-            <Box paddingY="0.25em" height="2.35em">
-              <Skeleton height="1em" width="78px" />
-            </Box>
+            <Skeleton height="1.5em" width="78px" />
           </Delayed>
         )}
       </Box>
-      <MetricChange
-        current={current}
-        previous={previous}
-        increaseIs={increaseIs}
-      />
+      {change !== undefined && (
+        <VStack align="start" gap={0} textStyle="xs">
+          {change !== 0 && (
+            <Text fontWeight={500} color={changeColor}>
+              {change > 0 ? "+" : "-"}
+              {formatChangeValue(change)}
+            </Text>
+          )}
+          {typeof previous === "number" && (
+            <Text color="fg.muted">
+              {formatPreviousValue(previous)} previous
+            </Text>
+          )}
+        </VStack>
+      )}
     </VStack>
   );
-}
-
-function MetricChange({
-  current,
-  previous,
-  increaseIs = "good",
-}: {
-  current?: number | string;
-  previous?: number;
-  increaseIs?: "good" | "bad" | "neutral";
-}) {
-  const change =
-    typeof current === "number" && typeof previous === "number"
-      ? Math.round(((current - previous) / (previous || 1)) * 100) / 100
-      : undefined;
-  const increaseReversal =
-    increaseIs == "neutral" ? 0 : increaseIs === "bad" ? -1 : 1;
-
-  return change !== undefined ? (
-    <HStack
-      fontSize="13px"
-      fontWeight={600}
-      gap={1}
-      color={
-        change * increaseReversal == 0
-          ? "gray.500"
-          : change * increaseReversal > 0
-            ? "green.500"
-            : "red.500"
-      }
-    >
-      {change == 0 ? null : change > 0 ? (
-        <ArrowUp size={13} />
-      ) : (
-        <ArrowDown size={13} />
-      )}
-      <Text>{change == 0 ? "-" : numeral(Math.abs(change)).format("0%")}</Text>
-    </HStack>
-  ) : null;
 }

@@ -50,6 +50,11 @@ import {
   OutputPathInput,
   useHttpTest,
 } from "./http";
+import {
+  ScenarioInputMappingSection,
+  isScenarioMappingValid,
+} from "~/components/suites/ScenarioInputMappingSection";
+import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 
 // ============================================================================
 // Constants
@@ -93,6 +98,7 @@ function buildHttpConfig(
   outputPath: string,
   headers: HttpHeader[],
   auth: HttpAuth | undefined,
+  scenarioMappings: Record<string, FieldMapping>,
 ): HttpComponentConfig {
   return {
     name: "HTTP",
@@ -103,6 +109,8 @@ function buildHttpConfig(
     outputPath,
     headers: headers.length > 0 ? headers : undefined,
     auth: auth?.type === "none" ? undefined : auth,
+    scenarioMappings:
+      Object.keys(scenarioMappings).length > 0 ? scenarioMappings : undefined,
   };
 }
 
@@ -210,6 +218,10 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   // Custom variables (in addition to fixed ones)
   const [customVariables, setCustomVariables] = useState<Variable[]>([]);
+  // Scenario mappings (persisted on agent config, used by the HTTP adapter at runtime)
+  const [scenarioMappings, setScenarioMappings] = useState<
+    Record<string, FieldMapping>
+  >({});
   // Default to variables tab when in evaluations context (has availableSources)
   const [activeTab, setActiveTab] = useState(showVariablesTab ? "variables" : "body");
 
@@ -283,6 +295,14 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       setOutputPath(config.outputPath || DEFAULT_OUTPUT_PATH);
       setHeaders(config.headers ?? []);
       setAuth(config.auth ?? { type: "none" });
+      // Load persisted scenario mappings or compute best-match defaults from the
+      // fixed scenario inputs (input / messages / threadId).
+      const existingScenarioMappings = config.scenarioMappings ?? {};
+      setScenarioMappings(
+        Object.keys(existingScenarioMappings).length > 0
+          ? existingScenarioMappings
+          : computeBestMatchMappings({ inputs: FIXED_VARIABLES }),
+      );
       setHasUnsavedChanges(false);
       formInitializedRef.current = true;
     } else if (!agentId && isOpen) {
@@ -294,6 +314,9 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       setOutputPath(DEFAULT_OUTPUT_PATH);
       setHeaders([]);
       setAuth({ type: "none" });
+      setScenarioMappings(
+        computeBestMatchMappings({ inputs: FIXED_VARIABLES }),
+      );
       setHasUnsavedChanges(false);
       formInitializedRef.current = true;
     }
@@ -346,8 +369,21 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
+  // For HTTP agents the scenario output is always the HTTP response body,
+  // so we synthesize a single virtual "output" field and skip the output-field
+  // picker. The ScenarioInputMappingSection still renders its read-only row.
+  const httpScenarioOutputs: Variable[] = useMemo(
+    () => [{ identifier: "output", type: "str" }],
+    [],
+  );
   const isValid =
-    (name?.trim().length ?? 0) > 0 && (url?.trim().length ?? 0) > 0;
+    (name?.trim().length ?? 0) > 0 &&
+    (url?.trim().length ?? 0) > 0 &&
+    isScenarioMappingValid({
+      mappings: scenarioMappings,
+      outputs: httpScenarioOutputs,
+      outputField: undefined,
+    });
 
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
@@ -359,6 +395,7 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
       outputPath,
       headers,
       auth,
+      scenarioMappings,
     );
 
     if (agentId) {
@@ -390,11 +427,27 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
     outputPath,
     headers,
     auth,
+    scenarioMappings,
     isValid,
     createMutation,
     updateMutation,
     checkAndProceed,
   ]);
+
+  const handleScenarioMappingChange = useCallback(
+    (identifier: string, mapping: FieldMapping | undefined) => {
+      setScenarioMappings((prev) => {
+        if (!mapping) {
+          const next = { ...prev };
+          delete next[identifier];
+          return next;
+        }
+        return { ...prev, [identifier]: mapping };
+      });
+      setHasUnsavedChanges(true);
+    },
+    [],
+  );
 
   const markDirty = () => setHasUnsavedChanges(true);
 
@@ -551,7 +604,12 @@ export function AgentHttpEditorDrawer(props: AgentHttpEditorDrawerProps) {
                         }}
                       />
                     </Field.Root>
-                    {/* TODO: Wire HTTP agent adapter to use fieldMappings (see GitHub issue) */}
+                    {/* Scenario input mapping — HTTP adapter reads these at runtime */}
+                    <ScenarioInputMappingSection
+                      inputs={variables}
+                      mappings={scenarioMappings}
+                      onMappingChange={handleScenarioMappingChange}
+                    />
                   </VStack>
                 </Tabs.Content>
 

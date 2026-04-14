@@ -19,6 +19,7 @@ import { AgentHistoryDrawer } from "./agents/AgentHistoryDrawer";
 import { AgentHttpEditorDrawer } from "./agents/AgentHttpEditorDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
+import { AgentWorkflowEditorDrawer } from "./agents/AgentWorkflowEditorDrawer";
 import { WorkflowSelectorDrawer } from "./agents/WorkflowSelectorDrawer";
 import { AlertDrawer } from "./analytics/AlertDrawer";
 import { DashboardNameDrawer } from "./analytics/DashboardNameDrawer";
@@ -79,6 +80,7 @@ export const drawers = {
   agentTypeSelector: AgentTypeSelectorDrawer,
   agentCodeEditor: AgentCodeEditorDrawer,
   agentHttpEditor: AgentHttpEditorDrawer,
+  agentWorkflowEditor: AgentWorkflowEditorDrawer,
   workflowSelector: WorkflowSelectorDrawer,
   evaluatorHistory: EvaluatorHistoryDrawer,
   evaluatorList: EvaluatorListDrawer,

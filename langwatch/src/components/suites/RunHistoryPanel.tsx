@@ -8,7 +8,7 @@
 
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { toaster } from "~/components/ui/toaster";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";

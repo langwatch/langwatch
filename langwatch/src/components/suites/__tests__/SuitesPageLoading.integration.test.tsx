@@ -66,7 +66,7 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
 }));
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "my-project" },
     pathname: "/[project]/simulations/[[...path]]",

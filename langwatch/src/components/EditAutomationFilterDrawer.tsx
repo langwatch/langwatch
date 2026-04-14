@@ -7,7 +7,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Monaco } from "@monaco-editor/react";
-import dynamic from "next/dynamic";
+import dynamic from "~/utils/compat/next-dynamic";
 import { useCallback, useRef, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -337,7 +337,7 @@ export function EditAutomationFilterDrawer({ automationId }: { automationId?: st
                         >[1],
                       );
                     }}
-                    onChange={(value) => {
+                    onChange={(value: any) => {
                       const newValue = value ?? "{}";
                       setCodeValue(newValue);
                       validateCode(newValue);

@@ -27,7 +27,7 @@ import type { TargetConfig } from "../types";
 // Mocks
 // ============================================================================
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: vi.fn(),
     query: {},

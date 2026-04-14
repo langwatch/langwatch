@@ -38,7 +38,7 @@ const { mockHasPermissionRef, mockExperimentsList, mockDeleteMutate } =
     };
   });
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     push: vi.fn(),

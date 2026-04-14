@@ -35,7 +35,7 @@ import type { LocalEvaluatorConfig } from "../types";
 // Track router state
 let mockRouterQuery: Record<string, string> = {};
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
     asPath: "/test",

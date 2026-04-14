@@ -60,6 +60,102 @@ vi.mock("@copilotkit/react-ui", () => {
   };
 });
 
+// Mock the router compat layer for tests.
+// Components import useRouter from ~/utils/compat/next-router which
+// calls React Router hooks (useNavigate, useLocation, etc.) that require
+// <BrowserRouter> context. In tests, we provide a stub.
+const mockRouter = {
+  query: {},
+  pathname: "/",
+  asPath: "/",
+  isReady: true,
+  route: "/",
+  basePath: "",
+  locale: undefined,
+  locales: undefined,
+  defaultLocale: undefined,
+  isFallback: false,
+  events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
+  push: vi.fn().mockResolvedValue(true),
+  replace: vi.fn().mockResolvedValue(true),
+  back: vi.fn(),
+  reload: vi.fn(),
+  prefetch: vi.fn().mockResolvedValue(undefined),
+  beforePopState: vi.fn(),
+};
+
+vi.mock("~/utils/compat/next-router", () => ({
+  useRouter: () => mockRouter,
+  default: mockRouter,
+  // Re-export the type aliases
+  NextRouter: {},
+}));
+
+// Also mock the old next/router and next/navigation paths in case any test
+// mocks reference them directly
+vi.mock("next/router", () => ({
+  useRouter: () => mockRouter,
+  default: mockRouter,
+}));
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+  redirect: vi.fn(),
+  notFound: vi.fn(),
+}));
+
+vi.mock("~/utils/compat/next-navigation", () => ({
+  useRouter: () => mockRouter,
+  usePathname: () => "/",
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+  redirect: vi.fn(),
+  notFound: vi.fn(),
+}));
+
+// Mock Link components that use React Router (requires Router context).
+vi.mock("~/utils/compat/next-link", () => {
+  const React = require("react");
+  return {
+    default: React.forwardRef(function MockLink(
+      { children, href, ...props }: any,
+      ref: any
+    ) {
+      return React.createElement("a", { ref, href: typeof href === "string" ? href : href?.pathname ?? "/", ...props }, children);
+    }),
+  };
+});
+
+vi.mock("next/link", () => {
+  const React = require("react");
+  return {
+    default: React.forwardRef(function MockLink(
+      { children, href, ...props }: any,
+      ref: any
+    ) {
+      return React.createElement("a", { ref, href: typeof href === "string" ? href : href?.pathname ?? "/", ...props }, children);
+    }),
+  };
+});
+
+// Mock dynamic() (next-dynamic compat) to return a simple passthrough in tests.
+// The real implementation uses React.lazy() which suspends in jsdom when
+// dynamic imports don't resolve synchronously.
+vi.mock("~/utils/compat/next-dynamic", () => ({
+  default: (importFn: () => Promise<any>, options?: any) => {
+    const React = require("react");
+    const Loading = options?.loading ?? (() => null);
+    // Return a component that just renders the loading fallback.
+    // The actual dynamically-imported component doesn't matter for most tests.
+    return function DynamicMock(props: any) {
+      return React.createElement(Loading);
+    };
+  },
+}));
+
 // Mock ResizeObserver for tests using floating-ui/popper (Chakra menus, tooltips, etc.)
 globalThis.ResizeObserver = class ResizeObserver {
   // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock

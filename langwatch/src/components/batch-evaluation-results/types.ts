@@ -13,7 +13,7 @@ import type { ExperimentRunWithItems } from "~/server/evaluations-v3/services/ty
 export type ComparisonRunData = {
   runId: string;
   /** Human-readable name for display (e.g., commit message or run ID) */
-  runName: string;
+  runName: string | React.ReactNode;
   color: string;
   data: BatchEvaluationData | null;
   isLoading: boolean;

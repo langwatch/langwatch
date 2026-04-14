@@ -24,8 +24,7 @@ import {
   Select as MultiSelect,
   type SingleValue,
 } from "chakra-react-select";
-import dynamic from "next/dynamic";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import React, {
   type Dispatch,
   type SetStateAction,
@@ -473,7 +472,7 @@ function AnalyticsCustomGraphContent({
               HTTP POST request to access identical data tailored for the custom
               graphs.
             </Text>
-            <Box padding={4} backgroundColor={"#272822"}>
+            <Box padding={4} backgroundColor="bg.subtle">
               <RenderCode
                 code={`# Set your API key and endpoint URL
 API_KEY="your_langwatch_api_key"
@@ -1047,7 +1046,7 @@ function SeriesFieldItem({
       <Accordion.ItemTrigger
         cursor="pointer"
         role="button"
-        background="gray.100"
+        background="bg.subtle"
         fontWeight="bold"
         paddingLeft={1}
         paddingRight={3}
@@ -1181,7 +1180,7 @@ function SeriesField({
 
   const metric_ = metric ? getMetric(metric) : undefined;
 
-  const { openDrawer } = useDrawer();
+  const { openDrawer, setFlowCallbacks } = useDrawer();
 
   // Sync aggregation when metric changes — if the current aggregation
   // isn't allowed by the new metric, switch to the first allowed one.
@@ -1373,10 +1372,8 @@ function SeriesField({
                   filters={
                     field.value ?? ({} as Record<FilterField, FilterParam>)
                   }
-                  onClick={() =>
-                    openDrawer("seriesFilters", {
-                      filters:
-                        field.value ?? ({} as Record<FilterField, FilterParam>),
+                  onClick={() => {
+                    setFlowCallbacks("seriesFilters", {
                       onChange: ({
                         filters,
                       }: {
@@ -1384,8 +1381,12 @@ function SeriesField({
                       }) => {
                         form.setValue(`series.${index}.filters`, filters);
                       },
-                    })
-                  }
+                    });
+                    openDrawer("seriesFilters", {
+                      filters:
+                        field.value ?? ({} as Record<FilterField, FilterParam>),
+                    });
+                  }}
                 >
                   {Object.keys(nonEmptyFilters).length > 0
                     ? "Edit Filters"
@@ -1522,7 +1523,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
                   {details && (
                     <Text
                       fontSize="sm"
-                      color={props.isSelected ? "white" : "gray.500"}
+                      color={props.isSelected ? "fg" : "fg.muted"}
                     >
                       {details}
                     </Text>
@@ -1596,7 +1597,5 @@ function GraphTypeField({
   );
 }
 
-// Export as client-side only component to avoid SSR issues with chakra-react-select
-export default dynamic(() => Promise.resolve(AnalyticsCustomGraphContent), {
-  ssr: false,
-});
+// No SSR in Vite — export directly (was wrapped in dynamic() for Next.js SSR avoidance)
+export default AnalyticsCustomGraphContent;

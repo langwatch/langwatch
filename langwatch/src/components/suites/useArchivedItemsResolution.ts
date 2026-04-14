@@ -13,7 +13,7 @@ interface ArchivedScenarioRef {
 }
 
 interface ArchivedTargetRef {
-  type: "http" | "prompt" | "code";
+  type: "http" | "prompt" | "code" | "workflow";
   referenceId: string;
 }
 

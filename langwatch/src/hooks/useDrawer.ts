@@ -1,4 +1,4 @@
-import Router, { useRouter } from "next/router";
+import Router, { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { useCallback, useMemo } from "react";
 import {

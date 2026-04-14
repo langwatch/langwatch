@@ -8,3 +8,4 @@
 export { SerializedCodeAgentAdapter } from "./code-agent.adapter";
 export { SerializedHttpAgentAdapter } from "./http-agent.adapter";
 export { SerializedPromptConfigAdapter } from "./prompt-config.adapter";
+export { SerializedWorkflowAgentAdapter } from "./workflow-agent.adapter";

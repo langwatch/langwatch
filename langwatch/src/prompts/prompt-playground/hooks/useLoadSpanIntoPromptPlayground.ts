@@ -1,5 +1,5 @@
-import { useSearchParams } from "next/navigation";
-import { useRouter } from "next/router";
+import { useSearchParams } from "~/utils/compat/next-navigation";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useRef } from "react";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

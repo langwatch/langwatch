@@ -11,7 +11,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Annotation } from "@prisma/client";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useMemo, useState } from "react";
 import { ChevronDown, Edit, MessageCircle, MoreVertical } from "react-feather";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";

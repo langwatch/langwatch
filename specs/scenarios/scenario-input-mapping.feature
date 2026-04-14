@@ -162,14 +162,8 @@ Feature: Scenario Input Mapping
     And "messages" is available as a source
     And "threadId" is available as a source
 
-  # NOTE: creating static value mappings from the UI is deferred.
-  # The inverted scenario-field-row layout (one row per scenario field,
-  # mapped to an agent input) has no natural surface to bind a literal.
-  # A future agent-input-row variant will add this. Stored value mappings
-  # still round-trip via the read-only render below, and the adapter still
-  # resolves them at execution time (see the @unit scenarios above).
-  @integration @deferred
-  Scenario: User can set a static value mapping (deferred)
+  @integration
+  Scenario: User can set a static value mapping
     Given the mapping UI is rendered for a code agent input "context"
     When the user types "Use the knowledge base" as a static value
     Then the fieldMappings for "context" has type "value" with that text

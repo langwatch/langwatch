@@ -1,6 +1,6 @@
 import { Button, Spinner, Text } from "@chakra-ui/react";
 import { FlaskConical } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useMemo, useState } from "react";
 import { Dialog } from "~/components/ui/dialog";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";

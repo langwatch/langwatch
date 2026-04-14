@@ -1,5 +1,6 @@
 import { brotliCompressSync, deflateSync, gzipSync } from "node:zlib";
-import { NextRequest } from "next/server";
+// NextRequest is just the standard web Request
+const NextRequest = Request;
 import { describe, expect, it } from "vitest";
 import { readBody } from "./decompressBody";
 

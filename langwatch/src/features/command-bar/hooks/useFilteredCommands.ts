@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import type { Command } from "../types";
 import {
   actionCommands,

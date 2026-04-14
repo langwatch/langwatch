@@ -16,10 +16,15 @@ import {
   TRPCError,
 } from "@trpc/server";
 import { getHTTPStatusCodeFromError } from "@trpc/server/http";
-import type { CreateNextContextOptions } from "@trpc/server/adapters/next";
+// Local type replacing CreateNextContextOptions from @trpc/server/adapters/next
+// to avoid pulling in the real `next` types.
+interface CreateNextContextOptions {
+  req: any;
+  res: any;
+}
 import type { Parser } from "@trpc-internal/parser";
 import type { UnsetMarker } from "@trpc-internal/utils";
-import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import type { Session } from "~/server/auth";
 import superjson from "superjson";
 import { ZodError } from "zod";

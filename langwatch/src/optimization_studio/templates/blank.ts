@@ -1,4 +1,5 @@
-import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
+// Inline to avoid circular dependency: DatasetTable → ag-grid CSS → crashes in Node
+const DEFAULT_DATASET_NAME = "Draft Dataset";
 import { DEFAULT_MODEL } from "../../utils/constants";
 import type { End, Entry, Signature, Workflow } from "../types/dsl";
 import { DEFAULT_MAX_TOKENS } from "../utils/registryUtils";

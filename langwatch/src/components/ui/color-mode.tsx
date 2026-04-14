@@ -11,10 +11,10 @@ export const colorSystem = {
   gray: {
     950: { value: "#09090b" },
     900: { value: "#111113" },
-    800: { value: "#090F1D" },
-    700: { value: "#1F2937" },
-    600: { value: "#213B41" },
-    500: { value: "#51676C" },
+    800: { value: "#1a1a2e" },
+    700: { value: "#2d2d3d" },
+    600: { value: "#3d3d4d" },
+    500: { value: "#5c5c6e" },
     400: { value: "#9CA3AF" },
     375: { value: "#B8BDBD" },
     350: { value: "#DDDDDD" },
@@ -142,7 +142,7 @@ export function ColorModeProvider(props: ColorModeProviderProps) {
   // Chakra v3 uses ".dark &" selector for dark mode, so we need attribute="class"
   return (
     <>
-      <style jsx global>{`
+      <style>{`
         html {
           transition: background-color 0.3s ease, color 0.3s ease;
         }

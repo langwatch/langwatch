@@ -1,9 +1,9 @@
-import { loadEnvConfig } from "@next/env";
+import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
 import { createLogger } from "./utils/logger/server";
 
-loadEnvConfig(process.cwd());
+dotenv.config();
 
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const redis = process.env.SKIP_REDIS

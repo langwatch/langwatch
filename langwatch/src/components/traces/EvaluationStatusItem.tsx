@@ -10,7 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import { MoreVertical, Pencil } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
 import { useMemo } from "react";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";

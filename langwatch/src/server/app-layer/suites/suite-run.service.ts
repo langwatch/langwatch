@@ -39,7 +39,7 @@ export type SuiteRunResult = {
 
 /** Target reference for scheduling */
 export type SuiteRunTarget = {
-  type: "http" | "prompt" | "code";
+  type: "http" | "prompt" | "code" | "workflow";
   referenceId: string;
 };
 

@@ -311,6 +311,32 @@ export const useOpenTargetEditor = () => {
         const availableSources = buildAvailableSources();
         const uiMappings = buildUIMappings(target, activeDatasetId);
 
+        const handleMappingChange = (
+          identifier: string,
+          mapping: UIFieldMapping | undefined,
+        ) => {
+          const currentActiveDatasetId =
+            useEvaluationsV3Store.getState().activeDatasetId;
+          const currentDatasets = useEvaluationsV3Store.getState().datasets;
+          const checkIsDatasetSource = (sourceId: string) =>
+            currentDatasets.some((d) => d.id === sourceId);
+
+          if (mapping) {
+            setTargetMapping(
+              target.id,
+              currentActiveDatasetId,
+              identifier,
+              convertFromUIMapping(mapping, checkIsDatasetSource),
+            );
+          } else {
+            removeTargetMapping(
+              target.id,
+              currentActiveDatasetId,
+              identifier,
+            );
+          }
+        };
+
         // Set flow callbacks for the evaluator editor using the centralized helper
         // This ensures we never forget a required callback
         setFlowCallbacks(
@@ -318,38 +344,14 @@ export const useOpenTargetEditor = () => {
           createEvaluatorEditorCallbacks({
             targetId: target.id,
             updateTarget,
+            onMappingChange: handleMappingChange,
           }),
         );
 
-        // Build mappings config for the evaluator editor
         const mappingsConfig = {
           availableSources,
           initialMappings: uiMappings,
-          onMappingChange: (
-            identifier: string,
-            mapping: UIFieldMapping | undefined,
-          ) => {
-            const currentActiveDatasetId =
-              useEvaluationsV3Store.getState().activeDatasetId;
-            const currentDatasets = useEvaluationsV3Store.getState().datasets;
-            const checkIsDatasetSource = (sourceId: string) =>
-              currentDatasets.some((d) => d.id === sourceId);
-
-            if (mapping) {
-              setTargetMapping(
-                target.id,
-                currentActiveDatasetId,
-                identifier,
-                convertFromUIMapping(mapping, checkIsDatasetSource),
-              );
-            } else {
-              removeTargetMapping(
-                target.id,
-                currentActiveDatasetId,
-                identifier,
-              );
-            }
-          },
+          onMappingChange: handleMappingChange,
         };
 
         // Pass initialLocalConfig from target state so drawer resumes unsaved changes

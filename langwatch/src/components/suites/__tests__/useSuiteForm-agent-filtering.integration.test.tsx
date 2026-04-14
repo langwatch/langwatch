@@ -3,8 +3,9 @@
  *
  * Tests for agent type filtering in useSuiteForm.availableTargets.
  *
- * HTTP and code agents are supported as suite targets.
- * Signature and workflow agents are excluded (not supported by the adapter layer).
+ * HTTP, code, and workflow agents are supported as suite targets.
+ * Signature agents are excluded — they're sub-components of workflows,
+ * not stand-alone scenario targets.
  */
 
 import { renderHook } from "@testing-library/react";
@@ -67,16 +68,17 @@ describe("useSuiteForm() — agent type filtering for availableTargets", () => {
         expect(referenceIds).not.toContain("agent_sig");
       });
 
-      it("excludes the workflow agent", () => {
+      it("includes the workflow agent", () => {
         const { result } = renderHook(() =>
           useSuiteForm({ ...baseParams, agents: mixedAgents }),
         );
 
-        const referenceIds = result.current.availableTargets.map(
-          (t) => t.referenceId,
+        const workflowTargets = result.current.availableTargets.filter(
+          (t) => t.type === "workflow",
         );
 
-        expect(referenceIds).not.toContain("agent_wf");
+        expect(workflowTargets).toHaveLength(1);
+        expect(workflowTargets[0]?.referenceId).toBe("agent_wf");
       });
     });
   });

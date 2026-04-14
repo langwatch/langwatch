@@ -47,4 +47,33 @@ describe("getRunDisplayName()", () => {
       expect(result).toBe("Run #1");
     });
   });
+
+  describe("when runId is provided", () => {
+    it("includes the runId in the fallback name", () => {
+      const result = getRunDisplayName({
+        commitMessage: undefined,
+        runId: "abc123",
+        index: 0,
+      });
+      expect(result).toBe("Run #1 (abc123)");
+    });
+
+    it("truncates long runId values", () => {
+      const result = getRunDisplayName({
+        commitMessage: undefined,
+        runId: "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+        index: 0,
+      });
+      expect(result).toBe("Run #1 (a1b2c3d4…)");
+    });
+
+    it("still prefers commitMessage over runId", () => {
+      const result = getRunDisplayName({
+        commitMessage: "Add retry logic",
+        runId: "abc123",
+        index: 0,
+      });
+      expect(result).toBe("Add retry logic");
+    });
+  });
 });

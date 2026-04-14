@@ -378,17 +378,16 @@ jobs:
           path: langwatch/node_modules/.prisma
           key: ${{ runner.os }}-prisma-${{ hashFiles('langwatch/prisma/schema.prisma') }}
 
-      # Cache Next.js build artifacts
-      - name: Cache Next.js
+      # Cache Vite build artifacts
+      - name: Cache Vite
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: |
-            langwatch/.next/cache/webpack
-            langwatch/.next/cache/swc
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-${{ hashFiles('langwatch/src/**/*', 'langwatch/next.config.mjs') }}
+            langwatch/node_modules/.vite
+          key: ${{ runner.os }}-vite-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-${{ hashFiles('langwatch/src/**/*', 'langwatch/vite.config.ts') }}
           restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-
-            ${{ runner.os }}-nextjs-
+            ${{ runner.os }}-vite-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-
+            ${{ runner.os }}-vite-
 
       # Cache Turbo build outputs
       - name: Cache Turbo

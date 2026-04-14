@@ -1,33 +1,18 @@
+/**
+ * Theme system definition for LangWatch.
+ * This file only exports the Chakra UI `system` — the app shell (providers,
+ * routing, NProgress) now lives in src/AppProviders.tsx and src/main.tsx.
+ */
 import {
-  ChakraProvider,
   createSystem,
   defaultConfig,
   defineRecipe,
   defineSlotRecipe,
 } from "@chakra-ui/react";
-import type { AppType } from "next/app";
-import type { Session } from "~/server/auth";
-import { SessionProvider } from "~/utils/auth-client";
-import "~/styles/globals.scss";
-import "~/styles/markdown.scss";
+import { colorSystem } from "../components/ui/color-mode";
 
-import { Inter } from "next/font/google";
-import Head from "next/head";
-import { useRouter } from "next/router";
-import NProgress from "nprogress";
-import { PostHogProvider } from "posthog-js/react";
-import { useEffect, useState } from "react";
-import { AnalyticsProvider } from "react-contextual-analytics";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { createAppAnalyticsClient } from "~/utils/analyticsClient";
-import { api } from "~/utils/api";
-import { ColorModeProvider, colorSystem } from "../components/ui/color-mode";
-import { Toaster } from "../components/ui/toaster";
-import { usePostHog } from "../hooks/usePostHog";
-import { ExtraFooterComponents } from "../../ee/saas/ExtraFooterComponents";
-import { CommandBarProvider } from "../features/command-bar";
-
-const inter = Inter({ subsets: ["latin"] });
+// Inter font loaded via CSS @import in globals.scss (no more next/font/google)
+const interFontFamily = "'Inter', sans-serif";
 
 export const system = createSystem(defaultConfig, {
   globalCss: {
@@ -46,10 +31,10 @@ export const system = createSystem(defaultConfig, {
     tokens: {
       fonts: {
         heading: {
-          value: inter.style.fontFamily,
+          value: interFontFamily,
         },
         body: {
-          value: inter.style.fontFamily,
+          value: interFontFamily,
         },
       },
       colors: colorSystem,
@@ -433,7 +418,7 @@ export const system = createSystem(defaultConfig, {
           },
           // Subtle background for table headers, zebra rows
           subtle: {
-            value: { _light: "{colors.gray.50}", _dark: "{colors.gray.800}" },
+            value: { _light: "{colors.gray.50}", _dark: "{colors.gray.900}" },
           },
           // Form inputs - blend into container
           input: {
@@ -476,6 +461,16 @@ export const system = createSystem(defaultConfig, {
       },
     },
     recipes: {
+      skeleton: defineRecipe({
+        base: {
+          "--skeleton-from": "{colors.gray.100}",
+          "--skeleton-to": "{colors.gray.200}",
+          _dark: {
+            "--skeleton-from": "{colors.gray.800}",
+            "--skeleton-to": "{colors.gray.700}",
+          },
+        },
+      }),
       heading: defineRecipe({
         base: {
           fontWeight: "500",
@@ -641,6 +636,29 @@ export const system = createSystem(defaultConfig, {
       }),
     },
     slotRecipes: {
+      tooltip: defineSlotRecipe({
+        slots: ["content", "arrow", "arrowTip"],
+        base: {
+          content: {
+            bg: "bg.panel/85",
+            backdropFilter: "blur(8px)",
+            color: "fg",
+            border: "1px solid",
+            borderColor: "border",
+            borderRadius: "md",
+            boxShadow: "lg",
+            px: "3",
+            py: "2",
+            textStyle: "xs",
+          },
+          arrow: {
+            "--arrow-background": "colors.bg.panel",
+          },
+          arrowTip: {
+            borderColor: "colors.bg.panel",
+          },
+        },
+      }),
       card: defineSlotRecipe({
         slots: ["root"],
         base: {
@@ -1175,118 +1193,7 @@ export const system = createSystem(defaultConfig, {
   },
 });
 
-let handleChangeStartTimeout: NodeJS.Timeout | null = null;
-let nProgressEnabled = false;
-setTimeout(() => {
-  nProgressEnabled = true;
-}, 1000);
-
-const LangWatch: AppType<{
-  session: Session | null;
-  injected?: string | undefined;
-}> = ({ Component, pageProps: { session, ...pageProps } }) => {
-  const router = useRouter();
-  const postHog = usePostHog();
-  const publicEnv = usePublicEnv();
-
-  const [previousFeatureFlagQueryParams, setPreviousFeatureFlagQueryParams] =
-    useState<{ key: string; value: string }[]>([]);
-
-  useEffect(() => {
-    const featureFlagQueryParams = Object.entries(router.query ?? {})
-      .filter(
-        ([key]) =>
-          key.startsWith("NEXT_PUBLIC_FEATURE_") &&
-          typeof router.query[key] === "string",
-      )
-      .map(([key, value]) => ({ key, value: value as string }));
-    setPreviousFeatureFlagQueryParams(featureFlagQueryParams);
-  }, [router.query]);
-
-  // Little hack to keep the feature flags on the url the same when navigating to a different page
-  const keepSameFeatureFlags = () => {
-    if (Object.keys(previousFeatureFlagQueryParams).length > 0) {
-      const parsedUrl = new URL(window.location.href);
-      let updated = false;
-      for (const { key, value } of previousFeatureFlagQueryParams) {
-        if (parsedUrl.searchParams.get(key) !== value) {
-          parsedUrl.searchParams.set(key, value);
-          updated = true;
-        }
-      }
-      if (updated) {
-        void router.replace(parsedUrl.toString(), undefined, {
-          shallow: true,
-        });
-      }
-    }
-  };
-
-  useEffect(() => {
-    NProgress.configure({ showSpinner: false });
-    const handleChangeDone = () => {
-      keepSameFeatureFlags();
-      if (handleChangeStartTimeout) {
-        clearTimeout(handleChangeStartTimeout);
-        handleChangeStartTimeout = null;
-      }
-      NProgress.done();
-    };
-    const handleChangeStart_ = () => {
-      if (nProgressEnabled && !handleChangeStartTimeout) {
-        handleChangeStartTimeout = setTimeout(() => {
-          NProgress.start();
-          handleChangeStartTimeout = null;
-        }, 100);
-      }
-    };
-
-    router.events.on("routeChangeStart", handleChangeStart_);
-    router.events.on("routeChangeComplete", handleChangeDone);
-    router.events.on("routeChangeError", handleChangeDone);
-
-    return () => {
-      router.events.off("routeChangeStart", handleChangeStart_);
-      router.events.off("routeChangeComplete", handleChangeDone);
-      router.events.off("routeChangeError", handleChangeDone);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router, keepSameFeatureFlags]);
-
-  return (
-    <SessionProvider
-      session={session}
-      refetchInterval={0}
-      refetchOnWindowFocus={false}
-    >
-      <ChakraProvider value={system}>
-        <ColorModeProvider>
-          <Head>
-            <title>LangWatch</title>
-          </Head>
-          <CommandBarProvider>
-            <AnalyticsProvider
-              client={createAppAnalyticsClient({
-                isSaaS: Boolean(publicEnv.data?.IS_SAAS),
-                posthogClient: postHog,
-              })}
-            >
-              {postHog ? (
-                <PostHogProvider client={postHog}>
-                  <Component {...pageProps} />
-                </PostHogProvider>
-              ) : (
-                <Component {...pageProps} />
-              )}
-            </AnalyticsProvider>
-            <Toaster />
-          </CommandBarProvider>
-
-          <ExtraFooterComponents />
-        </ColorModeProvider>
-      </ChakraProvider>
-    </SessionProvider>
-  );
-};
-
-export default api.withTRPC(LangWatch);
+// The LangWatch app shell (providers, routing, NProgress) has moved to:
+// - src/AppProviders.tsx (provider hierarchy)
+// - src/main.tsx (entry point with RouterProvider)
+// - src/routes.tsx (route definitions)

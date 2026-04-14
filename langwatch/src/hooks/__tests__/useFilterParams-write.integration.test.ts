@@ -15,7 +15,7 @@ let mockRouterQuery: Record<string, string | string[] | undefined> = {};
 let mockRouterAsPath = "/test-project/messages";
 const mockPush = vi.fn().mockResolvedValue(true);
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
     push: mockPush,
@@ -67,8 +67,13 @@ import { useFilterParams } from "../useFilterParams";
 function lastPushUrl(): string {
   const lastCall = mockPush.mock.lastCall;
   if (!lastCall) throw new Error("router.push was not called");
-  // First arg can be a string (URL) or an object ({ pathname, query })
-  return typeof lastCall[0] === "string" ? lastCall[0] : "";
+  // With the (url, as) overload, the display URL is the second arg.
+  // Fall back to first arg for string-form or object-form pushes.
+  if (typeof lastCall[1] === "string") return lastCall[1];
+  if (typeof lastCall[0] === "string") return lastCall[0];
+  throw new Error(
+    "router.push did not receive a string URL in either `url` or `as`",
+  );
 }
 
 function lastPushQuery(): Record<string, unknown> {
@@ -130,16 +135,135 @@ describe("useFilterParams() write operations", () => {
           query: "hello world",
           view: "table",
         };
+        mockRouterAsPath =
+          "/test-project/messages?origin=application&model=gpt-5-mini&query=hello+world&view=table";
 
         const { result } = renderHook(() => useFilterParams());
         result.current.clearFilters();
 
-        const query = lastPushQuery();
-        expect(query).not.toHaveProperty("origin");
-        expect(query).not.toHaveProperty("model");
-        expect(query).not.toHaveProperty("query");
+        const url = lastPushUrl();
+        expect(url).not.toContain("origin=");
+        expect(url).not.toContain("model=");
+        expect(url).not.toContain("query=");
         // Layout params preserved
-        expect(query).toHaveProperty("view", "table");
+        expect(url).toContain("view=table");
+      });
+    });
+
+    describe("when on a dynamic route page with [id] param", () => {
+      beforeEach(() => {
+        mockRouterQuery = {
+          project: "my-project",
+          id: "graph-abc",
+        };
+        mockRouterAsPath =
+          "/my-project/analytics/custom/graph-abc?dashboard=dash-123&show_filters=true&origin=application";
+      });
+
+      it("clears filter params but preserves non-filter params", () => {
+        const { result } = renderHook(() => useFilterParams());
+        result.current.clearFilters();
+
+        const url = lastPushUrl();
+        expect(url).not.toContain("origin=");
+        expect(url).toContain("dashboard=dash-123");
+        expect(url).toContain("show_filters=true");
+      });
+
+      it("does not leak route params into the display URL", () => {
+        const { result } = renderHook(() => useFilterParams());
+        result.current.clearFilters();
+
+        const url = lastPushUrl();
+        expect(url).not.toContain("project=");
+        expect(url).not.toContain("id=");
+      });
+    });
+  });
+
+  describe("setFilter() on dynamic route pages", () => {
+    describe("when page has [id] route param (e.g. custom graph edit)", () => {
+      beforeEach(() => {
+        // On /[project]/analytics/custom/[id], router.query includes `id`
+        // from the path segment, but the actual URL query string does not
+        mockRouterQuery = {
+          project: "my-project",
+          id: "graph-abc",
+          dashboard: "dash-123",
+          show_filters: "true",
+        };
+        mockRouterAsPath =
+          "/my-project/analytics/custom/graph-abc?dashboard=dash-123&show_filters=true";
+      });
+
+      it("uses the (url, as) overload so Next.js resolves the route correctly", () => {
+        const { result } = renderHook(() => useFilterParams());
+        result.current.setFilter("traces.origin", ["application"]);
+
+        const [routeArg, asArg] = mockPush.mock.lastCall!;
+        // First arg must be an object (tells Next.js "same page")
+        expect(typeof routeArg).toBe("object");
+        expect(routeArg).toHaveProperty("pathname");
+        // Second arg is the display URL string
+        expect(typeof asArg).toBe("string");
+      });
+
+      it("does not leak route params into the display URL", () => {
+        const { result } = renderHook(() => useFilterParams());
+        result.current.setFilter("traces.origin", ["application"]);
+
+        const url = lastPushUrl();
+        expect(url).not.toContain("project=");
+        expect(url).not.toContain("id=");
+      });
+
+      it("preserves existing query params and adds the new filter", () => {
+        const { result } = renderHook(() => useFilterParams());
+        result.current.setFilter("traces.origin", ["application"]);
+
+        const url = lastPushUrl();
+        expect(url).toContain("dashboard=dash-123");
+        expect(url).toContain("show_filters=true");
+        expect(url).toContain("origin=application");
+      });
+    });
+  });
+
+  describe("setFilters() on dynamic route pages", () => {
+    describe("when page has [id] route param", () => {
+      beforeEach(() => {
+        mockRouterQuery = {
+          project: "my-project",
+          id: "graph-abc",
+          dashboard: "dash-123",
+        };
+        mockRouterAsPath =
+          "/my-project/analytics/custom/graph-abc?dashboard=dash-123";
+      });
+
+      it("does not leak route params into the query string", () => {
+        const { result } = renderHook(() => useFilterParams());
+        result.current.setFilters({
+          "traces.origin": ["application"],
+          "spans.model": ["gpt-5-mini"],
+        } as Parameters<typeof result.current.setFilters>[0]);
+
+        const url = lastPushUrl();
+        expect(url).not.toContain("project=");
+        expect(url).not.toContain("id=");
+      });
+
+      it("preserves existing query params and adds new filters", () => {
+        const { result } = renderHook(() => useFilterParams());
+        result.current.setFilters({
+          "traces.origin": ["application"],
+          "spans.model": ["gpt-5-mini"],
+        } as Parameters<typeof result.current.setFilters>[0]);
+
+        const url = lastPushUrl();
+        expect(url).toContain("dashboard=dash-123");
+        expect(url).toContain("origin=application");
+        expect(url).toContain("model=gpt-5-mini");
       });
     });
   });
@@ -151,6 +275,8 @@ describe("useFilterParams() write operations", () => {
           "metadata.env": "prod",
           origin: "application",
         };
+        mockRouterAsPath =
+          "/test-project/messages?metadata.env=prod&origin=application";
 
         const { result } = renderHook(() => useFilterParams());
         result.current.setNegateFilters(true);

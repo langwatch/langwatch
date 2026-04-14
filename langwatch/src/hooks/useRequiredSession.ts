@@ -1,4 +1,4 @@
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useSession } from "~/utils/auth-client";
 
 export const publicRoutes = ["/share/[id]", "/auth/signin", "/auth/signup", "/auth/error"];

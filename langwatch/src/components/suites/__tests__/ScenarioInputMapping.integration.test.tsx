@@ -227,11 +227,8 @@ describe("ScenarioInputMappingSection", () => {
 
         renderSection({ mappings });
 
-        // Stored value mappings round-trip via the read-only render block:
-        // invertMappings only handles type:"source", so the section surfaces
-        // type:"value" entries as an inert <key>: <value> line beneath the
-        // scenario-field rows. Creating or editing them from the UI is
-        // deferred to a future agent-input-row variant.
+        // Static value mappings render read-only below; they are not part of the inverted display mappings.
+        // (Only type:"source" mappings flow through invertMappings; value mappings bypass that transform.)
         expect(screen.getByText("Use the KB")).toBeInTheDocument();
       });
     });

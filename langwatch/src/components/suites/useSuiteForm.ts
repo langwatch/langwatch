@@ -62,7 +62,7 @@ interface Prompt {
 
 interface AvailableTarget {
   name: string;
-  type: "http" | "prompt" | "code";
+  type: "http" | "prompt" | "code" | "workflow";
   referenceId: string;
 }
 
@@ -122,9 +122,21 @@ export function useSuiteForm({
     const result: AvailableTarget[] = [];
     if (agents) {
       for (const agent of agents) {
-        // Only http and code agents are supported as suite targets
-        if (agent.type !== "http" && agent.type !== "code") continue;
-        result.push({ name: agent.name, type: agent.type, referenceId: agent.id });
+        // http, code, and workflow agents are supported as suite targets.
+        // signature agents are excluded — they're used as sub-components of
+        // workflows rather than as stand-alone scenario targets.
+        if (
+          agent.type !== "http" &&
+          agent.type !== "code" &&
+          agent.type !== "workflow"
+        ) {
+          continue;
+        }
+        result.push({
+          name: agent.name,
+          type: agent.type,
+          referenceId: agent.id,
+        });
       }
     }
     if (prompts) {

@@ -14,6 +14,13 @@ if [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
   START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
 fi
 
+# In development, Vite runs on 5560 (user-facing) and proxies /api/* to the API server.
+# In production, only the API server runs on 5560.
+START_VITE_COMMAND=""
+if [[ "$NODE_ENV" = "development" ]]; then
+  START_VITE_COMMAND="pnpm run dev:vite"
+fi
+
 pnpm run start:prepare:db
 
 COMMANDS=()
@@ -22,16 +29,19 @@ if [ -n "$START_WORKERS_COMMAND" ]; then
   COMMANDS+=("\"$RUNTIME_ENV $START_WORKERS_COMMAND\"")
   NAMES+=("workers")
 fi
+if [ -n "$START_VITE_COMMAND" ]; then
+  COMMANDS+=("$RUNTIME_ENV $START_VITE_COMMAND")
+  NAMES+=("vite")
+fi
 if [ -n "$START_APP_COMMAND" ]; then
   COMMANDS+=("$RUNTIME_ENV $START_APP_COMMAND")
-  NAMES+=("app")
+  NAMES+=("api")
 fi
 
-# If only one command, exec directly to preserve JSON log format
-# (concurrently adds prefixes that break JSON parsing)
+# If only one command (production), exec directly to preserve JSON log format
 if [ ${#COMMANDS[@]} -eq 1 ]; then
   eval "$RUNTIME_ENV exec $START_APP_COMMAND"
 else
   NAMES_STR=$(IFS=,; echo "${NAMES[*]}")
-  concurrently --restart-tries -1 --names "$NAMES_STR" --prefix-colors "blue,yellow,magenta,cyan" "${COMMANDS[@]}"
+  concurrently --restart-tries -1 --names "$NAMES_STR" --prefix-colors "green,blue,yellow,magenta,cyan" "${COMMANDS[@]}"
 fi

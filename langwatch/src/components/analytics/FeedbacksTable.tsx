@@ -33,7 +33,7 @@ export const FeedbacksTable = () => {
         <Table.Body>
           {feedbacks.data?.events.length === 0 && (
             <Table.Row>
-              <Table.Cell colSpan={2}>
+              <Table.Cell colSpan={4}>
                 No written feedbacks received yet, check out our{" "}
                 <a
                   href="https://docs.langwatch.ai/docs/user-events/thumbs-up-down"

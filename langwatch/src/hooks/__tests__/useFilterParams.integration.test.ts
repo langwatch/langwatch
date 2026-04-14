@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 let mockRouterQuery: Record<string, string | string[] | undefined> = {};
 let mockRouterAsPath = "/test-project/messages";
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
     push: vi.fn().mockResolvedValue(true),

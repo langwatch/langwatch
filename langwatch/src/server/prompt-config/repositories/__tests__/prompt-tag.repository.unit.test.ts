@@ -85,7 +85,7 @@ describe("PromptTagRepository", () => {
           where: { organizationId, name: "canary" },
         });
         expect(mockTx.promptTagAssignment.deleteMany).toHaveBeenCalledWith({
-          where: { tagId: "canary", projectId: { in: ["proj_1"] } },
+          where: { tagId: "ptag_1", projectId: { in: ["proj_1"] } },
         });
         expect(mockTx.promptTag.delete).toHaveBeenCalledWith({
           where: { id: "ptag_1" },
@@ -125,12 +125,6 @@ describe("PromptTagRepository", () => {
             findFirst: vi.fn().mockResolvedValue(tag),
             update: vi.fn().mockResolvedValue(updatedTag),
           },
-          project: {
-            findMany: vi.fn().mockResolvedValue([{ id: "proj_1" }, { id: "proj_2" }]),
-          },
-          promptTagAssignment: {
-            updateMany: vi.fn().mockResolvedValue({ count: 3 }),
-          },
         };
         const mockPrisma = {
           $transaction: vi.fn((fn: (tx: typeof mockTx) => Promise<unknown>) => fn(mockTx)),
@@ -140,10 +134,6 @@ describe("PromptTagRepository", () => {
         const result = await repo.rename({ organizationId, oldName: "canary", newName: "beta" });
 
         expect(result).toEqual(updatedTag);
-        expect(mockTx.promptTagAssignment.updateMany).toHaveBeenCalledWith({
-          where: { tagId: "canary", projectId: { in: ["proj_1", "proj_2"] } },
-          data: { tagId: "beta" },
-        });
         expect(mockTx.promptTag.update).toHaveBeenCalledWith({
           where: { id: "ptag_1" },
           data: { name: "beta" },

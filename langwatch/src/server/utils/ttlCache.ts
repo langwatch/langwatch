@@ -44,7 +44,7 @@ export class TtlCache<T> {
   }
 
   async set(key: string, value: T): Promise<void> {
-    // Always set in memory as fallback
+    // Always shadow-write to memory so fallback is warm if Redis goes down later
     this.memory.set(key, { value, expiresAt: Date.now() + this.ttlMs });
 
     const r = this.redis;

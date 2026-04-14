@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { PublicShare } from "@prisma/client";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { useCallback, useEffect, useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";

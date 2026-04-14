@@ -1,5 +1,5 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { LuArrowLeft, LuExternalLink } from "react-icons/lu";
 
 import { Tooltip } from "~/components/ui/tooltip";

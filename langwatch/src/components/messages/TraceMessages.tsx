@@ -161,7 +161,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
             >
               <Box paddingY="6px" marginBottom="38px">
                 <RedactedField field="input">
-                  <Markdown className="markdown">
+                  <Markdown>
                     {translationState.translatedTextInput &&
                     translationState.translationActive
                       ? translationState.translatedTextInput
@@ -221,7 +221,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                     }}
                   >
                     <RedactedField field="output">
-                      <Markdown className="markdown">
+                      <Markdown>
                         {translationState.translatedTextOutput &&
                         translationState.translationActive
                           ? translationState.translatedTextOutput

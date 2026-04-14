@@ -200,9 +200,17 @@ export class SimulationRunnerService {
           projectId,
           prisma: this.prisma,
         });
+      // Code agents execute in a child process (see scenario-child-process.ts + data-prefetcher.ts),
+      // which bypasses this in-process adapter resolver. SuiteRunService.startRun routes code targets
+      // through that path; this branch only fires if something incorrectly calls resolveAdapter for a
+      // code target, which is a bug — throw loudly.
       case "code":
         throw new Error(
           "Code agent targets are only supported via the child process execution path",
+        );
+      case "workflow":
+        throw new Error(
+          "Workflow agent targets are only supported via the child process execution path",
         );
       default: {
         const _exhaustive: never = target.type;

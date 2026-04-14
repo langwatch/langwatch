@@ -15,7 +15,7 @@ import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { subDays } from "date-fns";
 import { Plus } from "lucide-react";
 import type { SimulationSuite } from "@prisma/client";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { PeriodSelector, usePeriodSelector, type Period } from "~/components/PeriodSelector";

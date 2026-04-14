@@ -1,6 +1,6 @@
 import type { IncomingHttpHeaders } from "http";
-import type { GetServerSidePropsContext, NextApiRequest } from "next";
-import type { NextRequest } from "next/server";
+import type { GetServerSidePropsContext, NextApiRequest } from "~/types/next-stubs";
+import type { NextRequest } from "~/types/next-stubs";
 
 import { auth } from "~/server/better-auth";
 import { prisma } from "~/server/db";

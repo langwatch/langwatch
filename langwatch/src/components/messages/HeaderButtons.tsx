@@ -1,5 +1,5 @@
 import { Box, Button, HStack } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useState } from "react";
 import { List, Table } from "react-feather";
 import { LuTrendingUp } from "react-icons/lu";

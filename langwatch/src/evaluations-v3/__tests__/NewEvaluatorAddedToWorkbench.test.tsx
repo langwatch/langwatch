@@ -57,7 +57,7 @@ let drawerProps: Record<string, unknown> = {};
 const flowCallbacksStore: Record<string, Record<string, unknown>> = {};
 
 // Mock next/router
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: currentDrawer
       ? { "drawer.open": currentDrawer, ...drawerProps }

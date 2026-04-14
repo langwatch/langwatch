@@ -13,9 +13,11 @@ import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { format } from "date-fns";
+import { formatChartDate } from "./formatChartDate";
 import numeral from "numeral";
-import React, { useCallback, useMemo } from "react";
+import React, { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { LuShield } from "react-icons/lu";
+import { ChartTooltip } from "./ChartTooltip";
 import { ChartErrorState } from "./ChartErrorState";
 import {
   Area,
@@ -37,7 +39,7 @@ import {
   YAxis,
 } from "recharts";
 import type { Payload } from "recharts/types/component/DefaultTooltipContent";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import type { z } from "zod";
 import type { FilterField } from "~/server/filters/types";
 import { availableFilters } from "~/server/filters/registry";
@@ -62,12 +64,13 @@ import { uppercaseFirstLetter } from "../../utils/stringCasing";
 import type { Unpacked } from "../../utils/types";
 import { Delayed } from "../Delayed";
 import { usePeriodSelector } from "../PeriodSelector";
-import { QuickwitNote } from "./QuickwitNote";
 import { SummaryMetric } from "./SummaryMetric";
 
 type Series = Unpacked<z.infer<typeof timeseriesSeriesInput>["series"]> & {
   name: string;
   colorSet: RotatingColorSet;
+  increaseIs?: "good" | "bad" | "neutral";
+  noDataUrl?: string;
 };
 
 export type CustomGraphInput = {
@@ -94,6 +97,7 @@ export type CustomGraphInput = {
   timeScale: "full" | number;
   connected?: boolean;
   height?: number;
+  excludeUnknownBuckets?: boolean;
   monitorGraph?: {
     disabled?: boolean;
     isGuardrail?: boolean;
@@ -128,6 +132,7 @@ export function CustomGraph({
   hideGroupLabel = false,
   filters,
   onDataPointClick,
+  emptyState,
 }: {
   input: CustomGraphInput;
   titleProps?: SystemStyleObject;
@@ -141,18 +146,9 @@ export function CustomGraph({
     startDate?: string;
     endDate?: string;
   }) => void;
+  emptyState?: React.ReactNode;
 }) {
   const publicEnv = usePublicEnv();
-
-  if (
-    publicEnv.data?.IS_QUICKWIT &&
-    (input.series.some(
-      (series) => !getMetric(series.metric).quickwitSupport || series.pipeline,
-    ) ||
-      (input.groupBy && !getGroup(input.groupBy).quickwitSupport))
-  ) {
-    return <QuickwitNote />;
-  }
 
   return (
     <CustomGraph_
@@ -162,6 +158,7 @@ export function CustomGraph({
       load={!!publicEnv.data}
       filters={filters}
       onDataPointClick={onDataPointClick}
+      emptyState={emptyState}
     />
   );
 }
@@ -175,10 +172,12 @@ const CustomGraph_ = React.memo(
     size,
     filters,
     onDataPointClick,
+    emptyState,
   }: {
     input: CustomGraphInput;
     titleProps?: {
       fontSize?: SystemStyleObject["fontSize"];
+      textStyle?: SystemStyleObject["textStyle"];
       color?: SystemStyleObject["color"];
       fontWeight?: SystemStyleObject["fontWeight"];
     };
@@ -193,12 +192,58 @@ const CustomGraph_ = React.memo(
       startDate?: string;
       endDate?: string;
     }) => void;
+    emptyState?: React.ReactNode;
   }) {
     const height_ = input.height ?? 300;
     const { filterParams, queryOpts } = useFilterParams();
     const { daysDifference } = usePeriodSelector();
     const router = useRouter();
     const { project } = useOrganizationTeamProject();
+
+    // Legend toggle: track hidden series in localStorage
+    const storageKey = `analytics:hidden:${project?.id ?? ""}:${input.graphId}`;
+    const [hiddenSeries, setHiddenSeries] = useState<Set<string>>(() => {
+      if (typeof window === "undefined") return new Set();
+      try {
+        const stored = localStorage.getItem(storageKey);
+        return stored ? new Set(JSON.parse(stored) as string[]) : new Set();
+      } catch {
+        return new Set();
+      }
+    });
+
+    // Re-sync when storageKey changes (project or graphId changed)
+    useEffect(() => {
+      try {
+        const stored = localStorage.getItem(storageKey);
+        setHiddenSeries(stored ? new Set(JSON.parse(stored) as string[]) : new Set());
+      } catch {
+        setHiddenSeries(new Set());
+      }
+    }, [storageKey]);
+
+    // Unique prefix for SVG gradient ids to avoid collisions across charts
+    const uniqueId = useId();
+
+    const toggleSeries = useCallback(
+      (dataKey: string) => {
+        setHiddenSeries((prev) => {
+          const next = new Set(prev);
+          if (next.has(dataKey)) {
+            next.delete(dataKey);
+          } else {
+            next.add(dataKey);
+          }
+          try {
+            localStorage.setItem(storageKey, JSON.stringify([...next]));
+          } catch {
+            // localStorage full or unavailable
+          }
+          return next;
+        });
+      },
+      [storageKey],
+    );
 
     // Default handler for drill-down on pie/donut and summary bar charts
     const defaultOnDataPointClick = useCallback(
@@ -369,7 +414,7 @@ const CustomGraph_ = React.memo(
       ),
     );
     const currentAndPreviousDataFilled =
-      input.graphType === "scatter"
+      input.graphType === "scatter" || input.graphType === "line"
         ? currentAndPreviousData
         : fillEmptyData(
           currentAndPreviousData,
@@ -429,9 +474,10 @@ const CustomGraph_ = React.memo(
 
         const group =
           input.groupBy && groupKey ? getGroup(input.groupBy) : undefined;
-        const groupName = groupKey
+        const displayGroupKey = groupKey || "unknown";
+        const groupName = groupKey !== undefined
           ? `${hideGroupLabel ? "" : group?.label.toLowerCase() + " "
-          }${groupKey}`
+          }${displayGroupKey}`
           : "";
         return input.series.length > 1
           ? (series?.name ?? aggKey) + (groupName ? ` (${groupName})` : "")
@@ -483,9 +529,7 @@ const CustomGraph_ = React.memo(
         };
 
         const colorIndex = colorMap[groupKey] ?? neutral;
-        const color = getColor(colorSet, colorIndex);
-
-        return color;
+        return getColor(colorSet, colorIndex);
       }
 
       return getColor(colorSet, index);
@@ -513,26 +557,25 @@ const CustomGraph_ = React.memo(
       ),
     );
     const yAxisValueFormat = valueFormats.length === 1 ? valueFormats[0] : "";
-    const allValues = Object.values(keysToValues).flatMap((values) => values);
+    const allValues = Object.values(keysToValues)
+      .flatMap((values) => values)
+      .filter(Number.isFinite);
     const maxValue = allValues.length > 0 ? Math.max(...allValues) : 0;
 
     const getColor = useGetRotatingColorForCharts();
+    const areaFillOpacity = useColorModeValue(0.3, 0.15);
     const gray400 = useColorRawValue("gray.400");
+    const gridColor = useColorModeValue(
+      "rgba(0, 0, 0, 0.08)",
+      "rgba(255, 255, 255, 0.08)",
+    );
+    const cursorColor = useColorModeValue(
+      "rgba(0, 0, 0, 0.1)",
+      "rgba(255, 255, 255, 0.1)",
+    );
 
-    const formatDate = (date: string) => {
-      if (!date) return "";
-
-      // If timeScale is in minutes (10, 30, or 60), show hours
-      if (typeof timeScale === "number" && timeScale < 1440) {
-        // If more than one day difference, include the date
-        if (daysDifference > 1) {
-          return format(new Date(date), "MMM d HH:mm");
-        }
-        return format(new Date(date), "HH:mm");
-      }
-
-      return format(new Date(date), "MMM d");
-    };
+    const formatDate = (date: string) =>
+      formatChartDate({ date, timeScale, daysDifference });
     const tooltipValueFormatter = (
       value: number | string,
       _: string,
@@ -555,12 +598,38 @@ const CustomGraph_ = React.memo(
 
     const container = (child: React.ReactNode) => {
       const dataLoaded = !timeseries.isLoading && timeseries.data;
+      const isSummaryType = summaryGraphTypes.includes(input.graphType);
       const allEmpty =
         dataLoaded &&
-        (allValues.length === 0 || currentAndPreviousData?.length === 0);
+        (allValues.length === 0 ||
+          currentAndPreviousData?.length === 0 ||
+          (!isSummaryType && allValues.every((v) => v === 0)));
 
       return (
         <Box width="full" height="full" position="relative">
+          {timeseries.isLoading && (
+            <Box
+              position="absolute"
+              inset={0}
+              display="flex"
+              alignItems="center"
+              justifyContent="center"
+            >
+              <HStack gap={1} align="end" opacity={0.15}>
+                {[35, 55, 25, 70, 45, 65, 40, 55, 30, 60, 50, 35].map(
+                  (h, i) => (
+                    <Skeleton
+                      key={i}
+                      width="8px"
+                      height={`${h}%`}
+                      maxHeight={`${(h / 100) * (height_ - 40)}px`}
+                      borderRadius="sm"
+                    />
+                  ),
+                )}
+              </HStack>
+            </Box>
+          )}
           {timeseries.isFetching && !timeseries.isLoading && (
             <Delayed>
               <Spinner position="absolute" right={4} top={4} />
@@ -600,14 +669,31 @@ const CustomGraph_ = React.memo(
                 </button>
               )}
               {allEmpty && input.graphType !== "monitor_graph" ? (
-                <Box
-                  position="absolute"
-                  top="50%"
-                  left="50%"
-                  transform="translate(-50%, -50%)"
-                >
-                  No data
-                </Box>
+                emptyState ?? (
+                  <VStack
+                    position="absolute"
+                    top="50%"
+                    left="50%"
+                    transform="translate(-50%, -50%)"
+                    gap={2}
+                  >
+                    <HStack gap={1} align="end" opacity={0.3}>
+                      {[40, 65, 30, 80, 50, 70, 45, 60].map((h, i) => (
+                        <Box
+                          key={i}
+                          width="6px"
+                          height={`${h}%`}
+                          maxHeight="40px"
+                          bg="border"
+                          borderRadius="sm"
+                        />
+                      ))}
+                    </HStack>
+                    <Text textStyle="xs" color="fg.subtle">
+                      No data — try adjusting the date range
+                    </Text>
+                  </VStack>
+                )
               ) : (
                 child
               )}
@@ -653,8 +739,7 @@ const CustomGraph_ = React.memo(
           <Flex
             paddingBottom={3}
             width="full"
-            justifyContent="space-between"
-            maxWidth={Object.entries(seriesSet).length * 142}
+            gap={0}
           >
             {timeseries.isLoading &&
               Object.entries(seriesSet).map(([key, series]) => (
@@ -672,6 +757,7 @@ const CustomGraph_ = React.memo(
                 previous={previousByKey[entry.key]?.value}
                 format={entry.metric?.format}
                 increaseIs={entry.metric?.increaseIs}
+                noDataUrl={entry.noDataUrl}
                 titleProps={titleProps}
               />
             ))}
@@ -717,15 +803,16 @@ const CustomGraph_ = React.memo(
               ))}
             </Pie>
             <Tooltip
+              content={<ChartTooltip />}
               formatter={tooltipValueFormatter}
               wrapperStyle={{ zIndex: 1000 }}
             />
             <Legend
               wrapperStyle={{
                 padding: "0 2rem",
-                maxHeight: "15%",
-                overflow: "auto",
+                flexWrap: "wrap",
                 zIndex: 1,
+                fontSize: 11,
               }}
             />
           </PieChart>
@@ -785,7 +872,7 @@ const CustomGraph_ = React.memo(
               }
               tickLine={false}
               axisLine={false}
-              tick={{ fill: gray400 }}
+              tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
               angle={input.graphType === "horizontal_bar" ? undefined : 45}
               textAnchor={
                 input.graphType === "horizontal_bar" ? "end" : "start"
@@ -794,8 +881,8 @@ const CustomGraph_ = React.memo(
             <YAxisComponent
               type="number"
               dataKey="value"
-              domain={[0, "dataMax"]}
-              tick={{ fill: gray400 }}
+              domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
+              tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
               tickFormatter={(value: number) => {
                 if (typeof yAxisValueFormat === "function") {
                   return yAxisValueFormat(value);
@@ -804,7 +891,9 @@ const CustomGraph_ = React.memo(
               }}
             />
             <Tooltip
+              content={<ChartTooltip />}
               formatter={tooltipValueFormatter}
+              cursor={{ fill: cursorColor }}
               wrapperStyle={{ zIndex: 1000 }}
             />
             <Bar
@@ -873,9 +962,33 @@ const CustomGraph_ = React.memo(
           // @ts-ignore
           layout={input.graphType === "horizontal_bar" ? "vertical" : undefined}
         >
+          <defs>
+            {(sortedKeys ?? []).map((aggKey, index) => (
+              <linearGradient
+                key={`gradient-${aggKey}`}
+                id={`gradient-${uniqueId}-${index}`}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop
+                  offset="0%"
+                  stopColor={colorForSeries(aggKey, index)}
+                  stopOpacity={areaFillOpacity}
+                />
+                <stop
+                  offset="100%"
+                  stopColor={colorForSeries(aggKey, index)}
+                  stopOpacity={0.02}
+                />
+              </linearGradient>
+            ))}
+          </defs>
           <CartesianGrid
             vertical={input.graphType === "scatter"}
             strokeDasharray="5 7"
+            stroke={gridColor}
           />
           <XAxisComponent
             type="category"
@@ -884,7 +997,7 @@ const CustomGraph_ = React.memo(
             tickFormatter={formatDate}
             tickLine={false}
             axisLine={false}
-            tick={{ fill: gray400 }}
+            tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
           />
           <YAxisComponent
             type="number"
@@ -892,8 +1005,8 @@ const CustomGraph_ = React.memo(
             tickLine={false}
             tickCount={4}
             tickMargin={20}
-            domain={[0, "dataMax"]}
-            tick={{ fill: gray400 }}
+            domain={[0, (dataMax: number) => (dataMax > 0 ? dataMax : 1)]}
+            tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
             tickFormatter={(value: number) => {
               if (typeof yAxisValueFormat === "function") {
                 return yAxisValueFormat(value);
@@ -902,7 +1015,9 @@ const CustomGraph_ = React.memo(
             }}
           />
           <Tooltip
+            content={<ChartTooltip />}
             formatter={tooltipValueFormatter}
+            cursor={{ fill: cursorColor }}
             labelFormatter={(_label, payload) => {
               if (input.graphType === "scatter") return "";
               return (
@@ -917,33 +1032,65 @@ const CustomGraph_ = React.memo(
           <Legend
             wrapperStyle={{
               padding: "0 2rem",
-              maxHeight: "15%",
-              overflow: "auto",
+              flexWrap: "wrap",
               zIndex: 1,
+              cursor: "pointer",
+              fontSize: 11,
             }}
+            onClick={(e) => {
+              const key = e.dataKey as string | undefined;
+              if (key) toggleSeries(key.replace(/^previous>/, ""));
+            }}
+            formatter={(value, entry) => (
+              <span
+                style={{
+                  opacity:
+                    entry.dataKey &&
+                    hiddenSeries.has(
+                      (entry.dataKey as string).replace(/^previous>/, ""),
+                    )
+                      ? 0.3
+                      : 1,
+                }}
+              >
+                {value}
+              </span>
+            )}
           />
           {(sortedKeys ?? []).map((aggKey, index) => {
             const strokeColor = colorForSeries(aggKey, index);
             const fillColor = colorForSeries(aggKey, index);
+            const isAreaType = ["area", "stacked_area"].includes(
+              input.graphType,
+            );
+            const isBarType = [
+              "bar",
+              "stacked_bar",
+              "horizontal_bar",
+            ].includes(input.graphType);
             const { series, groupKey } = getSeries(seriesByKey, aggKey);
             // Derive evaluatorId from per-series metadata, fall back to groupByKey or first series key
             const evaluatorId = series?.key || input.groupByKey || input.series[0]?.key;
-
+            const isHidden = hiddenSeries.has(aggKey);
+            // Extra props that only apply to Bar-type graphs
+            const extraProps: Record<string, unknown> = {};
+            if (isBarType && !["stacked_bar"].includes(input.graphType)) {
+              extraProps.radius = [3, 3, 0, 0];
+            }
             return (
               <React.Fragment key={aggKey}>
-                {/* @ts-ignore */}
+                {/* @ts-ignore - GraphElement is a union type (Line|Bar|Area|Scatter), some props are Bar-specific */}
                 <GraphElement
                   key={aggKey}
-                  type="linear"
+                  type="monotone"
+                  hide={isHidden}
                   dataKey={aggKey}
                   stroke={strokeColor}
-                  stackId={
-                    ["stacked_bar", "stacked_area"].includes(input.graphType)
-                      ? "same"
-                      : undefined
-                  }
-                  fill={fillColor}
-                  strokeWidth={2.5}
+                  stackId={["stacked_bar", "stacked_area"].includes(input.graphType) ? "same" : undefined}
+                  fill={isAreaType ? `url(#gradient-${uniqueId}-${index})` : fillColor}
+                  fillOpacity={isBarType ? 0.8 : undefined}
+                  {...extraProps}
+                  strokeWidth={isBarType ? 0 : 2.5}
                   dot={false}
                   activeDot={
                     input.graphType !== "scatter" ? { r: 8 } : undefined
@@ -996,7 +1143,8 @@ const CustomGraph_ = React.memo(
                   // @ts-ignore
                   <GraphElement
                     key={"previous>" + aggKey}
-                    type="linear"
+                    type="monotone"
+                    hide={isHidden}
                     dataKey={"previous>" + aggKey}
                     stackId={
                       ["stacked_bar", "stacked_area"].includes(input.graphType)
@@ -1162,8 +1310,13 @@ const shapeDataForSummary = (
       return {
         key: aggKey,
         name: nameForSeries(aggKey),
-        metric: formatOverride,
+        metric: formatOverride
+          ? series?.increaseIs
+            ? { ...formatOverride, increaseIs: series.increaseIs }
+            : formatOverride
+          : undefined,
         value: totalValue,
+        noDataUrl: series?.noDataUrl,
       };
     });
   };
@@ -1220,11 +1373,16 @@ const flattenGroupData = (
       }
 
       const aggregations = Object.fromEntries(
-        Object.entries(buckets).flatMap(([bucketKey, bucket]) => {
-          return Object.entries(bucket).map(([metricKey, metricValue]) => {
-            return [`${bucketKey}>${metricKey}`, metricValue ?? 0];
-          });
-        }),
+        Object.entries(buckets)
+          .filter(
+            ([bucketKey]) =>
+              !(input.excludeUnknownBuckets && bucketKey === "unknown"),
+          )
+          .flatMap(([bucketKey, bucket]) => {
+            return Object.entries(bucket).map(([metricKey, metricValue]) => {
+              return [`${bucketKey}>${metricKey}`, metricValue ?? 0];
+            });
+          }),
       );
 
       return {
@@ -1325,18 +1483,22 @@ function MonitorGraph({
         ? "redTones"
         : "orangeTones";
 
+  const finiteValues =
+    allValues && allValues.length > 0
+      ? allValues.filter(Number.isFinite)
+      : [];
   const maxValue = isPassRate
     ? 1
-    : Math.max(...(allValues && allValues.length > 0 ? allValues : [1]));
+    : finiteValues.length > 0
+      ? Math.max(...finiteValues)
+      : 1;
 
   // Color adjustments for light/dark mode
   // Light mode: light backgrounds, dark text
   // Dark mode: dark backgrounds, light text
   const bgAdjustment = useColorModeValue(-400, 200);
-  const borderAdjustment = useColorModeValue(-200, 100);
   const textAdjustment = useColorModeValue(300, -300);
   const areaAdjustment = useColorModeValue(-300, 100);
-  const skeletonAdjustment = useColorModeValue(-100, 100);
 
   // Glow effect for dark mode based on colorSet
   const glowColor = getColor(colorSet, 0, 0);
@@ -1351,7 +1513,7 @@ function MonitorGraph({
       height="full"
       position="relative"
       border="1px solid"
-      borderColor={getColor(colorSet, 0, borderAdjustment)}
+      borderColor="border"
       backgroundColor={getColor(colorSet, 0, bgAdjustment)}
       borderRadius="lg"
       paddingTop={2}
@@ -1397,7 +1559,6 @@ function MonitorGraph({
               <Skeleton
                 width="56px"
                 height="36px"
-                backgroundColor={getColor(colorSet, 0, skeletonAdjustment)}
               />
             )}
           </Text>
@@ -1461,7 +1622,7 @@ function MonitorGraph({
                 tickFormatter={formatDate}
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: gray400 }}
+                tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
               />
               <YAxis
                 type="number"
@@ -1470,7 +1631,7 @@ function MonitorGraph({
                 tickCount={4}
                 tickMargin={20}
                 domain={[0, maxValue]}
-                tick={{ fill: gray400 }}
+                tick={{ fill: gray400 }} style={{ fontSize: "11px" }}
                 tickFormatter={(value) => {
                   if (typeof yAxisValueFormat === "function") {
                     return yAxisValueFormat(value);

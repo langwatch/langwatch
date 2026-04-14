@@ -19,7 +19,7 @@ if git rev-parse --is-inside-work-tree &>/dev/null; then
   fi
 fi
 
-LAST_CHOICE_FILE="/tmp/.langwatch-dev-last-choice-${COMPOSE_PROJECT_NAME:-langwatch}"
+LAST_CHOICE_FILE="/tmp/.langwatch-dev-last-choice-v2-${COMPOSE_PROJECT_NAME:-langwatch}"
 
 # Check for required .env files
 check_env_files() {
@@ -87,16 +87,15 @@ echo "╠═══════════════════════�
 echo "║  Ports: app=$APP_PORT  bullboard=$BULLBOARD_PORT  ai-server=$AI_SERVER_PORT"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
-PROFILE_NAMES=("" "dev" "dev-search" "dev-nlp" "dev-scenarios" "dev-test" "dev-full")
+PROFILE_NAMES=("" "dev" "dev-nlp" "dev-scenarios" "dev-test" "dev-full")
 
 echo "Select a profile:"
 echo ""
-echo "  1) dev           - Minimal (postgres, redis, app)"
-echo "  2) dev-search    - + opensearch (for traces/search)"
-echo "  3) dev-nlp       - + NLP + langevals (for evaluations)"
-echo "  4) dev-scenarios - + scenario worker + bullboard + NLP"
-echo "  5) dev-test      - + AI test server"
-echo "  6) dev-full      - Everything"
+echo "  1) dev           - Minimal (postgres, redis, clickhouse, app)"
+echo "  2) dev-nlp       - + NLP + langevals (for evaluations)"
+echo "  3) dev-scenarios - + scenario worker + bullboard + NLP"
+echo "  4) dev-test      - + AI test server"
+echo "  5) dev-full      - Everything"
 echo ""
 echo "  r) rebuild       - Rebuild (removes node_modules, restarts)"
 echo "  d) down          - Stop all services"
@@ -117,34 +116,28 @@ case $choice in
   1)
     echo "$choice" > "$LAST_CHOICE_FILE"
     ensure_prepared
-    echo "Starting: postgres + redis + app..."
+    echo "Starting: postgres + redis + clickhouse + app..."
     $COMPOSE up
     ;;
   2)
     echo "$choice" > "$LAST_CHOICE_FILE"
     ensure_prepared
-    echo "Starting: + opensearch..."
-    $COMPOSE --profile search up
-    ;;
-  3)
-    echo "$choice" > "$LAST_CHOICE_FILE"
-    ensure_prepared
     echo "Starting: + nlp + langevals..."
     $COMPOSE --profile nlp up
     ;;
-  4)
+  3)
     echo "$choice" > "$LAST_CHOICE_FILE"
     ensure_prepared
     echo "Starting: scenarios (+ workers + bullboard + nlp)..."
     $COMPOSE --profile scenarios up
     ;;
-  5)
+  4)
     echo "$choice" > "$LAST_CHOICE_FILE"
     ensure_prepared
     echo "Starting: + ai-server..."
     $COMPOSE --profile test up
     ;;
-  6)
+  5)
     echo "$choice" > "$LAST_CHOICE_FILE"
     ensure_prepared
     echo "Starting: full stack..."

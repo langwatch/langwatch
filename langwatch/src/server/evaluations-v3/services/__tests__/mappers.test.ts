@@ -49,6 +49,7 @@ const workflowVersion: ExperimentRunWorkflowVersion = {
 
 const evaluatorBreakdown: ClickHouseEvaluatorBreakdownRow[] = [
   {
+    ExperimentId: "exp-1",
     RunId: "run-1",
     EvaluatorId: "eval-1",
     EvaluatorName: "Accuracy",
@@ -57,6 +58,7 @@ const evaluatorBreakdown: ClickHouseEvaluatorBreakdownRow[] = [
     hasPassedCount: 4,
   },
   {
+    ExperimentId: "exp-1",
     RunId: "run-1",
     EvaluatorId: "eval-2",
     EvaluatorName: null,

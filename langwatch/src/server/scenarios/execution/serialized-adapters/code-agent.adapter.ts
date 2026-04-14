@@ -264,7 +264,10 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
         ? this.config.inputs
         : [{ identifier: "input", type: "str" }];
 
-    if (this.config.scenarioMappings) {
+    if (
+      this.config.scenarioMappings &&
+      Object.keys(this.config.scenarioMappings).length > 0
+    ) {
       const resolved = resolveFieldMappings({
         fieldMappings: this.config.scenarioMappings,
         agentInput,
@@ -285,8 +288,8 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
         : JSON.stringify(lastUserMessage?.content ?? "");
 
     const record: Record<string, string> = {};
-    for (const [i, inp] of declaredInputs.entries()) {
-      record[inp.identifier] = i === 0 ? inputValue : "";
+    for (let i = 0; i < declaredInputs.length; i++) {
+      record[declaredInputs[i]!.identifier] = i === 0 ? inputValue : "";
     }
     return record;
   }

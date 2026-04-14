@@ -1,6 +1,6 @@
 import type { Experiment, ExperimentType, Project } from "@prisma/client";
 import { nanoid } from "nanoid";
-import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
 import { prisma } from "~/server/db";

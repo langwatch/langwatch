@@ -471,6 +471,10 @@ export const customComponentSchema = baseComponentSchema.extend({
   publishedId: z.string().optional(),
   version_id: z.string().optional(),
   versions: z.record(z.any()).optional(),
+  /** Maps agent input field identifiers to scenario data sources or static values. */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  /** Which output field to use as the scenario result. When unset, uses the first output. */
+  scenarioOutputField: z.string().optional(),
 });
 
 // TODO: Move schemas and exports to their own files

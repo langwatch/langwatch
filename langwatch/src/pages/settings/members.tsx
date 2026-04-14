@@ -12,6 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";

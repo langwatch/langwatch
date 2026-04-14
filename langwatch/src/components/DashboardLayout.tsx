@@ -13,9 +13,9 @@ import {
 } from "@chakra-ui/react";
 import type { Organization, Project, Team } from "@prisma/client";
 import { ChevronDown, ChevronRight, KeyRound, Plus } from "lucide-react";
-import ErrorPage from "next/error";
-import Head from "next/head";
-import { useRouter } from "next/router";
+import ErrorPage from "~/utils/compat/next-error";
+import Head from "~/utils/compat/next-head";
+import { useRouter } from "~/utils/compat/next-router";
 import { signOut } from "~/utils/auth-client";
 import numeral from "numeral";
 import React, { useState } from "react";
@@ -529,6 +529,8 @@ export const DashboardLayout = ({
           height="full"
           background="bg.surface"
           borderTopLeftRadius="xl"
+          outline="1px solid"
+          outlineColor="border"
           overflow="auto"
           display="flex"
           minHeight="calc(100vh - 56px)"

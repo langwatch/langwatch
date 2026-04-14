@@ -1,4 +1,4 @@
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import posthog from "posthog-js";
 import { useEffect } from "react";
 import { usePublicEnv } from "./usePublicEnv";

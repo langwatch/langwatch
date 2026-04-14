@@ -48,12 +48,12 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
       gap={0}
       fontSize="12px"
       minWidth="220px"
-      color="white"
+      color="fg"
     >
       <VStack align="stretch" gap={2} padding={2}>
         {/* Pass Rate */}
         <HStack justify="space-between">
-          <Text color="white/75">Pass</Text>
+          <Text color="fg.muted">Pass</Text>
           <HStack gap={1.5}>
             <PassRateCircle passRate={summary.passRate} />
             <Text
@@ -67,7 +67,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
 
         {/* Completed row */}
         <HStack justify="space-between">
-          <Text color="white/75">Completed</Text>
+          <Text color="fg.muted">Completed</Text>
           <Text fontWeight="medium">
             {summary.completedCount}/{summary.totalCount}
             {detail && (
@@ -89,27 +89,27 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
             <HStack
               justify="space-between"
               cursor="pointer"
-              _hover={{ bg: "white/10" }}
+              _hover={{ bg: "bg.muted" }}
               marginX={-2}
               paddingX={2}
               paddingY={0.5}
               borderRadius="md"
             >
-              <Text color="white/75">Avg Agent Latency</Text>
+              <Text color="fg.muted">Avg Agent Latency</Text>
               <HStack gap={1}>
-                <Icon as={LuClock} color="white/60" boxSize={3} />
+                <Icon as={LuClock} color="fg.muted" boxSize={3} />
                 <Text fontWeight="medium">
                   {formatLatency(summary.averageAgentLatencyMs)}
                 </Text>
-                <Icon as={LuChevronRight} boxSize={3} color="white/50" />
+                <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" />
               </HStack>
             </HStack>
           </Tooltip>
         ) : summary.averageAgentLatencyMs !== null ? (
           <HStack justify="space-between">
-            <Text color="white/75">Avg Agent Latency</Text>
+            <Text color="fg.muted">Avg Agent Latency</Text>
             <HStack gap={1}>
-              <Icon as={LuClock} color="white/60" boxSize={3} />
+              <Icon as={LuClock} color="fg.muted" boxSize={3} />
               <Text fontWeight="medium">
                 {formatLatency(summary.averageAgentLatencyMs)}
               </Text>
@@ -128,18 +128,18 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
             <HStack
               justify="space-between"
               cursor="pointer"
-              _hover={{ bg: "white/10" }}
+              _hover={{ bg: "bg.muted" }}
               marginX={-2}
               paddingX={2}
               paddingY={0.5}
               borderRadius="md"
             >
-              <Text color="white/75">Avg Agent Cost</Text>
+              <Text color="fg.muted">Avg Agent Cost</Text>
               <HStack gap={1}>
                 <Text fontWeight="medium">
                   {formatCost(summary.averageAgentCost)}
                 </Text>
-                <Icon as={LuChevronRight} boxSize={3} color="white/50" />
+                <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" />
               </HStack>
             </HStack>
           </Tooltip>
@@ -148,7 +148,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
         {/* Total Duration */}
         {summary.totalDurationMs !== null && (
           <HStack justify="space-between">
-            <Text color="white/75">Total Duration</Text>
+            <Text color="fg.muted">Total Duration</Text>
             <Text fontWeight="medium">{formatLatency(summary.totalDurationMs)}</Text>
           </HStack>
         )}
@@ -156,7 +156,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
         {/* Total Cost */}
         {summary.totalCost !== null && (
           <HStack justify="space-between">
-            <Text color="white/75">Total Cost</Text>
+            <Text color="fg.muted">Total Cost</Text>
             <Text fontWeight="medium">{formatCost(summary.totalCost)}</Text>
           </HStack>
         )}

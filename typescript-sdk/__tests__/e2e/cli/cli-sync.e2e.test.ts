@@ -33,7 +33,7 @@ import { ApiHelpers } from "./helpers/api-helpers";
 config({ path: ".env.test", override: true });
 
 const { expectCliResultSuccess } = expectations;
-const TMP_BASE_DIR = path.join(__dirname, "tmp");
+const TMP_BASE_DIR = path.join(__dirname, "tmp", "sync");
 
 const createUniquePromptName = () => {
   return `${PROMPT_NAME_PREFIX}-${Date.now()}`;

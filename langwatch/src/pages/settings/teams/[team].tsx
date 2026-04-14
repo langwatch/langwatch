@@ -2,7 +2,7 @@ import { Button, Card, Heading, HStack, Separator, Skeleton, Text, VStack } from
 import type { TeamUserRole } from "@prisma/client";
 import { TRPCClientError } from "@trpc/client";
 import isEqual from "lodash-es/isEqual";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useState } from "react";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";

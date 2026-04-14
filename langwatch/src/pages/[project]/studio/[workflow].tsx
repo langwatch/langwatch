@@ -1,4 +1,4 @@
-import ErrorPage from "next/error";
+import ErrorPage from "~/utils/compat/next-error";
 import { useEffect } from "react";
 import OptimizationStudio from "../../../optimization_studio/components/OptimizationStudio";
 import { useLoadWorkflow } from "../../../optimization_studio/hooks/useLoadWorkflow";
