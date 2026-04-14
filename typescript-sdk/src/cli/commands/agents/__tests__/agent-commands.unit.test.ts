@@ -93,6 +93,7 @@ describe("listAgentsCommand()", () => {
 
       await listAgentsCommand();
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });

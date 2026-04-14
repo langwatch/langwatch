@@ -74,6 +74,7 @@ describe("listModelProvidersCommand()", () => {
 
       await listModelProvidersCommand();
 
+      // eslint-disable-next-line @typescript-eslint/unbound-method
       expect(process.exit).not.toHaveBeenCalled();
     });
   });
