@@ -1260,12 +1260,29 @@ function buildArrayJoinTimeseriesQuery(
     `;
   }
 
+  // When the groupBy field uses arrayJoin (e.g. metadata.labels) and a filter
+  // exists for the same field, the trace-level filter (hasAny) only selects
+  // traces that have at least one matching value. But arrayJoin then expands
+  // ALL values from those traces, so unfiltered values leak into the results.
+  // Add a group_key restriction in the outer query to show only the filtered values.
+  let groupKeyFilter = "";
+  const groupKeyFilterParams: Record<string, unknown> = {};
+  if (input.groupBy && input.filters && groupByColumn.includes("arrayJoin")) {
+    const filterValues = input.filters[input.groupBy as keyof typeof input.filters];
+    if (Array.isArray(filterValues) && filterValues.length > 0) {
+      const paramName = "groupByFilterValues";
+      groupKeyFilter = `AND group_key IN ({${paramName}:Array(String)})`;
+      groupKeyFilterParams[paramName] = filterValues;
+    }
+  }
+
   const sql = `
     WITH deduped_traces AS (${cteBody})
     SELECT
       ${outerSelectExprs.join(",\n      ")}
     FROM deduped_traces
     WHERE period IS NOT NULL
+      ${groupKeyFilter}
     GROUP BY ${outerGroupBy.join(", ")}
     ${havingClause}
     ORDER BY period${dateTrunc ? ", date" : ""}
@@ -1280,6 +1297,7 @@ function buildArrayJoinTimeseriesQuery(
       previousStart: input.previousPeriodStartDate,
       previousEnd: input.startDate,
       ...filterParams,
+      ...groupKeyFilterParams,
       ...(input.groupByKey ? { groupByKey: input.groupByKey } : {}),
     },
   };

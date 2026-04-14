@@ -268,6 +268,12 @@ describe("aggregation-builder", () => {
       const labelsParam = paramKeys.find((k) => k.startsWith("labels"));
       expect(labelsParam).toBeDefined();
       expect(result.params[labelsParam!]).toEqual(["populator", "conversation"]);
+
+      // Outer query must restrict group_key to only the filtered labels
+      // (arrayJoin expands ALL labels from matching traces — without this,
+      // unfiltered labels leak into pie/bar chart results)
+      expect(result.sql).toContain("group_key IN");
+      expect(result.params.groupByFilterValues).toEqual(["populator", "conversation"]);
     });
 
     it("does not JOIN stored_spans when metadata.span_type uses cardinality alongside trace-level metrics", () => {

@@ -160,9 +160,22 @@ function buildUrl(
 ): string {
   if (typeof url === "string") return url;
   // If pathname is omitted, use the current URL path (Next.js behavior)
-  const pathname = url.pathname ?? window.location.pathname;
+  let pathname = url.pathname ?? window.location.pathname;
   const { query } = url;
   if (!query || Object.keys(query).length === 0) return pathname;
+
+  // Replace [param] placeholders in pathname with values from query.
+  // resolvePathname returns Next.js-style patterns like /[project]/analytics/custom/[id],
+  // but React Router needs the actual path segments.
+  if (routeParamKeys) {
+    for (const key of routeParamKeys) {
+      const value = query[key];
+      if (value !== undefined && value !== null) {
+        pathname = pathname.replace(`[${key}]`, String(value));
+      }
+    }
+  }
+
   const params = new URLSearchParams();
   for (const [key, value] of Object.entries(query)) {
     if (value === undefined || value === null) continue;
@@ -228,7 +241,7 @@ class RouterSingleton {
     _as?: string,
     options?: NextRouterOptions
   ): Promise<boolean> {
-    const target = buildUrl(url);
+    const target = _as ?? buildUrl(url);
     if (_routerInstance) {
       _routerInstance.navigate(target);
     } else {
@@ -246,7 +259,7 @@ class RouterSingleton {
     _as?: string,
     options?: NextRouterOptions
   ): Promise<boolean> {
-    const target = buildUrl(url);
+    const target = _as ?? buildUrl(url);
     if (_routerInstance) {
       _routerInstance.navigate(target);
     } else {
@@ -334,7 +347,10 @@ export function useRouter(): CompatRouter {
       events: routerEvents,
       isFallback: false,
       push: (url, _as?, options?) => {
-        const target = buildUrl(url, routeParamKeys);
+        // When `as` is provided (Next.js (url, as) overload), use it directly.
+        // The `as` string is the actual browser URL; `url` is the internal route
+        // descriptor which may contain [param] placeholders.
+        const target = _as ?? buildUrl(url, routeParamKeys);
         navigate(target, { replace: false });
         if (options?.scroll !== false) {
           window.scrollTo(0, 0);
@@ -342,7 +358,7 @@ export function useRouter(): CompatRouter {
         return Promise.resolve(true);
       },
       replace: (url, _as?, options?) => {
-        const target = buildUrl(url, routeParamKeys);
+        const target = _as ?? buildUrl(url, routeParamKeys);
         navigate(target, { replace: true });
         if (options?.scroll !== false) {
           window.scrollTo(0, 0);
