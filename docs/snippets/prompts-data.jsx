@@ -1445,9 +1445,9 @@ Summarize the data clearly for the user:
 
 ## Common Mistakes
 
-- Do NOT skip \`discover_schema\` -- always call it first to understand available metrics before querying
-- Do NOT try to write code -- this skill uses MCP tools only, no SDK installation or code changes
-- Do NOT hardcode metric names -- discover them dynamically so they stay correct as the platform evolves
+- Do NOT try to write code -- this skill queries existing data, no SDK installation or code changes
+- If using MCP, always call \`discover_schema\` first -- do NOT hardcode metric names
+- If using CLI, use the preset names (trace-count, total-cost, avg-latency, etc.)
 - Do NOT use \`platform_\` MCP tools for creating resources -- this skill is read-only analytics
 - Do NOT present raw JSON to the user -- summarize the data in a clear, human-readable format`,
 
@@ -3256,9 +3256,9 @@ Summarize the data clearly for the user:
 
 ## Common Mistakes
 
-- Do NOT skip \`discover_schema\` -- always call it first to understand available metrics before querying
-- Do NOT try to write code -- this skill uses MCP tools only, no SDK installation or code changes
-- Do NOT hardcode metric names -- discover them dynamically so they stay correct as the platform evolves
+- Do NOT try to write code -- this skill queries existing data, no SDK installation or code changes
+- If using MCP, always call \`discover_schema\` first -- do NOT hardcode metric names
+- If using CLI, use the preset names (trace-count, total-cost, avg-latency, etc.)
 - Do NOT use \`platform_\` MCP tools for creating resources -- this skill is read-only analytics
 - Do NOT present raw JSON to the user -- summarize the data in a clear, human-readable format`,
 
