@@ -49,7 +49,6 @@ onlyBuiltDependencies:
   - cpu-features
   - esbuild
   - msgpackr-extract
-  - node-pty
   - prisma
   - protobufjs
   - sharp
