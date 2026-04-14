@@ -90,7 +90,6 @@ export function ParameterRow({
       open={isOpen}
       onOpenChange={({ open }) => onOpenChange(open)}
       positioning={{ placement: "bottom-end", offset: { mainAxis: 4, crossAxis: 130 } }}
-      closeOnInteractOutside={false}
     >
       <Popover.Trigger asChild disabled={disabled}>
         <HStack
