@@ -41,7 +41,7 @@ export const runAgentCommand = async (
     }
   }
 
-  const config = agent.config as Record<string, unknown> | null;
+  const config = agent.config;
 
   if (agent.type === "http") {
     // HTTP agent — call the URL directly
