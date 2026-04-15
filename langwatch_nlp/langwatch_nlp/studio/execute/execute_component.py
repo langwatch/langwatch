@@ -22,6 +22,12 @@ async def execute_component(event: ExecuteComponentPayload):
     yield Debug(payload=DebugPayload(message="executing component"))
 
     node = [node for node in event.workflow.nodes if node.id == event.node_id][0]
+
+    if node.type in ("entry", "end"):
+        raise ValueError(
+            f"{node.type.capitalize()} nodes cannot be executed as standalone components"
+        )
+
     disable_dsp_caching()
 
     started_at = int(time.time() * 1000)

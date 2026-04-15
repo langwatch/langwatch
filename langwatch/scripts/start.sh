@@ -14,8 +14,8 @@ if [[ "$START_WORKERS" = "true" || "$START_WORKERS" = "1" ]]; then
   START_WORKERS_COMMAND="pnpm run start:workers && exit 1"
 fi
 
-# In development, Vite runs on 5560 (user-facing) and proxies /api/* to the API server.
-# In production, only the API server runs on 5560.
+# In development, Vite runs on PORT (default 5560) and proxies /api/* to PORT+1000.
+# In production, only the API server runs on PORT (default 5560).
 START_VITE_COMMAND=""
 if [[ "$NODE_ENV" = "development" ]]; then
   START_VITE_COMMAND="pnpm run dev:vite"

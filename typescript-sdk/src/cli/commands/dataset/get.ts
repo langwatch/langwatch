@@ -8,7 +8,7 @@ import { handleDatasetCommandError } from "./error-handler";
 /**
  * Gets dataset details by slug or ID, showing metadata and a preview of records.
  */
-export const getCommand = async (slugOrId: string): Promise<void> => {
+export const getCommand = async (slugOrId: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = createDatasetService();
@@ -18,6 +18,12 @@ export const getCommand = async (slugOrId: string): Promise<void> => {
     const dataset = await service.getDataset(slugOrId);
 
     spinner.succeed(`Dataset: ${chalk.cyan(dataset.name)}`);
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify(dataset, null, 2));
+      return;
+    }
+
     console.log();
     console.log(`  ${chalk.bold("Slug:")}       ${dataset.slug}`);
     console.log(`  ${chalk.bold("ID:")}         ${dataset.id}`);

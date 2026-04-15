@@ -162,7 +162,13 @@ jobs:
         with:
           node-version: 24
           cache: "pnpm"
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+          cache-dependency-path: |
+            langwatch/pnpm-lock.yaml
+            mcp-server/pnpm-lock.yaml
+
+      - name: Build mcp-server
+        working-directory: mcp-server
+        run: pnpm install --frozen-lockfile && pnpm run build
 
       - name: Install LangWatch app dependencies
         working-directory: langwatch

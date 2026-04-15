@@ -78,6 +78,38 @@ interface UseSessionOptions {
  * to the impersonated identity. This mirrors how NextAuth's `useSession`
  * worked — both server and client saw the same impersonation-aware session.
  */
+// Module-level session cache — survives component unmount/remount so
+// navigating between pages doesn't flash <LoadingScreen /> while the
+// session is re-fetched. The first successful fetch populates this;
+// subsequent mounts of useSession() start with the cached value.
+let _cachedSession: CompatSession | null = null;
+// Dedup in-flight fetches: multiple useSession() hooks mounting at the
+// same time share a single /api/auth/session request instead of each
+// firing their own.
+let _inflight: Promise<CompatSession | null> | null = null;
+// Subscribers: all mounted useSession() hooks that need to be notified
+// when the shared fetch resolves.
+const _subscribers = new Set<(session: CompatSession | null) => void>();
+
+async function _fetchSessionShared(): Promise<CompatSession | null> {
+  if (_inflight) return _inflight;
+  _inflight = (async () => {
+    try {
+      const res = await fetch("/api/auth/session", { credentials: "include" });
+      if (!res.ok) return _cachedSession;
+      const json = await res.json();
+      const session = adaptSession(json);
+      _cachedSession = session;
+      return session;
+    } catch {
+      return _cachedSession;
+    } finally {
+      _inflight = null;
+    }
+  })();
+  return _inflight;
+}
+
 export const useSession = (
   options?: UseSessionOptions,
 ): {
@@ -85,32 +117,30 @@ export const useSession = (
   status: SessionStatus;
   update: () => Promise<void>;
 } => {
-  const [data, setData] = useState<CompatSession | null>(null);
-  const [isPending, setIsPending] = useState(true);
-
-  const fetchSession = useCallback(async () => {
-    try {
-      const res = await fetch("/api/auth/session", { credentials: "include" });
-      if (!res.ok) {
-        // Network succeeded but server returned an error (5xx, etc.).
-        // Don't treat this as "unauthenticated" — keep the previous state
-        // so transient server errors don't flash the user as logged out.
-        setIsPending(false);
-        return;
-      }
-      const json = await res.json();
-      setData(adaptSession(json));
-    } catch {
-      // Network error — keep previous state, don't flash as logged out.
-      setIsPending(false);
-      return;
-    }
-    setIsPending(false);
-  }, []);
+  const [data, setData] = useState<CompatSession | null>(_cachedSession);
+  const [isPending, setIsPending] = useState(_cachedSession === null);
 
   useEffect(() => {
-    void fetchSession();
-  }, [fetchSession]);
+    // Subscribe to shared fetch results so all hooks update together
+    const handler = (session: CompatSession | null) => {
+      setData(session);
+      setIsPending(false);
+    };
+    _subscribers.add(handler);
+
+    // If we already have cached data, skip fetching
+    if (_cachedSession) {
+      setData(_cachedSession);
+      setIsPending(false);
+    } else {
+      void _fetchSessionShared().then((session) => {
+        // Notify all subscribers (including this one)
+        for (const sub of _subscribers) sub(session);
+      });
+    }
+
+    return () => { _subscribers.delete(handler); };
+  }, []);
 
   const status: SessionStatus = isPending
     ? "loading"
@@ -128,10 +158,17 @@ export const useSession = (
     }
   }, [options?.required, options?.onUnauthenticated, status]);
 
+  const update = useCallback(async () => {
+    // Force a fresh fetch (bypass inflight dedup) and notify all subscribers
+    _inflight = null;
+    const session = await _fetchSessionShared();
+    for (const sub of _subscribers) sub(session);
+  }, []);
+
   return {
     data,
     status,
-    update: fetchSession,
+    update,
   };
 };
 
@@ -248,6 +285,10 @@ export const signOut = async (opts?: {
   callbackUrl?: string;
   redirect?: boolean;
 }): Promise<void> => {
+  // Clear module-level session cache so the next useSession mount
+  // doesn't serve stale data after logout.
+  _cachedSession = null;
+
   if (opts?.redirect === false) {
     // Programmatic logout without redirect. The caller is responsible for
     // updating the UI (e.g., calling session.update() or navigating).

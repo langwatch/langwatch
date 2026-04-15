@@ -1,4 +1,4 @@
-import { Box, Text, HStack, VStack, Badge, Button, Code, Spinner, Tooltip, useDisclosure, useToast, Collapse,
+import { Box, Text, HStack, VStack, Badge, Button, Code, Spinner, useDisclosure, useToast, Collapse,
   AlertDialog, AlertDialogOverlay, AlertDialogContent, AlertDialogHeader,
   AlertDialogBody, AlertDialogFooter,
 } from "@chakra-ui/react";
@@ -8,9 +8,6 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import { useGroupDetail } from "../hooks/useGroupDetail.ts";
 import { JobList } from "../components/jobs/JobList.tsx";
 import { apiPost } from "../hooks/useApi.ts";
-import type { BullMQJob } from "../../shared/types.ts";
-import { timeAgo } from "../utils/timeAgo.ts";
-import { CopyButton } from "../components/CopyButton.tsx";
 
 export function GroupDetailPage() {
   const { groupId } = useParams<{ groupId: string }>();
@@ -18,7 +15,7 @@ export function GroupDetailPage() {
   const queueName = searchParams.get("queue") ?? undefined;
   const toast = useToast();
 
-  const { group, jobsPage, completedJobs, loading, error, isCompleted, fetchJobs } = useGroupDetail(groupId!, queueName);
+  const { group, jobsPage, loading, error, isCompleted, fetchJobs } = useGroupDetail(groupId!, queueName);
   const { isOpen, onOpen, onClose } = useDisclosure();
   const { isOpen: errorOpen, onToggle: toggleError } = useDisclosure({ defaultIsOpen: true });
   const cancelRef = useRef<HTMLButtonElement>(null);
@@ -79,29 +76,9 @@ export function GroupDetailPage() {
           </HStack>
         )}
 
-        {completedJobs.length > 0 ? (
-          <>
-            <Text
-              fontSize="sm"
-              fontWeight="600"
-              color="#00f0ff"
-              mb={3}
-              textTransform="uppercase"
-              letterSpacing="0.15em"
-            >
-              // Completed Jobs ({completedJobs.length})
-            </Text>
-            <VStack spacing={2} align="stretch">
-              {completedJobs.map((job) => (
-                <CompletedJobCard key={job.id} job={job} />
-              ))}
-            </VStack>
-          </>
-        ) : (
-          <Text color="#4a6a7a">
-            This group has completed processing. No recent completed jobs retained.
-          </Text>
-        )}
+        <Text color="#4a6a7a">
+          This group has completed processing.
+        </Text>
       </Box>
     );
   }
@@ -207,13 +184,13 @@ export function GroupDetailPage() {
         {group.activeJobId && (
           <Text>Active: <Text as="span" fontFamily="mono" color="#00ff41">{group.activeJobId}</Text></Text>
         )}
-        {group.isBlocked && group.errorTimestamp && (
-          <Text>Blocked for: <Text as="span" color="#ff0033">
+        {group.errorTimestamp && (
+          <Text>{group.isBlocked ? "Blocked for" : "Error"}: <Text as="span" color={group.isBlocked ? "#ff0033" : "#ffaa00"}>
             {(() => {
               const ms = Date.now() - group.errorTimestamp;
-              if (ms < 60_000) return `${Math.floor(ms / 1000)}s`;
-              if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m`;
-              return `${Math.floor(ms / 3_600_000)}h ${Math.floor((ms % 3_600_000) / 60_000)}m`;
+              if (ms < 60_000) return `${Math.floor(ms / 1000)}s ago`;
+              if (ms < 3_600_000) return `${Math.floor(ms / 60_000)}m ago`;
+              return `${Math.floor(ms / 3_600_000)}h ${Math.floor((ms % 3_600_000) / 60_000)}m ago`;
             })()}
           </Text></Text>
         )}
@@ -222,33 +199,34 @@ export function GroupDetailPage() {
         )}
       </HStack>
 
-      {/* Block error display */}
-      {group.isBlocked && group.errorMessage && (
+      {/* Error display — shown for blocked groups AND non-blocked groups with a last error */}
+      {group.errorMessage && (
         <Box
           mb={4}
           border="1px solid"
-          borderColor="rgba(255, 0, 51, 0.2)"
+          borderColor={group.isBlocked ? "rgba(255, 0, 51, 0.2)" : "rgba(255, 170, 0, 0.15)"}
           borderRadius="2px"
           overflow="hidden"
+          opacity={group.isBlocked ? 1 : 0.7}
         >
           <HStack
             px={4}
             py={3}
             cursor="pointer"
             onClick={toggleError}
-            _hover={{ bg: "rgba(255, 0, 51, 0.04)" }}
+            _hover={{ bg: group.isBlocked ? "rgba(255, 0, 51, 0.04)" : "rgba(255, 170, 0, 0.04)" }}
             userSelect="none"
           >
-            <Box color="#ff0033" fontSize="xs">
+            <Box color={group.isBlocked ? "#ff0033" : "#ffaa00"} fontSize="xs">
               {errorOpen ? <ChevronDownIcon /> : <ChevronRightIcon />}
             </Box>
-            <Text fontSize="sm" color="#ff0033" textTransform="uppercase" letterSpacing="0.1em" fontWeight="600">
-              Block Error
+            <Text fontSize="sm" color={group.isBlocked ? "#ff0033" : "#ffaa00"} textTransform="uppercase" letterSpacing="0.1em" fontWeight="600">
+              {group.isBlocked ? "Block Error" : "Last Error"}
             </Text>
           </HStack>
           <Collapse in={errorOpen}>
             <VStack align="stretch" spacing={2} px={4} pb={4}>
-              <Text fontSize="sm" color="#ff6666" wordBreak="break-all">
+              <Text fontSize="sm" color={group.isBlocked ? "#ff6666" : "#cc9944"} wordBreak="break-all">
                 {group.errorMessage}
               </Text>
               {group.errorStack && (
@@ -258,10 +236,11 @@ export function GroupDetailPage() {
                   wordBreak="break-all"
                   p={3}
                   bg="#060a12"
-                  border="1px solid rgba(255, 0, 51, 0.1)"
+                  border="1px solid"
+                  borderColor={group.isBlocked ? "rgba(255, 0, 51, 0.1)" : "rgba(255, 170, 0, 0.1)"}
                   borderRadius="2px"
                   fontSize="11px"
-                  color="#cc6666"
+                  color={group.isBlocked ? "#cc6666" : "#aa8844"}
                   maxH="300px"
                   overflow="auto"
                 >
@@ -379,97 +358,6 @@ export function GroupDetailPage() {
           </AlertDialogContent>
         </AlertDialogOverlay>
       </AlertDialog>
-    </Box>
-  );
-}
-
-function CompletedJobCard({ job }: { job: BullMQJob }) {
-  const { isOpen, onToggle } = useDisclosure();
-
-  return (
-    <Box
-      bg="#0a0e17"
-      borderRadius="2px"
-      border="1px solid"
-      borderColor="rgba(0, 255, 65, 0.15)"
-      boxShadow="0 0 6px rgba(0, 255, 65, 0.06)"
-      overflow="hidden"
-    >
-      <HStack px={4} py={3} cursor="pointer" onClick={onToggle} _hover={{ bg: "rgba(0, 255, 65, 0.04)" }}>
-        <Badge bg="rgba(0, 255, 65, 0.12)" color="#00ff41" fontSize="9px" borderRadius="2px">
-          COMPLETED
-        </Badge>
-        <Tooltip label={job.id} openDelay={200}>
-          <Text fontFamily="mono" fontSize="xs" color="#6a8a9a" maxW="300px" isTruncated>
-            {job.id}
-          </Text>
-        </Tooltip>
-        <CopyButton value={job.id} />
-        <Text fontFamily="mono" fontSize="xs" color="#4a6a7a">{job.name}</Text>
-        <Text fontSize="xs" color="#4a6a7a" ml="auto">
-          {job.finishedOn ? timeAgo(job.finishedOn) : timeAgo(job.timestamp)}
-        </Text>
-      </HStack>
-      {isOpen && (
-        <Box px={4} pb={3} borderTop="1px solid rgba(0, 255, 65, 0.08)">
-          <VStack align="stretch" spacing={2} pt={2}>
-            <HStack fontSize="xs">
-              <Text color="#4a6a7a" w="90px" textTransform="uppercase">Attempts</Text>
-              <Text color="#b0c4d8">{job.attemptsMade}</Text>
-            </HStack>
-            {job.processedOn && (
-              <HStack fontSize="xs">
-                <Text color="#4a6a7a" w="90px" textTransform="uppercase">Processed</Text>
-                <Text color="#b0c4d8">{new Date(job.processedOn).toISOString()}</Text>
-              </HStack>
-            )}
-            {job.finishedOn && (
-              <HStack fontSize="xs">
-                <Text color="#4a6a7a" w="90px" textTransform="uppercase">Finished</Text>
-                <Text color="#b0c4d8">{new Date(job.finishedOn).toISOString()}</Text>
-              </HStack>
-            )}
-            {job.returnvalue != null && (
-              <Box>
-                <Text fontSize="xs" color="#4a6a7a" textTransform="uppercase" mb={1}>Return Value</Text>
-                <Code
-                  display="block"
-                  whiteSpace="pre-wrap"
-                  wordBreak="break-all"
-                  p={3}
-                  bg="#060a12"
-                  border="1px solid rgba(0, 255, 65, 0.1)"
-                  borderRadius="2px"
-                  fontSize="11px"
-                  color="#00ff41"
-                  maxH="200px"
-                  overflow="auto"
-                >
-                  {typeof job.returnvalue === "string" ? job.returnvalue : JSON.stringify(job.returnvalue, null, 2)}
-                </Code>
-              </Box>
-            )}
-            <Box>
-              <Text fontSize="xs" color="#4a6a7a" textTransform="uppercase" mb={1}>Data</Text>
-              <Code
-                display="block"
-                whiteSpace="pre-wrap"
-                wordBreak="break-all"
-                p={3}
-                bg="#060a12"
-                border="1px solid rgba(0, 240, 255, 0.1)"
-                borderRadius="2px"
-                fontSize="11px"
-                color="#00f0ff"
-                maxH="300px"
-                overflow="auto"
-              >
-                {JSON.stringify(job.data, null, 2)}
-              </Code>
-            </Box>
-          </VStack>
-        </Box>
-      )}
     </Box>
   );
 }

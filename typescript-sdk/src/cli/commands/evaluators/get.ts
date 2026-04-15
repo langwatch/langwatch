@@ -61,7 +61,7 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   console.log();
 };
 
-export const getEvaluatorCommand = async (idOrSlug: string): Promise<void> => {
+export const getEvaluatorCommand = async (idOrSlug: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = new EvaluatorsApiService();
@@ -70,6 +70,10 @@ export const getEvaluatorCommand = async (idOrSlug: string): Promise<void> => {
   try {
     const evaluator = await service.get(idOrSlug);
     spinner.succeed(`Found evaluator "${evaluator.name}"`);
+    if (options?.format === "json") {
+      console.log(JSON.stringify(evaluator, null, 2));
+      return;
+    }
     formatEvaluatorDetails(evaluator);
   } catch (error) {
     spinner.fail();

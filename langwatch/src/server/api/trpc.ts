@@ -37,6 +37,7 @@ import { captureException } from "../../utils/posthogErrorCapture";
 import { auditLog } from "../auditLog";
 import type { OrganizationUserRole } from "@prisma/client";
 import type { PermissionMiddleware } from "./rbac";
+import type { OpsScope } from "./rbac";
 
 const logger = createLogger("langwatch:trpc");
 
@@ -55,6 +56,7 @@ interface CreateContextOptions {
   permissionChecked?: boolean;
   publiclyShared?: boolean;
   organizationRole?: OrganizationUserRole | null;
+  opsScope?: OpsScope;
 }
 
 /**
@@ -76,6 +78,7 @@ export const createInnerTRPCContext = (opts: CreateContextOptions) => {
     permissionChecked: opts.permissionChecked ?? false,
     publiclyShared: opts.publiclyShared ?? false,
     organizationRole: opts.organizationRole ?? undefined,
+    opsScope: opts.opsScope,
   };
 };
 

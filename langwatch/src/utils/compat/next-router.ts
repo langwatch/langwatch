@@ -81,6 +81,12 @@ const ROUTE_PATTERNS = [
   "/:project/workflows",
   "/:project/chat/:workflow",
   "/:project/studio/:workflow",
+  "/ops",
+  "/ops/queues",
+  "/ops/dejaview",
+  "/ops/foundry",
+  "/ops/projections",
+  "/ops/projections/:runId",
   "/:project",
   "/",
 ];
@@ -352,8 +358,13 @@ export function useRouter(): CompatRouter {
       query.path = catchAll ? catchAll.split("/") : [];
       delete query["*"];
     }
-    // Track which keys come from route params so we don't double-merge them
+    // Track which keys come from route params so we don't double-merge them.
+    // Include "path" (the renamed catch-all) so it's filtered from query strings.
     const routeParamKeySet = new Set(Object.keys(params));
+    if (routeParamKeySet.has("*")) {
+      routeParamKeySet.delete("*");
+      routeParamKeySet.add("path");
+    }
     searchParams.forEach((value, key) => {
       // Skip search params that shadow route params — the route param
       // already has the canonical value. Without this guard, `project`
@@ -378,8 +389,13 @@ export function useRouter(): CompatRouter {
       (location.search ? location.search : "") +
       (location.hash ? location.hash : "");
 
-    // Track which keys are route params (vs query string params)
+    // Track which keys are route params (vs query string params).
+    // Mirror the * → path rename so buildUrl filters "path" from query strings.
     const routeParamKeys = new Set(Object.keys(params));
+    if (routeParamKeys.has("*")) {
+      routeParamKeys.delete("*");
+      routeParamKeys.add("path");
+    }
 
     return {
       query,

@@ -29,7 +29,7 @@ export const parseColumns = (columnsStr: string): DatasetColumnType[] => {
  */
 export const createCommand = async (
   name: string,
-  options: { columns?: string },
+  options: { columns?: string; format?: string },
 ): Promise<void> => {
   checkApiKey();
 
@@ -52,6 +52,12 @@ export const createCommand = async (
     const dataset = await service.createDataset({ name, columnTypes });
 
     spinner.succeed(`Dataset created: ${chalk.cyan(dataset.slug)}`);
+
+    if (options.format === "json") {
+      console.log(JSON.stringify(dataset, null, 2));
+      return;
+    }
+
     console.log();
     console.log(`  ${chalk.bold("ID:")}    ${dataset.id}`);
     console.log(`  ${chalk.bold("Slug:")}  ${dataset.slug}`);

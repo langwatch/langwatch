@@ -61,13 +61,15 @@ async function scanSingleQueue(
   const blockedKey = `${prefix}blocked`;
 
   const dlqKey = `${prefix}dlq`;
+  const totalPendingKey = `${prefix}stats:total-pending`;
 
-  // O(1) counts + top N members by score
-  const [readyCount, blockedCount, dlqCount, topReadyMembers] = await Promise.all([
+  // O(1) counts + top N members by score + exact total pending
+  const [readyCount, blockedCount, dlqCount, topReadyMembers, totalPendingRaw] = await Promise.all([
     redis.zcard(readyKey),
     redis.scard(blockedKey),
     redis.scard(dlqKey),
     redis.zrevrange(readyKey, offset, offset + limit - 1, "WITHSCORES"),
+    redis.get(totalPendingKey),
   ]);
 
   // Build sampled group IDs from ready set page
@@ -133,26 +135,22 @@ async function scanSingleQueue(
     ? await dataPipeline.exec()
     : [];
 
-  // Pipeline 2b: Fetch error info for blocked groups (separate to avoid index interleaving)
-  const blockedGroupIndices: number[] = [];
+  // Pipeline 2b: Fetch error info for ALL groups (not just blocked).
+  // Error data persists through unblock/retry so Skynet can show "last error"
+  // on groups that are actively retrying after a previous failure.
   const errorPipeline = redis.pipeline();
-  for (let i = 0; i < allGroupIds.length; i++) {
-    const base = i * CMDS_PER_GROUP;
-    const isBlocked = (pipelineResults?.[base + 4]?.[1] as number) === 1;
-    if (isBlocked) {
-      errorPipeline.hgetall(`${prefix}group:${allGroupIds[i]!}:error`);
-      blockedGroupIndices.push(i);
-    }
+  for (const groupId of allGroupIds) {
+    errorPipeline.hgetall(`${prefix}group:${groupId}:error`);
   }
-  const errorResults = blockedGroupIndices.length > 0
+  const errorResults = allGroupIds.length > 0
     ? await errorPipeline.exec()
     : [];
 
   const groupErrors = new Map<string, { message: string; stack: string; timestamp: string }>();
-  for (let i = 0; i < blockedGroupIndices.length; i++) {
+  for (let i = 0; i < allGroupIds.length; i++) {
     const errorHash = errorResults?.[i]?.[1] as Record<string, string> | null;
     if (errorHash && errorHash.message) {
-      groupErrors.set(allGroupIds[blockedGroupIndices[i]!]!, {
+      groupErrors.set(allGroupIds[i]!, {
         message: errorHash.message,
         stack: errorHash.stack ?? "",
         timestamp: errorHash.timestamp ?? "",
@@ -225,10 +223,18 @@ async function scanSingleQueue(
 
   groups.sort((a, b) => b.pendingJobs - a.pendingJobs);
 
-  // Sum pending jobs from sampled groups (approximate when > SUMMARY_TOP_N groups exist)
-  let totalPendingJobs = 0;
-  for (const g of groups) {
-    totalPendingJobs += g.pendingJobs;
+  // Use exact Redis counter when available, fall back to approximate sum from fetched groups.
+  // Note: the fallback only covers the current page of groups (top N by pending count).
+  // Once stats:total-pending is populated by the upstream staging scripts, this fallback
+  // is no longer used and the counter is authoritative.
+  let totalPendingJobs: number;
+  if (totalPendingRaw !== null) {
+    totalPendingJobs = Math.max(0, parseInt(totalPendingRaw, 10) || 0);
+  } else {
+    totalPendingJobs = 0;
+    for (const g of groups) {
+      totalPendingJobs += g.pendingJobs;
+    }
   }
 
   return {

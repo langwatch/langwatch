@@ -10,8 +10,16 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
 
 // ---------------------------------------------------------------------------
-// Mocks
+// Stubs — child components that aren't under test
+// vi.hoisted ensures these are available when vi.mock runs (hoisted above imports)
 // ---------------------------------------------------------------------------
+
+const { Stub, NullStub } = vi.hoisted(() => ({
+  Stub: ({ children }: { children?: React.ReactNode }) => (
+    <div>{children}</div>
+  ),
+  NullStub: () => null,
+}));
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
@@ -22,18 +30,16 @@ vi.mock("~/utils/compat/next-router", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: vi.fn(),
 }));
 
-vi.mock("../../../hooks/useLiteMemberGuard", () => ({
+vi.mock("~/hooks/useLiteMemberGuard", () => ({
   useLiteMemberGuard: vi.fn(),
 }));
 
-vi.mock("../../../hooks/useTraceDetailsState", () => ({
-  useTraceDetailsState: () => ({
-    trace: { data: null, isLoading: false },
-  }),
+vi.mock("~/hooks/useTraceDetailsState", () => ({
+  useTraceDetailsState: () => ({ trace: { data: null, isLoading: false } }),
 }));
 
 vi.mock("~/hooks/useDrawer", () => ({
@@ -46,25 +52,18 @@ vi.mock("~/hooks/useDrawer", () => ({
   }),
 }));
 
-vi.mock("../../../hooks/useAnnotationCommentStore", () => ({
+vi.mock("~/hooks/useAnnotationCommentStore", () => ({
   useAnnotationCommentStore: () => ({
     setCommentState: vi.fn(),
     resetComment: vi.fn(),
   }),
 }));
 
-vi.mock("../../../utils/api", () => ({
+vi.mock("~/utils/api", () => ({
   api: {
-    traces: {
-      getEvaluations: {
-        useQuery: () => ({ data: [], isLoading: false }),
-      },
-    },
-    annotation: {
-      createQueueItem: {
-        useMutation: () => ({ mutate: vi.fn() }),
-      },
-    },
+    traces: { getEvaluations: { useQuery: () => ({ data: [], isLoading: false }) } },
+    annotation: { createQueueItem: { useMutation: () => ({ mutate: vi.fn() }) } },
+    ops: { getScope: { useQuery: () => ({ data: null, isLoading: false, isSuccess: false }) } },
     useContext: () => ({
       annotation: {
         getPendingItemsCount: { invalidate: vi.fn() },
@@ -75,77 +74,32 @@ vi.mock("../../../utils/api", () => ({
   },
 }));
 
-// Stub sub-components to isolate tab rendering
-vi.mock("../../messages/Conversation", () => ({
-  Conversation: () => <div data-testid="conversation">Conversation</div>,
+vi.mock("~/components/messages/Conversation", () => ({ Conversation: () => <div>Conversation</div> }));
+vi.mock("~/components/traces/Evaluations", () => ({ Evaluations: () => <div>Evaluations</div>, EvaluationsCount: NullStub, Guardrails: NullStub, Blocked: NullStub }));
+vi.mock("~/components/traces/Events", () => ({ Events: () => <div>Events</div> }));
+vi.mock("~/components/traces/SequenceDiagram", () => ({ SequenceDiagramContainer: () => <div>Sequence</div> }));
+vi.mock("~/components/traces/SpanTree", () => ({ SpanTree: () => <div>SpanTree</div> }));
+vi.mock("~/components/traces/Summary", () => ({ TraceSummary: () => <div>Summary</div> }));
+vi.mock("~/components/traces/ShareButton", () => ({ ShareButton: NullStub }));
+vi.mock("~/components/traces/AddParticipants", () => ({ AddParticipants: NullStub }));
+vi.mock("~/components/AddAnnotationQueueDrawer", () => ({ AddAnnotationQueueDrawer: NullStub }));
+vi.mock("~/components/ui/drawer", () => ({ Drawer: { CloseTrigger: NullStub } }));
+vi.mock("~/components/ui/link", () => ({ Link: Stub }));
+vi.mock("~/components/ui/toaster", () => ({ toaster: { create: vi.fn() } }));
+vi.mock("~/components/ui/popover", () => ({
+  Popover: { Root: Stub, Trigger: Stub, Content: Stub, Arrow: NullStub, CloseTrigger: NullStub, Body: Stub },
 }));
-vi.mock("../Evaluations", () => ({
-  Evaluations: () => <div>Evaluations</div>,
-  EvaluationsCount: () => null,
-  Guardrails: () => null,
-  Blocked: () => null,
-}));
-vi.mock("../Events", () => ({
-  Events: () => <div>Events</div>,
-}));
-vi.mock("../SequenceDiagram", () => ({
-  SequenceDiagramContainer: () => <div>Sequence</div>,
-}));
-vi.mock("../SpanTree", () => ({
-  SpanTree: () => <div>SpanTree</div>,
-}));
-vi.mock("../Summary", () => ({
-  TraceSummary: () => <div>Summary</div>,
-}));
-vi.mock("../ShareButton", () => ({
-  ShareButton: () => null,
-}));
-vi.mock("../AddParticipants", () => ({
-  AddParticipants: () => null,
-}));
-vi.mock("../../AddAnnotationQueueDrawer", () => ({
-  AddAnnotationQueueDrawer: () => null,
-}));
-vi.mock("../../ui/drawer", () => ({
-  Drawer: {
-    CloseTrigger: () => null,
-  },
-}));
-vi.mock("../../ui/link", () => ({
-  Link: ({ children }: { children: React.ReactNode }) => <a>{children}</a>,
-}));
-vi.mock("../../ui/toaster", () => ({
-  toaster: { create: vi.fn() },
-}));
-vi.mock("../../ui/popover", () => {
-  const P = ({ children }: { children?: React.ReactNode }) => (
-    <div>{children}</div>
-  );
-  return {
-    Popover: {
-      Root: P,
-      Trigger: P,
-      Content: P,
-      Arrow: () => null,
-      CloseTrigger: () => null,
-      Body: P,
-    },
-  };
-});
 
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { useLiteMemberGuard } from "../../../hooks/useLiteMemberGuard";
-import { TraceDetails } from "../TraceDetails";
-
-const mockUseOrganizationTeamProject = vi.mocked(useOrganizationTeamProject);
-const mockUseLiteMemberGuard = vi.mocked(useLiteMemberGuard);
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
+import { TraceDetails } from "~/components/traces/TraceDetails";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-function setup({ isLiteMember }: { isLiteMember: boolean }) {
-  mockUseOrganizationTeamProject.mockReturnValue({
+function renderTabs({ isLiteMember }: { isLiteMember: boolean }) {
+  vi.mocked(useOrganizationTeamProject).mockReturnValue({
     project: { id: "proj-1", slug: "test" },
     hasPermission: () => true,
     organizationRole: isLiteMember
@@ -153,13 +107,15 @@ function setup({ isLiteMember }: { isLiteMember: boolean }) {
       : OrganizationUserRole.MEMBER,
   } as unknown as ReturnType<typeof useOrganizationTeamProject>);
 
-  mockUseLiteMemberGuard.mockReturnValue({ isLiteMember });
+  vi.mocked(useLiteMemberGuard).mockReturnValue({ isLiteMember });
 
-  return render(
+  const { queryAllByRole } = render(
     <ChakraProvider value={defaultSystem}>
       <TraceDetails traceId="trace-1" />
     </ChakraProvider>,
   );
+
+  return queryAllByRole("tab").map((el) => (el.textContent ?? "").trim());
 }
 
 // ---------------------------------------------------------------------------
@@ -172,61 +128,23 @@ describe("TraceDetails tabs", () => {
   });
 
   describe("when user is a lite member", () => {
-    it("does not render the Trace Details tab", () => {
-      const { queryAllByRole } = setup({ isLiteMember: true });
+    it("hides Trace Details and Sequence tabs but shows Thread, Evaluations, Events", () => {
+      const tabs = renderTabs({ isLiteMember: true });
 
-      const tabs = queryAllByRole("tab").map((el) => el.textContent);
       expect(tabs).not.toContain("Trace Details");
-    });
-
-    it("does not render the Sequence tab", () => {
-      const { queryAllByRole } = setup({ isLiteMember: true });
-
-      const tabs = queryAllByRole("tab").map((el) => el.textContent);
       expect(tabs).not.toContain("Sequence");
-    });
-
-    it("renders the Thread tab", () => {
-      const { queryAllByRole } = setup({ isLiteMember: true });
-
-      const tabs = queryAllByRole("tab").map((el) => el.textContent);
       expect(tabs).toContain("Thread");
-    });
-
-    it("renders the Evaluations tab", () => {
-      const { queryAllByRole } = setup({ isLiteMember: true });
-
-      const tabs = queryAllByRole("tab").map((el) => el.textContent?.trim());
-      expect(tabs.some((t) => t?.startsWith("Evaluations"))).toBe(true);
-    });
-
-    it("renders the Events tab", () => {
-      const { queryAllByRole } = setup({ isLiteMember: true });
-
-      const tabs = queryAllByRole("tab").map((el) => el.textContent?.trim());
-      expect(tabs.some((t) => t?.startsWith("Events"))).toBe(true);
+      expect(tabs.some((t) => t.startsWith("Evaluations"))).toBe(true);
+      expect(tabs.some((t) => t.startsWith("Events"))).toBe(true);
     });
   });
 
   describe("when user is a full member", () => {
-    it("renders the Trace Details tab", () => {
-      const { queryAllByRole } = setup({ isLiteMember: false });
+    it("shows Trace Details, Sequence, and Thread tabs", () => {
+      const tabs = renderTabs({ isLiteMember: false });
 
-      const tabs = queryAllByRole("tab").map((el) => el.textContent);
       expect(tabs).toContain("Trace Details");
-    });
-
-    it("renders the Sequence tab", () => {
-      const { queryAllByRole } = setup({ isLiteMember: false });
-
-      const tabs = queryAllByRole("tab").map((el) => el.textContent);
       expect(tabs).toContain("Sequence");
-    });
-
-    it("renders the Thread tab", () => {
-      const { queryAllByRole } = setup({ isLiteMember: false });
-
-      const tabs = queryAllByRole("tab").map((el) => el.textContent);
       expect(tabs).toContain("Thread");
     });
   });

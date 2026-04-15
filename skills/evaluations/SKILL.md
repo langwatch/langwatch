@@ -52,8 +52,8 @@ If the user's request is **specific** ("add a faithfulness evaluator", "create a
 
 1. Check if you're in a codebase (look for `package.json`, `pyproject.toml`, `requirements.txt`, etc.)
 2. If **YES** → use the **Code approach** for experiments (SDK) and guardrails (code integration)
-3. If **NO** → use the **Platform approach** for evaluators (MCP tools) and monitors (UI guidance)
-4. If ambiguous → ask the user: "Do you want to write evaluation code or set things up on the platform?"
+3. If **NO** → use the **CLI approach** for evaluators, monitors, and datasets (preferred over MCP)
+4. If ambiguous → ask the user: "Do you want to write evaluation code or set things up via CLI?"
 
 Some features are code-only (experiments, guardrails) and some are platform-only (monitors). Evaluators work on both surfaces.
 
@@ -63,9 +63,11 @@ See [Plan Limits](_shared/plan-limits.md) for how to handle free plan limits gra
 
 ## Prerequisites
 
-Set up the LangWatch MCP for documentation access:
+**Preferred: Use the LangWatch CLI** (see [CLI Setup](_shared/cli-setup.md))
 
-See [MCP Setup](_shared/mcp-setup.md) for installation instructions.
+The CLI is the primary interface for agents. If the CLI is not available, fall back to MCP tools.
+
+See [MCP Setup](_shared/mcp-setup.md) for MCP installation as an alternative.
 
 If MCP installation fails, see [docs fallback](_shared/llms-txt-fallback.md).
 
@@ -192,11 +194,27 @@ Create or configure evaluators — the functions that score your agent's outputs
    evaluation.evaluate("ragas/faithfulness", index=idx, data={...})
    ```
 
-### Platform Approach
+### CLI Approach (Preferred for Agents)
+```bash
+langwatch evaluator list                                    # List evaluators
+langwatch evaluator create "My Evaluator" --type langevals/llm_judge
+langwatch evaluator get <idOrSlug>                          # View details
+langwatch evaluator update <idOrSlug> --name "New Name"     # Update
+langwatch evaluation run <slug> --wait                      # Run evaluation and wait
+langwatch evaluation status <runId>                         # Check run status
+```
+
+### Platform Approach (CLI preferred)
+```bash
+langwatch evaluator list                                      # List evaluators
+langwatch evaluator get <idOrSlug>                            # Get details
+langwatch evaluator create "Name" --type langevals/llm_judge  # Create
+langwatch evaluator update <idOrSlug> --name "New Name"       # Update
+```
+
+If the CLI is not available, use MCP tools as a fallback:
 1. Call `discover_schema` with category "evaluators" to see available types
 2. Use `platform_create_evaluator` to create an evaluator on the platform
-3. Use `platform_list_evaluators` to see existing evaluators
-4. Use `platform_get_evaluator` and `platform_update_evaluator` to review and modify
 
 This is useful for setting up LLM-as-judge evaluators, custom evaluators, or configuring evaluators that will be used in platform experiments and monitors.
 
@@ -204,6 +222,16 @@ This is useful for setting up LLM-as-judge evaluators, custom evaluators, or con
 
 Create test datasets for experiments.
 
+### CLI Approach (Preferred for Agents)
+```bash
+langwatch dataset list                                      # List datasets
+langwatch dataset create "My Dataset" -c input:string,output:string
+langwatch dataset upload my-dataset data.csv                # Upload CSV/JSON
+langwatch dataset records list my-dataset                   # View records
+langwatch dataset download my-dataset -f csv                # Download
+```
+
+### Docs Approach
 1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/datasets/overview.md`
 2. Generate a dataset tailored to your agent:
 
@@ -235,40 +263,51 @@ NEVER use generic examples like "What is 2+2?", "What is the capital of France?"
 
 ## Platform Approach: Prompts + Evaluators (No Code)
 
-When the user has no codebase and wants to set up evaluation building blocks on the platform:
-
-NOTE: Full UI experiments are not yet available via MCP. This approach sets up the building blocks (prompts + evaluators + datasets) that can then be used in the platform UI.
+When the user has no codebase and wants to set up evaluation building blocks on the platform.
+Use the CLI as the primary interface:
 
 ### Create or Update a Prompt
 
-Use the `platform_create_prompt` MCP tool to create a new prompt:
-- Provide a name, model, and messages (system + user)
-- The prompt will appear in your LangWatch project's Prompts section
-
-Or use `platform_list_prompts` to find existing prompts and `platform_update_prompt` to modify them.
+```bash
+langwatch prompt list                             # List existing prompts
+langwatch prompt create my-prompt                 # Create a new prompt YAML
+langwatch prompt push                             # Push to the platform
+langwatch prompt versions my-prompt               # View version history
+langwatch prompt tag assign my-prompt production  # Tag a version
+```
 
 ### Check Model Providers
 
-Before creating evaluators on the platform, verify model providers are configured:
+Before creating evaluators, verify model providers are configured:
 
-1. Call `platform_list_model_providers` to check existing providers
-2. If no providers are configured, ask the user if they have an LLM API key (OpenAI, Anthropic, etc.)
-3. If they do, set it up with `platform_set_model_provider` so evaluators can run
+```bash
+langwatch model-provider list                     # Check existing providers
+langwatch model-provider set openai --api-key sk-... # Set up a provider
+```
 
 ### Create an Evaluator
 
-Use the `platform_create_evaluator` MCP tool to set up evaluation criteria:
-- First call `discover_schema` with category "evaluators" to see available evaluator types
-- Create an LLM-as-judge evaluator for quality assessment
-- Or create a specific evaluator type matching your use case
+```bash
+langwatch evaluator list                          # See available evaluators
+langwatch evaluator create "Quality Judge" --type langevals/llm_judge
+langwatch evaluator get <idOrSlug> --format json  # View details
+```
 
 ### Create a Dataset
 
-Use the `platform_create_dataset` MCP tool to create a test dataset:
-- Provide a name and column definitions (e.g., `input` string, `expected_output` string)
-- Use `platform_create_dataset_records` to add records in batch (max 1000 per call)
-- Use `platform_list_datasets` to browse existing datasets
-- Use `platform_get_dataset` to view dataset contents and metadata
+```bash
+langwatch dataset create "Test Data" -c input:string,expected_output:string
+langwatch dataset upload test-data data.csv       # Upload from CSV/JSON/JSONL
+langwatch dataset records list test-data           # View records
+```
+
+### Set Up Monitors (Online Evaluation)
+
+```bash
+langwatch monitor create "Toxicity Check" --check-type ragas/toxicity
+langwatch monitor create "PII Detection" --check-type presidio/pii_detection --sample 0.5
+langwatch monitor list                            # View all monitors
+```
 
 ### Test in the Platform
 
@@ -278,17 +317,17 @@ Go to https://app.langwatch.ai and:
 3. Use the Prompt Playground to test variations
 4. Set up an experiment in the Experiments section using your prompt, evaluator, and dataset
 
-### Current Limitations
+### MCP Fallback
 
-- UI experiments cannot be created via MCP yet — use the platform UI
-- The MCP can create prompts, evaluators, and datasets, which are the building blocks for experiments
+If the CLI is not available, use MCP tools instead (`platform_create_prompt`, `platform_create_evaluator`, etc.).
 
 ## Common Mistakes
 
 - Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
 - Do NOT use generic/placeholder datasets — generate domain-specific examples
-- Do NOT use `platform_` MCP tools for code-based features (experiments, guardrails) — write code
-- Do use `platform_` MCP tools for platform-based features (evaluators, monitors) when the user wants no-code
+- Do NOT use MCP tools for code-based features (experiments, guardrails) — write code
+- Prefer the `langwatch` CLI over MCP tools for platform features (evaluators, monitors, datasets)
+- Only use MCP tools as a fallback when the CLI is not available
 - Do NOT skip running the experiment to verify it works
 - Monitors **measure** (async), guardrails **act** (sync, via code with `as_guardrail=True`) — both are online evaluation
 - Always set up `LANGWATCH_API_KEY` in `.env`

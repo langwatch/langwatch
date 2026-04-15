@@ -5,17 +5,19 @@ import { THROUGHPUT_BUFFER_SIZE, METRICS_COLLECT_INTERVAL_MS, REDIS_STATE_TTL_SE
 
 import { scanGroupQueues } from "./groupQueueScanner.ts";
 import { getRedisInfo, type RedisInfo } from "./redis.ts";
-import { normalizeErrorMessage } from "./blockedGroupAnalyzer.ts";
+import { normalizeErrorMessage } from "../../shared/normalizeErrorMessage.ts";
 
 const REDIS_STATE_KEY = "skynet:state";
 const KNOWN_PIPELINES_KEY = "skynet:known-pipelines";
+/** Prefix for per-job-name keys in prevCompleted/prevFailed maps to avoid collisions with queue-level keys */
+const JOB_NAME_COUNTER_PREFIX = "jn:";
 
 interface PersistedMetricsState {
-  version: 2;
+  version: 3;
   savedAt: number;
   peakCompletedPerSec: number;
   peakFailedPerSec: number;
-  peakStagedPerSec: number;
+  peakIngestedPerSec: number;
   peakLatencyP50Ms: number;
   peakLatencyP99Ms: number;
   peakPhases: Record<string, { completedPerSec: number; failedPerSec: number; latencyP50Ms: number; latencyP99Ms: number }>;
@@ -32,7 +34,7 @@ export class MetricsCollector {
   private lastTotalInFlight = 0;
   private lastTimestamp = Date.now();
   private hasBaseline = false;
-  private currentStagedPerSec = 0;
+  private currentIngestedPerSec = 0;
   private currentCompletedPerSec = 0;
   private currentFailedPerSec = 0;
   private currentPhases: DashboardData["phases"] = emptyPhases();
@@ -40,7 +42,7 @@ export class MetricsCollector {
   private currentLatencyP99Ms = 0;
   private peakCompletedPerSec = 0;
   private peakFailedPerSec = 0;
-  private peakStagedPerSec = 0;
+  private peakIngestedPerSec = 0;
   private peakLatencyP50Ms = 0;
   private peakLatencyP99Ms = 0;
   private peakPhases: Record<string, { completedPerSec: number; failedPerSec: number; latencyP50Ms: number; latencyP99Ms: number }> = {
@@ -152,14 +154,14 @@ export class MetricsCollector {
       totalGroups,
       blockedGroups,
       totalPendingJobs,
-      throughputStagedPerSec: this.currentStagedPerSec,
+      throughputIngestedPerSec: this.currentIngestedPerSec,
       totalCompleted: this.latestTotalCompleted,
       totalFailed: this.latestTotalFailed,
       completedPerSec: this.currentCompletedPerSec,
       failedPerSec: this.currentFailedPerSec,
       peakCompletedPerSec: this.peakCompletedPerSec,
       peakFailedPerSec: this.peakFailedPerSec,
-      peakStagedPerSec: this.peakStagedPerSec,
+      peakIngestedPerSec: this.peakIngestedPerSec,
       redisMemoryUsed: redisInfo.usedMemoryHuman,
       redisMemoryPeak: redisInfo.peakMemoryHuman,
       redisMemoryUsedBytes: redisInfo.usedMemoryBytes,
@@ -320,25 +322,72 @@ export class MetricsCollector {
     }
     this.currentPhases = phases;
 
-    // Build per-jobName metrics (pending/active from group scan, no throughput)
+    this.currentJobNameMetrics = await this.computeJobNameThroughput(queues, elapsed);
+
+    return { newCompleted, newFailed };
+  }
+
+  /** Read per-job-name Redis counters and compute throughput rates. */
+  private async computeJobNameThroughput(queues: QueueInfo[], elapsed: number): Promise<JobNameMetrics[]> {
     const jobNameCounts = this.buildJobNameCounts(queues);
-    const jobNameMetrics: JobNameMetrics[] = [];
-    for (const [key, counts] of jobNameCounts) {
-      const jobName = key.split("::")[1] ?? key;
-      const pipelineName = counts.pipelineName;
-      const phase = counts.phase;
 
-      const peak = this.peakJobNames.get(key) ?? { completedPerSec: 0, failedPerSec: 0, latencyP50Ms: 0, latencyP99Ms: 0 };
-      this.peakJobNames.set(key, peak);
+    // Deduplicate job names — multiple pipelines may share the same jobName,
+    // and Redis counters are keyed by jobName only (not pipeline::jobName).
+    const uniqueJobNames = new Set<string>();
+    for (const [compositeKey] of jobNameCounts) {
+      uniqueJobNames.add(compositeKey.split("::")[1] ?? compositeKey);
+    }
 
-      jobNameMetrics.push({
+    const jobNameCounterPipeline = this.redis.pipeline();
+    const dedupedJobNames: string[] = [];
+    for (const jobName of uniqueJobNames) {
+      for (const queueName of this.groupQueueNames) {
+        jobNameCounterPipeline.get(`${queueName}:gq:stats:completed:${jobName}`);
+        jobNameCounterPipeline.get(`${queueName}:gq:stats:failed:${jobName}`);
+      }
+      dedupedJobNames.push(jobName);
+    }
+    const jobNameCounterResults = dedupedJobNames.length > 0
+      ? await jobNameCounterPipeline.exec()
+      : [];
+
+    const jobNameTotals = aggregateJobNameCounters({
+      jobNameCounterKeys: dedupedJobNames.map((jn) => ({ compositeKey: jn, jobName: jn })),
+      jobNameCounterResults: dedupedJobNames.length > 0 ? jobNameCounterResults as Array<[Error | null, unknown]> | null : null,
+      queueCount: this.groupQueueNames.length,
+    });
+
+    const metrics: JobNameMetrics[] = [];
+    for (const [compositeKey, counts] of jobNameCounts) {
+      const jobName = compositeKey.split("::")[1] ?? compositeKey;
+
+      const totals = jobNameTotals.get(jobName) ?? { completed: 0, failed: 0 };
+      const prevKey = `${JOB_NAME_COUNTER_PREFIX}${compositeKey}`;
+      const prevC = this.prevCompleted.get(prevKey) ?? 0;
+      const prevF = this.prevFailed.get(prevKey) ?? 0;
+
+      let completedPerSec = 0;
+      let failedPerSec = 0;
+      if (this.prevCompleted.has(prevKey) && elapsed > 0) {
+        completedPerSec = Math.max(0, totals.completed - prevC) / elapsed;
+        failedPerSec = Math.max(0, totals.failed - prevF) / elapsed;
+      }
+      this.prevCompleted.set(prevKey, totals.completed);
+      this.prevFailed.set(prevKey, totals.failed);
+
+      const peak = this.peakJobNames.get(compositeKey) ?? { completedPerSec: 0, failedPerSec: 0, latencyP50Ms: 0, latencyP99Ms: 0 };
+      peak.completedPerSec = Math.max(peak.completedPerSec, completedPerSec);
+      peak.failedPerSec = Math.max(peak.failedPerSec, failedPerSec);
+      this.peakJobNames.set(compositeKey, peak);
+
+      metrics.push({
         jobName,
-        pipelineName,
-        phase,
+        pipelineName: counts.pipelineName,
+        phase: counts.phase,
         pending: counts.pending,
         active: counts.active,
-        completedPerSec: 0,
-        failedPerSec: 0,
+        completedPerSec,
+        failedPerSec,
         latencyP50Ms: 0,
         latencyP99Ms: 0,
         peakCompletedPerSec: peak.completedPerSec,
@@ -347,9 +396,7 @@ export class MetricsCollector {
         peakLatencyP99Ms: peak.latencyP99Ms,
       });
     }
-    this.currentJobNameMetrics = jobNameMetrics;
-
-    return { newCompleted, newFailed };
+    return metrics;
   }
 
   private async restoreState(): Promise<void> {
@@ -358,14 +405,14 @@ export class MetricsCollector {
       if (!raw) return;
 
       const state: PersistedMetricsState = JSON.parse(raw);
-      if (state.version !== 2) {
+      if (state.version !== 3) {
         console.log("Discarding stale metrics state (version mismatch), starting fresh");
         return;
       }
 
       this.peakCompletedPerSec = state.peakCompletedPerSec;
       this.peakFailedPerSec = state.peakFailedPerSec;
-      this.peakStagedPerSec = state.peakStagedPerSec;
+      this.peakIngestedPerSec = state.peakIngestedPerSec;
       this.peakLatencyP50Ms = state.peakLatencyP50Ms;
       this.peakLatencyP99Ms = state.peakLatencyP99Ms;
 
@@ -394,11 +441,11 @@ export class MetricsCollector {
 
   private async persistState(): Promise<void> {
     const state: PersistedMetricsState = {
-      version: 2,
+      version: 3,
       savedAt: Date.now(),
       peakCompletedPerSec: this.peakCompletedPerSec,
       peakFailedPerSec: this.peakFailedPerSec,
-      peakStagedPerSec: this.peakStagedPerSec,
+      peakIngestedPerSec: this.peakIngestedPerSec,
       peakLatencyP50Ms: this.peakLatencyP50Ms,
       peakLatencyP99Ms: this.peakLatencyP99Ms,
       peakPhases: this.peakPhases,
@@ -486,12 +533,12 @@ export class MetricsCollector {
         this.currentCompletedPerSec = Math.round((newCompleted / elapsed) * 100) / 100;
         this.currentFailedPerSec = Math.round((newFailed / elapsed) * 100) / 100;
 
-        const stagedDelta = (totalInFlight - this.lastTotalInFlight) + newCompleted + newFailed;
-        this.currentStagedPerSec = Math.round((Math.max(0, stagedDelta) / elapsed) * 100) / 100;
+        const ingestedDelta = (totalInFlight - this.lastTotalInFlight) + newCompleted + newFailed;
+        this.currentIngestedPerSec = Math.round((Math.max(0, ingestedDelta) / elapsed) * 100) / 100;
 
         this.peakCompletedPerSec = Math.max(this.peakCompletedPerSec, this.currentCompletedPerSec);
         this.peakFailedPerSec = Math.max(this.peakFailedPerSec, this.currentFailedPerSec);
-        this.peakStagedPerSec = Math.max(this.peakStagedPerSec, this.currentStagedPerSec);
+        this.peakIngestedPerSec = Math.max(this.peakIngestedPerSec, this.currentIngestedPerSec);
       }
 
       this.lastTotalInFlight = totalInFlight;
@@ -505,7 +552,7 @@ export class MetricsCollector {
 
       this.throughputBuffer.push({
         timestamp: now,
-        stagedPerSec: this.currentStagedPerSec,
+        ingestedPerSec: this.currentIngestedPerSec,
         completedPerSec: this.currentCompletedPerSec,
         failedPerSec: this.currentFailedPerSec,
         pendingCount: totalPending,
@@ -626,6 +673,34 @@ export function buildPipelineTree({ queues, seedKeys = [] }: { queues: QueueInfo
 
   tree.sort((a, b) => a.name.localeCompare(b.name));
   return tree;
+}
+
+/** Aggregate per-job-name counters from Redis pipeline results across multiple queues. */
+export function aggregateJobNameCounters({
+  jobNameCounterKeys,
+  jobNameCounterResults,
+  queueCount,
+}: {
+  jobNameCounterKeys: Array<{ compositeKey: string; jobName: string }>;
+  jobNameCounterResults: Array<[Error | null, unknown]> | null;
+  queueCount: number;
+}): Map<string, { completed: number; failed: number }> {
+  const totals = new Map<string, { completed: number; failed: number }>();
+  if (!jobNameCounterResults) return totals;
+
+  for (let i = 0; i < jobNameCounterKeys.length; i++) {
+    const { compositeKey } = jobNameCounterKeys[i]!;
+    let completed = 0;
+    let failed = 0;
+    for (let q = 0; q < queueCount; q++) {
+      const baseIdx = (i * queueCount + q) * 2;
+      completed += Number(jobNameCounterResults[baseIdx]?.[1] ?? 0);
+      failed += Number(jobNameCounterResults[baseIdx + 1]?.[1] ?? 0);
+    }
+    totals.set(compositeKey, { completed, failed });
+  }
+
+  return totals;
 }
 
 const EMPTY_PHASE = { pending: 0, active: 0, completedPerSec: 0, failedPerSec: 0, latencyP50Ms: 0, latencyP99Ms: 0, peakCompletedPerSec: 0, peakFailedPerSec: 0, peakLatencyP50Ms: 0, peakLatencyP99Ms: 0 } as const;

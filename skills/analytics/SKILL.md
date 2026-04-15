@@ -8,24 +8,51 @@ compatibility: Requires Node.js for MCP setup. Works with Claude Code, Claude We
 
 # Analyze Agent Performance with LangWatch
 
-This skill uses LangWatch MCP tools to query and present analytics. It does NOT write code.
+This skill queries and presents analytics. It does NOT write code.
 
-## Step 1: Set up the LangWatch MCP
+## Preferred: Use the LangWatch CLI
 
-Install the LangWatch MCP server so you have access to analytics and observability tools:
+If the `langwatch` CLI is available (check with `langwatch --help`), prefer it over MCP tools:
+
+```bash
+# Quick project overview
+langwatch status
+
+# Query metrics with presets
+langwatch analytics query --metric trace-count      # Total traces
+langwatch analytics query --metric total-cost       # Total cost
+langwatch analytics query --metric avg-latency      # Average latency
+langwatch analytics query --metric p95-latency      # P95 latency
+langwatch analytics query --metric eval-pass-rate   # Evaluation pass rate
+
+# Search traces
+langwatch trace search -q "error" --limit 10        # Find error traces
+langwatch trace search --start-date 2026-01-01      # Custom date range
+
+# Get trace details
+langwatch trace get <traceId>                       # Human-readable
+langwatch trace get <traceId> -f json               # Raw JSON
+langwatch trace export --format csv -o traces.csv   # Export as CSV
+langwatch trace export --format jsonl --limit 500   # Export as JSONL
+```
+
+Set `LANGWATCH_API_KEY` in the environment before running CLI commands.
+
+## Alternative: Use MCP Tools
+
+If the CLI is not available, use MCP tools instead.
+
+### Step 1: Set up the LangWatch MCP
 
 See [MCP Setup](_shared/mcp-setup.md) for installation instructions.
 
-## Step 2: Discover Available Metrics
-
-Before querying, discover what metrics and filters are available:
+### Step 2: Discover Available Metrics
 
 - Call `discover_schema` with category `"all"` to learn the full set of available metrics, aggregations, and filters
-- Review the returned schema to understand metric names and their supported aggregations
 
 CRITICAL: Always call `discover_schema` first. Do NOT hardcode or guess metric names.
 
-## Step 3: Query Analytics
+### Step 3: Query Analytics
 
 Use the appropriate MCP tool based on what the user needs:
 
@@ -66,8 +93,8 @@ Summarize the data clearly for the user:
 
 ## Common Mistakes
 
-- Do NOT skip `discover_schema` -- always call it first to understand available metrics before querying
-- Do NOT try to write code -- this skill uses MCP tools only, no SDK installation or code changes
-- Do NOT hardcode metric names -- discover them dynamically so they stay correct as the platform evolves
+- Do NOT try to write code -- this skill queries existing data, no SDK installation or code changes
+- If using MCP, always call `discover_schema` first -- do NOT hardcode metric names
+- If using CLI, use the preset names (trace-count, total-cost, avg-latency, etc.)
 - Do NOT use `platform_` MCP tools for creating resources -- this skill is read-only analytics
 - Do NOT present raw JSON to the user -- summarize the data in a clear, human-readable format

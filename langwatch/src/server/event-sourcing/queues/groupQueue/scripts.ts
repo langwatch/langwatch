@@ -5,11 +5,12 @@ import type { Cluster } from "ioredis";
 // This avoids loader incompatibilities across turbopack, webpack, vitest, and tsx.
 
 const STAGE_LUA = `
-local groupJobsKey = KEYS[1]
-local readyKey     = KEYS[2]
-local signalKey    = KEYS[3]
-local dedupKey     = KEYS[4]
-local dataKey      = KEYS[5]
+local groupJobsKey    = KEYS[1]
+local readyKey        = KEYS[2]
+local signalKey       = KEYS[3]
+local dedupKey        = KEYS[4]
+local dataKey         = KEYS[5]
+local totalPendingKey = KEYS[6]
 
 local stagedJobId    = ARGV[1]
 local groupId        = ARGV[2]
@@ -25,7 +26,7 @@ if dedupId ~= "" and dedupTtlMs > 0 then
   if existingJobId then
     local rank = redis.call("ZRANK", groupJobsKey, existingJobId)
     if rank then
-      -- Still in staging: squash in place
+      -- Still in staging: squash in place (net zero pending count change)
       if shouldExtend == 1 then
         redis.call("ZADD", groupJobsKey, dispatchAfter, existingJobId)
       end
@@ -55,12 +56,16 @@ redis.call("ZADD", readyKey, 1, groupId)
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
 
+-- New job staged: increment total pending counter
+redis.call("INCR", totalPendingKey)
+
 return 1
 `;
 
 const STAGE_BATCH_LUA = `
-local readyKey   = KEYS[1]
-local signalKey  = KEYS[2]
+local readyKey        = KEYS[1]
+local signalKey       = KEYS[2]
+local totalPendingKey = KEYS[3]
 
 local keyPrefix = ARGV[1]
 local count     = tonumber(ARGV[2])
@@ -123,6 +128,11 @@ end
 
 redis.call("LPUSH", signalKey, "1")
 redis.call("LTRIM", signalKey, 0, 999)
+
+-- Increment total pending counter by number of new (non-deduped) jobs
+if newStagedCount > 0 then
+  redis.call("INCRBY", totalPendingKey, newStagedCount)
+end
 
 return newStagedCount
 `;
@@ -313,14 +323,17 @@ return results
 `;
 
 const COMPLETE_LUA = `
-local activeKey  = KEYS[1]
-local jobsKey    = KEYS[2]
-local readyKey   = KEYS[3]
-local signalKey  = KEYS[4]
-local statsKey   = KEYS[5]
+local activeKey       = KEYS[1]
+local jobsKey         = KEYS[2]
+local readyKey        = KEYS[3]
+local signalKey       = KEYS[4]
+local statsKey        = KEYS[5]
+local errorKey        = KEYS[6]
+local totalPendingKey = KEYS[7]
 
 local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
+local jobName      = ARGV[3]
 
 local currentActive = redis.call("GET", activeKey)
 if currentActive ~= stagedJobId then
@@ -341,6 +354,17 @@ redis.call("LTRIM", signalKey, 0, 999)
 
 -- Increment completed counter for Skynet
 redis.call("INCR", statsKey)
+
+-- Increment per-job-name completed counter
+if jobName and jobName ~= "" then
+  redis.call("INCR", statsKey .. ":" .. jobName)
+end
+
+-- Decrement total pending counter
+redis.call("DECR", totalPendingKey)
+
+-- Clear any leftover error from previous failures now that the job succeeded
+redis.call("DEL", errorKey)
 
 return 1
 `;
@@ -393,6 +417,15 @@ end
 
 -- 5. Increment failed counter for Skynet
 redis.call("INCR", statsKey)
+
+-- 6. Increment per-job-name failed counter
+local ok, data = pcall(cjson.decode, jobDataJson)
+if ok and data then
+  local jn = data["__jobName"]
+  if jn and jn ~= "" then
+    redis.call("INCR", statsKey .. ":" .. jn)
+  end
+end
 
 return 1
 `;
@@ -497,15 +530,17 @@ export class GroupStagingScripts {
       dedupId !== "" ? `${this.keyPrefix}dedup:${dedupId}` : `${this.keyPrefix}dedup:__none__`;
 
     const dataKey = `${this.keyPrefix}group:${groupId}:data`;
+    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
     const result = await this.redis.eval(
       STAGE_LUA,
-      5,
+      6,
       groupJobsKey,
       readyKey,
       signalKey,
       dedupKey,
       dataKey,
+      totalPendingKey,
       stagedJobId,
       groupId,
       String(dispatchAfterMs),
@@ -540,6 +575,7 @@ export class GroupStagingScripts {
 
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
+    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
     const args: string[] = [this.keyPrefix, String(jobs.length)];
     for (const job of jobs) {
@@ -555,7 +591,7 @@ export class GroupStagingScripts {
       );
     }
 
-    const result = await this.redis.eval(STAGE_BATCH_LUA, 2, readyKey, signalKey, ...args);
+    const result = await this.redis.eval(STAGE_BATCH_LUA, 3, readyKey, signalKey, totalPendingKey, ...args);
 
     return Number(result);
   }
@@ -656,26 +692,33 @@ export class GroupStagingScripts {
   async complete({
     groupId,
     stagedJobId,
+    jobName,
   }: {
     groupId: string;
     stagedJobId: string;
+    jobName?: string;
   }): Promise<boolean> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const jobsKey = `${this.keyPrefix}group:${groupId}:jobs`;
     const readyKey = `${this.keyPrefix}ready`;
     const signalKey = `${this.keyPrefix}signal`;
     const statsKey = `${this.keyPrefix}stats:completed`;
+    const errorKey = `${this.keyPrefix}group:${groupId}:error`;
+    const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
 
     const result = await this.redis.eval(
       COMPLETE_LUA,
-      5,
+      7,
       activeKey,
       jobsKey,
       readyKey,
       signalKey,
       statsKey,
+      errorKey,
+      totalPendingKey,
       groupId,
       stagedJobId,
+      jobName ?? "",
     );
 
     return result === 1;

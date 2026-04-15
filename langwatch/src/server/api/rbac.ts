@@ -8,6 +8,7 @@ import { TRPCError } from "@trpc/server";
 import type { Session } from "~/server/auth";
 import { env } from "~/env.mjs";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import { isAdmin } from "../../../ee/admin/isAdmin";
 
 // ============================================================================
 // PERMISSION DEFINITIONS
@@ -46,6 +47,7 @@ export const Resources = {
   PROMPTS: "prompts",
   SECRETS: "secrets",
   PLAYGROUND: "playground",
+  OPS: "ops",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -370,6 +372,7 @@ type PermissionMiddlewareParams<InputType> = {
     permissionChecked: boolean;
     publiclyShared: boolean;
     organizationRole?: OrganizationUserRole | null;
+    opsScope?: OpsScope;
   };
   input: InputType;
   next: () => any;
@@ -926,6 +929,64 @@ export const checkPermissionOrPubliclyShared =
       ctx.publiclyShared = true;
     }
 
+    ctx.permissionChecked = true;
+    return next();
+  };
+
+// ============================================================================
+// OPS PERMISSION
+// ============================================================================
+
+export type OpsScope = { kind: "platform" };
+
+/**
+ * Resolve the ops scope for a user. Returns null if the user has no ops access.
+ * Shared between tRPC middleware and SSE endpoint.
+ *
+ * Only users listed in ADMIN_EMAILS have ops access. All ops data is
+ * platform-wide so no org-scoped tier exists.
+ */
+export function resolveOpsScope({
+  userEmail,
+}: {
+  userId: string;
+  userEmail: string | null | undefined;
+  permission: Permission;
+  prisma: unknown;
+}): OpsScope | null {
+  if (isAdmin({ email: userEmail })) {
+    return { kind: "platform" };
+  }
+
+  return null;
+}
+
+export const checkOpsPermission =
+  (permission: Permission) =>
+  async ({
+    ctx,
+    next,
+  }: PermissionMiddlewareParams<unknown>) => {
+    const user = ctx.session?.user;
+    if (!user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    const opsScope = await resolveOpsScope({
+      userId: user.id,
+      userEmail: user.email,
+      permission,
+      prisma: ctx.prisma,
+    });
+
+    if (!opsScope) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You do not have permission to access ops resources",
+      });
+    }
+
+    ctx.opsScope = opsScope;
     ctx.permissionChecked = true;
     return next();
   };
