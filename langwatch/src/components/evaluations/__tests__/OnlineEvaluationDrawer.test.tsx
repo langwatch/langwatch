@@ -88,11 +88,11 @@ describe("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
     user: ReturnType<typeof userEvent.setup>,
     level: "trace" | "thread" = "trace",
   ) => {
-    const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+    const levelName = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
-      expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
     });
-    await user.click(screen.getByLabelText(levelLabel));
+    await user.click(screen.getByRole("radio", { name: levelName }));
     await vi.advanceTimersByTimeAsync(50);
   };
 
@@ -250,11 +250,11 @@ describe("OnlineEvaluationDrawer", () => {
     user: ReturnType<typeof userEvent.setup>,
     level: "trace" | "thread" = "trace",
   ) => {
-    const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+    const levelName = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
-      expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
     });
-    await user.click(screen.getByLabelText(levelLabel));
+    await user.click(screen.getByRole("radio", { name: levelName }));
     await vi.advanceTimersByTimeAsync(50);
   };
 
@@ -264,8 +264,8 @@ describe("OnlineEvaluationDrawer", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Evaluation Level")).toBeInTheDocument();
-        expect(screen.getByLabelText(/Trace Level/i)).toBeInTheDocument();
-        expect(screen.getByLabelText(/Thread Level/i)).toBeInTheDocument();
+        expect(screen.getByRole("radio", { name: /Trace Level/i })).toBeInTheDocument();
+        expect(screen.getByRole("radio", { name: /Thread Level/i })).toBeInTheDocument();
       });
 
       // Evaluator section should NOT be visible yet

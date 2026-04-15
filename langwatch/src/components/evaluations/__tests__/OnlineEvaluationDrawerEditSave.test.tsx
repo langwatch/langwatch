@@ -86,11 +86,11 @@ describe("OnlineEvaluationDrawer", () => {
     user: ReturnType<typeof userEvent.setup>,
     level: "trace" | "thread" = "trace",
   ) => {
-    const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+    const levelName = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
-      expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
     });
-    await user.click(screen.getByLabelText(levelLabel));
+    await user.click(screen.getByRole("radio", { name: levelName }));
     await vi.advanceTimersByTimeAsync(50);
   };
 
@@ -261,11 +261,10 @@ describe("OnlineEvaluationDrawer", () => {
       );
 
       // Step 1: Select level first
-      const levelLabel = /Trace Level/i;
       await waitFor(() => {
-        expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+        expect(screen.getByRole("radio", { name: /Trace Level/i })).toBeInTheDocument();
       });
-      await user.click(screen.getByLabelText(levelLabel));
+      await user.click(screen.getByRole("radio", { name: /Trace Level/i }));
       await vi.advanceTimersByTimeAsync(50);
 
       // Step 2: Click "Select Evaluator"
