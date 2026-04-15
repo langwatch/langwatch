@@ -172,11 +172,9 @@ class Experiment:
         # Store the active iteration trace so target() can close it early
         self._active_iteration_trace: Optional[LangWatchTrace] = None
 
-        # Accumulated results across all batches (for building DataFrames)
-        self._all_dataset_entries: List[BatchEntry] = []
-        self._all_evaluations: List[EvaluationResult] = []
         self._finished: bool = False
         self._run_url: Optional[str] = None
+        self._cached_results_df: Optional[pd.DataFrame] = None
 
     def init(self):
         if not langwatch.get_api_key():
@@ -213,90 +211,145 @@ class Experiment:
     @property
     def results(self) -> pd.DataFrame:
         """
-        Per-row evaluation results as a pandas DataFrame.
+        Per-row evaluation results as a pandas DataFrame, fetched from the platform.
 
-        Each row corresponds to one dataset entry. Columns include the input
-        data, plus one column per evaluation metric (score values). Extra
-        columns: ``trace_id``, ``duration_ms``, ``error``.
+        Each row corresponds to one dataset entry (or one entry per target in
+        multi-target experiments). Columns include the input data, output,
+        trace_id, duration_ms, cost, plus one column per evaluation metric.
 
-        Built from client-side data collected during ``loop()`` — no server
-        round-trip needed.
+        The platform is the single source of truth — costs are computed from
+        traces, durations are accurate, and all data is consistent.
 
         Example::
 
             evaluation.results                    # renders as table in Jupyter
             evaluation.results.describe()         # summary statistics
             evaluation.results["my_metric"].mean() # aggregate a metric
+            evaluation.results.groupby("target")["quality"].mean()
         """
-        return self._build_results_df()
+        if self._cached_results_df is not None:
+            return self._cached_results_df
 
-    def _build_results_df(self) -> pd.DataFrame:
-        """Build a DataFrame from the client-side batch data."""
-        # Collect all dataset entries we've seen (including already-sent batches)
-        entries = list(self._all_dataset_entries)
-        evals = list(self._all_evaluations)
+        df = self._fetch_results_as_df()
+        self._cached_results_df = df
+        return df
 
-        if not entries:
+    def _fetch_results_as_df(self, retries: int = 5, delay: float = 3.0) -> pd.DataFrame:
+        """Fetch per-row results from the platform and build a DataFrame."""
+        endpoint = langwatch.get_endpoint()
+        api_key = langwatch.get_api_key() or ""
+
+        url = (
+            f"{endpoint}/api/evaluations/v3/runs/"
+            f"{urllib.parse.quote(self.run_id)}/results"
+            f"?experimentSlug={urllib.parse.quote(self.experiment_slug)}"
+        )
+
+        for attempt in range(retries):
+            try:
+                with httpx.Client(timeout=30) as client:
+                    response = client.get(url, headers={"X-Auth-Token": api_key})
+
+                if response.status_code == 404:
+                    if attempt < retries - 1:
+                        time.sleep(delay)
+                        continue
+                    return pd.DataFrame()
+
+                if response.is_success:
+                    data = response.json()
+                    return self._build_df_from_platform(data)
+
+            except Exception:
+                if attempt < retries - 1:
+                    time.sleep(delay)
+                    continue
+
+        return pd.DataFrame()
+
+    @staticmethod
+    def _build_df_from_platform(data: Dict[str, Any]) -> pd.DataFrame:
+        """Build a DataFrame from the platform API response (ExperimentRunWithItems)."""
+        dataset_entries = data.get("dataset", [])
+        evaluations = data.get("evaluations", [])
+
+        if not dataset_entries:
             return pd.DataFrame()
 
         # Build base rows from dataset entries
         rows: List[Dict[str, Any]] = []
-        for entry in entries:
-            row: Dict[str, Any] = {"index": entry.index}
-            # Flatten entry data into columns
-            if isinstance(entry.entry, dict):
-                for k, v in entry.entry.items():
+        for entry in dataset_entries:
+            row: Dict[str, Any] = {"index": entry.get("index", 0)}
+            # Flatten entry data
+            entry_data = entry.get("entry", {})
+            if isinstance(entry_data, dict):
+                for k, v in entry_data.items():
                     row[k] = v
-            row["trace_id"] = entry.trace_id
-            row["duration_ms"] = entry.duration
-            if entry.predicted:
-                row["output"] = entry.predicted.get("output", entry.predicted)
-            if entry.error:
-                row["error"] = entry.error
-            if entry.target_id:
-                row["target"] = entry.target_id
+            # Output from the target
+            predicted = entry.get("predicted")
+            if predicted:
+                row["output"] = predicted.get("output", predicted) if isinstance(predicted, dict) else predicted
+            row["trace_id"] = entry.get("traceId", "")
+            row["duration_ms"] = entry.get("duration", 0)
+            cost = entry.get("cost")
+            if cost is not None:
+                row["cost"] = cost
+            error = entry.get("error")
+            if error:
+                row["error"] = error
+            target_id = entry.get("targetId")
+            if target_id:
+                row["target"] = target_id
             rows.append(row)
 
         df = pd.DataFrame(rows)
         if df.empty:
             return df
 
-        # Pivot evaluation scores into columns (one column per metric name)
-        for ev in evals:
-            if ev.index is not None and ev.name:
-                mask = df["index"] == ev.index
-                if ev.target_id and "target" in df.columns:
-                    mask = mask & (df["target"] == ev.target_id)
-                if ev.score is not None:
-                    df.loc[mask, ev.name] = ev.score
-                if ev.passed is not None:
-                    df.loc[mask, f"{ev.name}_passed"] = ev.passed
+        # Pivot evaluation scores into columns
+        for ev in evaluations:
+            idx = ev.get("index")
+            name = ev.get("name") or ev.get("evaluator", "")
+            if idx is None or not name:
+                continue
+            mask = df["index"] == idx
+            target_id = ev.get("targetId")
+            if target_id and "target" in df.columns:
+                mask = mask & (df["target"] == target_id)
+            score = ev.get("score")
+            if score is not None:
+                df.loc[mask, name] = score
+            passed = ev.get("passed")
+            if passed is not None:
+                df.loc[mask, f"{name}_passed"] = passed
 
-        # Set index column as the DataFrame index
         if "index" in df.columns:
             df = df.set_index("index")
 
         return df
 
     def _auto_display_results(self) -> None:
-        """Display results after loop completion."""
+        """Fetch and display results after loop completion."""
         try:
-            df = self._build_results_df()
+            # Wait for platform to process final batch + traces
+            time.sleep(5)
+
+            df = self._fetch_results_as_df()
             if df.empty:
+                if self._run_url:
+                    print(f"\n  View details: {self._run_url}\n")
                 return
 
+            self._cached_results_df = df
             print()
 
-            # Find score columns (numeric, not trace_id/duration_ms/error)
-            meta_cols = {"trace_id", "duration_ms", "error", "target"}
+            meta_cols = {"trace_id", "duration_ms", "error", "target", "cost", "output"}
             score_cols = [c for c in df.columns if c not in meta_cols and pd.api.types.is_numeric_dtype(df[c])]
 
             if "target" in df.columns and len(df["target"].unique()) > 1:
-                # Multi-target: show aggregated summary per target
                 summary = df.groupby("target")[score_cols].mean()
                 self._display_df(summary)
             else:
-                # Single target or no targets: show full results
                 display_cols = [c for c in df.columns if c not in {"trace_id"}]
                 self._display_df(df[display_cols])
 
@@ -305,7 +358,8 @@ class Experiment:
             print(f"  Explore with: evaluation.results\n")
         except Exception:
             # Non-fatal: don't crash the experiment if result display fails
-            pass
+            if self._run_url:
+                print(f"\n  View details: {self._run_url}\n")
 
     @staticmethod
     def _display_df(df: pd.DataFrame) -> None:
@@ -539,7 +593,6 @@ class Experiment:
         )
         with self.lock:
             self.batch["dataset"].append(batch_entry)
-            self._all_dataset_entries.append(batch_entry)
 
         if time.time() - self.last_sent >= self.debounce_interval:
             self._send_batch()
@@ -844,7 +897,6 @@ class Experiment:
 
             with self.lock:
                 self.batch["dataset"].append(batch_entry)
-                self._all_dataset_entries.append(batch_entry)
 
             # Reset target context
             _target_context.reset(target_context_token)
@@ -994,7 +1046,6 @@ class Experiment:
 
         with self.lock:
             self.batch["dataset"].append(batch_entry)
-            self._all_dataset_entries.append(batch_entry)
 
     def log(
         self,
@@ -1082,7 +1133,6 @@ class Experiment:
 
         with self.lock:
             self.batch["evaluations"].append(eval)
-            self._all_evaluations.append(eval)
 
     def evaluate(
         self,
