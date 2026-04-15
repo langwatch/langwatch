@@ -7,7 +7,7 @@
  * - `DrawerProps<T>`: Props type for a specific drawer
  * - `DrawerCallbacks<T>`: Callback props (functions) for a specific drawer
  */
-import type { ComponentProps } from "react";
+import { lazy, type ComponentProps } from "react";
 
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
@@ -38,7 +38,11 @@ import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
 import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
-import { FoundryDrawer } from "./ops/foundry/FoundryDrawer";
+// Lazy-loaded: FoundryDrawer transitively imports the OTel SDK which has
+// side effects that break React if evaluated eagerly at app startup.
+const FoundryDrawer = lazy(
+  () => import("./ops/foundry/FoundryDrawer").then((m) => ({ default: m.FoundryDrawer })),
+);
 import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
 import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { PromptListDrawer } from "./prompts/PromptListDrawer";

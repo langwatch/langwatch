@@ -1,7 +1,7 @@
 import { OrganizationUserRole } from "@prisma/client";
 import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
-import { useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import {
   type DrawerType,
@@ -127,11 +127,13 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
           );
         }}
       >
-        <CurrentDrawerComponent
-          {...queryDrawer}
-          {...complexProps}
-          {...flowCallbacksForDrawer}
-        />
+        <Suspense>
+          <CurrentDrawerComponent
+            {...queryDrawer}
+            {...complexProps}
+            {...flowCallbacksForDrawer}
+          />
+        </Suspense>
       </ErrorBoundary>
     </DrawerOffsetProvider>
   );
