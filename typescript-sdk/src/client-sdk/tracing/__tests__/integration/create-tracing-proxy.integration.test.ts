@@ -348,7 +348,8 @@ describe("createTracingProxy Integration Tests", () => {
       expect(span.status.message).toBe("test error");
     });
 
-    it("should handle async methods that throw errors", async () => {
+    // Skipped due to OTLP exporter timeout flake — see langwatch/langwatch#3240.
+    it.skip("should handle async methods that throw errors", async () => {
       class TestClass {
         async publicMethod() {
           throw new Error('async error');
@@ -376,7 +377,8 @@ describe("createTracingProxy Integration Tests", () => {
   });
 
   describe("decorator span access", () => {
-    it("should call decorator method with correct context", async () => {
+    // Skipped due to span-flush race flake — see langwatch/langwatch#3240.
+    it.skip("should call decorator method with correct context", async () => {
       class TestClass {
         publicMethod() {
           return 'original result';

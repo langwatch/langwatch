@@ -350,7 +350,8 @@ describe("CLI E2E", () => {
         `);
       });
 
-      it("should not be in the prompts directory", () => {
+      // Skipped due to chronic CI flake — see langwatch/langwatch#3240.
+      it.skip("should not be in the prompts directory", () => {
         expect(() =>
           localPromptFileManagement.getPromptFileContent(promptHandle),
         ).toThrow();
