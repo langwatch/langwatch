@@ -7,7 +7,7 @@ import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 import type { Field } from "../../../../../optimization_studio/types/dsl";
-import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.zod.generated";
+import { evaluatorsSchema } from "../../../../../server/evaluations/evaluators.generated";
 import { getEvaluatorDefaultSettings } from "../../../../../server/evaluations/getEvaluator";
 import DynamicZodForm from "../../../../checks/DynamicZodForm";
 import { StepAccordion } from "../../components/StepAccordion";

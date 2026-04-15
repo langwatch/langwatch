@@ -46,7 +46,7 @@ vi.mock("../../utils", () => ({
   }),
 }));
 
-vi.mock("~/server/evaluations/evaluators.zod.generated", () => ({
+vi.mock("~/server/evaluations/evaluators.generated", () => ({
   evaluatorsSchema: { keyof: () => ({ or: () => ({}) }) },
 }));
 

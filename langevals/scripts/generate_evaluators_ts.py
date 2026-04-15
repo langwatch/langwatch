@@ -50,6 +50,118 @@ def stringify_field_types(field_types):
     return settings
 
 
+def get_field_type_to_zod(field, definitions=None):
+    """Convert a Python type annotation to a Zod schema string.
+    Uses only APIs compatible with both Zod v3 and v4."""
+    if inspect.isclass(field) and issubclass(field, BaseModel):
+        inner = stringify_zod_fields(
+            {
+                field_name: {
+                    "annotation": f.annotation,
+                    "description": f.description,
+                    "default": dump_model_type(f.default),
+                    "is_optional": not f.is_required
+                    or get_origin(f.annotation) == Optional
+                    or (
+                        get_origin(f.annotation) == Union
+                        and type(None) in get_args(f.annotation)
+                    ),
+                }
+                for field_name, f in field.model_fields.items()
+            },
+            definitions,
+        )
+        return f"z.object({{{inner}}})"
+    if field == str:
+        return "z.string()"
+    elif field == int:
+        return "z.number()"
+    elif field == float:
+        return "z.number()"
+    elif field == bool:
+        return "z.boolean()"
+    elif get_origin(field) == Literal:
+        args = get_args(field)
+        if len(args) == 1:
+            return f"z.literal({json.dumps(args[0])})"
+        literals = ", ".join([f"z.literal({json.dumps(v)})" for v in args])
+        return f"z.union([{literals}])"
+    elif get_origin(field) == Optional:
+        inner = get_field_type_to_zod(get_args(field)[0], definitions)
+        return f"{inner}.optional()"
+    elif get_origin(field) == Union:
+        args = [a for a in get_args(field) if a != type(None)]
+        if len(args) == 1:
+            # Optional[X] is Union[X, None]
+            return f"{get_field_type_to_zod(args[0], definitions)}.optional()"
+        parts = ", ".join([get_field_type_to_zod(a, definitions) for a in args])
+        return f"z.union([{parts}])"
+    elif get_origin(field) == list:
+        inner = get_field_type_to_zod(get_args(field)[0], definitions)
+        return f"z.array({inner})"
+    elif get_origin(field) == dict:
+        key_type, value_type = get_args(field)
+        value_zod = get_field_type_to_zod(value_type, definitions)
+        return f"z.record(z.string(), {value_zod})"
+    elif field == type(None):
+        return "z.undefined()"
+
+    evaluator_context = ""
+    if definitions:
+        evaluator_context = f" on {definitions.category}/{definitions.evaluator_name} settings"
+    raise ValueError(
+        f"Unsupported field type for Zod conversion: {field}{evaluator_context}"
+    )
+
+
+def stringify_zod_fields(fields, definitions=None):
+    """Convert a dict of field info to Zod object properties."""
+    parts = []
+    for field_name, info in fields.items():
+        annotation = info["annotation"]
+        description = info.get("description")
+        default = info.get("default")
+        is_optional = info.get("is_optional", False)
+
+        # Unwrap Optional for the base type
+        base_annotation = annotation
+        if get_origin(annotation) == Optional:
+            base_annotation = get_args(annotation)[0]
+        elif get_origin(annotation) == Union and type(None) in get_args(annotation):
+            args = [a for a in get_args(annotation) if a != type(None)]
+            if len(args) == 1:
+                base_annotation = args[0]
+
+        zod_type = get_field_type_to_zod(base_annotation, definitions)
+
+        # Add .describe() if there's a description
+        if description and not isinstance(description, PydanticUndefinedType):
+            desc_escaped = description.replace("\n", ". ").replace('"', '\\"')
+            zod_type += f'.describe("{desc_escaped}")'
+
+        # Add .default() if there's a default value
+        if default is not None and not isinstance(default, PydanticUndefinedType):
+            zod_type += f".default({json.dumps(default)})"
+        elif is_optional and default is None:
+            zod_type += ".optional()"
+
+        parts.append(f'    "{field_name}": {zod_type}')
+
+    return "\n" + ",\n".join(parts) + ",\n  "
+
+
+def dump_model_type(value):
+    return (
+        value.model_dump()
+        if isinstance(value, BaseModel)
+        else (
+            [dump_model_type(v) for v in value]
+            if isinstance(value, list)
+            else value
+        )
+    )
+
+
 def extract_evaluator_info(definitions: EvaluatorDefinitions) -> Dict[str, Any]:
     evaluator_info = {
         "name": definitions.name,
@@ -60,6 +172,7 @@ def extract_evaluator_info(definitions: EvaluatorDefinitions) -> Dict[str, Any]:
         "envVars": definitions.env_vars,
         "settingsTypes": {},
         "settingsDescriptions": {},
+        "settingsZodFields": {},
         "result": {},
     }
 
@@ -100,17 +213,6 @@ def extract_evaluator_info(definitions: EvaluatorDefinitions) -> Dict[str, Any]:
             f"Unsupported field type for typescript conversion: {field} on {definitions.category}/{definitions.evaluator_name} settings"
         )
 
-    def dump_model_type(value):
-        return (
-            value.model_dump()
-            if isinstance(value, BaseModel)
-            else (
-                [dump_model_type(v) for v in value]
-                if isinstance(value, list)
-                else value
-            )
-        )
-
     for field_name, field in definitions.settings_type.model_fields.items():
         default = dump_model_type(field.default)
         evaluator_info["settingsDescriptions"][field_name] = {
@@ -121,6 +223,24 @@ def extract_evaluator_info(definitions: EvaluatorDefinitions) -> Dict[str, Any]:
             "type": get_field_type_to_typescript(field.annotation),
             "description": field.description,
             "default": default,
+        }
+
+        def is_field_optional(f):
+            if not f.is_required:
+                return True
+            if get_origin(f.annotation) == Optional:
+                return True
+            if get_origin(f.annotation) == Union and type(None) in get_args(
+                f.annotation
+            ):
+                return True
+            return False
+
+        evaluator_info["settingsZodFields"][field_name] = {
+            "annotation": field.annotation,
+            "description": field.description,
+            "default": default,
+            "is_optional": is_field_optional(field),
         }
 
     base_score_description = EvaluationResult.model_fields["score"].description
@@ -177,7 +297,76 @@ def extract_evaluator_info(definitions: EvaluatorDefinitions) -> Dict[str, Any]:
 
 def generate_typescript_definitions(evaluators_info: Dict[str, Dict[str, Any]]) -> str:
     categories_union = " | ".join([f'"{value}"' for value in get_args(EvalCategories)])
-    ts_definitions = (
+
+    # Start with Zod import
+    ts_definitions = 'import { z } from "zod";\n\n'
+
+    # Zod schemas for result types
+    ts_definitions += (
+        "export const moneySchema = z.object({\n"
+        "  currency: z.string(),\n"
+        "  amount: z.number(),\n"
+        "});\n\n"
+    )
+
+    ts_definitions += (
+        "export const evaluationResultSkippedSchema = z.object({\n"
+        '  status: z.literal("skipped"),\n'
+        "  details: z.union([z.string(), z.undefined()]).optional(),\n"
+        "});\n\n"
+    )
+
+    ts_definitions += (
+        "export const evaluationResultErrorSchema = z.object({\n"
+        '  status: z.literal("error"),\n'
+        "  error_type: z.string(),\n"
+        "  details: z.string(),\n"
+        "  traceback: z.array(z.string()),\n"
+        "});\n\n"
+    )
+
+    ts_definitions += (
+        "export const evaluationResultSchema = z.object({\n"
+        '  status: z.literal("processed"),\n'
+        "  score: z.union([z.number(), z.undefined()]).optional(),\n"
+        "  passed: z.union([z.boolean(), z.undefined()]).optional(),\n"
+        "  label: z.union([z.string(), z.undefined()]).optional(),\n"
+        "  details: z.union([z.string(), z.undefined()]).optional(),\n"
+        "  cost: z.union([moneySchema, z.undefined()]).optional(),\n"
+        "  raw_response: z.any().optional(),\n"
+        "});\n\n"
+    )
+
+    ts_definitions += (
+        "export const singleEvaluationResultSchema = z.union([\n"
+        "  evaluationResultSchema,\n"
+        "  evaluationResultSkippedSchema,\n"
+        "  evaluationResultErrorSchema,\n"
+        "]);\n\n"
+    )
+
+    # evaluatorsSchema — Zod schema is the source of truth
+    ts_definitions += "export const evaluatorsSchema = z.object({\n"
+    for evaluator_name, evaluator_info in evaluators_info.items():
+        zod_fields = evaluator_info.get("settingsZodFields", {})
+        if len(zod_fields) == 0:
+            settings_zod = "z.object({})"
+        else:
+            inner = stringify_zod_fields(zod_fields)
+            settings_zod = f"z.object({{{inner}}})"
+        ts_definitions += f'  "{evaluator_name}": z.object({{\n'
+        ts_definitions += f"    settings: {settings_zod},\n"
+        ts_definitions += "  }),\n"
+    ts_definitions += "});\n\n"
+
+    ts_definitions += (
+        "export const batchEvaluationResultSchema = z.array(\n"
+        "  singleEvaluationResultSchema,\n"
+        ");\n\n"
+    )
+
+    # Plain types (kept for compile-time use)
+    ts_definitions += (
         f"export type EvaluatorDefinition<T extends EvaluatorTypes> = {{\n"
         f"    name: string;\n"
         f"    description: string;\n"
@@ -206,40 +395,15 @@ def generate_typescript_definitions(evaluators_info: Dict[str, Dict[str, Any]]) 
         f"    }};\n"
         f"}};\n\n"
         f"export type EvaluatorTypes = keyof Evaluators;\n\n"
-        f"export type EvaluationResult = {{\n"
-        f"    status: 'processed';\n"
-        f"    score?: number | undefined;\n"
-        f"    passed?: boolean | undefined;\n"
-        f"    label?: string | undefined;\n"
-        f"    details?: string | undefined;\n"
-        f"    cost?: Money | undefined;\n"
-        f"    raw_response?: any;\n"
-        f"}};\n\n"
-        f"export type EvaluationResultSkipped = {{\n"
-        f"    status: 'skipped';\n"
-        f"    details?: string | undefined;\n"
-        f"}};\n\n"
-        f"export type EvaluationResultError = {{\n"
-        f"    status: 'error';\n"
-        f"    error_type: string;\n"
-        f"    details: string;\n"
-        f"    traceback: string[];\n"
-        f"}};\n\n"
+        f"export type EvaluationResult = z.infer<typeof evaluationResultSchema>;\n\n"
+        f"export type EvaluationResultSkipped = z.infer<typeof evaluationResultSkippedSchema>;\n\n"
+        f"export type EvaluationResultError = z.infer<typeof evaluationResultErrorSchema>;\n\n"
         f"export type SingleEvaluationResult = EvaluationResult | EvaluationResultSkipped | EvaluationResultError;\n"
         f"export type BatchEvaluationResult = SingleEvaluationResult[];\n\n"
-        f"export type Money = {{\n"
-        f"    currency: string;\n"
-        f"    amount: number;\n"
-        f"}};\n\n"
+        f"export type Money = z.infer<typeof moneySchema>;\n\n"
     )
-    ts_definitions += "export type Evaluators = {\n"
-    for evaluator_name, evaluator_info in evaluators_info.items():
-        ts_definitions += f'  "{evaluator_name}": {{\n'
-        ts_definitions += (
-            f"    settings: {stringify_field_types(evaluator_info['settingsTypes'])};\n"
-        )
-        ts_definitions += "  };\n"
-    ts_definitions += "};\n\n"
+
+    ts_definitions += "export type Evaluators = z.infer<typeof evaluatorsSchema>;\n\n"
 
     ts_definitions += "export const AVAILABLE_EVALUATORS: {\n"
     ts_definitions += "  [K in EvaluatorTypes]: EvaluatorDefinition<K>;\n"
