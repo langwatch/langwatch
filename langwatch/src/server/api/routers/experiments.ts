@@ -76,7 +76,7 @@ export const experimentsRouter = createTRPCRouter({
       let workflowId = input.dsl.workflow_id;
       const name =
         input.workbenchState.name ?? (await findNextDraftName(input.projectId));
-      let slug = await generateUniqueExperimentSlug({
+      const slug = await generateUniqueExperimentSlug({
         baseSlug: slugify(name),
         projectId: input.projectId,
         prisma,
@@ -173,7 +173,7 @@ export const experimentsRouter = createTRPCRouter({
 
       const experimentId = input.experimentId ?? `experiment_${nanoid()}`;
 
-      const { slug: finalSlug } = await withSlugConflictRetry({
+      await withSlugConflictRetry({
         initialSlug: slug,
         execute: (s) => {
           const data = {
@@ -198,7 +198,6 @@ export const experimentsRouter = createTRPCRouter({
             excludeExperimentId: input.experimentId,
           }),
       });
-      slug = finalSlug;
 
       // For some reason, prisma upsert sometimes return not an experiment but {count: 0}, so we need to refetch it
       const updatedExperiment = await prisma.experiment.findUnique({
@@ -248,10 +247,10 @@ export const experimentsRouter = createTRPCRouter({
       const name =
         input.state.name || (await findNextDraftName(input.projectId));
 
+      const rawSlug = input.state.experimentSlug ?? experimentId.slice(-8);
       let slug: string;
       if (isNewExperiment) {
         // New experiment: deduplicate the slug to avoid P2002 constraint violations
-        const rawSlug = input.state.experimentSlug ?? experimentId.slice(-8);
         slug = await generateUniqueExperimentSlug({
           baseSlug: rawSlug,
           projectId: input.projectId,
@@ -265,8 +264,7 @@ export const experimentsRouter = createTRPCRouter({
       // Convert to plain JSON for Prisma storage
       const workbenchStateJson = JSON.parse(JSON.stringify(input.state));
 
-      const rawSlug = input.state.experimentSlug ?? experimentId.slice(-8);
-      const { slug: finalSlug } = await withSlugConflictRetry({
+      await withSlugConflictRetry({
         initialSlug: slug,
         execute: (s) => {
           const data = {
@@ -289,7 +287,6 @@ export const experimentsRouter = createTRPCRouter({
             prisma,
           }),
       });
-      slug = finalSlug;
 
       const updatedExperiment = await prisma.experiment.findUnique({
         where: {
