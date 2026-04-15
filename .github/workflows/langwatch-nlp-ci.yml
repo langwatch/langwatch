@@ -1,24 +1,17 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+# Branch protection requires `langwatch-nlp-complete` (includes docker-build).
+# `pull_request_target` runs real tests on `approved-ci` labeled dependabot
+# PRs (per-job `if:` guards); that event forces `relevant=true`.
 name: langwatch-nlp-ci
 
 on:
   push:
     branches:
       - main
-    paths:
-      - "langwatch_nlp/**"
-      - "python-sdk/**"
-      - ".github/workflows/langwatch-nlp-ci.yml"
   pull_request:
-    paths:
-      - "langwatch_nlp/**"
-      - "python-sdk/**"
-      - ".github/workflows/langwatch-nlp-ci.yml"
   pull_request_target:
     types: [labeled]
-    paths:
-      - "langwatch_nlp/**"
-      - "python-sdk/**"
-      - ".github/workflows/langwatch-nlp-ci.yml"
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -26,11 +19,28 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'langwatch_nlp/**'
+              - 'python-sdk/**'
+              - '.github/workflows/langwatch-nlp-ci.yml'
+
   lint:
+    needs: changes
     if: >
-      github.event_name != 'pull_request_target'
-      || (github.event.label.name == 'approved-ci'
-          && github.event.pull_request.user.login == 'dependabot[bot]')
+      needs.changes.outputs.relevant == 'true'
+      && (github.event_name != 'pull_request_target'
+          || (github.event.label.name == 'approved-ci'
+              && github.event.pull_request.user.login == 'dependabot[bot]'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -55,10 +65,12 @@ jobs:
       #   run: make lint
 
   test:
+    needs: changes
     if: >
-      github.event_name != 'pull_request_target'
-      || (github.event.label.name == 'approved-ci'
-          && github.event.pull_request.user.login == 'dependabot[bot]')
+      needs.changes.outputs.relevant == 'true'
+      && (github.event_name != 'pull_request_target'
+          || (github.event.label.name == 'approved-ci'
+              && github.event.pull_request.user.login == 'dependabot[bot]'))
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -82,10 +94,12 @@ jobs:
         run: make test
 
   test-integration:
+    needs: changes
     if: >
-      github.event_name != 'pull_request_target'
-      || (github.event.label.name == 'approved-ci'
-          && github.event.pull_request.user.login == 'dependabot[bot]')
+      needs.changes.outputs.relevant == 'true'
+      && (github.event_name != 'pull_request_target'
+          || (github.event.label.name == 'approved-ci'
+              && github.event.pull_request.user.login == 'dependabot[bot]'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -114,10 +128,12 @@ jobs:
         run: make test-integration
 
   docker-build:
+    needs: changes
     if: >
-      github.event_name != 'pull_request_target'
-      || (github.event.label.name == 'approved-ci'
-          && github.event.pull_request.user.login == 'dependabot[bot]')
+      needs.changes.outputs.relevant == 'true'
+      && (github.event_name != 'pull_request_target'
+          || (github.event.label.name == 'approved-ci'
+              && github.event.pull_request.user.login == 'dependabot[bot]'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -138,3 +154,13 @@ jobs:
           tags: langwatch/langwatch_nlp:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  langwatch-nlp-complete:
+    needs: [changes, lint, test, test-integration, docker-build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: lint, test, test-integration, docker-build
