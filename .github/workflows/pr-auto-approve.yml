@@ -1,8 +1,7 @@
 name: pr-auto-approve
 
-# Consolidated PR auto-approval workflow.
+# PR auto-approval workflow.
 #
-# Replaces approval-or-hotfix, low-risk-evaluation, and low-risk-label-reset.
 # The bot submits an APPROVE review for low-risk and firefighting PRs, which
 # satisfies branch protection's required_approving_review_count. Branch
 # protection — not this workflow — is what actually blocks merges; this
