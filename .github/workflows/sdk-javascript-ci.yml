@@ -10,6 +10,7 @@ on:
   pull_request:
   pull_request_target:
     types: [labeled]
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -24,27 +25,17 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      relevant: ${{ steps.filter.outputs.relevant || steps.force.outputs.relevant }}
+      relevant: ${{ steps.detect.outputs.relevant }}
     steps:
-      - name: Checkout
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - name: Detect relevant changes
-        if: github.event_name == 'pull_request'
-        id: filter
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: ./.github/actions/detect-changes
+        id: detect
         with:
           filters: |
             relevant:
               - 'typescript-sdk/**'
               - '.github/workflows/sdk-javascript-ci.yml'
               - '.github/.release-please-manifest.json'
-
-      - name: Force relevant on non-PR events
-        if: github.event_name != 'pull_request'
-        id: force
-        run: echo "relevant=true" >> "$GITHUB_OUTPUT"
 
   ci:
     needs: changes
@@ -64,20 +55,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2
+      - uses: ./.github/actions/setup-pnpm-node
         with:
-          version: 10.24.0
-
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
-        with:
-          node-version: 24
-          cache: "pnpm"
           cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          install-dir: typescript-sdk
 
       - name: Install TypeScript Native Preview
         run: pnpm install -D @typescript/native-preview
@@ -173,20 +154,16 @@ jobs:
         with:
           version: 10.24.0
 
+      # Single setup-node call covers all three pnpm lockfiles used by the
+      # e2e job (typescript-sdk, langwatch app, mcp-server). Calling
+      # setup-node twice silently discards the first cache config.
       - name: Setup Node
         uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
         with:
           node-version: 24
           cache: "pnpm"
-          cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
-
-      # Install LangWatch app dependencies
-      - name: Setup Node for LangWatch
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
-        with:
-          node-version: 24
-          cache: "pnpm"
           cache-dependency-path: |
+            typescript-sdk/pnpm-lock.yaml
             langwatch/pnpm-lock.yaml
             mcp-server/pnpm-lock.yaml
 
@@ -211,13 +188,7 @@ jobs:
         run: pnpm prisma:seed
 
       - name: Install goose
-        run: |
-          GOOSE_URL="https://github.com/pressly/goose/releases/download/v3.26.0/goose_linux_x86_64"
-          GOOSE_SHA256="8b3eee9845cd87d827ba1abddb85235fb3684f9fb1666426f647ddd12fd29efe"
-          curl -fsSL "$GOOSE_URL" -o /tmp/goose
-          echo "$GOOSE_SHA256  /tmp/goose" | sha256sum -c - || (rm -f /tmp/goose && exit 1)
-          sudo mv /tmp/goose /usr/local/bin/goose
-          chmod +x /usr/local/bin/goose
+        run: bash .github/scripts/install-goose.sh
 
       - name: Setup ClickHouse
         working-directory: langwatch

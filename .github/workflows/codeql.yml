@@ -11,6 +11,7 @@ on:
     branches: ["main"]
     # Draft PRs are excluded by specifying only these types
     types: [opened, synchronize, reopened, ready_for_review]
+  merge_group:
   schedule:
     - cron: "00 08 * * *"
 
@@ -19,16 +20,11 @@ jobs:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
     runs-on: ubuntu-latest
     outputs:
-      relevant: ${{ steps.filter.outputs.relevant || steps.force.outputs.relevant }}
+      relevant: ${{ steps.detect.outputs.relevant }}
     steps:
-      - name: Checkout
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - name: Detect relevant changes
-        if: github.event_name == 'pull_request'
-        id: filter
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: ./.github/actions/detect-changes
+        id: detect
         with:
           filters: |
             relevant:
@@ -41,11 +37,6 @@ jobs:
               - 'langevals/**'
               - 'sdk-go/**'
               - '.github/workflows/codeql.yml'
-
-      - name: Force relevant on non-PR events
-        if: github.event_name != 'pull_request'
-        id: force
-        run: echo "relevant=true" >> "$GITHUB_OUTPUT"
 
   analyze:
     needs: changes

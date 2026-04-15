@@ -10,6 +10,7 @@ on:
   pull_request:
   pull_request_target:
     types: [labeled]
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -20,27 +21,17 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      relevant: ${{ steps.filter.outputs.relevant || steps.force.outputs.relevant }}
+      relevant: ${{ steps.detect.outputs.relevant }}
     steps:
-      - name: Checkout
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - name: Detect relevant changes
-        if: github.event_name == 'pull_request'
-        id: filter
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: ./.github/actions/detect-changes
+        id: detect
         with:
           filters: |
             relevant:
               - 'mcp-server/**'
               - '.github/workflows/mcp-javascript-ci.yml'
               - '.github/.release-please-manifest.json'
-
-      - name: Force relevant on non-PR events
-        if: github.event_name != 'pull_request'
-        id: force
-        run: echo "relevant=true" >> "$GITHUB_OUTPUT"
 
   typecheck:
     needs: changes
@@ -56,20 +47,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2
+      - uses: ./.github/actions/setup-pnpm-node
         with:
-          version: 10.24.0
-
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
-        with:
-          node-version: 24
-          cache: "pnpm"
           cache-dependency-path: "mcp-server/pnpm-lock.yaml"
-
-      - name: Install dependencies
-        working-directory: mcp-server
-        run: pnpm install --frozen-lockfile
+          install-dir: mcp-server
 
       - name: Run typecheck
         working-directory: mcp-server
@@ -89,20 +70,10 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2
+      - uses: ./.github/actions/setup-pnpm-node
         with:
-          version: 10.24.0
-
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
-        with:
-          node-version: 24
-          cache: "pnpm"
           cache-dependency-path: "mcp-server/pnpm-lock.yaml"
-
-      - name: Install dependencies
-        working-directory: mcp-server
-        run: pnpm install --frozen-lockfile
+          install-dir: mcp-server
 
       - name: Build
         working-directory: mcp-server

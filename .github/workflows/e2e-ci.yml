@@ -10,6 +10,7 @@ on:
     branches:
       - main
   pull_request:
+  merge_group:
   workflow_dispatch:
   # Optional: run nightly for regression detection
   # schedule:
@@ -23,16 +24,11 @@ jobs:
   changes:
     runs-on: ubuntu-latest
     outputs:
-      relevant: ${{ steps.filter.outputs.relevant || steps.force.outputs.relevant }}
+      relevant: ${{ steps.detect.outputs.relevant }}
     steps:
-      - name: Checkout
-        if: github.event_name == 'pull_request'
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
-
-      - name: Detect relevant changes
-        if: github.event_name == 'pull_request'
-        id: filter
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: ./.github/actions/detect-changes
+        id: detect
         with:
           filters: |
             relevant:
@@ -40,11 +36,6 @@ jobs:
               - 'python-sdk/**'
               - 'agentic-e2e-tests/**'
               - '.github/workflows/e2e-ci.yml'
-
-      - name: Force relevant on non-PR events
-        if: github.event_name != 'pull_request'
-        id: force
-        run: echo "relevant=true" >> "$GITHUB_OUTPUT"
 
   e2e:
     needs: changes
@@ -165,13 +156,7 @@ jobs:
         run: pnpm start:prepare:files
 
       - name: Install goose
-        run: |
-          GOOSE_URL="https://github.com/pressly/goose/releases/download/v3.26.0/goose_linux_x86_64"
-          GOOSE_SHA256="8b3eee9845cd87d827ba1abddb85235fb3684f9fb1666426f647ddd12fd29efe"
-          curl -fsSL "$GOOSE_URL" -o /tmp/goose
-          echo "$GOOSE_SHA256  /tmp/goose" | sha256sum -c - || (rm -f /tmp/goose && exit 1)
-          sudo mv /tmp/goose /usr/local/bin/goose
-          chmod +x /usr/local/bin/goose
+        run: bash .github/scripts/install-goose.sh
 
       - name: Setup database
         working-directory: langwatch
