@@ -85,11 +85,9 @@ const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
 export const ProjectSelector = React.memo(function ProjectSelector({
   organizations,
   project,
-  organizationRole,
 }: {
   organizations: FullyLoadedOrganization[];
   project: Project;
-  organizationRole?: OrganizationUserRole;
 }) {
   const router = useRouter();
   const currentRoute = findCurrentRoute(router.pathname);
@@ -141,9 +139,10 @@ export const ProjectSelector = React.memo(function ProjectSelector({
               <>
                 {projectGroups
                   .filter((projectGroup) =>
-                    // Org admins with no TeamUser row (RoleBinding-only) can still
-                    // access all projects in their org.
-                    organizationRole === OrganizationUserRole.ADMIN ||
+                    // Org admins created via RoleBinding-only flow have no TeamUser row
+                    // but still have full access. Use the per-org role from organization.members
+                    // (which is pre-filtered to the current user by getAllForUser).
+                    projectGroup.organization.members[0]?.role === OrganizationUserRole.ADMIN ||
                     (projectGroup.team.members?.some(
                       (member) => member.userId === session?.user.id,
                     ) ?? false),
@@ -415,7 +414,6 @@ export const DashboardLayout = ({
               <ProjectSelector
                 organizations={organizations}
                 project={project}
-                organizationRole={organizationRole}
               />
               <Box display={["none", "none", "flex"]}>
                 <Breadcrumbs currentRoute={currentRoute} />
