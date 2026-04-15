@@ -29,7 +29,9 @@ import { prisma } from "../../../db";
 describe.skip("Feature: Experiment slug deduplication", () => {
   const projectId = "test-project-id";
   const createdExperimentIds: string[] = [];
-  const service = getApp().experiments;
+  // Lazy so the describe body can be evaluated even when skipped. getApp()
+  // throws at describe-registration time otherwise.
+  let service: ReturnType<typeof getApp>["experiments"];
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   const createExperimentWithSlug = async (slug: string) => {
@@ -48,6 +50,7 @@ describe.skip("Feature: Experiment slug deduplication", () => {
   };
 
   beforeAll(async () => {
+    service = getApp().experiments;
     const user = await getTestUser();
     const ctx = createInnerTRPCContext({
       session: {

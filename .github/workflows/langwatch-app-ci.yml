@@ -67,9 +67,12 @@ jobs:
   test-unit:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     env:
-      VITEST_MAX_WORKERS: "8" # Cannot use 100% here, it gets parsed as "100" so its actually slower
-      # Required environment variables for integration tests
+      VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       BASE_HOST: "localhost:3000"
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
@@ -93,11 +96,12 @@ jobs:
         working-directory: langwatch
         run: pnpm start:prepare:files
 
-      - name: Run unit tests with coverage
+      - name: Run unit tests with coverage (shard ${{ matrix.shard }}/4)
         id: unit-tests
         working-directory: langwatch
         run: |
-          pnpm test:unit --run --coverage --coverage.reporter=lcov --coverage.reporter=text \
+          pnpm test:unit --run --shard=${{ matrix.shard }}/4 \
+            --coverage --coverage.reporter=lcov --coverage.reporter=text \
             --reporter=default --reporter=json --outputFile=test-results.json \
             --dangerouslyIgnoreUnhandledErrors
 
@@ -120,14 +124,18 @@ jobs:
         with:
           files: langwatch/coverage/lcov.info
           flags: unit
-          name: unit-tests
+          name: unit-tests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
 
   test-integration:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     env:
-      VITEST_MAX_WORKERS: "8" # Cannot use 100% here, it gets parsed as "100" so its actually slower
+      VITEST_MAX_WORKERS: "4" # physical core count on GitHub-hosted ubuntu runners
       # Required environment variables for integration tests
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       BASE_HOST: "localhost:3000"
@@ -270,11 +278,12 @@ jobs:
         working-directory: langwatch
         run: pnpm clickhouse:migrate
 
-      - name: Run integration tests with coverage
+      - name: Run integration tests with coverage (shard ${{ matrix.shard }}/4)
         id: integration-tests
         working-directory: langwatch
         run: |
-          pnpm test:integration --coverage --coverage.reporter=lcov --coverage.reporter=text \
+          pnpm test:integration --shard=${{ matrix.shard }}/4 \
+            --coverage --coverage.reporter=lcov --coverage.reporter=text \
             --reporter=default --reporter=json --outputFile=test-results.json
 
       - name: Extract test failures
@@ -296,7 +305,7 @@ jobs:
         with:
           files: langwatch/coverage/lcov.info
           flags: integration
-          name: integration-tests
+          name: integration-tests-shard-${{ matrix.shard }}
           fail_ci_if_error: false
 
   lint:
