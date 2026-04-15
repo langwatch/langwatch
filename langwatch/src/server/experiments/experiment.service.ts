@@ -10,13 +10,10 @@ import { ExperimentRepository } from "./experiment.repository";
  * Owns slug generation, draft naming, lookups, and P2002 retry strategy.
  */
 export class ExperimentService {
-  constructor(
-    private readonly prisma: PrismaClient,
-    private readonly repository: ExperimentRepository,
-  ) {}
+  constructor(private readonly repository: ExperimentRepository) {}
 
   static create(prisma: PrismaClient): ExperimentService {
-    return new ExperimentService(prisma, new ExperimentRepository(prisma));
+    return new ExperimentService(new ExperimentRepository(prisma));
   }
 
   async getBySlug({
