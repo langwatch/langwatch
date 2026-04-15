@@ -1,6 +1,6 @@
 import { Badge, Box, Card, HStack, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
-import NextLink from "next/link";
+import NextLink from "~/utils/compat/next-link";
 import { formatDuration } from "~/components/ops/shared/formatters";
 import { replayStateColor } from "~/components/ops/shared/ReplayStateBadge";
 import { api } from "~/utils/api";

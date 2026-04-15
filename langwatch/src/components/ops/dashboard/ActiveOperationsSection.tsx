@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import NextLink from "next/link";
+import NextLink from "~/utils/compat/next-link";
 import type { DashboardData } from "~/server/app-layer/ops/types";
 import { useReplayStatus } from "~/hooks/useReplayStatus";
 

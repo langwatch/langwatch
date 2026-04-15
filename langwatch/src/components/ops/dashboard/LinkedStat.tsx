@@ -1,6 +1,6 @@
 import { HStack, Stat, Text } from "@chakra-ui/react";
 import { ArrowUpRight } from "lucide-react";
-import NextLink from "next/link";
+import NextLink from "~/utils/compat/next-link";
 
 export function LinkedStat({
   label,
