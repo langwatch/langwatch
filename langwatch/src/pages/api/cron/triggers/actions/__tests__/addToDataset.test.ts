@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { TriggerContext } from "../../types";
 import { handleAddToDataset } from "../addToDataset";
 
-vi.mock("~/server/api/routers/datasetRecord", () => ({
+vi.mock("~/server/api/routers/datasetRecord.utils", () => ({
   createManyDatasetRecords: vi.fn(),
 }));
 
