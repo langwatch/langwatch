@@ -6,7 +6,7 @@ description: "Time-travel debugger for event-sourced aggregates"
 **Deja View** (`/ops/dejaview`) is a time-travel debugger for LangWatch's event-sourcing system. It lets you search for any aggregate, inspect its full event history, and compute any projection's state at any point in that history — all from a single interface.
 
 <Frame>
-<img src="/images/ops/dejaview.png" alt="Deja View showing event timeline and projection state" />
+<img src="/images/ops/dejaview-detail.png" alt="Deja View showing event timeline and projection state" />
 </Frame>
 
 ## When to Use Deja View
@@ -25,16 +25,12 @@ The search bar at the top accepts:
 Results appear in a table showing matching aggregates. Click a row to load its event stream.
 
 <Frame>
-<img src="/images/ops/dejaview-search.png" alt="Deja View search results" />
+<img src="/images/ops/dejaview.png" alt="Deja View search interface" />
 </Frame>
 
 ## Event Timeline
 
 Once an aggregate is selected, the bottom of the screen shows a **horizontal event timeline** — a color-coded sequence of numbered event boxes.
-
-<Frame>
-<img src="/images/ops/dejaview-timeline.png" alt="Event timeline with color-coded event types" />
-</Frame>
 
 - Each box represents one event, numbered sequentially
 - Colors are assigned by event type, with a legend at the top
@@ -56,10 +52,6 @@ The center panel shows the current event's payload. Toggle between:
 - **Raw view** — the complete event data structure
 - **Diff view** — shows what changed compared to the previous event
 
-<Frame>
-<img src="/images/ops/dejaview-event.png" alt="Event payload with diff view" />
-</Frame>
-
 Press `e` or click the toggle to open a detailed JSON viewer in the right panel for deeply nested event payloads.
 
 ## Projection State
@@ -67,10 +59,6 @@ Press `e` or click the toggle to open a detailed JSON viewer in the right panel 
 The left panel lists all available **projections** and **reactors** for the aggregate type. Select a projection to compute its state at the current event position.
 
 This is the core of the time-travel capability: you can step through events and watch how a projection's state evolves with each event.
-
-<Frame>
-<img src="/images/ops/dejaview-projection.png" alt="Projection state computed at a specific event" />
-</Frame>
 
 For example:
 1. Select a projection (e.g., "TraceAnalytics")

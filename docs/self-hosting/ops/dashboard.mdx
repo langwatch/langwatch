@@ -37,19 +37,11 @@ When a [projection replay](/self-hosting/ops/projection-replay) is running or pi
 
 A time-series chart tracks throughput over time, showing staged, completed, and failed rates. Use this to identify processing backlogs (staged >> completed) or failure spikes.
 
-<Frame>
-<img src="/images/ops/dashboard-throughput.png" alt="Throughput chart showing staged vs completed rates" />
-</Frame>
-
 ## Pipeline Tree
 
 The pipeline tree shows the hierarchical structure of all processing pipelines. Each node represents a pipeline stage.
 
 Operators with `ops:manage` permission can **pause** and **unpause** individual pipeline stages directly from the tree. Pausing a stage prevents new jobs from being consumed while allowing in-flight jobs to complete.
-
-<Frame>
-<img src="/images/ops/dashboard-pipeline-tree.png" alt="Pipeline tree with pause controls" />
-</Frame>
 
 ## Top Errors
 
@@ -60,10 +52,6 @@ The bottom of the dashboard lists the top error patterns across all queues, show
 - **Pipeline** — which pipeline stage produced the error
 
 This gives a quick signal on whether errors are concentrated in a single pipeline or scattered across the system.
-
-<Frame>
-<img src="/images/ops/dashboard-top-errors.png" alt="Top errors table" />
-</Frame>
 
 ## Real-Time Updates
 

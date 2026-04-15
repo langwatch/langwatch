@@ -41,10 +41,6 @@ Set the **"Replay events since"** date — only events after this date are repro
 
 Once tenants and date are selected, the system automatically **discovers aggregates** — querying ClickHouse to find how many aggregates match each projection.
 
-<Frame>
-<img src="/images/ops/projection-replay-discover.png" alt="Aggregate discovery showing counts per projection" />
-</Frame>
-
 ### Step 3: Select Projections
 
 A table shows all available projections with:
@@ -64,10 +60,6 @@ Two action options:
 - **Start Full Replay** — runs the four-phase replay process
 - **Dry Run** — processes 5 sample aggregates in memory without writing, to verify the projection logic is correct
 
-<Frame>
-<img src="/images/ops/projection-replay-summary.png" alt="Replay summary with start and dry run buttons" />
-</Frame>
-
 ## Monitoring Progress
 
 When a replay starts, a **progress drawer** slides open showing real-time metrics:
@@ -79,16 +71,6 @@ When a replay starts, a **progress drawer** slides open showing real-time metric
 - **Throughput** — events per second
 - **Elapsed time** — wall clock since start
 - **Projection badges** — highlighting the currently active projection
-
-<Frame>
-<img src="/images/ops/projection-replay-progress.png" alt="Replay progress drawer with real-time metrics" />
-</Frame>
-
-A **status banner** also appears on the main page, visible even if you navigate away:
-
-<Frame>
-<img src="/images/ops/projection-replay-banner.png" alt="Replay status banner" />
-</Frame>
 
 ## Replay History
 
@@ -105,10 +87,6 @@ Below the wizard, a **history table** shows all past replay runs with:
 | **When** | Start timestamp |
 
 Click any row to navigate to its detailed status page (`/ops/projections/{runId}`).
-
-<Frame>
-<img src="/images/ops/projection-replay-history.png" alt="Replay history table" />
-</Frame>
 
 ## Single Aggregate Replay
 

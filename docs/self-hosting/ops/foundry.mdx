@@ -29,17 +29,9 @@ The Foundry is split into two panels:
 
 The project selector at the top of the sidebar determines where traces are sent. It lists all projects you have access to, grouped by organization. Selecting a project automatically uses its API key for execution.
 
-<Frame>
-<img src="/images/ops/foundry-connection.png" alt="Target project selector" />
-</Frame>
-
 ## Span Tree
 
 The span tree shows all spans in the trace as a nested hierarchy. Each span displays its type icon, name, and type badge.
-
-<Frame>
-<img src="/images/ops/foundry-span-tree.png" alt="Span tree with nested spans" />
-</Frame>
 
 **Supported span types:**
 - **LLM** — language model calls with messages, model, temperature
@@ -84,19 +76,11 @@ A horizontal timeline showing when each span executed relative to the trace star
 
 A directed acyclic graph (DAG) showing span relationships as nodes and edges. Nodes display the span name, type, and duration. The graph auto-layouts to minimize overlap, with pan and zoom controls.
 
-<Frame>
-<img src="/images/ops/foundry-graph.png" alt="Graph view of span relationships" />
-</Frame>
-
 ## JSON View
 
 A Monaco code editor showing the full trace configuration as JSON. You can edit the JSON directly — changes are validated in real-time and reflected in the other views.
 
 Buttons for **Format**, **Copy**, and **Reset** are available in the header.
-
-<Frame>
-<img src="/images/ops/foundry-json.png" alt="JSON editor with trace configuration" />
-</Frame>
 
 ## Sending Traces
 
@@ -109,10 +93,6 @@ The execution controls at the bottom of the sidebar let you send the configured 
 The **execution log** below the button shows the status of each send:
 - Pending, success (with copyable trace ID), or error
 - Click a successful entry to copy its trace ID for lookup in the main LangWatch UI
-
-<Frame>
-<img src="/images/ops/foundry-execution.png" alt="Execution controls and log" />
-</Frame>
 
 ## Presets
 

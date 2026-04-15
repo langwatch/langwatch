@@ -9,10 +9,6 @@ Queue Management is handled through three sections of the [Ops Dashboard](/self-
 
 When a job fails repeatedly, its group becomes **blocked** — no new jobs in that group are processed until the error is resolved. The Blocked section clusters these failures by normalized error message, so you can see patterns at a glance.
 
-<Frame>
-<img src="/images/ops/queue-blocked.png" alt="Blocked groups clustered by error" />
-</Frame>
-
 Each error cluster shows:
 - **Count** — how many groups are affected
 - **Error message** — normalized sample
@@ -40,10 +36,6 @@ All write actions require the `ops:manage` permission.
 
 The DLQ holds groups that were explicitly moved there — either automatically after exceeding retry limits or manually via the "Move to DLQ" action. Items in the DLQ are not processed until an operator takes action.
 
-<Frame>
-<img src="/images/ops/queue-dlq.png" alt="Dead Letter Queue management" />
-</Frame>
-
 Each DLQ entry shows:
 - **Queue name** — which queue the group came from
 - **Group ID** and **Pipeline** — for identification
@@ -65,10 +57,6 @@ Each DLQ entry shows:
 ## Groups Table
 
 The Groups table provides a detailed per-group view of all processing groups across queues.
-
-<Frame>
-<img src="/images/ops/queue-groups.png" alt="Groups table with status filters" />
-</Frame>
 
 Each row shows:
 - **Group ID** — the logical partition key
@@ -96,10 +84,6 @@ Click any row to open the **Group Detail** dialog, which shows:
 - Error message and stack trace
 - Active job ID (if currently processing)
 - Paginated list of all jobs in the group with their scores and raw data
-
-<Frame>
-<img src="/images/ops/queue-group-detail.png" alt="Group detail dialog showing error and jobs" />
-</Frame>
 
 ## Common Workflows
 

@@ -26297,19 +26297,11 @@ When a [projection replay](/self-hosting/ops/projection-replay) is running or pi
 
 A time-series chart tracks throughput over time, showing staged, completed, and failed rates. Use this to identify processing backlogs (staged >> completed) or failure spikes.
 
-<Frame>
-<img src="/images/ops/dashboard-throughput.png" alt="Throughput chart showing staged vs completed rates" />
-</Frame>
-
 ## Pipeline Tree
 
 The pipeline tree shows the hierarchical structure of all processing pipelines. Each node represents a pipeline stage.
 
 Operators with `ops:manage` permission can **pause** and **unpause** individual pipeline stages directly from the tree. Pausing a stage prevents new jobs from being consumed while allowing in-flight jobs to complete.
-
-<Frame>
-<img src="/images/ops/dashboard-pipeline-tree.png" alt="Pipeline tree with pause controls" />
-</Frame>
 
 ## Top Errors
 
@@ -26320,10 +26312,6 @@ The bottom of the dashboard lists the top error patterns across all queues, show
 - **Pipeline** — which pipeline stage produced the error
 
 This gives a quick signal on whether errors are concentrated in a single pipeline or scattered across the system.
-
-<Frame>
-<img src="/images/ops/dashboard-top-errors.png" alt="Top errors table" />
-</Frame>
 
 ## Real-Time Updates
 
@@ -26351,7 +26339,7 @@ description: "Time-travel debugger for event-sourced aggregates"
 **Deja View** (`/ops/dejaview`) is a time-travel debugger for LangWatch's event-sourcing system. It lets you search for any aggregate, inspect its full event history, and compute any projection's state at any point in that history — all from a single interface.
 
 <Frame>
-<img src="/images/ops/dejaview.png" alt="Deja View showing event timeline and projection state" />
+<img src="/images/ops/dejaview-detail.png" alt="Deja View showing event timeline and projection state" />
 </Frame>
 
 ## When to Use Deja View
@@ -26370,16 +26358,12 @@ The search bar at the top accepts:
 Results appear in a table showing matching aggregates. Click a row to load its event stream.
 
 <Frame>
-<img src="/images/ops/dejaview-search.png" alt="Deja View search results" />
+<img src="/images/ops/dejaview.png" alt="Deja View search interface" />
 </Frame>
 
 ## Event Timeline
 
 Once an aggregate is selected, the bottom of the screen shows a **horizontal event timeline** — a color-coded sequence of numbered event boxes.
-
-<Frame>
-<img src="/images/ops/dejaview-timeline.png" alt="Event timeline with color-coded event types" />
-</Frame>
 
 - Each box represents one event, numbered sequentially
 - Colors are assigned by event type, with a legend at the top
@@ -26401,10 +26385,6 @@ The center panel shows the current event's payload. Toggle between:
 - **Raw view** — the complete event data structure
 - **Diff view** — shows what changed compared to the previous event
 
-<Frame>
-<img src="/images/ops/dejaview-event.png" alt="Event payload with diff view" />
-</Frame>
-
 Press `e` or click the toggle to open a detailed JSON viewer in the right panel for deeply nested event payloads.
 
 ## Projection State
@@ -26412,10 +26392,6 @@ Press `e` or click the toggle to open a detailed JSON viewer in the right panel 
 The left panel lists all available **projections** and **reactors** for the aggregate type. Select a projection to compute its state at the current event position.
 
 This is the core of the time-travel capability: you can step through events and watch how a projection's state evolves with each event.
-
-<Frame>
-<img src="/images/ops/dejaview-projection.png" alt="Projection state computed at a specific event" />
-</Frame>
 
 For example:
 1. Select a projection (e.g., "TraceAnalytics")
@@ -26491,17 +26467,9 @@ The Foundry is split into two panels:
 
 The project selector at the top of the sidebar determines where traces are sent. It lists all projects you have access to, grouped by organization. Selecting a project automatically uses its API key for execution.
 
-<Frame>
-<img src="/images/ops/foundry-connection.png" alt="Target project selector" />
-</Frame>
-
 ## Span Tree
 
 The span tree shows all spans in the trace as a nested hierarchy. Each span displays its type icon, name, and type badge.
-
-<Frame>
-<img src="/images/ops/foundry-span-tree.png" alt="Span tree with nested spans" />
-</Frame>
 
 **Supported span types:**
 - **LLM** — language model calls with messages, model, temperature
@@ -26546,19 +26514,11 @@ A horizontal timeline showing when each span executed relative to the trace star
 
 A directed acyclic graph (DAG) showing span relationships as nodes and edges. Nodes display the span name, type, and duration. The graph auto-layouts to minimize overlap, with pan and zoom controls.
 
-<Frame>
-<img src="/images/ops/foundry-graph.png" alt="Graph view of span relationships" />
-</Frame>
-
 ## JSON View
 
 A Monaco code editor showing the full trace configuration as JSON. You can edit the JSON directly — changes are validated in real-time and reflected in the other views.
 
 Buttons for **Format**, **Copy**, and **Reset** are available in the header.
-
-<Frame>
-<img src="/images/ops/foundry-json.png" alt="JSON editor with trace configuration" />
-</Frame>
 
 ## Sending Traces
 
@@ -26571,10 +26531,6 @@ The execution controls at the bottom of the sidebar let you send the configured 
 The **execution log** below the button shows the status of each send:
 - Pending, success (with copyable trace ID), or error
 - Click a successful entry to copy its trace ID for lookup in the main LangWatch UI
-
-<Frame>
-<img src="/images/ops/foundry-execution.png" alt="Execution controls and log" />
-</Frame>
 
 ## Presets
 
@@ -26728,10 +26684,6 @@ Set the **"Replay events since"** date — only events after this date are repro
 
 Once tenants and date are selected, the system automatically **discovers aggregates** — querying ClickHouse to find how many aggregates match each projection.
 
-<Frame>
-<img src="/images/ops/projection-replay-discover.png" alt="Aggregate discovery showing counts per projection" />
-</Frame>
-
 ### Step 3: Select Projections
 
 A table shows all available projections with:
@@ -26751,10 +26703,6 @@ Two action options:
 - **Start Full Replay** — runs the four-phase replay process
 - **Dry Run** — processes 5 sample aggregates in memory without writing, to verify the projection logic is correct
 
-<Frame>
-<img src="/images/ops/projection-replay-summary.png" alt="Replay summary with start and dry run buttons" />
-</Frame>
-
 ## Monitoring Progress
 
 When a replay starts, a **progress drawer** slides open showing real-time metrics:
@@ -26766,16 +26714,6 @@ When a replay starts, a **progress drawer** slides open showing real-time metric
 - **Throughput** — events per second
 - **Elapsed time** — wall clock since start
 - **Projection badges** — highlighting the currently active projection
-
-<Frame>
-<img src="/images/ops/projection-replay-progress.png" alt="Replay progress drawer with real-time metrics" />
-</Frame>
-
-A **status banner** also appears on the main page, visible even if you navigate away:
-
-<Frame>
-<img src="/images/ops/projection-replay-banner.png" alt="Replay status banner" />
-</Frame>
 
 ## Replay History
 
@@ -26792,10 +26730,6 @@ Below the wizard, a **history table** shows all past replay runs with:
 | **When** | Start timestamp |
 
 Click any row to navigate to its detailed status page (`/ops/projections/{runId}`).
-
-<Frame>
-<img src="/images/ops/projection-replay-history.png" alt="Replay history table" />
-</Frame>
 
 ## Single Aggregate Replay
 
@@ -26849,10 +26783,6 @@ Queue Management is handled through three sections of the [Ops Dashboard](/self-
 
 When a job fails repeatedly, its group becomes **blocked** — no new jobs in that group are processed until the error is resolved. The Blocked section clusters these failures by normalized error message, so you can see patterns at a glance.
 
-<Frame>
-<img src="/images/ops/queue-blocked.png" alt="Blocked groups clustered by error" />
-</Frame>
-
 Each error cluster shows:
 - **Count** — how many groups are affected
 - **Error message** — normalized sample
@@ -26880,10 +26810,6 @@ All write actions require the `ops:manage` permission.
 
 The DLQ holds groups that were explicitly moved there — either automatically after exceeding retry limits or manually via the "Move to DLQ" action. Items in the DLQ are not processed until an operator takes action.
 
-<Frame>
-<img src="/images/ops/queue-dlq.png" alt="Dead Letter Queue management" />
-</Frame>
-
 Each DLQ entry shows:
 - **Queue name** — which queue the group came from
 - **Group ID** and **Pipeline** — for identification
@@ -26905,10 +26831,6 @@ Each DLQ entry shows:
 ## Groups Table
 
 The Groups table provides a detailed per-group view of all processing groups across queues.
-
-<Frame>
-<img src="/images/ops/queue-groups.png" alt="Groups table with status filters" />
-</Frame>
 
 Each row shows:
 - **Group ID** — the logical partition key
@@ -26936,10 +26858,6 @@ Click any row to open the **Group Detail** dialog, which shows:
 - Error message and stack trace
 - Active job ID (if currently processing)
 - Paginated list of all jobs in the group with their scores and raw data
-
-<Frame>
-<img src="/images/ops/queue-group-detail.png" alt="Group detail dialog showing error and jobs" />
-</Frame>
 
 ## Common Workflows
 
