@@ -9,6 +9,7 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { generate } from "@langwatch/ksuid";
+import { NotFoundError, ValidationError } from "~/server/app-layer/domain-error";
 import { GROWTH_SEAT_PLAN_TYPES } from "../../../../../ee/billing/utils/growthSeatEvent";
 import { encrypt } from "~/utils/encryption";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -545,10 +546,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       for (const [teamId, teamRoleUpdate] of dedupedTeamRoleUpdates.entries()) {
         const currentMembership = currentMembershipByTeamId.get(teamId);
         if (!currentMembership) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "User is not a member of this team",
-          });
+          throw new NotFoundError("team_membership_not_found", "TeamMember", userId);
         }
 
         if (
@@ -557,18 +555,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             teamRole: teamRoleUpdate.role as TeamRoleValue,
           })
         ) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: LITE_MEMBER_VIEWER_ONLY_ERROR,
-          });
+          throw new ValidationError(LITE_MEMBER_VIEWER_ONLY_ERROR);
         }
 
         const updateIsCustomRole = isCustomRole(teamRoleUpdate.role);
         if (updateIsCustomRole && !teamRoleUpdate.customRoleId) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Custom role ID is required for custom role updates",
-          });
+          throw new ValidationError("Custom role ID is required for custom role updates");
         }
 
         if (updateIsCustomRole && teamRoleUpdate.customRoleId) {
@@ -577,10 +569,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             select: { organizationId: true },
           });
           if (!customRole || customRole.organizationId !== organizationId) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: "Custom role not found",
-            });
+            throw new NotFoundError("custom_role_not_found", "CustomRole", teamRoleUpdate.customRoleId ?? "unknown");
           }
         }
 
@@ -597,11 +586,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
             where: { organizationId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId, role: TeamUserRole.ADMIN, userId: { not: null } },
           });
           if (teamAdminCount <= 1) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message:
-                "Cannot remove or demote the last admin from this team",
-            });
+            throw new ValidationError("Cannot remove or demote the last admin from this team");
           }
         }
 

@@ -1,4 +1,5 @@
 import { RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
+import { NotFoundError, ValidationError } from "~/server/app-layer/domain-error";
 
 export class TeamService {
   constructor(private readonly prisma: PrismaClient) {}
@@ -213,5 +214,119 @@ export class TeamService {
     );
 
     return results;
+  }
+
+  async removeMember({
+    teamId,
+    userId,
+    currentUserId,
+  }: {
+    teamId: string;
+    userId: string;
+    currentUserId: string;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      // Validate that the team exists
+      const team = await tx.team.findUnique({
+        where: { id: teamId },
+        select: { id: true, name: true, organizationId: true },
+      });
+
+      if (!team) {
+        throw new NotFoundError("team_not_found", "Team", teamId);
+      }
+
+      // Lock and validate admin count within transaction
+      const adminBindings = await tx.roleBinding.findMany({
+        where: {
+          organizationId: team.organizationId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamId,
+          role: TeamUserRole.ADMIN,
+          userId: { not: null },
+        },
+        select: { userId: true },
+      });
+
+      const adminCount = adminBindings.length;
+
+      if (adminCount === 0) {
+        throw new ValidationError("No admin found for this team");
+      }
+
+      // Check if the target user is currently a member
+      const targetBinding = await tx.roleBinding.findFirst({
+        where: {
+          organizationId: team.organizationId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamId,
+          userId,
+        },
+        select: { role: true },
+      });
+
+      if (!targetBinding) {
+        throw new NotFoundError("team_membership_not_found", "TeamMember", userId);
+      }
+
+      const isTargetUserAdmin = targetBinding.role === TeamUserRole.ADMIN;
+
+      if (adminCount === 1 && isTargetUserAdmin) {
+        if (userId === currentUserId) {
+          throw new ValidationError("You cannot remove yourself from the last admin position in this team");
+        }
+
+        throw new ValidationError("Cannot remove the last admin from this team");
+      }
+
+      // Remove RoleBinding and legacy TeamUser row (if any) atomically
+      await Promise.all([
+        tx.roleBinding.deleteMany({
+          where: {
+            organizationId: team.organizationId,
+            userId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: teamId,
+          },
+        }),
+        tx.teamUser.deleteMany({
+          where: { userId, teamId },
+        }),
+      ]);
+
+      // Post-removal validation: ensure we still have at least one admin
+      const finalAdminCount = await tx.roleBinding.count({
+        where: {
+          organizationId: team.organizationId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: teamId,
+          role: TeamUserRole.ADMIN,
+          userId: { not: null },
+        },
+      });
+
+      if (finalAdminCount === 0) {
+        throw new ValidationError("Operation would result in no admins for this team");
+      }
+
+      // Return updated team data for client cache invalidation
+      const updatedTeam = await tx.team.findUnique({
+        where: { id: teamId },
+        include: {
+          members: {
+            include: {
+              user: true,
+              assignedRole: true,
+            },
+          },
+        },
+      });
+
+      return {
+        success: true,
+        team: updatedTeam,
+        removedUserId: userId,
+      };
+    });
   }
 }

@@ -45,6 +45,7 @@ import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { signUpDataSchema } from "./onboarding";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
+import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 
 
 const customTeamRoleInputSchema = z
@@ -63,59 +64,6 @@ const teamRoleInputSchema = z.union([
   customTeamRoleInputSchema,
 ]);
 
-type UserRoleBinding = {
-  organizationId: string;
-  scopeType: RoleBindingScopeType;
-  scopeId: string;
-  role: TeamUserRole;
-  customRoleId: string | null;
-  customRole: {
-    id: string;
-    name: string;
-    description: string | null;
-    permissions: unknown;
-    organizationId: string;
-    createdAt: Date;
-    updatedAt: Date;
-  } | null;
-};
-
-function applyRoleBindingToTeamMember(
-  team: { members: { userId: string; [key: string]: unknown }[]; id: string; projects: { id: string }[] },
-  userId: string,
-  userRoleBindings: UserRoleBinding[],
-  organizationId: string,
-) {
-  const teamProjectIds = new Set(team.projects.map((p) => p.id));
-  const binding = userRoleBindings.find(
-    (b) =>
-      b.organizationId === organizationId &&
-      ((b.scopeType === RoleBindingScopeType.TEAM &&
-        b.scopeId === team.id) ||
-        (b.scopeType === RoleBindingScopeType.PROJECT &&
-          teamProjectIds.has(b.scopeId))),
-  );
-  if (binding) {
-    const bindingMember = {
-      userId,
-      teamId: team.id,
-      role: binding.role,
-      assignedRoleId: binding.customRoleId ?? null,
-      assignedRole: binding.customRole ?? null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    const existingIndex = team.members.findIndex(
-      (m) => m.userId === userId,
-    );
-    // A user may appear via multiple bindings (e.g. TEAM + PROJECT scope); last one wins.
-    if (existingIndex >= 0) {
-      team.members[existingIndex] = bindingMember;
-    } else {
-      team.members.push(bindingMember);
-    }
-  }
-}
 
 export const organizationRouter = createTRPCRouter({
   createAndAssign: protectedProcedure
@@ -189,40 +137,7 @@ export const organizationRouter = createTRPCRouter({
       const orgIds = organizations.map((o) => o.id);
       const userRoleBindings =
         orgIds.length > 0
-          ? await ctx.prisma.roleBinding.findMany({
-              where: {
-                organizationId: { in: orgIds },
-                OR: [
-                  { userId },
-                  { group: { members: { some: { userId } } } },
-                ],
-                scopeType: {
-                  in: [
-                    RoleBindingScopeType.TEAM,
-                    RoleBindingScopeType.ORGANIZATION,
-                    RoleBindingScopeType.PROJECT,
-                  ],
-                },
-              },
-              select: {
-                organizationId: true,
-                scopeType: true,
-                scopeId: true,
-                role: true,
-                customRoleId: true,
-                customRole: {
-                  select: {
-                    id: true,
-                    name: true,
-                    description: true,
-                    permissions: true,
-                    organizationId: true,
-                    createdAt: true,
-                    updatedAt: true,
-                  },
-                },
-              },
-            })
+          ? await new PrismaRoleBindingRepository(ctx.prisma).listForOrganizationsAndUser({ orgIds, userId })
           : [];
 
       for (const organization of organizations) {
@@ -293,7 +208,8 @@ export const organizationRouter = createTRPCRouter({
           // only grant organization:view — they don't give team-level access.
           // Org admins are handled by the organizationRole === ADMIN shortcut in
           // the frontend hasPermission and backend resolveTeamPermission.
-          applyRoleBindingToTeamMember(team, userId, userRoleBindings, organization.id);
+          const enriched = getApp().organizations.enrichTeamWithRoleBindings(team, userId, userRoleBindings, organization.id);
+          team.members = enriched.members;
 
           if (isDemoOrg) return true;
           return isExternal
