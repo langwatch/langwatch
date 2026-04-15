@@ -83,7 +83,10 @@ describe("CLI E2E", () => {
     await apiHelpers.cleapUpTestPrompts();
   });
 
-  describe("sync", () => {
+  // Entire sync suite skipped due to chronic CI flakes — see langwatch/langwatch#3240.
+  // Multiple tests in this describe block fail non-deterministically; skip
+  // the whole group rather than whack-a-mole individual tests.
+  describe.skip("sync", () => {
     describe("create local -> sync -> update local -> sync", () => {
       it("should keep remote prompt up to date", async () => {
         // Initialize project
