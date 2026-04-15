@@ -4,6 +4,7 @@ import {
   PRECONDITION_ALLOWED_RULES,
   getAvailablePreconditionFields,
   getFieldLabel,
+  normalizePreconditionTraceData,
   type PreconditionTraceData,
   type PreconditionField,
 } from "../precondition-matchers";
@@ -67,12 +68,12 @@ describe("PRECONDITION_FIELD_MATCHERS", () => {
   describe("traces.origin matcher", () => {
     const matcher = PRECONDITION_FIELD_MATCHERS["traces.origin"]!;
 
-    it("defaults to 'application' when origin is undefined", () => {
-      expect(matcher(makeTraceData({ origin: undefined }), "")).toBe("application");
+    it("returns null when origin is undefined", () => {
+      expect(matcher(makeTraceData({ origin: undefined }), "")).toBeNull();
     });
 
-    it("defaults to 'application' when origin is null", () => {
-      expect(matcher(makeTraceData({ origin: null }), "")).toBe("application");
+    it("returns null when origin is null", () => {
+      expect(matcher(makeTraceData({ origin: null }), "")).toBeNull();
     });
 
     it("returns empty string when origin is empty string", () => {
@@ -507,5 +508,66 @@ describe("getFieldLabel()", () => {
     expect(getFieldLabel("evaluations.evaluator_id")).toBe(
       "Contains Evaluation",
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// normalizePreconditionTraceData()
+// ---------------------------------------------------------------------------
+
+describe("normalizePreconditionTraceData()", () => {
+  describe("given trace data with no origin set", () => {
+    describe("when origin is undefined", () => {
+      it("defaults origin to 'application'", () => {
+        const result = normalizePreconditionTraceData(
+          makeTraceData({ origin: undefined }),
+        );
+        expect(result.origin).toBe("application");
+      });
+    });
+
+    describe("when origin is null", () => {
+      it("defaults origin to 'application'", () => {
+        const result = normalizePreconditionTraceData(
+          makeTraceData({ origin: null }),
+        );
+        expect(result.origin).toBe("application");
+      });
+    });
+  });
+
+  describe("given trace data with an explicit origin", () => {
+    describe("when origin is 'evaluation'", () => {
+      it("preserves the origin value", () => {
+        const result = normalizePreconditionTraceData(
+          makeTraceData({ origin: "evaluation" }),
+        );
+        expect(result.origin).toBe("evaluation");
+      });
+    });
+
+    describe("when origin is 'playground'", () => {
+      it("preserves the origin value", () => {
+        const result = normalizePreconditionTraceData(
+          makeTraceData({ origin: "playground" }),
+        );
+        expect(result.origin).toBe("playground");
+      });
+    });
+  });
+
+  describe("given trace data with other fields set", () => {
+    it("leaves all other fields untouched", () => {
+      const input = makeTraceData({
+        origin: undefined,
+        userId: "user_42",
+        labels: ["prod"],
+        hasError: true,
+      });
+      const result = normalizePreconditionTraceData(input);
+      expect(result.userId).toBe("user_42");
+      expect(result.labels).toEqual(["prod"]);
+      expect(result.hasError).toBe(true);
+    });
   });
 });

@@ -10,6 +10,7 @@ import type {
 } from "../tracer/types";
 import {
   PRECONDITION_FIELD_MATCHERS,
+  normalizePreconditionTraceData,
   type PreconditionTraceData,
 } from "../filters/precondition-matchers";
 import { getEvaluatorDefinitions } from "./getEvaluator";
@@ -244,10 +245,11 @@ export function evaluatePreconditions({
   traceData: PreconditionTraceData;
   preconditions: CheckPreconditions;
 }): boolean {
+  const normalizedData = normalizePreconditionTraceData(traceData);
   for (const precondition of preconditions) {
     const fieldValue = resolveFieldValue({
       field: precondition.field,
-      data: traceData,
+      data: normalizedData,
       key: precondition.key,
       subkey: precondition.subkey,
       value: precondition.value,
