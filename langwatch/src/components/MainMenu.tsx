@@ -1,7 +1,9 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
+import { Activity, Anvil, Film, History } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
+import { useOpsPermission } from "../hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
@@ -236,6 +238,8 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/datasets")}
               showLabel={showExpanded}
             />
+
+            <OpsSection showExpanded={showExpanded} />
           </VStack>
 
           <VStack width="full" gap={0.5} align="start">
@@ -258,6 +262,68 @@ export const MainMenu = React.memo(function MainMenu({
     </Box>
   );
 });
+
+const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
+  const router = useRouter();
+  const { hasAccess } = useOpsPermission();
+
+  const opsData = api.ops.getDashboardSnapshot.useQuery(undefined, {
+    enabled: hasAccess,
+    refetchInterval: 10000,
+  });
+
+  if (!hasAccess) return null;
+
+  const blockedCount =
+    opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ?? 0;
+  const dlqCount =
+    opsData.data?.queues.reduce((sum, q) => sum + q.dlqCount, 0) ?? 0;
+
+  return (
+    <>
+      <Text
+        fontSize="11px"
+        fontWeight="medium"
+        textTransform="uppercase"
+        color="gray.500"
+        paddingX={2}
+        paddingTop={3}
+        paddingBottom={1}
+      >
+        {showExpanded ? "Ops" : <div>&nbsp;</div>}
+      </Text>
+      <SideMenuLink
+        icon={Activity}
+        label="Dashboard"
+        href="/ops"
+        isActive={router.pathname === "/ops" || router.pathname.startsWith("/ops/queues")}
+        badgeNumber={blockedCount + dlqCount}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={Film}
+        label="Projection Replay"
+        href="/ops/projections"
+        isActive={router.pathname.startsWith("/ops/projections")}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={Anvil}
+        label="The Foundry"
+        href="/ops/foundry"
+        isActive={router.pathname.startsWith("/ops/foundry")}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={History}
+        label="Deja View"
+        href="/ops/dejaview"
+        isActive={router.pathname.startsWith("/ops/dejaview")}
+        showLabel={showExpanded}
+      />
+    </>
+  );
+};
 
 type PageMenuLinkProps = {
   icon: React.ComponentType<{ size?: string | number; color?: string }>;

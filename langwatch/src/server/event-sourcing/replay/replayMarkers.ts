@@ -160,3 +160,73 @@ export async function hasPreviousRun({
   ]);
   return { completedCount, markerCount };
 }
+
+/** Pipeline HSET "pending" for a batch of aggregate keys across ALL projections. */
+export async function markPendingBatchMulti({
+  redis,
+  projectionNames,
+  aggKeys,
+}: {
+  redis: IORedis;
+  projectionNames: string[];
+  aggKeys: string[];
+}): Promise<void> {
+  if (aggKeys.length === 0 || projectionNames.length === 0) return;
+  const pipeline = redis.pipeline();
+  for (const projName of projectionNames) {
+    const key = cutoffKey(projName);
+    for (const aggKey of aggKeys) {
+      pipeline.hset(key, aggKey, "pending");
+    }
+    pipeline.expire(key, MARKER_TTL_SECONDS);
+  }
+  const results = await pipeline.exec();
+  checkPipelineErrors(results, "markPendingBatchMulti");
+}
+
+/** Pipeline HSET cutoff markers for a batch of aggregate keys across ALL projections. */
+export async function markCutoffBatchMulti({
+  redis,
+  projectionNames,
+  cutoffs,
+}: {
+  redis: IORedis;
+  projectionNames: string[];
+  cutoffs: Map<string, { timestamp: number; eventId: string }>;
+}): Promise<void> {
+  if (cutoffs.size === 0 || projectionNames.length === 0) return;
+  const pipeline = redis.pipeline();
+  for (const projName of projectionNames) {
+    const key = cutoffKey(projName);
+    for (const [aggKey, cutoff] of cutoffs) {
+      pipeline.hset(key, aggKey, `${cutoff.timestamp}:${cutoff.eventId}`);
+    }
+    pipeline.expire(key, MARKER_TTL_SECONDS);
+  }
+  const results = await pipeline.exec();
+  checkPipelineErrors(results, "markCutoffBatchMulti");
+}
+
+/** Pipeline HDEL + SADD for a batch of aggregate keys across ALL projections. */
+export async function unmarkBatchMulti({
+  redis,
+  projectionNames,
+  aggKeys,
+}: {
+  redis: IORedis;
+  projectionNames: string[];
+  aggKeys: string[];
+}): Promise<void> {
+  if (aggKeys.length === 0 || projectionNames.length === 0) return;
+  const pipeline = redis.pipeline();
+  for (const projName of projectionNames) {
+    const cKey = cutoffKey(projName);
+    const compKey = completedKey(projName);
+    for (const aggKey of aggKeys) {
+      pipeline.hdel(cKey, aggKey);
+      pipeline.sadd(compKey, aggKey);
+    }
+  }
+  const results = await pipeline.exec();
+  checkPipelineErrors(results, "unmarkBatchMulti");
+}

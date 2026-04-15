@@ -81,6 +81,12 @@ const ROUTE_PATTERNS = [
   "/:project/workflows",
   "/:project/chat/:workflow",
   "/:project/studio/:workflow",
+  "/ops",
+  "/ops/queues",
+  "/ops/dejaview",
+  "/ops/foundry",
+  "/ops/projections",
+  "/ops/projections/:runId",
   "/:project",
   "/",
 ];

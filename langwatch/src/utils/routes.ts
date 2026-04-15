@@ -170,6 +170,14 @@ export const projectRoutes = {
     path: "/[project]/evaluators",
     title: "Evaluators",
   },
+  ops: {
+    path: "/ops",
+    title: "Ops",
+  },
+  opsDejaview: {
+    path: "/ops/dejaview",
+    title: "Deja View",
+  },
 } as const;
 
 export type Route = {

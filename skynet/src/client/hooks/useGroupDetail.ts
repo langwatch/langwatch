@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import type { GroupDetailData, JobInfo, BullMQJob } from "../../shared/types.ts";
+import type { GroupDetailData, JobInfo } from "../../shared/types.ts";
 import { apiFetch } from "./useApi.ts";
 import { JOBS_PAGE_SIZE } from "../../shared/constants.ts";
 
@@ -12,13 +12,11 @@ interface JobsPage {
 
 interface GroupResponse extends GroupDetailData {
   status?: "completed";
-  completedJobs?: BullMQJob[];
 }
 
 export function useGroupDetail(groupId: string, queueName?: string) {
   const [group, setGroup] = useState<GroupDetailData | null>(null);
   const [jobsPage, setJobsPage] = useState<JobsPage | null>(null);
-  const [completedJobs, setCompletedJobs] = useState<BullMQJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
@@ -30,23 +28,16 @@ export function useGroupDetail(groupId: string, queueName?: string) {
 
       if (data.status === "completed") {
         setIsCompleted(true);
-        setCompletedJobs(data.completedJobs ?? []);
         setGroup(data);
         setError(null);
       } else {
         setGroup(data);
         setError(null);
         setIsCompleted(false);
-        setCompletedJobs([]);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
-      if (message.includes("404")) {
-        setIsCompleted(true);
-        setError(null);
-      } else {
-        setError(message);
-      }
+      setError(message);
     }
   }, [groupId, queueName]);
 
@@ -70,5 +61,5 @@ export function useGroupDetail(groupId: string, queueName?: string) {
     return () => clearInterval(interval);
   }, [fetchGroup, fetchJobs]);
 
-  return { group, jobsPage, completedJobs, loading, error, isCompleted, fetchJobs };
+  return { group, jobsPage, loading, error, isCompleted, fetchJobs };
 }

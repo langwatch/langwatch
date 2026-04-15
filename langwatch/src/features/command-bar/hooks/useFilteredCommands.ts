@@ -12,6 +12,7 @@ import { MIN_SEARCH_QUERY_LENGTH, MIN_CATEGORY_MATCH_LENGTH } from "../constants
 import { getPlanManagementUrl } from "~/hooks/usePlanManagementUrl";
 import { getPageCommands } from "../pageCommands";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import { useOpsPermission } from "~/hooks/useOpsPermission";
 
 export interface FilteredCommands {
   navigation: Command[];
@@ -32,6 +33,16 @@ export function useFilteredCommands(
   const { enabled: isDarkModeEnabled } = useFeatureFlag(
     "release_ui_dark_mode_enabled",
   );
+  const { hasAccess: hasOpsAccess } = useOpsPermission();
+
+  const availableNavCommands = useMemo(
+    () =>
+      hasOpsAccess
+        ? navigationCommands
+        : navigationCommands.filter((cmd) => !cmd.id.startsWith("nav-ops")),
+    [hasOpsAccess],
+  );
+
   const filteredNavigation = useMemo(() => {
     if (!query.trim()) return [];
 
@@ -45,11 +56,19 @@ export function useFilteredCommands(
     );
 
     if (isSearchingCategory) {
-      return navigationCommands;
+      return availableNavCommands;
     }
 
-    return filterCommands(navigationCommands, query);
-  }, [query]);
+    return filterCommands(availableNavCommands, query);
+  }, [query, availableNavCommands]);
+
+  const availableActionCommands = useMemo(
+    () =>
+      hasOpsAccess
+        ? actionCommands
+        : actionCommands.filter((cmd) => cmd.id !== "action-send-trace"),
+    [hasOpsAccess],
+  );
 
   const filteredActions = useMemo(() => {
     if (!query.trim()) return [];
@@ -64,11 +83,11 @@ export function useFilteredCommands(
     );
 
     if (isSearchingCategory) {
-      return actionCommands;
+      return availableActionCommands;
     }
 
-    return filterCommands(actionCommands, query);
-  }, [query]);
+    return filterCommands(availableActionCommands, query);
+  }, [query, availableActionCommands]);
 
   // Filter support commands based on query (filter out "Open Chat" if not SAAS)
   const filteredSupport = useMemo(() => {
