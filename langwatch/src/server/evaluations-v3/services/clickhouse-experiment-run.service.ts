@@ -122,15 +122,18 @@ export class ClickHouseExperimentRunService {
           // Fetch run summaries
           const runsResult = await clickHouseClient.query({
             query: `
-              SELECT * FROM (
-                SELECT *
-                FROM experiment_runs
-                WHERE TenantId = {tenantId:String}
-                  AND ExperimentId IN ({experimentIds:Array(String)})
-                ORDER BY RunId, UpdatedAt DESC
-                LIMIT 1 BY TenantId, RunId, ExperimentId
-              )
-              ORDER BY CreatedAt DESC
+              SELECT *
+              FROM experiment_runs AS t
+              WHERE t.TenantId = {tenantId:String}
+                AND t.ExperimentId IN ({experimentIds:Array(String)})
+                AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
+                  SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
+                  FROM experiment_runs
+                  WHERE TenantId = {tenantId:String}
+                    AND ExperimentId IN ({experimentIds:Array(String)})
+                  GROUP BY TenantId, RunId, ExperimentId
+                )
+              ORDER BY t.CreatedAt DESC
               LIMIT 10000
             `,
             query_params: {
@@ -175,7 +178,7 @@ export class ClickHouseExperimentRunService {
           // Fetch per-evaluator breakdown for all runs.
           //
           // Dedup uses an IN-tuple subquery on (key columns, OccurredAt) instead
-          // of LIMIT 1 BY. ClickHouse's LIMIT 1 BY reads every selected column
+          // of the per-row dedup anti-pattern. That pattern reads every selected column
           // (including heavy payloads like EvaluationDetails / EvaluationInputs)
           // before deduplicating, which can OOM on large parts. The IN-tuple
           // pattern resolves dedup using only lightweight key columns and the
@@ -436,7 +439,7 @@ export class ClickHouseExperimentRunService {
           // BatchEvaluation invocations).
           //
           // Dedup uses an IN-tuple subquery on (key columns, OccurredAt) rather
-          // than LIMIT 1 BY: ClickHouse's LIMIT 1 BY reads every selected column
+          // than the per-row dedup anti-pattern. That pattern reads every selected column
           // (including heavy payloads like DatasetEntry / EvaluationDetails)
           // before deduplicating, which can OOM on large parts. The IN-tuple
           // pattern resolves dedup using only lightweight key columns and the

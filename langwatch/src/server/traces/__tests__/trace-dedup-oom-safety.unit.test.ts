@@ -244,4 +244,79 @@ describe("trace dedup OOM safety", () => {
       });
     });
   });
+
+  // ---------------------------------------------------------------------------
+  // aggregation-builder.ts: dedupedTraceSummaries (@regression #3158)
+  // ---------------------------------------------------------------------------
+  describe("dedupedTraceSummaries() (analytics)", () => {
+    const aggregationBuilderPath = path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "analytics",
+      "clickhouse",
+      "aggregation-builder.ts",
+    );
+    const aggregationBuilderSource = fs.readFileSync(
+      aggregationBuilderPath,
+      "utf-8",
+    );
+    const body = extractFunctionBody(
+      aggregationBuilderSource,
+      "dedupedTraceSummaries",
+    );
+
+    describe("when the dedup SQL template is inspected", () => {
+      it("does not use LIMIT 1 BY for deduplication", () => {
+        expect(body).not.toContain("LIMIT 1 BY");
+      });
+
+      it("uses max(UpdatedAt) GROUP BY for trace dedup", () => {
+        expect(body).toContain("max(UpdatedAt)");
+        expect(body).toMatch(/GROUP BY\s+TenantId,\s*TraceId/);
+      });
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // simulation.clickhouse.repository.ts: entire file (@regression #3158)
+  // ---------------------------------------------------------------------------
+  describe("SimulationClickHouseRepository (entire file)", () => {
+    const simulationRepoPath = path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "app-layer",
+      "simulations",
+      "repositories",
+      "simulation.clickhouse.repository.ts",
+    );
+    const simulationRepoSource = fs.readFileSync(simulationRepoPath, "utf-8");
+
+    it("does not use LIMIT 1 BY anywhere", () => {
+      expect(simulationRepoSource).not.toContain("LIMIT 1 BY");
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // clickhouse-experiment-run.service.ts: entire file (@regression #3158)
+  // ---------------------------------------------------------------------------
+  describe("ClickHouseExperimentRunService (entire file)", () => {
+    const experimentRunServicePath = path.resolve(
+      __dirname,
+      "..",
+      "..",
+      "evaluations-v3",
+      "services",
+      "clickhouse-experiment-run.service.ts",
+    );
+    const experimentRunServiceSource = fs.readFileSync(
+      experimentRunServicePath,
+      "utf-8",
+    );
+
+    it("does not use LIMIT 1 BY anywhere", () => {
+      expect(experimentRunServiceSource).not.toContain("LIMIT 1 BY");
+    });
+  });
 });
