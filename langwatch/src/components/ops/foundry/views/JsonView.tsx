@@ -15,14 +15,24 @@ export function JsonView() {
   }
 
   return (
-    <Box minW={0} overflow="hidden">
-      <Flex justify="flex-end" px={4} pt={3} pb={1}>
+    <Box p={4} minW={0} overflow="hidden">
+      <Flex justify="flex-end" mb={2}>
         <Button size="xs" variant="outline" onClick={copyJson}>
           <Copy size={12} />
           {copied ? "Copied!" : "Copy JSON"}
         </Button>
       </Flex>
-      <JsonViewer data={trace} maxHeight="calc(100vh - 180px)" />
+      <Box
+        rounded="lg"
+        border="1px solid"
+        borderColor="border"
+        bg="bg.subtle"
+        p={4}
+        overflow="auto"
+        maxH="calc(100vh - 200px)"
+      >
+        <JsonViewer data={trace} />
+      </Box>
     </Box>
   );
 }
