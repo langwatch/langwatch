@@ -227,7 +227,9 @@ jobs:
         id: path-check
         if: steps.pr-data.outputs.oversized == 'false'
         run: |
-          RESTRICTED_PATTERN='^(\.github/workflows/|(auth|security|migrations|prisma)/|.*/(auth|security|migrations|prisma)/)'
+          # dev/docs/LOW_RISK_PULL_REQUESTS.md is the policy doc the LLM
+          # evaluator reads — changes to it are never themselves low-risk.
+          RESTRICTED_PATTERN='^(\.github/workflows/|dev/docs/LOW_RISK_PULL_REQUESTS\.md$|(auth|security|migrations|prisma)/|.*/(auth|security|migrations|prisma)/)'
           if grep -qE "$RESTRICTED_PATTERN" /tmp/pr_files.txt; then
             echo "Restricted paths detected:"
             grep -E "$RESTRICTED_PATTERN" /tmp/pr_files.txt
