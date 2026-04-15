@@ -320,4 +320,92 @@ describe("Dataset Generation Skill", () => {
     },
     900_000
   );
+
+  it.skipIf(isCI)(
+    "generates a hallucination-testing dataset with context column for a RAG agent",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-dataset-hallucination-")
+      );
+
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/python-rag-agent")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+      setupLocalCli(tempFolder);
+
+      const envContent = [
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}`,
+        `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560"}`,
+      ].join("\n");
+      fs.writeFileSync(path.join(tempFolder, ".env"), envContent);
+
+      const result = await scenario.run({
+        name: "Hallucination-focused dataset for RAG agent",
+        description:
+          "User specifically asks for a dataset to test hallucination in their RAG agent. " +
+          "The agent should include a context column and cases where the answer is NOT in the context.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({
+            model: judgeModel,
+            instructions:
+              "You want to test hallucination in your RAG farm advisory bot. " +
+              "When shown a plan, approve it. When shown a preview, approve it. " +
+              "Emphasize that you specifically need to test cases where the bot hallucinates " +
+              "answers not in the knowledge base.",
+          }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent understood the user wants to test hallucination specifically",
+              "Agent created a dataset that includes a context or expected_contexts column alongside input and expected_output",
+              "Agent included negative cases — questions whose answers are NOT in the provided context, to test hallucination detection",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "I need a dataset specifically for testing hallucination in my RAG agent. " +
+            "I want to make sure it doesn't make up answers that aren't in the knowledge base. " +
+            "Read my code to understand the domain."
+          ),
+          scenario.agent(),
+          (state) => { toolCallFix(state); },
+          scenario.user(),
+          scenario.agent(),
+          (state) => { toolCallFix(state); },
+          scenario.user(),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            assertSkillWasRead(state, "datasets");
+
+            const csvFiles = findGeneratedFiles(tempFolder, [".csv"]);
+            expect(csvFiles.length).toBeGreaterThan(0);
+
+            // Read CSV content and check for context-related columns
+            const csvContent = csvFiles
+              .map((f) => fs.readFileSync(f, "utf8"))
+              .join("\n")
+              .toLowerCase();
+
+            const headerLine = csvContent.split("\n")[0] ?? "";
+            const hasContextColumn =
+              headerLine.includes("context") ||
+              headerLine.includes("expected_context");
+
+            expect(
+              hasContextColumn,
+              "Dataset should include a context or expected_contexts column for hallucination testing"
+            ).toBe(true);
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    900_000
+  );
 });
