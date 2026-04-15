@@ -420,9 +420,6 @@ function PatSettingsContent({
               {newToken && (
                 <CopyInput value={newToken} label="Personal Access Token" />
               )}
-              {projectId && (
-                <CopyInput value={projectId} label="Project ID" />
-              )}
               <Text fontSize="sm" color="fg.muted">
                 Use this token with the Authorization header:{" "}
                 <code>Authorization: Bearer pat-lw-...</code> along with the{" "}
