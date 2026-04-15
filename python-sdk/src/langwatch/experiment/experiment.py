@@ -172,8 +172,9 @@ class Experiment:
         # Store the active iteration trace so target() can close it early
         self._active_iteration_trace: Optional[LangWatchTrace] = None
 
-        # Cached results fetched from the platform
-        self._cached_results: Optional[Dict[str, Any]] = None
+        # Accumulated results across all batches (for building DataFrames)
+        self._all_dataset_entries: List[BatchEntry] = []
+        self._all_evaluations: List[EvaluationResult] = []
         self._finished: bool = False
         self._run_url: Optional[str] = None
 
@@ -210,100 +211,101 @@ class Experiment:
         self.initialized = True
 
     @property
-    def results(self) -> Dict[str, Any]:
+    def results(self) -> pd.DataFrame:
         """
-        Fetch experiment run results from the platform.
+        Per-row evaluation results as a pandas DataFrame.
 
-        Returns a dictionary with metrics, evaluations, and per-row data.
-        Results are cached after the first successful fetch.
+        Each row corresponds to one dataset entry. Columns include the input
+        data, plus one column per evaluation metric (score values). Extra
+        columns: ``trace_id``, ``duration_ms``, ``error``.
 
-        In Jupyter notebooks, this renders as a rich HTML table.
+        Built from client-side data collected during ``loop()`` — no server
+        round-trip needed.
+
+        Example::
+
+            evaluation.results                    # renders as table in Jupyter
+            evaluation.results.describe()         # summary statistics
+            evaluation.results["my_metric"].mean() # aggregate a metric
         """
-        if self._cached_results is not None:
-            return self._cached_results
+        return self._build_results_df()
 
-        if not self.initialized:
-            return {"status": "not_initialized", "message": "Experiment has not been initialized yet."}
+    def _build_results_df(self) -> pd.DataFrame:
+        """Build a DataFrame from the client-side batch data."""
+        # Collect all dataset entries we've seen (including already-sent batches)
+        entries = list(self._all_dataset_entries)
+        evals = list(self._all_evaluations)
 
-        return self._fetch_results()
+        if not entries:
+            return pd.DataFrame()
 
-    def _fetch_results(self, retries: int = 3, delay: float = 2.0) -> Dict[str, Any]:
-        """Fetch results from the platform, retrying until stable."""
-        endpoint = langwatch.get_endpoint()
-        api_key = langwatch.get_api_key() or ""
+        # Build base rows from dataset entries
+        rows: List[Dict[str, Any]] = []
+        for entry in entries:
+            row: Dict[str, Any] = {"index": entry.index}
+            # Flatten entry data into columns
+            if isinstance(entry.entry, dict):
+                for k, v in entry.entry.items():
+                    row[k] = v
+            row["trace_id"] = entry.trace_id
+            row["duration_ms"] = entry.duration
+            if entry.error:
+                row["error"] = entry.error
+            if entry.target_id:
+                row["target"] = entry.target_id
+            rows.append(row)
 
-        for attempt in range(retries):
-            try:
-                with httpx.Client(timeout=30) as client:
-                    response = client.get(
-                        f"{endpoint}/api/evaluations/v3/runs/{urllib.parse.quote(self.run_id)}",
-                        headers={"X-Auth-Token": api_key},
-                    )
+        df = pd.DataFrame(rows)
+        if df.empty:
+            return df
 
-                if response.status_code == 404:
-                    # Run might not be indexed yet — retry
-                    if attempt < retries - 1:
-                        time.sleep(delay)
-                        continue
-                    return {
-                        "status": "pending",
-                        "run_id": self.run_id,
-                        "message": "Results not yet available. View at: " + (self._run_url or ""),
-                    }
+        # Pivot evaluation scores into columns (one column per metric name)
+        for ev in evals:
+            if ev.index is not None and ev.name:
+                mask = df["index"] == ev.index
+                if ev.target_id:
+                    mask = mask & (df.get("target", pd.Series(dtype=str)) == ev.target_id)
+                if ev.score is not None:
+                    df.loc[mask, ev.name] = ev.score
+                if ev.passed is not None:
+                    df.loc[mask, f"{ev.name}_passed"] = ev.passed
 
-                if response.is_success:
-                    data = response.json()
-                    status = data.get("status", "unknown")
+        # Set index column as the DataFrame index
+        if "index" in df.columns:
+            df = df.set_index("index")
 
-                    if status in ("completed", "failed", "stopped"):
-                        self._cached_results = data
-                        return data
-
-                    # Still running — retry
-                    if attempt < retries - 1:
-                        time.sleep(delay)
-                        continue
-
-                    return data
-
-            except Exception:
-                if attempt < retries - 1:
-                    time.sleep(delay)
-                    continue
-                raise
-
-        return {"status": "pending", "run_id": self.run_id}
+        return df
 
     def _auto_display_results(self) -> None:
-        """Fetch results from the platform and display them after loop completion."""
-        # Wait briefly for platform to process final batch
-        time.sleep(2)
+        """Print a concise summary after loop completion."""
         try:
-            data = self._fetch_results(retries=5, delay=3.0)
-            self._cached_results = data
+            evals = list(self._all_evaluations)
+            entries = list(self._all_dataset_entries)
 
-            summary = data.get("summary", {})
-            total_passed = summary.get("totalPassed", 0)
-            total_failed = summary.get("totalFailed", 0)
-            pass_rate = summary.get("passRate", 0)
+            if entries:
+                total = len(entries)
+                errors = sum(1 for e in entries if e.error)
 
-            if summary:
-                print()
-                print(f"  Results: {total_passed} passed, {total_failed} failed ({pass_rate:.1f}% pass rate)")
-                if self._run_url:
-                    print(f"  Details: {self._run_url}")
-                print()
+                parts = [f"\n  Completed: {total} rows"]
+                if errors:
+                    parts.append(f"({errors} errors)")
 
-                # In Jupyter, display the rich HTML widget
-                try:
-                    from IPython.display import display
-                    from IPython import get_ipython
-                    if get_ipython() is not None:
-                        display(self)
-                except (ImportError, AttributeError):
-                    pass
+                # Summarize evaluation metrics
+                if evals:
+                    metric_scores: Dict[str, List[float]] = {}
+                    for ev in evals:
+                        if ev.score is not None:
+                            metric_scores.setdefault(ev.name, []).append(ev.score)
+
+                    for name, scores in metric_scores.items():
+                        avg = sum(scores) / len(scores)
+                        parts.append(f"\n  {name}: avg={avg:.3f} (n={len(scores)})")
+
+                print("".join(parts))
+
+            if self._run_url:
+                print(f"  View details: {self._run_url}\n")
         except Exception:
-            # Don't fail the experiment if result fetching has issues
             pass
 
     def __repr__(self) -> str:
@@ -315,57 +317,6 @@ class Experiment:
             parts.append(f"progress={self.progress}/{self.total}")
         parts_str = ", ".join(parts)
         return parts_str + ")"
-
-    def _repr_html_(self) -> str:
-        """Rich HTML rendering for Jupyter notebooks."""
-        status = "finished" if self._finished else "running" if self.initialized else "not started"
-        status_color = {"finished": "#22c55e", "running": "#3b82f6", "not started": "#6b7280"}[status]
-
-        rows = [
-            f"<tr><td style='padding:4px 12px;font-weight:600'>Name</td><td style='padding:4px 12px'>{self.name}</td></tr>",
-            f"<tr><td style='padding:4px 12px;font-weight:600'>Status</td><td style='padding:4px 12px;color:{status_color};font-weight:600'>{status.upper()}</td></tr>",
-            f"<tr><td style='padding:4px 12px;font-weight:600'>Run ID</td><td style='padding:4px 12px'><code>{self.run_id}</code></td></tr>",
-        ]
-
-        if self.total > 0:
-            pct = (self.progress / self.total * 100) if self.total > 0 else 0
-            rows.append(
-                f"<tr><td style='padding:4px 12px;font-weight:600'>Progress</td>"
-                f"<td style='padding:4px 12px'>{self.progress}/{self.total} ({pct:.0f}%)</td></tr>"
-            )
-
-        # If finished, show results summary inline
-        if self._finished and self._cached_results:
-            summary = self._cached_results.get("summary", {})
-            total_passed = summary.get("totalPassed", 0)
-            total_failed = summary.get("totalFailed", 0)
-            pass_rate = summary.get("passRate", 0)
-            pass_color = "#22c55e" if pass_rate >= 80 else "#f59e0b" if pass_rate >= 50 else "#ef4444"
-
-            rows.append(f"<tr><td colspan='2' style='padding:6px 12px;border-top:1px solid #e5e7eb;font-weight:700'>Results</td></tr>")
-            rows.append(f"<tr><td style='padding:2px 12px 2px 24px'>Passed</td><td style='padding:2px 12px;color:#22c55e'>{total_passed}</td></tr>")
-            rows.append(f"<tr><td style='padding:2px 12px 2px 24px'>Failed</td><td style='padding:2px 12px;color:#ef4444'>{total_failed}</td></tr>")
-            rows.append(
-                f"<tr><td style='padding:2px 12px 2px 24px'>Pass Rate</td>"
-                f"<td style='padding:2px 12px'>"
-                f"<div style='background:#e5e7eb;border-radius:4px;width:120px;height:14px;display:inline-block;vertical-align:middle'>"
-                f"<div style='background:{pass_color};border-radius:4px;width:{min(pass_rate, 100):.0f}%;height:100%'></div></div>"
-                f" <span style='font-weight:600;color:{pass_color}'>{pass_rate:.1f}%</span></td></tr>"
-            )
-
-        link_row = ""
-        if self._run_url:
-            link_row = (
-                f"<tr><td colspan='2' style='padding:6px 12px;border-top:1px solid #e5e7eb'>"
-                f"<a href='{self._run_url}' target='_blank' style='color:#3b82f6'>View in LangWatch &rarr;</a></td></tr>"
-            )
-
-        return (
-            f"<div style='border:1px solid #e5e7eb;border-radius:8px;font-family:system-ui,-apple-system,sans-serif;font-size:13px;max-width:500px'>"
-            f"<div style='padding:8px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb;font-weight:700;font-size:14px'>Experiment: {self.name}</div>"
-            f"<table style='border-collapse:collapse;width:100%'>{''.join(rows)}{link_row}</table>"
-            f"</div>"
-        )
 
     def loop(
         self,
@@ -566,16 +517,16 @@ class Experiment:
                 )
             )
         )
+        batch_entry = BatchEntry(
+            index=iteration["index"],
+            entry=entry,
+            duration=iteration["duration"],
+            error=str(iteration["error"]) if iteration["error"] else None,
+            trace_id=iteration["trace"].trace_id or "",
+        )
         with self.lock:
-            self.batch["dataset"].append(
-                BatchEntry(
-                    index=iteration["index"],
-                    entry=entry,
-                    duration=iteration["duration"],
-                    error=str(iteration["error"]) if iteration["error"] else None,
-                    trace_id=iteration["trace"].trace_id or "",
-                )
-            )
+            self.batch["dataset"].append(batch_entry)
+            self._all_dataset_entries.append(batch_entry)
 
         if time.time() - self.last_sent >= self.debounce_interval:
             self._send_batch()
@@ -1116,6 +1067,7 @@ class Experiment:
 
         with self.lock:
             self.batch["evaluations"].append(eval)
+            self._all_evaluations.append(eval)
 
     def evaluate(
         self,
