@@ -181,8 +181,8 @@
           "surfaces": {
             "code": {
               "sdk": {
-                "python": "langwatch.evaluation",
-                "typescript": "langwatch.evaluations"
+                "python": "langwatch.monitors",
+                "typescript": "langwatch.monitors"
               },
               "cli": [
                 "monitor list",

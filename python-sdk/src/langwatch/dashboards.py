@@ -7,7 +7,7 @@ Uses httpx via the generated REST API client for HTTP transport.
 """
 
 import urllib.parse
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 import httpx
 

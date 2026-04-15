@@ -177,6 +177,22 @@ class SuitesFacade:
         _raise_for_status(response, operation="run")
         return response.json()
 
+    def duplicate(self, suite_id: str) -> Dict[str, Any]:
+        """
+        Duplicate a suite.
+
+        Args:
+            suite_id: The suite ID to duplicate.
+
+        Returns:
+            Dictionary containing the duplicated suite data.
+        """
+        response = self._http().post(
+            f"/api/suites/{_quote(suite_id)}/duplicate"
+        )
+        _raise_for_status(response, operation="duplicate")
+        return response.json()
+
     def delete(self, suite_id: str) -> Dict[str, Any]:
         """
         Delete (archive) a suite.

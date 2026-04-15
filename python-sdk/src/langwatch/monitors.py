@@ -29,6 +29,8 @@ def _raise_for_status(response: httpx.Response, *, operation: str = "") -> None:
         detail = response.text or ""
     if status == 404:
         raise ValueError(f"Monitor not found: {detail}" if detail else "Monitor not found")
+    if status == 400:
+        raise ValueError(f"Bad request: {detail}" if detail else "Bad request")
     if status == 401:
         raise RuntimeError(f"Authentication failed: {detail}" if detail else "Authentication failed")
     if status >= 500:

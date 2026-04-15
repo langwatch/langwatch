@@ -6,7 +6,7 @@ Uses httpx via the generated REST API client for HTTP transport.
 """
 
 import urllib.parse
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import httpx
 
@@ -29,6 +29,8 @@ def _raise_for_status(response: httpx.Response, *, operation: str = "") -> None:
         detail = response.text or ""
     if status == 404:
         raise ValueError(f"Secret not found: {detail}" if detail else "Secret not found")
+    if status == 400:
+        raise ValueError(f"Bad request: {detail}" if detail else "Bad request")
     if status == 401:
         raise RuntimeError(f"Authentication failed: {detail}" if detail else "Authentication failed")
     if status >= 500:

@@ -249,6 +249,8 @@ class Experiment:
                     row[k] = v
             row["trace_id"] = entry.trace_id
             row["duration_ms"] = entry.duration
+            if entry.predicted:
+                row["output"] = entry.predicted.get("output", entry.predicted)
             if entry.error:
                 row["error"] = entry.error
             if entry.target_id:
@@ -263,8 +265,8 @@ class Experiment:
         for ev in evals:
             if ev.index is not None and ev.name:
                 mask = df["index"] == ev.index
-                if ev.target_id:
-                    mask = mask & (df.get("target", pd.Series(dtype=str)) == ev.target_id)
+                if ev.target_id and "target" in df.columns:
+                    mask = mask & (df["target"] == ev.target_id)
                 if ev.score is not None:
                     df.loc[mask, ev.name] = ev.score
                 if ev.passed is not None:
@@ -302,6 +304,7 @@ class Experiment:
                 print(f"  View details: {self._run_url}")
             print(f"  Explore with: evaluation.results\n")
         except Exception:
+            # Non-fatal: don't crash the experiment if result display fails
             pass
 
     @staticmethod
@@ -313,6 +316,7 @@ class Experiment:
                 display(df)
                 return
         except (ImportError, AttributeError):
+            # IPython not available — fall through to text display
             pass
         print(df.to_string())
 
@@ -380,6 +384,7 @@ class Experiment:
                 self._auto_display_results()
 
         except Exception as e:
+            self._finished = True
             Experiment._log_results(
                 langwatch.get_api_key() or "",
                 {
