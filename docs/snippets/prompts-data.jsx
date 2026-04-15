@@ -1866,25 +1866,45 @@ Should I adjust the style, add more edge cases, or proceed with the full generat
 
 **Wait for user confirmation before continuing.**
 
+## Dataset Size Guide
+
+| Use Case | Recommended Rows | Why |
+|----------|-----------------|-----|
+| Quick smoke test | 15-25 | Fast feedback on obvious failures |
+| Standard evaluation | 50-100 | Good coverage of main categories + edge cases |
+| Comprehensive benchmark | 150-300 | Statistical significance, covers long tail |
+| Regression suite | 30-50 focused rows | One row per known failure mode or bug fix |
+
+When in doubt, start with ~50 rows. It's better to have 50 excellent rows than 200 mediocre ones. The user can always ask for more later.
+
 ## Phase 4: Full Generation
 
-Once confirmed, generate the complete dataset as a CSV file:
+Once confirmed, generate the complete dataset as a CSV file.
+
+**IMPORTANT: Use proper CSV generation to avoid quoting issues.** Write a small Python or Node.js script rather than manually constructing CSV strings — fields often contain commas, quotes, or newlines that break manual formatting.
 
 \`\`\`python
-# Write CSV with proper escaping
 import csv
 
 rows = [
-    # ... your generated data
+    {"input": "hey my order hasn't arrived", "expected_output": "I'm sorry to hear that..."},
+    # ... more rows
 ]
 
-with open("evaluation_dataset.csv", "w", newline="") as f:
-    writer = csv.DictWriter(f, fieldnames=["input", "expected_output", ...])
+with open("evaluation_dataset.csv", "w", newline="", encoding="utf-8") as f:
+    writer = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
     writer.writeheader()
     writer.writerows(rows)
+
+print(f"Written {len(rows)} rows to evaluation_dataset.csv")
 \`\`\`
 
-Alternatively, create the CSV directly — but make sure fields with commas or newlines are properly quoted.
+Alternatively, generate as JSON and use the CLI to upload directly:
+
+\`\`\`bash
+# Generate JSON records and pipe to dataset
+echo '[{"input":"test","expected_output":"response"}]' | langwatch dataset records add <slug> --stdin
+\`\`\`
 
 ### Quality checklist before finalizing:
 - [ ] No two rows have the same input pattern

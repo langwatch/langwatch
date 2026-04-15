@@ -38,7 +38,13 @@ function copySkillToWorkDir(tempFolder: string) {
   }
 }
 
-function findGeneratedFiles(dir: string, extensions: string[]): string[] {
+function findGeneratedFiles({
+  dir,
+  extensions,
+}: {
+  dir: string;
+  extensions: string[];
+}): string[] {
   const results: string[] = [];
   if (!fs.existsSync(dir)) return results;
 
@@ -51,7 +57,7 @@ function findGeneratedFiles(dir: string, extensions: string[]): string[] {
       entry.name !== ".venv" &&
       entry.name !== "bin"
     ) {
-      results.push(...findGeneratedFiles(fullPath, extensions));
+      results.push(...findGeneratedFiles({ dir: fullPath, extensions }));
     } else if (
       entry.isFile() &&
       extensions.some((ext) => entry.name.endsWith(ext))
@@ -124,7 +130,7 @@ describe("Dataset Generation Skill", () => {
             assertSkillWasRead(state, "datasets");
 
             // Check a CSV file was created
-            const csvFiles = findGeneratedFiles(tempFolder, [".csv"]);
+            const csvFiles = findGeneratedFiles({ dir: tempFolder, extensions: [".csv"] });
             expect(
               csvFiles.length,
               `Expected at least one CSV file in ${tempFolder}`
@@ -221,7 +227,7 @@ describe("Dataset Generation Skill", () => {
             toolCallFix(state);
             assertSkillWasRead(state, "datasets");
 
-            const csvFiles = findGeneratedFiles(tempFolder, [".csv"]);
+            const csvFiles = findGeneratedFiles({ dir: tempFolder, extensions: [".csv"] });
             expect(csvFiles.length).toBeGreaterThan(0);
 
             const csvContent = csvFiles
@@ -381,7 +387,7 @@ describe("Dataset Generation Skill", () => {
             toolCallFix(state);
             assertSkillWasRead(state, "datasets");
 
-            const csvFiles = findGeneratedFiles(tempFolder, [".csv"]);
+            const csvFiles = findGeneratedFiles({ dir: tempFolder, extensions: [".csv"] });
             expect(csvFiles.length).toBeGreaterThan(0);
 
             // Read CSV content and check for context-related columns
@@ -468,7 +474,7 @@ describe("Dataset Generation Skill", () => {
             toolCallFix(state);
             assertSkillWasRead(state, "datasets");
 
-            const csvFiles = findGeneratedFiles(tempFolder, [".csv"]);
+            const csvFiles = findGeneratedFiles({ dir: tempFolder, extensions: [".csv"] });
             expect(csvFiles.length).toBeGreaterThan(0);
 
             const csvContent = csvFiles
