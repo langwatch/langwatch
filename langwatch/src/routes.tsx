@@ -43,7 +43,17 @@ function RootLayout() {
  * eliminating the gray flash that React.lazy + Suspense causes.
  */
 const page = (importFn: () => Promise<{ default: React.ComponentType }>) => ({
-  lazy: () => importFn().then((m) => ({ Component: m.default })),
+  lazy: () =>
+    importFn().then((m) => ({ Component: m.default })).catch((err: unknown) => {
+      // Chunk failed to load — likely a stale build after deployment.
+      // Reload once so the browser fetches the new index.html with current chunk URLs.
+      const alreadyReloaded = sessionStorage.getItem("chunk-reload");
+      if (!alreadyReloaded) {
+        sessionStorage.setItem("chunk-reload", "1");
+        window.location.reload();
+      }
+      throw err;
+    }),
 });
 
 const routes: RouteObject[] = [
@@ -55,7 +65,7 @@ const routes: RouteObject[] = [
   // Top-level pages
   { path: "/", ...page(() => import("./pages/index")) },
   { path: "/authorize", ...page(() => import("./pages/authorize")) },
-  { path: "/admin", ...page(() => import("./pages/admin/index")) },
+  { path: "/admin/*", ...page(() => import("./pages/admin/index")) },
   { path: "/invite/accept", ...page(() => import("./pages/invite/accept")) },
   { path: "/mcp/authorize", ...page(() => import("./pages/mcp/authorize")) },
   { path: "/share/:id", ...page(() => import("./pages/share/[id]")) },

@@ -19,6 +19,9 @@ import { prisma } from "~/server/db";
 import { isAdmin } from "../../../ee/admin/isAdmin";
 import { auditLog } from "~/server/auditLog";
 import { UserService } from "~/server/users/user.service";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:admin");
 
 export const app = new Hono().basePath("/api");
 
@@ -142,6 +145,14 @@ app.post("/admin/:resource", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   const user = session?.user.impersonator ?? session?.user;
   if (!session || !user || !isAdmin(user)) {
+    logger.warn(
+      {
+        hasSession: !!session,
+        userEmail: user?.email ?? null,
+        adminEmailsConfigured: !!process.env.ADMIN_EMAILS,
+      },
+      "admin access denied",
+    );
     return c.json({ message: "Not Found" }, 404);
   }
 
