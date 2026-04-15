@@ -464,6 +464,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
 /** Tests — noop commands, null-backed services. */
 export function createTestApp(overrides?: Partial<AppDependencies>): App {
+  const { prisma: testPrisma } = require("../db") as { prisma: PrismaClient; };
   const noop = async () => { };
   const config: AppConfig = {
     nodeEnv: "test",
@@ -516,7 +517,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       execution: void 0 as unknown as AppDependencies["evaluations"]["execution"],
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
-    experiments: ExperimentService.create(prisma),
+    experiments: ExperimentService.create(testPrisma),
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: { runs: SuiteRunService.create({ resolveClickHouseClient: null, startSuiteRun: noop, queueSimulationRun: noop }) },
     organizations: nullOrganizations,
