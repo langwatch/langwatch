@@ -60,7 +60,7 @@ def get_field_type_to_zod(field, definitions=None):
                     "annotation": f.annotation,
                     "description": f.description,
                     "default": dump_model_type(f.default),
-                    "is_optional": not f.is_required
+                    "is_optional": not f.is_required()
                     or get_origin(f.annotation) == Optional
                     or (
                         get_origin(f.annotation) == Union
@@ -226,7 +226,7 @@ def extract_evaluator_info(definitions: EvaluatorDefinitions) -> Dict[str, Any]:
         }
 
         def is_field_optional(f):
-            if not f.is_required:
+            if not f.is_required():
                 return True
             if get_origin(f.annotation) == Optional:
                 return True
@@ -271,7 +271,7 @@ def extract_evaluator_info(definitions: EvaluatorDefinitions) -> Dict[str, Any]:
         evaluator_info["result"]["label"] = {"description": label_field.description}
 
     def is_field_optional(field):
-        if not field.is_required:
+        if not field.is_required():
             return True
         if get_origin(field.annotation) == Optional:
             return True
