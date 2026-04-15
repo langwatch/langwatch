@@ -136,7 +136,7 @@
     "@trpc/server": "^10.45.4",
     "@vitejs/plugin-react": "^6.0.1",
     "@xyflow/react": "^12.10.2",
-    "ai": "^5.0.173",
+    "ai": "^6.0.161",
     "ajv": "^8.18.0",
     "bcrypt": "^6.0.0",
     "better-auth": "^1.6.4",
@@ -318,7 +318,8 @@
       "ra-core": "5.13.1",
       "ra-i18n-polyglot": "5.13.1",
       "ra-ui-materialui": "5.13.1",
-      "ra-language-english": "5.13.1"
+      "ra-language-english": "5.13.1",
+      "ai": "^6.0.161"
     }
   },
   "ct3aMetadata": {

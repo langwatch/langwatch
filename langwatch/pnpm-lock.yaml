@@ -11,6 +11,7 @@ overrides:
   ra-i18n-polyglot: 5.13.1
   ra-ui-materialui: 5.13.1
   ra-language-english: 5.13.1
+  ai: ^6.0.161
 
 packageExtensionsChecksum: sha256-LBc1N1GezKyerwGBwpMHZPFoMYZTHjpxVKWJilBVvTU=
 
@@ -131,7 +132,7 @@ importers:
         version: link:../mcp-server
       '@langwatch/scenario':
         specifier: file:vendor/langwatch-scenario-0.4.8.tgz
-        version: file:vendor/langwatch-scenario-0.4.8.tgz(e0c475da5843e02da7e10faea74baf09)
+        version: file:vendor/langwatch-scenario-0.4.8.tgz(6f5e67f63d6be86b4b71327167f30c49)
       '@microlink/react-json-view':
         specifier: ^1.31.18
         version: 1.31.18(@types/react@19.2.14)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
@@ -259,8 +260,8 @@ importers:
         specifier: ^12.10.2
         version: 12.10.2(@types/react@19.2.14)(immer@10.2.0)(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       ai:
-        specifier: ^5.0.173
-        version: 5.0.173(zod@3.25.76)
+        specifier: ^6.0.161
+        version: 6.0.161(zod@3.25.76)
       ajv:
         specifier: ^8.18.0
         version: 8.18.0
@@ -794,7 +795,7 @@ importers:
         version: 9.39.4
       '@langwatch/scenario':
         specifier: ^0.4.6
-        version: 0.4.7(602d7308de1c6775b0fe043cc37c7a9b)
+        version: 0.4.7(70f048ebe6ed444b8b1bb73122618e30)
       '@types/debug':
         specifier: ^4.1.12
         version: 4.1.12
@@ -814,8 +815,8 @@ importers:
         specifier: 7.0.0-dev.20250911.1
         version: 7.0.0-dev.20250911.1
       ai:
-        specifier: ^6.0.0
-        version: 6.0.116(zod@4.3.6)
+        specifier: ^6.0.161
+        version: 6.0.161(zod@4.3.6)
       dotenv:
         specifier: ^17.2.2
         version: 17.2.3
@@ -939,8 +940,8 @@ importers:
   packages/es-migration:
     dependencies:
       '@clickhouse/client':
-        specifier: 1.13.0
-        version: 1.13.0
+        specifier: 1.18.2
+        version: 1.18.2
       '@elastic/elasticsearch':
         specifier: ^8.17.0
         version: 8.19.1
@@ -1176,18 +1177,6 @@ packages:
 
   '@ai-sdk/azure@2.0.104':
     resolution: {integrity: sha512-g0ZDc/IgNCnIQuMj+bCBPionZwH4YBkfj5/CYeEPNqWrGBJm3aYfuWCjdT6Yayg+zlimunHZIjpjdDwan3i8Qg==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/gateway@2.0.77':
-    resolution: {integrity: sha512-n2zh7Qh5/VHeoR395vrUQBRbOcrIZ6vx8uvdsBkBAQDWrPylwMd31hv9UisFMT/kJGSD1yxcoFKx2Mk0ZNCung==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/gateway@3.0.66':
-    resolution: {integrity: sha512-SIQ0YY0iMuv+07HLsZ+bB990zUJ6S4ujORAh+Jv1V2KGNn73qQKnGO0JBk+w+Res8YqOFSycwDoWcFlQrVxS4A==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -1975,18 +1964,11 @@ packages:
   '@chevrotain/utils@12.0.0':
     resolution: {integrity: sha512-lB59uJoaGIfOOL9knQqQRfhl9g7x8/wqFkp13zTdkRu1huG9kg6IJs1O8hqj9rs6h7orGxHJUKb+mX3rPbWGhA==}
 
-  '@clickhouse/client-common@1.13.0':
-    resolution: {integrity: sha512-QlGUMd3EaKkIRLCv0WW8Rw9cOlqhwQPT+ucNWY8eC4UALsMhJLpa0H7Cd7MYc9CEtTv/xlr3IcYw5Tdho4Hr2g==}
-
   '@clickhouse/client-common@1.15.0':
     resolution: {integrity: sha512-/1BXaNNsBzH2w5ALWiH6M9zS+cJwlM9uMnMj9e8ETwvDjJzO+nIYlyxzp8Prc+9pEDZ5iAilZ4F8c0YVCzzNaA==}
 
   '@clickhouse/client-common@1.18.2':
     resolution: {integrity: sha512-J0SG6q9V31ydxonglpj9xhNRsUxCsF71iEZ784yldqMYwsHixj/9xHFDgBDX3DuMiDx/kPDfXnf+pimp08wIBA==}
-
-  '@clickhouse/client@1.13.0':
-    resolution: {integrity: sha512-uK+zqPaJnAoq3QIOvUNbHtbWUhyg2A/aSbdJtrY2+kawp4SMBLcfIbB9ucRv5Yht1CAa3b24CiUlypkmgarukg==}
-    engines: {node: '>=16'}
 
   '@clickhouse/client@1.15.0':
     resolution: {integrity: sha512-QmW+p4c/r0oa3X6Un6lcBs4GZtJEQUdvf//x8GeqM5ru6m4oIUg3WwvermP3HE31kpEGoFOQfKbMN5ooR5gvNw==}
@@ -3456,14 +3438,14 @@ packages:
     resolution: {integrity: sha512-/rBTXHZLCgLICsb8zT8gLmgyAVY3hxS73tW7lnkt/qW3TOMCTs+aMR+4NhRa/v6C5ZUPjdrIvol0mg0AGvpXuA==}
     engines: {node: '>=20', pnpm: '>=8'}
     peerDependencies:
-      ai: '>=6.0.0'
+      ai: ^6.0.161
       vitest: '>=3.2.4'
 
   '@langwatch/scenario@0.4.7':
     resolution: {integrity: sha512-eTujqAKb9kCBIXIlmN7Zo98SXibf0ymd9ZPRu0cLDWLwB0hrv4Zso1MzYuPAT9+cOFQ11m3RAZZQVV40yf4k0Q==}
     engines: {node: '>=20', pnpm: '>=8'}
     peerDependencies:
-      ai: '>=6.0.0'
+      ai: ^6.0.161
       vitest: '>=3.2.4'
 
   '@langwatch/scenario@file:vendor/langwatch-scenario-0.4.8.tgz':
@@ -3471,7 +3453,7 @@ packages:
     version: 0.4.8
     engines: {node: '>=20', pnpm: '>=8'}
     peerDependencies:
-      ai: '>=6.0.0'
+      ai: ^6.0.161
       vitest: '>=3.2.4'
 
   '@lukeed/csprng@1.1.0':
@@ -7220,18 +7202,6 @@ packages:
   agentkeepalive@4.6.0:
     resolution: {integrity: sha512-kja8j7PjmncONqaTsB8fQ+wE2mSU2DJ9D4XKoJ5PFWIdRMa6SLSN1ff4mOr4jCbfRSsxR4keIiySJU0N9T5hIQ==}
     engines: {node: '>= 8.0.0'}
-
-  ai@5.0.173:
-    resolution: {integrity: sha512-SnzPzJ5Y9rMdMEBHBhleMkfnSzEWwezk87MswKxAH/3iiX00yOjmd6JEZM2+whBpJU4xMPTz8iBVw165jDq16g==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  ai@6.0.116:
-    resolution: {integrity: sha512-7yM+cTmyRLeNIXwt4Vj+mrrJgVQ9RMIW5WO0ydoLoYkewIvsMcvUmqS4j2RJTUXaF1HphwmSKUMQ/HypNRGOmA==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
 
   ai@6.0.161:
     resolution: {integrity: sha512-ufhmijmx2YyWTPAicGgtpLOB/xD7mG8zKs1pT1Trj+JL/3r1rS8fkMi/cHZoChSAQSGB4pgmcWVxDrVTUvK2IQ==}
@@ -13702,26 +13672,19 @@ snapshots:
       '@ai-sdk/provider-utils': 3.0.23(zod@3.25.76)
       zod: 3.25.76
 
-  '@ai-sdk/gateway@2.0.77(zod@3.25.76)':
-    dependencies:
-      '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@3.25.76)
-      '@vercel/oidc': 3.1.0
-      zod: 3.25.76
-
-  '@ai-sdk/gateway@3.0.66(zod@4.3.6)':
-    dependencies:
-      '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.6)
-      '@vercel/oidc': 3.1.0
-      zod: 4.3.6
-
   '@ai-sdk/gateway@3.0.98(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 3.0.8
       '@ai-sdk/provider-utils': 4.0.23(zod@3.25.76)
       '@vercel/oidc': 3.1.0
       zod: 3.25.76
+
+  '@ai-sdk/gateway@3.0.98(zod@4.3.6)':
+    dependencies:
+      '@ai-sdk/provider': 3.0.8
+      '@ai-sdk/provider-utils': 4.0.23(zod@4.3.6)
+      '@vercel/oidc': 3.1.0
+      zod: 4.3.6
 
   '@ai-sdk/google@2.0.68(zod@3.25.76)':
     dependencies:
@@ -13772,13 +13735,6 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       eventsource-parser: 3.0.6
       zod: 3.25.76
-
-  '@ai-sdk/provider-utils@4.0.19(zod@4.3.6)':
-    dependencies:
-      '@ai-sdk/provider': 3.0.8
-      '@standard-schema/spec': 1.1.0
-      eventsource-parser: 3.0.6
-      zod: 4.3.6
 
   '@ai-sdk/provider-utils@4.0.23(zod@3.25.76)':
     dependencies:
@@ -15390,15 +15346,9 @@ snapshots:
 
   '@chevrotain/utils@12.0.0': {}
 
-  '@clickhouse/client-common@1.13.0': {}
-
   '@clickhouse/client-common@1.15.0': {}
 
   '@clickhouse/client-common@1.18.2': {}
-
-  '@clickhouse/client@1.13.0':
-    dependencies:
-      '@clickhouse/client-common': 1.13.0
 
   '@clickhouse/client@1.15.0':
     dependencies:
@@ -17101,13 +17051,13 @@ snapshots:
       - utf-8-validate
       - ws
 
-  '@langwatch/scenario@0.4.7(602d7308de1c6775b0fe043cc37c7a9b)':
+  '@langwatch/scenario@0.4.7(70f048ebe6ed444b8b1bb73122618e30)':
     dependencies:
       '@ag-ui/core': 0.0.28
       '@ai-sdk/openai': 3.0.41(zod@3.25.76)
       '@openai/agents': 0.3.9(@cfworker/json-schema@4.1.1)(bufferutil@4.1.0)(ws@8.20.0(bufferutil@4.1.0))(zod@3.25.76)
       '@opentelemetry/sdk-node': 0.212.0(@opentelemetry/api@1.9.1)
-      ai: 6.0.116(zod@4.3.6)
+      ai: 6.0.161(zod@4.3.6)
       chalk: 5.6.2
       langwatch: 0.16.1(87ad526478d3a30338425e4b7c5eec6a)
       open: 11.0.0
@@ -17130,13 +17080,13 @@ snapshots:
       - utf-8-validate
       - ws
 
-  '@langwatch/scenario@file:vendor/langwatch-scenario-0.4.8.tgz(e0c475da5843e02da7e10faea74baf09)':
+  '@langwatch/scenario@file:vendor/langwatch-scenario-0.4.8.tgz(6f5e67f63d6be86b4b71327167f30c49)':
     dependencies:
       '@ag-ui/core': 0.0.28
       '@ai-sdk/openai': 3.0.53(zod@3.25.76)
       '@openai/agents': 0.3.9(@cfworker/json-schema@4.1.1)(bufferutil@4.1.0)(ws@8.20.0(bufferutil@4.1.0))(zod@3.25.76)
       '@opentelemetry/sdk-node': 0.212.0(@opentelemetry/api@1.9.1)
-      ai: 5.0.173(zod@3.25.76)
+      ai: 6.0.161(zod@3.25.76)
       chalk: 5.6.2
       langwatch: 0.16.1(b741fc7393069c567b46209f63183954)
       open: 11.0.0
@@ -17496,7 +17446,7 @@ snapshots:
 
   '@opentelemetry/api-logs@0.205.0':
     dependencies:
-      '@opentelemetry/api': 1.9.0
+      '@opentelemetry/api': 1.9.1
 
   '@opentelemetry/api-logs@0.206.0':
     dependencies:
@@ -22480,22 +22430,6 @@ snapshots:
     dependencies:
       humanize-ms: 1.2.1
 
-  ai@5.0.173(zod@3.25.76):
-    dependencies:
-      '@ai-sdk/gateway': 2.0.77(zod@3.25.76)
-      '@ai-sdk/provider': 2.0.1
-      '@ai-sdk/provider-utils': 3.0.23(zod@3.25.76)
-      '@opentelemetry/api': 1.9.0
-      zod: 3.25.76
-
-  ai@6.0.116(zod@4.3.6):
-    dependencies:
-      '@ai-sdk/gateway': 3.0.66(zod@4.3.6)
-      '@ai-sdk/provider': 3.0.8
-      '@ai-sdk/provider-utils': 4.0.19(zod@4.3.6)
-      '@opentelemetry/api': 1.9.0
-      zod: 4.3.6
-
   ai@6.0.161(zod@3.25.76):
     dependencies:
       '@ai-sdk/gateway': 3.0.98(zod@3.25.76)
@@ -22503,6 +22437,14 @@ snapshots:
       '@ai-sdk/provider-utils': 4.0.23(zod@3.25.76)
       '@opentelemetry/api': 1.9.0
       zod: 3.25.76
+
+  ai@6.0.161(zod@4.3.6):
+    dependencies:
+      '@ai-sdk/gateway': 3.0.98(zod@4.3.6)
+      '@ai-sdk/provider': 3.0.8
+      '@ai-sdk/provider-utils': 4.0.23(zod@4.3.6)
+      '@opentelemetry/api': 1.9.0
+      zod: 4.3.6
 
   ajv-formats@2.1.1(ajv@8.18.0):
     optionalDependencies:

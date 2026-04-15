@@ -508,9 +508,9 @@ export const ComparisonCharts = ({
       }
 
       // Use the stored name for display, include color from targetColors
-      return Array.from(targetGroups.entries()).map(([id, data]) => ({
+      return Array.from(targetGroups.entries()).map(([id, data], index) => ({
         name: data.name,
-        color: targetColors[id],
+        color: targetColors[id] ?? RUN_COLORS[index % RUN_COLORS.length]!,
         cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
         latency:
           data.latencies.reduce((a, b) => a + b, 0) /
@@ -635,8 +635,9 @@ export const ComparisonCharts = ({
       }
     }
 
-    return Array.from(propertyGroups.entries()).map(([_key, data]) => ({
+    return Array.from(propertyGroups.entries()).map(([_key, data], index) => ({
       name: data.displayName,
+      color: RUN_COLORS[index % RUN_COLORS.length]!,
       cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
       latency:
         data.latencies.reduce((a, b) => a + b, 0) /
