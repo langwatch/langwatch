@@ -144,7 +144,7 @@ export const app = new Hono<{ Variables: Variables }>()
         ...toMonitorResponse(m),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/evaluations/${m.id}/edit`,
+          path: `/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=${m.id}`,
         }),
       })));
     }
@@ -193,7 +193,7 @@ export const app = new Hono<{ Variables: Variables }>()
         ...toMonitorResponse(monitor),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/evaluations/${monitor.id}/edit`,
+          path: `/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=${monitor.id}`,
         }),
       });
     }
@@ -264,7 +264,7 @@ export const app = new Hono<{ Variables: Variables }>()
         ...toMonitorResponse(monitor),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/evaluations/${monitor.id}/edit`,
+          path: `/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=${monitor.id}`,
         }),
       }, 201);
     }
@@ -353,7 +353,7 @@ export const app = new Hono<{ Variables: Variables }>()
         ...toMonitorResponse(monitor),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/evaluations/${monitor.id}/edit`,
+          path: `/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=${monitor.id}`,
         }),
       });
     }

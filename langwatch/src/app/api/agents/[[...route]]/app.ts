@@ -21,6 +21,11 @@ import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { NotFoundError, UnprocessableEntityError } from "../../shared/errors";
 import { platformUrl } from "../../shared/platform-url";
+
+function agentPlatformUrl({ projectSlug, agentId, agentType }: { projectSlug: string; agentId: string; agentType: string }): string {
+  const drawer = agentType === "http" ? "agentHttpEditor" : "agentCodeEditor";
+  return platformUrl({ projectSlug, path: `/agents?drawer.open=${drawer}&drawer.agentId=${agentId}` });
+}
 import { ZodError } from "zod";
 import { handleAgentError } from "./error-handler";
 
@@ -122,12 +127,9 @@ export const app = new Hono<{ Variables: Variables }>()
 
       return c.json({
         ...result,
-        data: result.data.map((a: { id: string }) => ({
+        data: result.data.map((a: { id: string; type: string }) => ({
           ...a,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/agents`,
-          }),
+          platformUrl: agentPlatformUrl({ projectSlug: project.slug, agentId: a.id, agentType: a.type }),
         })),
       });
     },
@@ -168,10 +170,7 @@ export const app = new Hono<{ Variables: Variables }>()
           config: agent.config,
           createdAt: agent.createdAt,
           updatedAt: agent.updatedAt,
-          platformUrl: platformUrl({
-            projectSlug: project.slug,
-            path: `/agents`,
-          }),
+          platformUrl: agentPlatformUrl({ projectSlug: project.slug, agentId: agent.id, agentType: agent.type }),
         },
         201,
       );

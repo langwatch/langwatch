@@ -82,7 +82,7 @@ app.get(
       ...toScenarioResponse(s),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/simulations/scenarios`,
+        path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${s.id}`,
       }),
     })));
   },
@@ -126,7 +126,7 @@ app.get(
       ...toScenarioResponse(scenario),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/simulations/scenarios`,
+        path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
       }),
     });
   },
@@ -169,7 +169,7 @@ app.post(
       ...toScenarioResponse(scenario),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/simulations/scenarios`,
+        path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
       }),
     }, 201);
   },
@@ -225,7 +225,7 @@ app.put(
       ...toScenarioResponse(scenario),
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/simulations/scenarios`,
+        path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
       }),
     });
   },

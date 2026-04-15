@@ -73,7 +73,7 @@ app.get(
       ...e,
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/evaluators`,
+        path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${e.id}`,
       }),
     })));
   },
@@ -131,11 +131,12 @@ app.get(
       });
     }
 
+    const parsed = apiResponseEvaluatorSchema.parse(evaluator);
     return c.json({
-      ...apiResponseEvaluatorSchema.parse(evaluator),
+      ...parsed,
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/evaluators`,
+        path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsed.id}`,
       }),
     });
   },
@@ -186,11 +187,12 @@ app.post(
       "Successfully created evaluator",
     );
 
+    const parsedCreated = apiResponseEvaluatorSchema.parse(enriched);
     return c.json({
-      ...apiResponseEvaluatorSchema.parse(enriched),
+      ...parsedCreated,
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/evaluators`,
+        path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsedCreated.id}`,
       }),
     });
   },
@@ -287,11 +289,12 @@ app.put(
       "Successfully updated evaluator",
     );
 
+    const parsedUpdated = apiResponseEvaluatorSchema.parse(enriched);
     return c.json({
-      ...apiResponseEvaluatorSchema.parse(enriched),
+      ...parsedUpdated,
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/evaluators`,
+        path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsedUpdated.id}`,
       }),
     });
   },

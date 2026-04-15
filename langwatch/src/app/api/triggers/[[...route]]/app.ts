@@ -127,7 +127,7 @@ export const app = new Hono<{ Variables: Variables }>()
         ...toTriggerResponse(t),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/triggers`,
+          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${t.id}`,
         }),
       })));
     },
@@ -173,7 +173,7 @@ export const app = new Hono<{ Variables: Variables }>()
         ...toTriggerResponse(trigger),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/triggers`,
+          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${trigger.id}`,
         }),
       });
     },
@@ -220,7 +220,7 @@ export const app = new Hono<{ Variables: Variables }>()
         ...toTriggerResponse(trigger),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/triggers`,
+          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${trigger.id}`,
         }),
       }, 201);
     },
@@ -281,7 +281,7 @@ export const app = new Hono<{ Variables: Variables }>()
         ...toTriggerResponse(updated),
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/triggers`,
+          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${updated.id}`,
         }),
       });
     },
