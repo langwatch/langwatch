@@ -375,7 +375,7 @@ jobs:
                 body: [
                   "**Automated low-risk assessment**",
                   "",
-                  "This PR was evaluated against the repository's [Low-Risk Pull Requests](dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure.",
+                  "This PR was evaluated against the repository's [Low-Risk Pull Requests](https://github.com/langwatch/langwatch/blob/main/dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure.",
                   `- **Scope:** ${scope}`,
                   "- **Exclusions confirmed:** no changes to auth, security settings, database schema, business-critical logic, or external integrations.",
                   "- **Classification:** `low-risk-change` under the documented policy.",
@@ -414,7 +414,7 @@ jobs:
                 body: [
                   "**Automated low-risk assessment**",
                   "",
-                  "This PR was evaluated against the repository's [Low-Risk Pull Requests](dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure and **does not qualify** as low risk.",
+                  "This PR was evaluated against the repository's [Low-Risk Pull Requests](https://github.com/langwatch/langwatch/blob/main/dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure and **does not qualify** as low risk.",
                   "",
                   `> ${reasoning}`,
                   "",
