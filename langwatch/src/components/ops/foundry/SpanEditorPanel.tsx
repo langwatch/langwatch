@@ -42,11 +42,11 @@ export function SpanEditorPanel() {
 
       <Flex gap={3} wrap="wrap">
         <Box flex="1" minW="140px">
-          <Text fontSize="xs" color="gray.400" mb={1}>Name</Text>
+          <Text fontSize="xs" color="fg.subtle" mb={1}>Name</Text>
           <Input size="sm" value={span.name} onChange={(e) => updateSpan(span.id, { name: e.target.value })} />
         </Box>
         <Box flex="1" minW="140px">
-          <Text fontSize="xs" color="gray.400" mb={1}>Type</Text>
+          <Text fontSize="xs" color="fg.subtle" mb={1}>Type</Text>
           <Select.Root size="sm" collection={spanTypeCollection} value={[span.type]} onValueChange={(e) => updateSpan(span.id, { type: e.value[0] as SpanType })}>
             <Select.Trigger><Select.ValueText /></Select.Trigger>
             <Portal><Select.Positioner><Select.Content>
@@ -58,15 +58,15 @@ export function SpanEditorPanel() {
 
       <Flex gap={3} wrap="wrap">
         <Box flex="1" minW="100px">
-          <Text fontSize="xs" color="gray.400" mb={1}>Duration (ms)</Text>
+          <Text fontSize="xs" color="fg.subtle" mb={1}>Duration (ms)</Text>
           <Input size="sm" type="number" value={span.durationMs} onChange={(e) => updateSpan(span.id, { durationMs: parseInt(e.target.value) || 0 })} min={0} />
         </Box>
         <Box flex="1" minW="100px">
-          <Text fontSize="xs" color="gray.400" mb={1}>Offset (ms)</Text>
+          <Text fontSize="xs" color="fg.subtle" mb={1}>Offset (ms)</Text>
           <Input size="sm" type="number" value={span.offsetMs} onChange={(e) => updateSpan(span.id, { offsetMs: parseInt(e.target.value) || 0 })} min={0} />
         </Box>
         <Box flex="1" minW="100px">
-          <Text fontSize="xs" color="gray.400" mb={1}>Status</Text>
+          <Text fontSize="xs" color="fg.subtle" mb={1}>Status</Text>
           <Select.Root size="sm" collection={statusCollection} value={[span.status]} onValueChange={(e) => updateSpan(span.id, { status: e.value[0] as "ok" | "error" | "unset" })}>
             <Select.Trigger><Select.ValueText /></Select.Trigger>
             <Portal><Select.Positioner><Select.Content>
@@ -79,7 +79,7 @@ export function SpanEditorPanel() {
       </Flex>
 
       {span.status === "error" && (
-        <Box rounded="lg" border="1px solid" borderColor="red.900/50" bg="red.950/20" p={3}>
+        <Box rounded="lg" border="1px solid" borderColor="red.500/30" bg="red.500/5" p={3}>
           <Text fontSize="xs" fontWeight="medium" color="red.400" mb={1}>Exception</Text>
           <Input size="sm" value={span.exception?.message ?? ""} onChange={(e) => updateSpan(span.id, { exception: { ...span.exception, message: e.target.value } })} placeholder="Error message" mb={2} />
           <Textarea size="sm" value={span.exception?.stackTrace ?? ""} onChange={(e) => updateSpan(span.id, { exception: { message: span.exception?.message ?? "", stackTrace: e.target.value || undefined } })} placeholder="Stack trace" rows={3} fontFamily="mono" fontSize="xs" />
@@ -88,13 +88,13 @@ export function SpanEditorPanel() {
 
       <Flex gap={3}>
         <Box flex={1}>
-          <Text fontSize="xs" color="gray.400" mb={1}>Input</Text>
+          <Text fontSize="xs" color="fg.subtle" mb={1}>Input</Text>
           <Textarea size="sm" fontSize="xs" rows={3} placeholder="Span input..."
             value={span.input?.type === "text" ? (span.input.value as string) : span.input ? JSON.stringify(span.input.value, null, 2) : ""}
             onChange={(e) => updateSpan(span.id, { input: e.target.value ? { type: "text", value: e.target.value } : undefined })} />
         </Box>
         <Box flex={1}>
-          <Text fontSize="xs" color="gray.400" mb={1}>Output</Text>
+          <Text fontSize="xs" color="fg.subtle" mb={1}>Output</Text>
           <Textarea size="sm" fontSize="xs" rows={3} placeholder="Span output..."
             value={span.output?.type === "text" ? (span.output.value as string) : span.output ? JSON.stringify(span.output.value, null, 2) : ""}
             onChange={(e) => updateSpan(span.id, { output: e.target.value ? { type: "text", value: e.target.value } : undefined })} />
@@ -106,7 +106,7 @@ export function SpanEditorPanel() {
       {span.type === "prompt" && <PromptSpanEditor span={span} />}
 
       <Box>
-        <Text fontSize="xs" fontWeight="medium" textTransform="uppercase" letterSpacing="wider" color="gray.500" mb={1}>Custom Attributes</Text>
+        <Text fontSize="xs" fontWeight="medium" textTransform="uppercase" letterSpacing="wider" color="fg.muted" mb={1}>Custom Attributes</Text>
         <AttributeEditor attributes={span.attributes} onChange={(attributes) => updateSpan(span.id, { attributes })} />
       </Box>
     </VStack>

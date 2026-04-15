@@ -30,7 +30,7 @@ export function AttributeEditor({
     <Flex direction="column" gap={1} mt={1}>
       {entries.map(([key, value]) => (
         <Flex key={key} align="center" gap={2}>
-          <Text fontSize="xs" color="gray.400" w="140px" flexShrink={0} truncate>{key}</Text>
+          <Text fontSize="xs" color="fg.subtle" w="140px" flexShrink={0} truncate>{key}</Text>
           <Input
             size="sm"
             flex={1}
@@ -38,7 +38,7 @@ export function AttributeEditor({
             value={String(value)}
             onChange={(e) => updateValue(key, e.target.value)}
           />
-          <Button size="xs" variant="ghost" color="gray.500" _hover={{ color: "red.400" }}
+          <Button size="xs" variant="ghost" color="fg.muted" _hover={{ color: "red.400" }}
             onClick={() => { const next = { ...attributes }; delete next[key]; onChange(next); }}>
             <Trash2 size={12} />
           </Button>

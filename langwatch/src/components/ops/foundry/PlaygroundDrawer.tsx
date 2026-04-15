@@ -31,7 +31,7 @@ export function PlaygroundDrawer({
         <Drawer.Backdrop />
         <Drawer.Positioner>
           <Drawer.Content>
-            <Drawer.Header borderBottom="1px solid" borderColor="gray.700" py={2}>
+            <Drawer.Header borderBottom="1px solid" borderColor="border" py={2}>
               <Flex align="center" justify="space-between" w="full">
                 <HStack gap={2}>
                   <Drawer.Title fontSize="sm" fontWeight="semibold">

@@ -41,12 +41,12 @@ export function PresetPicker() {
             overflow="auto"
             rounded="lg"
             border="1px solid"
-            borderColor="gray.700"
-            bg="gray.900"
+            borderColor="border"
+            bg="bg.panel"
             shadow="xl"
             p={1}
           >
-            <Text fontSize="xs" fontWeight="medium" color="gray.500" px={2} py={1}>
+            <Text fontSize="xs" fontWeight="medium" color="fg.muted" px={2} py={1}>
               Built-in Presets
             </Text>
             {builtIn.map((preset) => (
@@ -61,25 +61,25 @@ export function PresetPicker() {
                 px={3}
                 py={2}
                 textAlign="left"
-                _hover={{ bg: "gray.800" }}
+                _hover={{ bg: "bg.subtle" }}
                 onClick={() => loadPreset(preset.id)}
               >
                 <Flex w="full" justify="space-between" align="center">
-                  <Text fontSize="sm" fontWeight="medium" color="gray.200">
+                  <Text fontSize="sm" fontWeight="medium" color="fg.default">
                     {preset.name}
                   </Text>
-                  <Text fontSize="10px" color="gray.500">
+                  <Text fontSize="10px" color="fg.muted">
                     {countSpans(preset.config.spans)} spans
                   </Text>
                 </Flex>
-                <Text fontSize="xs" color="gray.500" lineClamp={1}>
+                <Text fontSize="xs" color="fg.muted" lineClamp={1}>
                   {preset.description}
                 </Text>
               </Flex>
             ))}
             {userPresets.length > 0 && (
               <>
-                <Text fontSize="xs" fontWeight="medium" color="gray.500" px={2} py={1} mt={1}>
+                <Text fontSize="xs" fontWeight="medium" color="fg.muted" px={2} py={1} mt={1}>
                   Your Presets
                 </Text>
                 {userPresets.map((preset) => (
@@ -94,16 +94,16 @@ export function PresetPicker() {
                     px={3}
                     py={2}
                     textAlign="left"
-                    _hover={{ bg: "gray.800" }}
+                    _hover={{ bg: "bg.subtle" }}
                     onClick={() => loadPreset(preset.id)}
                   >
                     <Flex w="full" justify="space-between" align="center">
-                      <Text fontSize="sm" fontWeight="medium" color="gray.200">
+                      <Text fontSize="sm" fontWeight="medium" color="fg.default">
                         {preset.name}
                       </Text>
                       <Badge colorPalette="purple" size="sm">Custom</Badge>
                     </Flex>
-                    <Text fontSize="xs" color="gray.500" lineClamp={1}>
+                    <Text fontSize="xs" color="fg.muted" lineClamp={1}>
                       {preset.description}
                     </Text>
                   </Flex>

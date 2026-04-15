@@ -26,10 +26,10 @@ function Splash() {
   return (
     <Center h="full">
       <VStack gap={3}>
-        <Text fontSize="lg" fontWeight="semibold" color="gray.300">
+        <Text fontSize="lg" fontWeight="semibold" color="fg.default">
           The Foundry
         </Text>
-        <Text fontSize="sm" color="gray.500" fontStyle="italic">
+        <Text fontSize="sm" color="fg.muted" fontStyle="italic">
           {line}
         </Text>
       </VStack>

@@ -24,17 +24,17 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
       <GridItem
         overflow="auto"
         borderRight="1px solid"
-        borderColor="gray.700"
+        borderColor="border"
       >
         <Flex direction="column" minH="full">
           <ConnectionSettings compact={compact} />
-          <Box borderTop="1px solid" borderColor="gray.700">
+          <Box borderTop="1px solid" borderColor="border">
             <TraceSettings compact={compact} />
           </Box>
-          <Box borderTop="1px solid" borderColor="gray.700" flex={1}>
+          <Box borderTop="1px solid" borderColor="border" flex={1}>
             <SpanTreePanel />
           </Box>
-          <Box borderTop="1px solid" borderColor="gray.700">
+          <Box borderTop="1px solid" borderColor="border">
             <ExecutionControls compact={compact} />
           </Box>
         </Flex>
@@ -43,17 +43,17 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
       {/* Right pane — minmax(0,1fr) prevents blowout */}
       <GridItem overflow="hidden" display="flex" flexDirection="column">
         <Tabs.Root defaultValue="editor" variant="line" size="sm" display="flex" flexDirection="column" flex={1} overflow="hidden">
-          <Tabs.List borderBottom="1px solid" borderColor="gray.700" px={3} gap={0} flexShrink={0}>
-            <Tabs.Trigger value="editor" fontSize="xs" px={3} py={1.5} color="gray.400" _selected={{ color: "gray.50", borderColor: "orange.500" }}>
+          <Tabs.List borderBottom="1px solid" borderColor="border" px={3} gap={0} flexShrink={0}>
+            <Tabs.Trigger value="editor" fontSize="xs" px={3} py={1.5} color="fg.muted" _selected={{ color: "fg.default", borderColor: "orange.500" }}>
               Editor
             </Tabs.Trigger>
-            <Tabs.Trigger value="waterfall" fontSize="xs" px={3} py={1.5} color="gray.400" _selected={{ color: "gray.50", borderColor: "orange.500" }}>
+            <Tabs.Trigger value="waterfall" fontSize="xs" px={3} py={1.5} color="fg.muted" _selected={{ color: "fg.default", borderColor: "orange.500" }}>
               Waterfall
             </Tabs.Trigger>
-            <Tabs.Trigger value="graph" fontSize="xs" px={3} py={1.5} color="gray.400" _selected={{ color: "gray.50", borderColor: "orange.500" }}>
+            <Tabs.Trigger value="graph" fontSize="xs" px={3} py={1.5} color="fg.muted" _selected={{ color: "fg.default", borderColor: "orange.500" }}>
               Graph
             </Tabs.Trigger>
-            <Tabs.Trigger value="json" fontSize="xs" px={3} py={1.5} color="gray.400" _selected={{ color: "gray.50", borderColor: "orange.500" }}>
+            <Tabs.Trigger value="json" fontSize="xs" px={3} py={1.5} color="fg.muted" _selected={{ color: "fg.default", borderColor: "orange.500" }}>
               JSON
             </Tabs.Trigger>
           </Tabs.List>
@@ -63,7 +63,7 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
               {selectedSpanId ? (
                 <SpanEditorPanel />
               ) : (
-                <Flex h="300px" align="center" justify="center" color="gray.500">
+                <Flex h="300px" align="center" justify="center" color="fg.muted">
                   <Box textAlign="center">
                     <Text fontSize="md">Select a span to edit</Text>
                     <Text fontSize="sm" mt={1}>Or add a new span from the tree</Text>

@@ -37,15 +37,15 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
 
   return (
     <Box p={3}>
-      <Text fontSize="xs" fontWeight="medium" textTransform="uppercase" letterSpacing="wider" color="gray.500" mb={2}>Execution</Text>
+      <Text fontSize="xs" fontWeight="medium" textTransform="uppercase" letterSpacing="wider" color="fg.muted" mb={2}>Execution</Text>
       <Flex gap={2} mb={2}>
         <Box flex={1}>
-          <Text fontSize="xs" color="gray.400" mb={1}>Run N times</Text>
+          <Text fontSize="xs" color="fg.subtle" mb={1}>Run N times</Text>
           <Input size="sm" type="number" value={batchCount} onChange={(e) => setBatchCount(parseInt(e.target.value) || 1)} min={1} max={100} />
         </Box>
         {!compact && (
           <Box flex={1}>
-            <Text fontSize="xs" color="gray.400" mb={1}>Stagger (ms)</Text>
+            <Text fontSize="xs" color="fg.subtle" mb={1}>Stagger (ms)</Text>
             <Input size="sm" type="number" value={staggerMs} onChange={(e) => setStaggerMs(parseInt(e.target.value) || 0)} min={0} step={100} />
           </Box>
         )}
@@ -53,7 +53,7 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
       <Button w="full" size="sm" colorPalette="orange" onClick={handleSend} disabled={running || !apiKey} loading={running} loadingText="Sending...">
         <Play size={14} /> Send Traces
       </Button>
-      {!apiKey && <Text fontSize="xs" color="gray.500" mt={1}>Navigate to a project first</Text>}
+      {!apiKey && <Text fontSize="xs" color="fg.muted" mt={1}>Navigate to a project first</Text>}
       <ExecutionLog />
     </Box>
   );
@@ -66,8 +66,8 @@ function ExecutionLog() {
   return (
     <Box mt={2}>
       <Flex justify="space-between" align="center" mb={1}>
-        <Text fontSize="xs" color="gray.500">Log</Text>
-        <Text as="button" fontSize="xs" color="gray.500" _hover={{ color: "gray.300" }} onClick={clearLog}>Clear</Text>
+        <Text fontSize="xs" color="fg.muted">Log</Text>
+        <Text as="button" fontSize="xs" color="fg.muted" _hover={{ color: "fg.default" }} onClick={clearLog}>Clear</Text>
       </Flex>
       <VStack maxH="120px" overflow="auto" gap={0.5} align="stretch">
         {log.map((entry) => (
@@ -91,8 +91,8 @@ function LogEntry({ entry }: { entry: { id: string; traceId: string; status: str
       fontSize="xs"
       rounded="sm"
       cursor={canCopy ? "pointer" : "default"}
-      bg={copied ? "green.950/20" : "transparent"}
-      _hover={canCopy ? { bg: copied ? "green.950/20" : "bg.subtle" } : undefined}
+      bg={copied ? "green.500/10" : "transparent"}
+      _hover={canCopy ? { bg: copied ? "green.500/10" : "bg.subtle" } : undefined}
       transition="background 0.15s"
       onClick={() => {
         if (!canCopy) return;

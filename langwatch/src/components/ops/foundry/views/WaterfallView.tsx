@@ -31,7 +31,7 @@ export function WaterfallView() {
   const selectSpan = useTraceStore((s) => s.selectSpan);
 
   const flat = flattenSpans(spans, 0, 0);
-  if (flat.length === 0) return <Flex h="200px" align="center" justify="center" color="gray.500"><Text>No spans</Text></Flex>;
+  if (flat.length === 0) return <Flex h="200px" align="center" justify="center" color="fg.muted"><Text>No spans</Text></Flex>;
 
   const minTime = Math.min(...flat.map((f) => f.absoluteStartMs));
   const maxTime = Math.max(...flat.map((f) => f.absoluteEndMs));
@@ -49,7 +49,7 @@ export function WaterfallView() {
               key={i}
               position="absolute"
               fontSize="10px"
-              color="gray.500"
+              color="fg.muted"
               transform="translateX(-50%)"
               left={`${((tick - minTime) / totalDuration) * 100}%`}
             >
@@ -74,12 +74,12 @@ export function WaterfallView() {
               cursor="pointer"
               rounded="sm"
               bg={isSelected ? "orange.500/10" : "transparent"}
-              _hover={{ bg: isSelected ? "orange.500/10" : "gray.800/40" }}
+              _hover={{ bg: isSelected ? "orange.500/10" : "bg.subtle" }}
               onClick={() => selectSpan(item.span.id)}
             >
               <Flex w="180px" flexShrink={0} align="center" gap={1} pr={2} pl={`${item.depth * 16 + 8}px`} truncate>
                 <Text fontSize="xs" flexShrink={0}>{SPAN_TYPE_ICONS[item.span.type]}</Text>
-                <Text fontSize="xs" color="gray.300" truncate>{item.span.name}</Text>
+                <Text fontSize="xs" color="fg.default" truncate>{item.span.name}</Text>
               </Flex>
               <Box flex={1} position="relative" h="20px">
                 <Box
@@ -96,7 +96,7 @@ export function WaterfallView() {
                   ringColor={isSelected ? "orange.400" : undefined}
                 />
               </Box>
-              <Text w="50px" flexShrink={0} textAlign="right" fontSize="10px" color="gray.500" pr={2}>
+              <Text w="50px" flexShrink={0} textAlign="right" fontSize="10px" color="fg.muted" pr={2}>
                 {item.span.durationMs}ms
               </Text>
             </Flex>

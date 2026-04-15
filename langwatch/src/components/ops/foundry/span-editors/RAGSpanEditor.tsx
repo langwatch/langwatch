@@ -13,14 +13,14 @@ export function RAGSpanEditor({ span }: { span: SpanConfig }) {
   }
 
   return (
-    <Box rounded="lg" border="1px solid" borderColor="teal.900/30" bg="teal.950/10" p={4}>
+    <Box rounded="lg" border="1px solid" borderColor="teal.500/20" bg="teal.500/5" p={4}>
       <Text fontSize="sm" fontWeight="semibold" color="teal.400" mb={3}>RAG Contexts</Text>
       <Flex direction="column" gap={3}>
         {contexts.map((ctx, i) => (
-          <Box key={i} rounded="md" border="1px solid" borderColor="gray.700" bg="gray.900/50" p={3}>
+          <Box key={i} rounded="md" border="1px solid" borderColor="border" bg="bg.subtle" p={3}>
             <Flex justify="space-between" mb={2}>
-              <Text fontSize="xs" fontWeight="medium" color="gray.400">Context {i + 1}</Text>
-              <Button size="xs" variant="ghost" color="gray.500" _hover={{ color: "red.400" }}
+              <Text fontSize="xs" fontWeight="medium" color="fg.subtle">Context {i + 1}</Text>
+              <Button size="xs" variant="ghost" color="fg.muted" _hover={{ color: "red.400" }}
                 onClick={() => updateSpan(span.id, { rag: { contexts: contexts.filter((_, j) => j !== i) } })}>
                 <Trash2 size={12} />
               </Button>
