@@ -1725,7 +1725,7 @@ This is an **interactive** skill. Don't dump everything in one message. Follow t
 
 3. **Third response:** Show a preview of 5-8 sample rows. Ask: "Do these look realistic? Should I change the style or add more edge cases?"
 
-4. **Final response:** Generate the full dataset, create the CSV, upload to LangWatch, and deliver the summary with local file path, platform link, and next steps.
+4. **Final response:** Generate the full dataset, create the CSV, upload to LangWatch, and deliver the summary with platform link, local file path, and next steps.
 
 If the user says "just do it" or "go ahead and generate everything" — you can compress steps 2-4 into fewer messages, but ALWAYS do the discovery phase first.
 
@@ -1936,32 +1936,24 @@ echo '[{"input":"test","expected_output":"response"}]' | langwatch dataset recor
 
 ### Create and upload the dataset
 
+Once the CSV is ready, create the dataset on LangWatch and upload it so the user and their team can review and edit it on the platform.
+
 \`\`\`bash
-# Create the dataset on LangWatch
 langwatch dataset create "<dataset-name>" --columns "input:string,expected_output:string" --format json
-
-# Upload the CSV
 langwatch dataset upload "<dataset-slug>" evaluation_dataset.csv
 \`\`\`
 
-If upload fails (auth error, network issue), don't panic — the CSV is saved locally. Tell the user the local path and how to upload manually later.
-
-If the user doesn't have \`LANGWATCH_API_KEY\` set, skip the upload and just deliver the CSV with instructions:
-\`\`\`bash
-langwatch login
-langwatch dataset upload "<dataset-slug>" evaluation_dataset.csv
-\`\`\`
+If the upload fails (missing API key, network issue), let the user know and help them fix it — they can always upload later with \`langwatch dataset upload\`.
 
 ### Deliver results to the user
 
 Always provide a clear summary:
 
 \`\`\`text
-## Dataset Generated
+## Dataset Ready
 
+**Platform:** <dataset-slug> — check it out at {LANGWATCH_ENDPOINT} → Datasets
 **Local file:** ./evaluation_dataset.csv (N rows)
-**Platform:** Check your datasets at {LANGWATCH_ENDPOINT} → Datasets section
-**Dataset slug:** <slug>
 
 ### What's in it
 - N rows across M categories
@@ -1969,7 +1961,7 @@ Always provide a clear summary:
 - Sources: [codebase, traces, prompts, user materials]
 
 ### Next steps
-1. Review the dataset on the platform — edit any rows that need tweaking
+1. Review and edit the dataset on the platform — share with your team
 2. Set up an evaluation experiment on the platform using this dataset
 3. Add more rows anytime:
    langwatch dataset records add <slug> --file more_rows.json
