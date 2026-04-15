@@ -548,7 +548,9 @@ async function checkPermissionFromBindings({
 
   // Union permissions across ALL matching bindings — permitted if any grants it
   for (const binding of bindings) {
-    // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only
+    // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only.
+    // ORG-scoped MEMBER bindings do NOT imply any team- or project-level access — team/project
+    // access requires a TEAM- or PROJECT-scoped binding. Only org:* permissions are checked here.
     if (
       binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
       binding.role !== TeamUserRole.CUSTOM

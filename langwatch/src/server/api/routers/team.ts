@@ -601,14 +601,13 @@ export const teamRouter = createTRPCRouter({
           });
         }
 
-        // Post-creation validation: ensure we have at least one admin
+        // Post-creation validation: ensure we have at least one admin (direct user or group binding)
         const finalAdminCount = await tx.roleBinding.count({
           where: {
             organizationId: input.organizationId,
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: team.id,
             role: TeamUserRole.ADMIN,
-            userId: { not: null },
           },
         });
 
@@ -719,14 +718,13 @@ export const teamRouter = createTRPCRouter({
           },
         });
 
-        // Post-removal validation: ensure we still have at least one admin
+        // Post-removal validation: ensure we still have at least one admin (direct user or group binding)
         const finalAdminCount = await tx.roleBinding.count({
           where: {
             organizationId: team.organizationId,
             scopeType: RoleBindingScopeType.TEAM,
             scopeId: input.teamId,
             role: TeamUserRole.ADMIN,
-            userId: { not: null },
           },
         });
 

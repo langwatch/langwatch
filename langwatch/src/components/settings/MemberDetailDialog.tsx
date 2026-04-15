@@ -59,8 +59,8 @@ export function MemberDetailDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, member.userId]);
 
-  const directBindings = api.roleBinding.listForOrg.useQuery(
-    { organizationId },
+  const directBindings = api.roleBinding.listForUser.useQuery(
+    { organizationId, userId: member.userId },
     { enabled: open && canManage },
   );
   const memberGroups = api.group.listForMember.useQuery(
@@ -100,7 +100,7 @@ export function MemberDetailDialog({
         ),
       ]);
 
-      void queryClient.roleBinding.listForOrg.invalidate();
+      void queryClient.roleBinding.listForUser.invalidate();
       void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
       void queryClient.organization.getAll.invalidate();
       toaster.create({ title: "Member updated", type: "success" });
@@ -112,9 +112,7 @@ export function MemberDetailDialog({
     }
   };
 
-  const userDirectBindings = (directBindings.data ?? []).filter(
-    (b) => b.userId === member.userId,
-  );
+  const userDirectBindings = directBindings.data ?? [];
 
   return (
     <Dialog.Root
