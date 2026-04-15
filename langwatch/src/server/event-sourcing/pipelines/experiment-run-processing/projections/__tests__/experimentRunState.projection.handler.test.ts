@@ -11,6 +11,7 @@ import type {
 	ExperimentRunProcessingEvent,
 	ExperimentRunStartedEvent,
 	TargetResultEvent,
+	TraceMetricsComputedEvent,
 } from "../../schemas/events";
 import {
 	ExperimentRunStateFoldProjection,
@@ -284,5 +285,101 @@ describe("experimentRunStateFoldProjection", () => {
     ]);
 
     expect(state.TotalCost).toBeCloseTo(0.015, 5);
+  });
+
+  describe("when trace metrics arrive via ECST", () => {
+    function createTraceMetricsEvent(
+      overrides: Partial<TraceMetricsComputedEvent["data"]> = {},
+      eventOverrides: Partial<TraceMetricsComputedEvent> = {},
+    ): TraceMetricsComputedEvent {
+      return {
+        id: "event-metrics-1",
+        aggregateId: "run-123",
+        aggregateType: "experiment_run",
+        tenantId: TEST_TENANT_ID,
+        createdAt: 5000,
+        occurredAt: 5000,
+        type: EXPERIMENT_RUN_EVENT_TYPES.TRACE_METRICS_COMPUTED,
+        version: EXPERIMENT_RUN_EVENT_VERSIONS.TRACE_METRICS_COMPUTED,
+        data: {
+          runId: "run-123",
+          experimentId: "exp-1",
+          traceId: "trace-abc",
+          totalCost: 0.003,
+          ...overrides,
+        },
+        ...eventOverrides,
+      };
+    }
+
+    it("accumulates trace cost into TotalCost", () => {
+      const state = foldEvents([
+        createStartedEvent(),
+        createTargetResultEvent(),
+        createTraceMetricsEvent({ totalCost: 0.003 }),
+      ]);
+
+      expect(state.TotalCost).toBeCloseTo(0.003, 6);
+    });
+
+    it("accumulates multiple trace costs", () => {
+      const state = foldEvents([
+        createStartedEvent(),
+        createTargetResultEvent(),
+        createTraceMetricsEvent({ traceId: "trace-1", totalCost: 0.003 }),
+        createTraceMetricsEvent(
+          { traceId: "trace-2", totalCost: 0.002 },
+          { id: "event-metrics-2", createdAt: 5100 },
+        ),
+      ]);
+
+      expect(state.TotalCost).toBeCloseTo(0.005, 6);
+    });
+
+    it("stores per-trace breakdown in TraceMetrics", () => {
+      const state = foldEvents([
+        createStartedEvent(),
+        createTraceMetricsEvent({ traceId: "trace-1", totalCost: 0.003 }),
+        createTraceMetricsEvent(
+          { traceId: "trace-2", totalCost: 0.002 },
+          { id: "event-metrics-2", createdAt: 5100 },
+        ),
+      ]);
+
+      expect(state.TraceMetrics["trace-1"]!.totalCost).toBe(0.003);
+      expect(state.TraceMetrics["trace-2"]!.totalCost).toBe(0.002);
+    });
+
+    it("replaces existing trace cost on re-delivery (idempotent)", () => {
+      const state = foldEvents([
+        createStartedEvent(),
+        createTraceMetricsEvent({ traceId: "trace-1", totalCost: 0.003 }),
+        createTraceMetricsEvent(
+          { traceId: "trace-1", totalCost: 0.004 },
+          { id: "event-metrics-1b", createdAt: 5200 },
+        ),
+      ]);
+
+      // Should use the latest cost, not double-count
+      expect(state.TotalCost).toBeCloseTo(0.004, 6);
+      expect(state.TraceMetrics["trace-1"]!.totalCost).toBe(0.004);
+    });
+
+    it("combines trace costs with inline target/evaluator costs", () => {
+      const state = foldEvents([
+        createStartedEvent(),
+        createTargetResultEvent({ cost: 0.01 }),
+        createEvaluatorResultEvent({ cost: 0.005 }),
+        createTraceMetricsEvent({ totalCost: 0.003 }),
+      ]);
+
+      // 0.01 (target) + 0.005 (evaluator) + 0.003 (trace) = 0.018
+      expect(state.TotalCost).toBeCloseTo(0.018, 5);
+    });
+
+    it("initializes TraceMetrics as empty", () => {
+      const state = foldEvents([createStartedEvent()]);
+      expect(state.TraceMetrics).toEqual({});
+    });
   });
 });

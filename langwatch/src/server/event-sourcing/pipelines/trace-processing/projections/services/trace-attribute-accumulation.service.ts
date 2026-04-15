@@ -76,6 +76,9 @@ export class TraceAttributeAccumulationService {
     const scenarioRunId = stringAttr(spanAttrs, "scenario.run_id");
     if (scenarioRunId) result["scenario.run_id"] = scenarioRunId;
 
+    const evaluationRunId = stringAttr(spanAttrs, "evaluation.run_id");
+    if (evaluationRunId) result["evaluation.run_id"] = evaluationRunId;
+
     const labels = spanAttrs[ATTR_KEYS.LANGWATCH_LABELS];
     if (typeof labels === "string") result["langwatch.labels"] = labels;
     else if (Array.isArray(labels))
