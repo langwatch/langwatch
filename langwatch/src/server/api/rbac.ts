@@ -372,6 +372,7 @@ type PermissionMiddlewareParams<InputType> = {
     permissionChecked: boolean;
     publiclyShared: boolean;
     organizationRole?: OrganizationUserRole | null;
+    opsScope?: OpsScope;
   };
   input: InputType;
   next: () => any;
@@ -1021,7 +1022,7 @@ export const checkOpsPermission =
 
     if (!opsScope) {
       throw new TRPCError({
-        code: "UNAUTHORIZED",
+        code: "FORBIDDEN",
         message: "You do not have permission to access ops resources",
       });
     }

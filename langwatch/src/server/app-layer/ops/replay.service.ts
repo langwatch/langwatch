@@ -34,6 +34,7 @@ export class ReplayService {
     projectionNames: string[];
     since: string;
     tenantIds: string[];
+    aggregateIds?: string[];
     description: string;
     userName: string;
   }): Promise<{ runId: string }> {
@@ -95,6 +96,7 @@ export class ReplayService {
     projectionNames: string[];
     since: string;
     tenantIds: string[];
+    aggregateIds?: string[];
     description: string;
     userName: string;
   }): Promise<void> {
@@ -146,6 +148,7 @@ export class ReplayService {
           projections: selectedProjections,
           tenantIds: params.tenantIds,
           since: params.since,
+          aggregateIds: params.aggregateIds,
         },
         {
           onProgress: (progress: ReplayProgress) => {

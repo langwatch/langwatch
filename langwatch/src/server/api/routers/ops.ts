@@ -341,6 +341,7 @@ export const opsRouter = createTRPCRouter({
         projectionNames: z.array(z.string()).min(1),
         since: z.string(),
         tenantIds: z.array(z.string()).optional(),
+        aggregateIds: z.array(z.string()).optional(),
         description: z.string(),
       }),
     )
@@ -361,6 +362,7 @@ export const opsRouter = createTRPCRouter({
           projectionNames: input.projectionNames,
           since: input.since,
           tenantIds,
+          aggregateIds: input.aggregateIds,
           description: input.description,
           userName,
         });

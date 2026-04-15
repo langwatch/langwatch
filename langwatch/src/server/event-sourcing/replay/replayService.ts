@@ -544,6 +544,16 @@ export class ReplayService {
       }
     }
 
+    // Filter to specific aggregate IDs if provided (single-aggregate replay)
+    if (config.aggregateIds && config.aggregateIds.length > 0) {
+      const allowedIds = new Set(config.aggregateIds);
+      for (const [key, entry] of aggregateProjectionMap) {
+        if (!allowedIds.has(entry.aggregateId)) {
+          aggregateProjectionMap.delete(key);
+        }
+      }
+    }
+
     if (aggregateProjectionMap.size === 0) {
       return { aggregatesReplayed: 0, totalEvents: 0, batchErrors: 0 };
     }
@@ -603,120 +613,112 @@ export class ReplayService {
       return { tenantId: entry.tenantId, aggregateType: entry.aggregateType, aggregateId: entry.aggregateId };
     });
 
-    await waitForAllActiveJobs({
-      redis: this.deps.redis,
-      aggregates: allDiscoveredAggregates,
-      projections: config.projections,
-    });
-    log.write({ step: "drain-all", aggregateCount: allDiscoveredAggregates.length });
-
-    // 4. Process in batches
     const totalBatches = Math.ceil(remaining.length / aggregateBatchSize);
     let aggregatesCompleted = skippedCount;
 
-    for (let i = 0; i < remaining.length; i += aggregateBatchSize) {
-      const batchKeys = remaining.slice(i, i + aggregateBatchSize);
-      const batchNum = Math.floor(i / aggregateBatchSize) + 1;
-      const batchStartTime = Date.now();
+    try {
+      await waitForAllActiveJobs({
+        redis: this.deps.redis,
+        aggregates: allDiscoveredAggregates,
+        projections: config.projections,
+      });
+      log.write({ step: "drain-all", aggregateCount: allDiscoveredAggregates.length });
 
-      const progress: ReplayProgress = {
-        phase: "replaying",
-        currentProjectionName: config.projections.map((p) => p.projectionName).join("+"),
-        currentProjectionIndex: 0,
-        totalProjections: config.projections.length,
-        totalAggregates: allAggregateKeys.length,
-        tenantCount: new Set(allDiscoveredAggregates.map((a) => a.tenantId)).size,
-        currentBatch: batchNum,
-        totalBatches,
-        batchAggregates: batchKeys.length,
-        batchPhase: "mark",
-        batchEventsProcessed: 0,
-        aggregatesCompleted,
-        totalEventsReplayed,
-        elapsedSec: (Date.now() - startTime) / 1000,
-        skippedCount,
-        batchErrors: totalBatchErrors,
-        firstError,
-      };
+      for (let i = 0; i < remaining.length; i += aggregateBatchSize) {
+        const batchKeys = remaining.slice(i, i + aggregateBatchSize);
+        const batchNum = Math.floor(i / aggregateBatchSize) + 1;
+        const batchStartTime = Date.now();
 
-      const emit = () => {
-        progress.elapsedSec = (Date.now() - startTime) / 1000;
-        callbacks?.onProgress?.({ ...progress });
-      };
-
-      emit();
-
-      try {
-        const batchResult = await this.replayBatchOptimized({
-          batchKeys,
-          aggregateProjectionMap,
-          projectionByName,
-          aggregateBatchSize,
-          concurrency,
-          log,
-          onBatchPhase: (phase, eventsProcessed) => {
-            progress.batchPhase = phase;
-            if (eventsProcessed !== undefined) {
-              progress.batchEventsProcessed = eventsProcessed;
-              progress.totalEventsReplayed = totalEventsReplayed + eventsProcessed;
-            }
-            emit();
-          },
-        });
-
-        totalEventsReplayed += batchResult.eventsReplayed;
-        aggregatesCompleted += batchKeys.length;
-
-        for (const key of batchKeys) {
-          const entry = aggregateProjectionMap.get(key)!;
-          touchedTenants.add(entry.tenantId);
-        }
-
-        callbacks?.onBatchComplete?.({
-          projectionName: config.projections.map((p) => p.projectionName).join("+"),
-          batchNum,
+        const progress: ReplayProgress = {
+          phase: "replaying",
+          currentProjectionName: config.projections.map((p) => p.projectionName).join("+"),
+          currentProjectionIndex: 0,
+          totalProjections: config.projections.length,
+          totalAggregates: allAggregateKeys.length,
+          tenantCount: new Set(allDiscoveredAggregates.map((a) => a.tenantId)).size,
+          currentBatch: batchNum,
           totalBatches,
-          aggregatesInBatch: batchKeys.length,
-          eventsInBatch: batchResult.eventsReplayed,
-          durationSec: (Date.now() - batchStartTime) / 1000,
-        });
-      } catch (error) {
-        totalBatchErrors++;
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        if (!firstError) firstError = errorMsg;
-        log.write({ step: "error", batch: batchNum, error: errorMsg });
-
-        progress.batchErrors = totalBatchErrors;
-        progress.firstError = firstError;
-        emit();
-
-        // Unpause all projections on error
-        for (const p of config.projections) {
-          await unpauseProjection({
-            redis: this.deps.redis,
-            pipelineName: p.pipelineName,
-            projectionName: p.projectionName,
-          }).catch(() => {});
-        }
-
-        return {
-          aggregatesReplayed: aggregatesCompleted - skippedCount,
-          totalEvents: totalEventsReplayed,
+          batchAggregates: batchKeys.length,
+          batchPhase: "mark",
+          batchEventsProcessed: 0,
+          aggregatesCompleted,
+          totalEventsReplayed,
+          elapsedSec: (Date.now() - startTime) / 1000,
+          skippedCount,
           batchErrors: totalBatchErrors,
           firstError,
         };
-      }
-    }
 
-    // 5. Unpause ALL projections
-    for (const p of config.projections) {
-      await unpauseProjection({
-        redis: this.deps.redis,
-        pipelineName: p.pipelineName,
-        projectionName: p.projectionName,
-      });
+        const emit = () => {
+          progress.elapsedSec = (Date.now() - startTime) / 1000;
+          callbacks?.onProgress?.({ ...progress });
+        };
+
+        emit();
+
+        try {
+          const batchResult = await this.replayBatchOptimized({
+            batchKeys,
+            aggregateProjectionMap,
+            projectionByName,
+            aggregateBatchSize,
+            concurrency,
+            log,
+            onBatchPhase: (phase, eventsProcessed) => {
+              progress.batchPhase = phase;
+              if (eventsProcessed !== undefined) {
+                progress.batchEventsProcessed = eventsProcessed;
+                progress.totalEventsReplayed = totalEventsReplayed + eventsProcessed;
+              }
+              emit();
+            },
+          });
+
+          totalEventsReplayed += batchResult.eventsReplayed;
+          aggregatesCompleted += batchKeys.length;
+
+          for (const key of batchKeys) {
+            const entry = aggregateProjectionMap.get(key)!;
+            touchedTenants.add(entry.tenantId);
+          }
+
+          callbacks?.onBatchComplete?.({
+            projectionName: config.projections.map((p) => p.projectionName).join("+"),
+            batchNum,
+            totalBatches,
+            aggregatesInBatch: batchKeys.length,
+            eventsInBatch: batchResult.eventsReplayed,
+            durationSec: (Date.now() - batchStartTime) / 1000,
+          });
+        } catch (error) {
+          totalBatchErrors++;
+          const errorMsg = error instanceof Error ? error.message : String(error);
+          if (!firstError) firstError = errorMsg;
+          log.write({ step: "error", batch: batchNum, error: errorMsg });
+
+          progress.batchErrors = totalBatchErrors;
+          progress.firstError = firstError;
+          emit();
+
+          return {
+            aggregatesReplayed: aggregatesCompleted - skippedCount,
+            totalEvents: totalEventsReplayed,
+            batchErrors: totalBatchErrors,
+            firstError,
+          };
+        }
+      }
+    } finally {
+      // 5. Unpause ALL projections — always runs, even on unexpected errors
+      for (const p of config.projections) {
+        await unpauseProjection({
+          redis: this.deps.redis,
+          pipelineName: p.pipelineName,
+          projectionName: p.projectionName,
+        }).catch(() => {});
+      }
+      log.write({ step: "unpause-all", projections: config.projections.map((p) => p.projectionName) });
     }
-    log.write({ step: "unpause-all", projections: config.projections.map((p) => p.projectionName) });
 
     // 6. Cleanup markers for all projections
     for (const p of config.projections) {

@@ -5,6 +5,7 @@ import type { Preset, TraceConfig } from "./types";
 import { builtInPresets } from "./presets";
 
 function loadUserPresets(): Preset[] {
+  if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem("otel-playground:presets");
     return raw ? (JSON.parse(raw) as Preset[]) : [];
@@ -14,6 +15,7 @@ function loadUserPresets(): Preset[] {
 }
 
 function saveUserPresets(presets: Preset[]) {
+  if (typeof window === "undefined") return;
   localStorage.setItem("otel-playground:presets", JSON.stringify(presets));
 }
 

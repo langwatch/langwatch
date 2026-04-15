@@ -130,6 +130,7 @@ export function SingleAggregateReplay({
               projectionNames: [...selectedProjections],
               since,
               tenantIds: [tenantId.trim()],
+              aggregateIds: [aggregateId.trim()],
               description: `Single aggregate replay: ${aggregateId.trim()}`,
             });
           }}

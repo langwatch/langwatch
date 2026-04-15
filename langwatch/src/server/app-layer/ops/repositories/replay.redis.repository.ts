@@ -89,7 +89,7 @@ export class ReplayRedisRepository implements ReplayRepository {
   }
 
   async getHistory(): Promise<ReplayHistoryEntry[]> {
-    const raw = await this.redis.lrange(REPLAY_HISTORY_KEY, 0, 19);
+    const raw = await this.redis.lrange(REPLAY_HISTORY_KEY, 0, REPLAY_HISTORY_MAX - 1);
     const entries: ReplayHistoryEntry[] = [];
     for (const item of raw) {
       try {

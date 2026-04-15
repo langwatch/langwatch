@@ -122,7 +122,15 @@ export async function waitForAllActiveJobs({
       );
     }
 
-    const allDrained = results.every(([_err, val]) => val === null);
+    const commandErrors = results.filter(([err]) => err != null);
+    if (commandErrors.length > 0) {
+      const names = projections.map((p) => p.projectionName).join(", ");
+      throw new Error(
+        `Failed to inspect active jobs while draining projections [${names}]: ${commandErrors[0]![0]!.message}`,
+      );
+    }
+
+    const allDrained = results.every(([, val]) => val === null);
     if (allDrained) return;
 
     await sleep(200);
