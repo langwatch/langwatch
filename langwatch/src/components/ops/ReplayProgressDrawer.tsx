@@ -35,7 +35,7 @@ export function ReplayProgressDrawer({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const { canManage } = useOpsPermission();
+  const { hasAccess: canManage } = useOpsPermission();
 
   const statusQuery = useReplayStatus({
     refetchInterval: open ? 1000 : false,

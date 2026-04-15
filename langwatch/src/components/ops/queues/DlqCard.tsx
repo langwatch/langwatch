@@ -15,7 +15,7 @@ import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
 
 export function DlqCard({ queueNames }: { queueNames: string[] }) {
-  const { canManage } = useOpsPermission();
+  const { hasAccess: canManage } = useOpsPermission();
   const utils = api.useContext();
 
   const dlqQuery = api.ops.listAllDlqGroups.useQuery(undefined, { refetchInterval: 10000 });

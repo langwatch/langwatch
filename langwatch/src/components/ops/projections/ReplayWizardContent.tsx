@@ -10,7 +10,7 @@ import { BulkReplayWizard } from "./BulkReplayWizard";
 import { SingleAggregateReplay } from "./SingleAggregateReplay";
 
 export function ReplayWizardContent() {
-  const { canManage } = useOpsPermission();
+  const { hasAccess: canManage } = useOpsPermission();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 

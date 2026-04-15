@@ -34,6 +34,8 @@ export class QueueService {
       return { groups: [], total: 0, page: params.page, pageSize: params.pageSize };
     }
 
+    // Groups are loaded in full then sliced — acceptable for typical queue
+    // sizes but would need server-side pagination if group counts grow large.
     const start = (params.page - 1) * params.pageSize;
     const end = start + params.pageSize;
     const paginatedGroups = queue.groups.slice(start, end);

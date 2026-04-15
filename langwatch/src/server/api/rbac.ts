@@ -944,6 +944,10 @@ export type OpsScope =
 /**
  * Resolve the ops scope for a user. Returns null if the user has no ops access.
  * Shared between tRPC middleware and SSE endpoint.
+ *
+ * Admins and OPS_ORG_ID members bypass the permission check and receive
+ * platform-level access. For regular org members, `permission` is checked
+ * against their role bindings via `resolveBindingPermission`.
  */
 export async function resolveOpsScope({
   userId,

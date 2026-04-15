@@ -30,6 +30,10 @@ export class App {
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;
+
+  get eventSourcing(): EventSourcing | undefined {
+    return this._eventSourcing;
+  }
   private readonly _gracefulCloseables: Array<{
     name: string;
     close: () => Promise<void>;

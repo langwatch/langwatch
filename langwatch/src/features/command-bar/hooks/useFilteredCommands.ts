@@ -62,6 +62,14 @@ export function useFilteredCommands(
     return filterCommands(availableNavCommands, query);
   }, [query, availableNavCommands]);
 
+  const availableActionCommands = useMemo(
+    () =>
+      hasOpsAccess
+        ? actionCommands
+        : actionCommands.filter((cmd) => cmd.id !== "action-send-trace"),
+    [hasOpsAccess],
+  );
+
   const filteredActions = useMemo(() => {
     if (!query.trim()) return [];
 
@@ -75,11 +83,11 @@ export function useFilteredCommands(
     );
 
     if (isSearchingCategory) {
-      return actionCommands;
+      return availableActionCommands;
     }
 
-    return filterCommands(actionCommands, query);
-  }, [query]);
+    return filterCommands(availableActionCommands, query);
+  }, [query, availableActionCommands]);
 
   // Filter support commands based on query (filter out "Open Chat" if not SAAS)
   const filteredSupport = useMemo(() => {

@@ -122,6 +122,8 @@ export function createEnvConfig() {
       STRIPE_LICENSE_PAYMENT_LINK_ID: z.string().optional(),
       STRIPE_LICENSE_PAYMENT_LINK_URL: z.string().optional(),
       ADMIN_EMAILS: z.string().optional(),
+      // Organization ID whose members get platform-level ops access.
+      // Only set this to an internal operations team organization.
       OPS_ORG_ID: z.string().optional(),
       HUBSPOT_PORTAL_ID: z.string().optional(),
       HUBSPOT_REACHED_LIMIT_FORM_ID: z.string().optional(),

@@ -2,17 +2,13 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import type { PrismaClient } from "@prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import {
-  checkOpsPermission,
-  type Permission,
-  type OpsScope,
-} from "~/server/api/rbac";
+import { checkOpsPermission, type OpsScope } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
 import { getProjectionMetadata, getReactorMetadata } from "~/server/event-sourcing/pipelineRegistry";
 
-const opsViewPermission = checkOpsPermission("ops:view" as Permission);
+const opsViewPermission = checkOpsPermission("ops:view");
 
-const opsManagePermission = checkOpsPermission("ops:manage" as Permission);
+const opsManagePermission = checkOpsPermission("ops:manage");
 
 function requireOps() {
   const ops = getApp().ops;
@@ -43,7 +39,16 @@ async function resolveTenantIds({
   const orgProjectIds = new Set(orgProjects.map((p) => p.id));
 
   if (requestedTenantIds && requestedTenantIds.length > 0) {
-    return requestedTenantIds.filter((id) => orgProjectIds.has(id));
+    const unauthorized = requestedTenantIds.filter(
+      (id) => !orgProjectIds.has(id),
+    );
+    if (unauthorized.length > 0) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: `Tenant(s) not accessible in your scope: ${unauthorized.join(", ")}`,
+      });
+    }
+    return requestedTenantIds;
   }
   return [...orgProjectIds];
 }
@@ -78,6 +83,34 @@ async function resolveOrgProjectIds({
     select: { id: true },
   })) as Array<{ id: string }>;
   return new Set(orgProjects.map((p) => p.id));
+}
+
+async function searchOpsProjects({
+  query,
+  opsScope,
+  prisma,
+}: {
+  query: string;
+  opsScope: OpsScope;
+  prisma: PrismaClient;
+}): Promise<Array<{ id: string; name: string; slug: string }>> {
+  const where: Record<string, unknown> = {
+    OR: [
+      { id: { contains: query } },
+      { name: { contains: query, mode: "insensitive" } },
+      { slug: { contains: query, mode: "insensitive" } },
+    ],
+  };
+
+  if (opsScope.kind === "organization") {
+    where.team = { organizationId: opsScope.organizationId };
+  }
+
+  return prisma.project.findMany({
+    where,
+    select: { id: true, name: true, slug: true },
+    take: 20,
+  }) as Promise<Array<{ id: string; name: string; slug: string }>>;
 }
 
 export const opsRouter = createTRPCRouter({
@@ -272,30 +305,11 @@ export const opsRouter = createTRPCRouter({
     .use(opsViewPermission)
     .input(z.object({ query: z.string() }))
     .query(async ({ input, ctx }) => {
-      const opsScope = ctx.opsScope!;
-      const where: Record<string, unknown> = {
-        OR: [
-          { id: { contains: input.query } },
-          { name: { contains: input.query, mode: "insensitive" } },
-          { slug: { contains: input.query, mode: "insensitive" } },
-        ],
-      };
-
-      if (opsScope.kind === "organization") {
-        where.team = { organizationId: opsScope.organizationId };
-      }
-
-      const projects = await ctx.prisma.project.findMany({
-        where,
-        select: { id: true, name: true, slug: true },
-        take: 20,
+      return searchOpsProjects({
+        query: input.query,
+        opsScope: ctx.opsScope!,
+        prisma: ctx.prisma,
       });
-
-      return projects.map((p: { id: string; name: string; slug: string }) => ({
-        id: p.id,
-        name: p.name,
-        slug: p.slug,
-      }));
     }),
 
   dryRunReplay: protectedProcedure
@@ -330,8 +344,7 @@ export const opsRouter = createTRPCRouter({
     .input(z.object({ runId: z.string() }))
     .query(async ({ input }) => {
       const ops = requireOps();
-      const history = await ops.replay.getHistory();
-      return history.find((entry) => entry.runId === input.runId) ?? null;
+      return ops.replay.findHistoryEntry({ runId: input.runId });
     }),
 
   startReplay: protectedProcedure

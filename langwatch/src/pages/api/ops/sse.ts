@@ -2,8 +2,10 @@ import type { NextApiRequest, NextApiResponse } from "next";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { resolveOpsScope } from "~/server/api/rbac";
-import type { Permission } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:ops:sse");
 
 export default async function handler(
   req: NextApiRequest,
@@ -23,7 +25,7 @@ export default async function handler(
   const opsScope = await resolveOpsScope({
     userId: session.user.id,
     userEmail: session.user.email,
-    permission: "ops:view" as Permission,
+    permission: "ops:view",
     prisma,
   });
   if (!opsScope) {
@@ -44,6 +46,7 @@ export default async function handler(
     "X-Accel-Buffering": "no",
   });
 
+  // SSE comment line to confirm connection is alive
   res.write(`:ok\n\n`);
 
   collector.addClient(res);
@@ -51,11 +54,16 @@ export default async function handler(
   try {
     const data = collector.getDashboardData();
     res.write(`event: dashboard\ndata: ${JSON.stringify(data)}\n\n`);
-  } catch {
-    // initial data not yet available
+  } catch (err) {
+    logger.warn({ error: err }, "Initial dashboard data not yet available");
   }
 
   req.on("close", () => {
+    collector.removeClient(res);
+  });
+
+  req.on("error", (err) => {
+    logger.warn({ error: err }, "SSE client connection error");
     collector.removeClient(res);
   });
 }

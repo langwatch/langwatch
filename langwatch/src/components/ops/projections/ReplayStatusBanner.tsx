@@ -10,7 +10,7 @@ export function ReplayStatusBanner() {
   const cancelMutation = api.ops.cancelReplay.useMutation({
     onSuccess: () => void statusQuery.refetch(),
   });
-  const { canManage } = useOpsPermission();
+  const { hasAccess: canManage } = useOpsPermission();
 
   const status = statusQuery.data;
   // Only show banner while actively running

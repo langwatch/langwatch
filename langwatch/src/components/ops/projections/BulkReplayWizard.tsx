@@ -27,7 +27,7 @@ export function BulkReplayWizard({
 }: {
   onReplayStarted: () => void;
 }) {
-  const { canManage } = useOpsPermission();
+  const { hasAccess: canManage } = useOpsPermission();
 
   const [tenantIds, setTenantIds] = useState<string[]>([]);
   const [allTenants, setAllTenants] = useState(false);

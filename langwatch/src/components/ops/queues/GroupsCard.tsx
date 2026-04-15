@@ -24,7 +24,7 @@ import { GroupDetailDialog } from "./GroupDetailDialog";
 import type { StatusFilter } from "./types";
 
 export function GroupsCard({ queueNames }: { queueNames: string[] }) {
-  const { canManage } = useOpsPermission();
+  const { hasAccess: canManage } = useOpsPermission();
   const utils = api.useContext();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");

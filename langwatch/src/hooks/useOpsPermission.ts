@@ -8,13 +8,10 @@ export function useOpsPermission() {
   });
 
   const scope = (query.data?.scope as OpsScope) ?? null;
-  const canManage =
-    scope?.kind === "platform" || scope?.kind === "organization";
 
   return {
     hasAccess: query.isSuccess,
     scope,
-    canManage,
     isLoading: query.isLoading,
   };
 }

@@ -44,7 +44,7 @@ export function ReplayProgressContent({ runId }: { runId: string }) {
     },
   });
 
-  const { canManage } = useOpsPermission();
+  const { hasAccess: canManage } = useOpsPermission();
 
   const liveStatus = statusQuery.data;
   const historyEntry = historyQuery.data;
