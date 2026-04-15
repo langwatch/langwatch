@@ -1,6 +1,8 @@
 import { esClient, TRACE_INDEX } from "../server/elasticsearch";
-import type { ElasticSearchTrace } from "../server/tracer/types";
-import { reservedTraceMetadataSchema } from "../server/tracer/types.generated";
+import {
+  type ElasticSearchTrace,
+  reservedTraceMetadataSchema,
+} from "../server/tracer/types";
 
 const migrateIndex = async () => {
   let searchAfter: any;

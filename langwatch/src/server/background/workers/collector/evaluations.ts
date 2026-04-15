@@ -9,8 +9,7 @@ import {
 import type { CheckPreconditions } from "../../../../server/evaluations/types";
 import { createLogger } from "../../../../utils/logger/server";
 import { prisma } from "../../../db";
-import type { ElasticSearchEvaluation, ElasticSearchTrace, Span } from "../../../tracer/types";
-import { elasticSearchEvaluationSchema } from "../../../tracer/types.generated";
+import { type ElasticSearchEvaluation, type ElasticSearchTrace, type Span, elasticSearchEvaluationSchema } from "../../../tracer/types";
 import { scheduleEvaluation } from "../../queues/evaluationsQueue";
 import type { CollectorJob, EvaluationJob } from "../../types";
 import { evaluationNameAutoslug } from "./evaluationNameAutoslug";

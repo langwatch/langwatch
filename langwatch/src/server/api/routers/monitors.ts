@@ -9,7 +9,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "../../evaluations/evaluators.generated";
-import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
+import { evaluatorsSchema } from "../../evaluations/evaluators.generated";
 import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission } from "../rbac";

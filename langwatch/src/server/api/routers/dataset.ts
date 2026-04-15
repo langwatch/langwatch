@@ -7,7 +7,7 @@ import { datasetErrorHandler } from "../../datasets/middleware";
 import {
   datasetRecordFormSchema,
   datasetRecordInputSchema,
-} from "../../datasets/types.generated";
+} from "../../datasets/types";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

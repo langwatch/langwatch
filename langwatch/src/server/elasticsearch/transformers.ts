@@ -2,21 +2,21 @@ import { z } from "zod";
 import { createLogger } from "../../utils/logger";
 import { parsePythonInsideJson } from "../../utils/parsePythonInsideJson";
 import { datasetSpanSchema } from "../datasets/types";
-import type {
-  DatasetSpan,
-  ElasticSearchSpan,
-  ElasticSearchTrace,
-  Evaluation,
-  Event,
-  ReservedTraceMetadata,
-  Span,
-  SpanInputOutput,
-  SpanMetrics,
-  Trace,
-  TraceInput,
-  TraceOutput,
+import {
+  type DatasetSpan,
+  type ElasticSearchSpan,
+  type ElasticSearchTrace,
+  type Evaluation,
+  type Event,
+  type ReservedTraceMetadata,
+  type Span,
+  type SpanInputOutput,
+  type SpanMetrics,
+  type Trace,
+  type TraceInput,
+  type TraceOutput,
+  reservedTraceMetadataSchema,
 } from "../tracer/types";
-import { reservedTraceMetadataSchema } from "../tracer/types.generated";
 import {
   elasticSearchEvaluationsToEvaluations,
   elasticSearchEventsToEvents,
