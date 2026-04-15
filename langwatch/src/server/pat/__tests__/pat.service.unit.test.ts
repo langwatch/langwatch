@@ -122,6 +122,43 @@ describe("PatService", () => {
       expect(result).toBeNull();
     });
 
+    it("returns null for expired tokens", async () => {
+      const { token, lookupId, hashedSecret } = generatePatToken();
+
+      prisma.personalAccessToken.findUnique.mockResolvedValue({
+        id: "pat-1",
+        lookupId,
+        hashedSecret,
+        userId: "user-1",
+        organizationId: "org-1",
+        revokedAt: null,
+        expiresAt: new Date(Date.now() - 60_000), // expired 1 minute ago
+        roleBindings: [],
+      });
+
+      const result = await service.verify({ token });
+      expect(result).toBeNull();
+    });
+
+    it("accepts tokens with a future expiration", async () => {
+      const { token, lookupId, hashedSecret } = generatePatToken();
+
+      prisma.personalAccessToken.findUnique.mockResolvedValue({
+        id: "pat-1",
+        lookupId,
+        hashedSecret,
+        userId: "user-1",
+        organizationId: "org-1",
+        revokedAt: null,
+        expiresAt: new Date(Date.now() + 86_400_000), // expires tomorrow
+        roleBindings: [],
+      });
+
+      const result = await service.verify({ token });
+      expect(result).not.toBeNull();
+      expect(result!.id).toBe("pat-1");
+    });
+
     it("returns null for non-existent tokens", async () => {
       prisma.personalAccessToken.findUnique.mockResolvedValue(null);
 
