@@ -1,3 +1,7 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+# Branch protection requires `codeql-complete`. Draft PRs are excluded
+# at the event level AND at the `changes` gate, so the analyze matrix
+# never starts on drafts.
 name: codeql
 
 on:
@@ -7,22 +11,45 @@ on:
     branches: ["main"]
     # Draft PRs are excluded by specifying only these types
     types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "langwatch/**"
-      - "langwatch_nlp/**"
-      - "langwatch_server/**"
-      - "python-sdk/**"
-      - "typescript-sdk/**"
-      - "mcp-server/**"
-      - "langevals/**"
-      - "sdk-go/**"
-      - ".github/workflows/codeql.yml"
   schedule:
     - cron: "00 08 * * *"
 
 jobs:
+  changes:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant || steps.force.outputs.relevant }}
+    steps:
+      - name: Checkout
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Detect relevant changes
+        if: github.event_name == 'pull_request'
+        id: filter
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        with:
+          filters: |
+            relevant:
+              - 'langwatch/**'
+              - 'langwatch_nlp/**'
+              - 'langwatch_server/**'
+              - 'python-sdk/**'
+              - 'typescript-sdk/**'
+              - 'mcp-server/**'
+              - 'langevals/**'
+              - 'sdk-go/**'
+              - '.github/workflows/codeql.yml'
+
+      - name: Force relevant on non-PR events
+        if: github.event_name != 'pull_request'
+        id: force
+        run: echo "relevant=true" >> "$GITHUB_OUTPUT"
+
   analyze:
-    if: github.event.pull_request.draft != true
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     name: analyze (${{ matrix.language }})
     # Runner size impacts CodeQL analysis time. To learn more, please see:
     #   - https://gh.io/recommended-hardware-resources-for-running-codeql
@@ -100,3 +127,14 @@ jobs:
         uses: github/codeql-action/analyze@ebcb5b36ded6beda4ceefea6a8bc4cc885255bb3 # v3
         with:
           category: "/language:${{matrix.language}}"
+
+  codeql-complete:
+    needs: [changes, analyze]
+    # `changes` is skipped on draft PRs; treat that as complete too.
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: changes, analyze

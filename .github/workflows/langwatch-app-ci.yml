@@ -1,3 +1,7 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+# Branch protection requires `langwatch-app-complete`. Upstream jobs
+# skip when paths don't match, and `alls-green` reports the final
+# consolidated status — no per-step `if:` guards needed.
 name: langwatch-app-ci
 
 on:
@@ -5,11 +9,6 @@ on:
     branches:
       - main
   pull_request:
-    paths:
-      - "langwatch/**"
-      - ".github/workflows/langwatch-app-ci.yml"
-      - ".github/.release-please-manifest.json"
-      - ".github/scripts/**"
   workflow_dispatch:
 
 env:
@@ -20,7 +19,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant || steps.force.outputs.relevant }}
+    steps:
+      - name: Checkout
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Detect relevant changes
+        if: github.event_name == 'pull_request'
+        id: filter
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        with:
+          filters: |
+            relevant:
+              - 'langwatch/**'
+              - '.github/workflows/langwatch-app-ci.yml'
+              - '.github/.release-please-manifest.json'
+              - '.github/scripts/**'
+
+      - name: Force relevant on non-PR events
+        if: github.event_name != 'pull_request'
+        id: force
+        run: echo "relevant=true" >> "$GITHUB_OUTPUT"
+
   typecheck:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -58,6 +85,8 @@ jobs:
         run: bash .github/scripts/notify-slack-job-failure.sh typecheck
 
   test-unit:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     env:
       VITEST_MAX_WORKERS: "8" # Cannot use 100% here, it gets parsed as "100" so its actually slower
       # Required environment variables for integration tests
@@ -126,6 +155,8 @@ jobs:
           fail_ci_if_error: false
 
   test-integration:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     env:
       VITEST_MAX_WORKERS: "8" # Cannot use 100% here, it gets parsed as "100" so its actually slower
       # Required environment variables for integration tests
@@ -317,6 +348,8 @@ jobs:
           fail_ci_if_error: false
 
   lint:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -338,6 +371,8 @@ jobs:
         run: bash .github/scripts/notify-slack-job-failure.sh lint
 
   build:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     env:
       # Disable telemetry and optimize build for CI
@@ -418,6 +453,8 @@ jobs:
         run: bash .github/scripts/notify-slack-job-failure.sh build
 
   ci-scripts-test:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -427,6 +464,8 @@ jobs:
         run: bash .github/scripts/__tests__/extract-failures.test.sh
 
   ci-self-test:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -478,3 +517,13 @@ jobs:
           fi
           echo "PASS: canary failed as expected and failures were extracted"
           cat langwatch/test-failures.txt
+
+  langwatch-app-complete:
+    needs: [changes, typecheck, test-unit, test-integration, lint, build, ci-scripts-test, ci-self-test]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: typecheck, test-unit, test-integration, lint, build, ci-scripts-test, ci-self-test

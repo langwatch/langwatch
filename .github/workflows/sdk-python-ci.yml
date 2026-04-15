@@ -1,3 +1,11 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+#
+# Why: branch protection on `main` requires specific checks to pass on
+# every PR. A top-level `paths:` filter would make this workflow silently
+# absent on unrelated PRs, leaving any required check stuck pending. So
+# the workflow always runs; `changes` decides whether jobs do real work
+# or skip; `sdk-python-complete` aggregates and reports one final status
+# that branch protection requires.
 name: sdk-python-ci
 
 on:
@@ -5,16 +13,8 @@ on:
     branches:
       - main
   pull_request:
-    paths:
-      - "python-sdk/**"
-      - "!python-sdk/src/langwatch/__version__.py"
-      - ".github/.release-please-manifest.json"
   pull_request_target:
     types: [labeled]
-    paths:
-      - "python-sdk/**"
-      - "!python-sdk/src/langwatch/__version__.py"
-      - ".github/.release-please-manifest.json"
   workflow_dispatch:
 
 concurrency:
@@ -22,11 +22,41 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Decides whether downstream jobs do real work. On non-PR events we
+  # always run; on PR events we diff the paths that matter.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant || steps.force.outputs.relevant }}
+    steps:
+      - name: Checkout
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Detect relevant changes
+        if: github.event_name == 'pull_request'
+        id: filter
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        with:
+          filters: |
+            relevant:
+              - 'python-sdk/**'
+              - '!python-sdk/src/langwatch/__version__.py'
+              - '.github/workflows/sdk-python-ci.yml'
+              - '.github/.release-please-manifest.json'
+
+      - name: Force relevant on non-PR events
+        if: github.event_name != 'pull_request'
+        id: force
+        run: echo "relevant=true" >> "$GITHUB_OUTPUT"
+
   test:
+    needs: changes
     if: >
-      github.event_name != 'pull_request_target'
-      || (github.event.label.name == 'approved-ci'
-          && github.event.pull_request.user.login == 'dependabot[bot]')
+      needs.changes.outputs.relevant == 'true'
+      && (github.event_name != 'pull_request_target'
+          || (github.event.label.name == 'approved-ci'
+              && github.event.pull_request.user.login == 'dependabot[bot]'))
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -70,10 +100,12 @@ jobs:
           make test-examples
 
   build:
+    needs: changes
     if: >
-      github.event_name != 'pull_request_target'
-      || (github.event.label.name == 'approved-ci'
-          && github.event.pull_request.user.login == 'dependabot[bot]')
+      needs.changes.outputs.relevant == 'true'
+      && (github.event_name != 'pull_request_target'
+          || (github.event.label.name == 'approved-ci'
+              && github.event.pull_request.user.login == 'dependabot[bot]'))
     runs-on: ubuntu-latest
 
     steps:
@@ -95,3 +127,18 @@ jobs:
       - name: Build package
         working-directory: python-sdk
         run: uv run python -m build
+
+  # One required check for the whole workflow. Reports success if every
+  # upstream job either passed or was legitimately skipped (paths didn't
+  # match). Reports failure if any upstream job failed. Uses `alls-green`
+  # because GitHub's default `needs:` semantics treat skipped needs as
+  # satisfied — that's the silent-success footgun we want to avoid.
+  sdk-python-complete:
+    needs: [changes, test, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: test, build

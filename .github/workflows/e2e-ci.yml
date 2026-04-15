@@ -1,3 +1,8 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+# `e2e-complete` is NOT required in branch protection (e2e is slow and
+# flaky) but follows the same pattern for consistency — if anything in
+# this workflow ever becomes a required check, the pattern is already
+# in place.
 name: e2e-ci
 
 on:
@@ -5,11 +10,6 @@ on:
     branches:
       - main
   pull_request:
-    paths:
-      - "langwatch/**"
-      - "python-sdk/**"
-      - "agentic-e2e-tests/**"
-      - ".github/workflows/e2e-ci.yml"
   workflow_dispatch:
   # Optional: run nightly for regression detection
   # schedule:
@@ -20,7 +20,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant || steps.force.outputs.relevant }}
+    steps:
+      - name: Checkout
+        if: github.event_name == 'pull_request'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Detect relevant changes
+        if: github.event_name == 'pull_request'
+        id: filter
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        with:
+          filters: |
+            relevant:
+              - 'langwatch/**'
+              - 'python-sdk/**'
+              - 'agentic-e2e-tests/**'
+              - '.github/workflows/e2e-ci.yml'
+
+      - name: Force relevant on non-PR events
+        if: github.event_name != 'pull_request'
+        id: force
+        run: echo "relevant=true" >> "$GITHUB_OUTPUT"
+
   e2e:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     env:
       # App configuration
@@ -205,3 +233,13 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh e2e
+
+  e2e-complete:
+    needs: [changes, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: e2e
