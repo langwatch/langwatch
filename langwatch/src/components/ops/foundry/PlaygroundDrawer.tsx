@@ -1,4 +1,4 @@
-import { Button, Flex, HStack, Drawer, Portal, CloseButton } from "@chakra-ui/react";
+import { Box, Button, Flex, HStack, Drawer, Portal, CloseButton } from "@chakra-ui/react";
 import { Play, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import { PlaygroundContent } from "./PlaygroundContent";

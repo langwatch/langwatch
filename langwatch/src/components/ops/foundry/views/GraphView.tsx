@@ -6,7 +6,6 @@ import {
   type Node,
   type Edge,
   type NodeTypes,
-  type OnNodeClick,
   Handle,
   Position,
 } from "@xyflow/react";
@@ -170,8 +169,8 @@ export function GraphView() {
     [spans, selectedSpanId],
   );
 
-  const onNodeClick: OnNodeClick<Node<SpanNodeData>> = useCallback(
-    (_event, node) => {
+  const onNodeClick = useCallback(
+    (_event: React.MouseEvent, node: Node<SpanNodeData>) => {
       selectSpan(node.data.spanId);
     },
     [selectSpan],

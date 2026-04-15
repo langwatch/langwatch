@@ -1011,7 +1011,7 @@ export const checkOpsPermission =
   async ({
     ctx,
     next,
-  }: PermissionMiddlewareParams<Record<string, unknown>>) => {
+  }: PermissionMiddlewareParams<unknown>) => {
     const user = ctx.session?.user;
     if (!user) {
       throw new TRPCError({ code: "UNAUTHORIZED" });

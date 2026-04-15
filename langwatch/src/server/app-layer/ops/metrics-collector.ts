@@ -1,7 +1,7 @@
 import * as os from "node:os";
 import type IORedis from "ioredis";
 import type { Cluster } from "ioredis";
-import type { NextApiResponse } from "next";
+import type { NextApiResponse } from "~/types/next-stubs";
 import type {
   DashboardData,
   PipelineNode,

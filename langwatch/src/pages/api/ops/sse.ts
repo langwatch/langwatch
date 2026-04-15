@@ -1,4 +1,4 @@
-import type { NextApiRequest, NextApiResponse } from "next";
+import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { resolveOpsScope } from "~/server/api/rbac";
