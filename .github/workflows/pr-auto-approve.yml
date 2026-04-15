@@ -76,17 +76,21 @@ jobs:
               r.state === "APPROVED" && r.commit_id === headSha
             );
 
-            const botApproved = approvalsForHead.some(r => r.user?.login === "github-actions[bot]");
-            const humanApproved = approvalsForHead.some(r => r.user?.type === "User");
+            const selfApproved = approvalsForHead.some(r => r.user?.login === "github-actions[bot]");
+            // Any other approval — human or another bot like Renovate/Dependabot —
+            // counts as a trusted approval and short-circuits this workflow. We
+            // only exclude *our own* bot's approval because acting on it would
+            // be a re-approval loop.
+            const otherApproved = approvalsForHead.some(r => r.user?.login !== "github-actions[bot]");
 
-            if (botApproved) {
+            if (selfApproved) {
               core.setOutput("short_circuit", "true");
-              core.setOutput("reason", "bot-already-approved");
+              core.setOutput("reason", "self-already-approved");
               core.info(`Bot already approved head_sha ${headSha}; skipping all jobs.`);
-            } else if (humanApproved) {
+            } else if (otherApproved) {
               core.setOutput("short_circuit", "true");
-              core.setOutput("reason", "human-approved");
-              core.info(`Human approval present on head_sha ${headSha}; skipping all jobs.`);
+              core.setOutput("reason", "external-approval");
+              core.info(`External approval present on head_sha ${headSha}; skipping all jobs.`);
             } else {
               core.setOutput("short_circuit", "false");
               core.setOutput("reason", "");
