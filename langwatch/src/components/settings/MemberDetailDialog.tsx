@@ -100,9 +100,11 @@ export function MemberDetailDialog({
         ),
       ]);
 
-      void queryClient.roleBinding.listForUser.invalidate();
-      void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
-      void queryClient.organization.getAll.invalidate();
+      await Promise.all([
+        queryClient.roleBinding.listForUser.invalidate(),
+        queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate(),
+        queryClient.organization.getAll.invalidate(),
+      ]);
       toaster.create({ title: "Member updated", type: "success" });
       onClose();
     } catch (e: any) {

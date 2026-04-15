@@ -194,7 +194,7 @@ describe("RBAC Integration Tests", () => {
       expect(result).toBe(false);
     });
 
-    it("should return true for organization admin with org-scoped binding", async () => {
+    it("returns true for organization admin with org-scoped binding", async () => {
       mockPrisma.team.findUnique.mockResolvedValue({
         id: "team-123",
         organizationId: "org-123",
@@ -283,7 +283,7 @@ describe("RBAC Integration Tests", () => {
       expect(result).toBe(false);
     });
 
-    it("should return true for organization admin with org-scoped binding", async () => {
+    it("returns true for organization admin with org-scoped binding", async () => {
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
         role: OrganizationUserRole.ADMIN,
       });

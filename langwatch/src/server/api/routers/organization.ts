@@ -63,6 +63,60 @@ const teamRoleInputSchema = z.union([
   customTeamRoleInputSchema,
 ]);
 
+type UserRoleBinding = {
+  organizationId: string;
+  scopeType: RoleBindingScopeType;
+  scopeId: string;
+  role: TeamUserRole;
+  customRoleId: string | null;
+  customRole: {
+    id: string;
+    name: string;
+    description: string | null;
+    permissions: unknown;
+    organizationId: string;
+    createdAt: Date;
+    updatedAt: Date;
+  } | null;
+};
+
+function applyRoleBindingToTeamMember(
+  team: { members: { userId: string; [key: string]: unknown }[]; id: string; projects: { id: string }[] },
+  userId: string,
+  userRoleBindings: UserRoleBinding[],
+  organizationId: string,
+) {
+  const teamProjectIds = new Set(team.projects.map((p) => p.id));
+  const binding = userRoleBindings.find(
+    (b) =>
+      b.organizationId === organizationId &&
+      ((b.scopeType === RoleBindingScopeType.TEAM &&
+        b.scopeId === team.id) ||
+        (b.scopeType === RoleBindingScopeType.PROJECT &&
+          teamProjectIds.has(b.scopeId))),
+  );
+  if (binding) {
+    const bindingMember = {
+      userId,
+      teamId: team.id,
+      role: binding.role,
+      assignedRoleId: binding.customRoleId ?? null,
+      assignedRole: binding.customRole ?? null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    const existingIndex = team.members.findIndex(
+      (m) => m.userId === userId,
+    );
+    // A user may appear via multiple bindings (e.g. TEAM + PROJECT scope); last one wins.
+    if (existingIndex >= 0) {
+      team.members[existingIndex] = bindingMember;
+    } else {
+      team.members.push(bindingMember);
+    }
+  }
+}
+
 export const organizationRouter = createTRPCRouter({
   createAndAssign: protectedProcedure
     .input(
@@ -239,35 +293,7 @@ export const organizationRouter = createTRPCRouter({
           // only grant organization:view — they don't give team-level access.
           // Org admins are handled by the organizationRole === ADMIN shortcut in
           // the frontend hasPermission and backend resolveTeamPermission.
-          const teamProjectIds = new Set(team.projects.map((p) => p.id));
-          const binding = userRoleBindings.find(
-            (b) =>
-              b.organizationId === organization.id &&
-              ((b.scopeType === RoleBindingScopeType.TEAM &&
-                b.scopeId === team.id) ||
-                (b.scopeType === RoleBindingScopeType.PROJECT &&
-                  teamProjectIds.has(b.scopeId))),
-          );
-          if (binding) {
-            const bindingMember = {
-              userId,
-              teamId: team.id,
-              role: binding.role,
-              assignedRoleId: binding.customRoleId ?? null,
-              assignedRole: binding.customRole ?? null,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            };
-            const existingIndex = team.members.findIndex(
-              (m) => m.userId === userId,
-            );
-            // A user may appear via multiple bindings (e.g. TEAM + PROJECT scope); last one wins.
-            if (existingIndex >= 0) {
-              team.members[existingIndex] = bindingMember;
-            } else {
-              team.members.push(bindingMember);
-            }
-          }
+          applyRoleBindingToTeamMember(team, userId, userRoleBindings, organization.id);
 
           if (isDemoOrg) return true;
           return isExternal

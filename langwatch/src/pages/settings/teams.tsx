@@ -15,7 +15,7 @@ import {
 import { Dialog } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
 import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, X } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
@@ -139,19 +139,25 @@ function AddToTeamDialog({
     },
   });
 
-  const userItems = (orgMembers.data?.members ?? [])
-    .filter((m) => !existingMemberIds.includes(m.userId))
-    .map((m) => ({
-      label: `${m.user.name ?? m.user.email} (${m.user.email})`,
-      value: m.userId,
-    }));
-  const userCollection = createListCollection({ items: userItems });
+  const userItems = useMemo(
+    () => (orgMembers.data?.members ?? [])
+      .filter((m) => !existingMemberIds.includes(m.userId))
+      .map((m) => ({
+        label: `${m.user.name ?? m.user.email} (${m.user.email})`,
+        value: m.userId,
+      })),
+    [orgMembers.data, existingMemberIds],
+  );
+  const userCollection = useMemo(() => createListCollection({ items: userItems }), [userItems]);
 
-  const allRoleItems = [
-    ...BASE_ROLE_ITEMS,
-    ...(customRoles.data ?? []).map((r) => ({ label: r.name, value: `CUSTOM:${r.id}` })),
-  ];
-  const allRoleCollection = createListCollection({ items: allRoleItems });
+  const allRoleItems = useMemo(
+    () => [
+      ...BASE_ROLE_ITEMS,
+      ...(customRoles.data ?? []).map((r) => ({ label: r.name, value: `CUSTOM:${r.id}` })),
+    ],
+    [customRoles.data],
+  );
+  const allRoleCollection = useMemo(() => createListCollection({ items: allRoleItems }), [allRoleItems]);
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
@@ -628,6 +634,8 @@ function TeamCard({
     onError: (e) => toaster.create({ title: e.message, type: "error" }),
   });
 
+  const existingMemberIds = team.directMembers.flatMap((m) => m.userId ? [m.userId] : []);
+
   return (
     <>
       <Card.Root overflow="hidden">
@@ -875,7 +883,7 @@ function TeamCard({
           teamId={team.id}
           teamName={team.name}
           organizationId={organizationId}
-          existingMemberIds={team.directMembers.flatMap((m) => m.userId ? [m.userId] : [])}
+          existingMemberIds={existingMemberIds}
           open={addingMember}
           onClose={() => setAddingMember(false)}
         />

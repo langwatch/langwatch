@@ -9,7 +9,7 @@ import {
 } from "@chakra-ui/react";
 import { RoleBindingScopeType } from "@prisma/client";
 import { Search } from "lucide-react";
-import { forwardRef, useImperativeHandle, useState } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
@@ -96,39 +96,57 @@ export const BindingInputRow = forwardRef<
   const teams = api.team.getTeamsWithMembers.useQuery({ organizationId });
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
-  const roleItems = [
+  const roleItems = useMemo(() => [
     ...BASE_ROLE_ITEMS,
     ...(customRoles.data ?? []).map((r) => ({
       label: r.name,
       value: `CUSTOM:${r.id}`,
       customRoleId: r.id,
     })),
-  ];
-  const roleCollection = createListCollection({ items: roleItems });
+  ], [customRoles.data]);
+  const roleCollection = useMemo(() => createListCollection({ items: roleItems }), [roleItems]);
 
-  const allTeamItems = (teams.data ?? []).map((t) => ({ label: t.name, value: t.id }));
-  const teamItems = teamSearch
-    ? allTeamItems.filter((t) => t.label.toLowerCase().includes(teamSearch.toLowerCase()))
-    : allTeamItems;
-  const teamCollection = createListCollection({ items: teamItems });
+  const allTeamItems = useMemo(
+    () => (teams.data ?? []).map((t) => ({ label: t.name, value: t.id })),
+    [teams.data],
+  );
+  const teamItems = useMemo(
+    () => teamSearch
+      ? allTeamItems.filter((t) => t.label.toLowerCase().includes(teamSearch.toLowerCase()))
+      : allTeamItems,
+    [allTeamItems, teamSearch],
+  );
+  const teamCollection = useMemo(() => createListCollection({ items: teamItems }), [teamItems]);
 
   // For project cascade: teams that have at least one project
-  const allProjectTeamItems = (teams.data ?? [])
-    .filter((t) => t.projects.length > 0)
-    .map((t) => ({ label: t.name, value: t.id }));
-  const projectTeamItems = projectTeamSearch
-    ? allProjectTeamItems.filter((t) => t.label.toLowerCase().includes(projectTeamSearch.toLowerCase()))
-    : allProjectTeamItems;
-  const projectTeamCollection = createListCollection({ items: projectTeamItems });
+  const allProjectTeamItems = useMemo(
+    () => (teams.data ?? [])
+      .filter((t) => t.projects.length > 0)
+      .map((t) => ({ label: t.name, value: t.id })),
+    [teams.data],
+  );
+  const projectTeamItems = useMemo(
+    () => projectTeamSearch
+      ? allProjectTeamItems.filter((t) => t.label.toLowerCase().includes(projectTeamSearch.toLowerCase()))
+      : allProjectTeamItems,
+    [allProjectTeamItems, projectTeamSearch],
+  );
+  const projectTeamCollection = useMemo(() => createListCollection({ items: projectTeamItems }), [projectTeamItems]);
 
   // Projects filtered to the selected team
-  const allProjectItems = (teams.data ?? [])
-    .find((t) => t.id === projectTeamId)
-    ?.projects.map((p) => ({ label: p.name, value: p.id })) ?? [];
-  const projectItems = projectSearch
-    ? allProjectItems.filter((p) => p.label.toLowerCase().includes(projectSearch.toLowerCase()))
-    : allProjectItems;
-  const projectCollection = createListCollection({ items: projectItems });
+  const allProjectItems = useMemo(
+    () => (teams.data ?? [])
+      .find((t) => t.id === projectTeamId)
+      ?.projects.map((p) => ({ label: p.name, value: p.id })) ?? [],
+    [teams.data, projectTeamId],
+  );
+  const projectItems = useMemo(
+    () => projectSearch
+      ? allProjectItems.filter((p) => p.label.toLowerCase().includes(projectSearch.toLowerCase()))
+      : allProjectItems,
+    [allProjectItems, projectSearch],
+  );
+  const projectCollection = useMemo(() => createListCollection({ items: projectItems }), [projectItems]);
 
   function getScopeName() {
     if (scopeType === RoleBindingScopeType.ORGANIZATION) return organization?.name ?? "Organization";

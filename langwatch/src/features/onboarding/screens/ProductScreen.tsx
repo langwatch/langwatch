@@ -5,7 +5,6 @@ import { AnalyticsBoundary } from "react-contextual-analytics";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectBySlugOrLatest } from "~/hooks/useProjectBySlugOrLatest";
-import { useRouter } from "~/utils/compat/next-router";
 import { OnboardingContainer } from "../components/containers/OnboardingContainer";
 
 import { ActiveProjectProvider } from "../contexts/ActiveProjectContext";
@@ -20,18 +19,10 @@ export const ProductScreen: React.FC = () => {
     canGoBack,
     handleSelectProduct,
   } = useProductFlow();
-  const router = useRouter();
   const { organization, isLoading } = useOrganizationTeamProject({
     redirectToOnboarding: true,
   });
-  const { project: activeProject } = useProjectBySlugOrLatest(organization);
-
-  // Fall back to URL query param if project not yet resolved
-  const projectSlugFromUrl =
-    typeof router.query.projectSlug === "string"
-      ? router.query.projectSlug
-      : undefined;
-  const skipSlug = activeProject?.slug ?? projectSlugFromUrl;
+  const { project: activeProject, slug: skipSlug } = useProjectBySlugOrLatest(organization);
 
   // Delay showing skeleton to avoid flicker on fast loads
   const [delayedLoading, setDelayedLoading] = useState(false);
