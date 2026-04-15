@@ -49,6 +49,7 @@ import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing
 import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 
 import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
+import { Deferred, type CommandDispatcher } from "./deferred";
 import type { EventSourcing } from "./eventSourcing";
 import { mapCommands } from "./mapCommands";
 import { ReportUsageForMonthCommand } from "./pipelines/billing-reporting/commands/reportUsageForMonth.command";
@@ -83,8 +84,48 @@ import { createSpanStorageBroadcastReactor } from "./pipelines/trace-processing/
 import { createTraceUpdateBroadcastReactor } from "./pipelines/trace-processing/reactors/traceUpdateBroadcast.reactor";
 import type { AppendStore } from "./projections/mapProjection.types";
 import type { ClickHouseExperimentRunResultRecord } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.mapProjection";
+import type { ResolveOriginCommandData } from "./pipelines/trace-processing/schemas/commands";
 
 const logger = createLogger("langwatch:event-sourcing:pipeline-registry");
+
+/**
+ * Creates an in-memory setTimeout-based fallback for deferred job processing.
+ * Used when the event-sourcing queue is unavailable (e.g. no Redis).
+ */
+function createInMemoryDeferredFallback<P>({ makeId, delayMs, process, logContext, errorMessage }: {
+  makeId?: (payload: P) => string;
+  delayMs: number;
+  process: (payload: P) => Promise<void>;
+  logContext: (payload: P) => Record<string, unknown>;
+  errorMessage: string;
+}): (payload: P) => Promise<void> {
+  const pending = new Map<string, ReturnType<typeof setTimeout>>();
+  return async (payload: P) => {
+    if (makeId) {
+      const dedupKey = makeId(payload);
+      if (pending.has(dedupKey)) return;
+      const timer = setTimeout(async () => {
+        pending.delete(dedupKey);
+        try {
+          await process(payload);
+        } catch (error) {
+          logger.error({ ...logContext(payload), error }, errorMessage);
+        }
+      }, delayMs);
+      if (typeof timer === "object" && "unref" in timer) timer.unref();
+      pending.set(dedupKey, timer);
+    } else {
+      const timer = setTimeout(async () => {
+        try {
+          await process(payload);
+        } catch (error) {
+          logger.error({ ...logContext(payload), error }, errorMessage);
+        }
+      }, delayMs);
+      if (typeof timer === "object" && "unref" in timer) timer.unref();
+    }
+  };
+}
 
 /**
  * Pre-constructed repositories, resolved at the composition root (presets.ts).
@@ -152,9 +193,9 @@ export class PipelineRegistry {
     //      customerIoEvaluationSyncReactor, customerIoSimulationSyncReactor
 
     const evalPipeline = this.registerEvaluationPipeline();
-    const { pipeline: tracePipeline, traceSummaryStore, wireSimulationDeps, wireExperimentDeps } = this.registerTracePipeline(evalPipeline);
+    const { pipeline: tracePipeline, traceSummaryStore, simComputeRunMetrics, wireExperimentDeps } = this.registerTracePipeline(evalPipeline);
     const suiteRunPipeline = this.registerSuiteRunPipeline();
-    const { pipeline: simulationPipeline, scenarioExecutionHandle } = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, wireSimulationDeps });
+    const { pipeline: simulationPipeline, scenarioExecutionHandle } = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, simComputeRunMetrics });
 
     const experimentRunPipeline = this.registerExperimentRunPipeline({ wireExperimentDeps });
     const billingPipeline = this.registerBillingReportingPipeline();
@@ -206,22 +247,13 @@ export class PipelineRegistry {
       "trace_summaries",
     );
 
-    // Late-bound reference to the trace pipeline's resolveOrigin command.
-    // The reactor deps closure captures this; the actual dispatcher is set
-    // after pipeline registration (same pattern as billing self-dispatch).
-    let resolveOriginDispatcher: ((data: any) => Promise<void>) | null = null;
-
-    // Late-bound reference to the deferred origin resolution queue.
-    // Set after pipeline registration, same pattern as resolveOriginDispatcher.
-    let scheduleDeferredDispatcher: ((payload: DeferredOriginPayload) => Promise<void>) | null = null;
+    // Deferred dispatchers — resolved after pipeline registration.
+    const resolveOrigin = new Deferred<CommandDispatcher<ResolveOriginCommandData>>("resolveOrigin");
+    const scheduleDeferred = new Deferred<(payload: DeferredOriginPayload) => Promise<void>>("scheduleDeferred");
+    const simComputeRunMetrics = new Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>("simComputeRunMetrics");
 
     const originGateReactor = createOriginGateReactor({
-      scheduleDeferred: async (payload: DeferredOriginPayload) => {
-        if (!scheduleDeferredDispatcher) {
-          throw new Error("scheduleDeferred dispatcher not yet initialized — pipeline registration order issue");
-        }
-        return scheduleDeferredDispatcher(payload);
-      },
+      scheduleDeferred: scheduleDeferred.fn,
     });
 
     const evaluationTriggerReactor = createEvaluationTriggerReactor({
@@ -247,19 +279,8 @@ export class PipelineRegistry {
       projects: this.deps.projects,
     });
 
-    // Late-bound reference for simulation metrics sync reactor.
-    // The simulation pipeline is registered after the trace pipeline,
-    // so computeRunMetrics is wired after simulation pipeline registration.
-    let simComputeRunMetrics: ((data: any) => Promise<void>) | null = null;
-
     const simulationMetricsSyncReactor = createSimulationMetricsSyncReactor({
-      computeRunMetrics: async (data) => {
-        if (!simComputeRunMetrics) {
-          logger.warn("simulation computeRunMetrics not yet initialized, skipping");
-          return;
-        }
-        return simComputeRunMetrics(data);
-      },
+      computeRunMetrics: simComputeRunMetrics.fn,
     });
 
     // Late-bound reference for experiment metrics sync reactor.
@@ -302,18 +323,13 @@ export class PipelineRegistry {
       }),
     );
 
-    // Wire the late-bound resolveOrigin dispatcher now that the pipeline is registered
+    // Resolve self-referencing command now that the pipeline is registered
     const traceCommands = mapCommands(tracePipeline.commands);
-    resolveOriginDispatcher = traceCommands.resolveOrigin;
+    resolveOrigin.resolve(traceCommands.resolveOrigin);
 
     // Wire the deferred origin resolution queue (BullMQ-backed, survives process restart).
     // After 5 min, dispatches resolveOrigin command → OriginResolvedEvent → fold → reactor.
-    const deferredOriginHandler = createDeferredOriginHandler(async (data) => {
-      if (!resolveOriginDispatcher) {
-        throw new Error("resolveOrigin dispatcher not yet initialized — pipeline registration order issue");
-      }
-      return resolveOriginDispatcher(data);
-    });
+    const deferredOriginHandler = createDeferredOriginHandler(resolveOrigin.fn);
     const deferredOriginQueue = tracePipeline.service.registerJob<DeferredOriginPayload>({
       name: "deferredOriginResolution",
       process: deferredOriginHandler,
@@ -332,50 +348,25 @@ export class PipelineRegistry {
     });
 
     if (deferredOriginQueue) {
-      scheduleDeferredDispatcher = (payload) => deferredOriginQueue.send(payload);
+      scheduleDeferred.resolve((payload) => deferredOriginQueue.send(payload));
     } else {
       // Fallback: event sourcing disabled, use in-memory setTimeout (best-effort)
-      const pendingDeferredChecks = new Map<string, ReturnType<typeof setTimeout>>();
-      scheduleDeferredDispatcher = async (payload: DeferredOriginPayload) => {
-        const dedupKey = makeDeferredJobId(payload);
-        if (pendingDeferredChecks.has(dedupKey)) return;
-        const handler = createDeferredOriginHandler(async (data) => {
-          if (!resolveOriginDispatcher) {
-            throw new Error("resolveOrigin dispatcher not yet initialized");
-          }
-          return resolveOriginDispatcher(data);
-        });
-        const timer = setTimeout(async () => {
-          pendingDeferredChecks.delete(dedupKey);
-          try {
-            await handler(payload);
-          } catch (error) {
-            logger.error(
-              { tenantId: payload.tenantId, traceId: payload.traceId, error },
-              "Deferred origin resolution failed",
-            );
-          }
-        }, DEFERRED_CHECK_DELAY_MS);
-        if (typeof timer === "object" && "unref" in timer) {
-          timer.unref();
-        }
-        pendingDeferredChecks.set(dedupKey, timer);
-      };
+      scheduleDeferred.resolve(
+        createInMemoryDeferredFallback({
+          makeId: makeDeferredJobId,
+          delayMs: DEFERRED_CHECK_DELAY_MS,
+          process: deferredOriginHandler,
+          logContext: (p) => ({ tenantId: p.tenantId, traceId: p.traceId }),
+          errorMessage: "Deferred origin resolution failed",
+        }),
+      );
     }
 
     return {
       pipeline: tracePipeline,
       traceSummaryStore,
-      /**
-       * Wires late-bound simulation computeRunMetrics into the trace-side
-       * simulationMetricsSync reactor. Called after the simulation
-       * pipeline is registered.
-       */
-      wireSimulationDeps: (deps: {
-        computeRunMetrics: (data: any) => Promise<void>;
-      }) => {
-        simComputeRunMetrics = deps.computeRunMetrics;
-      },
+      /** Cross-pipeline deferred — resolved by registerSimulationPipeline. */
+      simComputeRunMetrics,
       /**
        * Wires late-bound experiment computeExperimentRunMetrics and
        * lookupExperimentId into the trace-side experimentMetricsSync reactor.
@@ -405,10 +396,10 @@ export class PipelineRegistry {
     );
   }
 
-  private registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, wireSimulationDeps }: {
+  private registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, simComputeRunMetrics }: {
     suiteRunPipeline: ReturnType<PipelineRegistry["registerSuiteRunPipeline"]>;
     traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
-    wireSimulationDeps: ReturnType<PipelineRegistry["registerTracePipeline"]>["wireSimulationDeps"];
+    simComputeRunMetrics: Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>;
   }) {
     const simulationRunStore = this.cached<SimulationRunStateData>(
       new RepositoryFoldStore<SimulationRunStateData>(
@@ -436,31 +427,17 @@ export class PipelineRegistry {
       completeSuiteRunItem: suiteRunCommands.completeSuiteRunItem,
     });
 
-    // Late-bound: computeRunMetrics dispatches back to self (same pipeline)
-    let selfComputeRunMetrics: ((data: ComputeRunMetricsCommandData) => Promise<void>) | null = null;
-
-    // Late-bound: deferred retry dispatcher
-    let scheduleRetryDispatcher: ((payload: ComputeRunMetricsCommandData) => Promise<void>) | null = null;
+    // Deferred dispatchers — resolved after pipeline registration.
+    const selfComputeRunMetrics = new Deferred<CommandDispatcher<ComputeRunMetricsCommandData>>("selfComputeRunMetrics");
+    const scheduleRetry = new Deferred<(payload: ComputeRunMetricsCommandData) => Promise<void>>("scheduleRetry");
 
     const computeRunMetricsCommand = new ComputeRunMetricsCommand({
       traceSummaryStore,
-      scheduleRetry: async (payload) => {
-        if (!scheduleRetryDispatcher) {
-          logger.warn("scheduleRetry dispatcher not yet initialized, skipping");
-          return;
-        }
-        return scheduleRetryDispatcher(payload);
-      },
+      scheduleRetry: scheduleRetry.fn,
     });
 
     const traceMetricsSyncReactor = createTraceMetricsSyncReactor({
-      computeRunMetrics: async (data: any) => {
-        if (!selfComputeRunMetrics) {
-          logger.warn("computeRunMetrics self-dispatcher not yet initialized, skipping");
-          return;
-        }
-        return selfComputeRunMetrics(data);
-      },
+      computeRunMetrics: selfComputeRunMetrics.fn,
     });
 
     const simulationPipeline = this.deps.eventSourcing.register(
@@ -475,11 +452,14 @@ export class PipelineRegistry {
       }),
     );
 
-    // Wire late-bound self-dispatcher
+    // Resolve self-referencing command
     const simCommands = mapCommands(simulationPipeline.commands);
-    selfComputeRunMetrics = simCommands.computeRunMetrics;
+    selfComputeRunMetrics.resolve(simCommands.computeRunMetrics);
 
-    // Wire deferred retry job
+    // Resolve cross-pipeline deferred (trace → simulation)
+    simComputeRunMetrics.resolve(simCommands.computeRunMetrics);
+
+    // Resolve deferred retry job
     const retryJobId = (payload: ComputeRunMetricsCommandData) =>
       `compute-metrics-retry:${payload.tenantId}:${payload.scenarioRunId}:${payload.traceId}`;
 
@@ -503,30 +483,18 @@ export class PipelineRegistry {
     });
 
     if (retryQueue) {
-      scheduleRetryDispatcher = (payload) => retryQueue.send(payload);
+      scheduleRetry.resolve((payload) => retryQueue.send(payload));
     } else {
       // Fallback: event sourcing disabled, use in-memory setTimeout
-      scheduleRetryDispatcher = async (payload: ComputeRunMetricsCommandData) => {
-        const timer = setTimeout(async () => {
-          try {
-            await simCommands.computeRunMetrics(payload);
-          } catch (error) {
-            logger.error(
-              { tenantId: payload.tenantId, scenarioRunId: payload.scenarioRunId, traceId: payload.traceId, error },
-              "Deferred compute metrics retry failed",
-            );
-          }
-        }, COMPUTE_METRICS_RETRY_DELAY_MS);
-        if (typeof timer === "object" && "unref" in timer) {
-          timer.unref();
-        }
-      };
+      scheduleRetry.resolve(
+        createInMemoryDeferredFallback({
+          delayMs: COMPUTE_METRICS_RETRY_DELAY_MS,
+          process: (payload) => simCommands.computeRunMetrics(payload),
+          logContext: (p) => ({ tenantId: p.tenantId, scenarioRunId: p.scenarioRunId, traceId: p.traceId }),
+          errorMessage: "Deferred compute metrics retry failed",
+        }),
+      );
     }
-
-    // Wire the trace-side simulationMetricsSync reactor's late-bound deps
-    wireSimulationDeps({
-      computeRunMetrics: simCommands.computeRunMetrics,
-    });
 
     return { pipeline: simulationPipeline, scenarioExecutionHandle };
   }
