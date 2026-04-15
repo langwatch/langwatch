@@ -19,13 +19,14 @@ import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { prisma } from "../../../db";
-import { generateUniqueExperimentSlug } from "../experiments";
+import { ExperimentService } from "../../../experiments/experiment.service";
 
 globalForApp.__langwatch_app = createTestApp();
 
 describe("Feature: Experiment slug deduplication", () => {
   const projectId = "test-project-id";
   const createdExperimentIds: string[] = [];
+  const service = ExperimentService.create(prisma);
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   /**
@@ -65,14 +66,13 @@ describe("Feature: Experiment slug deduplication", () => {
     }
   });
 
-  describe("generateUniqueExperimentSlug()", () => {
+  describe("ExperimentService.generateUniqueSlug()", () => {
     describe("when no conflicting slug exists", () => {
       it("returns the base slug unchanged", async () => {
         const uniqueBase = `no-conflict-${nanoid(8)}`;
-        const result = await generateUniqueExperimentSlug({
+        const result = await service.generateUniqueSlug({
           baseSlug: uniqueBase,
           projectId,
-          prisma,
         });
 
         expect(result).toBe(uniqueBase);
@@ -90,10 +90,9 @@ describe("Feature: Experiment slug deduplication", () => {
 
       describe("when a new experiment generates the same slug", () => {
         it("gets deduplicated slug with -2 suffix", async () => {
-          const result = await generateUniqueExperimentSlug({
+          const result = await service.generateUniqueSlug({
             baseSlug: existingSlug,
             projectId,
-            prisma,
           });
 
           expect(result).toBe(`${existingSlug}-2`);
@@ -102,10 +101,9 @@ describe("Feature: Experiment slug deduplication", () => {
 
       describe("when the same experiment is updated with the same slug", () => {
         it("retains the original slug unchanged", async () => {
-          const result = await generateUniqueExperimentSlug({
+          const result = await service.generateUniqueSlug({
             baseSlug: existingSlug,
             projectId,
-            prisma,
             excludeExperimentId: existingExperimentId,
           });
 
@@ -124,10 +122,9 @@ describe("Feature: Experiment slug deduplication", () => {
 
       describe("when a new experiment generates the same base slug", () => {
         it("increments to -3 suffix", async () => {
-          const result = await generateUniqueExperimentSlug({
+          const result = await service.generateUniqueSlug({
             baseSlug,
             projectId,
-            prisma,
           });
 
           expect(result).toBe(`${baseSlug}-3`);
@@ -145,10 +142,9 @@ describe("Feature: Experiment slug deduplication", () => {
       });
 
       it("does not treat the unrelated slug as a conflict", async () => {
-        const result = await generateUniqueExperimentSlug({
+        const result = await service.generateUniqueSlug({
           baseSlug,
           projectId,
-          prisma,
         });
 
         expect(result).toBe(baseSlug);
