@@ -83,7 +83,7 @@ export class ExperimentRunResultStorageMapProjection
       DatasetEntry: JSON.stringify(event.data.entry),
       Predicted: event.data.predicted ? JSON.stringify(event.data.predicted) : null,
       TargetCost: event.data.cost ?? null,
-      TargetDurationMs: event.data.duration ?? null,
+      TargetDurationMs: event.data.duration != null ? Math.max(0, event.data.duration) : null,
       TargetError: event.data.error ?? null,
       TraceId: event.data.traceId ?? null,
       EvaluatorId: null,
@@ -138,7 +138,7 @@ export class ExperimentRunResultStorageMapProjection
       EvaluationDetails: event.data.details ?? null,
       EvaluationCost: event.data.cost ?? null,
       EvaluationInputs: event.data.inputs ? JSON.stringify(event.data.inputs) : null,
-      EvaluationDurationMs: event.data.duration ?? null,
+      EvaluationDurationMs: event.data.duration != null ? Math.max(0, event.data.duration) : null,
       OccurredAt: new Date(event.occurredAt),
     };
   }
