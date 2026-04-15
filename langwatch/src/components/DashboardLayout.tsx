@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { Organization, Project, Team } from "@prisma/client";
-import { ChevronDown, ChevronRight, KeyRound, Plus } from "lucide-react";
+import { Activity, ChevronDown, ChevronRight, Info, KeyRound, Plus } from "lucide-react";
 import ErrorPage from "~/utils/compat/next-error";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
@@ -316,14 +316,15 @@ export const DashboardLayout = ({
     return <ErrorPage statusCode={404} />;
   }
 
+  const isOpsRoute = router.pathname.startsWith("/ops");
+
   if (
     !publicPage &&
     (!session ||
       isLoading ||
       !organization ||
       !organizations ||
-      !team ||
-      !project)
+      (!isOpsRoute && (!team || !project)))
   ) {
     return <LoadingScreen />;
   }
@@ -401,7 +402,36 @@ export const DashboardLayout = ({
               </Link>
             </Box>
           )}
-          {organizations && project ? (
+          {router.pathname.startsWith("/ops") ? (
+            <HStack gap={3} alignItems="center" paddingLeft={2}>
+              <HStack
+                gap={1.5}
+                paddingX={2.5}
+                height="28px"
+                borderRadius="md"
+                bg="bg.emphasized"
+              >
+                <Activity size={14} />
+                <Text fontSize="sm" fontWeight="medium">
+                  Ops
+                </Text>
+              </HStack>
+              <HStack
+                gap={1.5}
+                paddingX={2.5}
+                height="28px"
+                borderRadius="md"
+                bg="orange.500/8"
+                border="1px solid"
+                borderColor="orange.500/15"
+              >
+                <Info size={12} color="var(--chakra-colors-orange-400)" />
+                <Text fontSize="xs" color="orange.400">
+                  Platform-wide — not scoped to a project
+                </Text>
+              </HStack>
+            </HStack>
+          ) : organizations && project ? (
             <HStack gap={0} alignItems="center">
               <ProjectSelector
                 organizations={organizations}
