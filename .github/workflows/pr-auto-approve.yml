@@ -99,7 +99,10 @@ jobs:
       contains(needs.preflight.outputs.labels, ',firefighting,')
     runs-on: ubuntu-latest
     steps:
-      - name: Submit bot APPROVE for firefighting override
+      # Clean up any stale low-risk-change label and assessment comments
+      # from a prior evaluator run, then APPROVE. Otherwise the PR thread
+      # contradicts itself ("does not qualify" comment + bot approval).
+      - name: Cleanup stale low-risk artifacts and submit bot APPROVE
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -107,6 +110,36 @@ jobs:
         with:
           script: |
             const prNumber = parseInt(process.env.PR_NUMBER, 10);
+
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                name: "low-risk-change",
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+            for (const comment of comments) {
+              if (
+                comment.user?.login === "github-actions[bot]" &&
+                comment.body?.startsWith("**Automated low-risk assessment**")
+              ) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id,
+                });
+              }
+            }
+
             await github.rest.pulls.createReview({
               owner: context.repo.owner,
               repo: context.repo.repo,
