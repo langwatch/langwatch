@@ -203,7 +203,7 @@
     "qs": "^6.15.1",
     "ra-data-simple-prisma": "^3.1.3",
     "react": "^19.2.5",
-    "react-admin": "^5.14.5",
+    "react-admin": "~5.13.6",
     "react-collapsed": "^4.2.0",
     "react-contextual-analytics": "^1.1.2",
     "react-dnd": "^16.0.1",
@@ -314,7 +314,11 @@
   "pnpm": {
     "overrides": {
       "@aws-sdk/xml-builder>fast-xml-parser": "^5.5.1",
-      "@langchain/community>fast-xml-parser": "^5.5.1"
+      "@langchain/community>fast-xml-parser": "^5.5.1",
+      "ra-core": "<5.13.2",
+      "ra-i18n-polyglot": "<5.13.2",
+      "ra-ui-materialui": "<5.13.2",
+      "ra-language-english": "<5.13.2"
     }
   },
   "ct3aMetadata": {
