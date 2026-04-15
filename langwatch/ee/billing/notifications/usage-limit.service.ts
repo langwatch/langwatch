@@ -24,6 +24,17 @@ const MIN_DAYS_BETWEEN_ALERTS = 30;
 const resourceLimitCooldown = new TtlCache<true>(24 * 60 * 60 * 1000, "ttlcache:billing:limitCooldown:");
 export { resourceLimitCooldown };
 
+// Guards notifyPlanLimitReached against concurrent calls (burst of traces from
+// a single org hitting the limit middleware at the same time). Two layers:
+//
+// 1. planLimitInFlight (sync Set) — blocks same-tick races where multiple
+//    Promise.all callers interleave before any async operation resolves.
+// 2. planLimitCooldown (TtlCache) — blocks subsequent ticks and coordinates
+//    across pods via Redis. The DB 30-day window remains authoritative.
+const planLimitInFlight = new Set<string>();
+const planLimitCooldown = new TtlCache<true>(MIN_DAYS_BETWEEN_ALERTS * 24 * 60 * 60 * 1000, "ttlcache:billing:planLimitCooldown:");
+export { planLimitInFlight, planLimitCooldown };
+
 export interface UsageLimitData {
   organizationId: string;
   currentMonthMessagesCount: number;
@@ -119,48 +130,69 @@ export class UsageLimitService {
       return;
     }
 
-    const organization = await this.organizationService.findWithAdmins(organizationId);
-
-    if (!organization) {
+    // Synchronous guard: blocks same-tick concurrent calls (e.g. 5 trace
+    // requests hitting Promise.all) before any await yields execution.
+    if (planLimitInFlight.has(organizationId)) {
       return;
     }
-
-    if (organization.sentPlanLimitAlert) {
-      const timeSinceLastAlert =
-        Date.now() - organization.sentPlanLimitAlert.getTime();
-      const daysSinceLastAlert = Math.floor(
-        timeSinceLastAlert / (1000 * 60 * 60 * 24),
-      );
-
-      if (daysSinceLastAlert < MIN_DAYS_BETWEEN_ALERTS) {
-        return;
-      }
-    }
-
-    const admin = organization.members[0]?.user;
-
-    const context = {
-      organizationId,
-      organizationName: organization.name,
-      adminName: admin?.name ?? undefined,
-      adminEmail: admin?.email ?? undefined,
-      planName,
-    };
-
-    await Promise.all([
-      this.notificationService.sendSlackPlanLimitAlert(context),
-      this.notificationService.sendHubspotPlanLimitForm(context),
-    ]);
+    planLimitInFlight.add(organizationId);
 
     try {
-      await this.organizationService.updateSentPlanLimitAlert(organizationId, new Date());
-    } catch (error) {
-      captureException(
-        new Error(
-          `Critical: plan limit notification sent but DB timestamp update failed for org ${organizationId} on plan ${planName}`,
-          { cause: error },
-        ),
-      );
+      // Atomic cross-pod guard: SET NX EX claims the cooldown slot in a
+      // single Redis round-trip, closing the distributed TOCTOU window.
+      const claimed = await planLimitCooldown.claim(organizationId, true);
+      if (!claimed) {
+        return;
+      }
+
+      const organization = await this.organizationService.findWithAdmins(organizationId);
+
+      if (!organization) {
+        await planLimitCooldown.delete(organizationId);
+        return;
+      }
+
+      if (organization.sentPlanLimitAlert) {
+        const timeSinceLastAlert =
+          Date.now() - organization.sentPlanLimitAlert.getTime();
+        const daysSinceLastAlert = Math.floor(
+          timeSinceLastAlert / (1000 * 60 * 60 * 24),
+        );
+
+        if (daysSinceLastAlert < MIN_DAYS_BETWEEN_ALERTS) {
+          return;
+        }
+      }
+
+      const admin = organization.members[0]?.user;
+
+      const context = {
+        organizationId,
+        organizationName: organization.name,
+        adminName: admin?.name ?? undefined,
+        adminEmail: admin?.email ?? undefined,
+        planName,
+      };
+
+      // Both sends are fire-and-forget (errors swallowed internally),
+      // so use allSettled to await completion without short-circuiting.
+      await Promise.allSettled([
+        this.notificationService.sendSlackPlanLimitAlert(context),
+        this.notificationService.sendHubspotPlanLimitForm(context),
+      ]);
+
+      try {
+        await this.organizationService.updateSentPlanLimitAlert(organizationId, new Date());
+      } catch (error) {
+        captureException(
+          new Error(
+            `Critical: plan limit notification sent but DB timestamp update failed for org ${organizationId} on plan ${planName}`,
+            { cause: error },
+          ),
+        );
+      }
+    } finally {
+      planLimitInFlight.delete(organizationId);
     }
   }
 

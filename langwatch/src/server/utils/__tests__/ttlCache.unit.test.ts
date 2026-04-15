@@ -7,6 +7,11 @@ const { mockRedisStore, mockRedis } = vi.hoisted(() => {
     setex: vi.fn(async (key: string, ttl: number, value: string) => {
       mockRedisStore.set(key, { value, ttl });
     }),
+    set: vi.fn(async (key: string, value: string, ex: string, ttl: number, nx: string) => {
+      if (nx === "NX" && mockRedisStore.has(key)) return null;
+      mockRedisStore.set(key, { value, ttl });
+      return "OK";
+    }),
     del: vi.fn(async (key: string) => { mockRedisStore.delete(key); }),
   };
   return { mockRedisStore, mockRedis };
@@ -87,6 +92,51 @@ describe("TtlCache", () => {
       const result = await cache.get("obj1");
 
       expect(result).toEqual(obj);
+    });
+  });
+
+  describe("when claiming a key", () => {
+    it("returns true and stores value when key is absent", async () => {
+      const cache = new TtlCache<boolean>(30_000, "test:");
+
+      const result = await cache.claim("lock1", true);
+
+      expect(result).toBe(true);
+      expect(await cache.get("lock1")).toBe(true);
+    });
+
+    it("returns false when key already exists", async () => {
+      const cache = new TtlCache<boolean>(30_000, "test:");
+
+      await cache.claim("lock1", true);
+      const second = await cache.claim("lock1", true);
+
+      expect(second).toBe(false);
+    });
+
+    it("uses SET NX EX on Redis", async () => {
+      const cache = new TtlCache<boolean>(60_000, "test:");
+
+      await cache.claim("lock1", true);
+
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        "test:lock1", JSON.stringify(true), "EX", 60, "NX",
+      );
+    });
+  });
+
+  describe("when Redis fails on claim", () => {
+    it("falls back to in-memory claim", async () => {
+      const cache = new TtlCache<boolean>(30_000, "test:");
+      mockRedis.set.mockRejectedValueOnce(new Error("connection reset"));
+
+      const result = await cache.claim("lock1", true);
+
+      expect(result).toBe(true);
+
+      // Redis also fails on get, so memory fallback is used
+      mockRedis.get.mockRejectedValueOnce(new Error("connection reset"));
+      expect(await cache.get("lock1")).toBe(true);
     });
   });
 

@@ -36,6 +36,8 @@ import { env } from "../../../src/env.mjs";
 import {
   UsageLimitService,
   resourceLimitCooldown,
+  planLimitCooldown,
+  planLimitInFlight,
 } from "../notifications/usage-limit.service";
 import type { NotificationService } from "../notifications/notification.service";
 import type { NotificationRepository } from "../notifications/repositories/notification.repository";
@@ -152,6 +154,13 @@ describe("UsageLimitService", () => {
   // -------------------------------------------------------------------------
 
   describe("notifyPlanLimitReached()", () => {
+    afterEach(async () => {
+      planLimitInFlight.delete("org_1");
+      planLimitInFlight.delete("org_missing");
+      await planLimitCooldown.delete("org_1");
+      await planLimitCooldown.delete("org_missing");
+    });
+
     describe("when IS_SAAS is false", () => {
       beforeEach(() => {
         vi.mocked(env).IS_SAAS = false;
@@ -250,6 +259,56 @@ describe("UsageLimitService", () => {
         });
 
         expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalled();
+      });
+    });
+
+    describe("when called concurrently for the same organization", () => {
+      it("sends only one notification", async () => {
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
+
+        await Promise.all([
+          service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" }),
+          service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" }),
+          service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" }),
+          service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" }),
+          service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" }),
+        ]);
+
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when called again after cooldown expires", () => {
+      it("sends notification again", async () => {
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
+
+        await service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" });
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(1);
+
+        // Simulate cooldown expiry
+        planLimitInFlight.delete("org_1");
+        await planLimitCooldown.delete("org_1");
+        vi.mocked(notificationService.sendSlackPlanLimitAlert as ReturnType<typeof vi.fn>).mockClear();
+
+        await service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" });
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when one notification channel fails", () => {
+      it("completes without throwing (fire-and-forget sends)", async () => {
+        const { service, organizationService, notificationService } = createService();
+        (organizationService.findWithAdmins as ReturnType<typeof vi.fn>).mockResolvedValue(ORG_WITH_ADMIN);
+        (notificationService.sendSlackPlanLimitAlert as ReturnType<typeof vi.fn>)
+          .mockRejectedValueOnce(new Error("Slack down"));
+
+        // Should not throw — allSettled absorbs the rejection
+        await service.notifyPlanLimitReached({ organizationId: "org_1", planName: "free" });
+
+        expect(notificationService.sendSlackPlanLimitAlert).toHaveBeenCalledTimes(1);
+        expect(notificationService.sendHubspotPlanLimitForm).toHaveBeenCalledTimes(1);
       });
     });
   });
