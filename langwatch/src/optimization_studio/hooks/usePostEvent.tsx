@@ -248,8 +248,15 @@ export const useHandleServerMessage = ({
             });
           }
 
-          // Don't auto-open the drawer when execution completes —
-          // let the user open it themselves if they want to inspect results
+          // Auto-select the node and expand properties when execution completes,
+          // so the user can see the results without having to click manually.
+          if (
+            message.payload.execution_state?.status === "success" ||
+            message.payload.execution_state?.status === "error"
+          ) {
+            workflowStore.setSelectedNode(message.payload.component_id);
+            workflowStore.setPropertiesExpanded(true);
+          }
           break;
         case "execution_state_change":
           logger.debug(

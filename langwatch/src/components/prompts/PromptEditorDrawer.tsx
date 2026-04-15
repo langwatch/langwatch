@@ -306,7 +306,22 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
   //   drawer session. Prevents re-initialization when deps change.
   //
   const [configValues, setConfigValues] = useState<PromptConfigFormValues>(
-    buildDefaultFormValues,
+    () =>
+      props.initialLocalConfig
+        ? buildDefaultFormValues({
+            version: {
+              configData: {
+                llm: props.initialLocalConfig.llm,
+                messages:
+                  props.initialLocalConfig.messages as PromptConfigFormValues["version"]["configData"]["messages"],
+                inputs:
+                  props.initialLocalConfig.inputs as PromptConfigFormValues["version"]["configData"]["inputs"],
+                outputs:
+                  props.initialLocalConfig.outputs as PromptConfigFormValues["version"]["configData"]["outputs"],
+              },
+            },
+          })
+        : buildDefaultFormValues(),
   );
   const [isFormInitialized, setIsFormInitialized] = useState(false);
   // Ref set directly in init/reset effects so the watch subscription
