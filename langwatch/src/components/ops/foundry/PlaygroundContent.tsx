@@ -77,7 +77,7 @@ export function PlaygroundContent({ compact = false }: { compact?: boolean }) {
             <Tabs.Content value="graph" p={0} h="full">
               <GraphView />
             </Tabs.Content>
-            <Tabs.Content value="json" p={0}>
+            <Tabs.Content value="json" p={0} h="full">
               <JsonView />
             </Tabs.Content>
           </Box>

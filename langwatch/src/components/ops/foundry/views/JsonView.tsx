@@ -3,7 +3,7 @@ import type { Monaco } from "@monaco-editor/react";
 import dynamic from "~/utils/compat/next-dynamic";
 import { useMemo } from "react";
 import { useTraceStore } from "../traceStore";
-import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
+import { useColorMode } from "~/components/ui/color-mode";
 
 const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
   ssr: false,
@@ -17,6 +17,7 @@ const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
 export function JsonView() {
   const trace = useTraceStore((s) => s.trace);
   const setTrace = useTraceStore((s) => s.setTrace);
+  const { colorMode } = useColorMode();
 
   const jsonString = useMemo(
     () => JSON.stringify(trace, null, 2),
@@ -34,19 +35,14 @@ export function JsonView() {
   }
 
   return (
-    <Box h="full" w="full">
+    <Box h="full" w="full" minH={0}>
       <MonacoEditor
         height="100%"
         language="json"
         value={jsonString}
         onChange={handleChange}
-        theme="monokai"
+        theme={colorMode === "dark" ? "vs-dark" : "light"}
         beforeMount={(monaco: Monaco) => {
-          monaco.editor.defineTheme(
-            "monokai",
-            monokaiTheme as Parameters<typeof monaco.editor.defineTheme>[1],
-          );
-
           monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
             validate: true,
             allowComments: false,
