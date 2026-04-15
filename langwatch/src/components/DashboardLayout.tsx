@@ -138,9 +138,9 @@ export const ProjectSelector = React.memo(function ProjectSelector({
               <>
                 {projectGroups
                   .filter((projectGroup) =>
-                    projectGroup.team.members.some(
+                    projectGroup.team.members?.some(
                       (member) => member.userId === session?.user.id,
-                    ),
+                    ) ?? false,
                   )
                   .map((projectGroup) => (
                     <Menu.ItemGroup
@@ -334,7 +334,7 @@ export const DashboardLayout = ({
   const userIsPartOfTeam =
     publicPage ||
     isDemoProject ||
-    team?.members.some((member) => member.userId === user?.id);
+    team?.members?.some((member) => member.userId === user?.id) ?? false;
 
   const menuWidth = compactMenu ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
   const isTracesOrAnalyticsPage =
