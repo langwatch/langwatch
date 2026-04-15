@@ -37,6 +37,7 @@ DOCS_KEY_MAP=(
   [scenarios]="scenarios"
   [prompts]="prompts"
   [analytics]="analytics"
+  [datasets]="datasets"
   [level-up]="level_up"
   [recipes-debug-instrumentation]="recipe_debug_instrumentation"
   [recipes-improve-setup]="recipe_improve_setup"
@@ -47,7 +48,7 @@ DOCS_KEY_MAP=(
 )
 
 # Ordered list for deterministic output
-DOCS_ORDER="tracing evaluations scenarios prompts analytics level-up recipes-debug-instrumentation recipes-improve-setup recipes-evaluate-multimodal recipes-generate-rag-dataset recipes-test-compliance recipes-test-cli-usability"
+DOCS_ORDER="tracing evaluations scenarios prompts analytics datasets level-up recipes-debug-instrumentation recipes-improve-setup recipes-evaluate-multimodal recipes-generate-rag-dataset recipes-test-compliance recipes-test-cli-usability"
 
 for stem in $DOCS_ORDER; do
   file="$COMPILED_DIR/${stem}.docs.txt"
