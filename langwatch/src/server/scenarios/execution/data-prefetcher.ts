@@ -453,19 +453,19 @@ async function fetchWorkflowAgentData(
     null;
   if (!workflowId) return null;
 
-  const published = await workflowVersionFetcher.getLatestDsl({
+  const latest = await workflowVersionFetcher.getLatestDsl({
     projectId,
     workflowId,
   });
-  if (!published) return null;
+  if (!latest) return null;
 
-  const { inputs, outputs } = extractWorkflowIO(published.dsl);
+  const { inputs, outputs } = extractWorkflowIO(latest.dsl);
 
   return {
     type: "workflow",
     agentId: agent.id,
-    workflowId: published.workflowId,
-    workflow: published.dsl,
+    workflowId: latest.workflowId,
+    workflow: latest.dsl,
     inputs,
     outputs,
     scenarioMappings: config.scenarioMappings,

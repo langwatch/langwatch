@@ -535,7 +535,7 @@ describe("prefetchScenarioData", () => {
       },
     };
 
-    const publishedDsl = {
+    const workflowDsl = {
       workflow_id: "wf_1",
       nodes: [
         {
@@ -583,7 +583,7 @@ describe("prefetchScenarioData", () => {
           workflowVersionFetcher: {
             getLatestDsl: vi.fn().mockResolvedValue({
               workflowId: "wf_1",
-              dsl: publishedDsl,
+              dsl: workflowDsl,
             }),
           },
         });
@@ -615,7 +615,7 @@ describe("prefetchScenarioData", () => {
               },
             });
             expect(result.data.adapterData.scenarioOutputField).toBe("answer");
-            expect(result.data.adapterData.workflow).toEqual(publishedDsl);
+            expect(result.data.adapterData.workflow).toEqual(workflowDsl);
           }
         }
       });
@@ -675,31 +675,5 @@ describe("prefetchScenarioData", () => {
       });
     });
 
-    describe("when the workflow has a latest version but was never published", () => {
-      it("resolves DSL from the latest version", async () => {
-        const deps = createMockDeps({
-          agentFetcher: {
-            findById: vi.fn().mockResolvedValue(workflowAgent),
-          },
-          workflowVersionFetcher: {
-            getLatestDsl: vi.fn().mockResolvedValue({
-              workflowId: "wf_1",
-              dsl: publishedDsl,
-            }),
-          },
-        });
-
-        const result = await prefetchScenarioData(
-          defaultContext,
-          workflowTarget,
-          deps,
-        );
-
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.adapterData.type).toBe("workflow");
-        }
-      });
-    });
-  });
+});
 });
