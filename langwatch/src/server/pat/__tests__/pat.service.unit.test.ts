@@ -4,7 +4,7 @@ import { generatePatToken, hashSecret } from "../pat-token.utils";
 
 // Mock PrismaClient
 function createMockPrisma() {
-  return {
+  const mock = {
     personalAccessToken: {
       create: vi.fn(),
       findUnique: vi.fn(),
@@ -14,7 +14,9 @@ function createMockPrisma() {
     roleBinding: {
       create: vi.fn(),
     },
+    $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mock)),
   } as any;
+  return mock;
 }
 
 describe("PatService", () => {
@@ -78,7 +80,6 @@ describe("PatService", () => {
         revokedAt: null,
         roleBindings: [{ role: "MEMBER", scopeType: "ORGANIZATION", scopeId: "org-1" }],
       });
-      prisma.personalAccessToken.update.mockResolvedValue({});
 
       const result = await service.verify({ token });
 
