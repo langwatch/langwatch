@@ -154,6 +154,58 @@ jobs:
             });
             core.info(`PR #${prNumber} approved via firefighting override.`);
 
+  dismiss-firefighting-approval:
+    # When someone strips the firefighting label, also dismiss the bot's
+    # firefighting approval — otherwise an approval granted under one
+    # policy stays in place after the trigger for it is gone.
+    # This job does NOT depend on preflight (we want it to run even when
+    # preflight short-circuits — the bot's approval is what we're removing).
+    if: >-
+      github.event.action == 'unlabeled' &&
+      github.event.label.name == 'firefighting' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dismiss bot firefighting approvals
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            // Match the exact body string submitted by the firefighting job.
+            // Keep this in sync with the firefighting APPROVE body below.
+            const FIREFIGHTING_REVIEW_BODY = "Approved by automation: `firefighting` label present (manual override).";
+            const toDismiss = reviews.filter(r =>
+              r.state === "APPROVED" &&
+              r.user?.login === "github-actions[bot]" &&
+              r.body === FIREFIGHTING_REVIEW_BODY
+            );
+            for (const review of toDismiss) {
+              try {
+                await github.rest.pulls.dismissReview({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: prNumber,
+                  review_id: review.id,
+                  message: "Dismissed: `firefighting` label was removed.",
+                });
+                core.info(`Dismissed bot firefighting approval ${review.id} on PR #${prNumber}.`);
+              } catch (error) {
+                // 422 = already dismissed (stale-dismissed on push, or prior run). Skip.
+                if (error.status !== 422) throw error;
+                core.info(`Review ${review.id} already dismissed; skipping.`);
+              }
+            }
+            if (toDismiss.length === 0) {
+              core.info(`No bot firefighting approvals to dismiss on PR #${prNumber}.`);
+            }
+
   evaluate:
     needs: preflight
     if: >-
