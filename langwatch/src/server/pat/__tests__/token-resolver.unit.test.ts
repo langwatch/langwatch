@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { TokenResolver } from "../token-resolver";
-import { generatePatToken, hashSecret } from "../pat-token.utils";
+import { generatePatToken } from "../pat-token.utils";
 
 function createMockPrisma() {
   return {

@@ -72,12 +72,16 @@ export function hashSecret(secret: string): string {
 
 /**
  * Verifies a secret against a stored hash.
+ * Returns false (instead of throwing) when the hash lengths differ,
+ * which can happen if hashedSecret is corrupt or a different algorithm.
  */
 export function verifySecret(secret: string, hashedSecret: string): boolean {
-  return crypto.timingSafeEqual(
-    Buffer.from(hashSecret(secret), "hex"),
-    Buffer.from(hashedSecret, "hex"),
-  );
+  const computed = Buffer.from(hashSecret(secret), "hex");
+  const stored = Buffer.from(hashedSecret, "hex");
+
+  if (computed.length !== stored.length) return false;
+
+  return crypto.timingSafeEqual(computed, stored);
 }
 
 /**

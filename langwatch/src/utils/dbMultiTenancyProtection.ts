@@ -57,6 +57,10 @@ const EXEMPT_MODELS = [
   "Group",
   "GroupMembership",
   "RoleBinding",
+  /**
+   * PATs are organization-level, scoped by organizationId + userId.
+   */
+  "PersonalAccessToken",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {

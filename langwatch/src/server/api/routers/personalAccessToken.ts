@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { PatService } from "~/server/pat/pat.service";
 import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
-import { skipPermissionCheck } from "../rbac";
+import { skipPermissionCheck, type Permission } from "../rbac";
 
 const roleBindingSchema = z.object({
   role: z.nativeEnum(TeamUserRole),
@@ -69,8 +69,22 @@ export const personalAccessTokenRouter = createTRPCRouter({
       }
 
       // Validate that requested bindings don't exceed the user's own permissions.
-      // For each binding, verify the user has the same or higher permission at that scope.
       for (const binding of input.bindings) {
+        // Validate scope ownership: scopeId must belong to this organization
+        if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
+          if (binding.scopeId !== input.organizationId) {
+            throw new Error("Organization scope must match the PAT's organization");
+          }
+        } else if (binding.scopeType === RoleBindingScopeType.TEAM) {
+          const team = await ctx.prisma.team.findFirst({
+            where: { id: binding.scopeId, organizationId: input.organizationId },
+            select: { id: true },
+          });
+          if (!team) {
+            throw new Error(`Team ${binding.scopeId} not found in this organization`);
+          }
+        }
+
         const scope =
           binding.scopeType === RoleBindingScopeType.ORGANIZATION
             ? ({ type: "org" as const, id: binding.scopeId })
@@ -79,30 +93,69 @@ export const personalAccessTokenRouter = createTRPCRouter({
               : await (async () => {
                   const project = await ctx.prisma.project.findUnique({
                     where: { id: binding.scopeId },
-                    select: { teamId: true },
+                    include: { team: { select: { id: true, organizationId: true } } },
                   });
                   if (!project) throw new Error(`Project ${binding.scopeId} not found`);
-                  return { type: "project" as const, id: binding.scopeId, teamId: project.teamId };
+                  if (project.team.organizationId !== input.organizationId) {
+                    throw new Error(`Project ${binding.scopeId} does not belong to this organization`);
+                  }
+                  return { type: "project" as const, id: binding.scopeId, teamId: project.team.id };
                 })();
 
-        // Check that the user has the permission that this role grants
-        const userHasPermission = await checkRoleBindingPermission({
-          prisma: ctx.prisma,
-          principal: { type: "user", id: ctx.session.user.id },
-          organizationId: input.organizationId,
-          scope,
-          // Check if user has at least manage permission at the scope
-          // (if they're assigning ADMIN, they need manage; otherwise view suffices)
-          permission:
+        // For CUSTOM roles, load the custom role's permissions and verify the
+        // user has every one of them — prevents privilege escalation via PAT.
+        if (binding.role === TeamUserRole.CUSTOM) {
+          if (!binding.customRoleId) {
+            throw new Error("CUSTOM role requires a customRoleId");
+          }
+          const customRole = await ctx.prisma.customRole.findUnique({
+            where: { id: binding.customRoleId, organizationId: input.organizationId },
+            select: { permissions: true },
+          });
+          if (!customRole) {
+            throw new Error(`Custom role ${binding.customRoleId} not found`);
+          }
+          const perms = Array.isArray(customRole.permissions)
+            ? (customRole.permissions as string[])
+            : [];
+          for (const perm of perms) {
+            const userHas = await checkRoleBindingPermission({
+              prisma: ctx.prisma,
+              principal: { type: "user", id: ctx.session.user.id },
+              organizationId: input.organizationId,
+              scope,
+              permission: perm as Permission,
+            });
+            if (!userHas) {
+              throw new Error(
+                `Cannot grant permission "${perm}" — exceeds your own access`,
+              );
+            }
+          }
+        } else {
+          // For built-in roles, check that the user has at least the same role's
+          // highest permission at this scope (manage for ADMIN, create for MEMBER,
+          // view for VIEWER).
+          const representativePermission: Permission =
             binding.role === TeamUserRole.ADMIN
               ? "project:manage"
-              : "project:view",
-        });
+              : binding.role === TeamUserRole.MEMBER
+                ? "project:create"
+                : "project:view";
 
-        if (!userHasPermission) {
-          throw new Error(
-            `Cannot create PAT with permissions exceeding your own at scope ${binding.scopeType}:${binding.scopeId}`,
-          );
+          const userHasPermission = await checkRoleBindingPermission({
+            prisma: ctx.prisma,
+            principal: { type: "user", id: ctx.session.user.id },
+            organizationId: input.organizationId,
+            scope,
+            permission: representativePermission,
+          });
+
+          if (!userHasPermission) {
+            throw new Error(
+              `Cannot create PAT with ${binding.role} permissions — exceeds your own access at ${binding.scopeType}:${binding.scopeId}`,
+            );
+          }
         }
       }
 

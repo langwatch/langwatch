@@ -8,8 +8,10 @@ import {
 
 export class PatService {
   private readonly repo: PatRepository;
+  private readonly prisma: PrismaClient;
 
   constructor(prisma: PrismaClient) {
+    this.prisma = prisma;
     this.repo = PatRepository.create(prisma);
   }
 
@@ -18,7 +20,7 @@ export class PatService {
   }
 
   /**
-   * Creates a new PAT with the given role bindings.
+   * Creates a new PAT with the given role bindings inside a transaction.
    * Returns the plaintext token (shown once) plus the persisted record.
    */
   async create({
@@ -39,21 +41,27 @@ export class PatService {
   }): Promise<{ token: string; pat: PersonalAccessToken }> {
     const { token, lookupId, hashedSecret } = generatePatToken();
 
-    const pat = await this.repo.create({
-      name,
-      lookupId,
-      hashedSecret,
-      userId,
-      organizationId,
-    });
+    const pat = await this.prisma.$transaction(async (tx) => {
+      const txRepo = PatRepository.create(tx as PrismaClient);
 
-    if (bindings.length > 0) {
-      await this.repo.createRoleBindings({
-        patId: pat.id,
+      const created = await txRepo.create({
+        name,
+        lookupId,
+        hashedSecret,
+        userId,
         organizationId,
-        bindings,
       });
-    }
+
+      if (bindings.length > 0) {
+        await txRepo.createRoleBindings({
+          patId: created.id,
+          organizationId,
+          bindings,
+        });
+      }
+
+      return created;
+    });
 
     return { token, pat };
   }
@@ -61,7 +69,9 @@ export class PatService {
   /**
    * Verifies a PAT token string and returns the token record if valid.
    * Returns null if the token is invalid, revoked, or not found.
-   * Updates lastUsedAt on successful verification.
+   *
+   * Does NOT update lastUsedAt — callers should call markUsed() after
+   * confirming the request is fully authorized (e.g., project resolved).
    */
   async verify({
     token,
@@ -80,10 +90,14 @@ export class PatService {
     // Verify the secret portion
     if (!verifySecret(parts.secret, pat.hashedSecret)) return null;
 
-    // Fire-and-forget lastUsedAt update — non-critical
-    void this.repo.updateLastUsedAt({ id: pat.id });
-
     return pat;
+  }
+
+  /**
+   * Fire-and-forget lastUsedAt update. Call after full authorization succeeds.
+   */
+  markUsed({ id }: { id: string }): void {
+    void this.repo.updateLastUsedAt({ id });
   }
 
   /**

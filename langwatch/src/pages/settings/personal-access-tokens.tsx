@@ -72,7 +72,7 @@ function PatSettingsContent({
 }: {
   organizationId: string;
 }) {
-  const { data: session } = useRequiredSession();
+  useRequiredSession();
   const pats = api.personalAccessToken.list.useQuery({ organizationId });
   const createMutation = api.personalAccessToken.create.useMutation();
   const revokeMutation = api.personalAccessToken.revoke.useMutation();
