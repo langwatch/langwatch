@@ -71,17 +71,19 @@ function roleSummary(
 }
 
 export default function PersonalAccessTokensPage() {
-  const { organization } = useOrganizationTeamProject();
+  const { organization, project } = useOrganizationTeamProject();
 
   if (!organization) return <SettingsLayout />;
 
-  return <PatSettingsContent organizationId={organization.id} />;
+  return <PatSettingsContent organizationId={organization.id} projectId={project?.id} />;
 }
 
 function PatSettingsContent({
   organizationId,
+  projectId,
 }: {
   organizationId: string;
+  projectId?: string;
 }) {
   useRequiredSession();
   const pats = api.personalAccessToken.list.useQuery({ organizationId });
@@ -282,6 +284,7 @@ function PatSettingsContent({
 
       {/* Create Token Dialog */}
       <Dialog.Root
+        size="lg"
         open={isCreateOpen && !newToken}
         onOpenChange={({ open }) => {
           if (!open) {
@@ -393,6 +396,7 @@ function PatSettingsContent({
 
       {/* Show Token Dialog */}
       <Dialog.Root
+        size="lg"
         open={!!newToken}
         onOpenChange={({ open }) => {
           if (!open) {
@@ -416,6 +420,9 @@ function PatSettingsContent({
               {newToken && (
                 <CopyInput value={newToken} label="Personal Access Token" />
               )}
+              {projectId && (
+                <CopyInput value={projectId} label="Project ID" />
+              )}
               <Text fontSize="sm" color="fg.muted">
                 Use this token with the Authorization header:{" "}
                 <code>Authorization: Bearer pat-lw-...</code> along with the{" "}
@@ -431,6 +438,7 @@ function PatSettingsContent({
 
       {/* Revoke Confirmation Dialog */}
       <Dialog.Root
+        size="lg"
         open={!!patToRevoke}
         onOpenChange={({ open }) => {
           if (!open) setPatToRevoke(null);
