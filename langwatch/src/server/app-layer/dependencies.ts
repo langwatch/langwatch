@@ -27,6 +27,7 @@ import type { EventExplorerService } from "./ops/event-explorer.service";
 import type { ReplayService } from "./ops/replay.service";
 import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { UsageService } from "./usage/usage.service";
+import type { ExperimentService } from "../experiments/experiment.service";
 
 export interface OpsDependencies {
   queues: QueueService;
@@ -62,6 +63,7 @@ export interface AppDependencies {
   suiteRuns: {
     runs: SuiteRunService;
   };
+  experiments: ExperimentService;
   organizations: OrganizationService;
   projects: ProjectService;
   tokenizer: TokenizerService;

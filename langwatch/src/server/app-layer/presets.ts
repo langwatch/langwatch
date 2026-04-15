@@ -22,6 +22,7 @@ import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/ev
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
+import { ExperimentService } from "../experiments/experiment.service";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
@@ -165,6 +166,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "EvaluationRunService",
   );
 
+  const experiments = traced(
+    ExperimentService.create(prisma),
+    "ExperimentService",
+  );
   const organizations = traced(
     new OrganizationService(
       new PrismaOrganizationRepository(prisma),
@@ -437,6 +442,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     broadcast,
     traces,
     evaluations,
+    experiments,
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
@@ -458,6 +464,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
 /** Tests — noop commands, null-backed services. */
 export function createTestApp(overrides?: Partial<AppDependencies>): App {
+  const { prisma: testPrisma } = require("../db") as { prisma: PrismaClient; };
   const noop = async () => { };
   const config: AppConfig = {
     nodeEnv: "test",
@@ -510,6 +517,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       execution: void 0 as unknown as AppDependencies["evaluations"]["execution"],
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
+    experiments: ExperimentService.create(testPrisma),
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: { runs: SuiteRunService.create({ resolveClickHouseClient: null, startSuiteRun: noop, queueSimulationRun: noop }) },
     organizations: nullOrganizations,
