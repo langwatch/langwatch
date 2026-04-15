@@ -510,8 +510,10 @@ describe("OnlineEvaluationDrawer", () => {
         wrapper: Wrapper,
       });
 
-      // Make changes to trigger unsaved state
+      // Make changes to trigger unsaved state (two changes needed: drawer resets
+      // isInitialRenderRef on open, so the first change is skipped as "initial")
       await selectLevel(user, "trace");
+      await selectLevel(user, "thread");
 
       // Try to close - should show confirmation
       await user.click(screen.getByText("Cancel"));
@@ -566,8 +568,10 @@ describe("OnlineEvaluationDrawer", () => {
         wrapper: Wrapper,
       });
 
-      // Make changes to trigger unsaved state
+      // Make changes to trigger unsaved state (two changes needed: drawer resets
+      // isInitialRenderRef on open, so the first change is skipped as "initial")
       await selectLevel(user, "trace");
+      await selectLevel(user, "thread");
 
       // Try to close - user confirms
       await user.click(screen.getByText("Cancel"));
