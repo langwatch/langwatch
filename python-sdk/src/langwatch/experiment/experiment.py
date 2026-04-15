@@ -277,28 +277,44 @@ class Experiment:
         return df
 
     def _auto_display_results(self) -> None:
-        """Display the results DataFrame after loop completion."""
+        """Display results after loop completion."""
         try:
             df = self._build_results_df()
             if df.empty:
                 return
 
             print()
-            try:
-                from IPython.display import display
-                from IPython import get_ipython
-                if get_ipython() is not None:
-                    display(df)
-                else:
-                    print(df.to_string())
-            except (ImportError, AttributeError):
-                print(df.to_string())
+
+            # Find score columns (numeric, not trace_id/duration_ms/error)
+            meta_cols = {"trace_id", "duration_ms", "error", "target"}
+            score_cols = [c for c in df.columns if c not in meta_cols and pd.api.types.is_numeric_dtype(df[c])]
+
+            if "target" in df.columns and len(df["target"].unique()) > 1:
+                # Multi-target: show aggregated summary per target
+                summary = df.groupby("target")[score_cols].mean()
+                self._display_df(summary)
+            else:
+                # Single target or no targets: show full results
+                display_cols = [c for c in df.columns if c not in {"trace_id"}]
+                self._display_df(df[display_cols])
 
             if self._run_url:
-                print(f"\n  View details: {self._run_url}")
-            print()
+                print(f"  View details: {self._run_url}")
+            print(f"  Explore with: evaluation.results\n")
         except Exception:
             pass
+
+    @staticmethod
+    def _display_df(df: pd.DataFrame) -> None:
+        try:
+            from IPython.display import display
+            from IPython import get_ipython
+            if get_ipython() is not None:
+                display(df)
+                return
+        except (ImportError, AttributeError):
+            pass
+        print(df.to_string())
 
     def __repr__(self) -> str:
         status = "finished" if self._finished else "running" if self.initialized else "not started"
@@ -823,6 +839,7 @@ class Experiment:
 
             with self.lock:
                 self.batch["dataset"].append(batch_entry)
+                self._all_dataset_entries.append(batch_entry)
 
             # Reset target context
             _target_context.reset(target_context_token)
@@ -972,6 +989,7 @@ class Experiment:
 
         with self.lock:
             self.batch["dataset"].append(batch_entry)
+            self._all_dataset_entries.append(batch_entry)
 
     def log(
         self,
