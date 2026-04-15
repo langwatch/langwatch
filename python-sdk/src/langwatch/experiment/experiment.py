@@ -277,34 +277,26 @@ class Experiment:
         return df
 
     def _auto_display_results(self) -> None:
-        """Print a concise summary after loop completion."""
+        """Display the results DataFrame after loop completion."""
         try:
-            evals = list(self._all_evaluations)
-            entries = list(self._all_dataset_entries)
+            df = self._build_results_df()
+            if df.empty:
+                return
 
-            if entries:
-                total = len(entries)
-                errors = sum(1 for e in entries if e.error)
-
-                parts = [f"\n  Completed: {total} rows"]
-                if errors:
-                    parts.append(f"({errors} errors)")
-
-                # Summarize evaluation metrics
-                if evals:
-                    metric_scores: Dict[str, List[float]] = {}
-                    for ev in evals:
-                        if ev.score is not None:
-                            metric_scores.setdefault(ev.name, []).append(ev.score)
-
-                    for name, scores in metric_scores.items():
-                        avg = sum(scores) / len(scores)
-                        parts.append(f"\n  {name}: avg={avg:.3f} (n={len(scores)})")
-
-                print("".join(parts))
+            print()
+            try:
+                from IPython.display import display
+                from IPython import get_ipython
+                if get_ipython() is not None:
+                    display(df)
+                else:
+                    print(df.to_string())
+            except (ImportError, AttributeError):
+                print(df.to_string())
 
             if self._run_url:
-                print(f"  View details: {self._run_url}\n")
+                print(f"\n  View details: {self._run_url}")
+            print()
         except Exception:
             pass
 
