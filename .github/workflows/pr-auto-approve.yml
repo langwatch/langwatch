@@ -1,37 +1,31 @@
-name: pr-gate
+name: pr-auto-approve
 
-# Consolidated PR review gate.
+# Consolidated PR auto-approval workflow.
 #
 # Replaces approval-or-hotfix, low-risk-evaluation, and low-risk-label-reset.
-# The bot satisfies branch protection's required_approving_review_count by
-# submitting an APPROVE review for low-risk and firefighting PRs. The
+# The bot submits an APPROVE review for low-risk and firefighting PRs, which
+# satisfies branch protection's required_approving_review_count. Branch
+# protection — not this workflow — is what actually blocks merges; this
+# workflow only decides whether the bot adds its approving review. The
 # `low-risk-change` label is audit-only — no gating logic depends on it.
 
 on:
   pull_request_target:
     types: [opened, synchronize, reopened, labeled, unlabeled]
-  workflow_dispatch:
-    inputs:
-      pr_number:
-        description: "PR number to evaluate"
-        required: true
-        type: number
 
 permissions:
   pull-requests: write
   contents: read
 
 concurrency:
-  group: pr-gate-${{ github.event.pull_request.number || inputs.pr_number }}
+  group: pr-auto-approve-${{ github.event.pull_request.number }}
   cancel-in-progress: true
 
 jobs:
-  gate:
+  evaluate:
     # Fork PRs cannot mutate labels/reviews from pull_request_target without secrets;
     # let them run other CI but skip this job rather than fail noisily.
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
 
     steps:
@@ -42,13 +36,13 @@ jobs:
       - name: Checkout repo (policy doc)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
-          ref: ${{ github.event.pull_request.base.sha || github.sha }}
+          ref: ${{ github.event.pull_request.base.sha }}
 
       - name: Resolve PR context
         id: ctx
         env:
           GH_TOKEN: ${{ github.token }}
-          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
           PR_JSON=$(gh pr view "$PR_NUMBER" --json number,headRefOid,labels)
           HEAD_SHA=$(echo "$PR_JSON" | jq -r '.headRefOid')
@@ -125,13 +119,13 @@ jobs:
             core.info(`PR #${prNumber} approved via firefighting override.`);
 
       - name: Stop here if firefighting handled
-        id: firefighting-gate
+        id: firefighting-handled
         if: contains(steps.ctx.outputs.labels, ',firefighting,')
         run: echo "firefighting=true" >> "$GITHUB_OUTPUT"
 
       - name: Fetch PR diff and metadata
         id: pr-data
-        if: steps.firefighting-gate.outputs.firefighting != 'true'
+        if: steps.firefighting-handled.outputs.firefighting != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ steps.ctx.outputs.pr_number }}
@@ -154,7 +148,7 @@ jobs:
 
       - name: Fail fast for oversized diffs
         id: oversized
-        if: steps.firefighting-gate.outputs.firefighting != 'true' && steps.pr-data.outputs.oversized == 'true'
+        if: steps.firefighting-handled.outputs.firefighting != 'true' && steps.pr-data.outputs.oversized == 'true'
         run: |
           echo "qualifies=false" >> "$GITHUB_OUTPUT"
           echo "scope=Diff too large for automated evaluation" >> "$GITHUB_OUTPUT"
@@ -162,7 +156,7 @@ jobs:
 
       - name: Check for restricted paths
         id: path-check
-        if: steps.firefighting-gate.outputs.firefighting != 'true' && steps.pr-data.outputs.oversized == 'false'
+        if: steps.firefighting-handled.outputs.firefighting != 'true' && steps.pr-data.outputs.oversized == 'false'
         run: |
           RESTRICTED_PATTERN='^(\.github/workflows/|(auth|security|migrations|prisma)/|.*/(auth|security|migrations|prisma)/)'
           if grep -qE "$RESTRICTED_PATTERN" /tmp/pr_files.txt; then
@@ -183,7 +177,7 @@ jobs:
 
       - name: Evaluate PR with OpenAI
         id: evaluate
-        if: steps.firefighting-gate.outputs.firefighting != 'true' && steps.pr-data.outputs.oversized == 'false' && steps.path-check.outputs.blocked == 'false'
+        if: steps.firefighting-handled.outputs.firefighting != 'true' && steps.pr-data.outputs.oversized == 'false' && steps.path-check.outputs.blocked == 'false'
         env:
           OPENAI_API_KEY: ${{ secrets.LOW_RISK_OPENAI_API_KEY }}
         run: |
@@ -264,7 +258,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Apply outcome — label, comment, and bot review
-        if: steps.firefighting-gate.outputs.firefighting != 'true'
+        if: steps.firefighting-handled.outputs.firefighting != 'true'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           PR_NUMBER: ${{ steps.ctx.outputs.pr_number }}
