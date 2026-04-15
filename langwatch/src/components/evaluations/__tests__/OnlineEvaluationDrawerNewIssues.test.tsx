@@ -74,7 +74,8 @@ describe("OnlineEvaluationDrawer - New Issues & Validation", () => {
     await waitFor(() => {
       expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole("radio", { name: levelName }));
+    const radio = screen.getByRole("radio", { name: levelName });
+    await user.click(radio.closest("label") ?? radio);
     await vi.advanceTimersByTimeAsync(50);
   };
 
@@ -275,7 +276,7 @@ describe("OnlineEvaluationDrawer - New Issues & Validation", () => {
 
       // Now switch to Thread level - should NOT auto-open editor anymore
       const threadRadio = screen.getByRole("radio", { name: /Thread Level/i });
-      await user.click(threadRadio);
+      await user.click(threadRadio.closest("label") ?? threadRadio);
 
       await vi.advanceTimersByTimeAsync(200);
 
@@ -1082,7 +1083,7 @@ describe("OnlineEvaluationDrawer - New Issues & Validation", () => {
 
       // Now switch to Thread level
       const threadRadio = screen.getByRole("radio", { name: /Thread Level/i });
-      await user.click(threadRadio);
+      await user.click(threadRadio.closest("label") ?? threadRadio);
 
       await vi.advanceTimersByTimeAsync(200);
 
@@ -1149,7 +1150,7 @@ describe("OnlineEvaluationDrawer - New Issues & Validation", () => {
 
       // Now switch to Thread level
       const threadRadio = screen.getByRole("radio", { name: /Thread Level/i });
-      await user.click(threadRadio);
+      await user.click(threadRadio.closest("label") ?? threadRadio);
 
       await vi.advanceTimersByTimeAsync(200);
 

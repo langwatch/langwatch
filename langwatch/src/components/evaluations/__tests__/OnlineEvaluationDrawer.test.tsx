@@ -92,7 +92,8 @@ describe("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
     await waitFor(() => {
       expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole("radio", { name: levelName }));
+    const radio = screen.getByRole("radio", { name: levelName });
+    await user.click(radio.closest("label") ?? radio);
     await vi.advanceTimersByTimeAsync(50);
   };
 
@@ -254,7 +255,8 @@ describe("OnlineEvaluationDrawer", () => {
     await waitFor(() => {
       expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole("radio", { name: levelName }));
+    const radio = screen.getByRole("radio", { name: levelName });
+    await user.click(radio.closest("label") ?? radio);
     await vi.advanceTimersByTimeAsync(50);
   };
 

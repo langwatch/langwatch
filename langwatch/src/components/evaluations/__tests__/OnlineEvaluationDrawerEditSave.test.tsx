@@ -90,7 +90,8 @@ describe("OnlineEvaluationDrawer", () => {
     await waitFor(() => {
       expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
     });
-    await user.click(screen.getByRole("radio", { name: levelName }));
+    const radio = screen.getByRole("radio", { name: levelName });
+    await user.click(radio.closest("label") ?? radio);
     await vi.advanceTimersByTimeAsync(50);
   };
 
@@ -264,7 +265,8 @@ describe("OnlineEvaluationDrawer", () => {
       await waitFor(() => {
         expect(screen.getByRole("radio", { name: /Trace Level/i })).toBeInTheDocument();
       });
-      await user.click(screen.getByRole("radio", { name: /Trace Level/i }));
+      const r = screen.getByRole("radio", { name: /Trace Level/i });
+      await user.click(r.closest("label") ?? r);
       await vi.advanceTimersByTimeAsync(50);
 
       // Step 2: Click "Select Evaluator"
@@ -808,13 +810,13 @@ describe("OnlineEvaluationDrawer", () => {
       expect(threadRadio).not.toBeChecked();
 
       // Select trace level
-      await user.click(traceRadio);
+      await user.click(traceRadio.closest("label") ?? traceRadio);
       await vi.advanceTimersByTimeAsync(50);
       expect(traceRadio).toBeChecked();
       expect(threadRadio).not.toBeChecked();
 
       // Switch to Thread Level
-      await user.click(threadRadio);
+      await user.click(threadRadio.closest("label") ?? threadRadio);
       await waitFor(() => {
         expect(threadRadio).toBeChecked();
         expect(traceRadio).not.toBeChecked();
@@ -940,7 +942,7 @@ describe("OnlineEvaluationDrawer", () => {
 
       // Evaluator should remain selected after level change
       const threadRadio = screen.getByRole("radio", { name: /thread/i });
-      await user.click(threadRadio);
+      await user.click(threadRadio.closest("label") ?? threadRadio);
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
