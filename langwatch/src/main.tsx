@@ -10,9 +10,6 @@ import "./styles/globals.scss";
 // Enable imperative navigation from outside React (e.g. navigateToDrawer)
 setRouterInstance(router);
 
-// Clear stale-chunk reload guard so future deployments can also auto-reload
-sessionStorage.removeItem("chunk-reload");
-
 const container = document.getElementById("root");
 if (!container) throw new Error("Root element not found");
 

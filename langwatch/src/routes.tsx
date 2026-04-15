@@ -45,6 +45,13 @@ function RootLayout() {
 const page = (importFn: () => Promise<{ default: React.ComponentType }>) => ({
   lazy: () =>
     importFn().then((m) => ({ Component: m.default })).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message.toLowerCase() : "";
+      const isChunkError =
+        msg.includes("loading chunk") ||
+        msg.includes("failed to fetch dynamically imported module");
+
+      if (!isChunkError) throw err;
+
       // Chunk failed to load — likely a stale build after deployment.
       // Reload once so the browser fetches the new index.html with current chunk URLs.
       const alreadyReloaded = sessionStorage.getItem("chunk-reload");
