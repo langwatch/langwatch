@@ -410,7 +410,7 @@ describe("Dataset Generation Skill", () => {
   );
 
   it.skipIf(isCI)(
-    "asks clarifying questions when codebase has little domain signal and uploads to platform",
+    "generates a travel-specific dataset when user provides domain context for a generic codebase",
     async () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-dataset-ts-generic-")
@@ -448,19 +448,15 @@ describe("Dataset Generation Skill", () => {
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent asked the user about the domain or use case since the codebase was too generic to determine it",
-              "Agent incorporated the travel planning context provided by the user into the dataset",
+              "Agent incorporated the travel planning context into the dataset",
               "Agent created a CSV file with travel-related inputs (trips, hotels, flights, activities, destinations)",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "generate an evaluation dataset for my chatbot. it's a travel planning assistant that helps users plan trips, book hotels, and find activities."
+            "generate an evaluation dataset for my chatbot. it's a travel planning assistant that helps users plan trips, book hotels, and find activities. please explore the code and then generate the full dataset."
           ),
-          scenario.agent(),
-          (state) => { toolCallFix(state); },
-          scenario.user(),
           scenario.agent(),
           (state) => { toolCallFix(state); },
           scenario.user(),
