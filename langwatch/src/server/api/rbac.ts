@@ -937,70 +937,25 @@ export const checkPermissionOrPubliclyShared =
 // OPS PERMISSION
 // ============================================================================
 
-export type OpsScope =
-  | { kind: "platform" }
-  | { kind: "organization"; organizationId: string };
+export type OpsScope = { kind: "platform" };
 
 /**
  * Resolve the ops scope for a user. Returns null if the user has no ops access.
  * Shared between tRPC middleware and SSE endpoint.
  *
- * Admins and OPS_ORG_ID members bypass the permission check and receive
- * platform-level access. For regular org members, `permission` is checked
- * against their role bindings via `resolveBindingPermission`.
+ * Only users listed in ADMIN_EMAILS have ops access. All ops data is
+ * platform-wide so no org-scoped tier exists.
  */
-export async function resolveOpsScope({
-  userId,
+export function resolveOpsScope({
   userEmail,
-  permission,
-  prisma,
 }: {
   userId: string;
   userEmail: string | null | undefined;
   permission: Permission;
-  prisma: Parameters<typeof resolveBindingPermission>[3];
-}): Promise<OpsScope | null> {
+  prisma: unknown;
+}): OpsScope | null {
   if (isAdmin({ email: userEmail })) {
     return { kind: "platform" };
-  }
-
-  if (env.IS_SAAS && env.OPS_ORG_ID) {
-    const membership = await prisma.organizationUser.findFirst({
-      where: { userId, organizationId: env.OPS_ORG_ID },
-    });
-    if (membership) {
-      return { kind: "platform" };
-    }
-  }
-
-  const memberships = await prisma.organizationUser.findMany({
-    where: { userId },
-    select: { organizationId: true },
-  });
-
-  for (const membership of memberships) {
-    const bindings = await prisma.roleBinding.findMany({
-      where: {
-        organizationId: membership.organizationId,
-        userId,
-      },
-      select: { role: true, customRoleId: true },
-    });
-
-    for (const binding of bindings) {
-      const permitted = await resolveBindingPermission(
-        binding,
-        null,
-        permission,
-        prisma,
-      );
-      if (permitted) {
-        return {
-          kind: "organization",
-          organizationId: membership.organizationId,
-        };
-      }
-    }
   }
 
   return null;

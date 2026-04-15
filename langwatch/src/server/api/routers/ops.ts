@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
-import { checkOpsPermission, type OpsScope } from "~/server/api/rbac";
+import { checkOpsPermission } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
 import { getProjectionMetadata, getReactorMetadata } from "~/server/event-sourcing/pipelineRegistry";
 
@@ -18,62 +18,6 @@ function requireOps() {
     });
   }
   return ops;
-}
-
-async function resolveTenantIds({
-  opsScope,
-  requestedTenantIds,
-}: {
-  opsScope: OpsScope;
-  requestedTenantIds?: string[];
-}): Promise<string[]> {
-  if (opsScope.kind !== "organization") return requestedTenantIds ?? [];
-
-  const orgProjectIds = new Set(
-    await getApp().organizations.getProjectIds(opsScope.organizationId),
-  );
-
-  if (requestedTenantIds && requestedTenantIds.length > 0) {
-    const unauthorized = requestedTenantIds.filter(
-      (id) => !orgProjectIds.has(id),
-    );
-    if (unauthorized.length > 0) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: `Tenant(s) not accessible in your scope: ${unauthorized.join(", ")}`,
-      });
-    }
-    return requestedTenantIds;
-  }
-  return [...orgProjectIds];
-}
-
-function assertTenantAccess({
-  opsScope,
-  orgProjectIds,
-  tenantId,
-}: {
-  opsScope: OpsScope;
-  orgProjectIds: Set<string>;
-  tenantId: string;
-}): void {
-  if (opsScope.kind === "organization" && !orgProjectIds.has(tenantId)) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: "Tenant not accessible in your scope",
-    });
-  }
-}
-
-async function resolveOrgProjectIds({
-  opsScope,
-}: {
-  opsScope: OpsScope;
-}): Promise<Set<string>> {
-  if (opsScope.kind !== "organization") return new Set<string>();
-  return new Set(
-    await getApp().organizations.getProjectIds(opsScope.organizationId),
-  );
 }
 
 export const opsRouter = createTRPCRouter({
@@ -248,32 +192,22 @@ export const opsRouter = createTRPCRouter({
         tenantIds: z.array(z.string()).optional(),
       }),
     )
-    .query(async ({ input, ctx }) => {
+    .query(async ({ input }) => {
       const ops = requireOps();
-      const opsScope = ctx.opsScope!;
-      const tenantIds = await resolveTenantIds({
-        opsScope,
-        requestedTenantIds: input.tenantIds,
-      });
 
       return ops.eventExplorer.discoverAggregates({
         projectionNames: input.projectionNames,
         since: input.since,
-        tenantIds,
+        tenantIds: input.tenantIds ?? [],
       });
     }),
 
   searchTenants: protectedProcedure
     .use(opsViewPermission)
     .input(z.object({ query: z.string() }))
-    .query(async ({ input, ctx }) => {
-      const opsScope = ctx.opsScope!;
+    .query(async ({ input }) => {
       return getApp().projects.searchByQuery({
         query: input.query,
-        organizationId:
-          opsScope.kind === "organization"
-            ? opsScope.organizationId
-            : undefined,
       });
     }),
 
@@ -325,11 +259,6 @@ export const opsRouter = createTRPCRouter({
     )
     .mutation(async ({ input, ctx }) => {
       const ops = requireOps();
-      const opsScope = ctx.opsScope!;
-      const tenantIds = await resolveTenantIds({
-        opsScope,
-        requestedTenantIds: input.tenantIds,
-      });
 
       const userName =
         ctx.session.user.name ?? ctx.session.user.email ?? "unknown";
@@ -338,7 +267,7 @@ export const opsRouter = createTRPCRouter({
         return await ops.replay.startReplay({
           projectionNames: input.projectionNames,
           since: input.since,
-          tenantIds,
+          tenantIds: input.tenantIds ?? [],
           aggregateIds: input.aggregateIds,
           description: input.description,
           userName,
@@ -504,26 +433,12 @@ export const opsRouter = createTRPCRouter({
         tenantId: z.string().optional(),
       }),
     )
-    .query(async ({ input, ctx }) => {
+    .query(async ({ input }) => {
       const ops = requireOps();
-      const opsScope = ctx.opsScope!;
-
-      let tenantIds: string[] = [];
-      if (input.tenantId) {
-        const orgProjectIds = await resolveOrgProjectIds({
-          opsScope,
-        });
-        assertTenantAccess({ opsScope, orgProjectIds, tenantId: input.tenantId });
-        tenantIds = [input.tenantId];
-      } else {
-        tenantIds = await resolveTenantIds({
-          opsScope,
-        });
-      }
 
       return ops.eventExplorer.searchAggregates({
         query: input.query,
-        tenantIds,
+        tenantIds: input.tenantId ? [input.tenantId] : [],
       });
     }),
 
@@ -536,14 +451,8 @@ export const opsRouter = createTRPCRouter({
         limit: z.number().int().min(1).max(5000).default(500),
       }),
     )
-    .query(async ({ input, ctx }) => {
+    .query(async ({ input }) => {
       const ops = requireOps();
-      const opsScope = ctx.opsScope!;
-      const orgProjectIds = await resolveOrgProjectIds({
-        opsScope,
-      });
-      assertTenantAccess({ opsScope, orgProjectIds, tenantId: input.tenantId });
-
       return ops.eventExplorer.getAggregateEvents(input);
     }),
 
@@ -557,13 +466,8 @@ export const opsRouter = createTRPCRouter({
         eventIndex: z.number().int().min(0),
       }),
     )
-    .query(async ({ input, ctx }) => {
+    .query(async ({ input }) => {
       const ops = requireOps();
-      const opsScope = ctx.opsScope!;
-      const orgProjectIds = await resolveOrgProjectIds({
-        opsScope,
-      });
-      assertTenantAccess({ opsScope, orgProjectIds, tenantId: input.tenantId });
 
       const result = await ops.eventExplorer.computeProjectionState(input);
       if (!result.aggregateType) {
