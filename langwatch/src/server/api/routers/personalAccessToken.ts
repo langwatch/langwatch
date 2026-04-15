@@ -31,6 +31,7 @@ export const personalAccessTokenRouter = createTRPCRouter({
         id: pat.id,
         name: pat.name,
         createdAt: pat.createdAt,
+        expiresAt: pat.expiresAt,
         lastUsedAt: pat.lastUsedAt,
         revokedAt: pat.revokedAt,
         roleBindings: pat.roleBindings.map((rb) => ({
@@ -48,6 +49,7 @@ export const personalAccessTokenRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         name: z.string().min(1).max(100),
+        expiresAt: z.coerce.date().optional(),
         bindings: z.array(roleBindingSchema).min(1),
       }),
     )
@@ -164,6 +166,7 @@ export const personalAccessTokenRouter = createTRPCRouter({
         name: input.name,
         userId: ctx.session.user.id,
         organizationId: input.organizationId,
+        expiresAt: input.expiresAt,
         bindings: input.bindings,
       });
 

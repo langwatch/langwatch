@@ -27,11 +27,13 @@ export class PatService {
     name,
     userId,
     organizationId,
+    expiresAt,
     bindings,
   }: {
     name: string;
     userId: string;
     organizationId: string;
+    expiresAt?: Date | null;
     bindings: Array<{
       role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
       customRoleId?: string | null;
@@ -50,6 +52,7 @@ export class PatService {
         hashedSecret,
         userId,
         organizationId,
+        expiresAt,
       });
 
       if (bindings.length > 0) {
@@ -86,6 +89,9 @@ export class PatService {
 
     // Revoked tokens are rejected
     if (pat.revokedAt) return null;
+
+    // Expired tokens are rejected
+    if (pat.expiresAt && pat.expiresAt < new Date()) return null;
 
     // Verify the secret portion
     if (!verifySecret(parts.secret, pat.hashedSecret)) return null;

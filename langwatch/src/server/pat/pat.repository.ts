@@ -17,15 +17,17 @@ export class PatRepository {
     hashedSecret,
     userId,
     organizationId,
+    expiresAt,
   }: {
     name: string;
     lookupId: string;
     hashedSecret: string;
     userId: string;
     organizationId: string;
+    expiresAt?: Date | null;
   }): Promise<PersonalAccessToken> {
     return this.prisma.personalAccessToken.create({
-      data: { name, lookupId, hashedSecret, userId, organizationId },
+      data: { name, lookupId, hashedSecret, userId, organizationId, expiresAt: expiresAt ?? null },
     });
   }
 

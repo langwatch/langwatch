@@ -24,6 +24,17 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { api } from "../../utils/api";
 
+const EXPIRATION_OPTIONS = [
+  { label: "No expiration", value: "" },
+  { label: "7 days", value: "7" },
+  { label: "30 days", value: "30" },
+  { label: "60 days", value: "60" },
+  { label: "90 days", value: "90" },
+  { label: "Custom...", value: "custom" },
+];
+
+const expirationCollection = createListCollection({ items: EXPIRATION_OPTIONS });
+
 const ROLE_OPTIONS = [
   { label: "Admin", value: TeamUserRole.ADMIN, description: "Full access" },
   {
@@ -88,14 +99,25 @@ function PatSettingsContent({
   const [selectedRole, setSelectedRole] = useState<TeamUserRole>(
     TeamUserRole.MEMBER,
   );
+  const [expirationPreset, setExpirationPreset] = useState("");
+  const [customDate, setCustomDate] = useState("");
   const [newToken, setNewToken] = useState<string | null>(null);
   const [patToRevoke, setPatToRevoke] = useState<string | null>(null);
 
   const handleCreate = () => {
+    let expiresAt: Date | undefined;
+    if (expirationPreset === "custom" && customDate) {
+      expiresAt = new Date(customDate);
+    } else if (expirationPreset && expirationPreset !== "custom") {
+      const days = parseInt(expirationPreset, 10);
+      expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+    }
+
     createMutation.mutate(
       {
         organizationId,
         name,
+        expiresAt,
         bindings: [
           {
             role: selectedRole,
@@ -109,6 +131,8 @@ function PatSettingsContent({
           setNewToken(result.token);
           setName("");
           setSelectedRole(TeamUserRole.MEMBER);
+          setExpirationPreset("");
+          setCustomDate("");
           void queryClient.personalAccessToken.list.invalidate();
         },
         onError: (error) => {
@@ -186,6 +210,7 @@ function PatSettingsContent({
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Permissions</Table.ColumnHeader>
+                  <Table.ColumnHeader>Expires</Table.ColumnHeader>
                   <Table.ColumnHeader>Created</Table.ColumnHeader>
                   <Table.ColumnHeader>Last Used</Table.ColumnHeader>
                   <Table.ColumnHeader width="80px"></Table.ColumnHeader>
@@ -194,7 +219,7 @@ function PatSettingsContent({
               <Table.Body>
                 {activePats.length === 0 && (
                   <Table.Row>
-                    <Table.Cell colSpan={5}>
+                    <Table.Cell colSpan={6}>
                       <Text color="gray.500" textAlign="center" paddingY={4}>
                         No active tokens. Create one to get started.
                       </Text>
@@ -213,6 +238,17 @@ function PatSettingsContent({
                       <Text fontSize="sm" color="gray.600">
                         {roleSummary(pat.roleBindings)}
                       </Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      {pat.expiresAt ? (
+                        new Date(pat.expiresAt) < new Date() ? (
+                          <Badge size="sm" colorPalette="red">Expired</Badge>
+                        ) : (
+                          new Date(pat.expiresAt).toLocaleDateString()
+                        )
+                      ) : (
+                        <Badge size="sm" colorPalette="gray">Never</Badge>
+                      )}
                     </Table.Cell>
                     <Table.Cell>
                       {new Date(pat.createdAt).toLocaleDateString()}
@@ -252,6 +288,8 @@ function PatSettingsContent({
             onCreateClose();
             setName("");
             setSelectedRole(TeamUserRole.MEMBER);
+            setExpirationPreset("");
+            setCustomDate("");
           }
         }}
       >
@@ -302,6 +340,39 @@ function PatSettingsContent({
                     ))}
                   </Select.Content>
                 </Select.Root>
+              </VStack>
+              <VStack gap={1} align="start" width="full">
+                <Text fontWeight="600" fontSize="sm">
+                  Expiration
+                </Text>
+                <Select.Root
+                  collection={expirationCollection}
+                  value={[expirationPreset]}
+                  onValueChange={(details) => {
+                    const val = details.value[0] ?? "";
+                    setExpirationPreset(val);
+                    if (val !== "custom") setCustomDate("");
+                  }}
+                >
+                  <Select.Trigger width="full" background="bg">
+                    <Select.ValueText placeholder="No expiration" />
+                  </Select.Trigger>
+                  <Select.Content width="300px" paddingY={2}>
+                    {EXPIRATION_OPTIONS.map((option) => (
+                      <Select.Item key={option.value} item={option}>
+                        {option.label}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+                {expirationPreset === "custom" && (
+                  <Input
+                    type="date"
+                    value={customDate}
+                    min={new Date(Date.now() + 86400000).toISOString().split("T")[0]}
+                    onChange={(e) => setCustomDate(e.target.value)}
+                  />
+                )}
               </VStack>
               <Text fontSize="sm" color="gray.500">
                 The token will have organization-wide permissions with the
