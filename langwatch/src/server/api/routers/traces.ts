@@ -12,7 +12,7 @@ import { getApp } from "~/server/app-layer/app";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
-import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
+import { evaluatorsSchema } from "../../evaluations/evaluators.generated";
 import { evaluatePreconditions, buildPreconditionTraceDataFromTrace, checkEvaluatorRequiredFields } from "../../evaluations/preconditions";
 import { checkPreconditionSchema } from "../../evaluations/types";
 import { checkPermissionOrPubliclyShared, checkProjectPermission } from "../rbac";

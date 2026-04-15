@@ -29,7 +29,7 @@ vi.mock("~/server/evaluations/evaluators.generated", () => ({
 }));
 
 // Mock evaluatorsSchema - minimal mock
-vi.mock("~/server/evaluations/evaluators.zod.generated", () => {
+vi.mock("~/server/evaluations/evaluators.generated", () => {
   return {
     evaluatorsSchema: {
       shape: {},

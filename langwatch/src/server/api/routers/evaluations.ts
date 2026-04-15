@@ -17,7 +17,7 @@ import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "../../evaluations/evaluators.generated";
-import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
+import { evaluatorsSchema } from "../../evaluations/evaluators.generated";
 import { mappingStateSchema } from "../../tracer/tracesMapping";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";

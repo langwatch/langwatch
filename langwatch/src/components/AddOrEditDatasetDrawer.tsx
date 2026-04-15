@@ -20,12 +20,12 @@ import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { tryToMapPreviousColumnsToNewColumns } from "../optimization_studio/utils/datasetUtils";
-import type {
-  DatasetColumns,
-  DatasetRecordForm,
-  DatasetRecordInput,
+import {
+  type DatasetColumns,
+  type DatasetRecordForm,
+  type DatasetRecordInput,
+  datasetRecordFormSchema,
 } from "../server/datasets/types";
-import { datasetRecordFormSchema } from "../server/datasets/types.generated";
 import { api } from "../utils/api";
 import { isHandledByGlobalHandler } from "../utils/trpcError";
 import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";
