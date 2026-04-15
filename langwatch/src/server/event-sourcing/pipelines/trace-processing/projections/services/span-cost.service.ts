@@ -82,12 +82,11 @@ export class SpanCostService {
       }
     }
 
-    // Fallback: Strands SDK sends TTFT as a span attribute (integer ms)
     if (timeToFirstToken === null) {
       const attrTtft = coerceToNumber(
         span.spanAttributes["gen_ai.server.time_to_first_token"],
       );
-      if (attrTtft !== null && attrTtft !== undefined && attrTtft >= 0) {
+      if (attrTtft !== null && attrTtft >= 0) {
         timeToFirstToken = attrTtft;
       }
     }
