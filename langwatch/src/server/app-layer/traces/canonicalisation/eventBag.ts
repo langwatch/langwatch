@@ -38,6 +38,20 @@ export class EventBag {
     return out;
   }
 
+  /** Take all events matching any of the given names, preserving original order */
+  takeAllByNames(names: readonly string[]): NormalizedEvent[] {
+    const nameSet = new Set(names);
+    const out: NormalizedEvent[] = [];
+    for (let i = 0; i < this.events.length; i++) {
+      if (this.consumed.has(i)) continue;
+      if (nameSet.has(this.events[i]?.name ?? "")) {
+        this.consumed.add(i);
+        out.push(this.events[i]!);
+      }
+    }
+    return out;
+  }
+
   /** Events that remain after consumption */
   remaining(): NormalizedEvent[] {
     const out: NormalizedEvent[] = [];
