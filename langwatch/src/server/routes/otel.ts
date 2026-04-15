@@ -21,6 +21,8 @@ import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { TokenResolver } from "~/server/pat/token-resolver";
+import { extractCredentials } from "~/server/pat/auth-middleware";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 
@@ -76,24 +78,28 @@ app.use(loggerMiddleware());
 
 // ── shared auth + limit check ────────────────────────────────────────
 
+const tokenResolver = TokenResolver.create(prisma);
+
 async function authenticateAndCheckLimit(c: {
   req: { raw: Request; header: (name: string) => string | undefined };
 }) {
-  const xAuthToken = c.req.header("x-auth-token");
-  const authHeader = c.req.header("authorization");
+  const credentials = extractCredentials(c);
 
-  const authToken =
-    xAuthToken ??
-    (authHeader?.toLowerCase().startsWith("bearer ")
-      ? authHeader.slice(7)
-      : null);
-
-  if (!authToken) {
+  if (!credentials) {
     return { error: "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.", status: 401 as const };
   }
 
+  const resolved = await tokenResolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
+  });
+
+  if (!resolved) {
+    return { error: "Invalid auth token.", status: 401 as const };
+  }
+
   const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
+    where: { id: resolved.project.id },
     include: { team: true },
   });
 

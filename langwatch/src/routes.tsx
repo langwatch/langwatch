@@ -144,6 +144,10 @@ const routes: RouteObject[] = [
     path: "/settings/roles",
     ...page(() => import("./pages/settings/roles")),
   },
+  {
+    path: "/settings/personal-access-tokens",
+    ...page(() => import("./pages/settings/personal-access-tokens")),
+  },
   { path: "/settings/scim", ...page(() => import("./pages/settings/scim")) },
   {
     path: "/settings/secrets",

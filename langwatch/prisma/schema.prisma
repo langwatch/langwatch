@@ -91,6 +91,7 @@ model User {
     promptTagsUpdated       PromptTag[]            @relation("promptTagUpdatedBy")
     groupMemberships        GroupMembership[]
     roleBindings            RoleBinding[]
+    personalAccessTokens    PersonalAccessToken[]
 
 }
 
@@ -206,7 +207,8 @@ model Organization {
     scimTokens    ScimToken[]
     promptTags    PromptTag[]
     groups        Group[]
-    roleBindings  RoleBinding[]
+    roleBindings           RoleBinding[]
+    personalAccessTokens   PersonalAccessToken[]
     // License enforcement fields (COSS-0226)
     license                String?   @db.Text
     licenseExpiresAt       DateTime?
@@ -1289,6 +1291,8 @@ model RoleBinding {
     user           User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
     groupId        String?
     group          Group?               @relation("GroupBindings", fields: [groupId], references: [id], onDelete: Cascade)
+    patId          String?
+    pat            PersonalAccessToken? @relation(fields: [patId], references: [id], onDelete: Cascade)
 
     // Role — built-in named role or custom
     role           TeamUserRole
@@ -1308,7 +1312,28 @@ model RoleBinding {
     @@index([organizationId])
     @@index([userId])
     @@index([groupId])
+    @@index([patId])
     @@index([scopeType, scopeId])
+}
+
+model PersonalAccessToken {
+    id             String        @id @default(nanoid())
+    name           String
+    lookupId       String        @unique
+    hashedSecret   String
+    userId         String
+    user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+    organizationId String
+    organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    roleBindings   RoleBinding[]
+    lastUsedAt     DateTime?
+    revokedAt      DateTime?
+    createdAt      DateTime      @default(now())
+    updatedAt      DateTime      @default(now()) @updatedAt
+
+    @@index([userId])
+    @@index([organizationId])
+    @@index([lookupId])
 }
 
 model BillingMeterCheckpoint {
