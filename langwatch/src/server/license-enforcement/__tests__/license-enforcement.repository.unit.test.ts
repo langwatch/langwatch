@@ -107,13 +107,13 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getPromptCount", () => {
-    it("queries prompts with organization filter (no archive filter)", async () => {
+    it("queries prompts with organization filter and deletedAt null", async () => {
       mockPrisma.llmPromptConfig.count.mockResolvedValue(10);
 
       const result = await repository.getPromptCount(organizationId);
 
       expect(mockPrisma.llmPromptConfig.count).toHaveBeenCalledWith({
-        where: { project: { team: { organizationId } } },
+        where: { project: { team: { organizationId } }, deletedAt: null },
       });
       expect(result).toBe(10);
     });

@@ -213,7 +213,7 @@ describe("SuiteRepository", () => {
           where: { id: "suite_abc123", projectId: "proj_1" },
           data: {
             archivedAt: expect.any(Date),
-            slug: "critical-path--archived",
+            slug: "critical-path--archived-abc123",
           },
         });
       });
