@@ -248,15 +248,6 @@ export const useHandleServerMessage = ({
             });
           }
 
-          // Auto-select the node and expand properties when execution completes,
-          // so the user can see the results without having to click manually.
-          if (
-            message.payload.execution_state?.status === "success" ||
-            message.payload.execution_state?.status === "error"
-          ) {
-            workflowStore.setSelectedNode(message.payload.component_id);
-            workflowStore.setPropertiesExpanded(true);
-          }
           break;
         case "execution_state_change":
           logger.debug(
@@ -264,6 +255,22 @@ export const useHandleServerMessage = ({
             "execution_state_change received",
           );
           setWorkflowExecutionState(message.payload.execution_state);
+
+          // Auto-select the target node and expand properties when a
+          // "Run workflow until here" execution completes, so the user
+          // can see the results without clicking manually.
+          if (
+            message.payload.execution_state?.status === "success" ||
+            message.payload.execution_state?.status === "error"
+          ) {
+            const untilNodeId =
+              getWorkflow().state.execution?.until_node_id;
+            if (untilNodeId) {
+              workflowStore.setSelectedNode(untilNodeId);
+              workflowStore.setPropertiesExpanded(true);
+            }
+          }
+
           if (message.payload.execution_state?.status === "error") {
             alertOnError(message.payload.execution_state.error);
             stopWorkflowIfRunning(message.payload.execution_state.error);
