@@ -28,8 +28,11 @@ import {
 } from "../tracer/types.generated";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
 import { createLogger } from "../../utils/logger/server";
+import { TokenResolver } from "../pat/token-resolver";
+import { extractCredentials } from "../pat/auth-middleware";
 
 const logger = createLogger("langwatch.collector");
+const tokenResolver = TokenResolver.create(prisma);
 
 export const app = new Hono().basePath("/api");
 
@@ -42,14 +45,9 @@ app.post(
   "/collector",
   bodyLimit({ maxSize: 10 * 1024 * 1024 }), // 10MB
   async (c) => {
-    const xAuthToken = c.req.header("x-auth-token");
-    const authHeader = c.req.header("authorization");
+    const credentials = extractCredentials(c);
 
-    const authToken =
-      xAuthToken ??
-      (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
-
-    if (!authToken) {
+    if (!credentials) {
       logger.warn(
         "collector request is not authenticated, no auth token provided",
       );
@@ -83,18 +81,25 @@ app.post(
       return c.json({ message: "Invalid body, expecting json" }, 400);
     }
 
-    const project = await prisma.project.findUnique({
-      where: { apiKey: authToken as string, archivedAt: null },
-      include: {
-        team: true,
-      },
+    const resolved = await tokenResolver.resolve({
+      token: credentials.token,
+      projectId: credentials.projectId,
     });
 
-    if (!project) {
+    if (!resolved) {
       logger.warn(
         "collector request is not authenticated, invalid auth token",
       );
 
+      return c.json({ message: "Invalid auth token." }, 401);
+    }
+
+    const project = await prisma.project.findUnique({
+      where: { id: resolved.project.id },
+      include: { team: true },
+    });
+
+    if (!project) {
       return c.json({ message: "Invalid auth token." }, 401);
     }
 

@@ -48,6 +48,7 @@ import { translateRouter } from "./routers/translate";
 import { automationRouter } from "./routers/automations";
 import { scimTokenRouter } from "./routers/scimToken";
 import { roleBindingRouter } from "./routers/roleBinding";
+import { personalAccessTokenRouter } from "./routers/personalAccessToken";
 import { groupRouter } from "./routers/group";
 import { userRouter } from "./routers/user";
 import { workflowRouter } from "./routers/workflows";
@@ -103,6 +104,7 @@ const coreRouters = {
   licenseEnforcement: licenseEnforcementRouter,
   scimToken: scimTokenRouter,
   roleBinding: roleBindingRouter,
+  personalAccessToken: personalAccessTokenRouter,
   group: groupRouter,
   ops: opsRouter,
 };
