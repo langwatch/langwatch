@@ -1,5 +1,4 @@
 import { api } from "~/utils/api";
-import type { OpsScope } from "~/server/api/rbac";
 
 export function useOpsPermission() {
   const query = api.ops.getScope.useQuery(undefined, {
@@ -7,11 +6,9 @@ export function useOpsPermission() {
     refetchOnWindowFocus: false,
   });
 
-  const scope = (query.data?.scope as OpsScope) ?? null;
-
   return {
     hasAccess: query.isSuccess,
-    scope,
+    scope: query.data?.scope ?? null,
     isLoading: query.isLoading,
   };
 }
