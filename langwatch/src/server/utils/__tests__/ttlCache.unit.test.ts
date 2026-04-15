@@ -125,6 +125,21 @@ describe("TtlCache", () => {
     });
   });
 
+  describe("when Redis fails on claim", () => {
+    it("falls back to in-memory claim", async () => {
+      const cache = new TtlCache<boolean>(30_000, "test:");
+      mockRedis.set.mockRejectedValueOnce(new Error("connection reset"));
+
+      const result = await cache.claim("lock1", true);
+
+      expect(result).toBe(true);
+
+      // Redis also fails on get, so memory fallback is used
+      mockRedis.get.mockRejectedValueOnce(new Error("connection reset"));
+      expect(await cache.get("lock1")).toBe(true);
+    });
+  });
+
   describe("when Redis fails on get", () => {
     it("falls back to in-memory cache", async () => {
       const cache = new TtlCache<number>(30_000, "test:");
