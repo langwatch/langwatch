@@ -291,7 +291,7 @@ export const useOrganizationTeamProject = (
     };
   }
 
-  const organizationRole = organization?.members[0]?.role;
+  const organizationRole = organization?.members?.[0]?.role;
 
   const isOrganizationFeatureEnabled = (feature: string): boolean => {
     if (!organization?.features) return false;
@@ -331,7 +331,7 @@ export const useOrganizationTeamProject = (
     }
 
     // Team-level permission checking
-    const teamMember = team?.members[0];
+    const teamMember = team?.members?.[0];
     if (!teamMember) return false;
 
     // Check if user has custom role assignment
