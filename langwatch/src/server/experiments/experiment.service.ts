@@ -29,7 +29,7 @@ export class ExperimentService {
     });
 
     if (!experiment) {
-      throw new ExperimentNotFoundError();
+      throw new ExperimentNotFoundError(slug);
     }
 
     return experiment;
@@ -45,7 +45,7 @@ export class ExperimentService {
     const experiment = await this.repository.findById({ id, projectId });
 
     if (!experiment) {
-      throw new ExperimentNotFoundError();
+      throw new ExperimentNotFoundError(id);
     }
 
     return experiment;
@@ -132,17 +132,17 @@ export class ExperimentService {
       (await this.repository.findAllSlugs({ projectId })).map((e) => e.slug),
     );
 
-    let draftName;
     let index = experiments.length + 1;
-    while (true) {
-      draftName = `Draft Evaluation (${index})`;
+    const maxIndex = index + 1000;
+    while (index < maxIndex) {
+      const draftName = `Draft Evaluation (${index})`;
       if (!slugs.has(slugify(draftName))) {
-        break;
+        return draftName;
       }
       index++;
     }
 
-    return draftName;
+    return `Draft Evaluation (${nanoid(8)})`;
   }
 
   /**

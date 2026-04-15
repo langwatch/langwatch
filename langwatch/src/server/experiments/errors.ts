@@ -1,11 +1,16 @@
-/**
- * Custom error types for experiment domain.
- * These are framework-agnostic and can be mapped to tRPC/HTTP errors in the router layer.
- */
+import { NotFoundError } from "../app-layer/domain-error";
 
-export class ExperimentNotFoundError extends Error {
-  constructor(message = "Experiment not found") {
-    super(message);
+export class ExperimentNotFoundError extends NotFoundError {
+  declare readonly kind: "experiment_not_found";
+
+  constructor(
+    experimentId: string,
+    options: { reasons?: readonly Error[] } = {},
+  ) {
+    super("experiment_not_found", "Experiment", experimentId, {
+      meta: { experimentId },
+      ...options,
+    });
     this.name = "ExperimentNotFoundError";
   }
 }

@@ -22,3 +22,15 @@ Feature: Experiment slug deduplication
     Given experiments exist in the project with slugs "my-experiment" and "my-experiment-2"
     When a new experiment is saved with a name that generates slug "my-experiment"
     Then the new experiment is created with slug "my-experiment-3"
+
+  @regression @integration
+  Scenario: Slug with no conflict returns unchanged
+    Given no experiment exists in the project with the target slug
+    When a new experiment is saved
+    Then the slug is used as-is without a numeric suffix
+
+  @regression @integration
+  Scenario: Unrelated slug sharing the same prefix is not treated as a conflict
+    Given an experiment exists with slug "my-exp-extended"
+    When a new experiment is saved with a name that generates slug "my-exp"
+    Then the new experiment is created with slug "my-exp" without a suffix

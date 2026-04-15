@@ -7,7 +7,7 @@ import {
 } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
-import { ExperimentNotFoundError } from "../../experiments/errors";
+import { DomainError } from "../../app-layer/domain-error";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -55,9 +55,12 @@ import { enforceLicenseLimit } from "../../license-enforcement";
 
 type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
-/** Maps experiment domain errors to TRPCError. */
+/** Maps experiment domain errors to TRPCError using kind discriminant. */
 const mapExperimentError = (error: unknown): never => {
-  if (error instanceof ExperimentNotFoundError) {
+  if (
+    error instanceof DomainError &&
+    error.kind === "experiment_not_found"
+  ) {
     throw new TRPCError({ code: "NOT_FOUND", message: error.message });
   }
   throw error;

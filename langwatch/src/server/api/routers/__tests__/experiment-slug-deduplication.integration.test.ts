@@ -28,9 +28,6 @@ describe("Feature: Experiment slug deduplication", () => {
   const service = getApp().experiments;
   let caller: ReturnType<typeof appRouter.createCaller>;
 
-  /**
-   * Helper to create an experiment directly in the database with a specific slug.
-   */
   const createExperimentWithSlug = async (slug: string) => {
     const id = `experiment_${nanoid()}`;
     await prisma.experiment.create({
@@ -65,81 +62,79 @@ describe("Feature: Experiment slug deduplication", () => {
     }
   });
 
-  describe("ExperimentService.generateUniqueSlug()", () => {
-    describe("when no conflicting slug exists", () => {
-      it("returns the base slug unchanged", async () => {
-        const uniqueBase = `no-conflict-${nanoid(8)}`;
+  describe("when slug has no conflict", () => {
+    it("returns slug unchanged without a numeric suffix", async () => {
+      const uniqueBase = `no-conflict-${nanoid(8)}`;
+      const result = await service.generateUniqueSlug({
+        baseSlug: uniqueBase,
+        projectId,
+      });
+
+      expect(result).toBe(uniqueBase);
+    });
+  });
+
+  describe("given an experiment exists with slug 'my-experiment'", () => {
+    let existingSlug: string;
+    let existingExperimentId: string;
+
+    beforeAll(async () => {
+      existingSlug = `my-experiment-${nanoid(6)}`;
+      existingExperimentId = await createExperimentWithSlug(existingSlug);
+    });
+
+    describe("when a new experiment generates the same slug", () => {
+      it("gets deduplicated slug when slug conflicts with existing experiment", async () => {
         const result = await service.generateUniqueSlug({
-          baseSlug: uniqueBase,
+          baseSlug: existingSlug,
           projectId,
         });
 
-        expect(result).toBe(uniqueBase);
+        expect(result).toBe(`${existingSlug}-2`);
       });
     });
 
-    describe("given an experiment exists with slug 'my-experiment'", () => {
-      let existingSlug: string;
-      let existingExperimentId: string;
-
-      beforeAll(async () => {
-        existingSlug = `my-experiment-${nanoid(6)}`;
-        existingExperimentId = await createExperimentWithSlug(existingSlug);
-      });
-
-      describe("when a new experiment generates the same slug", () => {
-        it("gets deduplicated slug with -2 suffix", async () => {
-          const result = await service.generateUniqueSlug({
-            baseSlug: existingSlug,
-            projectId,
-          });
-
-          expect(result).toBe(`${existingSlug}-2`);
+    describe("when that same experiment is updated with the same name", () => {
+      it("does not trigger slug deduplication against itself", async () => {
+        const result = await service.generateUniqueSlug({
+          baseSlug: existingSlug,
+          projectId,
+          excludeExperimentId: existingExperimentId,
         });
-      });
 
-      describe("when the same experiment is updated with the same slug", () => {
-        it("retains the original slug unchanged", async () => {
-          const result = await service.generateUniqueSlug({
-            baseSlug: existingSlug,
-            projectId,
-            excludeExperimentId: existingExperimentId,
-          });
-
-          expect(result).toBe(existingSlug);
-        });
+        expect(result).toBe(existingSlug);
       });
     });
+  });
 
-    describe("given experiments exist with slugs 'test-slug' and 'test-slug-2'", () => {
-      const baseSlug = `test-slug-${nanoid(6)}`;
+  describe("given experiments exist with slugs 'test-slug' and 'test-slug-2'", () => {
+    const baseSlug = `test-slug-${nanoid(6)}`;
 
-      beforeAll(async () => {
-        await createExperimentWithSlug(baseSlug);
-        await createExperimentWithSlug(`${baseSlug}-2`);
-      });
-
-      describe("when a new experiment generates the same base slug", () => {
-        it("increments to -3 suffix", async () => {
-          const result = await service.generateUniqueSlug({
-            baseSlug,
-            projectId,
-          });
-
-          expect(result).toBe(`${baseSlug}-3`);
-        });
-      });
+    beforeAll(async () => {
+      await createExperimentWithSlug(baseSlug);
+      await createExperimentWithSlug(`${baseSlug}-2`);
     });
 
-    describe("when an unrelated slug shares the same prefix", () => {
-      const baseSlug = `my-exp-${nanoid(6)}`;
+    describe("when a new experiment generates the same base slug", () => {
+      it("increments the suffix to -3", async () => {
+        const result = await service.generateUniqueSlug({
+          baseSlug,
+          projectId,
+        });
 
-      beforeAll(async () => {
-        // Create an unrelated experiment whose slug starts with baseSlug
-        // but is a different word (e.g., "my-exp-abc123-extended")
-        await createExperimentWithSlug(`${baseSlug}-extended`);
+        expect(result).toBe(`${baseSlug}-3`);
       });
+    });
+  });
 
+  describe("given an unrelated experiment shares the same slug prefix", () => {
+    const baseSlug = `my-exp-${nanoid(6)}`;
+
+    beforeAll(async () => {
+      await createExperimentWithSlug(`${baseSlug}-extended`);
+    });
+
+    describe("when a new experiment generates the shorter base slug", () => {
       it("does not treat the unrelated slug as a conflict", async () => {
         const result = await service.generateUniqueSlug({
           baseSlug,
