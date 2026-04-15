@@ -1,4 +1,4 @@
-name: pr-auto-approve
+name: Auto-approve for validated Low-Risk or Firefighting
 
 # PR auto-approval workflow.
 #
