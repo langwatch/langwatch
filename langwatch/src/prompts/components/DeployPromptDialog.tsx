@@ -484,12 +484,12 @@ export function DeployPromptDialog({
               Cancel
             </Button>
             <Button
-              colorPalette="orange"
+              colorPalette="blue"
               size="sm"
               onClick={() => void handleSave()}
               loading={isSaving}
             >
-              Save changes
+              Save
             </Button>
           </HStack>
         </DialogFooter>

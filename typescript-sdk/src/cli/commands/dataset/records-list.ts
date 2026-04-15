@@ -18,7 +18,7 @@ const truncate = (value: string, maxLength: number): string => {
  */
 export const recordsListCommand = async (
   slugOrId: string,
-  options: { page?: string; limit?: string },
+  options: { page?: string; limit?: string; format?: string },
 ): Promise<void> => {
   checkApiKey();
 
@@ -44,6 +44,11 @@ export const recordsListCommand = async (
     spinner.succeed(
       `Found ${pagination.total} record${pagination.total !== 1 ? "s" : ""} in "${slugOrId}"`,
     );
+
+    if (options.format === "json") {
+      console.log(JSON.stringify({ data: records, pagination }, null, 2));
+      return;
+    }
 
     if (records.length === 0) {
       console.log();

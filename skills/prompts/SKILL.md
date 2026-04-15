@@ -3,7 +3,7 @@ name: prompts
 user-prompt: "Version my prompts with LangWatch"
 description: Version and manage your agent's prompts with LangWatch Prompts CLI. Use for both onboarding (set up prompt versioning for an entire codebase) and targeted operations (version a specific prompt, create a new prompt version). Supports Python and TypeScript.
 license: MIT
-compatibility: Requires Node.js for MCP setup. Works with Claude Code and similar coding agents.
+compatibility: Works with Claude Code and similar coding agents. CLI is the preferred interface.
 ---
 
 # Version Your Prompts with LangWatch Prompts CLI
@@ -23,28 +23,39 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 
 ## Detect Context
 
-This skill is primarily code-path (CLI + SDK). Platform MCP tools exist for prompt management (`platform_create_prompt`, `platform_update_prompt`, etc.) but users typically manage prompts directly in the UI. If the user has no codebase and wants to create prompts on the platform, use the `platform_create_prompt` MCP tool instead.
+This skill is primarily code-path (CLI + SDK). If the user has no codebase and wants to create prompts on the platform, use the `langwatch` CLI (`langwatch prompt list`, `langwatch prompt create`, etc.). MCP tools are available as a fallback.
 
 ## Plan Limits
 
 See [Plan Limits](_shared/plan-limits.md) for how to handle free plan limits gracefully. The free plan has a limited number of prompts. Work within the limits and show value before suggesting an upgrade. Do NOT try to work around limits.
 
-## Step 1: Set up the LangWatch MCP
+## Step 1: Set up the LangWatch CLI
 
-First, install the LangWatch MCP server so you have access to Prompts CLI documentation:
+See [CLI Setup](_shared/cli-setup.md) for installation. The CLI provides all prompt management commands:
 
+```bash
+langwatch prompt list                              # List prompts
+langwatch prompt init                              # Initialize prompts project
+langwatch prompt create <name>                     # Create a prompt YAML
+langwatch prompt sync                              # Sync local ↔ remote
+langwatch prompt push                              # Push local to server
+langwatch prompt pull                              # Pull remote to local
+langwatch prompt versions <handle>                 # View version history
+langwatch prompt restore <handle> <versionId>      # Rollback to a version
+langwatch prompt tag assign <prompt> <tag>         # Tag a version
+```
+
+If the CLI is not available, set up the MCP as a fallback:
 See [MCP Setup](_shared/mcp-setup.md) for installation instructions.
-
-If MCP installation fails, see [docs fallback](_shared/llms-txt-fallback.md) to fetch docs directly via URLs.
 
 ## Step 2: Read the Prompts CLI Docs
 
-Use the LangWatch MCP to fetch the Prompts CLI documentation:
+Use `langwatch prompt --help` to see all available commands, or fetch documentation:
 
-- Call `fetch_langwatch_docs` with no arguments to see the docs index
-- Find the Prompts CLI page and read it for step-by-step instructions
+- Call `fetch_langwatch_docs` (MCP) to read the full Prompts CLI documentation
+- Or see [docs fallback](_shared/llms-txt-fallback.md) to fetch docs directly via URLs
 
-CRITICAL: Do NOT guess how to use the Prompts CLI. Read the actual documentation first. The CLI has specific commands and workflows that must be followed exactly.
+CRITICAL: Do NOT guess how to use the Prompts CLI. Read the actual documentation or `--help` output first.
 
 ## Step 3: Install and Authenticate the LangWatch CLI
 
@@ -132,7 +143,7 @@ const prompt = await langwatch.prompts.get("my-agent", { tag: "production" });
 
 ### Assigning Tags
 
-Use the Deploy dialog in the LangWatch UI to assign `production` or `staging` tags to a version. For programmatic assignment, use the `platform_assign_prompt_tag` MCP tool or the REST API:
+Use the Deploy dialog in the LangWatch UI to assign `production` or `staging` tags to a version. For programmatic assignment, use the CLI or REST API:
 
 ```bash
 curl -X PUT -H "X-Auth-Token: $LANGWATCH_API_KEY" \
@@ -147,7 +158,7 @@ In config files or anywhere a prompt identifier is accepted, you can use shortha
 
 ### Custom Tags
 
-Create custom tags via `platform_create_prompt_tag` MCP tool or `POST /api/prompts/tags` for workflows like canary releases or blue-green deployments.
+Create custom tags via `langwatch prompt tag create <name>` (or `POST /api/prompts/tags`) for workflows like canary releases or blue-green deployments.
 
 ## Step 9: Verify
 

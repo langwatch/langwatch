@@ -11,7 +11,7 @@ import { handleDatasetCommandError } from "./error-handler";
  */
 export const updateCommand = async (
   slugOrId: string,
-  options: { name?: string; columns?: string },
+  options: { name?: string; columns?: string; format?: string },
 ): Promise<void> => {
   checkApiKey();
 
@@ -44,6 +44,12 @@ export const updateCommand = async (
     });
 
     spinner.succeed(`Dataset updated: ${chalk.cyan(dataset.slug)}`);
+
+    if (options.format === "json") {
+      console.log(JSON.stringify(dataset, null, 2));
+      return;
+    }
+
     console.log();
     console.log(`  ${chalk.bold("Slug:")}  ${dataset.slug}`);
     console.log(`  ${chalk.bold("Name:")}  ${dataset.name}`);

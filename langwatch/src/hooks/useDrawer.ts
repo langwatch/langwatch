@@ -232,20 +232,18 @@ export const useDrawer = () => {
 
       complexProps = nonSerializableProps;
 
-      // Build query from current non-drawer, non-path query params only.
-      // Path params (project, scenarioSetId, etc.) are part of the URL path
-      // and must NOT be serialized into the query string.
-      const pathParamKeys = new Set(
-        (router.pathname.match(/\[(\w+)\]/g) ?? []).map((m) => m.slice(1, -1)),
-      );
+      // Build query from the actual browser URL (router.asPath), not
+      // router.query which may be stale after (url, as) shallow pushes.
+      // This preserves filter params that only exist in the asPath URL.
+      const queryString = router.asPath.split("?")[1] ?? "";
       const currentQueryOnly = Object.fromEntries(
-        Object.entries(router.query).filter(
-          ([key, value]) =>
-            !key.startsWith("drawer.") &&
-            !pathParamKeys.has(key) &&
-            typeof value !== "function" &&
-            typeof value !== "object",
-        ),
+        Object.entries(
+          qs.parse(queryString, {
+            allowDots: true,
+            comma: true,
+            allowEmptyArrays: true,
+          }),
+        ).filter(([key]) => !key.startsWith("drawer")),
       );
 
       const newQuery = qs.stringify(
@@ -385,16 +383,17 @@ export const useDrawer = () => {
     clearFlowCallbacks();
     complexProps = {};
 
-    // Filter out drawer params and path params, keep only actual query params
-    const pathParamKeys = new Set(
-      (router.pathname.match(/\[(\w+)\]/g) ?? []).map((m) => m.slice(1, -1)),
-    );
+    // Build clean URL from asPath (not router.query which may be stale
+    // after (url, as) shallow pushes and misses filter params).
+    const currentQs = router.asPath.split("?")[1] ?? "";
+    const parsedQuery = qs.parse(currentQs, {
+      allowDots: true,
+      comma: true,
+      allowEmptyArrays: true,
+    });
     const cleanQuery = Object.fromEntries(
-      Object.entries(router.query).filter(
-        ([key]) =>
-          !key.startsWith("drawer.") &&
-          key !== "span" &&
-          !pathParamKeys.has(key),
+      Object.entries(parsedQuery).filter(
+        ([key]) => !key.startsWith("drawer") && key !== "span",
       ),
     );
     const queryString = qs.stringify(cleanQuery, {

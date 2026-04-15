@@ -18,6 +18,27 @@ const mcpServerDistPath = path.resolve(
   "../../../mcp-server/dist/index.js"
 );
 
+const cliDistPath = path.resolve(
+  __dirname,
+  "../../../typescript-sdk/dist/cli/index.js"
+);
+
+/**
+ * Sets up a local `langwatch` CLI wrapper in the temp folder's bin/ directory.
+ * This ensures Claude Code uses the local build (with all new commands)
+ * instead of the globally installed npm version.
+ */
+export function setupLocalCli(workingDirectory: string): void {
+  const binDir = path.join(workingDirectory, "bin");
+  fs.mkdirSync(binDir, { recursive: true });
+
+  const wrapperScript = `#!/usr/bin/env bash
+exec node "${cliDistPath}" "$@"
+`;
+  const wrapperPath = path.join(binDir, "langwatch");
+  fs.writeFileSync(wrapperPath, wrapperScript, { mode: 0o755 });
+}
+
 /**
  * Creates a Claude Code agent adapter for use with @langwatch/scenario.
  *
@@ -124,9 +145,15 @@ export function createClaudeCodeAgent({
             )
           : process.env;
 
+        // Prepend local bin/ (if exists) to PATH so Claude uses our built CLI
+        const localBinDir = path.join(workingDirectory, "bin");
+        const pathPrefix = fs.existsSync(localBinDir)
+          ? `${localBinDir}:${envVars.PATH ?? ""}`
+          : envVars.PATH;
+
         const child = spawn(claudeBin, args, {
           cwd: workingDirectory,
-          env: { ...envVars, FORCE_COLOR: "0" },
+          env: { ...envVars, FORCE_COLOR: "0", PATH: pathPrefix },
           stdio: ["ignore", "pipe", "pipe"],
         });
 

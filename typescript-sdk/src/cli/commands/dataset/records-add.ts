@@ -1,4 +1,5 @@
 import chalk from "chalk";
+import fs from "fs";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { createDatasetService } from "./service-factory";
@@ -40,24 +41,35 @@ export const parseRecordsJson = (jsonStr: string): Record<string, unknown>[] => 
 };
 
 /**
- * Adds records to a dataset from inline JSON or stdin.
+ * Adds records to a dataset from inline JSON, a file, or stdin.
  */
 export const recordsAddCommand = async (
   slugOrId: string,
-  options: { json?: string; stdin?: boolean },
+  options: { json?: string; file?: string; stdin?: boolean },
 ): Promise<void> => {
   checkApiKey();
 
-  if (!options.json && !options.stdin) {
+  if (!options.json && !options.file && !options.stdin) {
     console.error(
-      chalk.red("Error: One of --json or --stdin is required."),
+      chalk.red("Error: One of --json, --file, or --stdin is required."),
     );
     process.exit(1);
   }
 
   let entries: Record<string, unknown>[];
   try {
-    const jsonStr = options.stdin ? await readStdin() : options.json!;
+    let jsonStr: string;
+    if (options.file) {
+      if (!fs.existsSync(options.file)) {
+        console.error(chalk.red(`Error: File not found: ${options.file}`));
+        process.exit(1);
+      }
+      jsonStr = fs.readFileSync(options.file, "utf-8");
+    } else if (options.stdin) {
+      jsonStr = await readStdin();
+    } else {
+      jsonStr = options.json!;
+    }
     entries = parseRecordsJson(jsonStr);
   } catch (error) {
     console.error(

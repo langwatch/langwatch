@@ -10,5 +10,9 @@ export type CreateEvaluatorBody = NonNullable<
   paths["/api/evaluators"]["post"]["requestBody"]
 >["content"]["application/json"];
 
+export type UpdateEvaluatorBody = NonNullable<
+  paths["/api/evaluators/{id}"]["put"]["requestBody"]
+>["content"]["application/json"];
+
 export type DeleteEvaluatorResponse =
   paths["/api/evaluators/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];

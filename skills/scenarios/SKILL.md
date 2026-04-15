@@ -1,14 +1,14 @@
 ---
 name: scenarios
 user-prompt: "Add scenario tests for my agent"
-description: Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios (MCP), and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.
+description: Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios (CLI or MCP), and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.
 license: MIT
-compatibility: Requires Node.js for MCP setup. Works with Claude Code, Claude Web, and similar AI assistants.
+compatibility: Works with Claude Code and similar AI assistants. CLI is the preferred interface for platform operations.
 ---
 
 # Test Your Agent with Scenarios
 
-NEVER invent your own agent testing framework. Use `@langwatch/scenario` (Python: `langwatch-scenario`) for code-based tests, or the platform MCP tools for no-code scenarios. The Scenario framework provides user simulation, judge-based evaluation, multi-turn conversation testing, and adversarial red teaming out of the box. Do NOT build these capabilities from scratch.
+NEVER invent your own agent testing framework. Use `@langwatch/scenario` (Python: `langwatch-scenario`) for code-based tests, or the `langwatch` CLI for no-code platform scenarios. The Scenario framework provides user simulation, judge-based evaluation, multi-turn conversation testing, and adversarial red teaming out of the box. Do NOT build these capabilities from scratch.
 
 ## Determine Scope
 
@@ -34,8 +34,8 @@ If the user's request is about **red teaming** ("red team my agent", "find vulne
 
 1. Check if you're in a codebase (look for `package.json`, `pyproject.toml`, `requirements.txt`, etc.)
 2. If **YES** → use the **Code approach** (Scenario SDK — write test files)
-3. If **NO** → use the **Platform approach** (MCP tools — no files needed)
-4. If ambiguous → ask the user: "Do you want to write scenario test code or create scenarios on the platform?"
+3. If **NO** → use the **CLI approach** (preferred) or MCP tools as fallback
+4. If ambiguous → ask the user: "Do you want to write scenario test code or create scenarios via CLI?"
 
 ## The Agent Testing Pyramid
 
@@ -308,33 +308,32 @@ describe("Agent Security", () => {
 
 ---
 
-## Platform Approach: MCP Tools
+## Platform Approach: CLI (preferred)
 
 Use this when the user has no codebase and wants to create scenarios directly on the platform.
 
 NOTE: If you have a codebase and want to write scenario test code, use the Code Approach above instead.
 
-### Step 1: Set up the LangWatch MCP
+### Step 1: Set up the CLI
 
-The MCP must be configured with your LangWatch API key.
+See [CLI Setup](_shared/cli-setup.md) for installation. Set `LANGWATCH_API_KEY` in your `.env` file.
 
-See [MCP Setup](_shared/mcp-setup.md) for installation instructions.
+### Step 2: Create Scenarios
 
-### Step 2: Understand the Scenario Schema
+```bash
+# List existing scenarios
+langwatch scenario list
 
-Call `discover_schema` with category "scenarios" to understand:
-- Available fields (name, situation, criteria, labels, etc.)
-- How to structure your scenarios
+# Create a scenario with situation and criteria
+langwatch scenario create "Happy Path" \
+  --situation "Customer asks about product availability" \
+  --criteria "Agent checks inventory,Agent provides accurate stock info"
 
-### Step 3: Create Scenarios
-
-Use the `platform_create_scenario` MCP tool to create test scenarios:
-
-For each scenario, define:
-- **name**: A descriptive name for the test case
-- **situation**: The context and user behavior to simulate
-- **criteria**: What the agent should do (list of success criteria)
-- **labels**: Tags for organization (optional)
+# Create edge case scenarios
+langwatch scenario create "Error Handling" \
+  --situation "Customer sends empty message" \
+  --criteria "Agent asks for clarification,Agent doesn't crash"
+```
 
 Create scenarios covering:
 1. **Happy path**: Normal, expected interactions
@@ -342,13 +341,27 @@ Create scenarios covering:
 3. **Error handling**: When things go wrong
 4. **Boundary conditions**: Limits of the agent's capabilities
 
-### Step 4: Review and Iterate
+### Step 3: Review and Iterate
 
-Use `platform_list_scenarios` to see all your scenarios and `platform_get_scenario` to review details. Use `platform_update_scenario` to refine them.
+```bash
+langwatch scenario list --format json              # List all scenarios
+langwatch scenario get <id>                        # Review details
+langwatch scenario update <id> --criteria "..."    # Refine criteria
+```
 
-### Step 5: Run Simulations
+### Step 4: Set Up Suites (Run Plans)
 
-Go to https://app.langwatch.ai and navigate to your project's Simulations section to run the scenarios you created.
+```bash
+langwatch agent list --format json                 # Find agent IDs
+langwatch suite create "Regression Test" \
+  --scenarios <id1>,<id2> \
+  --targets http:<agentId>
+langwatch suite run <suiteId> --wait               # Run and wait for results
+```
+
+### MCP Fallback
+
+If the CLI is not available, use MCP tools instead (`platform_create_scenario`, `platform_list_scenarios`, etc.).
 
 ### Verify by Running
 
@@ -377,7 +390,7 @@ For TypeScript: `npx vitest run`
 - Do NOT forget to set a generous timeout (e.g., `180_000` ms) for TypeScript red team tests since they involve many LLM calls across multiple turns
 
 ### Platform Approach
-- This approach uses `platform_` MCP tools — do NOT write code files
+- This approach uses the `langwatch` CLI (or MCP tools as fallback) — do NOT write code files
 - Do NOT use `fetch_scenario_docs` for SDK documentation — that's for code-based testing
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios — each should test one specific behavior

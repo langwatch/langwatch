@@ -3,7 +3,7 @@ name: level-up
 user-prompt: "Take my agent to the next level"
 description: Take your AI agent to the next level with full LangWatch integration. Adds tracing, prompt versioning, evaluation experiments, and simulation tests in one go. Use when the user wants comprehensive observability, testing, and prompt management for their agent.
 license: MIT
-compatibility: Requires Node.js for MCP setup. Works with Claude Code and similar coding agents.
+compatibility: Works with Claude Code and similar coding agents. CLI is the preferred interface.
 ---
 
 # Take Your Agent to the Next Level
@@ -16,10 +16,10 @@ See [Plan Limits](_shared/plan-limits.md). The free plan has limits on prompts, 
 
 ## Prerequisites
 
-Set up the LangWatch MCP first — you'll need it for every step below.
+Set up the LangWatch CLI first — you'll use it throughout. See [CLI Setup](_shared/cli-setup.md).
 
+For documentation access, also set up the MCP:
 See [MCP Setup](_shared/mcp-setup.md) for installation instructions.
-
 If MCP installation fails, see [docs fallback](_shared/llms-txt-fallback.md) to fetch docs directly.
 
 ## Consultant Mode

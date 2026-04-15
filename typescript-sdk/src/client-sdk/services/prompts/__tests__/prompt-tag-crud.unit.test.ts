@@ -198,22 +198,13 @@ describe("Tag CRUD", () => {
   describe("tag type is widened to string", () => {
     it("passes an arbitrary string tag through to the API service", async () => {
       // Verifies that GetPromptOptions.tag accepts any string, not just "production"|"staging"
-      const promptsApiService = mock<PromptsApiService>();
-      const localPromptsService = mock<LocalPromptsService>();
-      const facade = new PromptsFacade({
-        promptsApiService,
-        localPromptsService,
-        langwatchApiClient: {} as InternalConfig["langwatchApiClient"],
-        logger: {} as InternalConfig["logger"],
-      });
-
       // Verify the get method is called with the custom tag
       // (type-level: this would not compile if tag were "production" | "staging")
-      const options: Parameters<typeof facade.get>[1] = { tag: "canary" };
+      const options: Parameters<PromptsFacade["get"]>[1] = { tag: "canary" };
       expect(options.tag).toBe("canary");
 
       // Verify the API service call also accepts string tags
-      const serviceOptions: Parameters<typeof promptsApiService.get>[1] = { tag: "canary" };
+      const serviceOptions: Parameters<PromptsApiService["get"]>[1] = { tag: "canary" };
       expect(serviceOptions?.tag).toBe("canary");
     });
   });

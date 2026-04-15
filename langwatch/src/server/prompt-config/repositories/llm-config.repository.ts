@@ -216,6 +216,7 @@ export class LlmConfigRepository {
 
     const config = await this.prisma.llmPromptConfig.findFirst({
       where: {
+        deletedAt: null,
         OR: [
           {
             projectId,

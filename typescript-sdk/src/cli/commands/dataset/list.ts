@@ -9,7 +9,7 @@ import { handleDatasetCommandError } from "./error-handler";
  * Lists all datasets for the current project.
  * Displays a table with name, slug, record count, and last updated.
  */
-export const listCommand = async (): Promise<void> => {
+export const listCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = createDatasetService();
@@ -22,6 +22,11 @@ export const listCommand = async (): Promise<void> => {
     spinner.succeed(
       `Found ${pagination.total} dataset${pagination.total !== 1 ? "s" : ""}`,
     );
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify({ data: datasets, pagination }, null, 2));
+      return;
+    }
 
     if (datasets.length === 0) {
       console.log();

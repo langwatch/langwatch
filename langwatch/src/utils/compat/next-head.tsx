@@ -25,7 +25,8 @@ export default function Head({ children }: HeadProps) {
           child.type === "title" &&
           child.props?.children
         ) {
-          document.title = String(child.props.children);
+          const c = child.props.children;
+          document.title = Array.isArray(c) ? c.join("") : String(c);
         }
       }
     }

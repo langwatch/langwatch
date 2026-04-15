@@ -431,7 +431,17 @@ function AnalyticsCustomGraphContent({
               </Card.Header>
               <Card.Body>
                 {debouncedCustomGraphInput && (
-                  <CustomGraph input={debouncedCustomGraphInput} />
+                  <CustomGraph
+                    input={debouncedCustomGraphInput}
+                    filters={
+                      filterParams.filters as
+                        | Record<
+                            FilterField,
+                            string[] | Record<string, string[]>
+                          >
+                        | undefined
+                    }
+                  />
                 )}
               </Card.Body>
             </Card.Root>

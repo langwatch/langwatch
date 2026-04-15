@@ -7,7 +7,7 @@ import {
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 
-export const listEvaluatorsCommand = async (): Promise<void> => {
+export const listEvaluatorsCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
 
   const service = new EvaluatorsApiService();
@@ -19,6 +19,11 @@ export const listEvaluatorsCommand = async (): Promise<void> => {
     spinner.succeed(
       `Found ${evaluators.length} evaluator${evaluators.length !== 1 ? "s" : ""}`,
     );
+
+    if (options?.format === "json") {
+      console.log(JSON.stringify(evaluators, null, 2));
+      return;
+    }
 
     if (evaluators.length === 0) {
       console.log();

@@ -14,7 +14,7 @@ if (!container) throw new Error("Root element not found");
 
 createRoot(container).render(
   <OuterProviders>
-    <Suspense>
+    <Suspense fallback={null}>
       <RouterProvider router={router} />
     </Suspense>
   </OuterProviders>
