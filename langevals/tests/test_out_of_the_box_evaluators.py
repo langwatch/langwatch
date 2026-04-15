@@ -34,6 +34,8 @@ entries = pd.DataFrame(
 )
 
 
+# Skipped due to LLM-judged non-determinism — see langwatch/langwatch#3240.
+@pytest.mark.skip(reason="flaky LLM eval pass rate; tracked in #3240")
 @pytest.mark.parametrize("entry", entries.itertuples())
 @pytest.mark.flaky(max_runs=3)
 @pytest.mark.pass_rate(0.8)

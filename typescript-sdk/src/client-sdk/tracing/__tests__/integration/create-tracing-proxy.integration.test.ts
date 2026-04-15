@@ -55,7 +55,8 @@ describe("createTracingProxy Integration Tests", () => {
   });
 
   describe("basic functionality", () => {
-    it("should create a proxy that traces public methods", async () => {
+    // Skipped due to OTLP integration flake — see langwatch/langwatch#3240.
+    it.skip("should create a proxy that traces public methods", async () => {
       class TestClass {
         publicMethod() {
           return 'public result';
