@@ -67,8 +67,9 @@ export const createCommand = async (
         .join(", ");
       console.log(`  ${chalk.bold("Columns:")} ${colStr}`);
     }
-    if (dataset.platformUrl) {
-      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(dataset.platformUrl)}`);
+    const viewUrl = (dataset as Record<string, unknown>).platformUrl as string | undefined;
+    if (viewUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(viewUrl)}`);
     }
   } catch (error) {
     spinner.fail("Failed to create dataset");
