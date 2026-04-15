@@ -172,6 +172,11 @@ class Experiment:
         # Store the active iteration trace so target() can close it early
         self._active_iteration_trace: Optional[LangWatchTrace] = None
 
+        # Cached results fetched from the platform
+        self._cached_results: Optional[Dict[str, Any]] = None
+        self._finished: bool = False
+        self._run_url: Optional[str] = None
+
     def init(self):
         if not langwatch.get_api_key():
             raise ValueError(
@@ -200,10 +205,167 @@ class Experiment:
         self.experiment_slug = response_json["slug"]
 
         url_encoded_run_id = urllib.parse.quote(self.run_id)
-        print(
-            f"Follow the results at: {langwatch.get_endpoint()}{experiment_path}?runId={url_encoded_run_id}"
-        )
+        self._run_url = f"{langwatch.get_endpoint()}{experiment_path}?runId={url_encoded_run_id}"
+        print(f"Follow the results at: {self._run_url}")
         self.initialized = True
+
+    @property
+    def results(self) -> Dict[str, Any]:
+        """
+        Fetch experiment run results from the platform.
+
+        Returns a dictionary with metrics, evaluations, and per-row data.
+        Results are cached after the first successful fetch.
+
+        In Jupyter notebooks, this renders as a rich HTML table.
+        """
+        if self._cached_results is not None:
+            return self._cached_results
+
+        if not self.initialized:
+            return {"status": "not_initialized", "message": "Experiment has not been initialized yet."}
+
+        return self._fetch_results()
+
+    def _fetch_results(self, retries: int = 3, delay: float = 2.0) -> Dict[str, Any]:
+        """Fetch results from the platform, retrying until stable."""
+        endpoint = langwatch.get_endpoint()
+        api_key = langwatch.get_api_key() or ""
+
+        for attempt in range(retries):
+            try:
+                with httpx.Client(timeout=30) as client:
+                    response = client.get(
+                        f"{endpoint}/api/evaluations/v3/runs/{urllib.parse.quote(self.run_id)}",
+                        headers={"X-Auth-Token": api_key},
+                    )
+
+                if response.status_code == 404:
+                    # Run might not be indexed yet — retry
+                    if attempt < retries - 1:
+                        time.sleep(delay)
+                        continue
+                    return {
+                        "status": "pending",
+                        "run_id": self.run_id,
+                        "message": "Results not yet available. View at: " + (self._run_url or ""),
+                    }
+
+                if response.is_success:
+                    data = response.json()
+                    status = data.get("status", "unknown")
+
+                    if status in ("completed", "failed", "stopped"):
+                        self._cached_results = data
+                        return data
+
+                    # Still running — retry
+                    if attempt < retries - 1:
+                        time.sleep(delay)
+                        continue
+
+                    return data
+
+            except Exception:
+                if attempt < retries - 1:
+                    time.sleep(delay)
+                    continue
+                raise
+
+        return {"status": "pending", "run_id": self.run_id}
+
+    def _auto_display_results(self) -> None:
+        """Fetch results from the platform and display them after loop completion."""
+        # Wait briefly for platform to process final batch
+        time.sleep(2)
+        try:
+            data = self._fetch_results(retries=5, delay=3.0)
+            self._cached_results = data
+
+            summary = data.get("summary", {})
+            total_passed = summary.get("totalPassed", 0)
+            total_failed = summary.get("totalFailed", 0)
+            pass_rate = summary.get("passRate", 0)
+
+            if summary:
+                print()
+                print(f"  Results: {total_passed} passed, {total_failed} failed ({pass_rate:.1f}% pass rate)")
+                if self._run_url:
+                    print(f"  Details: {self._run_url}")
+                print()
+
+                # In Jupyter, display the rich HTML widget
+                try:
+                    from IPython.display import display
+                    from IPython import get_ipython
+                    if get_ipython() is not None:
+                        display(self)
+                except (ImportError, AttributeError):
+                    pass
+        except Exception:
+            # Don't fail the experiment if result fetching has issues
+            pass
+
+    def __repr__(self) -> str:
+        status = "finished" if self._finished else "running" if self.initialized else "not started"
+        parts = [f"Experiment(name={self.name!r}, status={status}"]
+        if self.initialized:
+            parts.append(f"run_id={self.run_id!r}")
+        if self.total > 0:
+            parts.append(f"progress={self.progress}/{self.total}")
+        parts_str = ", ".join(parts)
+        return parts_str + ")"
+
+    def _repr_html_(self) -> str:
+        """Rich HTML rendering for Jupyter notebooks."""
+        status = "finished" if self._finished else "running" if self.initialized else "not started"
+        status_color = {"finished": "#22c55e", "running": "#3b82f6", "not started": "#6b7280"}[status]
+
+        rows = [
+            f"<tr><td style='padding:4px 12px;font-weight:600'>Name</td><td style='padding:4px 12px'>{self.name}</td></tr>",
+            f"<tr><td style='padding:4px 12px;font-weight:600'>Status</td><td style='padding:4px 12px;color:{status_color};font-weight:600'>{status.upper()}</td></tr>",
+            f"<tr><td style='padding:4px 12px;font-weight:600'>Run ID</td><td style='padding:4px 12px'><code>{self.run_id}</code></td></tr>",
+        ]
+
+        if self.total > 0:
+            pct = (self.progress / self.total * 100) if self.total > 0 else 0
+            rows.append(
+                f"<tr><td style='padding:4px 12px;font-weight:600'>Progress</td>"
+                f"<td style='padding:4px 12px'>{self.progress}/{self.total} ({pct:.0f}%)</td></tr>"
+            )
+
+        # If finished, show results summary inline
+        if self._finished and self._cached_results:
+            summary = self._cached_results.get("summary", {})
+            total_passed = summary.get("totalPassed", 0)
+            total_failed = summary.get("totalFailed", 0)
+            pass_rate = summary.get("passRate", 0)
+            pass_color = "#22c55e" if pass_rate >= 80 else "#f59e0b" if pass_rate >= 50 else "#ef4444"
+
+            rows.append(f"<tr><td colspan='2' style='padding:6px 12px;border-top:1px solid #e5e7eb;font-weight:700'>Results</td></tr>")
+            rows.append(f"<tr><td style='padding:2px 12px 2px 24px'>Passed</td><td style='padding:2px 12px;color:#22c55e'>{total_passed}</td></tr>")
+            rows.append(f"<tr><td style='padding:2px 12px 2px 24px'>Failed</td><td style='padding:2px 12px;color:#ef4444'>{total_failed}</td></tr>")
+            rows.append(
+                f"<tr><td style='padding:2px 12px 2px 24px'>Pass Rate</td>"
+                f"<td style='padding:2px 12px'>"
+                f"<div style='background:#e5e7eb;border-radius:4px;width:120px;height:14px;display:inline-block;vertical-align:middle'>"
+                f"<div style='background:{pass_color};border-radius:4px;width:{min(pass_rate, 100):.0f}%;height:100%'></div></div>"
+                f" <span style='font-weight:600;color:{pass_color}'>{pass_rate:.1f}%</span></td></tr>"
+            )
+
+        link_row = ""
+        if self._run_url:
+            link_row = (
+                f"<tr><td colspan='2' style='padding:6px 12px;border-top:1px solid #e5e7eb'>"
+                f"<a href='{self._run_url}' target='_blank' style='color:#3b82f6'>View in LangWatch &rarr;</a></td></tr>"
+            )
+
+        return (
+            f"<div style='border:1px solid #e5e7eb;border-radius:8px;font-family:system-ui,-apple-system,sans-serif;font-size:13px;max-width:500px'>"
+            f"<div style='padding:8px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb;font-weight:700;font-size:14px'>Experiment: {self.name}</div>"
+            f"<table style='border-collapse:collapse;width:100%'>{''.join(rows)}{link_row}</table>"
+            f"</div>"
+        )
 
     def loop(
         self,
@@ -253,6 +415,10 @@ class Experiment:
 
                 executor.submit(self._wait_for_completion).result()
                 progress_bar.close()
+                self._finished = True
+
+                # Auto-fetch and display results after completion
+                self._auto_display_results()
 
         except Exception as e:
             Experiment._log_results(

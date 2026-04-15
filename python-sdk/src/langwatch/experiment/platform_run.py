@@ -114,7 +114,7 @@ class ExperimentRunSummary:
     total_cost: float = 0.0
 
 
-@dataclass
+@dataclass(repr=False)
 class ExperimentRunResult:
     """Result of running a platform evaluation."""
 
@@ -143,6 +143,78 @@ class ExperimentRunResult:
 
         if should_exit and self.failed > 0:
             sys.exit(1)
+
+    def __repr__(self) -> str:
+        status_icon = {"completed": "OK", "failed": "FAIL", "stopped": "STOPPED"}.get(
+            self.status, self.status
+        )
+        return (
+            f"ExperimentRunResult("
+            f"status={status_icon}, "
+            f"passed={self.passed}, failed={self.failed}, "
+            f"pass_rate={self.pass_rate:.1f}%, "
+            f"duration={self.duration / 1000:.1f}s)"
+        )
+
+    def _repr_html_(self) -> str:
+        """Rich HTML representation for Jupyter notebooks."""
+        pass_color = "#22c55e" if self.pass_rate >= 80 else "#f59e0b" if self.pass_rate >= 50 else "#ef4444"
+        status_badge = {
+            "completed": '<span style="color:#22c55e;font-weight:600">COMPLETED</span>',
+            "failed": '<span style="color:#ef4444;font-weight:600">FAILED</span>',
+            "stopped": '<span style="color:#f59e0b;font-weight:600">STOPPED</span>',
+        }.get(self.status, self.status)
+
+        rows = [
+            f"<tr><td style='padding:4px 12px;font-weight:600'>Status</td><td style='padding:4px 12px'>{status_badge}</td></tr>",
+            f"<tr><td style='padding:4px 12px;font-weight:600'>Run ID</td><td style='padding:4px 12px'><code>{self.run_id}</code></td></tr>",
+            f"<tr><td style='padding:4px 12px;font-weight:600'>Duration</td><td style='padding:4px 12px'>{self.duration / 1000:.1f}s</td></tr>",
+            f"<tr><td style='padding:4px 12px;font-weight:600'>Passed</td><td style='padding:4px 12px;color:#22c55e'>{self.passed}</td></tr>",
+            f"<tr><td style='padding:4px 12px;font-weight:600'>Failed</td><td style='padding:4px 12px;color:#ef4444'>{self.failed}</td></tr>",
+            f"<tr><td style='padding:4px 12px;font-weight:600'>Pass Rate</td>"
+            f"<td style='padding:4px 12px'>"
+            f"<div style='background:#e5e7eb;border-radius:4px;width:120px;height:16px;display:inline-block;vertical-align:middle'>"
+            f"<div style='background:{pass_color};border-radius:4px;width:{min(self.pass_rate, 100):.0f}%;height:100%'></div></div>"
+            f" <span style='font-weight:600;color:{pass_color}'>{self.pass_rate:.1f}%</span></td></tr>",
+        ]
+
+        # Target breakdown
+        if self.summary.targets:
+            rows.append("<tr><td colspan='2' style='padding:8px 12px 4px;font-weight:700;border-top:1px solid #e5e7eb'>Targets</td></tr>")
+            for t in self.summary.targets:
+                cost_str = f" | ${t.total_cost:.4f}" if t.total_cost else ""
+                latency_str = f" | {t.avg_latency:.0f}ms" if t.avg_latency else ""
+                rows.append(
+                    f"<tr><td style='padding:2px 12px 2px 24px;color:#6b7280'>{t.name}</td>"
+                    f"<td style='padding:2px 12px'>"
+                    f"<span style='color:#22c55e'>{t.passed} passed</span>, "
+                    f"<span style='color:#ef4444'>{t.failed} failed</span>"
+                    f"{latency_str}{cost_str}</td></tr>"
+                )
+
+        # Evaluator breakdown
+        if self.summary.evaluators:
+            rows.append("<tr><td colspan='2' style='padding:8px 12px 4px;font-weight:700;border-top:1px solid #e5e7eb'>Evaluators</td></tr>")
+            for e in self.summary.evaluators:
+                score_str = f" (avg: {e.avg_score:.2f})" if e.avg_score is not None else ""
+                rows.append(
+                    f"<tr><td style='padding:2px 12px 2px 24px;color:#6b7280'>{e.name}</td>"
+                    f"<td style='padding:2px 12px'>{e.pass_rate:.1f}% pass rate{score_str}</td></tr>"
+                )
+
+        link_row = ""
+        if self.run_url:
+            link_row = (
+                f"<tr><td colspan='2' style='padding:8px 12px;border-top:1px solid #e5e7eb'>"
+                f"<a href='{self.run_url}' target='_blank' style='color:#3b82f6'>View full results in LangWatch &rarr;</a></td></tr>"
+            )
+
+        return (
+            f"<div style='border:1px solid #e5e7eb;border-radius:8px;font-family:system-ui,-apple-system,sans-serif;font-size:13px;max-width:500px'>"
+            f"<div style='padding:8px 12px;background:#f9fafb;border-bottom:1px solid #e5e7eb;font-weight:700;font-size:14px'>Experiment Results</div>"
+            f"<table style='border-collapse:collapse;width:100%'>{''.join(rows)}{link_row}</table>"
+            f"</div>"
+        )
 
 
 def _is_notebook() -> bool:
