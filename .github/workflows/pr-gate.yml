@@ -1,8 +1,15 @@
-name: low-risk-evaluation
+name: pr-gate
+
+# Consolidated PR review gate.
+#
+# Replaces approval-or-hotfix, low-risk-evaluation, and low-risk-label-reset.
+# The bot satisfies branch protection's required_approving_review_count by
+# submitting an APPROVE review for low-risk and firefighting PRs. The
+# `low-risk-change` label is audit-only — no gating logic depends on it.
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened]
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
     inputs:
       pr_number:
@@ -13,34 +20,122 @@ on:
 permissions:
   pull-requests: write
   contents: read
-  checks: write
 
 concurrency:
-  group: low-risk-eval-${{ github.event.pull_request.number || inputs.pr_number }}
+  group: pr-gate-${{ github.event.pull_request.number || inputs.pr_number }}
   cancel-in-progress: true
 
 jobs:
-  evaluate:
-    # Skip fork PRs — secrets and write permissions are unavailable
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+  gate:
+    # Fork PRs cannot mutate labels/reviews from pull_request_target without secrets;
+    # let them run other CI but skip this job rather than fail noisily.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      - name: Checkout repo (policy doc)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha || github.sha }}
 
-      - name: Fetch PR metadata and diff
-        id: pr-data
+      - name: Resolve PR context
+        id: ctx
         env:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+        run: |
+          PR_JSON=$(gh pr view "$PR_NUMBER" --json number,headRefOid,labels,author)
+          HEAD_SHA=$(echo "$PR_JSON" | jq -r '.headRefOid')
+          LABELS=$(echo "$PR_JSON" | jq -r '[.labels[].name] | join(",")')
+          echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "labels=$LABELS" >> "$GITHUB_OUTPUT"
+
+      - name: Strip stale low-risk-change label on synchronize
+        if: github.event.action == 'synchronize'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          PR_NUMBER: ${{ steps.ctx.outputs.pr_number }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                name: "low-risk-change",
+              });
+              core.info(`Removed low-risk-change label from PR #${prNumber} (new commits pushed). Re-evaluation follows.`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              core.info("No low-risk-change label present; nothing to strip.");
+            }
+
+      - name: Check if bot already approved this head_sha (idempotency)
+        id: idempotency
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          PR_NUMBER: ${{ steps.ctx.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.ctx.outputs.head_sha }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const headSha = process.env.HEAD_SHA;
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+            const alreadyApproved = reviews.some(r =>
+              r.state === "APPROVED" &&
+              r.user?.login === "github-actions[bot]" &&
+              r.commit_id === headSha
+            );
+            core.setOutput("already_approved", alreadyApproved ? "true" : "false");
+            if (alreadyApproved) {
+              core.info(`Bot already approved head_sha ${headSha}; skipping re-approval.`);
+            }
+
+      - name: Firefighting fast-path — approve, skip LLM eval
+        if: contains(steps.ctx.outputs.labels, 'firefighting') && steps.idempotency.outputs.already_approved != 'true'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          PR_NUMBER: ${{ steps.ctx.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.ctx.outputs.head_sha }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              commit_id: process.env.HEAD_SHA,
+              event: "APPROVE",
+              body: "Approved by automation: `firefighting` label present (manual override).",
+            });
+            core.info(`PR #${prNumber} approved via firefighting override.`);
+
+      - name: Stop here if firefighting handled
+        id: firefighting-gate
+        if: contains(steps.ctx.outputs.labels, 'firefighting')
+        run: echo "firefighting=true" >> "$GITHUB_OUTPUT"
+
+      - name: Fetch PR diff and metadata
+        id: pr-data
+        if: steps.firefighting-gate.outputs.firefighting != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ steps.ctx.outputs.pr_number }}
         run: |
           gh pr view "$PR_NUMBER" --json title,body --template '{{.title}}' > /tmp/pr_title.txt
           gh pr view "$PR_NUMBER" --json title,body --template '{{.body}}' > /tmp/pr_body.txt
           gh pr view "$PR_NUMBER" --json files --jq '.files[].path' > /tmp/pr_files.txt
           gh pr diff "$PR_NUMBER" > /tmp/pr_diff.txt
 
-          # Fail closed if diff exceeds model window — large PRs could hide risky changes
+          # Fail closed if diff exceeds model window — large PRs could hide risky changes.
           DIFF_LIMIT=100000
           DIFF_SIZE=$(wc -c < /tmp/pr_diff.txt)
           if [ "$DIFF_SIZE" -gt "$DIFF_LIMIT" ]; then
@@ -53,7 +148,7 @@ jobs:
 
       - name: Fail fast for oversized diffs
         id: oversized
-        if: steps.pr-data.outputs.oversized == 'true'
+        if: steps.firefighting-gate.outputs.firefighting != 'true' && steps.pr-data.outputs.oversized == 'true'
         run: |
           echo "qualifies=false" >> "$GITHUB_OUTPUT"
           echo "scope=Diff too large for automated evaluation" >> "$GITHUB_OUTPUT"
@@ -61,7 +156,7 @@ jobs:
 
       - name: Check for restricted paths
         id: path-check
-        if: steps.pr-data.outputs.oversized == 'false'
+        if: steps.firefighting-gate.outputs.firefighting != 'true' && steps.pr-data.outputs.oversized == 'false'
         run: |
           RESTRICTED_PATTERN='^(\.github/workflows/|(auth|security|migrations|prisma)/|.*/(auth|security|migrations|prisma)/)'
           if grep -qE "$RESTRICTED_PATTERN" /tmp/pr_files.txt; then
@@ -82,7 +177,7 @@ jobs:
 
       - name: Evaluate PR with OpenAI
         id: evaluate
-        if: steps.pr-data.outputs.oversized == 'false' && steps.path-check.outputs.blocked == 'false'
+        if: steps.firefighting-gate.outputs.firefighting != 'true' && steps.pr-data.outputs.oversized == 'false' && steps.path-check.outputs.blocked == 'false'
         env:
           OPENAI_API_KEY: ${{ secrets.LOW_RISK_OPENAI_API_KEY }}
         run: |
@@ -91,7 +186,6 @@ jobs:
           PR_BODY=$(cat /tmp/pr_body.txt)
           PR_DIFF=$(cat /tmp/pr_diff_truncated.txt)
 
-          # Build the JSON payload using jq to handle escaping
           PAYLOAD=$(jq -n \
             --arg policy "$POLICY" \
             --arg title "$PR_TITLE" \
@@ -133,7 +227,6 @@ jobs:
             -H "Authorization: Bearer $OPENAI_API_KEY" \
             -d "$PAYLOAD")
 
-          # Extract the assistant's message content
           RESULT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
 
           if [ "$RESULT" = "null" ] || [ -z "$RESULT" ]; then
@@ -164,27 +257,31 @@ jobs:
             echo "$REASONING_DELIM"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Apply label and comment
+      - name: Apply outcome — label, comment, and bot review
+        if: steps.firefighting-gate.outputs.firefighting != 'true'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
+          PR_NUMBER: ${{ steps.ctx.outputs.pr_number }}
+          HEAD_SHA: ${{ steps.ctx.outputs.head_sha }}
+          ALREADY_APPROVED: ${{ steps.idempotency.outputs.already_approved }}
           QUALIFIES: ${{ steps.oversized.outputs.qualifies || steps.restricted.outputs.qualifies || steps.evaluate.outputs.qualifies }}
           SCOPE: ${{ steps.oversized.outputs.scope || steps.restricted.outputs.scope || steps.evaluate.outputs.scope }}
           REASONING: ${{ steps.oversized.outputs.reasoning || steps.restricted.outputs.reasoning || steps.evaluate.outputs.reasoning }}
         with:
           script: |
             const prNumber = parseInt(process.env.PR_NUMBER, 10);
-            const qualifies = process.env.QUALIFIES === 'true';
+            const headSha = process.env.HEAD_SHA;
+            const alreadyApproved = process.env.ALREADY_APPROVED === "true";
+            const qualifies = process.env.QUALIFIES === "true";
             const scope = process.env.SCOPE;
             const reasoning = process.env.REASONING;
 
-            // Delete previous bot assessment comments to avoid clutter
+            // Drop previous bot assessment comments to keep the PR thread tidy.
             const comments = await github.paginate(github.rest.issues.listComments, {
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: prNumber,
             });
-
             for (const comment of comments) {
               if (
                 comment.user?.login === "github-actions[bot]" &&
@@ -213,40 +310,30 @@ jobs:
                 body: [
                   "**Automated low-risk assessment**",
                   "",
-                  `This PR was evaluated against the repository's [Low-Risk Pull Requests](dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure.`,
+                  "This PR was evaluated against the repository's [Low-Risk Pull Requests](dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure.",
                   `- **Scope:** ${scope}`,
-                  `- **Exclusions confirmed:** no changes to auth, security settings, database schema, business-critical logic, or external integrations.`,
-                  `- **Classification:** \`low-risk-change\` under the documented policy.`,
+                  "- **Exclusions confirmed:** no changes to auth, security settings, database schema, business-critical logic, or external integrations.",
+                  "- **Classification:** `low-risk-change` under the documented policy.",
                   "",
                   `> ${reasoning}`,
                   "",
-                  "This classification allows merging without manual review once all required CI checks are passing and branch protection rules are satisfied.",
+                  "An approving review has been submitted by automation. The PR may merge once required CI checks pass.",
                 ].join("\n"),
               });
 
-              // Directly create a passing check run for the approval check.
-              // We can't re-run the workflow (creates zombie runs) and
-              // GITHUB_TOKEN label events don't trigger other workflows.
-              const pr = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: prNumber,
-              });
-
-              await github.rest.checks.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                head_sha: pr.data.head.sha,
-                name: "check-approval-or-label",
-                status: "completed",
-                conclusion: "success",
-                output: {
-                  title: "Low-risk label applied by automation",
-                  summary: "PR was labeled `low-risk-change` by the automated evaluation workflow.",
-                },
-              });
-
-              core.info(`PR #${prNumber} labeled as low-risk-change and approval check set to success.`);
+              if (!alreadyApproved) {
+                await github.rest.pulls.createReview({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pull_number: prNumber,
+                  commit_id: headSha,
+                  event: "APPROVE",
+                  body: "Approved by automation: PR qualifies as `low-risk-change` under the documented policy.",
+                });
+                core.info(`PR #${prNumber} labeled low-risk-change and bot-approved.`);
+              } else {
+                core.info(`PR #${prNumber} labeled low-risk-change; bot approval already exists for this head_sha.`);
+              }
             } else {
               try {
                 await github.rest.issues.removeLabel({
@@ -266,7 +353,7 @@ jobs:
                 body: [
                   "**Automated low-risk assessment**",
                   "",
-                  `This PR was evaluated against the repository's [Low-Risk Pull Requests](dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure and **does not qualify** as low risk.`,
+                  "This PR was evaluated against the repository's [Low-Risk Pull Requests](dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure and **does not qualify** as low risk.",
                   "",
                   `> ${reasoning}`,
                   "",
@@ -274,65 +361,5 @@ jobs:
                 ].join("\n"),
               });
 
-              core.info(`PR #${prNumber} does not qualify as low-risk.`);
-            }
-
-      - name: Refresh approval check for firefighting or approvals
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
-        env:
-          PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
-        with:
-          script: |
-            const prNumber = parseInt(process.env.PR_NUMBER, 10);
-            const pr = await github.rest.pulls.get({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: prNumber,
-            });
-
-            const { data: labels } = await github.rest.issues.listLabelsOnIssue({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: prNumber,
-            });
-            const labelNames = labels.map(l => l.name);
-
-            // firefighting label → pass the check regardless of evaluation
-            if (labelNames.includes("firefighting")) {
-              await github.rest.checks.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                head_sha: pr.data.head.sha,
-                name: "check-approval-or-label",
-                status: "completed",
-                conclusion: "success",
-                output: { title: "Approved", summary: "PR has firefighting label." },
-              });
-              core.info("Refreshed approval check for firefighting label.");
-              return;
-            }
-
-            // Existing approval → pass the check
-            const reviews = await github.rest.pulls.listReviews({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              pull_number: prNumber,
-            });
-            const approvedUsers = new Set();
-            for (const review of reviews.data) {
-              if (review.state === "APPROVED") {
-                approvedUsers.add(review.user.login);
-              }
-            }
-            if (approvedUsers.size >= 1) {
-              await github.rest.checks.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                head_sha: pr.data.head.sha,
-                name: "check-approval-or-label",
-                status: "completed",
-                conclusion: "success",
-                output: { title: "Approved", summary: `PR has ${approvedUsers.size} approval(s).` },
-              });
-              core.info("Refreshed approval check for existing approval.");
+              core.info(`PR #${prNumber} does not qualify as low-risk; manual review required.`);
             }
