@@ -1,6 +1,5 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import type { PrismaClient } from "@prisma/client";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { checkOpsPermission, type OpsScope } from "~/server/api/rbac";
 import { getApp } from "~/server/app-layer/app";
@@ -23,20 +22,16 @@ function requireOps() {
 
 async function resolveTenantIds({
   opsScope,
-  prisma,
   requestedTenantIds,
 }: {
   opsScope: OpsScope;
-  prisma: PrismaClient;
   requestedTenantIds?: string[];
 }): Promise<string[]> {
   if (opsScope.kind !== "organization") return requestedTenantIds ?? [];
 
-  const orgProjects = (await prisma.project.findMany({
-    where: { team: { organizationId: opsScope.organizationId } },
-    select: { id: true },
-  })) as Array<{ id: string }>;
-  const orgProjectIds = new Set(orgProjects.map((p) => p.id));
+  const orgProjectIds = new Set(
+    await getApp().organizations.getProjectIds(opsScope.organizationId),
+  );
 
   if (requestedTenantIds && requestedTenantIds.length > 0) {
     const unauthorized = requestedTenantIds.filter(
@@ -72,45 +67,13 @@ function assertTenantAccess({
 
 async function resolveOrgProjectIds({
   opsScope,
-  prisma,
 }: {
   opsScope: OpsScope;
-  prisma: PrismaClient;
 }): Promise<Set<string>> {
   if (opsScope.kind !== "organization") return new Set<string>();
-  const orgProjects = (await prisma.project.findMany({
-    where: { team: { organizationId: opsScope.organizationId } },
-    select: { id: true },
-  })) as Array<{ id: string }>;
-  return new Set(orgProjects.map((p) => p.id));
-}
-
-async function searchOpsProjects({
-  query,
-  opsScope,
-  prisma,
-}: {
-  query: string;
-  opsScope: OpsScope;
-  prisma: PrismaClient;
-}): Promise<Array<{ id: string; name: string; slug: string }>> {
-  const where: Record<string, unknown> = {
-    OR: [
-      { id: { contains: query } },
-      { name: { contains: query, mode: "insensitive" } },
-      { slug: { contains: query, mode: "insensitive" } },
-    ],
-  };
-
-  if (opsScope.kind === "organization") {
-    where.team = { organizationId: opsScope.organizationId };
-  }
-
-  return prisma.project.findMany({
-    where,
-    select: { id: true, name: true, slug: true },
-    take: 20,
-  }) as Promise<Array<{ id: string; name: string; slug: string }>>;
+  return new Set(
+    await getApp().organizations.getProjectIds(opsScope.organizationId),
+  );
 }
 
 export const opsRouter = createTRPCRouter({
@@ -290,7 +253,6 @@ export const opsRouter = createTRPCRouter({
       const opsScope = ctx.opsScope!;
       const tenantIds = await resolveTenantIds({
         opsScope,
-        prisma: ctx.prisma,
         requestedTenantIds: input.tenantIds,
       });
 
@@ -305,10 +267,13 @@ export const opsRouter = createTRPCRouter({
     .use(opsViewPermission)
     .input(z.object({ query: z.string() }))
     .query(async ({ input, ctx }) => {
-      return searchOpsProjects({
+      const opsScope = ctx.opsScope!;
+      return getApp().projects.searchByQuery({
         query: input.query,
-        opsScope: ctx.opsScope!,
-        prisma: ctx.prisma,
+        organizationId:
+          opsScope.kind === "organization"
+            ? opsScope.organizationId
+            : undefined,
       });
     }),
 
@@ -363,7 +328,6 @@ export const opsRouter = createTRPCRouter({
       const opsScope = ctx.opsScope!;
       const tenantIds = await resolveTenantIds({
         opsScope,
-        prisma: ctx.prisma,
         requestedTenantIds: input.tenantIds,
       });
 
@@ -548,14 +512,12 @@ export const opsRouter = createTRPCRouter({
       if (input.tenantId) {
         const orgProjectIds = await resolveOrgProjectIds({
           opsScope,
-          prisma: ctx.prisma,
         });
         assertTenantAccess({ opsScope, orgProjectIds, tenantId: input.tenantId });
         tenantIds = [input.tenantId];
       } else {
         tenantIds = await resolveTenantIds({
           opsScope,
-          prisma: ctx.prisma,
         });
       }
 
@@ -579,7 +541,6 @@ export const opsRouter = createTRPCRouter({
       const opsScope = ctx.opsScope!;
       const orgProjectIds = await resolveOrgProjectIds({
         opsScope,
-        prisma: ctx.prisma,
       });
       assertTenantAccess({ opsScope, orgProjectIds, tenantId: input.tenantId });
 
@@ -601,7 +562,6 @@ export const opsRouter = createTRPCRouter({
       const opsScope = ctx.opsScope!;
       const orgProjectIds = await resolveOrgProjectIds({
         opsScope,
-        prisma: ctx.prisma,
       });
       assertTenantAccess({ opsScope, orgProjectIds, tenantId: input.tenantId });
 

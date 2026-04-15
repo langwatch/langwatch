@@ -1,4 +1,6 @@
 import type { Tracer, Context } from "@opentelemetry/api";
+import { context, trace, SpanStatusCode, ROOT_CONTEXT } from "@opentelemetry/api";
+import { createFoundryProvider } from "./otelBrowser";
 import type { SpanConfig, TraceConfig } from "./types";
 
 export async function executeTrace({
@@ -10,10 +12,6 @@ export async function executeTrace({
   apiKey: string;
   endpoint: string;
 }): Promise<string> {
-  // Lazy-import OTel modules — they pull in Node.js polyfills that break SSR
-  const { createFoundryProvider } = await import("./otelBrowser");
-  const { context, trace, SpanStatusCode, ROOT_CONTEXT } =
-    await import("@opentelemetry/api");
 
   const provider = createFoundryProvider({
     apiKey,

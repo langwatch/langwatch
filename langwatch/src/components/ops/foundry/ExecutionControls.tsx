@@ -5,6 +5,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useTraceStore } from "./traceStore";
 import { useExecutionStore } from "./executionStore";
 import { useFoundryProjectStore } from "./foundryProjectStore";
+import { executeTrace } from "./traceExecutor";
 
 export function ExecutionControls({ compact = false }: { compact?: boolean }) {
   const { batchCount, staggerMs, running, setBatchCount, setStaggerMs, setRunning, addLogEntry, updateLogEntry } = useExecutionStore();
@@ -20,7 +21,6 @@ export function ExecutionControls({ compact = false }: { compact?: boolean }) {
       const logId = `log-${Date.now()}-${i}`;
       addLogEntry({ id: logId, traceId: logId, timestamp: Date.now(), status: "pending" });
       try {
-        const { executeTrace } = await import("./traceExecutor");
         const traceId = await executeTrace({
           trace,
           apiKey,

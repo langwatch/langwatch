@@ -39,7 +39,7 @@ export function useFilteredCommands(
     () =>
       hasOpsAccess
         ? navigationCommands
-        : navigationCommands.filter((cmd) => cmd.id !== "nav-ops"),
+        : navigationCommands.filter((cmd) => !cmd.id.startsWith("nav-ops")),
     [hasOpsAccess],
   );
 
