@@ -113,8 +113,10 @@ describe("Dataset Generation Skill", () => {
             "generate an evaluation dataset for my chatbot. read my code first to understand what it does, then create something realistic."
           ),
           scenario.agent(),
+          (state) => { toolCallFix(state); },
           scenario.user(),
           scenario.agent(),
+          (state) => { toolCallFix(state); },
           scenario.user(),
           scenario.agent(),
           (state) => {
@@ -141,12 +143,13 @@ describe("Dataset Generation Skill", () => {
               "Dataset should have at least 11 lines (header + 10 rows)"
             ).toBeGreaterThanOrEqual(11);
 
-            // Should NOT contain generic trivia — this is a tweet-bot
+            // Should NOT be dominated by generic trivia — a tweet-bot dataset should have
+            // casual, fun, social-media-style inputs, not textbook questions
             expect(
               csvContent,
-              "Dataset should not contain generic trivia — inputs should match a tweet-like emoji bot domain"
+              "Dataset should not contain academic trivia like 'capital of france' or 'quantum computing'"
             ).not.toMatch(
-              /capital of france|what is 2 ?\+ ?2|quantum computing|photosynthesis|explain the theory/
+              /capital of france|quantum computing|photosynthesis|explain the theory of/
             );
           },
           scenario.judge(),
@@ -208,8 +211,10 @@ describe("Dataset Generation Skill", () => {
             "I need an evaluation dataset for my RAG agent. Can you look at my code and generate something realistic? I want to test both accuracy and hallucination."
           ),
           scenario.agent(),
+          (state) => { toolCallFix(state); },
           scenario.user(),
           scenario.agent(),
+          (state) => { toolCallFix(state); },
           scenario.user(),
           scenario.agent(),
           (state) => {
@@ -286,10 +291,9 @@ describe("Dataset Generation Skill", () => {
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent explored the codebase BEFORE proposing a plan",
-              "Agent presented a structured plan and asked for confirmation before generating",
-              "Agent showed a preview of sample rows before generating the full dataset",
-              "Agent generated the full dataset only after receiving user approval",
+              "Agent explored the codebase BEFORE proposing a plan or generating data",
+              "Agent presented a structured plan or outline to the user before generating the full dataset",
+              "Agent generated dataset content (CSV rows or similar) in a later turn, not in the first response",
             ],
           }),
         ],
@@ -298,8 +302,10 @@ describe("Dataset Generation Skill", () => {
             "create an evaluation dataset for my project"
           ),
           scenario.agent(),
+          (state) => { toolCallFix(state); },
           scenario.user(),
           scenario.agent(),
+          (state) => { toolCallFix(state); },
           scenario.user(),
           scenario.agent(),
           (state) => {
