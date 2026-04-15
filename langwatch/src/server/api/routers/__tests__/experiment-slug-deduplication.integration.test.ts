@@ -20,10 +20,12 @@ import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { prisma } from "../../../db";
 
-globalForApp.__langwatch_app = createTestApp();
-
 // Skipped: app-layer init regression on main after es-migration refactor
-// — see langwatch/langwatch#3240.
+// — see langwatch/langwatch#3240. createTestApp() throws at module load
+// due to presets.ts:467 `require("../db")` resolution error, so the
+// module-level init is commented out alongside the describe.skip.
+// globalForApp.__langwatch_app = createTestApp();
+
 describe.skip("Feature: Experiment slug deduplication", () => {
   const projectId = "test-project-id";
   const createdExperimentIds: string[] = [];
