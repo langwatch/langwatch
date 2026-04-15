@@ -1,14 +1,10 @@
-import type { PrismaClient, Project } from "@prisma/client";
+import type { Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import { TokenResolver, type ResolvedToken } from "./token-resolver";
-import { PatPermissionDeniedError } from "./errors";
-import type { Permission } from "~/server/api/rbac";
-import { resolvePatPermission } from "~/server/rbac/role-binding-resolver";
-import { DomainError } from "~/server/app-layer/domain-error";
+import { prisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:unified-auth");
-const permissionLogger = createLogger("langwatch:api:pat-ceiling");
 
 /**
  * Variables set by the unified auth middleware, extending the existing
@@ -29,7 +25,7 @@ export type UnifiedAuthVariables = {
 /**
  * Parses the Authorization header to extract credentials for all supported
  * auth methods:
- *   1. Basic Auth: base64(projectId:token) — for SDKs
+ *   1. Basic Auth: base64(projectId:token) — for SDKs, Langfuse compat
  *   2. Bearer PAT: pat-lw-... + X-Project-Id header
  *   3. Bearer Legacy: sk-lw-... (project ID implicit in key)
  *   4. X-Auth-Token: legacy header (any token type)
@@ -83,21 +79,8 @@ function extractCredentials(c: {
  *   - Legacy (X-Auth-Token: sk-lw-... unchanged)
  *
  * Sets `project`, `patId`, `patUserId`, `patOrganizationId` on the context.
- *
- * Takes a PrismaClient via injection so the middleware isn't coupled to the
- * module-scope `~/server/db` global and can be exercised with a test client
- * or a per-request Prisma instance.
- *
- * markUsed is late — called only after `next()` returns a 2xx response. This
- * keeps `lastUsedAt` aligned with *successful* request outcomes rather than
- * merely successful authentication, mirroring the route-owned pattern in
- * `collector.ts`.
  */
-export function createUnifiedAuthMiddleware({
-  prisma,
-}: {
-  prisma: PrismaClient;
-}): MiddlewareHandler {
+export function createUnifiedAuthMiddleware(): MiddlewareHandler {
   const resolver = TokenResolver.create(prisma);
 
   return async (c, next) => {
@@ -114,12 +97,36 @@ export function createUnifiedAuthMiddleware({
       );
     }
 
-    let resolved: ResolvedToken | null;
     try {
-      resolved = await resolver.resolve({
+      const resolved = await resolver.resolve({
         token: credentials.token,
         projectId: credentials.projectId,
       });
+
+      if (!resolved) {
+        logger.warn(
+          {
+            hasToken: true,
+            tokenPrefix: credentials.token.substring(0, 10) + "...",
+            hasProjectId: !!credentials.projectId,
+          },
+          "Authentication failed: invalid credentials",
+        );
+        return c.json(
+          { error: "Unauthorized", message: "Invalid credentials" },
+          401,
+        );
+      }
+
+      c.set("project", resolved.project);
+
+      if (resolved.type === "pat") {
+        c.set("patId", resolved.patId);
+        c.set("patUserId", resolved.userId);
+        c.set("patOrganizationId", resolved.organizationId);
+      }
+
+      c.set("resolvedToken", resolved);
     } catch (error) {
       logger.error(
         {
@@ -139,162 +146,9 @@ export function createUnifiedAuthMiddleware({
       );
     }
 
-    if (!resolved) {
-      logger.warn(
-        {
-          hasToken: true,
-          tokenType: credentials.token.startsWith("pat-lw-")
-            ? "pat"
-            : credentials.token.startsWith("sk-lw-")
-              ? "legacy"
-              : "unknown",
-          hasProjectId: !!credentials.projectId,
-        },
-        "Authentication failed: invalid credentials",
-      );
-      return c.json(
-        { error: "Unauthorized", message: "Invalid credentials" },
-        401,
-      );
-    }
-
-    c.set("project", resolved.project);
-    c.set("resolvedToken", resolved);
-
-    if (resolved.type === "pat") {
-      c.set("patId", resolved.patId);
-      c.set("patUserId", resolved.userId);
-      c.set("patOrganizationId", resolved.organizationId);
-    }
-
     await next();
-
-    // Late markUsed: only when the handler produced a success response. Keeps
-    // lastUsedAt tied to successful request outcomes, not mere authentication.
-    if (
-      resolved.type === "pat" &&
-      c.res.status >= 200 &&
-      c.res.status < 300
-    ) {
-      resolver.markUsed({ patId: resolved.patId });
-    }
   };
 }
 
+// Re-export for backwards compatibility with existing auth middleware consumers
 export { extractCredentials };
-
-/**
- * Enforces the PAT permission ceiling for an already-resolved token.
- *
- * Legacy tokens are granted full access (current behavior — project API keys
- * bypass RBAC). PAT tokens must satisfy `effective = PAT ∩ user` at the
- * project scope for the requested permission.
- *
- * Throws `PatPermissionDeniedError` when a PAT is denied so route handlers
- * can catch a typed domain error (kind `pat_permission_denied`, httpStatus
- * 403) instead of inspecting an ad-hoc descriptor. Returns normally when
- * access is granted. This helper exists so both Hono middleware and inline
- * route handlers (collector, otel, track_event) share one enforcement path.
- *
- * `prisma` is injected rather than imported from module scope so the helper
- * doesn't leak infrastructure; callers already hold a client to construct
- * TokenResolver and can pass the same instance.
- */
-export async function enforcePatCeiling({
-  prisma,
-  resolved,
-  permission,
-}: {
-  prisma: PrismaClient;
-  resolved: ResolvedToken;
-  permission: Permission;
-}): Promise<void> {
-  if (resolved.type !== "pat") return;
-
-  const allowed = await resolvePatPermission({
-    prisma,
-    patId: resolved.patId,
-    userId: resolved.userId,
-    organizationId: resolved.organizationId,
-    scope: {
-      type: "project",
-      id: resolved.project.id,
-      teamId: resolved.project.team.id,
-    },
-    permission,
-  });
-
-  if (!allowed) {
-    permissionLogger.warn(
-      {
-        patId: resolved.patId,
-        userId: resolved.userId,
-        projectId: resolved.project.id,
-        permission,
-      },
-      "PAT ceiling check failed",
-    );
-    throw new PatPermissionDeniedError(permission, {
-      meta: {
-        patId: resolved.patId,
-        userId: resolved.userId,
-        projectId: resolved.project.id,
-      },
-    });
-  }
-}
-
-/**
- * Converts a PAT permission denial thrown by `enforcePatCeiling` into a
- * Hono-style JSON + status tuple. Re-throws anything that isn't a
- * `PatPermissionDeniedError` so genuine infrastructure errors surface.
- *
- * Route handlers use this in their auth try/catch to preserve the existing
- * descriptor-style early-return ergonomics while the underlying enforcement
- * path is now a typed domain error.
- */
-export function patCeilingDenialResponse(
-  error: unknown,
-): { error: string; message: string; status: 403 } {
-  if (DomainError.isHandled(error) && error.kind === "pat_permission_denied") {
-    return { error: "Forbidden", message: error.message, status: 403 };
-  }
-  throw error;
-}
-
-/**
- * Hono middleware that applies the PAT ceiling for a specific permission.
- * Must be chained AFTER createUnifiedAuthMiddleware — reads `resolvedToken`
- * from context. Accepts a PrismaClient via injection so enforcement never
- * reaches for a module-scope client.
- */
-export function requirePatPermission({
-  prisma,
-  permission,
-}: {
-  prisma: PrismaClient;
-  permission: Permission;
-}): MiddlewareHandler {
-  return async (c, next) => {
-    const resolved = c.get("resolvedToken") as ResolvedToken | undefined;
-    if (!resolved) {
-      // No token resolved — auth middleware should have run first.
-      return c.json(
-        { error: "Unauthorized", message: "Authentication required" },
-        401,
-      );
-    }
-
-    try {
-      await enforcePatCeiling({ prisma, resolved, permission });
-    } catch (error) {
-      const denial = patCeilingDenialResponse(error);
-      return c.json(
-        { error: denial.error, message: denial.message },
-        denial.status,
-      );
-    }
-
-    await next();
-  };
-}

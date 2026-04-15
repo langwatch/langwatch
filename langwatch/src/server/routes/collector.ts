@@ -29,11 +29,7 @@ import {
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
 import { createLogger } from "../../utils/logger/server";
 import { TokenResolver } from "../pat/token-resolver";
-import {
-  enforcePatCeiling,
-  extractCredentials,
-  patCeilingDenialResponse,
-} from "../pat/auth-middleware";
+import { extractCredentials } from "../pat/auth-middleware";
 
 const logger = createLogger("langwatch.collector");
 const tokenResolver = TokenResolver.create(prisma);
@@ -98,25 +94,14 @@ app.post(
       return c.json({ message: "Invalid auth token." }, 401);
     }
 
-    // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
-    // access — ADMIN and MEMBER have it; VIEWER does not, preventing
-    // read-only PATs from ingesting traces.
-    try {
-      await enforcePatCeiling({
-        prisma,
-        resolved,
-        permission: "traces:create",
-      });
-    } catch (error) {
-      const denial = patCeilingDenialResponse(error);
-      logger.warn(
-        { projectId: resolved.project.id, patId: resolved.type === "pat" ? resolved.patId : undefined },
-        "collector request denied by PAT ceiling",
-      );
-      return c.json({ message: denial.message }, denial.status);
-    }
+    const project = await prisma.project.findUnique({
+      where: { id: resolved.project.id },
+      include: { team: true },
+    });
 
-    const project = resolved.project;
+    if (!project) {
+      return c.json({ message: "Invalid auth token." }, 401);
+    }
 
     logger.info(
       { projectId: project.id },

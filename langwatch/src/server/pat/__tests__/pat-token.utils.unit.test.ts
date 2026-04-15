@@ -6,6 +6,7 @@ import {
   verifySecret,
   getTokenType,
   PAT_PREFIX,
+  LEGACY_PREFIX,
 } from "../pat-token.utils";
 
 describe("PAT Token Utilities", () => {

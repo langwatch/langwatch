@@ -108,13 +108,4 @@ export class TokenResolver {
       project,
     };
   }
-
-  /**
-   * Marks a PAT as used. Callers should invoke this only after the request
-   * is fully validated (body parsed, params accepted) so lastUsedAt reflects
-   * successful authenticated use, not merely successful authentication.
-   */
-  markUsed({ patId }: { patId: string }): void {
-    this.patService.markUsed({ id: patId });
-  }
 }

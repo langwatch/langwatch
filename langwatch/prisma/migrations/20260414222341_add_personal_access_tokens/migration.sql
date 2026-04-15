@@ -1,3 +1,66 @@
+/*
+  Warnings:
+
+  - Made the column `metadata` on table `Notification` required. This step will fail if there are existing NULL values in that column.
+
+*/
+-- DropForeignKey
+ALTER TABLE "Agent" DROP CONSTRAINT "Agent_copiedFromAgentId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "Evaluator" DROP CONSTRAINT "Evaluator_copiedFromEvaluatorId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "Invoice" DROP CONSTRAINT "Invoice_subscriptionId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "InvoiceItem" DROP CONSTRAINT "InvoiceItem_invoiceId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "PromptTag" DROP CONSTRAINT "PromptTag_createdById_fkey";
+
+-- DropForeignKey
+ALTER TABLE "PromptTag" DROP CONSTRAINT "PromptTag_organizationId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "PromptTag" DROP CONSTRAINT "PromptTag_updatedById_fkey";
+
+-- DropForeignKey
+ALTER TABLE "PromptTagAssignment" DROP CONSTRAINT "PromptTagAssignment_configId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "PromptTagAssignment" DROP CONSTRAINT "PromptTagAssignment_createdById_fkey";
+
+-- DropForeignKey
+ALTER TABLE "PromptTagAssignment" DROP CONSTRAINT "PromptTagAssignment_updatedById_fkey";
+
+-- DropForeignKey
+ALTER TABLE "PromptTagAssignment" DROP CONSTRAINT "PromptTagAssignment_versionId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "SavedView" DROP CONSTRAINT "SavedView_projectId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "SavedView" DROP CONSTRAINT "SavedView_userId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "Scenario" DROP CONSTRAINT "Scenario_lastUpdatedById_fkey";
+
+-- DropForeignKey
+ALTER TABLE "Scenario" DROP CONSTRAINT "Scenario_projectId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "Subscription" DROP CONSTRAINT "Subscription_organizationId_fkey";
+
+-- DropForeignKey
+ALTER TABLE "TriggerSent" DROP CONSTRAINT "TriggerSent_customGraphId_fkey";
+
+-- DropIndex
+DROP INDEX "CustomGraph_id_key";
+
+-- AlterTable
+ALTER TABLE "Notification" ALTER COLUMN "metadata" SET NOT NULL;
+
 -- AlterTable
 ALTER TABLE "RoleBinding" ADD COLUMN     "patId" TEXT;
 
@@ -5,12 +68,10 @@ ALTER TABLE "RoleBinding" ADD COLUMN     "patId" TEXT;
 CREATE TABLE "PersonalAccessToken" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
-    "description" TEXT,
     "lookupId" TEXT NOT NULL,
     "hashedSecret" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
-    "expiresAt" TIMESTAMP(3),
     "lastUsedAt" TIMESTAMP(3),
     "revokedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -33,19 +94,3 @@ CREATE INDEX "PersonalAccessToken_lookupId_idx" ON "PersonalAccessToken"("lookup
 
 -- CreateIndex
 CREATE INDEX "RoleBinding_patId_idx" ON "RoleBinding"("patId");
-
--- Partial unique indexes for PAT-principal bindings. Mirrors the four existing
--- indexes for user/group principals from 20260410120000_fix_role_binding_unique_custom_role.
--- Without these, the same PAT could be granted the same (role, scope) twice,
--- or the same (customRole, scope) twice — silently duplicating permissions.
-
--- PAT bindings — built-in roles (customRoleId IS NULL)
-CREATE UNIQUE INDEX "RoleBinding_pat_builtin_role_scope_key"
-  ON "RoleBinding"("patId", "role", "scopeType", "scopeId")
-  WHERE "patId" IS NOT NULL AND "customRoleId" IS NULL;
-
--- PAT bindings — custom roles (different customRoleIds are distinct at the same scope)
-CREATE UNIQUE INDEX "RoleBinding_pat_custom_role_scope_key"
-  ON "RoleBinding"("patId", "customRoleId", "scopeType", "scopeId")
-  WHERE "patId" IS NOT NULL AND "customRoleId" IS NOT NULL;
-

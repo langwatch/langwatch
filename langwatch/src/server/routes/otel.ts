@@ -22,11 +22,7 @@ import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { TokenResolver } from "~/server/pat/token-resolver";
-import {
-  enforcePatCeiling,
-  extractCredentials,
-  patCeilingDenialResponse,
-} from "~/server/pat/auth-middleware";
+import { extractCredentials } from "~/server/pat/auth-middleware";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 
@@ -96,6 +92,15 @@ async function authenticateAndCheckLimit(c: {
   const resolved = await tokenResolver.resolve({
     token: credentials.token,
     projectId: credentials.projectId,
+  });
+
+  if (!resolved) {
+    return { error: "Invalid auth token.", status: 401 as const };
+  }
+
+  const project = await prisma.project.findUnique({
+    where: { id: resolved.project.id },
+    include: { team: true },
   });
 
   if (!resolved) {
