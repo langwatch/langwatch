@@ -1,24 +1,13 @@
 import { Center, EmptyState, Spacer, Spinner } from "@chakra-ui/react";
-import { useRouter } from "next/router";
-import { useEffect } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { OpsDashboardContent } from "~/components/ops/dashboard";
 import { ConnectionStatusIndicator } from "~/components/ops/shared/ConnectionStatusIndicator";
+import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useOpsSSE } from "~/hooks/useOpsSSE";
 import { api } from "~/utils/api";
 
 export default function OpsPage() {
-  const router = useRouter();
-  const { hasAccess, isLoading } = useOpsPermission();
-
-  useEffect(() => {
-    if (!isLoading && !hasAccess) {
-      void router.push("/");
-    }
-  }, [hasAccess, isLoading, router]);
-
   const { data: sseData, status } = useOpsSSE();
   const snapshot = api.ops.getDashboardSnapshot.useQuery(undefined, {
     enabled: !sseData,
@@ -27,34 +16,34 @@ export default function OpsPage() {
 
   const data = sseData ?? snapshot.data ?? null;
 
-  if (isLoading || !hasAccess) return null;
-
   return (
-    <DashboardLayout>
-      <PageLayout.Header>
-        <PageLayout.Heading>Ops Dashboard</PageLayout.Heading>
-        <Spacer />
-        <ConnectionStatusIndicator status={status} />
-      </PageLayout.Header>
-      <PageLayout.Container>
-        {data ? (
-          <OpsDashboardContent data={data} />
-        ) : (
-          <Center paddingY={20}>
-            <EmptyState.Root>
-              <EmptyState.Content>
-                <EmptyState.Indicator>
-                  <Spinner size="lg" />
-                </EmptyState.Indicator>
-                <EmptyState.Title>Loading metrics</EmptyState.Title>
-                <EmptyState.Description>
-                  Waiting for the first collection cycle...
-                </EmptyState.Description>
-              </EmptyState.Content>
-            </EmptyState.Root>
-          </Center>
-        )}
-      </PageLayout.Container>
-    </DashboardLayout>
+    <OpsPageShell>
+      <DashboardLayout>
+        <PageLayout.Header>
+          <PageLayout.Heading>Ops Dashboard</PageLayout.Heading>
+          <Spacer />
+          <ConnectionStatusIndicator status={status} />
+        </PageLayout.Header>
+        <PageLayout.Container>
+          {data ? (
+            <OpsDashboardContent data={data} />
+          ) : (
+            <Center paddingY={20}>
+              <EmptyState.Root>
+                <EmptyState.Content>
+                  <EmptyState.Indicator>
+                    <Spinner size="lg" />
+                  </EmptyState.Indicator>
+                  <EmptyState.Title>Loading metrics</EmptyState.Title>
+                  <EmptyState.Description>
+                    Waiting for the first collection cycle...
+                  </EmptyState.Description>
+                </EmptyState.Content>
+              </EmptyState.Root>
+            </Center>
+          )}
+        </PageLayout.Container>
+      </DashboardLayout>
+    </OpsPageShell>
   );
 }
