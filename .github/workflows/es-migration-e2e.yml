@@ -1,0 +1,177 @@
+name: es-migration-e2e
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "langwatch/packages/es-migration/**"
+      - "langwatch/src/server/event-sourcing/**"
+      - "langwatch/src/server/app-layer/traces/**"
+      - "langwatch/src/server/app-layer/evaluations/**"
+      - "langwatch/src/server/app-layer/dspy-steps/**"
+      - "langwatch/src/server/clickhouse/migrations/**"
+      - "langwatch/elastic/migrations/**"
+      - ".github/workflows/es-migration-e2e.yml"
+  pull_request:
+    paths:
+      - "langwatch/packages/es-migration/**"
+      - "langwatch/src/server/event-sourcing/**"
+      - "langwatch/src/server/app-layer/traces/**"
+      - "langwatch/src/server/app-layer/evaluations/**"
+      - "langwatch/src/server/app-layer/dspy-steps/**"
+      - "langwatch/src/server/clickhouse/migrations/**"
+      - "langwatch/elastic/migrations/**"
+      - ".github/workflows/es-migration-e2e.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    name: Seed ES → Run Migration → Validate CH
+    runs-on: ubuntu-latest
+
+    env:
+      ELASTICSEARCH_NODE_URL: "http://localhost:9200"
+      CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/default"
+      E2E_TENANT_ID: "e2e-test-project"
+      E2E_TRACE_COUNT: "5"
+      E2E_SIMULATION_COUNT: "3"
+      # The elastic:migrate and clickhouse:migrate scripts run under pnpm task,
+      # which the main app wires up via env — these match langwatch-app-ci.yml.
+      DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
+      NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
+      NEXTAUTH_URL: "http://localhost:3000"
+      API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
+      BASE_HOST: "localhost:3000"
+      BUILD_TIME: "true"
+      SKIP_ENV_VALIDATION: "true"
+
+    services:
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        ports:
+          - 9200:9200
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: false
+          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+        options: >-
+          --health-cmd "curl -f http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: langwatch_ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: langwatch_test
+        options: >-
+          --health-cmd "pg_isready -U langwatch_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2
+        with:
+          version: 10.24.0
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
+        with:
+          node-version: 24
+          cache: "pnpm"
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+
+      - name: Install dependencies
+        working-directory: langwatch
+        run: CI=true pnpm install --frozen-lockfile
+
+      - name: Prepare generated files
+        working-directory: langwatch
+        run: pnpm start:prepare:files
+
+      - name: Setup Prisma database
+        working-directory: langwatch
+        run: pnpm prisma:migrate
+
+      - name: Create ES indices and aliases
+        working-directory: langwatch
+        run: pnpm elastic:migrate
+
+      - name: Install Goose migration tool
+        run: |
+          GOOSE_URL="https://github.com/pressly/goose/releases/download/v3.26.0/goose_linux_x86_64"
+          GOOSE_SHA256="8b3eee9845cd87d827ba1abddb85235fb3684f9fb1666426f647ddd12fd29efe"
+          curl -fsSL "$GOOSE_URL" -o /tmp/goose
+          echo "$GOOSE_SHA256  /tmp/goose" | sha256sum -c - || (rm -f /tmp/goose && exit 1)
+          sudo mv /tmp/goose /usr/local/bin/goose
+          chmod +x /usr/local/bin/goose
+
+      - name: Start ClickHouse
+        run: |
+          docker run -d \
+            --name clickhouse \
+            --network host \
+            -e CLICKHOUSE_DB=default \
+            -e CLICKHOUSE_USER=default \
+            -e CLICKHOUSE_PASSWORD=ci_password \
+            clickhouse/clickhouse-server:latest
+
+          echo "Waiting for ClickHouse to be ready..."
+          for i in {1..60}; do
+            if curl -sf "http://localhost:8123/?user=default&password=ci_password" -d "SELECT 1" >/dev/null 2>&1; then
+              echo "ClickHouse is ready"
+              break
+            fi
+            echo "Attempt $i: Waiting for ClickHouse..."
+            sleep 1
+          done
+
+      - name: Run ClickHouse migrations
+        working-directory: langwatch
+        run: pnpm clickhouse:migrate
+
+      - name: Seed Elasticsearch with sample traces and scenario events
+        working-directory: langwatch/packages/es-migration
+        run: pnpm tsx test/e2e/seed.ts
+
+      - name: Run es-migration — traces target
+        working-directory: langwatch/packages/es-migration
+        run: pnpm tsx src/index.ts traces --single-batch
+
+      - name: Run es-migration — simulations target
+        working-directory: langwatch/packages/es-migration
+        run: pnpm tsx src/index.ts simulations --single-batch
+
+      - name: Validate ClickHouse contents match seeded data
+        working-directory: langwatch/packages/es-migration
+        run: pnpm tsx test/e2e/validate.ts
+
+      - name: Dump ClickHouse tables on failure
+        if: failure()
+        run: |
+          echo "=== event_log by AggregateType ==="
+          curl -s "http://localhost:8123/?user=default&password=ci_password" \
+            -d "SELECT AggregateType, count() FROM default.event_log WHERE TenantId = '${{ env.E2E_TENANT_ID }}' GROUP BY AggregateType FORMAT TabSeparated" || true
+          echo "=== trace_summaries ==="
+          curl -s "http://localhost:8123/?user=default&password=ci_password" \
+            -d "SELECT count() FROM default.trace_summaries WHERE TenantId = '${{ env.E2E_TENANT_ID }}'" || true
+          echo "=== stored_spans ==="
+          curl -s "http://localhost:8123/?user=default&password=ci_password" \
+            -d "SELECT count() FROM default.stored_spans WHERE TenantId = '${{ env.E2E_TENANT_ID }}'" || true
+          echo "=== simulation_runs ==="
+          curl -s "http://localhost:8123/?user=default&password=ci_password" \
+            -d "SELECT count(DISTINCT ScenarioRunId) FROM default.simulation_runs WHERE TenantId = '${{ env.E2E_TENANT_ID }}'" || true

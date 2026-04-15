@@ -80,7 +80,7 @@ export const getProxiedImageUrl = (url: string): string => {
   if (url.startsWith("data:")) return url;
   if (url.startsWith("/")) return url;
 
-  return `/image-proxy?url=${encodeURIComponent(url)}`;
+  return `/api/image-proxy?url=${encodeURIComponent(url)}`;
 };
 
 export const ExternalImage = ({

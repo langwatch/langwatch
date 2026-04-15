@@ -13,7 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
 import type { Organization, Project, Team } from "@prisma/client";
-import { ChevronDown, ChevronRight, KeyRound, Plus } from "lucide-react";
+import { Activity, ChevronDown, ChevronRight, Info, KeyRound, Plus } from "lucide-react";
 import ErrorPage from "~/utils/compat/next-error";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
@@ -29,6 +29,7 @@ import { usePlanManagementUrl } from "../hooks/usePlanManagementUrl";
 import { usePostHogIdentify } from "../hooks/usePostHogIdentify";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
+import { ImpersonationBanner } from "../../ee/admin/ImpersonationBanner";
 import { ImpersonationSwitchBackMenuItem } from "../../ee/admin/ImpersonationSwitchBackMenuItem";
 import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../utils/api";
@@ -321,14 +322,15 @@ export const DashboardLayout = ({
     return <ErrorPage statusCode={404} />;
   }
 
+  const isOpsRoute = router.pathname.startsWith("/ops");
+
   if (
     !publicPage &&
     (!session ||
       isLoading ||
       !organization ||
       !organizations ||
-      !team ||
-      !project)
+      (!isOpsRoute && (!team || !project)))
   ) {
     return <LoadingScreen />;
   }
@@ -355,7 +357,7 @@ export const DashboardLayout = ({
       width="full"
       minHeight="100vh"
       background="bg.page"
-      overflowX={["auto", "auto", "clip"]}
+      overflowX={["auto", "auto", "hidden"]}
     >
       <Head>
         <title>
@@ -377,15 +379,16 @@ export const DashboardLayout = ({
         gap={4}
         overflow="hidden"
       >
-        {publicEnv.data?.NODE_ENV === "development" && (
+        {(user?.impersonator || publicEnv.data?.NODE_ENV === "development") && (
           <Box
             position="absolute"
             top={-5}
             right="-100px"
             bottom={0}
             w="400px"
-            background="orange.300"
+            background={user?.impersonator ? "blue.300" : "orange.300"}
             filter="blur(40px)"
+            pointerEvents="none"
           ></Box>
         )}
 
@@ -409,7 +412,36 @@ export const DashboardLayout = ({
               </Link>
             </Box>
           )}
-          {organizations && project ? (
+          {router.pathname.startsWith("/ops") ? (
+            <HStack gap={3} alignItems="center" paddingLeft={2}>
+              <HStack
+                gap={1.5}
+                paddingX={2.5}
+                height="28px"
+                borderRadius="md"
+                bg="bg.emphasized"
+              >
+                <Activity size={14} />
+                <Text fontSize="sm" fontWeight="medium">
+                  Ops
+                </Text>
+              </HStack>
+              <HStack
+                gap={1.5}
+                paddingX={2.5}
+                height="28px"
+                borderRadius="md"
+                bg="orange.500/8"
+                border="1px solid"
+                borderColor="orange.500/15"
+              >
+                <Info size={12} color="var(--chakra-colors-orange-400)" />
+                <Text fontSize="xs" color="orange.400">
+                  Platform-wide — not scoped to a project
+                </Text>
+              </HStack>
+            </HStack>
+          ) : organizations && project ? (
             <HStack gap={0} alignItems="center">
               <ProjectSelector
                 organizations={organizations}
@@ -449,6 +481,7 @@ export const DashboardLayout = ({
               DEV
             </Text>
           )}
+          {user && <ImpersonationBanner user={user} />}
 
           {/* Command bar trigger */}
           {project && <CommandBarTrigger />}
@@ -535,15 +568,25 @@ export const DashboardLayout = ({
         <Box
           width="full"
           height="full"
+          background="bg.page"
+          borderTopLeftRadius="xl"
+          boxShadow="-4px -2px 12px 0px rgba(0, 0, 0, 0.06)"
+          _dark={{
+            boxShadow: "-4px -2px 16px 0px rgba(0, 0, 0, 0.4)",
+          }}
+          minHeight="calc(100vh - 56px)"
+          maxHeight="calc(100vh - 56px)"
+          maxWidth={`calc(100vw - ${menuWidth})`}
+        >
+        <Box
+          width="full"
+          height="full"
           background="bg.surface"
           borderTopLeftRadius="xl"
-          outline="1px solid"
-          outlineColor="border"
           overflow="auto"
           display="flex"
           minHeight="calc(100vh - 56px)"
           maxHeight="calc(100vh - 56px)"
-          maxWidth={`calc(100vw - ${menuWidth})`}
         >
           <VStack width="full" gap={0} {...props}>
             {/* Alert banners */}
@@ -750,6 +793,7 @@ export const DashboardLayout = ({
               </Alert.Root>
             )}
           </VStack>
+        </Box>
         </Box>
       </HStack>
       <GlobalUpgradeModal />

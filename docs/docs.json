@@ -502,7 +502,8 @@
             "group": "Operations",
             "pages": [
               "self-hosting/security",
-              "self-hosting/upgrade"
+              "self-hosting/upgrade",
+              "self-hosting/upgrade-v3"
             ]
           }
         ]
@@ -675,7 +676,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1776195431",
+      "source": "/ci/cache/busted/1776275213",
       "destination": "/"
     },
     {

@@ -71,6 +71,17 @@ import { NotificationService } from "../../../ee/billing/notifications/notificat
 import { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
 import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
+import { QueueService } from "./ops/queue.service";
+import { EventExplorerService } from "./ops/event-explorer.service";
+import { ReplayService } from "./ops/replay.service";
+import { QueueRedisRepository } from "./ops/repositories/queue.redis.repository";
+import { NullQueueRepository } from "./ops/repositories/queue.repository";
+import { ReplayRedisRepository } from "./ops/repositories/replay.redis.repository";
+import { NullReplayRepository } from "./ops/repositories/replay.repository";
+import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
+import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
+import { getOpsMetricsCollector } from "./ops/metrics-collector";
+import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
 import { traced } from "./tracing";
 import { TraceService } from "../traces/trace.service";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
@@ -401,6 +412,26 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     planProvider,
   });
 
+  const queueRepo = redis
+    ? new QueueRedisRepository(redis)
+    : new NullQueueRepository();
+  const replayRepo = redis
+    ? new ReplayRedisRepository(redis)
+    : new NullReplayRepository();
+  const sharedCh = getSharedClickHouseClient();
+  const eventExplorerRepo = sharedCh
+    ? new EventExplorerClickHouseRepository(sharedCh)
+    : new NullEventExplorerRepository();
+
+  const ops = {
+    queues: new QueueService(queueRepo),
+    eventExplorer: new EventExplorerService(eventExplorerRepo),
+    replay: new ReplayService(replayRepo),
+    metricsCollector: redis
+      ? getOpsMetricsCollector({ redis, queueRepo })
+      : null,
+  };
+
   return initializeApp({
     config,
     broadcast,
@@ -419,6 +450,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     nurturing,
     usageLimits,
     commands,
+    ops,
     _eventSourcing: es,
     _gracefulCloseables: gracefulCloseables,
   });
@@ -499,6 +531,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     notifications: NotificationService.createNull(),
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
+    ops: {
+      queues: new QueueService(new NullQueueRepository()),
+      eventExplorer: new EventExplorerService(new NullEventExplorerRepository()),
+      replay: new ReplayService(new NullReplayRepository()),
+      metricsCollector: null,
+    },
     commands: {
       traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop, resolveOrigin: noop, addAnnotation: noop, removeAnnotation: noop, bulkSyncAnnotations: noop } satisfies AppCommands["traces"],
       evaluations: {

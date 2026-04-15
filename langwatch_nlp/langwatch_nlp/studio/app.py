@@ -173,10 +173,10 @@ async def execute_event_on_a_subprocess(
 
         process = cast(Any, process)
 
-        timeout_without_messages = 900  # seconds (match AWS Lambda max execution timeout)
+        timeout_without_messages = int(os.getenv("NLP_STREAM_IDLE_TIMEOUT_SECONDS", "900"))
         if isinstance(event, ExecuteOptimization):
             # TODO: temporary until we actually send events in the middle of optimization process
-            timeout_without_messages = 120 * 60  # 120 minutes
+            timeout_without_messages = int(os.getenv("NLP_OPTIMIZATION_IDLE_TIMEOUT_SECONDS", "7200"))
 
         try:
             done = False

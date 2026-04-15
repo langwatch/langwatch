@@ -51,6 +51,7 @@
 		".next",
 		".next-saas",
 		"**/*.snippet.*",
-		"src/**/codegen/snippets/**/*"
+		"src/**/codegen/snippets/**/*",
+		"packages/insanity-check/**/*"
 	]
 }

@@ -3,6 +3,7 @@ import type {
   ProjectRepository,
   ProjectWithOrgAdmin,
   ProjectWithTeam,
+  SearchProjectsResult,
   UpdateProjectMetadataInput,
 } from "./project.repository";
 
@@ -55,5 +56,33 @@ export class PrismaProjectRepository implements ProjectRepository {
       organizationId: org?.id ?? null,
       adminUserId: org?.members?.[0]?.userId ?? null,
     };
+  }
+
+  async searchByQuery({
+    query,
+    organizationId,
+    limit = 20,
+  }: {
+    query: string;
+    organizationId?: string;
+    limit?: number;
+  }): Promise<SearchProjectsResult[]> {
+    const where: Record<string, unknown> = {
+      OR: [
+        { id: { contains: query } },
+        { name: { contains: query, mode: "insensitive" } },
+        { slug: { contains: query, mode: "insensitive" } },
+      ],
+    };
+
+    if (organizationId) {
+      where.team = { organizationId };
+    }
+
+    return this.prisma.project.findMany({
+      where,
+      select: { id: true, name: true, slug: true },
+      take: limit,
+    });
   }
 }

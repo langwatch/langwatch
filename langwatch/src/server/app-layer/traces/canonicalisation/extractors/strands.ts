@@ -145,38 +145,47 @@ export class StrandsExtractor implements CanonicalAttributesExtractor {
     if (!ctx.bag.attrs.has(ATTR_KEYS.GEN_AI_INPUT_MESSAGES)) {
       const inputMessages: unknown[] = [];
 
-      for (const eventName of ROLE_EVENT_NAMES) {
-        const events = ctx.bag.events.takeAll(eventName);
-        for (const event of events) {
-          // Infer role from event name (e.g., "gen_ai.user.message" → "user")
-          const role = eventName.split(".")[1];
-          const eventAttrs = (event.attributes ?? {}) as Record<
-            string,
-            unknown
-          >;
+      // Take all role-based events in their original array order to preserve
+      // conversation interleaving (user, assistant, user, assistant, ...).
+      // Previously iterating by role name grouped all messages of the same
+      // role together, destroying chronological order.
+      const roleEvents = ctx.bag.events.takeAllByNames(ROLE_EVENT_NAMES);
+      for (const event of roleEvents) {
+        // Infer role from event name (e.g., "gen_ai.user.message" → "user")
+        const role = event.name.split(".")[1];
+        const eventAttrs = (event.attributes ?? {}) as Record<
+          string,
+          unknown
+        >;
 
-          const content = extractStrandsContent(eventAttrs);
+        const content = extractStrandsContent(eventAttrs);
 
-          if (content !== void 0) {
-            inputMessages.push({ role, content });
-          }
+        if (content !== void 0) {
+          inputMessages.push({ role, content });
         }
       }
 
       if (inputMessages.length > 0) {
-        // Extract system instruction from assembled messages
-        const sysInstruction = extractSystemInstructionFromMessages(inputMessages);
-        if (sysInstruction !== null) {
-          ctx.setAttrIfAbsent(
-            ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
-            sysInstruction,
-          );
+        // Always strip system messages — they are promoted to gen_ai.system_instructions.
+        // Filter to system-only first so extractSystemInstructionFromMessages sees
+        // the system message at position 0 regardless of where it appeared chronologically.
+        const chatMessages = stripSystemMessages(inputMessages);
+        const systemOnly = inputMessages.filter(
+          (m) =>
+            typeof m === "object" &&
+            m !== null &&
+            (m as Record<string, unknown>).role === "system",
+        );
+        if (systemOnly.length > 0) {
+          const sysInstruction =
+            extractSystemInstructionFromMessages(systemOnly);
+          if (sysInstruction !== null) {
+            ctx.setAttrIfAbsent(
+              ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS,
+              sysInstruction,
+            );
+          }
         }
-
-        // Strip system messages — they are promoted to gen_ai.system_instructions
-        const chatMessages = sysInstruction !== null
-          ? stripSystemMessages(inputMessages)
-          : inputMessages;
 
         if (chatMessages.length > 0) {
           ctx.setAttr(ATTR_KEYS.GEN_AI_INPUT_MESSAGES, chatMessages);
