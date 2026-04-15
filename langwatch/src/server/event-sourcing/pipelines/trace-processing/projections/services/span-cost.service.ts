@@ -9,6 +9,7 @@ export const FIRST_TOKEN_EVENTS = new Set([
   "first_token",
   "llm.first_token",
   "ai.stream.firstChunk",
+  "First Token Stream Event",
 ]);
 
 export const LAST_TOKEN_EVENTS = new Set([
@@ -63,9 +64,8 @@ export class SpanCostService {
   } {
     let timeToFirstToken: number | null = null;
     let timeToLastToken: number | null = null;
-    if (!span.events?.length) return { timeToFirstToken, timeToLastToken };
 
-    for (const event of span.events) {
+    for (const event of span.events ?? []) {
       const delta = event.timeUnixMs - span.startTimeUnixMs;
       if (delta < 0) continue;
       if (
@@ -79,6 +79,16 @@ export class SpanCostService {
         (timeToLastToken === null || delta > timeToLastToken)
       ) {
         timeToLastToken = delta;
+      }
+    }
+
+    // Fallback: Strands SDK sends TTFT as a span attribute (integer ms)
+    if (timeToFirstToken === null) {
+      const attrTtft = coerceToNumber(
+        span.spanAttributes["gen_ai.server.time_to_first_token"],
+      );
+      if (attrTtft !== null && attrTtft !== undefined && attrTtft >= 0) {
+        timeToFirstToken = attrTtft;
       }
     }
 
