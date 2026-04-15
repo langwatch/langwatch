@@ -1811,7 +1811,7 @@ Based on discovery, present a structured plan. Ask the user to confirm before pr
 
 **Template:**
 
-\`\`\`
+\`\`\`text
 ## Dataset Generation Plan
 
 **System:** [what the system does]
@@ -1853,7 +1853,7 @@ Shall I proceed with this plan? Feel free to adjust categories, add columns, or 
 
 Generate the first 5-8 rows and show them to the user **before** generating the full dataset. This catches direction issues early.
 
-\`\`\`
+\`\`\`text
 Here's a preview of the first few rows. Do these look realistic and on-target?
 
 | input | expected_output |
@@ -1910,7 +1910,7 @@ langwatch dataset upload "<dataset-slug>" evaluation_dataset.csv
 If upload fails (auth error, network issue), don't panic — the CSV is saved locally. Tell the user the local path and how to upload manually later.
 
 If the user doesn't have \`LANGWATCH_API_KEY\` set, skip the upload and just deliver the CSV with instructions:
-\`\`\`
+\`\`\`bash
 langwatch login
 langwatch dataset upload "<dataset-slug>" evaluation_dataset.csv
 \`\`\`
@@ -1919,7 +1919,7 @@ langwatch dataset upload "<dataset-slug>" evaluation_dataset.csv
 
 Always provide a clear summary:
 
-\`\`\`
+\`\`\`text
 ## Dataset Generated
 
 **Local file:** ./evaluation_dataset.csv (N rows)
@@ -1933,8 +1933,7 @@ Always provide a clear summary:
 
 ### Next steps
 1. Review the dataset on the platform — edit any rows that need tweaking
-2. Run an evaluation experiment:
-   langwatch evaluation run --dataset <slug> --evaluator <evaluator-slug>
+2. Set up an evaluation experiment on the platform using this dataset
 3. Add more rows anytime:
    langwatch dataset records add <slug> --file more_rows.json
 4. Re-run this skill to generate a complementary dataset covering different aspects
@@ -1945,7 +1944,7 @@ Always provide a clear summary:
 This is the MOST IMPORTANT part. Here are patterns for different domains:
 
 ### For customer support bots:
-\`\`\`
+\`\`\`text
 "hey my order #4521 hasnt arrived yet its been 2 weeks"
 "can i get a refund? the product was damaged when it arrived"
 "your website keeps giving me an error when i try to checkout"
@@ -1954,7 +1953,7 @@ This is the MOST IMPORTANT part. Here are patterns for different domains:
 \`\`\`
 
 ### For coding assistants:
-\`\`\`
+\`\`\`text
 "how do i sort a list in python"
 "getting TypeError: cannot read property 'map' of undefined"
 "can you refactor this to use async/await instead of callbacks"
@@ -1963,7 +1962,7 @@ This is the MOST IMPORTANT part. Here are patterns for different domains:
 \`\`\`
 
 ### For RAG/knowledge-base systems:
-\`\`\`
+\`\`\`text
 "what's the return policy"
 "do you ship internationally"
 "my package says delivered but i never got it"

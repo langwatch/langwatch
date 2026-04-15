@@ -408,4 +408,98 @@ describe("Dataset Generation Skill", () => {
     },
     900_000
   );
+
+  it.skipIf(isCI)(
+    "asks clarifying questions when codebase has little domain signal and uploads to platform",
+    async () => {
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "langwatch-skill-dataset-ts-generic-")
+      );
+
+      // Use the generic TypeScript fixture — "You are a helpful assistant" gives no domain signal
+      execSync(
+        `cp -r ${path.resolve(__dirname, "fixtures/typescript-vercel")}/* ${tempFolder}/`
+      );
+      copySkillToWorkDir(tempFolder);
+      setupLocalCli(tempFolder);
+
+      const envContent = [
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}`,
+        `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560"}`,
+      ].join("\n");
+      fs.writeFileSync(path.join(tempFolder, ".env"), envContent);
+
+      const result = await scenario.run({
+        name: "Dataset generation with user-provided domain context",
+        description:
+          "The codebase is a generic 'helpful assistant' with no domain signal. " +
+          "The agent should ask the user clarifying questions about their use case, " +
+          "then generate a dataset matching the domain the user describes.",
+        agents: [
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
+          scenario.userSimulatorAgent({
+            model: judgeModel,
+            instructions:
+              "Your bot is a travel planning assistant that helps users plan trips, book hotels, " +
+              "and find activities. The code just says 'helpful assistant' but you should tell the agent " +
+              "it's actually a travel bot when asked about the domain. " +
+              "When shown a plan, approve it. When shown a preview, approve it.",
+          }),
+          scenario.judgeAgent({
+            model: judgeModel,
+            criteria: [
+              "Agent asked the user about the domain or use case since the codebase was too generic to determine it",
+              "Agent incorporated the travel planning context provided by the user into the dataset",
+              "Agent created a CSV file with travel-related inputs (trips, hotels, flights, activities, destinations)",
+            ],
+          }),
+        ],
+        script: [
+          scenario.user(
+            "generate an evaluation dataset for my chatbot. it's a travel planning assistant that helps users plan trips, book hotels, and find activities."
+          ),
+          scenario.agent(),
+          (state) => { toolCallFix(state); },
+          scenario.user(),
+          scenario.agent(),
+          (state) => { toolCallFix(state); },
+          scenario.user(),
+          scenario.agent(),
+          (state) => { toolCallFix(state); },
+          scenario.user(),
+          scenario.agent(),
+          (state) => {
+            toolCallFix(state);
+            assertSkillWasRead(state, "datasets");
+
+            const csvFiles = findGeneratedFiles(tempFolder, [".csv"]);
+            expect(csvFiles.length).toBeGreaterThan(0);
+
+            const csvContent = csvFiles
+              .map((f) => fs.readFileSync(f, "utf8"))
+              .join("\n")
+              .toLowerCase();
+
+            // Should contain travel-related terms from user-provided context
+            const hasTravelTerms =
+              csvContent.includes("travel") ||
+              csvContent.includes("hotel") ||
+              csvContent.includes("flight") ||
+              csvContent.includes("trip") ||
+              csvContent.includes("book") ||
+              csvContent.includes("destination");
+
+            expect(
+              hasTravelTerms,
+              "Dataset should contain travel-related terms since the user described a travel bot"
+            ).toBe(true);
+          },
+          scenario.judge(),
+        ],
+      });
+
+      expect(result.success).toBe(true);
+    },
+    900_000
+  );
 });
