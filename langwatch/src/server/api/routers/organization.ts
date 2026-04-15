@@ -261,8 +261,7 @@ export const organizationRouter = createTRPCRouter({
             const existingIndex = team.members.findIndex(
               (m) => m.userId === userId,
             );
-            // RoleBinding is authoritative: always overwrite any legacy TeamUser entry.
-            // If a TeamUser row and a RoleBinding disagree on role, the binding wins.
+            // A user may appear via multiple bindings (e.g. TEAM + PROJECT scope); last one wins.
             if (existingIndex >= 0) {
               team.members[existingIndex] = bindingMember;
             } else {
