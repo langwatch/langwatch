@@ -220,7 +220,7 @@ function PatSettingsContent({
                 {activePats.length === 0 && (
                   <Table.Row>
                     <Table.Cell colSpan={6}>
-                      <Text color="gray.500" textAlign="center" paddingY={4}>
+                      <Text color="fg.muted" textAlign="center" paddingY={4}>
                         No active tokens. Create one to get started.
                       </Text>
                     </Table.Cell>
@@ -235,7 +235,7 @@ function PatSettingsContent({
                       </HStack>
                     </Table.Cell>
                     <Table.Cell>
-                      <Text fontSize="sm" color="gray.600">
+                      <Text fontSize="sm" color="fg.muted">
                         {roleSummary(pat.roleBindings)}
                       </Text>
                     </Table.Cell>
@@ -374,7 +374,7 @@ function PatSettingsContent({
                   />
                 )}
               </VStack>
-              <Text fontSize="sm" color="gray.500">
+              <Text fontSize="sm" color="fg.muted">
                 The token will have organization-wide permissions with the
                 selected role. Your own permissions act as a ceiling — the token
                 can never exceed your access.
@@ -410,13 +410,13 @@ function PatSettingsContent({
           <Dialog.CloseTrigger />
           <Dialog.Body paddingBottom={6}>
             <VStack gap={4} align="start">
-              <Text color="orange.500" fontWeight="600">
+              <Text color="orange.400" fontWeight="600">
                 Copy this token now. You won&apos;t be able to see it again.
               </Text>
               {newToken && (
                 <CopyInput value={newToken} label="Personal Access Token" />
               )}
-              <Text fontSize="sm" color="gray.500">
+              <Text fontSize="sm" color="fg.muted">
                 Use this token with the Authorization header:{" "}
                 <code>Authorization: Bearer pat-lw-...</code> along with the{" "}
                 <code>X-Project-Id</code> header, or use Basic Auth:{" "}
