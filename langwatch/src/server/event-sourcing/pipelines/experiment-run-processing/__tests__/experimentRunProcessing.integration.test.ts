@@ -132,9 +132,6 @@ async function waitForExperimentRunState(
       );
       const data = projection?.data as ExperimentRunStateData | undefined;
       if (data && predicate(data)) {
-        // Add a delay for ClickHouse eventual consistency
-        // The projection data might not be fully visible immediately
-        await new Promise((resolve) => setTimeout(resolve, 500));
         return;
       }
     } catch {
