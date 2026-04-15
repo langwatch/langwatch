@@ -320,7 +320,7 @@ describe.skipIf(!hasTestcontainers)(
           pipeline,
           compositeKey,
           tenantId,
-          (data) => data.FinishedAt !== null,
+          (data) => data.FinishedAt !== null && data.Total >= 2,
         );
 
         const projection = await pipeline.service.getProjectionByName(
