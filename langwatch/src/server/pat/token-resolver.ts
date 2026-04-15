@@ -100,6 +100,9 @@ export class TokenResolver {
     // Verify the project belongs to the same organization as the PAT
     if (project.team.organizationId !== pat.organizationId) return null;
 
+    // Mark as used only after full authorization succeeds
+    this.patService.markUsed({ id: pat.id });
+
     return {
       type: "pat",
       patId: pat.id,
