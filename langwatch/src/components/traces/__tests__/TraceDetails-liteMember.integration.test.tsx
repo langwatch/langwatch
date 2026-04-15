@@ -65,6 +65,11 @@ vi.mock("../../../utils/api", () => ({
         useMutation: () => ({ mutate: vi.fn() }),
       },
     },
+    ops: {
+      getScope: {
+        useQuery: () => ({ data: null, isLoading: false, isSuccess: false }),
+      },
+    },
     useContext: () => ({
       annotation: {
         getPendingItemsCount: { invalidate: vi.fn() },
