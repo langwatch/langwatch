@@ -4,6 +4,7 @@ import {
   PromptTagRepository,
   type ProtectedTag,
 } from "./repositories/prompt-tag.repository";
+import { isUniqueConstraintError } from "../utils/prismaErrors";
 
 const TAG_NAME_REGEX = /^[a-z][a-z0-9_-]*$/;
 const PURELY_NUMERIC_REGEX = /^\d+$/;
@@ -222,11 +223,3 @@ export class PromptTagService {
   }
 }
 
-function isUniqueConstraintError(error: unknown): boolean {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code: string }).code === "P2002"
-  );
-}

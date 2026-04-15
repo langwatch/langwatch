@@ -80,47 +80,36 @@ describe("Feature: Experiment slug deduplication", () => {
     });
 
     describe("given an experiment exists with slug 'my-experiment'", () => {
+      let existingSlug: string;
       let existingExperimentId: string;
 
       beforeAll(async () => {
-        existingExperimentId = await createExperimentWithSlug(
-          `my-experiment-${nanoid(6)}`
-        );
+        existingSlug = `my-experiment-${nanoid(6)}`;
+        existingExperimentId = await createExperimentWithSlug(existingSlug);
       });
 
       describe("when a new experiment generates the same slug", () => {
-        it("appends -2 suffix to avoid the constraint violation", async () => {
-          // Use the exact slug of the existing experiment
-          const existingExperiment = await prisma.experiment.findUnique({
-            where: { id: existingExperimentId, projectId },
-          });
-          const conflictingSlug = existingExperiment!.slug;
-
+        it("gets deduplicated slug with -2 suffix", async () => {
           const result = await generateUniqueExperimentSlug({
-            baseSlug: conflictingSlug,
+            baseSlug: existingSlug,
             projectId,
             prisma,
           });
 
-          expect(result).toBe(`${conflictingSlug}-2`);
+          expect(result).toBe(`${existingSlug}-2`);
         });
       });
 
-      describe("when updating the same experiment with the same slug", () => {
-        it("returns the base slug unchanged (excludes self)", async () => {
-          const existingExperiment = await prisma.experiment.findUnique({
-            where: { id: existingExperimentId, projectId },
-          });
-          const slug = existingExperiment!.slug;
-
+      describe("when the same experiment is updated with the same slug", () => {
+        it("retains the original slug unchanged", async () => {
           const result = await generateUniqueExperimentSlug({
-            baseSlug: slug,
+            baseSlug: existingSlug,
             projectId,
             prisma,
             excludeExperimentId: existingExperimentId,
           });
 
-          expect(result).toBe(slug);
+          expect(result).toBe(existingSlug);
         });
       });
     });
@@ -134,7 +123,7 @@ describe("Feature: Experiment slug deduplication", () => {
       });
 
       describe("when a new experiment generates the same base slug", () => {
-        it("skips to -3 suffix", async () => {
+        it("increments to -3 suffix", async () => {
           const result = await generateUniqueExperimentSlug({
             baseSlug,
             projectId,
@@ -145,15 +134,35 @@ describe("Feature: Experiment slug deduplication", () => {
         });
       });
     });
+
+    describe("when an unrelated slug shares the same prefix", () => {
+      const baseSlug = `my-exp-${nanoid(6)}`;
+
+      beforeAll(async () => {
+        // Create an unrelated experiment whose slug starts with baseSlug
+        // but is a different word (e.g., "my-exp-abc123-extended")
+        await createExperimentWithSlug(`${baseSlug}-extended`);
+      });
+
+      it("does not treat the unrelated slug as a conflict", async () => {
+        const result = await generateUniqueExperimentSlug({
+          baseSlug,
+          projectId,
+          prisma,
+        });
+
+        expect(result).toBe(baseSlug);
+      });
+    });
   });
 
-  describe("saveEvaluationsV3 router mutation", () => {
+  describe("saveEvaluationsV3()", () => {
     describe("given an experiment exists with a specific slug", () => {
       const sharedName = `Regression 977 ${nanoid(6)}`;
       let firstExperimentId: string;
+      let firstSlug: string;
 
       beforeAll(async () => {
-        // Create the first experiment via the real router mutation
         const result = await caller.experiments.saveEvaluationsV3({
           projectId,
           state: {
@@ -166,19 +175,20 @@ describe("Feature: Experiment slug deduplication", () => {
         });
         firstExperimentId = result.id;
         createdExperimentIds.push(firstExperimentId);
+
+        const experiment = await prisma.experiment.findUnique({
+          where: { id: firstExperimentId, projectId },
+        });
+        firstSlug = experiment!.slug;
       });
 
       describe("when a new experiment is saved with the same name", () => {
-        it("deduplicates the slug without P2002 error", async () => {
+        it("gets deduplicated slug without P2002 error", async () => {
           const result = await caller.experiments.saveEvaluationsV3({
             projectId,
             state: {
               name: sharedName,
-              experimentSlug: (
-                await prisma.experiment.findUnique({
-                  where: { id: firstExperimentId, projectId },
-                })
-              )!.slug,
+              experimentSlug: firstSlug,
               datasets: [],
               activeDatasetId: "dummy",
               evaluators: [],
@@ -188,12 +198,26 @@ describe("Feature: Experiment slug deduplication", () => {
 
           createdExperimentIds.push(result.id);
 
-          const first = await prisma.experiment.findUnique({
-            where: { id: firstExperimentId, projectId },
+          expect(result.slug).toBe(`${firstSlug}-2`);
+        });
+      });
+
+      describe("when the same experiment is updated with the same name", () => {
+        it("retains the original slug unchanged", async () => {
+          const result = await caller.experiments.saveEvaluationsV3({
+            projectId,
+            experimentId: firstExperimentId,
+            state: {
+              name: sharedName,
+              experimentSlug: firstSlug,
+              datasets: [],
+              activeDatasetId: "dummy",
+              evaluators: [],
+              targets: [],
+            },
           });
 
-          expect(result.slug).toBe(`${first!.slug}-2`);
-          expect(result.slug).not.toBe(first!.slug);
+          expect(result.slug).toBe(firstSlug);
         });
       });
     });
