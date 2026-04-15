@@ -48,7 +48,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          PR_JSON=$(gh pr view "$PR_NUMBER" --json headRefOid,labels)
+          PR_JSON=$(gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json headRefOid,labels)
           HEAD_SHA=$(echo "$PR_JSON" | jq -r '.headRefOid')
           # Bracket-pad the label CSV so `contains()` matches exact label
           # names (`,foo,`) and never substrings.
@@ -76,17 +76,21 @@ jobs:
               r.state === "APPROVED" && r.commit_id === headSha
             );
 
-            const botApproved = approvalsForHead.some(r => r.user?.login === "github-actions[bot]");
-            const humanApproved = approvalsForHead.some(r => r.user?.type === "User");
+            const selfApproved = approvalsForHead.some(r => r.user?.login === "github-actions[bot]");
+            // Any other approval — human or another bot like Renovate/Dependabot —
+            // counts as a trusted approval and short-circuits this workflow. We
+            // only exclude *our own* bot's approval because acting on it would
+            // be a re-approval loop.
+            const otherApproved = approvalsForHead.some(r => r.user?.login !== "github-actions[bot]");
 
-            if (botApproved) {
+            if (selfApproved) {
               core.setOutput("short_circuit", "true");
-              core.setOutput("reason", "bot-already-approved");
+              core.setOutput("reason", "self-already-approved");
               core.info(`Bot already approved head_sha ${headSha}; skipping all jobs.`);
-            } else if (humanApproved) {
+            } else if (otherApproved) {
               core.setOutput("short_circuit", "true");
-              core.setOutput("reason", "human-approved");
-              core.info(`Human approval present on head_sha ${headSha}; skipping all jobs.`);
+              core.setOutput("reason", "external-approval");
+              core.info(`External approval present on head_sha ${headSha}; skipping all jobs.`);
             } else {
               core.setOutput("short_circuit", "false");
               core.setOutput("reason", "");
@@ -193,10 +197,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          gh pr view "$PR_NUMBER" --json title,body --template '{{.title}}' > /tmp/pr_title.txt
-          gh pr view "$PR_NUMBER" --json title,body --template '{{.body}}' > /tmp/pr_body.txt
-          gh pr view "$PR_NUMBER" --json files --jq '.files[].path' > /tmp/pr_files.txt
-          gh pr diff "$PR_NUMBER" > /tmp/pr_diff.txt
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body --template '{{.title}}' > /tmp/pr_title.txt
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json title,body --template '{{.body}}' > /tmp/pr_body.txt
+          gh pr view "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --json files --jq '.files[].path' > /tmp/pr_files.txt
+          gh pr diff "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" > /tmp/pr_diff.txt
 
           # Fail closed if diff exceeds model window — large PRs could hide risky changes.
           DIFF_LIMIT=100000
