@@ -35,6 +35,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Deliberately checkout the base branch, not the PR head, because this is
+      # a `pull_request_target` workflow with write permissions and access to
+      # secrets. Reading the policy doc from the base prevents a PR from
+      # changing the policy that evaluates itself.
       - name: Checkout repo (policy doc)
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
@@ -46,9 +50,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PR_NUMBER: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: |
-          PR_JSON=$(gh pr view "$PR_NUMBER" --json number,headRefOid,labels,author)
+          PR_JSON=$(gh pr view "$PR_NUMBER" --json number,headRefOid,labels)
           HEAD_SHA=$(echo "$PR_JSON" | jq -r '.headRefOid')
-          LABELS=$(echo "$PR_JSON" | jq -r '[.labels[].name] | join(",")')
+          # Bracket-pad the comma-joined labels so downstream `contains()` checks
+          # match exact label names (`,foo,`) instead of substrings.
+          LABELS=$(echo "$PR_JSON" | jq -r '"," + ([.labels[].name] | join(",")) + ","')
           echo "pr_number=$PR_NUMBER" >> "$GITHUB_OUTPUT"
           echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
           echo "labels=$LABELS" >> "$GITHUB_OUTPUT"
@@ -100,7 +106,7 @@ jobs:
             }
 
       - name: Firefighting fast-path — approve, skip LLM eval
-        if: contains(steps.ctx.outputs.labels, 'firefighting') && steps.idempotency.outputs.already_approved != 'true'
+        if: contains(steps.ctx.outputs.labels, ',firefighting,') && steps.idempotency.outputs.already_approved != 'true'
         uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
         env:
           PR_NUMBER: ${{ steps.ctx.outputs.pr_number }}
@@ -120,7 +126,7 @@ jobs:
 
       - name: Stop here if firefighting handled
         id: firefighting-gate
-        if: contains(steps.ctx.outputs.labels, 'firefighting')
+        if: contains(steps.ctx.outputs.labels, ',firefighting,')
         run: echo "firefighting=true" >> "$GITHUB_OUTPUT"
 
       - name: Fetch PR diff and metadata
