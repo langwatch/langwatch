@@ -1,38 +1,70 @@
-import { Box, Button, Flex } from "@chakra-ui/react";
-import { Copy } from "lucide-react";
-import { useState } from "react";
+import { Box } from "@chakra-ui/react";
+import type { Monaco } from "@monaco-editor/react";
+import dynamic from "~/utils/compat/next-dynamic";
+import { useMemo } from "react";
 import { useTraceStore } from "../traceStore";
-import { JsonViewer } from "~/components/ops/JsonViewer";
+import monokaiTheme from "~/optimization_studio/components/code/Monokai.json";
+
+const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
+  ssr: false,
+  loading: () => (
+    <Box padding={4} color="fg.muted">
+      Loading editor...
+    </Box>
+  ),
+});
 
 export function JsonView() {
   const trace = useTraceStore((s) => s.trace);
-  const [copied, setCopied] = useState(false);
+  const setTrace = useTraceStore((s) => s.setTrace);
 
-  function copyJson() {
-    navigator.clipboard.writeText(JSON.stringify(trace, null, 2));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const jsonString = useMemo(
+    () => JSON.stringify(trace, null, 2),
+    [trace],
+  );
+
+  function handleChange(value: string | undefined) {
+    if (!value) return;
+    try {
+      const parsed = JSON.parse(value);
+      setTrace(parsed);
+    } catch {
+      // invalid JSON while typing — ignore
+    }
   }
 
   return (
-    <Box p={4} minW={0} overflow="hidden">
-      <Flex justify="flex-end" mb={2}>
-        <Button size="xs" variant="outline" onClick={copyJson}>
-          <Copy size={12} />
-          {copied ? "Copied!" : "Copy JSON"}
-        </Button>
-      </Flex>
-      <Box
-        rounded="lg"
-        border="1px solid"
-        borderColor="border"
-        bg="bg.subtle"
-        p={4}
-        overflow="auto"
-        maxH="calc(100vh - 200px)"
-      >
-        <JsonViewer data={trace} />
-      </Box>
+    <Box h="full" w="full">
+      <MonacoEditor
+        height="100%"
+        language="json"
+        value={jsonString}
+        onChange={handleChange}
+        theme="monokai"
+        beforeMount={(monaco: Monaco) => {
+          monaco.editor.defineTheme(
+            "monokai",
+            monokaiTheme as Parameters<typeof monaco.editor.defineTheme>[1],
+          );
+
+          monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
+            validate: true,
+            allowComments: false,
+            trailingCommas: "error",
+          });
+        }}
+        options={{
+          minimap: { enabled: false },
+          fontSize: 12,
+          lineNumbers: "on",
+          scrollBeyondLastLine: false,
+          automaticLayout: true,
+          tabSize: 2,
+          wordWrap: "on",
+          formatOnPaste: true,
+          readOnly: false,
+        }}
+      />
     </Box>
   );
 }
