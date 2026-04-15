@@ -76,8 +76,11 @@ import { slugify } from "~/utils/slugify";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { createLogger } from "~/utils/logger/server";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
+import { TokenResolver } from "~/server/pat/token-resolver";
+import { extractCredentials } from "~/server/pat/auth-middleware";
 
 const logger = createLogger("langwatch:misc");
+const tokenResolver = TokenResolver.create(prisma);
 
 export const app = new Hono().basePath("/api");
 
@@ -686,17 +689,20 @@ const predefinedEventTypes = predefinedEventsSchemas.options.map(
 );
 
 app.post("/track_event", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const credentials = extractCredentials(c);
+  if (!credentials) {
+    return c.json({ message: "Authentication required. Use X-Auth-Token header or Authorization: Bearer token." }, 401);
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
+  const resolved = await tokenResolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
   });
-  if (!project) {
+  if (!resolved) {
     return c.json({ message: "Invalid auth token." }, 401);
   }
+
+  const project = resolved.project;
 
   let rawBody: Record<string, any>;
   try {
