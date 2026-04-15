@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Eye } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { api } from "~/utils/api";
 import { parseFragment, buildFragment } from "./fragment";

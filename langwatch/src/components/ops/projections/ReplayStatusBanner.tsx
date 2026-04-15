@@ -1,4 +1,4 @@
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { Badge, Button, Card, HStack, Status, Text } from "@chakra-ui/react";
 import { api } from "~/utils/api";
 import { useOpsPermission } from "~/hooks/useOpsPermission";

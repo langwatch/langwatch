@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 
 export default function OpsQueuesPage() {
   const router = useRouter();

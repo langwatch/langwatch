@@ -1,4 +1,4 @@
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { Badge, Card, HStack, Status, Table, Text } from "@chakra-ui/react";
 import { ArrowRight } from "lucide-react";
 import { api } from "~/utils/api";
