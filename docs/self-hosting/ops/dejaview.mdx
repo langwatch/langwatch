@@ -1,0 +1,112 @@
+---
+title: Deja View
+description: "Time-travel debugger for event-sourced aggregates"
+---
+
+**Deja View** (`/ops/dejaview`) is a time-travel debugger for LangWatch's event-sourcing system. It lets you search for any aggregate, inspect its full event history, and compute any projection's state at any point in that history — all from a single interface.
+
+<Frame>
+<img src="/images/ops/dejaview.png" alt="Deja View showing event timeline and projection state" />
+</Frame>
+
+## When to Use Deja View
+
+- **Debugging projection state** — "Why does this trace show the wrong evaluation result?" Look at the events and compute the projection to see where state diverged.
+- **Investigating processing failures** — Find the aggregate, check what events were stored, and identify whether the issue is in the events or the projection.
+- **Auditing** — Review the complete history of any aggregate: every event that happened, in order.
+- **Verifying a replay** — After running a [projection replay](/self-hosting/ops/projection-replay), check that the rebuilt state looks correct.
+
+## Searching for Aggregates
+
+The search bar at the top accepts:
+- **Aggregate ID** (required) — the primary key of the aggregate you're looking for
+- **Tenant ID** (optional) — filter to a specific project/tenant
+
+Results appear in a table showing matching aggregates. Click a row to load its event stream.
+
+<Frame>
+<img src="/images/ops/dejaview-search.png" alt="Deja View search results" />
+</Frame>
+
+## Event Timeline
+
+Once an aggregate is selected, the bottom of the screen shows a **horizontal event timeline** — a color-coded sequence of numbered event boxes.
+
+<Frame>
+<img src="/images/ops/dejaview-timeline.png" alt="Event timeline with color-coded event types" />
+</Frame>
+
+- Each box represents one event, numbered sequentially
+- Colors are assigned by event type, with a legend at the top
+- The current event is highlighted with a border
+- Click any event to jump to it, or use keyboard shortcuts to navigate
+
+### Keyboard Shortcuts
+
+| Key | Action |
+|---|---|
+| `h` or `←` | Previous event |
+| `l` or `→` | Next event |
+| `e` | Toggle event detail panel |
+
+## Event Payload
+
+The center panel shows the current event's payload. Toggle between:
+
+- **Raw view** — the complete event data structure
+- **Diff view** — shows what changed compared to the previous event
+
+<Frame>
+<img src="/images/ops/dejaview-event.png" alt="Event payload with diff view" />
+</Frame>
+
+Press `e` or click the toggle to open a detailed JSON viewer in the right panel for deeply nested event payloads.
+
+## Projection State
+
+The left panel lists all available **projections** and **reactors** for the aggregate type. Select a projection to compute its state at the current event position.
+
+This is the core of the time-travel capability: you can step through events and watch how a projection's state evolves with each event.
+
+<Frame>
+<img src="/images/ops/dejaview-projection.png" alt="Projection state computed at a specific event" />
+</Frame>
+
+For example:
+1. Select a projection (e.g., "TraceAnalytics")
+2. Navigate to event #5 — see the projection state after events 1-5
+3. Step forward to event #6 — see how the state changed
+4. Compare with the current state to identify where things went wrong
+
+## Deep Linking
+
+Deja View encodes its full state in the URL fragment, making every view shareable:
+
+```
+/ops/dejaview#query=trace_abc&tenant=project_xyz&event=5&proj=TraceAnalytics
+```
+
+Copy the URL from your browser to share the exact view — aggregate, event position, and selected projection — with a colleague. No additional setup required.
+
+## Common Workflows
+
+### "Why is this trace's evaluation wrong?"
+
+1. Search for the trace's aggregate ID
+2. Select the evaluation projection
+3. Step through events to find where the evaluation result was computed
+4. Check the event payload — is the input data correct?
+5. Check the projection state — does the fold logic produce the expected result?
+
+### "Did the replay fix this aggregate?"
+
+1. After running a [projection replay](/self-hosting/ops/projection-replay), search for the aggregate
+2. Select the replayed projection
+3. Navigate to the latest event
+4. Verify the projection state matches expectations
+
+### "What happened to this aggregate at 2pm yesterday?"
+
+1. Search for the aggregate ID
+2. Use the event timeline to find events around that timestamp
+3. Step through them to see the sequence of state changes

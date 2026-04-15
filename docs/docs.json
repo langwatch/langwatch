@@ -505,6 +505,17 @@
               "self-hosting/upgrade",
               "self-hosting/upgrade-v3"
             ]
+          },
+          {
+            "group": "Ops Console",
+            "pages": [
+              "self-hosting/ops/overview",
+              "self-hosting/ops/dashboard",
+              "self-hosting/ops/queue-management",
+              "self-hosting/ops/projection-replay",
+              "self-hosting/ops/dejaview",
+              "self-hosting/ops/foundry"
+            ]
           }
         ]
       },
