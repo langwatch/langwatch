@@ -323,7 +323,12 @@ class Experiment:
             if passed is not None:
                 df.loc[mask, f"{name}_passed"] = passed
 
-        if "index" in df.columns:
+        # Set up proper indexing
+        if "target" in df.columns and len(df["target"].unique()) > 1:
+            # Multi-target: use (target, index) MultiIndex for natural grouping
+            if "index" in df.columns:
+                df = df.set_index(["target", "index"]).sort_index()
+        elif "index" in df.columns:
             df = df.set_index("index")
 
         return df
@@ -342,19 +347,10 @@ class Experiment:
 
             self._cached_results_df = df
             print()
-
-            meta_cols = {"trace_id", "duration_ms", "error", "target", "cost", "output"}
-            score_cols = [c for c in df.columns if c not in meta_cols and pd.api.types.is_numeric_dtype(df[c])]
-
-            if "target" in df.columns and len(df["target"].unique()) > 1:
-                summary = df.groupby("target")[score_cols].mean()
-                self._display_df(summary)
-            else:
-                display_cols = [c for c in df.columns if c not in {"trace_id"}]
-                self._display_df(df[display_cols])
+            self._display_df(df)
 
             if self._run_url:
-                print(f"  View details: {self._run_url}")
+                print(f"\n  View details: {self._run_url}")
             print(f"  Explore with: evaluation.results\n")
         except Exception:
             # Non-fatal: don't crash the experiment if result display fails
