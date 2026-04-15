@@ -1,0 +1,426 @@
+name: Auto-approve for validated Low-Risk or Firefighting Check
+
+# PR auto-approval workflow.
+#
+# The bot submits an APPROVE review for low-risk and firefighting PRs, which
+# satisfies branch protection's required_approving_review_count. Branch
+# protection — not this workflow — is what actually blocks merges; this
+# workflow only decides whether the bot adds its approving review. The
+# `low-risk-change` label is audit-only — no gating logic depends on it.
+#
+# Decision tree, in order:
+#   1. Bot already approved current head_sha → no-op (idempotency).
+#   2. Human already approved current head_sha → no-op.
+#   3. `firefighting` label present → bot APPROVE, skip everything else.
+#   4. Otherwise → low-risk evaluation (size/path/LLM) → label + comment + approve, or remove label + comment.
+#
+# Self-healing on push: branch protection's `dismiss_stale_reviews: true`
+# strips ALL approvals on every push, so this workflow re-walks the tree
+# from scratch on every `synchronize` event.
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+concurrency:
+  group: pr-auto-approve-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    # Fork PRs cannot mutate labels/reviews from pull_request_target without secrets;
+    # let other CI run but skip every job here rather than fail noisily.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    outputs:
+      head_sha: ${{ steps.ctx.outputs.head_sha }}
+      labels: ${{ steps.ctx.outputs.labels }}
+      short_circuit: ${{ steps.short-circuit.outputs.short_circuit }}
+      reason: ${{ steps.short-circuit.outputs.reason }}
+    steps:
+      - name: Resolve PR context
+        id: ctx
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          PR_JSON=$(gh pr view "$PR_NUMBER" --json headRefOid,labels)
+          HEAD_SHA=$(echo "$PR_JSON" | jq -r '.headRefOid')
+          # Bracket-pad the label CSV so `contains()` matches exact label
+          # names (`,foo,`) and never substrings.
+          LABELS=$(echo "$PR_JSON" | jq -r '"," + ([.labels[].name] | join(",")) + ","')
+          echo "head_sha=$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          echo "labels=$LABELS" >> "$GITHUB_OUTPUT"
+
+      - name: Check for existing approvals on current head_sha
+        id: short-circuit
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ steps.ctx.outputs.head_sha }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const headSha = process.env.HEAD_SHA;
+            const reviews = await github.paginate(github.rest.pulls.listReviews, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+            });
+
+            const approvalsForHead = reviews.filter(r =>
+              r.state === "APPROVED" && r.commit_id === headSha
+            );
+
+            const botApproved = approvalsForHead.some(r => r.user?.login === "github-actions[bot]");
+            const humanApproved = approvalsForHead.some(r => r.user?.type === "User");
+
+            if (botApproved) {
+              core.setOutput("short_circuit", "true");
+              core.setOutput("reason", "bot-already-approved");
+              core.info(`Bot already approved head_sha ${headSha}; skipping all jobs.`);
+            } else if (humanApproved) {
+              core.setOutput("short_circuit", "true");
+              core.setOutput("reason", "human-approved");
+              core.info(`Human approval present on head_sha ${headSha}; skipping all jobs.`);
+            } else {
+              core.setOutput("short_circuit", "false");
+              core.setOutput("reason", "");
+            }
+
+  firefighting:
+    needs: preflight
+    if: >-
+      needs.preflight.outputs.short_circuit != 'true' &&
+      contains(needs.preflight.outputs.labels, ',firefighting,')
+    runs-on: ubuntu-latest
+    steps:
+      # Clean up any stale low-risk-change label and assessment comments
+      # from a prior evaluator run, then APPROVE. Otherwise the PR thread
+      # contradicts itself ("does not qualify" comment + bot approval).
+      - name: Cleanup stale low-risk artifacts and submit bot APPROVE
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                name: "low-risk-change",
+              });
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+            for (const comment of comments) {
+              if (
+                comment.user?.login === "github-actions[bot]" &&
+                comment.body?.startsWith("**Automated low-risk assessment**")
+              ) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id,
+                });
+              }
+            }
+
+            await github.rest.pulls.createReview({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: prNumber,
+              commit_id: process.env.HEAD_SHA,
+              event: "APPROVE",
+              body: "Approved by automation: `firefighting` label present (manual override).",
+            });
+            core.info(`PR #${prNumber} approved via firefighting override.`);
+
+  evaluate:
+    needs: preflight
+    if: >-
+      needs.preflight.outputs.short_circuit != 'true' &&
+      !contains(needs.preflight.outputs.labels, ',firefighting,')
+    runs-on: ubuntu-latest
+    steps:
+      # Deliberately checkout the base branch, not the PR head, because this is
+      # a `pull_request_target` workflow with write permissions and access to
+      # secrets. Reading the policy doc from the base prevents a PR from
+      # changing the policy that evaluates itself.
+      - name: Checkout repo (policy doc)
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+
+      - name: Strip stale low-risk-change label on synchronize
+        if: github.event.action == 'synchronize'
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            try {
+              await github.rest.issues.removeLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                name: "low-risk-change",
+              });
+              core.info(`Removed low-risk-change label from PR #${prNumber} (new commits pushed). Re-evaluation follows.`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+              core.info("No low-risk-change label present; nothing to strip.");
+            }
+
+      - name: Fetch PR diff and metadata
+        id: pr-data
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr view "$PR_NUMBER" --json title,body --template '{{.title}}' > /tmp/pr_title.txt
+          gh pr view "$PR_NUMBER" --json title,body --template '{{.body}}' > /tmp/pr_body.txt
+          gh pr view "$PR_NUMBER" --json files --jq '.files[].path' > /tmp/pr_files.txt
+          gh pr diff "$PR_NUMBER" > /tmp/pr_diff.txt
+
+          # Fail closed if diff exceeds model window — large PRs could hide risky changes.
+          DIFF_LIMIT=100000
+          DIFF_SIZE=$(wc -c < /tmp/pr_diff.txt)
+          if [ "$DIFF_SIZE" -gt "$DIFF_LIMIT" ]; then
+            echo "PR diff is ${DIFF_SIZE} chars (> ${DIFF_LIMIT}); too large for automated evaluation."
+            echo "oversized=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "oversized=false" >> "$GITHUB_OUTPUT"
+            cp /tmp/pr_diff.txt /tmp/pr_diff_truncated.txt
+          fi
+
+      - name: Fail fast for oversized diffs
+        id: oversized
+        if: steps.pr-data.outputs.oversized == 'true'
+        run: |
+          {
+            echo "qualifies=false"
+            echo "scope=Diff too large for automated evaluation"
+            echo "reasoning=This PR's diff exceeds the size limit for automated low-risk evaluation. Manual review required."
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Check for restricted paths
+        id: path-check
+        if: steps.pr-data.outputs.oversized == 'false'
+        run: |
+          RESTRICTED_PATTERN='^(\.github/workflows/|(auth|security|migrations|prisma)/|.*/(auth|security|migrations|prisma)/)'
+          if grep -qE "$RESTRICTED_PATTERN" /tmp/pr_files.txt; then
+            echo "Restricted paths detected:"
+            grep -E "$RESTRICTED_PATTERN" /tmp/pr_files.txt
+            echo "blocked=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "blocked=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Fail fast for restricted paths
+        id: restricted
+        if: steps.path-check.outputs.blocked == 'true'
+        run: |
+          {
+            echo "qualifies=false"
+            echo "scope=Changes include restricted paths (workflows, auth, migrations, etc.)"
+            echo "reasoning=This PR modifies files in restricted directories that require manual review per policy."
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Evaluate PR with OpenAI
+        id: llm
+        if: steps.pr-data.outputs.oversized == 'false' && steps.path-check.outputs.blocked == 'false'
+        env:
+          OPENAI_API_KEY: ${{ secrets.LOW_RISK_OPENAI_API_KEY }}
+        run: |
+          POLICY=$(cat dev/docs/LOW_RISK_PULL_REQUESTS.md)
+          PR_TITLE=$(cat /tmp/pr_title.txt)
+          PR_BODY=$(cat /tmp/pr_body.txt)
+          PR_DIFF=$(cat /tmp/pr_diff_truncated.txt)
+
+          PAYLOAD=$(jq -n \
+            --arg policy "$POLICY" \
+            --arg title "$PR_TITLE" \
+            --arg body "$PR_BODY" \
+            --arg diff "$PR_DIFF" \
+            '{
+              model: "gpt-5-mini",
+              response_format: {
+                type: "json_schema",
+                json_schema: {
+                  name: "low_risk_evaluation",
+                  strict: true,
+                  schema: {
+                    type: "object",
+                    properties: {
+                      qualifies: { type: "boolean", description: "true if the PR meets ALL low-risk criteria" },
+                      reasoning: { type: "string", description: "2-3 sentence explanation of the assessment" },
+                      scope: { type: "string", description: "Brief summary of what the PR changes" }
+                    },
+                    required: ["qualifies", "reasoning", "scope"],
+                    additionalProperties: false
+                  }
+                }
+              },
+              messages: [
+                {
+                  role: "system",
+                  content: ("You evaluate pull requests against a low-risk change policy.\n\nHere is the policy:\n\n" + $policy + "\n\nEvaluate the PR and return JSON with exactly these fields:\n- \"qualifies\": boolean (true if the PR meets ALL low-risk criteria)\n- \"reasoning\": string (2-3 sentence explanation of your assessment)\n- \"scope\": string (brief summary of what the PR changes)")
+                },
+                {
+                  role: "user",
+                  content: ("PR Title: " + $title + "\n\nPR Description:\n" + $body + "\n\nDiff:\n" + $diff)
+                }
+              ]
+            }')
+
+          RESPONSE=$(curl -s --max-time 60 https://api.openai.com/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $OPENAI_API_KEY" \
+            -d "$PAYLOAD")
+
+          RESULT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+
+          if [ "$RESULT" = "null" ] || [ -z "$RESULT" ]; then
+            echo "OpenAI API error:"
+            echo "$RESPONSE" | jq .
+            exit 1
+          fi
+
+          QUALIFIES=$(echo "$RESULT" | jq -r '.qualifies')
+          REASONING=$(echo "$RESULT" | jq -r '.reasoning')
+          SCOPE=$(echo "$RESULT" | jq -r '.scope')
+
+          echo "qualifies=$QUALIFIES" >> "$GITHUB_OUTPUT"
+
+          SCOPE_DELIM="$(openssl rand -hex 16)"
+          {
+            echo "scope<<$SCOPE_DELIM"
+            echo "$SCOPE"
+            echo "$SCOPE_DELIM"
+          } >> "$GITHUB_OUTPUT"
+
+          REASONING_DELIM="$(openssl rand -hex 16)"
+          {
+            echo "reasoning<<$REASONING_DELIM"
+            echo "$REASONING"
+            echo "$REASONING_DELIM"
+          } >> "$GITHUB_OUTPUT"
+
+      # The three eval steps (oversized / restricted / llm) are mutually
+      # exclusive — exactly one populates outputs, so the `||` chain picks
+      # the populated one.
+      - name: Apply outcome — label, comment, and bot review
+        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
+          QUALIFIES: ${{ steps.oversized.outputs.qualifies || steps.restricted.outputs.qualifies || steps.llm.outputs.qualifies }}
+          SCOPE: ${{ steps.oversized.outputs.scope || steps.restricted.outputs.scope || steps.llm.outputs.scope }}
+          REASONING: ${{ steps.oversized.outputs.reasoning || steps.restricted.outputs.reasoning || steps.llm.outputs.reasoning }}
+        with:
+          script: |
+            const prNumber = parseInt(process.env.PR_NUMBER, 10);
+            const headSha = process.env.HEAD_SHA;
+            const qualifies = process.env.QUALIFIES === "true";
+            const scope = process.env.SCOPE;
+            const reasoning = process.env.REASONING;
+
+            // Drop previous bot assessment comments to keep the PR thread tidy.
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+            });
+            for (const comment of comments) {
+              if (
+                comment.user?.login === "github-actions[bot]" &&
+                comment.body?.startsWith("**Automated low-risk assessment**")
+              ) {
+                await github.rest.issues.deleteComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  comment_id: comment.id,
+                });
+              }
+            }
+
+            if (qualifies) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                labels: ["low-risk-change"],
+              });
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: [
+                  "**Automated low-risk assessment**",
+                  "",
+                  "This PR was evaluated against the repository's [Low-Risk Pull Requests](https://github.com/langwatch/langwatch/blob/main/dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure.",
+                  `- **Scope:** ${scope}`,
+                  "- **Exclusions confirmed:** no changes to auth, security settings, database schema, business-critical logic, or external integrations.",
+                  "- **Classification:** `low-risk-change` under the documented policy.",
+                  "",
+                  `> ${reasoning}`,
+                  "",
+                  "An approving review has been submitted by automation. The PR may merge once required CI checks pass.",
+                ].join("\n"),
+              });
+
+              await github.rest.pulls.createReview({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: prNumber,
+                commit_id: headSha,
+                event: "APPROVE",
+                body: "Approved by automation: PR qualifies as `low-risk-change` under the documented policy.",
+              });
+              core.info(`PR #${prNumber} labeled low-risk-change and bot-approved.`);
+            } else {
+              try {
+                await github.rest.issues.removeLabel({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: prNumber,
+                  name: "low-risk-change",
+                });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: prNumber,
+                body: [
+                  "**Automated low-risk assessment**",
+                  "",
+                  "This PR was evaluated against the repository's [Low-Risk Pull Requests](https://github.com/langwatch/langwatch/blob/main/dev/docs/LOW_RISK_PULL_REQUESTS.md) procedure and **does not qualify** as low risk.",
+                  "",
+                  `> ${reasoning}`,
+                  "",
+                  "This PR requires a manual review before merging.",
+                ].join("\n"),
+              });
+
+              core.info(`PR #${prNumber} does not qualify as low-risk; manual review required.`);
+            }
