@@ -10,7 +10,7 @@ import { BulkReplayWizard } from "./BulkReplayWizard";
 import { SingleAggregateReplay } from "./SingleAggregateReplay";
 
 export function ReplayWizardContent() {
-  const { hasAccess: canManage } = useOpsPermission();
+  const { hasAccess } = useOpsPermission();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
@@ -24,7 +24,7 @@ export function ReplayWizardContent() {
 
         <BulkReplayWizard onReplayStarted={() => setDrawerOpen(true)} />
 
-        {canManage && projections.length > 0 && (
+        {hasAccess && projections.length > 0 && (
           <Collapsible.Root
             open={advancedOpen}
             onOpenChange={(e) => setAdvancedOpen(e.open)}

@@ -14,7 +14,7 @@ import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
 
 export function BlockedCard({ queueNames }: { queueNames: string[] }) {
-  const { hasAccess: canManage } = useOpsPermission();
+  const { hasAccess } = useOpsPermission();
   const utils = api.useContext();
 
   const blockedQuery = api.ops.getBlockedSummary.useQuery();
@@ -57,7 +57,7 @@ export function BlockedCard({ queueNames }: { queueNames: string[] }) {
               Blocked — {blockedQuery.data.totalBlocked} groups, {blockedQuery.data.clusters.length} error patterns
             </Text>
             <Spacer />
-            {canManage && (
+            {hasAccess && (
               <HStack gap={1.5} flexWrap="wrap">
                 {queuesWithBlocked.map((q) => (
                   <Button key={q.name} variant="outline" size="2xs" colorPalette="orange" onClick={() => setUnblockAllTarget(q.name)}>

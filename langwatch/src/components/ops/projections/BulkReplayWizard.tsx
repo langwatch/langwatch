@@ -27,7 +27,7 @@ export function BulkReplayWizard({
 }: {
   onReplayStarted: () => void;
 }) {
-  const { hasAccess: canManage } = useOpsPermission();
+  const { hasAccess } = useOpsPermission();
 
   const [tenantIds, setTenantIds] = useState<string[]>([]);
   const [allTenants, setAllTenants] = useState(false);
@@ -411,7 +411,7 @@ export function BulkReplayWizard({
                   </Stat.Root>
                 </HStack>
 
-                {canManage && (
+                {hasAccess && (
                   <VStack align="stretch" gap={3}>
                     <Box>
                       <Text

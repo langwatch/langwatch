@@ -12,7 +12,7 @@ export function PipelineTreeNode({
   onToggleExpand,
   onPause,
   onUnpause,
-  canManage,
+  hasAccess,
   queueNames,
 }: {
   node: PipelineNode;
@@ -23,7 +23,7 @@ export function PipelineTreeNode({
   onToggleExpand: (path: string) => void;
   onPause: (key: string) => void;
   onUnpause: (key: string) => void;
-  canManage: boolean;
+  hasAccess: boolean;
   queueNames: string[];
 }) {
   const path = parentPath ? `${parentPath}/${node.name}` : node.name;
@@ -79,7 +79,7 @@ export function PipelineTreeNode({
           )}
         </HStack>
 
-        {canManage && (
+        {hasAccess && (
           <Box flexShrink={0} onClick={(e) => e.stopPropagation()}>
             {directlyPaused ? (
               <Button variant="ghost" size="2xs" colorPalette="green" onClick={() => onUnpause(path)}>
@@ -106,7 +106,7 @@ export function PipelineTreeNode({
             onToggleExpand={onToggleExpand}
             onPause={onPause}
             onUnpause={onUnpause}
-            canManage={canManage}
+            hasAccess={hasAccess}
             queueNames={queueNames}
           />
         ))}

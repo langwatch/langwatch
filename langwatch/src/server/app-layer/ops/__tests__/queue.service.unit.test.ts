@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { QueueService } from "../queue.service";
 import type { QueueRepository, DlqGroupInfo } from "../repositories/queue.repository";
 import type { GroupInfo, QueueInfo } from "../types";

@@ -44,7 +44,7 @@ export function ReplayProgressContent({ runId }: { runId: string }) {
     },
   });
 
-  const { hasAccess: canManage } = useOpsPermission();
+  const { hasAccess } = useOpsPermission();
 
   const liveStatus = statusQuery.data;
   const historyEntry = historyQuery.data;
@@ -119,7 +119,7 @@ export function ReplayProgressContent({ runId }: { runId: string }) {
             stateColor={stateColor}
             progressPercent={progressPercent}
             isRunning={!!isRunning}
-            canManage={canManage}
+            hasAccess={hasAccess}
             cancelMutation={cancelMutation}
           />
         )}
@@ -137,14 +137,14 @@ function LiveRunView({
   stateColor,
   progressPercent,
   isRunning,
-  canManage,
+  hasAccess,
   cancelMutation,
 }: {
   status: ReplayStatus;
   stateColor: string;
   progressPercent: number;
   isRunning: boolean;
-  canManage: boolean;
+  hasAccess: boolean;
   cancelMutation: { isPending: boolean; mutate: () => void };
 }) {
   const throughputRate = useMemo(() => {
@@ -234,7 +234,7 @@ function LiveRunView({
                   </Badge>
                 )}
               </HStack>
-              {isRunning && canManage && (
+              {isRunning && hasAccess && (
                 <Button
                   size="xs"
                   colorPalette="red"

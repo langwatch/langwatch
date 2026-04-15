@@ -15,7 +15,7 @@ import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { api } from "~/utils/api";
 
 export function DlqCard({ queueNames }: { queueNames: string[] }) {
-  const { hasAccess: canManage } = useOpsPermission();
+  const { hasAccess } = useOpsPermission();
   const utils = api.useContext();
 
   const dlqQuery = api.ops.listAllDlqGroups.useQuery(undefined, { refetchInterval: 10000 });
@@ -52,7 +52,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
               Dead Letter Queue — {groups.length} group{groups.length !== 1 ? "s" : ""}
             </Text>
             <Spacer />
-            {canManage && (
+            {hasAccess && (
               <HStack gap={1.5} flexWrap="wrap">
                 {dlqQueueNames.map((qn) => {
                   const count = groups.filter((g) => g.queueName === qn).length;
@@ -83,7 +83,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
                   <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
                   <Table.ColumnHeader>Error</Table.ColumnHeader>
                   <Table.ColumnHeader textAlign="end" width="50px">Jobs</Table.ColumnHeader>
-                  {canManage && <Table.ColumnHeader width="70px">Actions</Table.ColumnHeader>}
+                  {hasAccess && <Table.ColumnHeader width="70px">Actions</Table.ColumnHeader>}
                 </Table.Row>
               </Table.Header>
               <Table.Body>
@@ -94,7 +94,7 @@ export function DlqCard({ queueNames }: { queueNames: string[] }) {
                     <Table.Cell><Text textStyle="xs" color="fg.muted">{group.pipelineName ?? "\u2014"}</Text></Table.Cell>
                     <Table.Cell><Text textStyle="xs" color="red.500" truncate maxWidth="220px" title={group.error ?? undefined}>{group.error ?? ""}</Text></Table.Cell>
                     <Table.Cell textAlign="end"><Text textStyle="xs">{group.jobCount}</Text></Table.Cell>
-                    {canManage && (
+                    {hasAccess && (
                       <Table.Cell>
                         <Button variant="outline" size="2xs" colorPalette="green" onClick={() => setReplayTarget({ queueName: group.queueName, groupId: group.groupId })}>Replay</Button>
                       </Table.Cell>

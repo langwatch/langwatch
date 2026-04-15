@@ -509,7 +509,6 @@ export class ReplayService {
     const concurrency = config.concurrency ?? 10;
 
     const startTime = Date.now();
-    let totalAggregatesReplayed = 0;
     let totalEventsReplayed = 0;
     let totalBatchErrors = 0;
     let firstError: string | undefined;

@@ -24,7 +24,7 @@ import { GroupDetailDialog } from "./GroupDetailDialog";
 import type { StatusFilter } from "./types";
 
 export function GroupsCard({ queueNames }: { queueNames: string[] }) {
-  const { hasAccess: canManage } = useOpsPermission();
+  const { hasAccess } = useOpsPermission();
   const utils = api.useContext();
 
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -145,7 +145,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                       <Table.ColumnHeader textAlign="end" width="45px">Retry</Table.ColumnHeader>
                       <Table.ColumnHeader width="75px">Oldest</Table.ColumnHeader>
                       <Table.ColumnHeader width="65px">Status</Table.ColumnHeader>
-                      {canManage && <Table.ColumnHeader width="100px">Actions</Table.ColumnHeader>}
+                      {hasAccess && <Table.ColumnHeader width="100px">Actions</Table.ColumnHeader>}
                     </Table.Row>
                   </Table.Header>
                   <Table.Body>
@@ -190,7 +190,7 @@ export function GroupsCard({ queueNames }: { queueNames: string[] }) {
                             <Badge size="xs" colorPalette="gray" variant="subtle">OK</Badge>
                           )}
                         </Table.Cell>
-                        {canManage && (
+                        {hasAccess && (
                           <Table.Cell onClick={(e) => e.stopPropagation()}>
                             <HStack gap={1}>
                               {group.isBlocked && (

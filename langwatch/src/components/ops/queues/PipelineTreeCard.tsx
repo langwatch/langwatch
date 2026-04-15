@@ -17,7 +17,7 @@ export function PipelineTreeCard({
   pausedKeys: string[];
   queueNames: string[];
 }) {
-  const { hasAccess: canManage } = useOpsPermission();
+  const { hasAccess } = useOpsPermission();
   const utils = api.useContext();
   const [filter, setFilter] = useState("");
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(() => new Set());
@@ -99,7 +99,7 @@ export function PipelineTreeCard({
               onToggleExpand={handleToggleExpand}
               onPause={handlePause}
               onUnpause={handleUnpause}
-              canManage={canManage}
+              hasAccess={hasAccess}
               queueNames={queueNames}
             />
           ))

@@ -35,7 +35,7 @@ export function ReplayProgressDrawer({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const { hasAccess: canManage } = useOpsPermission();
+  const { hasAccess } = useOpsPermission();
 
   const statusQuery = useReplayStatus({
     refetchInterval: open ? 1000 : false,
@@ -243,7 +243,7 @@ export function ReplayProgressDrawer({
                 Full Page View
               </Button>
             )}
-            {isRunning && canManage && (
+            {isRunning && hasAccess && (
               <Button
                 size="sm"
                 colorPalette="red"
