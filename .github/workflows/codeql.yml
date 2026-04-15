@@ -15,6 +15,10 @@ on:
   schedule:
     - cron: "00 08 * * *"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   changes:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft != true
