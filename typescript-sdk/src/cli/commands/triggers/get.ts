@@ -52,6 +52,9 @@ export const getTriggerCommand = async (
     console.log(`    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`);
     console.log(`    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`);
     console.log(`    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`);
+    if ((trigger as Record<string, unknown>).platformUrl) {
+      console.log(`    ${chalk.bold("View:")}   ${chalk.underline((trigger as Record<string, unknown>).platformUrl as string)}`);
+    }
 
     if (Object.keys(trigger.filters).length > 0) {
       console.log();

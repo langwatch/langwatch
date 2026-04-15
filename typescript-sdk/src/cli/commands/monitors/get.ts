@@ -66,6 +66,9 @@ export const getMonitorCommand = async (
     console.log(
       `  ${chalk.gray("Created:")}   ${new Date(monitor.createdAt).toLocaleString()}`
     );
+    if ((monitor as Record<string, unknown>).platformUrl) {
+      console.log(`  ${chalk.bold("View:")}     ${chalk.underline((monitor as Record<string, unknown>).platformUrl as string)}`);
+    }
     console.log();
   } catch (error) {
     spinner.fail();

@@ -29,6 +29,10 @@ export const getAgentCommand = async (id: string, options?: { format?: string })
     console.log(`  ${chalk.gray("Created:")} ${new Date(agent.createdAt).toLocaleString()}`);
     console.log(`  ${chalk.gray("Updated:")} ${new Date(agent.updatedAt).toLocaleString()}`);
 
+    if ((agent as unknown as Record<string, unknown>).platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline((agent as unknown as Record<string, unknown>).platformUrl as string)}`);
+    }
+
     if (agent.config && Object.keys(agent.config).length > 0) {
       console.log();
       console.log(chalk.bold("  Config:"));

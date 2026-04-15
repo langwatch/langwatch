@@ -29,6 +29,8 @@ export const createEvaluatorCommand = async (
 
     if (options.format === "json") {
       console.log(JSON.stringify(evaluator, null, 2));
+    } else if ((evaluator as Record<string, unknown>).platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline((evaluator as Record<string, unknown>).platformUrl as string)}`);
     }
   } catch (error) {
     spinner.fail();

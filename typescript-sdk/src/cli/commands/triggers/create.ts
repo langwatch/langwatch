@@ -69,6 +69,9 @@ export const createTriggerCommand = async (
     console.log();
     console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);
     console.log(`  ${chalk.gray("Action:")} ${trigger.action}`);
+    if ((trigger as Record<string, unknown>).platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline((trigger as Record<string, unknown>).platformUrl as string)}`);
+    }
     console.log();
   } catch (error) {
     spinner.fail();

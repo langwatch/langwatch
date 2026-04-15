@@ -34,6 +34,7 @@ import {
   promptServiceMiddleware,
 } from "../../middleware/prompt-service";
 import { baseResponses, conflictResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import {
   type ApiResponsePrompt,
   apiResponsePromptWithVersionDataSchema,
@@ -95,7 +96,13 @@ app.get(
     });
 
     return c.json(
-      apiResponsePromptWithVersionDataSchema.array().parse(configs),
+      apiResponsePromptWithVersionDataSchema.array().parse(configs).map((p) => ({
+        ...p,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/prompts`,
+        }),
+      })),
     );
   },
 );
@@ -437,7 +444,13 @@ app.get(
     );
 
     return c.json(
-      apiResponsePromptWithVersionDataSchema.array().parse(versions),
+      apiResponsePromptWithVersionDataSchema.array().parse(versions).map((v) => ({
+        ...v,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/prompts`,
+        }),
+      })),
     );
   },
 );
@@ -484,9 +497,13 @@ app.post(
         "Successfully restored prompt version",
       );
 
-      return c.json(
-        apiResponsePromptWithVersionDataSchema.parse(restored),
-      );
+      return c.json({
+        ...apiResponsePromptWithVersionDataSchema.parse(restored),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/prompts`,
+        }),
+      });
     } catch (error) {
       if (error instanceof NotFoundError) {
         return c.json({ error: error.message }, 404);
@@ -595,7 +612,13 @@ app.get(
         });
       }
 
-      return c.json(apiResponsePromptWithVersionDataSchema.parse(config));
+      return c.json({
+        ...apiResponsePromptWithVersionDataSchema.parse(config),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/prompts`,
+        }),
+      });
     } catch (error: unknown) {
       if (error instanceof HTTPException) {
         throw error;
@@ -686,7 +709,13 @@ app.post(
         projectId: project.id,
       });
 
-      return c.json(apiResponsePromptWithVersionDataSchema.parse(newConfig));
+      return c.json({
+        ...apiResponsePromptWithVersionDataSchema.parse(newConfig),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/prompts`,
+        }),
+      });
     } catch (error: any) {
       logger.error({ projectId: project.id, error }, "Error creating prompt");
       if (error instanceof TagValidationError) {
@@ -905,9 +934,13 @@ app.put(
         "Successfully updated prompt",
       );
 
-      return c.json(
-        apiResponsePromptWithVersionDataSchema.parse(updatedConfig),
-      );
+      return c.json({
+        ...apiResponsePromptWithVersionDataSchema.parse(updatedConfig),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/prompts`,
+        }),
+      });
     } catch (error: any) {
       logger.error({ projectId, promptId: id, error }, "Error updating prompt");
       if (error instanceof TagValidationError) {

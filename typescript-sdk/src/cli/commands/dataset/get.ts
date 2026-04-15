@@ -47,6 +47,9 @@ export const getCommand = async (slugOrId: string, options?: { format?: string }
         `  ${chalk.bold("Updated:")}    ${formatRelativeTime(dataset.updatedAt)}`,
       );
     }
+    if (dataset.platformUrl) {
+      console.log(`  ${chalk.bold("View:")}       ${chalk.underline(dataset.platformUrl)}`);
+    }
 
     // Show a preview of the first 10 records
     if (dataset.entries.length > 0) {

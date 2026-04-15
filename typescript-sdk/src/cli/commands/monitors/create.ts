@@ -79,6 +79,9 @@ export const createMonitorCommand = async (
     console.log(`  ${chalk.gray("ID:")}   ${chalk.green(monitor.id)}`);
     console.log(`  ${chalk.gray("Type:")} ${monitor.checkType}`);
     console.log(`  ${chalk.gray("Mode:")} ${monitor.executionMode}`);
+    if ((monitor as Record<string, unknown>).platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline((monitor as Record<string, unknown>).platformUrl as string)}`);
+    }
     console.log();
   } catch (error) {
     spinner.fail();

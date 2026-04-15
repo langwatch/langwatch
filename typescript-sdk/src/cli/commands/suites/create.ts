@@ -79,6 +79,9 @@ export const createSuiteCommand = async (
     console.log(`  ${chalk.gray("Targets:")}   ${suite.targets.length}`);
     console.log(`  ${chalk.gray("Repeat:")}    ${suite.repeatCount}`);
     console.log();
+    if ((suite as Record<string, unknown>).platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline((suite as Record<string, unknown>).platformUrl as string)}`);
+    }
     console.log(
       chalk.gray(`Run it with: ${chalk.cyan(`langwatch suite run ${suite.id}`)}`),
     );

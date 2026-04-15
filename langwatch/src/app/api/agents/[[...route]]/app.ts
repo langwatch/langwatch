@@ -20,6 +20,7 @@ import {
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { NotFoundError, UnprocessableEntityError } from "../../shared/errors";
+import { platformUrl } from "../../shared/platform-url";
 import { ZodError } from "zod";
 import { handleAgentError } from "./error-handler";
 
@@ -119,7 +120,16 @@ export const app = new Hono<{ Variables: Variables }>()
         limit,
       });
 
-      return c.json(result);
+      return c.json({
+        ...result,
+        data: result.data.map((a: { id: string }) => ({
+          ...a,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/agents`,
+          }),
+        })),
+      });
     },
   )
 
@@ -158,6 +168,10 @@ export const app = new Hono<{ Variables: Variables }>()
           config: agent.config,
           createdAt: agent.createdAt,
           updatedAt: agent.updatedAt,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/agents`,
+          }),
         },
         201,
       );
@@ -192,6 +206,10 @@ export const app = new Hono<{ Variables: Variables }>()
         config: agent.config,
         createdAt: agent.createdAt,
         updatedAt: agent.updatedAt,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/agents`,
+        }),
       });
     },
   )
@@ -237,6 +255,10 @@ export const app = new Hono<{ Variables: Variables }>()
         config: agent.config,
         createdAt: agent.createdAt,
         updatedAt: agent.updatedAt,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/agents`,
+        }),
       });
     },
   )

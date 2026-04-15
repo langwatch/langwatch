@@ -13,6 +13,7 @@ import {
   resourceLimitMiddleware,
 } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 
 const logger = createLogger("langwatch:api:scenarios");
 
@@ -77,7 +78,13 @@ app.get(
     const service = getService();
     const scenarios = await service.getAll({ projectId: project.id });
 
-    return c.json(scenarios.map(toScenarioResponse));
+    return c.json(scenarios.map((s) => ({
+      ...toScenarioResponse(s),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/simulations/scenarios`,
+      }),
+    })));
   },
 );
 
@@ -115,7 +122,13 @@ app.get(
       return c.json({ error: "Scenario not found" }, 404);
     }
 
-    return c.json(toScenarioResponse(scenario));
+    return c.json({
+      ...toScenarioResponse(scenario),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/simulations/scenarios`,
+      }),
+    });
   },
 );
 
@@ -152,7 +165,13 @@ app.post(
       labels: body.labels,
     });
 
-    return c.json(toScenarioResponse(scenario), 201);
+    return c.json({
+      ...toScenarioResponse(scenario),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/simulations/scenarios`,
+      }),
+    }, 201);
   },
 );
 
@@ -202,7 +221,13 @@ app.put(
       ...(body.labels !== undefined && { labels: body.labels }),
     });
 
-    return c.json(toScenarioResponse(scenario));
+    return c.json({
+      ...toScenarioResponse(scenario),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/simulations/scenarios`,
+      }),
+    });
   },
 );
 

@@ -14,6 +14,7 @@ import {
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import { handleError } from "../../middleware";
 
 patchZodOpenapi();
@@ -78,7 +79,13 @@ export const app = new Hono<{ Variables: Variables }>()
         orderBy: { updatedAt: "desc" },
       });
 
-      return c.json(workflows.map(toWorkflowResponse));
+      return c.json(workflows.map((w) => ({
+        ...toWorkflowResponse(w),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/workflows`,
+        }),
+      })));
     },
   )
 
@@ -117,7 +124,13 @@ export const app = new Hono<{ Variables: Variables }>()
         return c.json({ error: "Workflow not found" }, 404);
       }
 
-      return c.json(toWorkflowResponse(workflow));
+      return c.json({
+        ...toWorkflowResponse(workflow),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/workflows`,
+        }),
+      });
     },
   )
 
@@ -167,7 +180,13 @@ export const app = new Hono<{ Variables: Variables }>()
         data: body,
       });
 
-      return c.json(toWorkflowResponse(updated));
+      return c.json({
+        ...toWorkflowResponse(updated),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/workflows`,
+        }),
+      });
     },
   )
 

@@ -14,6 +14,7 @@ import {
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import { badRequestSchema } from "../../shared/schemas";
 
 patchZodOpenapi();
@@ -139,7 +140,13 @@ export const app = new Hono<{ Variables: Variables }>()
         orderBy: { createdAt: "asc" },
       });
 
-      return c.json(monitors.map(toMonitorResponse));
+      return c.json(monitors.map((m) => ({
+        ...toMonitorResponse(m),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/evaluations/${m.id}/edit`,
+        }),
+      })));
     }
   )
 
@@ -182,7 +189,13 @@ export const app = new Hono<{ Variables: Variables }>()
         return c.json({ error: "Monitor not found" }, 404);
       }
 
-      return c.json(toMonitorResponse(monitor));
+      return c.json({
+        ...toMonitorResponse(monitor),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/evaluations/${monitor.id}/edit`,
+        }),
+      });
     }
   )
 
@@ -247,7 +260,13 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       });
 
-      return c.json(toMonitorResponse(monitor), 201);
+      return c.json({
+        ...toMonitorResponse(monitor),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/evaluations/${monitor.id}/edit`,
+        }),
+      }, 201);
     }
   )
 
@@ -330,7 +349,13 @@ export const app = new Hono<{ Variables: Variables }>()
         data,
       });
 
-      return c.json(toMonitorResponse(monitor));
+      return c.json({
+        ...toMonitorResponse(monitor),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/evaluations/${monitor.id}/edit`,
+        }),
+      });
     }
   )
 

@@ -13,6 +13,7 @@ import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 
@@ -132,9 +133,19 @@ app.post(
         metadata: trace.metadata,
         error: trace.error,
         evaluations: trace.evaluations,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/messages/${trace.trace_id}`,
+        }),
       }));
     } else {
-      traces = enrichedTraces;
+      traces = enrichedTraces.map((trace) => ({
+        ...trace,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/messages/${trace.trace_id}`,
+        }),
+      }));
     }
 
     return c.json({
@@ -238,6 +249,10 @@ app.get(
         timestamps: trace.timestamps,
         metadata: trace.metadata,
         evaluations,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/messages/${traceId}`,
+        }),
       });
     }
 
@@ -246,6 +261,10 @@ app.get(
       ...trace,
       evaluations,
       ascii_tree: asciiTree,
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/messages/${traceId}`,
+      }),
     });
   },
 );

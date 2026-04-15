@@ -19,6 +19,7 @@ import {
   evaluatorServiceMiddleware,
 } from "../../middleware/evaluator-service";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import {
   apiResponseEvaluatorSchema,
   createEvaluatorInputSchema,
@@ -68,7 +69,13 @@ app.get(
       projectId: project.id,
     });
 
-    return c.json(apiResponseEvaluatorSchema.array().parse(evaluators));
+    return c.json(apiResponseEvaluatorSchema.array().parse(evaluators).map((e) => ({
+      ...e,
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/evaluators`,
+      }),
+    })));
   },
 );
 
@@ -124,7 +131,13 @@ app.get(
       });
     }
 
-    return c.json(apiResponseEvaluatorSchema.parse(evaluator));
+    return c.json({
+      ...apiResponseEvaluatorSchema.parse(evaluator),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/evaluators`,
+      }),
+    });
   },
 );
 
@@ -173,7 +186,13 @@ app.post(
       "Successfully created evaluator",
     );
 
-    return c.json(apiResponseEvaluatorSchema.parse(enriched));
+    return c.json({
+      ...apiResponseEvaluatorSchema.parse(enriched),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/evaluators`,
+      }),
+    });
   },
 );
 
@@ -268,7 +287,13 @@ app.put(
       "Successfully updated evaluator",
     );
 
-    return c.json(apiResponseEvaluatorSchema.parse(enriched));
+    return c.json({
+      ...apiResponseEvaluatorSchema.parse(enriched),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/evaluators`,
+      }),
+    });
   },
 );
 

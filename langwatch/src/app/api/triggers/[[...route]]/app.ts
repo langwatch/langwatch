@@ -15,6 +15,7 @@ import {
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import { handleError } from "../../middleware";
 
 patchZodOpenapi();
@@ -122,7 +123,13 @@ export const app = new Hono<{ Variables: Variables }>()
         orderBy: { createdAt: "desc" },
       });
 
-      return c.json(triggers.map(toTriggerResponse));
+      return c.json(triggers.map((t) => ({
+        ...toTriggerResponse(t),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/triggers`,
+        }),
+      })));
     },
   )
 
@@ -162,7 +169,13 @@ export const app = new Hono<{ Variables: Variables }>()
         return c.json({ error: "Trigger not found" }, 404);
       }
 
-      return c.json(toTriggerResponse(trigger));
+      return c.json({
+        ...toTriggerResponse(trigger),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/triggers`,
+        }),
+      });
     },
   )
 
@@ -203,7 +216,13 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       });
 
-      return c.json(toTriggerResponse(trigger), 201);
+      return c.json({
+        ...toTriggerResponse(trigger),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/triggers`,
+        }),
+      }, 201);
     },
   )
 
@@ -258,7 +277,13 @@ export const app = new Hono<{ Variables: Variables }>()
         data,
       });
 
-      return c.json(toTriggerResponse(updated));
+      return c.json({
+        ...toTriggerResponse(updated),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/triggers`,
+        }),
+      });
     },
   )
 

@@ -12,6 +12,7 @@ import {
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import { handleError } from "../../middleware";
 import { SimulationFacade } from "~/server/simulations/simulation.facade";
 
@@ -124,7 +125,16 @@ export const app = new Hono<{ Variables: Variables }>()
         }
 
         const runs = "runs" in result ? result.runs : [];
-        return c.json({ runs, hasMore: false });
+        return c.json({
+          runs: runs.map((r) => ({
+            ...r,
+            platformUrl: platformUrl({
+              projectSlug: project.slug,
+              path: `/simulations`,
+            }),
+          })),
+          hasMore: false,
+        });
       }
 
       if (scenarioSetId) {
@@ -137,7 +147,13 @@ export const app = new Hono<{ Variables: Variables }>()
         });
 
         return c.json({
-          runs: result.runs,
+          runs: result.runs.map((r) => ({
+            ...r,
+            platformUrl: platformUrl({
+              projectSlug: project.slug,
+              path: `/simulations`,
+            }),
+          })),
           hasMore: result.hasMore,
           nextCursor: result.nextCursor,
         });
@@ -155,7 +171,13 @@ export const app = new Hono<{ Variables: Variables }>()
       }
 
       return c.json({
-        runs: result.runs,
+        runs: result.runs.map((r) => ({
+          ...r,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/simulations`,
+          }),
+        })),
         hasMore: result.hasMore,
         nextCursor: result.nextCursor,
       });
@@ -200,7 +222,13 @@ export const app = new Hono<{ Variables: Variables }>()
         return c.json({ error: "Simulation run not found" }, 404);
       }
 
-      return c.json(run);
+      return c.json({
+        ...run,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/simulations`,
+        }),
+      });
     },
   )
 
