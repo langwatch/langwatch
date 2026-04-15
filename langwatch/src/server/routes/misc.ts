@@ -76,37 +76,11 @@ import { slugify } from "~/utils/slugify";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { createLogger } from "~/utils/logger/server";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
-import {
-  createUnifiedAuthMiddleware,
-  requirePatPermission,
-  type UnifiedAuthVariables,
-} from "~/server/pat/auth-middleware";
+import { TokenResolver } from "~/server/pat/token-resolver";
+import { extractCredentials } from "~/server/pat/auth-middleware";
 
 const logger = createLogger("langwatch:misc");
-// Shared auth middlewares for every PAT-aware handler in this file.
-// `createUnifiedAuthMiddleware` runs the extractCredentials → TokenResolver
-// → setContext → late markUsed pipeline once; `requirePatPermission`
-// enforces the per-route ceiling and returns 403 on denial.
-const authMiddleware = createUnifiedAuthMiddleware({ prisma });
-const requireAnalyticsView = requirePatPermission({
-  prisma,
-  permission: "analytics:view",
-});
-// TODO(pat): move DSPy steps under a dedicated experiments permission once
-// the RBAC catalog has one. `workflows:manage` is the closest existing
-// ceiling — VIEWER blocked, ADMIN/MEMBER allowed.
-const requireWorkflowsManage = requirePatPermission({
-  prisma,
-  permission: "workflows:manage",
-});
-const requireTracesCreate = requirePatPermission({
-  prisma,
-  permission: "traces:create",
-});
-const requireTriggersManage = requirePatPermission({
-  prisma,
-  permission: "triggers:manage",
-});
+const tokenResolver = TokenResolver.create(prisma);
 
 export const app = new Hono<{ Variables: UnifiedAuthVariables }>().basePath(
   "/api",
@@ -682,8 +656,21 @@ const predefinedEventTypes = predefinedEventsSchemas.options.map(
   (schema) => schema.shape.event_type.value,
 );
 
-app.post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
-  const project = c.get("project");
+app.post("/track_event", async (c) => {
+  const credentials = extractCredentials(c);
+  if (!credentials) {
+    return c.json({ message: "Authentication required. Use X-Auth-Token header or Authorization: Bearer token." }, 401);
+  }
+
+  const resolved = await tokenResolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
+  });
+  if (!resolved) {
+    return c.json({ message: "Invalid auth token." }, 401);
+  }
+
+  const project = resolved.project;
 
   let rawBody: Record<string, any>;
   try {
