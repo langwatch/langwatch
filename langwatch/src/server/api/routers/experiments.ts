@@ -449,7 +449,7 @@ export const experimentsRouter = createTRPCRouter({
           })
           .catch(mapExperimentError);
       } else if (input.experimentSlug) {
-        return await experimentService
+        return await experimentService()
           .getBySlug({
             projectId: input.projectId,
             slug: input.experimentSlug,
@@ -502,13 +502,9 @@ export const experimentsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiments = await prisma.experiment.findMany({
-        where: {
-          projectId: input.projectId,
-        },
+      return await experimentService().getAll({
+        projectId: input.projectId,
       });
-
-      return experiments;
     }),
 
   getAllForEvaluationsList: protectedProcedure
@@ -762,7 +758,7 @@ export const experimentsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), experimentId: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await experimentService
+      const experiment = await experimentService()
         .getById({
           projectId: input.projectId,
           id: input.experimentId,
@@ -788,7 +784,7 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await experimentService
+      const experiment = await experimentService()
         .getById({
           projectId: input.projectId,
           id: input.experimentId,
