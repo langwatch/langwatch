@@ -13,20 +13,19 @@
 import { ExperimentType } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { globalForApp } from "../../../app-layer/app";
+import { getApp, globalForApp } from "../../../app-layer/app";
 import { createTestApp } from "../../../app-layer/presets";
 import { getTestUser } from "../../../../utils/testUtils";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { prisma } from "../../../db";
-import { ExperimentService } from "../../../experiments/experiment.service";
 
 globalForApp.__langwatch_app = createTestApp();
 
 describe("Feature: Experiment slug deduplication", () => {
   const projectId = "test-project-id";
   const createdExperimentIds: string[] = [];
-  const service = ExperimentService.create(prisma);
+  const service = getApp().experiments;
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   /**

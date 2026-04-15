@@ -8,7 +8,6 @@ import {
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { ExperimentNotFoundError } from "../../experiments/errors";
-import { ExperimentService } from "../../experiments/experiment.service";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -64,8 +63,8 @@ const mapExperimentError = (error: unknown): never => {
   throw error;
 };
 
-/** Module-level service for query procedures that don't have ctx.prisma. */
-const experimentService = ExperimentService.create(prisma);
+/** Experiment service from app dependency container. */
+const experimentService = () => getApp().experiments;
 
 export const experimentsRouter = createTRPCRouter({
   saveExperiment: protectedProcedure
@@ -80,7 +79,7 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
-      const experimentService = ExperimentService.create(ctx.prisma);
+      const experiments = experimentService();
 
       // Enforce experiment limit only when creating new experiments
       if (!input.experimentId) {
@@ -90,10 +89,10 @@ export const experimentsRouter = createTRPCRouter({
       let workflowId = input.dsl.workflow_id;
       const name =
         input.workbenchState.name ??
-        (await experimentService.findNextDraftName({
+        (await experiments.findNextDraftName({
           projectId: input.projectId,
         }));
-      const slug = await experimentService.generateUniqueSlug({
+      const slug = await experiments.generateUniqueSlug({
         baseSlug: slugify(name),
         projectId: input.projectId,
         excludeExperimentId: input.experimentId,
@@ -189,7 +188,7 @@ export const experimentsRouter = createTRPCRouter({
 
       const experimentId = input.experimentId ?? `experiment_${nanoid()}`;
 
-      await experimentService.saveWithSlugRetry({
+      await experiments.saveWithSlugRetry({
         initialSlug: slug,
         execute: (s) => {
           const data = {
@@ -207,7 +206,7 @@ export const experimentsRouter = createTRPCRouter({
           });
         },
         regenerateSlug: () =>
-          experimentService.generateUniqueSlug({
+          experiments.generateUniqueSlug({
             baseSlug: slugify(name),
             projectId: input.projectId,
             excludeExperimentId: input.experimentId,
@@ -242,7 +241,7 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
-      const experimentService = ExperimentService.create(ctx.prisma);
+      const experiments = experimentService();
       const experimentId =
         input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
 
@@ -262,14 +261,14 @@ export const experimentsRouter = createTRPCRouter({
       // For existing experiments, keep the same slug to avoid breaking URLs
       const name =
         input.state.name ||
-        (await experimentService.findNextDraftName({
+        (await experiments.findNextDraftName({
           projectId: input.projectId,
         }));
 
       const rawSlug = input.state.experimentSlug ?? experimentId.slice(-8);
       let slug: string;
       if (isNewExperiment) {
-        slug = await experimentService.generateUniqueSlug({
+        slug = await experiments.generateUniqueSlug({
           baseSlug: rawSlug,
           projectId: input.projectId,
         });
@@ -280,7 +279,7 @@ export const experimentsRouter = createTRPCRouter({
       // Convert to plain JSON for Prisma storage
       const workbenchStateJson = JSON.parse(JSON.stringify(input.state));
 
-      await experimentService.saveWithSlugRetry({
+      await experiments.saveWithSlugRetry({
         initialSlug: slug,
         execute: (s) => {
           const data = {
@@ -297,7 +296,7 @@ export const experimentsRouter = createTRPCRouter({
           });
         },
         regenerateSlug: () =>
-          experimentService.generateUniqueSlug({
+          experiments.generateUniqueSlug({
             baseSlug: rawSlug,
             projectId: input.projectId,
           }),
@@ -329,7 +328,7 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await experimentService
+      const experiment = await experimentService()
         .getBySlug({
           projectId: input.projectId,
           slug: input.experimentSlug,
@@ -443,7 +442,7 @@ export const experimentsRouter = createTRPCRouter({
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       if (input.experimentId) {
-        return await experimentService
+        return await experimentService()
           .getById({
             projectId: input.projectId,
             id: input.experimentId,
@@ -474,7 +473,7 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await experimentService
+      const experiment = await experimentService()
         .getBySlug({
           projectId: input.projectId,
           slug: input.experimentSlug,
@@ -640,7 +639,7 @@ export const experimentsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await experimentService
+      const experiment = await experimentService()
         .getBySlug({
           projectId: input.projectId,
           slug: input.experimentSlug,
@@ -709,7 +708,7 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await experimentService
+      const experiment = await experimentService()
         .getBySlug({
           projectId: input.projectId,
           slug: input.experimentSlug,
@@ -1064,13 +1063,13 @@ export const experimentsRouter = createTRPCRouter({
 
       // Create new experiment with unique slug
       const experimentName = experiment.name ?? experiment.slug;
-      const copyService = ExperimentService.create(ctx.prisma);
-      const initialSlug = await copyService.generateUniqueSlug({
+      const experiments = experimentService();
+      const initialSlug = await experiments.generateUniqueSlug({
         baseSlug: slugify(experimentName),
         projectId: input.projectId,
       });
 
-      const { result: newExperiment } = await copyService.saveWithSlugRetry({
+      const { result: newExperiment } = await experiments.saveWithSlugRetry({
         initialSlug,
         execute: (s) =>
           ctx.prisma.experiment.create({
@@ -1088,7 +1087,7 @@ export const experimentsRouter = createTRPCRouter({
             },
           }),
         regenerateSlug: () =>
-          copyService.generateUniqueSlug({
+          experiments.generateUniqueSlug({
             baseSlug: slugify(experimentName),
             projectId: input.projectId,
           }),
@@ -1104,7 +1103,7 @@ export const experimentsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      return await experimentService.getLatest({
+      return await experimentService().getLatest({
         projectId: input.projectId,
       });
     }),
@@ -1186,13 +1185,13 @@ const copyEvaluationsV3Experiment = async ({
 
   // Generate unique slug for the new experiment
   const experimentName = experiment.name ?? experiment.slug;
-  const copyService = ExperimentService.create(ctx.prisma);
-  const initialSlug = await copyService.generateUniqueSlug({
+  const experiments = experimentService();
+  const initialSlug = await experiments.generateUniqueSlug({
     baseSlug: slugify(experimentName),
     projectId: targetProjectId,
   });
 
-  const { result: newExperiment } = await copyService.saveWithSlugRetry({
+  const { result: newExperiment } = await experiments.saveWithSlugRetry({
     initialSlug,
     execute: (s) =>
       ctx.prisma.experiment.create({
@@ -1206,7 +1205,7 @@ const copyEvaluationsV3Experiment = async ({
         },
       }),
     regenerateSlug: () =>
-      copyService.generateUniqueSlug({
+      experiments.generateUniqueSlug({
         baseSlug: slugify(experimentName),
         projectId: targetProjectId,
       }),
