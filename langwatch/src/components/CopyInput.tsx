@@ -90,7 +90,7 @@ export function CopyInput(
         readOnly
         style={{ paddingRight: isSecure ? "4rem" : "2rem" }}
         _hover={{
-          backgroundColor: "gray.50",
+          backgroundColor: "bg.subtle",
         }}
       />
     </InputGroup>
