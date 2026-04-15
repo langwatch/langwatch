@@ -6,6 +6,9 @@ import {
   getProjectionMetadata,
   getDejaViewProjections,
 } from "~/server/event-sourcing/pipelineRegistry";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:ops:event-explorer");
 
 export class EventExplorerService {
   constructor(readonly repo: EventExplorerRepository) {}
@@ -197,8 +200,11 @@ export class EventExplorerService {
         try {
           state = dejaViewProj.apply(state, event);
           appliedCount++;
-        } catch {
-          // skip events that fail to apply
+        } catch (err) {
+          logger.warn(
+            { error: err, eventId: row.eventId, projectionName: params.projectionName },
+            "Skipping event that failed to apply during projection state computation",
+          );
         }
       }
     }

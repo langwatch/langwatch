@@ -13,6 +13,9 @@ import type {
 } from "./types";
 import type { QueueRepository } from "./repositories/queue.repository";
 import { normalizeErrorMessage } from "./normalize-error-message";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:ops:metrics-collector");
 
 const THROUGHPUT_BUFFER_SIZE = 900;
 const METRICS_COLLECT_INTERVAL_MS = 2_000;
@@ -301,8 +304,8 @@ class OpsMetricsCollector {
       try {
         const data = this.getDashboardData();
         this.broadcast("dashboard", data);
-      } catch {
-        // ignore broadcast errors
+      } catch (err) {
+        logger.warn({ error: err }, "Failed to broadcast dashboard data");
       }
     }, SSE_PUSH_INTERVAL_MS);
     this.heartbeatInterval = setInterval(() => {
@@ -363,8 +366,8 @@ class OpsMetricsCollector {
   private async discoverQueues(): Promise<void> {
     try {
       this.groupQueueNames = await this.queueRepo.discoverQueueNames();
-    } catch {
-      // keep existing names on error
+    } catch (err) {
+      logger.warn({ error: err }, "Queue discovery failed, keeping existing names");
     }
   }
 
@@ -764,8 +767,8 @@ class OpsMetricsCollector {
 
       this.latestTotalCompleted = state.latestTotalCompleted;
       this.latestTotalFailed = state.latestTotalFailed;
-    } catch {
-      // start fresh on error
+    } catch (err) {
+      logger.warn({ error: err }, "Failed to restore persisted metrics state, starting fresh");
     }
   }
 
@@ -806,6 +809,17 @@ class OpsMetricsCollector {
       maxMemoryBytes: parseInt(get("maxmemory"), 10) || 0,
       connectedClients: parseInt(get("connected_clients"), 10) || 0,
     };
+  }
+
+  private pruneStaleCounters(): void {
+    const activeKeys = new Set(this.groupQueueNames);
+    for (const key of this.prevCompleted.keys()) {
+      if (key.startsWith(JOB_NAME_COUNTER_PREFIX)) continue;
+      if (!activeKeys.has(key)) {
+        this.prevCompleted.delete(key);
+        this.prevFailed.delete(key);
+      }
+    }
   }
 
   private async collect(): Promise<void> {
@@ -938,9 +952,12 @@ class OpsMetricsCollector {
       this.lastCpuUsage = process.cpuUsage();
       this.lastCpuTime = now;
 
-      this.persistState().catch(() => {});
-    } catch {
-      // collection error, retry next interval
+      this.pruneStaleCounters();
+      this.persistState().catch((err) => {
+        logger.warn({ error: err }, "Failed to persist metrics state");
+      });
+    } catch (err) {
+      logger.warn({ error: err }, "Metrics collection failed, retrying next interval");
     } finally {
       this.isCollecting = false;
     }
@@ -955,7 +972,9 @@ export function getOpsMetricsCollector(params: {
 }): OpsMetricsCollector {
   if (!singleton) {
     singleton = new OpsMetricsCollector(params);
-    singleton.start().catch(() => {});
+    singleton.start().catch((err) => {
+      logger.error({ error: err }, "Failed to start ops metrics collector");
+    });
   }
   return singleton;
 }

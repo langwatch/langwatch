@@ -250,4 +250,113 @@ describe("QueueService", () => {
       });
     });
   });
+
+  describe("unblockGroup()", () => {
+    describe("when group is blocked", () => {
+      it("delegates to repo and returns result", async () => {
+        const repo = createMockRepo({
+          unblockGroup: vi.fn().mockResolvedValue({ wasBlocked: true }),
+        });
+        const service = new QueueService(repo);
+
+        const result = await service.unblockGroup({ queueName: "q1", groupId: "g1" });
+
+        expect(result).toEqual({ wasBlocked: true });
+        expect(repo.unblockGroup).toHaveBeenCalledWith({ queueName: "q1", groupId: "g1" });
+      });
+    });
+
+    describe("when group is not blocked", () => {
+      it("returns wasBlocked false", async () => {
+        const repo = createMockRepo({
+          unblockGroup: vi.fn().mockResolvedValue({ wasBlocked: false }),
+        });
+        const service = new QueueService(repo);
+
+        const result = await service.unblockGroup({ queueName: "q1", groupId: "g1" });
+
+        expect(result.wasBlocked).toBe(false);
+      });
+    });
+  });
+
+  describe("drainGroup()", () => {
+    describe("when group has jobs", () => {
+      it("delegates to repo and returns removed count", async () => {
+        const repo = createMockRepo({
+          drainGroup: vi.fn().mockResolvedValue({ jobsRemoved: 5 }),
+        });
+        const service = new QueueService(repo);
+
+        const result = await service.drainGroup({ queueName: "q1", groupId: "g1" });
+
+        expect(result).toEqual({ jobsRemoved: 5 });
+        expect(repo.drainGroup).toHaveBeenCalledWith({ queueName: "q1", groupId: "g1" });
+      });
+    });
+  });
+
+  describe("moveToDlq()", () => {
+    describe("when group exists", () => {
+      it("delegates to repo and returns moved count", async () => {
+        const repo = createMockRepo({
+          moveToDlq: vi.fn().mockResolvedValue({ jobsMoved: 3 }),
+        });
+        const service = new QueueService(repo);
+
+        const result = await service.moveToDlq({ queueName: "q1", groupId: "g1" });
+
+        expect(result).toEqual({ jobsMoved: 3 });
+        expect(repo.moveToDlq).toHaveBeenCalledWith({ queueName: "q1", groupId: "g1" });
+      });
+    });
+  });
+
+  describe("unblockAll()", () => {
+    describe("when multiple groups are blocked", () => {
+      it("delegates to repo and returns unblocked count", async () => {
+        const repo = createMockRepo({
+          unblockAll: vi.fn().mockResolvedValue({ unblockedCount: 7 }),
+        });
+        const service = new QueueService(repo);
+
+        const result = await service.unblockAll({ queueName: "q1" });
+
+        expect(result).toEqual({ unblockedCount: 7 });
+        expect(repo.unblockAll).toHaveBeenCalledWith({ queueName: "q1" });
+      });
+    });
+  });
+
+  describe("canaryRedrive()", () => {
+    describe("when DLQ groups exist", () => {
+      it("delegates to repo with count and filter", async () => {
+        const repo = createMockRepo({
+          canaryRedrive: vi.fn().mockResolvedValue({ redrivenCount: 3, groupIds: ["g1", "g2", "g3"] }),
+        });
+        const service = new QueueService(repo);
+
+        const result = await service.canaryRedrive({ queueName: "q1", count: 3, pipelineFilter: "trace" });
+
+        expect(result).toEqual({ redrivenCount: 3, groupIds: ["g1", "g2", "g3"] });
+        expect(repo.canaryRedrive).toHaveBeenCalledWith({ queueName: "q1", count: 3, pipelineFilter: "trace" });
+      });
+    });
+  });
+
+  describe("canaryUnblock()", () => {
+    describe("when blocked groups exist", () => {
+      it("delegates to repo with count and filter", async () => {
+        const repo = createMockRepo({
+          canaryUnblock: vi.fn().mockResolvedValue({ unblockedCount: 2, groupIds: ["g1", "g2"] }),
+        });
+        const service = new QueueService(repo);
+
+        const result = await service.canaryUnblock({ queueName: "q1", count: 5 });
+
+        expect(result).toEqual({ unblockedCount: 2, groupIds: ["g1", "g2"] });
+        expect(repo.canaryUnblock).toHaveBeenCalledWith({ queueName: "q1", count: 5 });
+      });
+    });
+  });
 });

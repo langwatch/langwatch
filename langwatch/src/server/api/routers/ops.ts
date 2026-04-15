@@ -380,9 +380,13 @@ export const opsRouter = createTRPCRouter({
           userName,
         });
       } catch (err) {
+        const rawMessage = err instanceof Error ? err.message : String(err);
+        const safeMessage = rawMessage.includes("already running")
+          ? rawMessage
+          : "Replay could not be started";
         throw new TRPCError({
           code: "CONFLICT",
-          message: err instanceof Error ? err.message : String(err),
+          message: safeMessage,
         });
       }
     }),

@@ -9,6 +9,7 @@ import { useExecutionStore } from "./executionStore";
 import { usePresetStore } from "./presetStore";
 import { useFoundryProjectStore } from "./foundryProjectStore";
 import { SPAN_TYPE_ICONS, type SpanConfig } from "./types";
+import { executeTrace } from "./traceExecutor";
 
 export function FoundryDrawer() {
   const { project } = useOrganizationTeamProject();
@@ -50,7 +51,6 @@ export function FoundryDrawer() {
     const logId = `log-${Date.now()}`;
     addLogEntry({ id: logId, traceId: logId, timestamp: Date.now(), status: "pending" });
     try {
-      const { executeTrace } = await import("./traceExecutor");
       const traceId = await executeTrace({ trace, apiKey, endpoint: window.location.origin });
       updateLogEntry(logId, { status: "success", traceId });
       setLastTraceId(traceId);
