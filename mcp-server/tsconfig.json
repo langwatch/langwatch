@@ -17,7 +17,10 @@
     "jsx": "preserve",
     "incremental": true,
     "noUncheckedIndexedAccess": true,
-    "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
+    "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
+    "paths": {
+      "zod": ["./node_modules/zod"]
+    }
   },
   "include": [
     ".eslintrc.cjs",
