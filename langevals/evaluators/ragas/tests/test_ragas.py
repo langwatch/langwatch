@@ -2,10 +2,6 @@ import os
 import dotenv
 import pytest
 
-# Entire ragas test module skipped: LLM-judged scores are non-deterministic
-# and tests fail intermittently on CI. Tracked in langwatch/langwatch#3240.
-pytestmark = pytest.mark.skip(reason="flaky LLM evals; tracked in #3240")
-
 from langevals_core.base_evaluator import EvaluatorSettings
 from langevals_ragas.bleu_score import RagasBLEUScoreEntry, RagasBLEUScoreEvaluator
 from langevals_ragas.context_f1 import (
