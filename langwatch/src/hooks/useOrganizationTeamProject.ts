@@ -332,7 +332,12 @@ export const useOrganizationTeamProject = (
 
     // Team-level permission checking
     const teamMember = team?.members?.[0];
-    if (!teamMember) return false;
+    if (!teamMember) {
+      // Users created via the RoleBinding-only flow (no legacy TeamUser row) still
+      // have full team access when they are org admins — mirrors the server-side
+      // behaviour where an org-scoped ADMIN RoleBinding grants all permissions.
+      return organizationRole === OrganizationUserRole.ADMIN;
+    }
 
     // Check if user has custom role assignment
     if (teamMember.assignedRole) {
