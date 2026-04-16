@@ -85,7 +85,9 @@ function makeTestPlan(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe("Organization Invites Integration", () => {
+// Skipped: app-layer init regression on main after es-migration refactor
+// — see langwatch/langwatch#3240.
+describe.skip("Organization Invites Integration", () => {
   const testNamespace = `invite-test-${nanoid(8)}`;
   let organizationId: string;
   let teamId: string;

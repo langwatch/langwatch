@@ -36,6 +36,8 @@ export const createScenarioCommand = async (
 
     if (options.format === "json") {
       console.log(JSON.stringify(scenario, null, 2));
+    } else if (scenario.platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(scenario.platformUrl)}`);
     }
   } catch (error) {
     spinner.fail();

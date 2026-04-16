@@ -1,0 +1,50 @@
+# Path-change gate for the "always-run + aggregator" pattern. See #3223.
+#
+# On `pull_request` / `pull_request_target` we diff the PR against its
+# base using dorny/paths-filter. On every other event (push, schedule,
+# workflow_dispatch, merge_group) we force `relevant=true` so the real
+# jobs always run — required aggregator checks need a concrete result.
+#
+# The caller MUST check out the repo first so this composite action is
+# accessible — dorny/paths-filter then reads the diff against the PR
+# base.
+#
+# Usage:
+#   jobs:
+#     changes:
+#       runs-on: ubuntu-latest
+#       outputs: { relevant: ${{ steps.detect.outputs.relevant }} }
+#       steps:
+#         - uses: actions/checkout@...
+#         - uses: ./.github/actions/detect-changes
+#           id: detect
+#           with:
+#             filters: |
+#               relevant:
+#                 - 'foo/**'
+name: detect-changes
+description: Decide whether a path-filtered workflow should run real work.
+inputs:
+  filters:
+    description: YAML filter block for dorny/paths-filter (must define a `relevant` filter).
+    required: true
+outputs:
+  relevant:
+    description: "'true' if relevant paths changed, or if event is not a PR."
+    value: ${{ steps.filter.outputs.relevant || steps.force.outputs.relevant }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect relevant changes
+      if: github.event_name == 'pull_request' || github.event_name == 'pull_request_target'
+      id: filter
+      uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+      with:
+        filters: ${{ inputs.filters }}
+
+    - name: Force relevant on non-PR events
+      if: github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
+      id: force
+      shell: bash
+      run: echo "relevant=true" >> "$GITHUB_OUTPUT"

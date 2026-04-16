@@ -270,14 +270,14 @@ export class ExperimentsFacade {
     const passRate = summary.passRate ??
       (completedCells > 0 ? (totalPassed / completedCells) * 100 : 0);
 
-    return {
+    const result: ExperimentRunResult = {
       runId,
       status,
       passed: totalPassed,
       failed: totalFailed,
       passRate,
       duration,
-      runUrl,  // Always use the endpoint-based URL we constructed
+      runUrl,
       summary,
       printSummary: (exitOnFailure = true) => {
         this.printSummary({
@@ -295,7 +295,15 @@ export class ExperimentsFacade {
           process.exit(1);
         }
       },
+      toString: () =>
+        `ExperimentRunResult { status: ${status.toUpperCase()}, passed: ${totalPassed}, failed: ${totalFailed}, passRate: ${passRate.toFixed(1)}%, duration: ${(duration / 1000).toFixed(1)}s }`,
     };
+
+    // Custom Node.js inspect for console.log
+    (result as Record<string | symbol, unknown>)[Symbol.for("nodejs.util.inspect.custom")] =
+      () => result.toString();
+
+    return result;
   }
 
   /**

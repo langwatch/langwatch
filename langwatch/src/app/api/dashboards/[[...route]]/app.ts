@@ -15,6 +15,7 @@ import {
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { BadRequestError, NotFoundError } from "../../shared/errors";
+import { platformUrl } from "../../shared/platform-url";
 import { handleDashboardError } from "./error-handler";
 
 patchZodOpenapi();
@@ -102,6 +103,10 @@ export const app = new Hono<{ Variables: Variables }>()
           graphCount: d._count.graphs,
           createdAt: d.createdAt,
           updatedAt: d.updatedAt,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/analytics/reports?dashboard=${d.id}`,
+          }),
         })),
       });
     },
@@ -129,6 +134,10 @@ export const app = new Hono<{ Variables: Variables }>()
           order: dashboard.order,
           createdAt: dashboard.createdAt,
           updatedAt: dashboard.updatedAt,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/analytics/reports?dashboard=${dashboard.id}`,
+          }),
         },
         201,
       );
@@ -177,6 +186,10 @@ export const app = new Hono<{ Variables: Variables }>()
           graphs: dashboard.graphs,
           createdAt: dashboard.createdAt,
           updatedAt: dashboard.updatedAt,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/analytics/reports?dashboard=${dashboard.id}`,
+          }),
         });
       } catch (error) {
         return mapDashboardNotFoundError(error);
@@ -205,6 +218,10 @@ export const app = new Hono<{ Variables: Variables }>()
           order: dashboard.order,
           createdAt: dashboard.createdAt,
           updatedAt: dashboard.updatedAt,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/analytics/reports?dashboard=${dashboard.id}`,
+          }),
         });
       } catch (error) {
         return mapDashboardNotFoundError(error);

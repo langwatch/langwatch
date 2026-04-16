@@ -1,20 +1,40 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+# Branch protection can require `clickhouse-serverless-complete` as a
+# single check. Jobs skip cleanly when the paths aren't relevant.
 name: clickhouse-serverless
 
 on:
   pull_request:
-    paths:
-      - "clickhouse-serverless/**"
-      - ".github/workflows/clickhouse-serverless.yml"
   push:
     branches: [main]
-    paths:
-      - "clickhouse-serverless/**"
+  merge_group:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'clickhouse-serverless/**'
+              - '.github/workflows/clickhouse-serverless.yml'
+
   test:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     name: go tests + lint
     runs-on: ubuntu-latest
     defaults:
@@ -33,9 +53,10 @@ jobs:
       - run: make lint
 
   e2e:
+    needs: [changes, test]
+    if: needs.changes.outputs.relevant == 'true'
     name: docker e2e
     runs-on: ubuntu-latest
-    needs: test
     defaults:
       run:
         working-directory: clickhouse-serverless
@@ -55,3 +76,13 @@ jobs:
         run: |
           docker logs ch-e2e 2>&1 | tail -100 || true
           docker logs garage-e2e 2>&1 | tail -50 || true
+
+  clickhouse-serverless-complete:
+    needs: [changes, test, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: test, e2e

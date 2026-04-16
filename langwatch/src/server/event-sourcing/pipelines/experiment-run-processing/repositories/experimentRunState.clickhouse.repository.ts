@@ -94,6 +94,7 @@ export class ExperimentRunStateRepositoryClickHouse<
       PassedCount: record.PassedCount ?? 0,
       GradedCount: record.GradedCount ?? 0,
       LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
+      TraceMetrics: {},
     };
   }
 

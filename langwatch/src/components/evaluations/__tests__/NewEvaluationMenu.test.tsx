@@ -28,6 +28,7 @@ const mockPush = vi.fn((url: string) => {
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockQuery,
+    pathname: "",
     asPath:
       Object.keys(mockQuery).length > 0
         ? "/test?" + new URLSearchParams(mockQuery).toString()
@@ -321,8 +322,7 @@ describe("NewEvaluationMenu", () => {
   });
 
   describe("Add Online Evaluation option", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("opens online evaluation drawer when clicked", async () => {
+    it("opens online evaluation drawer when clicked", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<NewEvaluationMenu />, { wrapper: Wrapper });
 
@@ -344,8 +344,7 @@ describe("NewEvaluationMenu", () => {
   });
 
   describe("Setup Guardrail option", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("opens guardrails drawer when clicked", async () => {
+    it("opens guardrails drawer when clicked", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<NewEvaluationMenu />, { wrapper: Wrapper });
 

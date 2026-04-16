@@ -58,7 +58,7 @@ export const createTriggerCommand = async (
       process.exit(1);
     }
 
-    const trigger = await response.json() as { id: string; name: string; action: string };
+    const trigger = await response.json() as { id: string; name: string; action: string; platformUrl?: string };
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
     if (options.format === "json") {
@@ -69,6 +69,9 @@ export const createTriggerCommand = async (
     console.log();
     console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);
     console.log(`  ${chalk.gray("Action:")} ${trigger.action}`);
+    if (trigger.platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(trigger.platformUrl)}`);
+    }
     console.log();
   } catch (error) {
     spinner.fail();

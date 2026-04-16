@@ -32,6 +32,9 @@ export const getDashboardCommand = async (
     console.log(`    ${chalk.gray("Graphs:")}  ${Array.isArray(dashboard.graphs) ? dashboard.graphs.length : 0}`);
     console.log(`    ${chalk.gray("Created:")} ${new Date(dashboard.createdAt).toLocaleString()}`);
     console.log(`    ${chalk.gray("Updated:")} ${new Date(dashboard.updatedAt).toLocaleString()}`);
+    if (dashboard.platformUrl) {
+      console.log(`    ${chalk.bold("View:")}   ${chalk.underline(dashboard.platformUrl)}`);
+    }
     console.log();
   } catch (error) {
     spinner.fail();

@@ -32,6 +32,8 @@ export const createAgentCommand = async (
 
     if (options.format === "json") {
       console.log(JSON.stringify(agent, null, 2));
+    } else if (agent.platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(agent.platformUrl)}`);
     }
   } catch (error) {
     spinner.fail();

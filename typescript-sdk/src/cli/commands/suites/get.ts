@@ -48,6 +48,11 @@ export const getSuiteCommand = async (
       console.log(`    ${chalk.gray("•")} ${target.type}:${target.referenceId}`);
     }
 
+    if (suite.platformUrl) {
+      console.log();
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(suite.platformUrl)}`);
+    }
+
     console.log();
     console.log(
       chalk.gray(

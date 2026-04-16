@@ -15,6 +15,7 @@ import {
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import { handleError } from "../../middleware";
 
 patchZodOpenapi();
@@ -43,6 +44,10 @@ const triggerResponseSchema = z.object({
   alertType: alertTypeEnum.nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+const triggerResponseWithPlatformUrlSchema = triggerResponseSchema.extend({
+  platformUrl: z.string().url(),
 });
 
 const createTriggerSchema = z.object({
@@ -107,7 +112,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(z.array(triggerResponseSchema)),
+              schema: resolver(z.array(triggerResponseWithPlatformUrlSchema)),
             },
           },
         },
@@ -122,7 +127,13 @@ export const app = new Hono<{ Variables: Variables }>()
         orderBy: { createdAt: "desc" },
       });
 
-      return c.json(triggers.map(toTriggerResponse));
+      return c.json(triggers.map((t) => ({
+        ...toTriggerResponse(t),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${t.id}`,
+        }),
+      })));
     },
   )
 
@@ -137,7 +148,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(triggerResponseSchema),
+              schema: resolver(triggerResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -162,7 +173,13 @@ export const app = new Hono<{ Variables: Variables }>()
         return c.json({ error: "Trigger not found" }, 404);
       }
 
-      return c.json(toTriggerResponse(trigger));
+      return c.json({
+        ...toTriggerResponse(trigger),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${trigger.id}`,
+        }),
+      });
     },
   )
 
@@ -177,7 +194,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Trigger created",
           content: {
             "application/json": {
-              schema: resolver(triggerResponseSchema),
+              schema: resolver(triggerResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -203,7 +220,13 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       });
 
-      return c.json(toTriggerResponse(trigger), 201);
+      return c.json({
+        ...toTriggerResponse(trigger),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${trigger.id}`,
+        }),
+      }, 201);
     },
   )
 
@@ -218,7 +241,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Trigger updated",
           content: {
             "application/json": {
-              schema: resolver(triggerResponseSchema),
+              schema: resolver(triggerResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -258,7 +281,13 @@ export const app = new Hono<{ Variables: Variables }>()
         data,
       });
 
-      return c.json(toTriggerResponse(updated));
+      return c.json({
+        ...toTriggerResponse(updated),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/automations?drawer.open=editAutomationFilter&drawer.automationId=${updated.id}`,
+        }),
+      });
     },
   )
 

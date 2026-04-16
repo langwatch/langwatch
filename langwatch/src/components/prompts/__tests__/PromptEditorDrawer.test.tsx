@@ -924,7 +924,16 @@ describe("PromptEditorDrawer", () => {
       mockGetByIdOrHandle.mockReturnValue({ data: undefined, isLoading: false });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: The save button for new prompts is disabled (shows "Saved") until
+    // `hasUnsavedChanges` becomes true. That state is driven by a react-hook-form
+    // watch() subscription set up in a useEffect, which fires asynchronously after
+    // mount when form values actually change — not on initial render. Since the
+    // test uses a mocked form with pre-filled content but never triggers a form
+    // value change event, the subscription never fires and the button stays disabled,
+    // so the ChangeHandleDialog never opens and checkAndProceed is never reached.
+    // Fix requires either: (a) firing a real input change event to trigger the
+    // watch subscription, or (b) initialising hasUnsavedChanges eagerly for new
+    // prompts when the form already has content on mount.
     it.skip("calls checkAndProceed when creating new prompt", async () => {
       // For new prompts, hasUnsavedChanges is true when messages have content
       // Set message content so save button is enabled
