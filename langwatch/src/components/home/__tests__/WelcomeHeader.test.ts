@@ -51,22 +51,28 @@ describe("WelcomeHeader", () => {
   });
 
   describe("getTimeOfDay", () => {
-    it("returns morning for hours 0-11", () => {
-      expect(getTimeOfDay(0)).toBe("morning");
-      expect(getTimeOfDay(6)).toBe("morning");
-      expect(getTimeOfDay(11)).toBe("morning");
+    describe("when hour is between 0 and 11", () => {
+      it("returns morning", () => {
+        expect(getTimeOfDay(0)).toBe("morning");
+        expect(getTimeOfDay(6)).toBe("morning");
+        expect(getTimeOfDay(11)).toBe("morning");
+      });
     });
 
-    it("returns afternoon for hours 12-17", () => {
-      expect(getTimeOfDay(12)).toBe("afternoon");
-      expect(getTimeOfDay(15)).toBe("afternoon");
-      expect(getTimeOfDay(17)).toBe("afternoon");
+    describe("when hour is between 12 and 17", () => {
+      it("returns afternoon", () => {
+        expect(getTimeOfDay(12)).toBe("afternoon");
+        expect(getTimeOfDay(15)).toBe("afternoon");
+        expect(getTimeOfDay(17)).toBe("afternoon");
+      });
     });
 
-    it("returns evening for hours 18-23", () => {
-      expect(getTimeOfDay(18)).toBe("evening");
-      expect(getTimeOfDay(21)).toBe("evening");
-      expect(getTimeOfDay(23)).toBe("evening");
+    describe("when hour is between 18 and 23", () => {
+      it("returns evening", () => {
+        expect(getTimeOfDay(18)).toBe("evening");
+        expect(getTimeOfDay(21)).toBe("evening");
+        expect(getTimeOfDay(23)).toBe("evening");
+      });
     });
   });
 
