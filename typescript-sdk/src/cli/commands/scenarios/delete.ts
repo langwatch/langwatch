@@ -1,11 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  ScenariosApiService,
-  ScenariosApiError,
-} from "@/client-sdk/services/scenarios";
+import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const deleteScenarioCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -20,16 +17,11 @@ export const deleteScenarioCommand = async (id: string, options?: { format?: str
     scenarioName = scenario.name;
     resolveSpinner.succeed(`Found scenario "${scenarioName}"`);
   } catch (error) {
-    resolveSpinner.fail();
-    if (error instanceof ScenariosApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error finding scenario: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({
+      spinner: resolveSpinner,
+      error,
+      action: `find scenario "${id}"`,
+    });
     process.exit(1);
   }
 
@@ -45,16 +37,11 @@ export const deleteScenarioCommand = async (id: string, options?: { format?: str
       console.log(JSON.stringify({ id, name: scenarioName, archived: true }, null, 2));
     }
   } catch (error) {
-    deleteSpinner.fail();
-    if (error instanceof ScenariosApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error archiving scenario: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({
+      spinner: deleteSpinner,
+      error,
+      action: `archive scenario "${scenarioName}"`,
+    });
     process.exit(1);
   }
 };

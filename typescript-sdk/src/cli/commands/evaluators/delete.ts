@@ -1,11 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  EvaluatorsApiService,
-  EvaluatorsApiError,
-} from "@/client-sdk/services/evaluators";
+import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const deleteEvaluatorCommand = async (
   idOrSlug: string,
@@ -25,16 +22,11 @@ export const deleteEvaluatorCommand = async (
     evaluatorName = evaluator.name;
     resolveSpinner.succeed(`Found evaluator "${evaluatorName}"`);
   } catch (error) {
-    resolveSpinner.fail();
-    if (error instanceof EvaluatorsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error finding evaluator: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({
+      spinner: resolveSpinner,
+      error,
+      action: `find evaluator "${idOrSlug}"`,
+    });
     process.exit(1);
   }
 
@@ -50,16 +42,11 @@ export const deleteEvaluatorCommand = async (
       console.log(JSON.stringify({ id: evaluatorId, name: evaluatorName, archived: true }, null, 2));
     }
   } catch (error) {
-    deleteSpinner.fail();
-    if (error instanceof EvaluatorsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error archiving evaluator: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({
+      spinner: deleteSpinner,
+      error,
+      action: `archive evaluator "${evaluatorName}"`,
+    });
     process.exit(1);
   }
 };
