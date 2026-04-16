@@ -16,8 +16,8 @@ FAIL=0
 # ---------------------------------------------------------------------------
 # Guard: script must exist before we can test it
 # ---------------------------------------------------------------------------
-if [ ! -x "$SCRIPT" ]; then
-  echo "FAIL: $SCRIPT does not exist yet — expected to exist after fix"
+if [ ! -f "$SCRIPT" ] || [ ! -r "$SCRIPT" ]; then
+  echo "FAIL: $SCRIPT is missing or not readable"
   exit 1
 fi
 
@@ -178,6 +178,16 @@ fi
 exit "\$EXIT_CODE"
 CURLSHIM
   chmod +x "$bin_dir/curl"
+
+  # ------------------------------------------------------------------
+  # sleep shim — short-circuit retry waits. Without this, the failure
+  # paths burn 60+30 seconds of real sleep each run.
+  # ------------------------------------------------------------------
+  cat > "$bin_dir/sleep" << 'SLEEPSHIM'
+#!/usr/bin/env bash
+exit 0
+SLEEPSHIM
+  chmod +x "$bin_dir/sleep"
 
   echo "$bin_dir"
 }
