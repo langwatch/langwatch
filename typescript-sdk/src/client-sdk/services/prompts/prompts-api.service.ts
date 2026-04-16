@@ -68,9 +68,9 @@ export class PromptsApiService {
    * @throws {PromptsApiError}
    */
   private handleApiError(operation: string, error: any, status?: number): never {
-    const message = formatApiErrorForOperation(operation, error, {
+    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
       status: status ?? extractStatusFromResponse(error),
-    });
+    } });
 
     throw new PromptsApiError(message, operation, error);
   }
@@ -375,7 +375,7 @@ export class PromptsApiService {
       // Transport-level failures (network errors, timeouts, unresolved DNS)
       // surface here. Preserve the underlying message so the user knows
       // whether the API is reachable.
-      const message = formatApiErrorForOperation("sync prompt", error);
+      const message = formatApiErrorForOperation({ operation: "sync prompt", error: error });
       throw new PromptsApiError(message, "sync", error);
     }
 
@@ -383,7 +383,7 @@ export class PromptsApiService {
       const err: unknown = response.error;
       const status =
         response.response?.status ?? extractStatusFromResponse(err);
-      const message = formatApiErrorMessage(err, { status });
+      const message = formatApiErrorMessage({ error: err, options: { status } });
       throw new PromptsApiError(
         `Failed to sync prompt: ${message}`,
         "sync",

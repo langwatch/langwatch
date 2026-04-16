@@ -35,9 +35,9 @@ export class WorkflowsApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation(operation, error, {
+    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
       status: extractStatusFromResponse(error),
-    });
+    } });
     throw new WorkflowsApiError(message, operation, error);
   }
 

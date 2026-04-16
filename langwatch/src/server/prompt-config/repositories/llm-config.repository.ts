@@ -407,20 +407,26 @@ export class LlmConfigRepository {
     //
     // Null out handle to free it for reuse — the @@unique([handle]) constraint
     // treats NULL as distinct per row in Postgres, so future prompts can
-    // reclaim the same handle. Preserve the handle's display name in `name`
-    // (stripping the org/project prefix) so listings keep a readable label.
+    // reclaim the same handle. Preserve the existing display name; only fall
+    // back to the (unprefixed) handle when the stored name is empty, so any
+    // custom title the user gave the prompt survives archival in suite/history
+    // listings.
     const displayName = this.removeHandlePrefixes(
       config.handle,
       projectId,
       organizationId,
     );
+    const archivedName =
+      config.name && config.name.trim() !== ""
+        ? config.name
+        : (displayName ?? config.name);
 
     await this.prisma.llmPromptConfig.update({
       where: { id: config.id, projectId },
       data: {
         deletedAt: new Date(),
         handle: null,
-        name: displayName ?? config.name,
+        name: archivedName,
       },
     });
 

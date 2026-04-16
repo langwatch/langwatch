@@ -74,10 +74,11 @@ function determineErrorResponse(
   // descriptive message. Route-specific `handlePossibleConflictError` may
   // already translate this into an HTTPException, but this global safety
   // net catches cases where that wrapper isn't wired up yet.
-  if (
-    error.code === "P2002" ||
-    (error as { meta?: { target?: unknown } }).meta?.target
-  ) {
+  // Tighten the check to require either the explicit P2002 code or a
+  // PrismaClientKnownRequestError shape — `meta.target` alone could appear
+  // on unrelated errors that happen to use the same field name.
+  const isPrismaKnownError = error.name === "PrismaClientKnownRequestError";
+  if (error.code === "P2002" || isPrismaKnownError) {
     const target = (error as { meta?: { target?: unknown } }).meta?.target;
     const targetStr = Array.isArray(target)
       ? target.join(", ")

@@ -52,7 +52,7 @@ export class SecretsApiService {
       } catch {
         // leave as raw text
       }
-      const message = formatApiErrorMessage(parsed, { status: response.status });
+      const message = formatApiErrorMessage({ error: parsed, options: { status: response.status } });
       throw new SecretsApiError(
         `HTTP ${response.status}: ${message}`,
         options?.method ?? "GET",

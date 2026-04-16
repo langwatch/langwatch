@@ -32,13 +32,13 @@ describe("LlmConfigRepository", () => {
         const prisma = makeMockPrisma({ update: mockUpdate });
 
         // Mock getConfigByIdOrHandleWithLatestVersion to return a config with
-        // a prefixed handle (what the DB actually stores).
+        // a prefixed handle (what the DB actually stores) and a non-empty name.
         const repo = new LlmConfigRepository(prisma);
         vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",
-          name: "support-bot",
+          name: "Support Bot v2",
           handle: "proj_1/support-bot",
           scope: "PROJECT",
           copiedFromPromptId: null,
@@ -51,7 +51,41 @@ describe("LlmConfigRepository", () => {
         await repo.deleteConfig("prompt_1", "proj_1", "org_1");
 
         // Handle is nulled out to free it for future reuse; deletedAt is set;
-        // the unprefixed display name is preserved on `name`.
+        // the existing display name is preserved (not overwritten with the
+        // slug) so suite/history listings keep showing the user's title.
+        expect(mockUpdate).toHaveBeenCalledWith({
+          where: { id: "prompt_1", projectId: "proj_1" },
+          data: {
+            deletedAt: expect.any(Date),
+            handle: null,
+            name: "Support Bot v2",
+          },
+        });
+      });
+
+      it("falls back to the unprefixed handle when name is empty", async () => {
+        const mockUpdate = vi.fn(() =>
+          Promise.resolve({ id: "prompt_1", deletedAt: new Date() }),
+        );
+        const prisma = makeMockPrisma({ update: mockUpdate });
+
+        const repo = new LlmConfigRepository(prisma);
+        vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
+          id: "prompt_1",
+          projectId: "proj_1",
+          organizationId: "org_1",
+          name: "",
+          handle: "proj_1/support-bot",
+          scope: "PROJECT",
+          copiedFromPromptId: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          deletedAt: null,
+          latestVersion: {} as any,
+        });
+
+        await repo.deleteConfig("prompt_1", "proj_1", "org_1");
+
         expect(mockUpdate).toHaveBeenCalledWith({
           where: { id: "prompt_1", projectId: "proj_1" },
           data: {

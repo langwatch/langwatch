@@ -73,10 +73,16 @@ export interface FormatApiErrorOptions {
   status?: number;
 }
 
-export function formatApiErrorMessage(
-  error: unknown,
-  options: FormatApiErrorOptions = {},
-): string {
+export interface FormatApiErrorMessageParams {
+  error: unknown;
+  /** Currently only `status` — kept as an object for forward extension. */
+  options?: FormatApiErrorOptions;
+}
+
+export function formatApiErrorMessage({
+  error,
+  options = {},
+}: FormatApiErrorMessageParams): string {
   if (error == null) {
     return options.status
       ? `Request failed with status ${options.status}`
@@ -102,38 +108,11 @@ export function formatApiErrorMessage(
     const fromDetail = typeof body.detail === "string" ? body.detail : undefined;
     const fromReason = typeof body.reason === "string" ? body.reason : undefined;
 
-    // If `body.error` is itself a nested object (some tRPC-style shapes, or
-    // a native Error instance that got passed through), drill into it.
-    if (body.error && typeof body.error === "object") {
-      const nested = body.error as Record<string, unknown>;
-
-      // Native Error instances have .message on the prototype — handle them
-      // specifically to avoid dropping back to raw JSON.
-      if (body.error instanceof Error && body.error.message) {
-        return body.error.message;
-      }
-
-      const fromNestedMsg = typeof nested.message === "string" ? nested.message : undefined;
-      const fromNestedErr = typeof nested.error === "string" ? nested.error : undefined;
-      const nestedMeaningful = firstMeaningful(fromNestedMsg, fromNestedErr);
-      if (nestedMeaningful) {
-        const kind = fromError && !isGeneric(fromError) ? fromError : undefined;
-        return kind ? `${kind}: ${nestedMeaningful}` : nestedMeaningful;
-      }
-
-      // Fall through to stringify the nested object if it has no standard
-      // message fields — e.g. { code: "ERR_X", status: 400 } — so we still
-      // surface those identifiers to the user.
-      const nestedRaw = stringifyBody(nested);
-      if (nestedRaw && nestedRaw !== "{}") {
-        return nestedRaw;
-      }
-    }
-
+    // 1. Top-level meaningful fields take priority. If the server gave us a
+    //    descriptive `message`/`error`/`detail`/`reason`, use that — even if
+    //    `body.error` is an object with its own (potentially generic) message.
     const meaningful = firstMeaningful(fromMessage, fromError, fromDetail, fromReason);
     if (meaningful) {
-      // When both `error` and `message` are present and they differ, prefer
-      // showing both so the user sees the category + the description.
       if (
         fromError &&
         fromMessage &&
@@ -146,8 +125,34 @@ export function formatApiErrorMessage(
       return meaningful;
     }
 
-    // No meaningful top-level fields — dump the raw JSON so that the user at
-    // least sees the server payload. Attach status for context.
+    // 2. Nested `body.error` — only used as a fallback when no top-level
+    //    field carried a useful message. Native Error instances and
+    //    tRPC-style envelopes both fit here.
+    if (body.error && typeof body.error === "object") {
+      const nested = body.error as Record<string, unknown>;
+
+      if (body.error instanceof Error && body.error.message) {
+        return body.error.message;
+      }
+
+      const fromNestedMsg = typeof nested.message === "string" ? nested.message : undefined;
+      const fromNestedErr = typeof nested.error === "string" ? nested.error : undefined;
+      const nestedMeaningful = firstMeaningful(fromNestedMsg, fromNestedErr);
+      if (nestedMeaningful) {
+        return nestedMeaningful;
+      }
+
+      // Stringify the nested object so identifiers like `{ code, status }`
+      // still reach the user.
+      const nestedRaw = stringifyBody(nested);
+      if (nestedRaw && nestedRaw !== "{}") {
+        return nestedRaw;
+      }
+    }
+
+    // 3. No meaningful top-level or nested fields — dump the raw JSON so
+    //    the user at least sees the server payload. Attach status for
+    //    context.
     const raw = stringifyBody(body);
 
     // Collapse empty / near-empty payloads to a friendlier message — there's
@@ -171,16 +176,22 @@ export function formatApiErrorMessage(
   }
 }
 
+export interface FormatApiErrorForOperationParams {
+  operation: string;
+  error: unknown;
+  options?: FormatApiErrorOptions;
+}
+
 /**
  * Builds a fully-qualified error message for a specific operation, including
  * the operation name and the extracted server-side message.
  */
-export function formatApiErrorForOperation(
-  operation: string,
-  error: unknown,
-  options: FormatApiErrorOptions = {},
-): string {
-  const message = formatApiErrorMessage(error, options);
+export function formatApiErrorForOperation({
+  operation,
+  error,
+  options = {},
+}: FormatApiErrorForOperationParams): string {
+  const message = formatApiErrorMessage({ error, options });
   return `Failed to ${operation}: ${message}`;
 }
 

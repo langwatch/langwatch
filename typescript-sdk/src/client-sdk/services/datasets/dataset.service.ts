@@ -84,7 +84,7 @@ export class DatasetService {
    * Extracts a human-readable error message from an API error response.
    */
   private extractErrorMessage(error: unknown, status: number): string {
-    return formatApiErrorMessage(error, { status });
+    return formatApiErrorMessage({ error: error, options: { status } });
   }
 
   /**

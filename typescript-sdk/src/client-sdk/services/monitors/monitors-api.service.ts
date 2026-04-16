@@ -83,7 +83,7 @@ export class MonitorsApiService {
       } catch {
         // leave as raw text
       }
-      const message = formatApiErrorMessage(parsed, { status: response.status });
+      const message = formatApiErrorMessage({ error: parsed, options: { status: response.status } });
       throw new MonitorsApiError(
         `HTTP ${response.status}: ${message}`,
         options?.method ?? "GET",

@@ -8,24 +8,24 @@ import {
 describe("formatApiErrorMessage", () => {
   describe("when given a null or undefined error", () => {
     it("returns a generic message with status when available", () => {
-      expect(formatApiErrorMessage(null, { status: 503 })).toBe(
+      expect(formatApiErrorMessage({ error: null, options: { status: 503 } })).toBe(
         "Request failed with status 503",
       );
     });
 
     it("returns a generic message without status", () => {
-      expect(formatApiErrorMessage(undefined)).toBe("Unknown error occurred");
+      expect(formatApiErrorMessage({ error: undefined })).toBe("Unknown error occurred");
     });
   });
 
   describe("when given a string error", () => {
     it("returns the string directly", () => {
-      expect(formatApiErrorMessage("Something broke")).toBe("Something broke");
+      expect(formatApiErrorMessage({ error: "Something broke" })).toBe("Something broke");
     });
 
     it("annotates a generic string with the status", () => {
       expect(
-        formatApiErrorMessage("Internal server error", { status: 500 }),
+        formatApiErrorMessage({ error: "Internal server error", options: { status: 500 } }),
       ).toBe("Internal server error (status 500)");
     });
   });
@@ -33,7 +33,7 @@ describe("formatApiErrorMessage", () => {
   describe("when given an Error instance", () => {
     it("returns the Error message", () => {
       const err = new Error("fetch failed: ECONNREFUSED");
-      expect(formatApiErrorMessage(err)).toBe("fetch failed: ECONNREFUSED");
+      expect(formatApiErrorMessage({ error: err })).toBe("fetch failed: ECONNREFUSED");
     });
   });
 
@@ -43,7 +43,7 @@ describe("formatApiErrorMessage", () => {
         error: "Conflict",
         message: "Prompt handle already exists for scope PROJECT",
       };
-      expect(formatApiErrorMessage(body)).toBe(
+      expect(formatApiErrorMessage({ error: body })).toBe(
         "Conflict: Prompt handle already exists for scope PROJECT",
       );
     });
@@ -53,7 +53,7 @@ describe("formatApiErrorMessage", () => {
         error: "NotFoundError",
         message: "NotFoundError",
       };
-      expect(formatApiErrorMessage(body)).toBe("NotFoundError");
+      expect(formatApiErrorMessage({ error: body })).toBe("NotFoundError");
     });
 
     it("falls back to error when message is generic", () => {
@@ -61,7 +61,7 @@ describe("formatApiErrorMessage", () => {
         error: "TagValidationError",
         message: "Internal server error",
       };
-      expect(formatApiErrorMessage(body)).toBe("TagValidationError");
+      expect(formatApiErrorMessage({ error: body })).toBe("TagValidationError");
     });
 
     it("does not collapse to 'Internal server error' when other fields exist", () => {
@@ -69,12 +69,12 @@ describe("formatApiErrorMessage", () => {
         error: "Internal server error",
         message: "connection refused",
       };
-      expect(formatApiErrorMessage(body)).toBe("connection refused");
+      expect(formatApiErrorMessage({ error: body })).toBe("connection refused");
     });
 
     it("serialises the raw body when no meaningful fields are present", () => {
       const body = { code: "UNEXPECTED", details: { traceId: "abc" } };
-      const formatted = formatApiErrorMessage(body, { status: 500 });
+      const formatted = formatApiErrorMessage({ error: body, options: { status: 500 } });
       expect(formatted).toContain("UNEXPECTED");
       expect(formatted).toContain("traceId");
       expect(formatted).toContain("500");
@@ -87,20 +87,20 @@ describe("formatApiErrorMessage", () => {
           code: "BAD_REQUEST",
         },
       };
-      expect(formatApiErrorMessage(body)).toBe(
+      expect(formatApiErrorMessage({ error: body })).toBe(
         "validation failed: name is required",
       );
     });
 
     it("ignores fields with empty strings", () => {
       const body = { error: "", message: "the real message" };
-      expect(formatApiErrorMessage(body)).toBe("the real message");
+      expect(formatApiErrorMessage({ error: body })).toBe("the real message");
     });
   });
 
   it("never swallows the body when only generic labels are present", () => {
     const body = { error: "Internal server error", message: "Internal server error" };
-    const formatted = formatApiErrorMessage(body, { status: 500 });
+    const formatted = formatApiErrorMessage({ error: body, options: { status: 500 } });
     expect(formatted.toLowerCase()).toContain("server returned");
     expect(formatted).toContain("500");
   });
@@ -109,7 +109,7 @@ describe("formatApiErrorMessage", () => {
 describe("formatApiErrorForOperation", () => {
   it("prepends the operation context", () => {
     const body = { error: "NotFoundError", message: "Prompt not found" };
-    expect(formatApiErrorForOperation("fetch prompt", body)).toBe(
+    expect(formatApiErrorForOperation({ operation: "fetch prompt", error: body })).toBe(
       "Failed to fetch prompt: NotFoundError: Prompt not found",
     );
   });
