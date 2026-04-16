@@ -23,8 +23,13 @@ export default function BackofficePage() {
     { retry: false, refetchOnWindowFocus: false },
   );
 
-  const hasAccess = adminStatus.data?.isAdmin;
-  const isDenied = adminStatus.isSuccess && !hasAccess;
+  const hasAccess = adminStatus.data?.isAdmin === true;
+  // "Denied" covers both the explicit non-admin response AND a query failure
+  // (e.g. session expired / auth middleware error) — in either case the user
+  // can't enter the Backoffice, so we redirect rather than leaving them on a
+  // spinner forever.
+  const isDenied =
+    (adminStatus.isSuccess && !hasAccess) || adminStatus.isError;
 
   useEffect(() => {
     if (isDenied) {
@@ -32,13 +37,13 @@ export default function BackofficePage() {
     }
   }, [isDenied, router]);
 
-  if (adminStatus.isLoading || !hasAccess) {
+  if (!hasAccess) {
     return (
       <OpsPageShell>
         <BackofficeLayout>
           <Center paddingY={20}>
             <VStack gap={3}>
-              <Spinner size="lg" />
+              {!isDenied && <Spinner size="lg" />}
               <Text color="fg.muted" fontSize="sm">
                 {isDenied ? "Access denied" : "Loading Backoffice…"}
               </Text>

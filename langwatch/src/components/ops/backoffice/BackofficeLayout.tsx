@@ -1,6 +1,6 @@
 import { Box, Container, HStack, Text, VStack } from "@chakra-ui/react";
 import { ChevronDown, ChevronRight } from "lucide-react";
-import { type PropsWithChildren, useEffect, useState } from "react";
+import { type PropsWithChildren, useEffect, useId, useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { MenuLink } from "~/components/MenuLink";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -10,6 +10,10 @@ import { usePathname } from "~/utils/compat/next-navigation";
  * Collapsible sidebar section — visually matches SettingsLayout so Backoffice
  * inherits the same menu feel (uppercase muted headers, chevron, active group
  * auto-expanded).
+ *
+ * Uses `<button>` semantics on the header so the control is keyboard-operable
+ * (Enter/Space toggle), plus `aria-expanded` / `aria-controls` so screen
+ * readers announce the collapsible state.
  */
 function NavSection({
   label,
@@ -19,6 +23,7 @@ function NavSection({
   const pathname = usePathname();
   const isActive = paths.some((p) => pathname?.startsWith(p));
   const [open, setOpen] = useState(isActive);
+  const panelId = `backoffice-nav-${useId()}`;
 
   useEffect(() => {
     if (isActive) setOpen(true);
@@ -26,29 +31,37 @@ function NavSection({
 
   return (
     <VStack align="start" width="full" gap={0}>
-      <HStack
+      <Box
+        as="button"
         width="full"
         px={4}
         py={1}
-        cursor="pointer"
         color="fg.muted"
+        background="transparent"
+        border="none"
+        textAlign="left"
+        cursor="pointer"
         _hover={{ color: "fg" }}
+        aria-expanded={open}
+        aria-controls={panelId}
         onClick={() => setOpen((v) => !v)}
       >
-        <Text
-          fontSize="xs"
-          fontWeight="semibold"
-          textTransform="uppercase"
-          letterSpacing="wider"
-        >
-          {label}
-        </Text>
-        <Box ml="auto">
-          {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        </Box>
-      </HStack>
+        <HStack width="full">
+          <Text
+            fontSize="xs"
+            fontWeight="semibold"
+            textTransform="uppercase"
+            letterSpacing="wider"
+          >
+            {label}
+          </Text>
+          <Box ml="auto">
+            {open ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+          </Box>
+        </HStack>
+      </Box>
       {open && (
-        <VStack align="start" width="full" gap={1} pl={2}>
+        <VStack id={panelId} align="start" width="full" gap={1} pl={2}>
           {children}
         </VStack>
       )}
