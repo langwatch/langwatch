@@ -218,61 +218,9 @@ jobs:
         run: bash .github/scripts/install-goose.sh
 
       - name: Start ClickHouse with storage policy
-        run: |
-          # Create storage policy config file
-          # Note: Storage policies can only be loaded at server startup, not via SYSTEM RELOAD CONFIG
-          # Each disk must have a unique name AND path - we define 'hot' and 'cold' disks with different paths
-          cat > /tmp/storage_policy.xml << 'EOF'
-          <clickhouse>
-              <storage_configuration>
-                  <disks>
-                      <hot>
-                          <path>/var/lib/clickhouse/hot/</path>
-                      </hot>
-                      <cold>
-                          <path>/var/lib/clickhouse/cold/</path>
-                      </cold>
-                  </disks>
-                  <policies>
-                      <local_primary>
-                          <volumes>
-                              <hot>
-                                  <disk>hot</disk>
-                              </hot>
-                              <cold>
-                                  <disk>cold</disk>
-                              </cold>
-                          </volumes>
-                      </local_primary>
-                  </policies>
-              </storage_configuration>
-          </clickhouse>
-          EOF
-
-          # Start ClickHouse container with config mounted (loads at startup)
-          docker run -d \
-            --name clickhouse \
-            --network host \
-            -e CLICKHOUSE_DB=default \
-            -e CLICKHOUSE_USER=default \
-            -e CLICKHOUSE_PASSWORD=ci_password \
-            -v /tmp/storage_policy.xml:/etc/clickhouse-server/config.d/storage_policy.xml:ro \
-            clickhouse/clickhouse-server:latest
-
-          # Wait for ClickHouse to be ready (use HTTP port — native port 9000 is unreliable with --network host)
-          echo "Waiting for ClickHouse to be ready..."
-          for i in {1..60}; do
-            if curl -sf "http://localhost:8123/?user=default&password=ci_password" -d "SELECT 1" >/dev/null 2>&1; then
-              echo "ClickHouse is ready"
-              break
-            fi
-            echo "Attempt $i: Waiting for ClickHouse..."
-            sleep 1
-          done
-
-          # Verify storage policy is available
-          echo "Verifying storage policy..."
-          curl -sf "http://localhost:8123/?user=default&password=ci_password" -d "SELECT policy_name, volume_name, disks FROM system.storage_policies WHERE policy_name = 'local_primary'"
+        env:
+          CLICKHOUSE_PASSWORD: ci_password
+        run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
 
       - name: Run ClickHouse migrations
         working-directory: langwatch
@@ -423,6 +371,9 @@ jobs:
 
       - name: Test extract-failures.sh
         run: bash .github/scripts/__tests__/extract-failures.test.sh
+
+      - name: Test start-clickhouse-with-storage-policy.sh
+        run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
 
   ci-self-test:
     needs: changes
