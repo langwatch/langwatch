@@ -59,7 +59,7 @@ const makeEvaluator = (overrides: Partial<EvaluatorResponse> = {}): EvaluatorRes
   updatedAt: "2026-01-02T00:00:00Z",
   fields: [{ identifier: "input", type: "string" }],
   outputFields: [{ identifier: "score", type: "number" }],
-  platformUrl: "",
+  platformUrl: "https://app.langwatch.ai/proj-1/evaluators/evaluator_abc123",
   ...overrides,
 });
 
