@@ -73,7 +73,7 @@ const AdminApp = () => {
   ];
 
   return (
-    <Admin dataProvider={dataProvider("/api/admin", {})}>
+    <Admin dataProvider={dataProvider("/api/admin", {})} basename="/admin">
       <Resource
         name="user"
         list={
