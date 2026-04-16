@@ -94,6 +94,30 @@ export type EvaluatorResultEventData = z.infer<
 export type EvaluatorResultEvent = z.infer<typeof evaluatorResultEventSchema>;
 
 /**
+ * Trace metrics computed event - emitted when trace cost data is synced
+ * from the trace processing pipeline (ECST pattern).
+ */
+export const traceMetricsComputedEventDataSchema = z.object({
+  runId: z.string(),
+  experimentId: z.string(),
+  traceId: z.string(),
+  totalCost: z.number(),
+});
+
+export const traceMetricsComputedEventSchema = EventSchema.extend({
+  type: z.literal(EXPERIMENT_RUN_EVENT_TYPES.TRACE_METRICS_COMPUTED),
+  data: traceMetricsComputedEventDataSchema,
+  metadata: experimentRunEventMetadataSchema.optional(),
+});
+
+export type TraceMetricsComputedEventData = z.infer<
+  typeof traceMetricsComputedEventDataSchema
+>;
+export type TraceMetricsComputedEvent = z.infer<
+  typeof traceMetricsComputedEventSchema
+>;
+
+/**
  * Experiment run completed event - emitted when an experiment run finishes.
  */
 export const experimentRunCompletedEventDataSchema = z.object({
@@ -123,10 +147,12 @@ export type ExperimentRunProcessingEvent =
   | ExperimentRunStartedEvent
   | TargetResultEvent
   | EvaluatorResultEvent
+  | TraceMetricsComputedEvent
   | ExperimentRunCompletedEvent;
 
 export {
 	isEvaluatorResultEvent, isExperimentRunCompletedEvent,
-	isExperimentRunStartedEvent, isTargetResultEvent
+	isExperimentRunStartedEvent, isTargetResultEvent,
+	isTraceMetricsComputedEvent
 } from "./typeGuards";
 

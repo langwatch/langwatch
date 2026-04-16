@@ -558,6 +558,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         startExperimentRun: noop,
         recordTargetResult: noop,
         recordEvaluatorResult: noop,
+        computeExperimentRunMetrics: noop,
         completeExperimentRun: noop,
       } as AppCommands["experimentRuns"],
       simulations: {
