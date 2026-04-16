@@ -293,6 +293,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             \`Links.Attributes\` AS Links_Attributes
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
+            AND ArchivedAt IS NULL
             AND TraceId = {traceId:String}
             AND (TenantId, TraceId, SpanId, StartTime) IN (
               SELECT TenantId, TraceId, SpanId, max(StartTime)
@@ -406,6 +407,7 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             event_attrs AS attributes
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
+            AND ArchivedAt IS NULL
             AND TraceId = {traceId:String}
             AND (TenantId, TraceId, SpanId, StartTime) IN (
               SELECT TenantId, TraceId, SpanId, max(StartTime)

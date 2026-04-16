@@ -860,10 +860,12 @@ export class ClickHouseTraceService {
                 StatusMessage
               FROM stored_spans
               WHERE TenantId = {tenantId:String}
+                AND ArchivedAt IS NULL
                 AND TraceId = (
                   SELECT TraceId FROM stored_spans
                   WHERE TenantId = {tenantId:String}
                     AND SpanId = {spanId:String}
+                    AND ArchivedAt IS NULL
                   LIMIT 1
                 )
               LIMIT 1000
@@ -1421,15 +1423,19 @@ export class ClickHouseTraceService {
         const [countResult, summaryResult] = await Promise.all([
           clickHouseClient.query({
             query: `
-              SELECT uniq(ts.TraceId) as total
-              FROM trace_summaries ts
-              WHERE ts.TenantId = {tenantId:String}
-                AND ts.ArchivedAt IS NULL
-                AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
-                AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
-                ${extraFilters}
-                ${traceIdFilter}
-                ${searchFilter}
+              SELECT count() AS total
+              FROM (
+                SELECT ts.TraceId
+                FROM trace_summaries ts
+                WHERE ts.TenantId = {tenantId:String}
+                  AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                  AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                  ${extraFilters}
+                  ${traceIdFilter}
+                  ${searchFilter}
+                GROUP BY ts.TraceId
+                HAVING argMax(ts.ArchivedAt, ts.UpdatedAt) IS NULL
+              )
             `,
             query_params: sharedParams,
             format: "JSONEachRow",
@@ -1469,10 +1475,10 @@ export class ClickHouseTraceService {
                   SELECT s.TraceId
                   FROM (
                     SELECT ts.TraceId AS TraceId,
-                           argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa
+                           argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa,
+                           argMax(ts.ArchivedAt, ts.UpdatedAt) AS _archived
                     FROM trace_summaries ts
                     WHERE ts.TenantId = {tenantId:String}
-                      AND ts.ArchivedAt IS NULL
                       AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                       AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
                       ${extraFilters}
@@ -1481,6 +1487,7 @@ export class ClickHouseTraceService {
                       ${cursorCondition}
                     GROUP BY ts.TraceId
                   ) s
+                  WHERE s._archived IS NULL
                   ORDER BY s._oa ${orderDirection}, s.TraceId ${orderDirection}
                   LIMIT {pageSize:UInt32}
                 )
@@ -1731,6 +1738,7 @@ export class ClickHouseTraceService {
           \`Links.Attributes\` AS Links_Attributes
         FROM stored_spans AS t
         WHERE t.TenantId = {tenantId:String}
+          AND t.ArchivedAt IS NULL
           AND t.TraceId IN ({traceIds:Array(String)})
           AND (t.TenantId, t.TraceId, t.SpanId, t.StartTime) IN (
             SELECT TenantId, TraceId, SpanId, max(StartTime)
