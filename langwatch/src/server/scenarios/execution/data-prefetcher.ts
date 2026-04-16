@@ -68,11 +68,11 @@ export interface AgentFetcher {
 }
 
 /**
- * Minimal interface for workflow version lookup - loads the published DSL
+ * Minimal interface for workflow version lookup - loads the latest DSL
  * for a workflow so the worker-thread adapter can execute it without DB access.
  */
 export interface WorkflowVersionFetcher {
-  getPublishedDsl(params: {
+  getLatestDsl(params: {
     projectId: string;
     workflowId: string;
   }): Promise<{ workflowId: string; dsl: Record<string, unknown> } | null>;
@@ -453,19 +453,19 @@ async function fetchWorkflowAgentData(
     null;
   if (!workflowId) return null;
 
-  const published = await workflowVersionFetcher.getPublishedDsl({
+  const latest = await workflowVersionFetcher.getLatestDsl({
     projectId,
     workflowId,
   });
-  if (!published) return null;
+  if (!latest) return null;
 
-  const { inputs, outputs } = extractWorkflowIO(published.dsl);
+  const { inputs, outputs } = extractWorkflowIO(latest.dsl);
 
   return {
     type: "workflow",
     agentId: agent.id,
-    workflowId: published.workflowId,
-    workflow: published.dsl,
+    workflowId: latest.workflowId,
+    workflow: latest.dsl,
     inputs,
     outputs,
     scenarioMappings: config.scenarioMappings,
@@ -561,14 +561,14 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
       findById: (params) => agentRepository.findById(params),
     },
     workflowVersionFetcher: {
-      getPublishedDsl: async ({ projectId, workflowId }) => {
+      getLatestDsl: async ({ projectId, workflowId }) => {
         const workflow = await prisma.workflow.findFirst({
           where: { id: workflowId, projectId, archivedAt: null },
-          select: { id: true, publishedId: true },
+          select: { id: true, latestVersionId: true },
         });
-        if (!workflow?.publishedId) return null;
+        if (!workflow?.latestVersionId) return null;
         const version = await prisma.workflowVersion.findFirst({
-          where: { id: workflow.publishedId, projectId },
+          where: { id: workflow.latestVersionId, projectId },
           select: { dsl: true },
         });
         if (!version) return null;

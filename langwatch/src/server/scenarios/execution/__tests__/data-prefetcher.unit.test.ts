@@ -77,7 +77,7 @@ describe("prefetchScenarioData", () => {
     };
 
     const workflowVersionFetcher: WorkflowVersionFetcher = {
-      getPublishedDsl: vi.fn().mockResolvedValue(null),
+      getLatestDsl: vi.fn().mockResolvedValue(null),
     };
 
     const projectFetcher: ProjectFetcher = {
@@ -535,7 +535,7 @@ describe("prefetchScenarioData", () => {
       },
     };
 
-    const publishedDsl = {
+    const workflowDsl = {
       workflow_id: "wf_1",
       nodes: [
         {
@@ -574,16 +574,16 @@ describe("prefetchScenarioData", () => {
       referenceId: "agent_wf",
     };
 
-    describe("when the agent and published workflow exist", () => {
+    describe("when the agent and workflow have a latest version", () => {
       it("returns WorkflowAgentData with inputs, outputs, mappings and workflow DSL", async () => {
         const deps = createMockDeps({
           agentFetcher: {
             findById: vi.fn().mockResolvedValue(workflowAgent),
           },
           workflowVersionFetcher: {
-            getPublishedDsl: vi.fn().mockResolvedValue({
+            getLatestDsl: vi.fn().mockResolvedValue({
               workflowId: "wf_1",
-              dsl: publishedDsl,
+              dsl: workflowDsl,
             }),
           },
         });
@@ -615,20 +615,20 @@ describe("prefetchScenarioData", () => {
               },
             });
             expect(result.data.adapterData.scenarioOutputField).toBe("answer");
-            expect(result.data.adapterData.workflow).toEqual(publishedDsl);
+            expect(result.data.adapterData.workflow).toEqual(workflowDsl);
           }
         }
       });
     });
 
-    describe("when the workflow has no published version", () => {
+    describe("when the workflow has no saved version", () => {
       it("returns a friendly 'Workflow agent not found' error", async () => {
         const deps = createMockDeps({
           agentFetcher: {
             findById: vi.fn().mockResolvedValue(workflowAgent),
           },
           workflowVersionFetcher: {
-            getPublishedDsl: vi.fn().mockResolvedValue(null),
+            getLatestDsl: vi.fn().mockResolvedValue(null),
           },
         });
 
@@ -647,7 +647,7 @@ describe("prefetchScenarioData", () => {
 
     describe("when the agent has no workflowId", () => {
       it("returns 'Workflow agent not found' without touching the version fetcher", async () => {
-        const getPublishedDsl = vi.fn();
+        const getLatestDsl = vi.fn();
         const deps = createMockDeps({
           agentFetcher: {
             findById: vi.fn().mockResolvedValue({
@@ -657,7 +657,7 @@ describe("prefetchScenarioData", () => {
             }),
           },
           workflowVersionFetcher: {
-            getPublishedDsl,
+            getLatestDsl,
           },
         });
 
@@ -671,8 +671,9 @@ describe("prefetchScenarioData", () => {
         if (!result.success) {
           expect(result.error).toBe("Workflow agent agent_wf not found");
         }
-        expect(getPublishedDsl).not.toHaveBeenCalled();
+        expect(getLatestDsl).not.toHaveBeenCalled();
       });
     });
-  });
+
+});
 });
