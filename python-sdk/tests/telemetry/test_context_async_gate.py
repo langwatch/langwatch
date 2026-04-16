@@ -16,6 +16,8 @@ import pytest
 
 from langwatch.telemetry import context as ctx_mod
 
+pytestmark = pytest.mark.unit
+
 
 class TestAsyncLoopDetection:
     def test_not_on_loop_outside_asyncio(self):
@@ -84,20 +86,17 @@ class TestThreadingPathStillWorks:
             assert list(ctx_mod.main_thread_langwatch_trace) == before
 
     def test_child_thread_reads_main_fallback_when_contextvar_missing(self):
-        """In the pure-threading path, a child thread can still see the main's trace."""
+        """In the pure-threading path, a child thread sees the main's trace via get_current_trace()."""
         ctx_mod.main_thread_langwatch_trace.clear()
         ctx_mod.main_thread_langwatch_trace.append("SENTINEL_TRACE")  # type: ignore[arg-type]
 
         seen: list = []
 
         def worker():
-            seen.append(ctx_mod.stored_langwatch_trace.get(None))
-            if (
-                ctx_mod._is_on_child_thread()
-                and not ctx_mod._is_on_async_loop()
-                and ctx_mod.main_thread_langwatch_trace
-            ):
-                seen.append(ctx_mod.main_thread_langwatch_trace[-1])
+            # Exercise the real production code path instead of reimplementing
+            # the predicate — a regression in get_current_trace() should cause
+            # this test to fail too.
+            seen.append(ctx_mod.get_current_trace(suppress_warning=True))
 
         t = threading.Thread(target=worker)
         t.start()
@@ -105,5 +104,4 @@ class TestThreadingPathStillWorks:
 
         ctx_mod.main_thread_langwatch_trace.clear()
 
-        assert seen[0] is None  # contextvar not inherited in a raw Thread
-        assert seen[-1] == "SENTINEL_TRACE"
+        assert seen == ["SENTINEL_TRACE"]

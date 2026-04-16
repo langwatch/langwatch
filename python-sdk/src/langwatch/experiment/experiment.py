@@ -485,8 +485,10 @@ class Experiment:
         across items. Use together with :meth:`asubmit` to schedule per-item work.
         """
         if not self.initialized:
-            self.init()
+            # init() does a blocking httpx.post — run it off-loop.
+            await asyncio.to_thread(self.init)
 
+        progress_bar: Optional[tqdm] = None
         try:
             total_ = (
                 total
@@ -526,9 +528,10 @@ class Experiment:
                     progress_bar.update(1)
 
             await self._await_completion()
-            progress_bar.close()
             self._finished = True
-            self._auto_display_results()
+            # _auto_display_results sleeps for several seconds and issues
+            # synchronous HTTP — keep it off the event loop.
+            await asyncio.to_thread(self._auto_display_results)
 
         except Exception as e:
             self._finished = True
@@ -544,6 +547,20 @@ class Experiment:
                 },
             )
             raise e
+        finally:
+            # Guarantee cleanup on normal completion, early `break`, or
+            # exception. Without this, a consumer that breaks out of `async
+            # for` leaves _async_semaphore dangling (stale asubmit calls),
+            # background tasks running, and the tqdm bar open.
+            pending = [t for t in self._async_tasks if not t.done()]
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+            self._async_tasks = []
+            self._async_semaphore = None
+            if progress_bar is not None:
+                progress_bar.close()
 
     def asubmit(
         self, func: Callable[..., Any], /, *args: Any, **kwargs: Any

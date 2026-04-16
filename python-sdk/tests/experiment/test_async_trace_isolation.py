@@ -63,6 +63,7 @@ def _mock_http_capture():
     return captured, mock_post
 
 
+@pytest.mark.unit
 class TestAsyncLoopTraceIsolation:
     """Each concurrent item must run under its own isolated OTel trace."""
 
@@ -106,6 +107,7 @@ class TestAsyncLoopTraceIsolation:
         assert observed == {i: i for i in range(6)}
 
 
+@pytest.mark.unit
 class TestAsyncLoopBoundResource:
     """Loop-bound resources created outside the loop must survive concurrent use."""
 
@@ -141,6 +143,7 @@ class TestAsyncLoopBoundResource:
         assert sorted(seen) == items
 
 
+@pytest.mark.unit
 class TestAsyncConcurrencyBound:
     @pytest.mark.asyncio
     async def test_concurrency_limit_is_respected(self, experiment):
@@ -165,6 +168,7 @@ class TestAsyncConcurrencyBound:
         assert peak >= 2, f"Concurrency was not exercised: peak={peak}"
 
 
+@pytest.mark.unit
 class TestAsyncSyncCallable:
     """Sync callables in async mode must not block concurrent async siblings."""
 
@@ -232,6 +236,7 @@ class TestAsyncSyncCallable:
         assert elapsed < 0.35
 
 
+@pytest.mark.unit
 class TestAsyncFailureIsolation:
     @pytest.mark.asyncio
     async def test_one_failing_task_does_not_abort_siblings(self, experiment):
@@ -258,6 +263,7 @@ class TestAsyncFailureIsolation:
             assert e.error is None
 
 
+@pytest.mark.integration
 class TestAsyncHttpPayload:
     """HTTP-mocked integration guard: batch payloads carry unique trace_ids per item."""
 
