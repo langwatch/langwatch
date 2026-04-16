@@ -61,16 +61,13 @@ export const listModelProvidersCommand = async (options?: { format?: string }): 
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof ModelProvidersApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching model providers: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    // ModelProvidersApiError.message already starts with "Failed to …" via
+    // formatApiErrorForOperation, so don't double-prefix.
+    const message =
+      error instanceof ModelProvidersApiError
+        ? error.message
+        : `Failed to fetch model providers: ${formatApiErrorMessage({ error })}`;
+    spinner.fail(chalk.red(message));
     process.exit(1);
   }
 };

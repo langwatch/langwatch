@@ -64,16 +64,13 @@ export const listScenariosCommand = async (options?: { format?: string }): Promi
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof ScenariosApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching scenarios: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    // ScenariosApiError.message already starts with "Failed to …" via
+    // formatApiErrorForOperation, so don't double-prefix.
+    const message =
+      error instanceof ScenariosApiError
+        ? error.message
+        : `Failed to fetch scenarios: ${formatApiErrorMessage({ error })}`;
+    spinner.fail(chalk.red(message));
     process.exit(1);
   }
 };

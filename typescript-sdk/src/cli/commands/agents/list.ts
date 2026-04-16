@@ -65,16 +65,13 @@ export const listAgentsCommand = async (options?: { format?: string }): Promise<
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof AgentsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching agents: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    // AgentsApiError.message already starts with "Failed to list agents: …"
+    // via formatApiErrorForOperation, so don't double-prefix.
+    const message =
+      error instanceof AgentsApiError
+        ? error.message
+        : `Failed to fetch agents: ${formatApiErrorMessage({ error })}`;
+    spinner.fail(chalk.red(message));
     process.exit(1);
   }
 };

@@ -64,16 +64,13 @@ export const listWorkflowsCommand = async (options?: { format?: string }): Promi
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof WorkflowsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching workflows: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    // WorkflowsApiError.message already starts with "Failed to …" via
+    // formatApiErrorForOperation, so don't double-prefix.
+    const message =
+      error instanceof WorkflowsApiError
+        ? error.message
+        : `Failed to fetch workflows: ${formatApiErrorMessage({ error })}`;
+    spinner.fail(chalk.red(message));
     process.exit(1);
   }
 };

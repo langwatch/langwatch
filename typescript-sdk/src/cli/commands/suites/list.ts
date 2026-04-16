@@ -66,16 +66,13 @@ export const listSuitesCommand = async (options?: { format?: string }): Promise<
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof SuitesApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching suites: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    // SuitesApiError.message already starts with "Failed to …" via
+    // formatApiErrorForOperation, so don't double-prefix.
+    const message =
+      error instanceof SuitesApiError
+        ? error.message
+        : `Failed to fetch suites: ${formatApiErrorMessage({ error })}`;
+    spinner.fail(chalk.red(message));
     process.exit(1);
   }
 };

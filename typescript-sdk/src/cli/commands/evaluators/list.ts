@@ -70,16 +70,13 @@ export const listEvaluatorsCommand = async (options?: { format?: string }): Prom
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof EvaluatorsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching evaluators: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    // EvaluatorsApiError.message already starts with "Failed to …" via
+    // formatApiErrorForOperation, so don't double-prefix.
+    const message =
+      error instanceof EvaluatorsApiError
+        ? error.message
+        : `Failed to fetch evaluators: ${formatApiErrorMessage({ error })}`;
+    spinner.fail(chalk.red(message));
     process.exit(1);
   }
 };
