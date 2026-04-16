@@ -1,25 +1,37 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+# Branch protection can require `docs-complete` as a single check.
 name: docs-ci
 
 on:
   push:
     branches:
       - main
-    paths:
-      - "docs/**"
-      - "skills/**"
-      - ".github/workflows/docs-ci.yml"
   pull_request:
-    paths:
-      - "docs/**"
-      - "skills/**"
-      - ".github/workflows/docs-ci.yml"
+  merge_group:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'docs/**'
+              - 'skills/**'
+              - '.github/workflows/docs-ci.yml'
+
   check_links:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -40,6 +52,8 @@ jobs:
           fi
 
   check_generated_files:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -78,3 +92,13 @@ jobs:
             echo "Then commit the updated files."
             exit 1
           fi
+
+  docs-complete:
+    needs: [changes, check_links, check_generated_files]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: check_links, check_generated_files

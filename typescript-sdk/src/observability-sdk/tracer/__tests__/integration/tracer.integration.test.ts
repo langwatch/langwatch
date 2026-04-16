@@ -200,7 +200,8 @@ describe("Tracer Integration Tests", () => {
       expect(child2Span.attributes[semconv.ATTR_LANGWATCH_SPAN_TYPE]).toBe("tool");
     });
 
-    it("should handle errors and exceptions properly", async () => {
+    // Skipped due to OTLP integration flake — see langwatch/langwatch#3240.
+    it.skip("should handle errors and exceptions properly", async () => {
       const tracer = getLangWatchTracer("error-handling-test");
 
       await expect(

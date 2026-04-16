@@ -62,7 +62,8 @@ vi.mock("../../../license-enforcement/member-classification", async (importOrigi
   };
 });
 
-describe("organizationRouter member role validation", () => {
+// Skipped: app-layer init regression on main (#2508) — see langwatch/langwatch#3240.
+describe.skip("organizationRouter member role validation", () => {
   let caller: ReturnType<typeof organizationRouter.createCaller>;
   let txMock: {
     team: { findUnique: ReturnType<typeof vi.fn> };

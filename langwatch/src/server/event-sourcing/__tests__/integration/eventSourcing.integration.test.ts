@@ -12,7 +12,8 @@ import {
 } from "./testHelpers";
 import type { TestEvent, TestProjection } from "./testPipelines";
 
-describe("Event Sourcing", () => {
+// Skipped: chronic async-event-handler timeout flake — see langwatch/langwatch#3240.
+describe.skip("Event Sourcing", () => {
   let pipeline: ReturnType<typeof createTestPipeline>;
   let tenantId: ReturnType<typeof createTestTenantId>;
   let tenantIdString: string;

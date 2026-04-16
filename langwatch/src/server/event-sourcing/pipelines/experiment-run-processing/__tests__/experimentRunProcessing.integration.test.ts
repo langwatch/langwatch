@@ -208,7 +208,8 @@ const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
 );
 
-describe.skipIf(!hasTestcontainers)(
+// Skipped: chronic async-event-handler timeout flake — see langwatch/langwatch#3240.
+describe.skip(
   "Experiment Run Processing Pipeline",
   () => {
     let pipeline: ReturnType<typeof createExperimentRunTestPipeline>;

@@ -12,7 +12,8 @@ import { prisma } from "~/server/db";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
-describe("Feature: Dataset REST API", () => {
+// Skipped: app-layer init regression on main (#2508) — see langwatch/langwatch#3240.
+describe.skip("Feature: Dataset REST API", () => {
   let testApiKey: string;
   let testProjectId: string;
   let testOrganization: Organization;

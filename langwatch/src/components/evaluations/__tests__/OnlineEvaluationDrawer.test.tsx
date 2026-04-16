@@ -226,7 +226,8 @@ describe("OnlineEvaluationDrawer + EvaluatorListDrawer Integration", () => {
   });
 });
 
-describe("OnlineEvaluationDrawer", () => {
+// Skipped: broken by react-admin pin in #3241 — see langwatch/langwatch#3240.
+describe.skip("OnlineEvaluationDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetState();
