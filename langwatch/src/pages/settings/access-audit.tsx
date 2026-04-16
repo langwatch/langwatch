@@ -269,13 +269,11 @@ function AccessAuditPage() {
             )}
           </Card.Body>
         </Card.Root>
-
       </VStack>
     </SettingsLayout>
   );
 }
 
-
-export default withPermissionGuard("organization:manage", {
+export default withPermissionGuard("organization:view", {
   layoutComponent: SettingsLayout,
 })(AccessAuditPage);

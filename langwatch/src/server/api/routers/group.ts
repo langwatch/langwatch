@@ -7,7 +7,7 @@ import {
   ENTERPRISE_FEATURE_ERRORS,
 } from "../enterprise";
 import { checkOrganizationPermission } from "../rbac";
-import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
+import { assertScopeInOrg } from "./roleBinding";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { slugify } from "~/utils/slugify";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -202,9 +202,9 @@ export const groupRouter = createTRPCRouter({
 
       // Validate all binding scopes belong to this org before starting the transaction
       if (input.bindings?.length) {
-        const repo = new PrismaRoleBindingRepository(ctx.prisma);
         for (const b of input.bindings) {
-          await repo.validateScopeInOrg({
+          await assertScopeInOrg({
+            prisma: ctx.prisma,
             organizationId: input.organizationId,
             scopeType: b.scopeType,
             scopeId: b.scopeId,
@@ -266,7 +266,8 @@ export const groupRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
       }
 
-      await new PrismaRoleBindingRepository(ctx.prisma).validateScopeInOrg({
+      await assertScopeInOrg({
+        prisma: ctx.prisma,
         organizationId: input.organizationId,
         scopeType: input.scopeType,
         scopeId: input.scopeId,

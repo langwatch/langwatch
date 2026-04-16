@@ -73,82 +73,145 @@ setup("authenticate", async ({ page, request }) => {
 
   // Wait for successful authentication - should redirect away from signin
   await expect(page).not.toHaveURL(/\/auth\/signin/);
-  console.log("Signed in successfully. Current URL:", page.url());
 
-  // Step 3: Create org + project via API if not already set up.
-  // page.request inherits the browser session cookies from the sign-in above,
-  // so this call is fully authenticated. This is more reliable than clicking
-  // through the onboarding UI (which has timing/button-label issues in self-hosted mode).
-  console.log("Checking if org/project setup is needed...");
+  // Step 3: Wait for either onboarding OR main app to appear
+  // The page may show a loading screen first, so we need to wait for actual content
+  console.log("Waiting for post-login page to load...");
 
-  const getAllResponse = await page.request.get(
-    "/api/trpc/organization.getAll?batch=1&input=" +
-      encodeURIComponent(JSON.stringify({ "0": { json: {} } })),
-  );
-  console.log("getAll status:", getAllResponse.status());
-  const getAllData = await getAllResponse.json().catch(() => null);
-  const orgs: Array<{ teams: Array<{ projects: Array<unknown> }> }> =
-    getAllData?.["0"]?.result?.data?.json ?? [];
-  console.log(
-    "Orgs found:",
-    orgs.length,
-    "| Projects:",
-    orgs.flatMap((o) => o.teams).flatMap((t) => t.projects).length,
-  );
-  const hasProject = orgs.some((o) =>
-    o.teams.some((t) => t.projects.length > 0),
-  );
+  const onboardingHeading = page.getByText("Welcome Aboard", { exact: false });
+  const mainAppNav = page.getByRole("navigation");
 
-  if (!hasProject) {
-    console.log("No project found — creating org + project via API...");
-    const initResponse = await page.request.post(
-      "/api/trpc/onboarding.initializeOrganization?batch=1",
-      {
-        data: {
-          "0": {
-            json: {
-              orgName: "Browser Test Org",
-              projectName: "Browser Test Project",
-              language: "other",
-              framework: "other",
-            },
-          },
-        },
-      },
-    );
-    console.log("initializeOrganization status:", initResponse.status());
-    const initData = await initResponse.json().catch(() => null);
-    if (!initResponse.ok() || initData?.["0"]?.error) {
-      console.log(
-        "WARNING: initializeOrganization failed:",
-        JSON.stringify(initData).slice(0, 500),
-      );
-    } else {
-      console.log("Org + project created successfully.");
+  // Wait for either onboarding or main navigation to appear (with longer timeout)
+  await Promise.race([
+    onboardingHeading.waitFor({ state: "visible", timeout: 30000 }),
+    mainAppNav.waitFor({ state: "visible", timeout: 30000 }),
+  ]).catch(() => {
+    // If neither appears, continue anyway and check below
+  });
+
+  // Small delay to let React fully render
+  await page.waitForTimeout(1000);
+
+  // Step 4: Complete onboarding if shown
+  const isOnboarding = await onboardingHeading.isVisible().catch(() => false);
+
+  if (isOnboarding) {
+    console.log("Completing onboarding flow...");
+
+    // Fill in organization/company name
+    const companyInput = page.getByPlaceholder("Company or your name");
+    await companyInput.fill("Browser Test Org");
+    console.log("  - Filled company name");
+
+    // Accept terms of service (click the label since Chakra checkbox control intercepts pointer events)
+    const tosLabel = page.getByText("I agree to the LangWatch");
+    await tosLabel.click();
+    console.log("  - Accepted terms");
+
+    // Check if we have a "Next" button (multi-screen) or "Finish" button (single screen)
+    const nextButton = page.getByRole("button", { name: "Next" });
+    const finishButton = page.getByRole("button", { name: "Finish" });
+
+    if (await nextButton.isVisible().catch(() => false)) {
+      // Multi-screen onboarding flow
+      await nextButton.click();
+      await page.waitForTimeout(2000);
+      console.log("  - Clicked Next");
+
+      // Handle subsequent screens
+      for (let i = 0; i < 5; i++) {
+        // Select "For myself" if visible (simplifies flow)
+        const myselfOption = page.getByText(/for myself/i);
+        if (await myselfOption.isVisible().catch(() => false)) {
+          await myselfOption.click();
+          console.log("  - Selected 'For myself'");
+        }
+
+        // Look for Skip or Finish buttons
+        const skipBtn = page.getByRole("button", { name: "Skip" });
+        const finishBtn = page.getByRole("button", { name: "Finish" });
+        const nextBtn = page.getByRole("button", { name: "Next" });
+
+        if (await finishBtn.isVisible().catch(() => false)) {
+          if (!(await finishBtn.isDisabled())) {
+            await finishBtn.click();
+            console.log("  - Clicked Finish");
+            break;
+          }
+        }
+
+        if (await skipBtn.isVisible().catch(() => false)) {
+          await skipBtn.click();
+          await page.waitForTimeout(2000);
+          console.log("  - Clicked Skip");
+          continue;
+        }
+
+        if (await nextBtn.isVisible().catch(() => false)) {
+          if (!(await nextBtn.isDisabled())) {
+            await nextBtn.click();
+            await page.waitForTimeout(2000);
+            console.log("  - Clicked Next");
+            continue;
+          }
+        }
+
+        // Nothing clickable, break
+        break;
+      }
+    } else if (await finishButton.isVisible().catch(() => false)) {
+      // Single-screen onboarding (self-hosted or simplified flow)
+      // Wait for Finish button to be enabled
+      await expect(finishButton).toBeEnabled({ timeout: 5000 });
+      await finishButton.click();
+      console.log("  - Clicked Finish (single screen)");
     }
+
+    // Wait for onboarding to complete
+    await page.waitForTimeout(2000);
+    console.log("Onboarding completed");
   } else {
-    console.log("Org/project already exists, skipping setup.");
+    console.log("No onboarding detected, user already set up");
   }
 
-  // Step 4: Navigate to the app root and wait for main navigation.
-  // This confirms the session + org/project are wired up before saving state.
-  console.log("Navigating to app root to confirm setup...");
-  await page.goto("/");
+  // Step 5: Handle any additional setup screens (project creation, etc.)
+  // Wait a moment for page to settle, then check for project creation screen
+  await page.waitForTimeout(3000);
 
-  const homeLink = page.getByRole("link", { name: "Home", exact: true });
-  await homeLink
-    .waitFor({ state: "visible", timeout: 30000 })
-    .catch(async () => {
-      console.log(
-        "WARNING: Home link not visible. URL:",
-        page.url(),
-      );
-      await page.screenshot({
-        path: path.join(__dirname, "..", "debug-post-setup.png"),
-      });
+  const needsProject = await page
+    .getByRole("heading", { name: /create.*project/i })
+    .isVisible()
+    .catch(() => false);
+
+  if (needsProject) {
+    console.log("Creating test project...");
+    const projectNameInput = page.getByRole("textbox", { name: /name/i });
+    if (await projectNameInput.isVisible()) {
+      await projectNameInput.fill("Browser Test Project");
+      await page.getByRole("button", { name: /create/i }).click();
+      await page.waitForTimeout(3000);
+    }
+    console.log("Project created");
+  }
+
+  // Step 6: Verify we're in the main app before saving
+  // Wait for navigation to appear (indicates main app is loaded)
+  await page.waitForTimeout(2000);
+
+  // Make sure we're not on onboarding anymore
+  const stillOnboarding = await page
+    .getByText("Welcome Aboard", { exact: false })
+    .isVisible()
+    .catch(() => false);
+
+  if (stillOnboarding) {
+    console.log("WARNING: Still on onboarding page, taking screenshot for debug");
+    await page.screenshot({
+      path: path.join(__dirname, "..", "debug-onboarding.png"),
     });
+  }
 
-  // Step 5: Save authentication state
+  // Step 7: Save authentication state
   await page.context().storageState({ path: AUTH_FILE });
 
   console.log("Authentication state saved to:", AUTH_FILE);

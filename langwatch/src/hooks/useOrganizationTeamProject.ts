@@ -291,7 +291,7 @@ export const useOrganizationTeamProject = (
     };
   }
 
-  const organizationRole = organization?.members?.[0]?.role;
+  const organizationRole = organization?.members[0]?.role;
 
   const isOrganizationFeatureEnabled = (feature: string): boolean => {
     if (!organization?.features) return false;
@@ -331,13 +331,8 @@ export const useOrganizationTeamProject = (
     }
 
     // Team-level permission checking
-    const teamMember = team?.members?.[0];
-    if (!teamMember) {
-      // Users created via the RoleBinding-only flow (no legacy TeamUser row) still
-      // have full team access when they are org admins — mirrors the server-side
-      // behaviour where an org-scoped ADMIN RoleBinding grants all permissions.
-      return organizationRole === OrganizationUserRole.ADMIN;
-    }
+    const teamMember = team?.members[0];
+    if (!teamMember) return false;
 
     // Check if user has custom role assignment
     if (teamMember.assignedRole) {

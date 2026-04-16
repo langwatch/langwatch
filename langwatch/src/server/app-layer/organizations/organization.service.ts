@@ -1,4 +1,4 @@
-import { PricingModel, RoleBindingScopeType, type OrganizationUserRole, type TeamUserRole } from "@prisma/client";
+import { PricingModel, type OrganizationUserRole, type TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { generate } from "@langwatch/ksuid";
 import { slugify } from "~/utils/slugify";
@@ -22,7 +22,6 @@ import type {
 } from "./repositories/organization.repository";
 import type { User } from "@prisma/client";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
-import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 
 export type OrganizationFeatureName = "billable_events_usage";
 
@@ -305,42 +304,5 @@ export class OrganizationService {
     filters: AuditLogFilters,
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
     return this.repo.getAuditLogs(filters);
-  }
-
-  /**
-   * Returns a team enriched with a synthesized member entry for the given user
-   * if the user has a RoleBinding for this team or one of its projects but no
-   * TeamUser row yet. This is a pure function — it does not mutate the input.
-   */
-  enrichTeamWithRoleBindings(
-    team: { members: any[]; id: string; projects: { id: string }[] },
-    userId: string,
-    userRoleBindings: RoleBindingForSynthesis[],
-    organizationId: string,
-  ): typeof team {
-    const teamProjectIds = new Set(team.projects.map((p) => p.id));
-    const binding = userRoleBindings.find(
-      (b) =>
-        b.organizationId === organizationId &&
-        ((b.scopeType === RoleBindingScopeType.TEAM && b.scopeId === team.id) ||
-          (b.scopeType === RoleBindingScopeType.PROJECT && teamProjectIds.has(b.scopeId))),
-    );
-    if (!binding) return team;
-
-    const bindingMember = {
-      userId,
-      teamId: team.id,
-      role: binding.role,
-      assignedRoleId: binding.customRoleId ?? null,
-      assignedRole: binding.customRole ?? null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    const existingIndex = team.members.findIndex((m: { userId: string }) => m.userId === userId);
-    const newMembers =
-      existingIndex >= 0
-        ? team.members.map((m: unknown, i: number) => (i === existingIndex ? bindingMember : m))
-        : [...team.members, bindingMember];
-    return { ...team, members: newMembers };
   }
 }
