@@ -1,6 +1,6 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import { Activity, Anvil, Film, History } from "lucide-react";
+import { Activity, Anvil, Film, History, Shield } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
 import { useOpsPermission } from "../hooks/useOpsPermission";
@@ -278,6 +278,17 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
     refetchInterval: 10000,
   });
 
+  // Backoffice is admin-only. `useOpsPermission` already gates the whole
+  // OPS section on admin today, but we keep the isAdmin query decoupled so
+  // that if ops:view ever broadens beyond admin, the Backoffice link still
+  // stays strictly admin-only. Gated on `shouldShow` so the request is
+  // skipped entirely when the section isn't rendered.
+  const adminStatus = api.user.isAdmin.useQuery(
+    {},
+    { enabled: shouldShow, retry: false, refetchOnWindowFocus: false },
+  );
+  const isAdminUser = adminStatus.data?.isAdmin ?? false;
+
   if (!shouldShow) return null;
 
   const blockedCount =
@@ -327,6 +338,15 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         isActive={router.pathname.startsWith("/ops/dejaview")}
         showLabel={showExpanded}
       />
+      {isAdminUser && (
+        <SideMenuLink
+          icon={Shield}
+          label="Backoffice"
+          href="/ops/backoffice"
+          isActive={router.pathname.startsWith("/ops/backoffice")}
+          showLabel={showExpanded}
+        />
+      )}
     </>
   );
 };

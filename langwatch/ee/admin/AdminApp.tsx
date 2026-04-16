@@ -30,7 +30,17 @@ import type { User } from "@prisma/client";
 import { PlanTypes, SubscriptionStatus } from "@prisma/client";
 import { useState } from "react";
 
-const AdminApp = () => {
+interface AdminAppProps {
+  /**
+   * Basename passed to react-admin's <Admin>, used when mounting the same
+   * component at a non-default URL (e.g. "/ops/backoffice" in addition to
+   * "/admin"). Defaults to "/admin" for backwards compatibility with the
+   * original /admin entry point.
+   */
+  basename?: string;
+}
+
+const AdminApp = ({ basename = "/admin" }: AdminAppProps = {}) => {
   const [loadingImpersonation, setLoadingImpersonation] = useState<
     string | undefined
   >();
@@ -73,7 +83,7 @@ const AdminApp = () => {
   ];
 
   return (
-    <Admin dataProvider={dataProvider("/api/admin", {})} basename="/admin">
+    <Admin dataProvider={dataProvider("/api/admin", {})} basename={basename}>
       <Resource
         name="user"
         list={
