@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
 
 export const runWorkflowCommand = async (
   id: string,
@@ -30,9 +32,8 @@ export const runWorkflowCommand = async (
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Workflow execution failed (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Workflow execution failed: ${message}`);
       process.exit(1);
     }
 
@@ -63,7 +64,7 @@ export const runWorkflowCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error running workflow: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error running workflow: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

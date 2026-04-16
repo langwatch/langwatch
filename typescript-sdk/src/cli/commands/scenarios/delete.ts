@@ -5,6 +5,7 @@ import {
   ScenariosApiError,
 } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const deleteScenarioCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -25,7 +26,7 @@ export const deleteScenarioCommand = async (id: string, options?: { format?: str
     } else {
       console.error(
         chalk.red(
-          `Error finding scenario: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error finding scenario: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }
@@ -50,7 +51,7 @@ export const deleteScenarioCommand = async (id: string, options?: { format?: str
     } else {
       console.error(
         chalk.red(
-          `Error archiving scenario: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error archiving scenario: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

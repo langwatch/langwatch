@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const listScenariosCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -69,7 +70,7 @@ export const listScenariosCommand = async (options?: { format?: string }): Promi
     } else {
       console.error(
         chalk.red(
-          `Error fetching scenarios: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error fetching scenarios: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

@@ -5,6 +5,7 @@ import {
   AnnotationsApiError,
 } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const getAnnotationCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -57,7 +58,7 @@ export const getAnnotationCommand = async (id: string, options?: { format?: stri
     } else {
       console.error(
         chalk.red(
-          `Error fetching annotation: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error fetching annotation: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

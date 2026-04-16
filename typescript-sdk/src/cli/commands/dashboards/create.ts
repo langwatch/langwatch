@@ -5,6 +5,7 @@ import {
   DashboardsApiError,
 } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const createDashboardCommand = async (name: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -31,7 +32,7 @@ export const createDashboardCommand = async (name: string, options?: { format?: 
     } else {
       console.error(
         chalk.red(
-          `Error creating dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error creating dashboard: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

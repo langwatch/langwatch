@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
 
 export const createTriggerCommand = async (
   name: string,
@@ -52,9 +54,8 @@ export const createTriggerCommand = async (
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to create trigger (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to create trigger: ${message}`);
       process.exit(1);
     }
 
@@ -78,7 +79,7 @@ export const createTriggerCommand = async (
     if (error instanceof SyntaxError) {
       console.error(chalk.red("Error: --filters must be valid JSON"));
     } else {
-      console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`));
+      console.error(chalk.red(`Error: ${formatApiErrorMessage({ error })}`));
     }
     process.exit(1);
   }

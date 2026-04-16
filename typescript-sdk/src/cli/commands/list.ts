@@ -3,6 +3,7 @@ import ora from "ora";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { checkApiKey } from "../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../utils/formatting";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const listCommand = async (options?: { format?: string }): Promise<void> => {
   try {
@@ -85,11 +86,7 @@ export const listCommand = async (options?: { format?: string }): Promise<void> 
         console.error(chalk.red(`Error: ${error.message}`));
       } else {
         console.error(
-          chalk.red(
-            `Error fetching prompts: ${
-              error instanceof Error ? error.message : "Unknown error"
-            }`,
-          ),
+          chalk.red(`Error fetching prompts: ${formatApiErrorMessage({ error })}`),
         );
       }
       process.exit(1);
@@ -101,7 +98,7 @@ export const listCommand = async (options?: { format?: string }): Promise<void> 
       console.error(
         chalk.red(
           `Unexpected error: ${
-            error instanceof Error ? error.message : "Unknown error"
+            formatApiErrorMessage({ error })
           }`,
         ),
       );

@@ -9,6 +9,7 @@ import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
 import { pullPrompts } from "./pull";
 import { pushPrompts } from "./push";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const syncCommand = async (): Promise<void> => {
   console.log("🔄 Starting sync...");
@@ -126,7 +127,7 @@ export const syncCommand = async (): Promise<void> => {
       console.error(
         chalk.red(
           `Unexpected error: ${
-            error instanceof Error ? error.message : "Unknown error"
+            formatApiErrorMessage({ error })
           }`
         )
       );

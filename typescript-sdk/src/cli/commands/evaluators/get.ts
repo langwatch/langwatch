@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/evaluators";
 import type { EvaluatorResponse } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   const config = evaluator.config as
@@ -86,7 +87,7 @@ export const getEvaluatorCommand = async (idOrSlug: string, options?: { format?:
     } else {
       console.error(
         chalk.red(
-          `Error fetching evaluator: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error fetching evaluator: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

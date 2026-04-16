@@ -5,6 +5,7 @@ import {
   EvaluatorsApiError,
 } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const createEvaluatorCommand = async (
   name: string,
@@ -39,7 +40,7 @@ export const createEvaluatorCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error creating evaluator: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error creating evaluator: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

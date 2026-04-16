@@ -1,7 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
+import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
 
 export const listSecretsCommand = async (options?: {
   format?: string;
@@ -20,9 +22,8 @@ export const listSecretsCommand = async (options?: {
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to fetch secrets (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to fetch secrets: ${message}`);
       process.exit(1);
     }
 
@@ -74,7 +75,7 @@ export const listSecretsCommand = async (options?: {
     spinner.fail();
     console.error(
       chalk.red(
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Error: ${formatApiErrorMessage({ error })}`
       )
     );
     process.exit(1);

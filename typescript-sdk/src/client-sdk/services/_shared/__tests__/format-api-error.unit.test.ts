@@ -35,6 +35,44 @@ describe("formatApiErrorMessage", () => {
       const err = new Error("fetch failed: ECONNREFUSED");
       expect(formatApiErrorMessage({ error: err })).toBe("fetch failed: ECONNREFUSED");
     });
+
+    it("appends cause.code for node fetch transport failures", () => {
+      // Node's fetch wraps transport errors as `TypeError: fetch failed` with
+      // the real reason (ECONNREFUSED, ENOTFOUND, etc.) on `.cause`. Without
+      // this, users see a useless "fetch failed" with no clue whether DNS,
+      // the port, or the server is the problem.
+      const cause = Object.assign(new Error(""), { code: "ECONNREFUSED" });
+      const err = Object.assign(new TypeError("fetch failed"), { cause });
+      expect(formatApiErrorMessage({ error: err })).toBe(
+        "fetch failed (ECONNREFUSED)",
+      );
+    });
+
+    it("includes cause.code and cause.message together when both informative", () => {
+      const cause = Object.assign(
+        new Error("getaddrinfo ENOTFOUND host.invalid"),
+        { code: "ENOTFOUND" },
+      );
+      const err = Object.assign(new TypeError("fetch failed"), { cause });
+      expect(formatApiErrorMessage({ error: err })).toBe(
+        "fetch failed (ENOTFOUND: getaddrinfo ENOTFOUND host.invalid)",
+      );
+    });
+
+    it("drops cause detail when it duplicates the outer message", () => {
+      const cause = Object.assign(new Error("fetch failed"), {});
+      const err = Object.assign(new TypeError("fetch failed"), { cause });
+      expect(formatApiErrorMessage({ error: err })).toBe("fetch failed");
+    });
+
+    it("handles plain-object causes without crashing", () => {
+      const err = Object.assign(new Error("request timed out"), {
+        cause: { code: "ETIMEDOUT", message: "timeout after 30s" },
+      });
+      expect(formatApiErrorMessage({ error: err })).toBe(
+        "request timed out (ETIMEDOUT: timeout after 30s)",
+      );
+    });
   });
 
   describe("when given an API error body", () => {

@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
 
 export const deleteMonitorCommand = async (
   id: string,
@@ -21,9 +23,8 @@ export const deleteMonitorCommand = async (
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to delete monitor (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to delete monitor: ${message}`);
       process.exit(1);
     }
 
@@ -41,7 +42,7 @@ export const deleteMonitorCommand = async (
     spinner.fail();
     console.error(
       chalk.red(
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
+        `Error: ${formatApiErrorMessage({ error })}`
       )
     );
     process.exit(1);

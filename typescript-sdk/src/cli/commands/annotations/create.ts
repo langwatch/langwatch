@@ -5,6 +5,7 @@ import {
   AnnotationsApiError,
 } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const createAnnotationCommand = async (
   traceId: string,
@@ -46,7 +47,7 @@ export const createAnnotationCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error creating annotation: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error creating annotation: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

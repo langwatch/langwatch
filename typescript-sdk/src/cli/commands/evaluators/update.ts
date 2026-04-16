@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/evaluators";
 import type { UpdateEvaluatorBody } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const updateEvaluatorCommand = async (
   idOrSlug: string,
@@ -30,7 +31,7 @@ export const updateEvaluatorCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error finding evaluator: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error finding evaluator: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }
@@ -64,7 +65,7 @@ export const updateEvaluatorCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error updating evaluator: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error updating evaluator: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

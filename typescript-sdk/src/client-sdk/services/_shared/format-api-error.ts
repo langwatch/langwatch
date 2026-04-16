@@ -96,7 +96,29 @@ export function formatApiErrorMessage({
   }
 
   if (error instanceof Error) {
-    return error.message || "Unknown error occurred";
+    // Node's fetch wraps transport failures as `TypeError: fetch failed` with
+    // the real reason (ECONNREFUSED, ENOTFOUND, timeout, etc.) on `.cause`.
+    // Surface that so the user can tell whether the endpoint is wrong, the
+    // server is down, or DNS can't resolve the host.
+    const base = error.message || "Unknown error occurred";
+    const cause = (error as { cause?: unknown }).cause;
+    const causeMsg =
+      cause instanceof Error
+        ? cause.message
+        : cause && typeof cause === "object" &&
+            typeof (cause as { message?: unknown }).message === "string"
+          ? (cause as { message: string }).message
+          : undefined;
+    const causeCode =
+      cause && typeof cause === "object" &&
+      typeof (cause as { code?: unknown }).code === "string"
+        ? (cause as { code: string }).code
+        : undefined;
+
+    const detail = [causeCode, causeMsg && causeMsg !== base ? causeMsg : undefined]
+      .filter((s): s is string => typeof s === "string" && s.length > 0)
+      .join(": ");
+    return detail ? `${base} (${detail})` : base;
   }
 
   if (typeof error === "object") {

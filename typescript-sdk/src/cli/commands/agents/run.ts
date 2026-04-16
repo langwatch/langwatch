@@ -5,6 +5,8 @@ import {
   AgentsApiError,
 } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const runAgentCommand = async (
   id: string,
@@ -26,7 +28,7 @@ export const runAgentCommand = async (
     if (error instanceof AgentsApiError) {
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
-      console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`));
+      console.error(chalk.red(`Error: ${formatApiErrorMessage({ error })}`));
     }
     process.exit(1);
   }
@@ -72,7 +74,7 @@ export const runAgentCommand = async (
       }
     } catch (error) {
       runSpinner.fail();
-      console.error(chalk.red(`Error calling agent: ${error instanceof Error ? error.message : "Unknown error"}`));
+      console.error(chalk.red(`Error calling agent: ${formatApiErrorMessage({ error })}`));
       process.exit(1);
     }
   } else {
@@ -106,9 +108,8 @@ export const runAgentCommand = async (
       );
 
       if (!response.ok) {
-        const errorBody = await response.text();
-        runSpinner.fail(`Agent execution failed (${response.status})`);
-        console.error(chalk.red(`Error: ${errorBody}`));
+        const message = await formatFetchError(response);
+        runSpinner.fail(`Agent execution failed: ${message}`);
         process.exit(1);
       }
 
@@ -133,7 +134,7 @@ export const runAgentCommand = async (
       }
     } catch (error) {
       runSpinner.fail();
-      console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`));
+      console.error(chalk.red(`Error: ${formatApiErrorMessage({ error })}`));
       process.exit(1);
     }
   }

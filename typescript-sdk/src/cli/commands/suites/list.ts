@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const listSuitesCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -71,7 +72,7 @@ export const listSuitesCommand = async (options?: { format?: string }): Promise<
     } else {
       console.error(
         chalk.red(
-          `Error fetching suites: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error fetching suites: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

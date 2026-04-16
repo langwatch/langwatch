@@ -6,6 +6,7 @@ import type { PromptsConfig, LocalPromptConfig, MaterializedPrompt, PromptsLock 
 import { localPromptConfigSchema } from "../types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptFileNotFoundError } from "./errors/prompt-not-found.error";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export class FileManager {
   private static readonly PROMPTS_CONFIG_FILE = "prompts.json";
@@ -77,7 +78,7 @@ export class FileManager {
       const content = fs.readFileSync(configPath, "utf-8");
       return JSON.parse(content) as PromptsConfig;
     } catch (error) {
-      throw new Error(`Failed to parse prompts.json: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(`Failed to parse prompts.json: ${formatApiErrorMessage({ error })}`);
     }
   }
 
@@ -113,7 +114,7 @@ export class FileManager {
       const content = fs.readFileSync(lockPath, "utf-8");
       return JSON.parse(content) as PromptsLock;
     } catch (error) {
-      throw new Error(`Failed to parse prompts-lock.json: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(`Failed to parse prompts-lock.json: ${formatApiErrorMessage({ error })}`);
     }
   }
 
@@ -168,7 +169,7 @@ export class FileManager {
       if (error instanceof Error && error.message.includes("Invalid prompt configuration")) {
         throw error; // Re-throw zod validation errors as-is
       }
-      throw new Error(`Failed to parse local prompt file ${filePath}: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(`Failed to parse local prompt file ${filePath}: ${formatApiErrorMessage({ error })}`);
     }
   }
 

@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const listAnnotationsCommand = async (options: {
   traceId?: string;
@@ -82,7 +83,7 @@ export const listAnnotationsCommand = async (options: {
     } else {
       console.error(
         chalk.red(
-          `Error fetching annotations: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error fetching annotations: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

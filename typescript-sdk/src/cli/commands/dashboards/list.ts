@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const listDashboardsCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -65,7 +66,7 @@ export const listDashboardsCommand = async (options?: { format?: string }): Prom
     } else {
       console.error(
         chalk.red(
-          `Error fetching dashboards: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error fetching dashboards: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

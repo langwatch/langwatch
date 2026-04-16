@@ -5,6 +5,7 @@ import {
   AnalyticsApiError,
 } from "@/client-sdk/services/analytics/analytics-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 const METRIC_PRESETS: Record<string, { metric: string; aggregation: string }> = {
   "trace-count": { metric: "metadata.trace_id", aggregation: "cardinality" },
@@ -136,7 +137,7 @@ export const queryAnalyticsCommand = async (options: {
     } else {
       console.error(
         chalk.red(
-          `Error querying analytics: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error querying analytics: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

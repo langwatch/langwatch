@@ -5,6 +5,7 @@ import {
   WorkflowsApiError,
 } from "@/client-sdk/services/workflows/workflows-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const deleteWorkflowCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -24,7 +25,7 @@ export const deleteWorkflowCommand = async (id: string, options?: { format?: str
     } else {
       console.error(
         chalk.red(
-          `Error finding workflow: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error finding workflow: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }
@@ -46,7 +47,7 @@ export const deleteWorkflowCommand = async (id: string, options?: { format?: str
     } else {
       console.error(
         chalk.red(
-          `Error archiving workflow: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error archiving workflow: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

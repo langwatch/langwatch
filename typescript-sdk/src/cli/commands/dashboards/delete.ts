@@ -5,6 +5,7 @@ import {
   DashboardsApiError,
 } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const deleteDashboardCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -26,7 +27,7 @@ export const deleteDashboardCommand = async (id: string, options?: { format?: st
     } else {
       console.error(
         chalk.red(
-          `Error deleting dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error deleting dashboard: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

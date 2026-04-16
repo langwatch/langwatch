@@ -5,6 +5,7 @@ import {
   SuitesApiError,
 } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const getSuiteCommand = async (
   id: string,
@@ -66,7 +67,7 @@ export const getSuiteCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

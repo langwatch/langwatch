@@ -3,6 +3,7 @@ import ora from "ora";
 import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
+import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
 
 export const promptVersionsCommand = async (
   handle: string,
@@ -68,9 +69,7 @@ export const promptVersionsCommand = async (
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
       console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`
-        )
+        chalk.red(`Error: ${formatApiErrorMessage({ error })}`)
       );
     }
     process.exit(1);

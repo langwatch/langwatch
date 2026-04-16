@@ -5,6 +5,7 @@ import {
   EvaluationsApiError,
 } from "@/client-sdk/services/evaluations/evaluations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const runEvaluationCommand = async (
   slug: string,
@@ -78,7 +79,7 @@ export const runEvaluationCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error running evaluation: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error running evaluation: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

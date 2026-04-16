@@ -5,6 +5,7 @@ import {
   AnnotationsApiError,
 } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const deleteAnnotationCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -26,7 +27,7 @@ export const deleteAnnotationCommand = async (id: string, options?: { format?: s
     } else {
       console.error(
         chalk.red(
-          `Error deleting annotation: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error deleting annotation: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

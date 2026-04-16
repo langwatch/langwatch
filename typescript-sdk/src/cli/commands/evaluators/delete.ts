@@ -5,6 +5,7 @@ import {
   EvaluatorsApiError,
 } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const deleteEvaluatorCommand = async (
   idOrSlug: string,
@@ -30,7 +31,7 @@ export const deleteEvaluatorCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error finding evaluator: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error finding evaluator: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }
@@ -55,7 +56,7 @@ export const deleteEvaluatorCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error archiving evaluator: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error archiving evaluator: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

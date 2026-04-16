@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const listEvaluatorsCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -75,7 +76,7 @@ export const listEvaluatorsCommand = async (options?: { format?: string }): Prom
     } else {
       console.error(
         chalk.red(
-          `Error fetching evaluators: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error fetching evaluators: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

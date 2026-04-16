@@ -2,6 +2,8 @@ import chalk from "chalk";
 import ora from "ora";
 import fs from "fs";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
 
 export const exportTracesCommand = async (options: {
   startDate?: string;
@@ -50,9 +52,8 @@ export const exportTracesCommand = async (options: {
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Export failed (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Export failed: ${message}`);
       process.exit(1);
     }
 
@@ -99,7 +100,7 @@ export const exportTracesCommand = async (options: {
   } catch (error) {
     spinner.fail();
     console.error(
-      chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`),
+      chalk.red(`Error: ${formatApiErrorMessage({ error })}`),
     );
     process.exit(1);
   }

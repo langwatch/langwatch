@@ -6,6 +6,7 @@ import {
   type SuiteTarget,
 } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 function parseTargets(targetStrings: string[]): SuiteTarget[] {
   return targetStrings.map((t) => {
@@ -92,7 +93,7 @@ export const createSuiteCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

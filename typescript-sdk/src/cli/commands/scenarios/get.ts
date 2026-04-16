@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/scenarios";
 import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 const formatScenarioDetails = (scenario: ScenarioResponse): void => {
   console.log();
@@ -60,7 +61,7 @@ export const getScenarioCommand = async (id: string, options?: { format?: string
     } else {
       console.error(
         chalk.red(
-          `Error fetching scenario: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error fetching scenario: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

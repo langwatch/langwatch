@@ -5,6 +5,7 @@ import {
   AgentsApiError,
 } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const getAgentCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -47,7 +48,7 @@ export const getAgentCommand = async (id: string, options?: { format?: string })
     } else {
       console.error(
         chalk.red(
-          `Error fetching agent: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error fetching agent: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

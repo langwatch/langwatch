@@ -7,6 +7,7 @@ import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { PromptConverter } from "../utils/promptConverter";
 import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 interface AddOptions {
   version?: string;
@@ -154,7 +155,7 @@ export const addCommand = async (
         console.error(
           chalk.red(
             `Error adding prompt: ${
-              error instanceof Error ? error.message : "Unknown error"
+              formatApiErrorMessage({ error })
             }`,
           ),
         );
@@ -168,7 +169,7 @@ export const addCommand = async (
       console.error(
         chalk.red(
           `Unexpected error: ${
-            error instanceof Error ? error.message : "Unknown error"
+            formatApiErrorMessage({ error })
           }`,
         ),
       );

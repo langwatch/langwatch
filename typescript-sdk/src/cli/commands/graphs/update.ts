@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
 
 export const updateGraphCommand = async (
   id: string,
@@ -48,9 +50,8 @@ export const updateGraphCommand = async (
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to update graph (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to update graph: ${message}`);
       process.exit(1);
     }
 
@@ -78,7 +79,7 @@ export const updateGraphCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`
+          `Error: ${formatApiErrorMessage({ error })}`
         )
       );
     }

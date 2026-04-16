@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/scenarios";
 import type { UpdateScenarioBody } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const updateScenarioCommand = async (
   id: string,
@@ -41,7 +42,7 @@ export const updateScenarioCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error updating scenario: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error updating scenario: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

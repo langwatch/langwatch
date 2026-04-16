@@ -5,6 +5,7 @@ import {
   TracesApiError,
 } from "@/client-sdk/services/traces/traces-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const getTraceCommand = async (
   traceId: string,
@@ -43,7 +44,7 @@ export const getTraceCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error fetching trace: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error fetching trace: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

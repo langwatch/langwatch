@@ -5,6 +5,7 @@ import {
   EvaluationsApiError,
 } from "@/client-sdk/services/evaluations/evaluations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const evaluationStatusCommand = async (
   runId: string,
@@ -70,7 +71,7 @@ export const evaluationStatusCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error checking status: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error checking status: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

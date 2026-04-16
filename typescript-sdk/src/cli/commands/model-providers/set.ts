@@ -5,6 +5,7 @@ import {
   ModelProvidersApiError,
 } from "@/client-sdk/services/model-providers/model-providers-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const setModelProviderCommand = async (
   provider: string,
@@ -51,7 +52,7 @@ export const setModelProviderCommand = async (
     } else {
       console.error(
         chalk.red(
-          `Error configuring model provider: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error configuring model provider: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

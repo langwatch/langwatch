@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/model-providers/model-providers-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const listModelProvidersCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -66,7 +67,7 @@ export const listModelProvidersCommand = async (options?: { format?: string }): 
     } else {
       console.error(
         chalk.red(
-          `Error fetching model providers: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error fetching model providers: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

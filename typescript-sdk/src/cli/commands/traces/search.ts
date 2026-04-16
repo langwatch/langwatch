@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/traces/traces-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const searchTracesCommand = async (options: {
   query?: string;
@@ -106,7 +107,7 @@ export const searchTracesCommand = async (options: {
     } else {
       console.error(
         chalk.red(
-          `Error searching traces: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error searching traces: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

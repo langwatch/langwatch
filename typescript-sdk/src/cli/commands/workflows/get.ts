@@ -5,6 +5,7 @@ import {
   WorkflowsApiError,
 } from "@/client-sdk/services/workflows/workflows-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const getWorkflowCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -40,7 +41,7 @@ export const getWorkflowCommand = async (id: string, options?: { format?: string
     } else {
       console.error(
         chalk.red(
-          `Error fetching workflow: ${error instanceof Error ? error.message : "Unknown error"}`,
+          `Error fetching workflow: ${formatApiErrorMessage({ error })}`,
         ),
       );
     }

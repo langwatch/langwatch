@@ -4,6 +4,7 @@ import {
   DatasetNotFoundError,
   DatasetPlanLimitError,
 } from "@/client-sdk/services/datasets/errors";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 /**
  * Centralized error handler for all dataset CLI commands.
@@ -29,7 +30,7 @@ export function handleDatasetCommandError(error: unknown, context: string): neve
   } else {
     console.error(
       chalk.red(
-        `Error ${context}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        `Error ${context}: ${formatApiErrorMessage({ error })}`,
       ),
     );
   }

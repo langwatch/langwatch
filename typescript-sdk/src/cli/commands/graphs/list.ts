@@ -1,7 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
+import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
 
 export const listGraphsCommand = async (options: {
   dashboardId?: string;
@@ -24,9 +26,8 @@ export const listGraphsCommand = async (options: {
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to fetch graphs (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to fetch graphs: ${message}`);
       process.exit(1);
     }
 
@@ -77,7 +78,7 @@ export const listGraphsCommand = async (options: {
     console.log();
   } catch (error) {
     spinner.fail();
-    console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`));
+    console.error(chalk.red(`Error: ${formatApiErrorMessage({ error })}`));
     process.exit(1);
   }
 };

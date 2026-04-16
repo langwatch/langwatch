@@ -4,6 +4,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { FileManager } from "../utils/fileManager";
 import { PromptsError } from "@/client-sdk/services/prompts";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const removeCommand = async (name: string): Promise<void> => {
   try {
@@ -104,7 +105,7 @@ export const removeCommand = async (name: string): Promise<void> => {
       if (error instanceof PromptsError) {
         console.error(chalk.red(`Error: ${error.message}`));
       } else {
-        console.error(chalk.red(`Error removing prompt: ${error instanceof Error ? error.message : "Unknown error"}`));
+        console.error(chalk.red(`Error removing prompt: ${formatApiErrorMessage({ error })}`));
       }
       process.exit(1);
     }
@@ -113,7 +114,7 @@ export const removeCommand = async (name: string): Promise<void> => {
     if (error instanceof PromptsError) {
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
-      console.error(chalk.red(`Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`));
+      console.error(chalk.red(`Unexpected error: ${formatApiErrorMessage({ error })}`));
     }
     process.exit(1);
   }
