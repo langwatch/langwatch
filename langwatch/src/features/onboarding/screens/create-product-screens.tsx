@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useAnalytics } from "react-contextual-analytics";
 import { ObservabilityScreen } from "../components/sections/ObservabilityScreen";
 import { ProductSelectionScreen } from "../components/sections/ProductSelectionScreen";
 import { ViaClaudeCodeScreen } from "../components/sections/ViaClaudeCodeScreen";
@@ -20,9 +21,17 @@ export const useCreateProductScreens = ({
   flow,
   onSelectProduct,
 }: UseProductScreensProps): OnboardingScreen[] => {
-  const ProductSelectionScreenWrapped: React.FC = () => (
-    <ProductSelectionScreen onSelectProduct={onSelectProduct} />
-  );
+  const ProductSelectionScreenWrapped: React.FC = () => {
+    const { emit } = useAnalytics();
+    return (
+      <ProductSelectionScreen
+        onSelectProduct={(product) => {
+          emit("selected", "product", { product });
+          onSelectProduct(product);
+        }}
+      />
+    );
+  };
 
   const screensBase: Record<ProductScreenIndex, OnboardingScreen> = useMemo(
     () => ({
