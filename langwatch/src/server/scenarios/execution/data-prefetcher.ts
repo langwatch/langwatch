@@ -285,12 +285,13 @@ async function fetchAgentData(
     return fetchCodeAgentData(projectId, target.referenceId, deps.agentFetcher);
   }
   if (target.type === "workflow") {
-    return fetchWorkflowAgentData(
+    return fetchWorkflowAgentData({
       projectId,
-      target.referenceId,
-      deps.agentFetcher,
-      deps.workflowVersionFetcher,
-    );
+      agentId: target.referenceId,
+      agentFetcher: deps.agentFetcher,
+      workflowVersionFetcher: deps.workflowVersionFetcher,
+      modelParamsProvider: deps.modelParamsProvider,
+    });
   }
   return fetchHttpAgentData(projectId, target.referenceId, deps.agentFetcher);
 }
@@ -432,12 +433,19 @@ interface WorkflowField {
   type: string;
 }
 
-async function fetchWorkflowAgentData(
-  projectId: string,
-  agentId: string,
-  agentFetcher: AgentFetcher,
-  workflowVersionFetcher: WorkflowVersionFetcher,
-): Promise<WorkflowAgentData | null> {
+async function fetchWorkflowAgentData({
+  projectId,
+  agentId,
+  agentFetcher,
+  workflowVersionFetcher,
+  modelParamsProvider,
+}: {
+  projectId: string;
+  agentId: string;
+  agentFetcher: AgentFetcher;
+  workflowVersionFetcher: WorkflowVersionFetcher;
+  modelParamsProvider: ModelParamsProvider;
+}): Promise<WorkflowAgentData | null> {
   const agent = await agentFetcher.findById({ projectId, id: agentId });
   if (!agent || agent.type !== "workflow") return null;
 
@@ -459,18 +467,143 @@ async function fetchWorkflowAgentData(
   });
   if (!latest) return null;
 
-  const { inputs, outputs } = extractWorkflowIO(latest.dsl);
+  const hydratedDsl = await hydrateLlmParameters({
+    dsl: latest.dsl,
+    projectId,
+    modelParamsProvider,
+  });
+
+  const { inputs, outputs } = extractWorkflowIO(hydratedDsl);
 
   return {
     type: "workflow",
     agentId: agent.id,
     workflowId: latest.workflowId,
-    workflow: latest.dsl,
+    workflow: hydratedDsl,
     inputs,
     outputs,
     scenarioMappings: config.scenarioMappings,
     scenarioOutputField: config.scenarioOutputField,
   };
+}
+
+/**
+ * Injects litellm_params into every llm-type parameter across all DSL nodes.
+ *
+ * Mirrors addEnvs.ts node-parameter hydration but uses the prefetcher's
+ * ModelParamsProvider abstraction so the child process never needs DB access.
+ * We dedupe by model string to avoid N provider lookups for N identical nodes.
+ */
+async function hydrateLlmParameters({
+  dsl,
+  projectId,
+  modelParamsProvider,
+}: {
+  dsl: Record<string, unknown>;
+  projectId: string;
+  modelParamsProvider: ModelParamsProvider;
+}): Promise<Record<string, unknown>> {
+  const nodes = Array.isArray(dsl.nodes) ? (dsl.nodes as unknown[]) : [];
+  if (nodes.length === 0) return dsl;
+
+  // Resolve the fallback model: workflow.default_llm.model or DEFAULT_MODEL
+  const defaultLlm =
+    typeof dsl.default_llm === "object" && dsl.default_llm !== null
+      ? (dsl.default_llm as Record<string, unknown>)
+      : null;
+  const defaultModel =
+    typeof defaultLlm?.model === "string" && defaultLlm.model.length > 0
+      ? defaultLlm.model
+      : DEFAULT_MODEL;
+
+  // Collect unique models needed before hitting the provider
+  const modelsNeeded = new Set<string>();
+  for (const node of nodes) {
+    if (typeof node !== "object" || node === null) continue;
+    const n = node as Record<string, unknown>;
+    const nodeData =
+      typeof n.data === "object" && n.data !== null
+        ? (n.data as Record<string, unknown>)
+        : null;
+    const rawParameters = nodeData?.parameters;
+    const parameters = Array.isArray(rawParameters) ? (rawParameters as unknown[]) : [];
+    for (const param of parameters) {
+      if (typeof param !== "object" || param === null) continue;
+      const p = param as Record<string, unknown>;
+      if (p.type !== "llm") continue;
+      const value = typeof p.value === "object" && p.value !== null
+        ? (p.value as Record<string, unknown>)
+        : null;
+      const model =
+        typeof value?.model === "string" && value.model.length > 0
+          ? value.model
+          : defaultModel;
+      modelsNeeded.add(model);
+    }
+  }
+
+  // Fetch litellm_params for each unique model
+  const litellmParamsByModel = new Map<string, Record<string, unknown>>();
+  await Promise.all(
+    Array.from(modelsNeeded).map(async (model) => {
+      const result = await modelParamsProvider.prepare(projectId, model);
+      if (!result.success) {
+        logger.warn(
+          { projectId, model, reason: result.reason },
+          `Skipping llm parameter hydration: ${result.message}`,
+        );
+        return;
+      }
+      litellmParamsByModel.set(model, result.params as Record<string, unknown>);
+    }),
+  );
+
+  if (litellmParamsByModel.size === 0) return dsl;
+
+  const hydratedNodes = nodes.map((node) => {
+    if (typeof node !== "object" || node === null) return node;
+    const n = node as Record<string, unknown>;
+    const data =
+      typeof n.data === "object" && n.data !== null
+        ? (n.data as Record<string, unknown>)
+        : null;
+    if (!data) return node;
+
+    const parameters = Array.isArray(data.parameters)
+      ? (data.parameters as unknown[])
+      : null;
+    if (!parameters) return node;
+
+    const hydratedParams = parameters.map((param) => {
+      if (typeof param !== "object" || param === null) return param;
+      const p = param as Record<string, unknown>;
+      if (p.type !== "llm") return param;
+
+      const existingValue =
+        typeof p.value === "object" && p.value !== null
+          ? (p.value as Record<string, unknown>)
+          : null;
+      const model =
+        typeof existingValue?.model === "string" && existingValue.model.length > 0
+          ? existingValue.model
+          : defaultModel;
+
+      const litellmParams = litellmParamsByModel.get(model);
+      if (!litellmParams) return param;
+
+      // Use existing value if present, otherwise fall back to default_llm or an empty object
+      const baseValue =
+        existingValue ??
+        defaultLlm ??
+        { model };
+
+      return { ...p, value: { ...baseValue, litellm_params: litellmParams } };
+    });
+
+    return { ...n, data: { ...data, parameters: hydratedParams } };
+  });
+
+  return { ...dsl, nodes: hydratedNodes };
 }
 
 /**
