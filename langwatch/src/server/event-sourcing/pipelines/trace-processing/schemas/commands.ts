@@ -86,3 +86,13 @@ export type ResolveOriginCommandData = z.infer<
   typeof resolveOriginCommandDataSchema
 >;
 
+export const archiveTraceCommandDataSchema = z.object({
+  tenantId: z.string(),
+  traceId: z.string(),
+  occurredAt: z.number(),
+});
+
+export type ArchiveTraceCommandData = z.infer<
+  typeof archiveTraceCommandDataSchema
+>;
+

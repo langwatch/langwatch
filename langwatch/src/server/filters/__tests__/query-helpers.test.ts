@@ -52,7 +52,7 @@ describe("buildTraceSummariesConditions", () => {
 
   it("joins conditions with AND", () => {
     const result = buildTraceSummariesConditions(baseParams);
-    expect(result.split(" AND ").length).toBe(3);
+    expect(result.split(" AND ").length).toBe(4);
   });
 });
 

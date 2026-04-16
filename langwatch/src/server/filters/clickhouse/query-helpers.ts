@@ -21,6 +21,7 @@ export function buildTraceSummariesConditions(
 ): string {
   const conditions: string[] = [
     "TenantId = {tenantId:String}",
+    "ArchivedAt IS NULL",
     "OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
     "OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
   ];

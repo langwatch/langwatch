@@ -158,6 +158,100 @@ app.post(
   },
 );
 
+// POST /archive - Archive multiple traces
+app.post(
+  "/archive",
+  describeRoute({
+    description:
+      "Archive one or more traces by ID. Archived traces are excluded from all query results but the data is not deleted.",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Traces archived successfully",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                archived: z.number(),
+              }),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  zValidator(
+    "json",
+    z.object({
+      traceIds: z
+        .array(z.string())
+        .min(1)
+        .max(1000)
+        .describe("Trace IDs to archive"),
+    }),
+  ),
+  async (c) => {
+    const project = c.get("project");
+    const { traceIds } = c.req.valid("json");
+
+    logger.info(
+      { projectId: project.id, traceCount: traceIds.length },
+      "Archiving traces",
+    );
+
+    const traceService = TraceService.create(prisma);
+    const archived = await traceService.archiveTraces(project.id, traceIds);
+
+    return c.json({ archived });
+  },
+);
+
+// POST /:traceId/archive - Archive a single trace
+app.post(
+  "/:traceId/archive",
+  describeRoute({
+    description: "Archive a single trace by ID",
+    parameters: [
+      {
+        name: "traceId",
+        in: "path",
+        description: "The trace ID to archive",
+        required: true,
+        schema: { type: "string" },
+      },
+    ],
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Trace archived successfully",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                archived: z.number(),
+              }),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const { traceId } = c.req.param();
+
+    logger.info(
+      { projectId: project.id, traceId },
+      "Archiving trace",
+    );
+
+    const traceService = TraceService.create(prisma);
+    const archived = await traceService.archiveTraces(project.id, [traceId]);
+
+    return c.json({ archived });
+  },
+);
+
 // GET /:traceId - Get a single trace by ID
 app.get(
   "/:traceId",

@@ -204,6 +204,7 @@ export class ClickHouseTraceService {
               SELECT DISTINCT TraceId
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
+                AND ArchivedAt IS NULL
                 AND Attributes['gen_ai.conversation.id'] = {threadId:String}
               ORDER BY CreatedAt ASC
               LIMIT 1000
@@ -303,6 +304,7 @@ export class ClickHouseTraceService {
               SELECT DISTINCT TraceId
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
+                AND ArchivedAt IS NULL
                 AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
               ORDER BY CreatedAt ASC
               LIMIT 1000
@@ -615,7 +617,7 @@ export class ClickHouseTraceService {
 
         try {
           // Build date filter conditions
-          const conditions: string[] = ["TenantId = {tenantId:String}"];
+          const conditions: string[] = ["TenantId = {tenantId:String}", "ArchivedAt IS NULL"];
           if (input.startDate) {
             conditions.push(
               "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
@@ -720,7 +722,7 @@ export class ClickHouseTraceService {
 
         try {
           // Build date filter conditions
-          const conditions: string[] = ["TenantId = {tenantId:String}"];
+          const conditions: string[] = ["TenantId = {tenantId:String}", "ArchivedAt IS NULL"];
           if (input.startDate) {
             conditions.push(
               "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
@@ -1141,6 +1143,7 @@ export class ClickHouseTraceService {
               SELECT DISTINCT SpanName
               FROM stored_spans
               WHERE TenantId = {tenantId:String}
+                AND ArchivedAt IS NULL
                 AND StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
                 AND SpanName != ''
@@ -1170,6 +1173,7 @@ export class ClickHouseTraceService {
               SELECT DISTINCT arrayJoin(mapKeys(Attributes)) AS key
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
+                AND ArchivedAt IS NULL
                 AND CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})
               ORDER BY key ASC
@@ -1203,6 +1207,102 @@ export class ClickHouseTraceService {
           );
           throw new Error("Failed to fetch distinct field names");
         }
+      },
+    );
+  }
+
+  /**
+   * Archive traces by setting ArchivedAt on trace_summaries and stored_spans.
+   *
+   * Inserts new rows with ArchivedAt set; the ReplacingMergeTree engine
+   * ensures the archived version eventually replaces the original. Read
+   * queries filter with `ArchivedAt IS NULL` for immediate exclusion.
+   *
+   * @returns The number of traces archived
+   */
+  async archiveTraces(
+    projectId: string,
+    traceIds: string[],
+  ): Promise<number> {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseTraceService.archiveTraces",
+      { attributes: { "tenant.id": projectId, "trace.count": traceIds.length } },
+      async () => {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
+          throw new Error("ClickHouse client not available");
+        }
+
+        if (traceIds.length === 0) {
+          return 0;
+        }
+
+        const now = new Date();
+
+        // Archive trace_summaries: read latest rows, re-insert with ArchivedAt set
+        await clickHouseClient.query({
+          query: `
+            INSERT INTO trace_summaries
+            SELECT
+              *,
+              {archivedAt:DateTime64(3)} AS ArchivedAt
+            FROM (
+              SELECT * EXCEPT(ArchivedAt, UpdatedAt),
+                     now64(3) AS UpdatedAt
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+                AND TraceId IN ({traceIds:Array(String)})
+                AND (TenantId, TraceId, UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE TenantId = {tenantId:String}
+                    AND TraceId IN ({traceIds:Array(String)})
+                  GROUP BY TenantId, TraceId
+                )
+            )
+          `,
+          query_params: {
+            tenantId: projectId,
+            traceIds,
+            archivedAt: now.toISOString(),
+          },
+        });
+
+        // Archive stored_spans: read latest rows, re-insert with ArchivedAt set
+        await clickHouseClient.query({
+          query: `
+            INSERT INTO stored_spans
+            SELECT
+              *,
+              {archivedAt:DateTime64(3)} AS ArchivedAt
+            FROM (
+              SELECT * EXCEPT(ArchivedAt, StartTime),
+                     StartTime
+              FROM stored_spans
+              WHERE TenantId = {tenantId:String}
+                AND TraceId IN ({traceIds:Array(String)})
+                AND (TenantId, TraceId, SpanId, StartTime) IN (
+                  SELECT TenantId, TraceId, SpanId, max(StartTime)
+                  FROM stored_spans
+                  WHERE TenantId = {tenantId:String}
+                    AND TraceId IN ({traceIds:Array(String)})
+                  GROUP BY TenantId, TraceId, SpanId
+                )
+            )
+          `,
+          query_params: {
+            tenantId: projectId,
+            traceIds,
+            archivedAt: now.toISOString(),
+          },
+        });
+
+        this.logger.info(
+          { projectId, traceCount: traceIds.length },
+          "Archived traces in ClickHouse",
+        );
+
+        return traceIds.length;
       },
     );
   }
@@ -1319,6 +1419,7 @@ export class ClickHouseTraceService {
               SELECT uniq(ts.TraceId) as total
               FROM trace_summaries ts
               WHERE ts.TenantId = {tenantId:String}
+                AND ts.ArchivedAt IS NULL
                 AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
                 ${extraFilters}
@@ -1358,6 +1459,7 @@ export class ClickHouseTraceService {
                 toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
               FROM trace_summaries ts
               WHERE ts.TenantId = {tenantId:String}
+                AND ts.ArchivedAt IS NULL
                 AND ts.TraceId IN (
                   SELECT s.TraceId
                   FROM (
@@ -1365,6 +1467,7 @@ export class ClickHouseTraceService {
                            argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa
                     FROM trace_summaries ts
                     WHERE ts.TenantId = {tenantId:String}
+                      AND ts.ArchivedAt IS NULL
                       AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                       AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
                       ${extraFilters}
@@ -1380,6 +1483,7 @@ export class ClickHouseTraceService {
                   SELECT TenantId, TraceId, max(UpdatedAt)
                   FROM trace_summaries
                   WHERE TenantId = {tenantId:String}
+                    AND ArchivedAt IS NULL
                   GROUP BY TenantId, TraceId
                 )
               ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
@@ -1580,11 +1684,13 @@ export class ClickHouseTraceService {
           toUnixTimestamp64Milli(UpdatedAt) AS ts_UpdatedAt
         FROM trace_summaries AS t
         WHERE t.TenantId = {tenantId:String}
+          AND t.ArchivedAt IS NULL
           AND t.TraceId IN ({traceIds:Array(String)})
           AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
             WHERE TenantId = {tenantId:String}
+              AND ArchivedAt IS NULL
               AND TraceId IN ({traceIds:Array(String)})
             GROUP BY TenantId, TraceId
           )

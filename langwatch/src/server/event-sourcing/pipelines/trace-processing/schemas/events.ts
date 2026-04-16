@@ -11,6 +11,7 @@ import {
   ORIGIN_RESOLVED_EVENT_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
+  TRACE_ARCHIVED_EVENT_TYPE,
 } from "./constants";
 import { instrumentationScopeSchema, resourceSchema, spanSchema } from "./otlp";
 
@@ -335,6 +336,43 @@ export function isAnnotationsBulkSyncedEvent(
 }
 
 /**
+ * Zod schema for TraceArchivedEvent metadata.
+ */
+export const traceArchivedEventMetadataSchema = z
+  .object({
+    processingTraceparent: z.string().optional(),
+  })
+  .passthrough();
+
+/**
+ * Zod schema for TraceArchivedEvent data.
+ */
+export const traceArchivedEventDataSchema = z.object({
+  traceId: z.string(),
+  archivedAtMs: z.number(),
+});
+
+export const traceArchivedEventSchema = EventSchema.extend({
+  type: z.literal(TRACE_ARCHIVED_EVENT_TYPE),
+  data: traceArchivedEventDataSchema,
+  metadata: traceArchivedEventMetadataSchema,
+});
+
+export type TraceArchivedEventData = z.infer<
+  typeof traceArchivedEventDataSchema
+>;
+export type TraceArchivedEvent = z.infer<typeof traceArchivedEventSchema>;
+
+/**
+ * Type guard for TraceArchivedEvent.
+ */
+export function isTraceArchivedEvent(
+  event: TraceProcessingEvent,
+): event is TraceArchivedEvent {
+  return event.type === TRACE_ARCHIVED_EVENT_TYPE;
+}
+
+/**
  * Union of all trace processing event types.
  */
 export type TraceProcessingEvent =
@@ -345,4 +383,5 @@ export type TraceProcessingEvent =
   | OriginResolvedEvent
   | AnnotationAddedEvent
   | AnnotationRemovedEvent
-  | AnnotationsBulkSyncedEvent;
+  | AnnotationsBulkSyncedEvent
+  | TraceArchivedEvent;

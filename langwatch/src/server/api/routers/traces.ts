@@ -112,6 +112,23 @@ export const tracesRouter = createTRPCRouter({
       );
     }),
 
+  archive: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceIds: z.array(z.string()).min(1).max(1000),
+      }),
+    )
+    .use(checkProjectPermission("traces:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const traceService = TraceService.create(ctx.prisma);
+      const archived = await traceService.archiveTraces(
+        input.projectId,
+        input.traceIds,
+      );
+      return { archived };
+    }),
+
   getTopicCounts: protectedProcedure
     .input(tracesFilterInput)
     .use(checkProjectPermission("traces:view"))

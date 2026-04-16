@@ -82,6 +82,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Traces
     "traces:view",
     "traces:share",
+    "traces:manage",
     // Annotations
     "annotations:view",
     "annotations:manage",
@@ -122,6 +123,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Traces
     "traces:view",
     "traces:share",
+    "traces:manage",
     // Annotations
     "annotations:view",
     "annotations:manage",

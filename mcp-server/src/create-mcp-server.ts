@@ -240,6 +240,25 @@ function registerTools(server: McpServer): void {
   );
 
   server.tool(
+    "archive_traces",
+    "Archive one or more traces by ID. Archived traces are excluded from all query results (search, get, analytics) but the underlying data is not deleted. This is a soft-delete operation.",
+    {
+      traceIds: z
+        .array(z.string())
+        .min(1)
+        .max(1000)
+        .describe("One or more trace IDs to archive"),
+    },
+    withToolLogging("archive_traces", async (params) => {
+      requireApiKey();
+      const { handleArchiveTraces } = await import("./tools/archive-traces.js");
+      return {
+        content: [{ type: "text", text: await handleArchiveTraces(params) }],
+      };
+    })
+  );
+
+  server.tool(
     "get_analytics",
     'Query analytics timeseries from LangWatch. Metrics use "category.name" format (e.g., "performance.completion_time"). Use discover_schema to see available metrics.',
     {

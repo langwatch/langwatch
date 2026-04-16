@@ -175,6 +175,13 @@ export async function getTraceById(
   ) as Promise<TraceDetailResponse>;
 }
 
+/** Archives one or more traces by ID. */
+export async function archiveTraces(traceIds: string[]): Promise<{ archived: number }> {
+  return makeRequest("POST", "/api/traces/archive", {
+    traceIds,
+  }) as Promise<{ archived: number }>;
+}
+
 /** Fetches analytics timeseries data for the given metrics and date range. */
 export async function getAnalyticsTimeseries(params: {
   series: Array<{

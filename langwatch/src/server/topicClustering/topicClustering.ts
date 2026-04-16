@@ -204,11 +204,13 @@ async function fetchCountsFromClickHouse(
         toString(countIf(TopicId IS NOT NULL AND TopicId != '')) AS assigned
       FROM trace_summaries t
       WHERE TenantId = {tenantId:String}
+        AND ArchivedAt IS NULL
         AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
         AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
+            AND ArchivedAt IS NULL
             AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
           GROUP BY TenantId, TraceId
         )
@@ -305,6 +307,7 @@ async function fetchTracesFromClickHouse(
 
   const baseConditions = [
     "TenantId = {tenantId:String}",
+    "ArchivedAt IS NULL",
     "OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})",
     "OccurredAt < now64(3)",
     "ComputedInput IS NOT NULL",
