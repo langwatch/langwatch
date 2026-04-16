@@ -32,12 +32,15 @@ export const searchTracesCommand = async (options: {
       : now;
     const pageSize = options.limit ? parseInt(options.limit, 10) : 25;
 
+    // The `format` option controls CLI output (table vs json); the API's
+    // `format` parameter controls server response shape ("digest" | "json").
+    // Always request the richer "json" shape and render locally.
     const result = await service.search({
       query: options.query,
       startDate,
       endDate,
       pageSize,
-      format: (options.format as "digest" | "json") ?? "json",
+      format: "json",
     });
 
     const traces = result.traces as Array<Record<string, unknown>>;

@@ -51,6 +51,45 @@ function collectAllOwnPropertyNames(value: unknown, seen = new Set<unknown>()): 
   return Array.from(names);
 }
 
+interface ZodIssue {
+  path?: unknown;
+  message?: unknown;
+}
+
+/**
+ * Renders a Zod validation error body into a user-readable string. Returns
+ * undefined if `body` is not a Zod error shape.
+ *
+ * Examples:
+ *   { name: "ZodError", issues: [{ path: ["format"], message: "Invalid enum value..." }] }
+ *   → "Validation failed: format — Invalid enum value..."
+ *   { name: "ZodError", issues: [<issue1>, <issue2>] }
+ *   → "Validation failed: a.b — msg1; c — msg2"
+ */
+function formatZodIssues(body: Record<string, unknown>): string | undefined {
+  const isZod =
+    body.name === "ZodError" ||
+    (Array.isArray(body.issues) && body.issues.length > 0);
+  if (!isZod || !Array.isArray(body.issues)) return undefined;
+
+  const rendered = (body.issues as ZodIssue[])
+    .map((issue) => {
+      const pathArr = Array.isArray(issue.path) ? issue.path : [];
+      const path = pathArr
+        .filter((p) => typeof p === "string" || typeof p === "number")
+        .join(".");
+      const msg = typeof issue.message === "string" ? issue.message : "";
+      if (path && msg) return `${path} — ${msg}`;
+      if (msg) return msg;
+      if (path) return path;
+      return undefined;
+    })
+    .filter((s): s is string => typeof s === "string" && s.length > 0);
+
+  if (rendered.length === 0) return undefined;
+  return `Validation failed: ${rendered.join("; ")}`;
+}
+
 function stringifyBody(body: unknown): string {
   try {
     // Use all own property names (including non-enumerable ones, common on
@@ -124,6 +163,11 @@ export function formatApiErrorMessage({
   if (typeof error === "object") {
     const body = error as Record<string, unknown>;
 
+    // Zod validation errors: `{ name: "ZodError", issues: [{ path, message }] }`.
+    // Without this they render as unreadable raw JSON to the user.
+    const zod = formatZodIssues(body);
+    if (zod) return zod;
+
     // Most specific fields first.
     const fromMessage = typeof body.message === "string" ? body.message : undefined;
     const fromError = typeof body.error === "string" ? body.error : undefined;
@@ -156,6 +200,10 @@ export function formatApiErrorMessage({
       if (body.error instanceof Error && body.error.message) {
         return body.error.message;
       }
+
+      // Zod validation envelopes: `{ success: false, error: { name: "ZodError", issues: [...] } }`
+      const nestedZod = formatZodIssues(nested);
+      if (nestedZod) return nestedZod;
 
       const fromNestedMsg = typeof nested.message === "string" ? nested.message : undefined;
       const fromNestedErr = typeof nested.error === "string" ? nested.error : undefined;

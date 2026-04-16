@@ -118,6 +118,42 @@ describe("formatApiErrorMessage", () => {
       expect(formatted).toContain("500");
     });
 
+    it("formats top-level ZodError issues into a readable list", () => {
+      const body = {
+        name: "ZodError",
+        issues: [
+          { path: ["format"], message: "Invalid enum value" },
+          { path: ["limit"], message: "Must be positive" },
+        ],
+      };
+      expect(formatApiErrorMessage({ error: body })).toBe(
+        "Validation failed: format — Invalid enum value; limit — Must be positive",
+      );
+    });
+
+    it("formats ZodError envelopes wrapped in { success: false, error: {...} }", () => {
+      // Real-world shape from `/api/traces/search` on bad input.
+      const body = {
+        success: false,
+        error: {
+          name: "ZodError",
+          issues: [
+            {
+              received: "table",
+              code: "invalid_enum_value",
+              options: ["digest", "json"],
+              path: ["format"],
+              message:
+                "Invalid enum value. Expected 'digest' | 'json', received 'table'",
+            },
+          ],
+        },
+      };
+      expect(formatApiErrorMessage({ error: body })).toBe(
+        "Validation failed: format — Invalid enum value. Expected 'digest' | 'json', received 'table'",
+      );
+    });
+
     it("handles nested error objects (tRPC-style)", () => {
       const body = {
         error: {
