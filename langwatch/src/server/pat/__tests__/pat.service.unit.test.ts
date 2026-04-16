@@ -7,6 +7,7 @@ function createMockPrisma() {
   const mock = {
     personalAccessToken: {
       create: vi.fn(),
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
@@ -71,7 +72,7 @@ describe("PatService", () => {
     it("verifies a valid token and returns the PAT record", async () => {
       const { token, lookupId, hashedSecret } = generatePatToken();
 
-      prisma.personalAccessToken.findUnique.mockResolvedValue({
+      prisma.personalAccessToken.findFirst.mockResolvedValue({
         id: "pat-1",
         lookupId,
         hashedSecret,
@@ -91,7 +92,7 @@ describe("PatService", () => {
       const { lookupId } = generatePatToken();
       const wrongToken = `pat-lw-${lookupId}_wrongsecretvalue123456789012345678901234567`;
 
-      prisma.personalAccessToken.findUnique.mockResolvedValue({
+      prisma.personalAccessToken.findFirst.mockResolvedValue({
         id: "pat-1",
         lookupId,
         hashedSecret: hashSecret("correctSecret"),
@@ -108,7 +109,7 @@ describe("PatService", () => {
     it("returns null for revoked tokens", async () => {
       const { token, lookupId, hashedSecret } = generatePatToken();
 
-      prisma.personalAccessToken.findUnique.mockResolvedValue({
+      prisma.personalAccessToken.findFirst.mockResolvedValue({
         id: "pat-1",
         lookupId,
         hashedSecret,
@@ -125,7 +126,7 @@ describe("PatService", () => {
     it("returns null for expired tokens", async () => {
       const { token, lookupId, hashedSecret } = generatePatToken();
 
-      prisma.personalAccessToken.findUnique.mockResolvedValue({
+      prisma.personalAccessToken.findFirst.mockResolvedValue({
         id: "pat-1",
         lookupId,
         hashedSecret,
@@ -143,7 +144,7 @@ describe("PatService", () => {
     it("accepts tokens with a future expiration", async () => {
       const { token, lookupId, hashedSecret } = generatePatToken();
 
-      prisma.personalAccessToken.findUnique.mockResolvedValue({
+      prisma.personalAccessToken.findFirst.mockResolvedValue({
         id: "pat-1",
         lookupId,
         hashedSecret,
@@ -160,7 +161,7 @@ describe("PatService", () => {
     });
 
     it("returns null for non-existent tokens", async () => {
-      prisma.personalAccessToken.findUnique.mockResolvedValue(null);
+      prisma.personalAccessToken.findFirst.mockResolvedValue(null);
 
       const result = await service.verify({
         token: "pat-lw-nonexistent_secret123456789012345678901234567890",

@@ -8,6 +8,7 @@ function createMockPrisma() {
       findUnique: vi.fn(),
     },
     personalAccessToken: {
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
     },
@@ -67,7 +68,7 @@ describe("TokenResolver", () => {
         team: { id: "team-1", organizationId: "org-1" },
       };
 
-      prisma.personalAccessToken.findUnique.mockResolvedValue(mockPat);
+      prisma.personalAccessToken.findFirst.mockResolvedValue(mockPat);
       prisma.project.findUnique.mockResolvedValue(mockProject);
 
       const result = await resolver.resolve({
@@ -86,7 +87,7 @@ describe("TokenResolver", () => {
 
     it("returns null when no projectId is provided", async () => {
       const { token, lookupId, hashedSecret } = generatePatToken();
-      prisma.personalAccessToken.findUnique.mockResolvedValue({
+      prisma.personalAccessToken.findFirst.mockResolvedValue({
         id: "pat-1",
         lookupId,
         hashedSecret,
@@ -102,7 +103,7 @@ describe("TokenResolver", () => {
 
     it("returns null when project is in a different org", async () => {
       const { token, lookupId, hashedSecret } = generatePatToken();
-      prisma.personalAccessToken.findUnique.mockResolvedValue({
+      prisma.personalAccessToken.findFirst.mockResolvedValue({
         id: "pat-1",
         lookupId,
         hashedSecret,

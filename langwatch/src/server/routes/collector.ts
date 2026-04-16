@@ -29,7 +29,7 @@ import {
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
 import { createLogger } from "../../utils/logger/server";
 import { TokenResolver } from "../pat/token-resolver";
-import { extractCredentials } from "../pat/auth-middleware";
+import { enforcePatCeiling, extractCredentials } from "../pat/auth-middleware";
 
 const logger = createLogger("langwatch.collector");
 const tokenResolver = TokenResolver.create(prisma);
@@ -92,6 +92,22 @@ app.post(
       );
 
       return c.json({ message: "Invalid auth token." }, 401);
+    }
+
+    // Enforce PAT ceiling (legacy tokens bypass). Uses `traces:view` as the v1
+    // primitive — every project role has it, so this confirms the PAT is
+    // actually scoped to this project. Tighten when a `traces:create`
+    // permission is introduced.
+    const denial = await enforcePatCeiling({
+      resolved,
+      permission: "traces:view",
+    });
+    if (denial) {
+      logger.warn(
+        { projectId: resolved.project.id, patId: resolved.type === "pat" ? resolved.patId : undefined },
+        "collector request denied by PAT ceiling",
+      );
+      return c.json({ message: denial.error }, denial.status);
     }
 
     const project = resolved.project;
