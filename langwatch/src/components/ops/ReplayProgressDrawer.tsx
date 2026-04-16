@@ -47,6 +47,9 @@ export function ReplayProgressDrawer({
 
   const status = statusQuery.data;
   const isRunning = status?.state === "running";
+  const activeProjections = new Set(
+    status?.currentProjection?.split("+").filter(Boolean) ?? [],
+  );
 
   const stateColor =
     status?.state === "completed"
@@ -115,9 +118,9 @@ export function ReplayProgressDrawer({
                     <Text textStyle="sm" fontWeight="medium">
                       {PHASE_LABELS[status.currentPhase] ?? status.currentPhase}
                     </Text>
-                    {status.currentProjection && (
+                    {activeProjections.size > 0 && (
                       <Text textStyle="xs" color="fg.muted">
-                        {status.currentProjection}
+                        {activeProjections.size} projection{activeProjections.size !== 1 ? "s" : ""}
                       </Text>
                     )}
                   </VStack>
@@ -189,8 +192,8 @@ export function ReplayProgressDrawer({
                     <Badge
                       key={name}
                       size="sm"
-                      variant={name === status.currentProjection ? "solid" : "subtle"}
-                      colorPalette={name === status.currentProjection ? "orange" : "gray"}
+                      variant={activeProjections.has(name) ? "solid" : "subtle"}
+                      colorPalette={activeProjections.has(name) ? "orange" : "gray"}
                     >
                       {name}
                     </Badge>

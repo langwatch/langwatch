@@ -372,7 +372,8 @@ describe("MapAccumulator", () => {
 
       await acc.flush();
 
-      const records = projection.store.bulkAppend!.mock.calls[0]![0] as Array<{ doubled: number }>;
+      const bulkSpy = projection.store.bulkAppend as ReturnType<typeof vi.fn>;
+      const records = bulkSpy.mock.calls[0]![0] as Array<{ doubled: number }>;
       expect(records).toEqual([{ doubled: 40 }]);
     });
   });
