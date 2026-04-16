@@ -12,7 +12,7 @@ import asyncio
 # `CodeSettings` is not fully defined. Skip the whole module rather than taking
 # down the rest of the suite at collection time.
 try:
-    import chainlit as cl  # noqa: F401
+    import chainlit  # noqa: F401
     import chainlit.config  # noqa: F401
     from chainlit.context import init_http_context  # noqa: F401
 except Exception as _chainlit_err:  # pragma: no cover - environment-dependent
