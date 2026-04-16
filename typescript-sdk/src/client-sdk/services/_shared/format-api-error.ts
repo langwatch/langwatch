@@ -162,7 +162,13 @@ export function formatApiErrorMessage(
     return `server returned ${withStatus}`;
   }
 
-  return String(error);
+  // Primitive types (number, boolean, bigint, symbol) — coerce safely.
+  // We've already handled string, null/undefined, Error, and object above.
+  try {
+    return String(error as number | boolean | bigint);
+  } catch {
+    return "Unknown error occurred";
+  }
 }
 
 /**

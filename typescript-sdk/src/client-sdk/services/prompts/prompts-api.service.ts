@@ -349,7 +349,16 @@ export class PromptsApiService {
     localVersion?: number;
     commitMessage?: string;
   }): Promise<SyncResult> {
-    let response: Awaited<ReturnType<LangwatchApiClient["POST"]>> | undefined;
+    // openapi-fetch returns `{ data?, error?, response }`; we only need
+    // these fields from the response so an explicit shape keeps the
+    // no-redundant-type-constituents lint happy (the generic POST return is
+    // widened to `any` by the generated types).
+    interface SyncApiResponse {
+      data?: unknown;
+      error?: unknown;
+      response?: { status?: number };
+    }
+    let response: SyncApiResponse | undefined;
     try {
       response = await this.apiClient.POST(
         "/api/prompts/{id}/sync",
@@ -361,7 +370,7 @@ export class PromptsApiService {
             commitMessage: params.commitMessage,
           },
         },
-      ) as any;
+      );
     } catch (error) {
       // Transport-level failures (network errors, timeouts, unresolved DNS)
       // surface here. Preserve the underlying message so the user knows
@@ -370,10 +379,10 @@ export class PromptsApiService {
       throw new PromptsApiError(message, "sync", error);
     }
 
-    if (response && (response as any).error) {
-      const err = (response as any).error;
+    if (response?.error) {
+      const err: unknown = response.error;
       const status =
-        (response as any).response?.status ?? extractStatusFromResponse(err);
+        response.response?.status ?? extractStatusFromResponse(err);
       const message = formatApiErrorMessage(err, { status });
       throw new PromptsApiError(
         `Failed to sync prompt: ${message}`,
@@ -382,9 +391,16 @@ export class PromptsApiService {
       );
     }
 
-    const data = (response as any).data;
+    const data = response?.data as SyncResult | undefined;
+    if (!data) {
+      throw new PromptsApiError(
+        "Failed to sync prompt: server returned no data",
+        "sync",
+        response,
+      );
+    }
     return {
-      action: data.action as SyncAction,
+      action: data.action,
       prompt: data.prompt,
       conflictInfo: data.conflictInfo,
     };

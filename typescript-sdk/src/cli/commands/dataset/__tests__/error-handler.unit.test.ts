@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import {
   DatasetApiError,
   DatasetNotFoundError,
@@ -7,11 +7,13 @@ import {
 import { handleDatasetCommandError } from "../error-handler";
 
 describe("handleDatasetCommandError", () => {
-  let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
-  let processExitSpy: ReturnType<typeof vi.spyOn>;
+  let consoleErrorSpy: MockInstance<typeof console.error>;
+  let processExitSpy: MockInstance<typeof process.exit>;
 
   beforeEach(() => {
-    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {
+      /* suppress */
+    });
     processExitSpy = vi
       .spyOn(process, "exit")
       .mockImplementation(((_code?: number | string | null) => {
