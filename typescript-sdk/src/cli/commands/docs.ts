@@ -20,7 +20,7 @@ export function normalizeDocsUrl(input: string | undefined, kind: DocsKind): str
   if (url === "") return indexUrl;
 
   // Append .md if not already an .md/.txt file (before any query/hash)
-  const match = url.match(/^([^?#]*)([?#].*)?$/);
+  const match = /^([^?#]*)([?#].*)?$/.exec(url);
   let pathPart = match?.[1] ?? url;
   const suffix = match?.[2] ?? "";
   if (!/\.(md|txt)$/i.test(pathPart)) {
