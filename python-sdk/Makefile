@@ -1,4 +1,4 @@
-.PHONY: test test-tracing install example
+.PHONY: test test-tracing test-notebooks install example
 
 test-unit:
 	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration and not e2e" -k "not test_example and not test_prompt_service_tracing and not test_prompt_tracing and not test_context and not test_tracing" $(filter-out $@,$(MAKECMDGOALS))
@@ -50,7 +50,12 @@ build:
 
 example:
 	@args="$(filter-out $@,$(MAKECMDGOALS))"; \
-	if [[ $$args =~ "fastapi" ]]; then \
+	if [[ $$args =~ \.ipynb$$ ]]; then \
+		PYTHONPATH=$$PYTHONPATH:. uv run jupyter nbconvert \
+			--to notebook --execute --inplace \
+			--ExecutePreprocessor.timeout=600 \
+			"$$args"; \
+	elif [[ $$args =~ "fastapi" ]]; then \
 		uv run python $$args; \
 	elif [[ $$args =~ "streamlit" ]]; then \
 		uv run streamlit run $$args; \
@@ -59,6 +64,19 @@ example:
 	else \
 		uv run chainlit run -w --port 9000 $$args; \
 	fi
+
+# Execute every example notebook end-to-end. Requires LANGWATCH_API_KEY
+# (and any notebook-specific keys like GOOGLE_API_KEY) to be set in the
+# environment. Notebooks are executed in-place so their outputs update.
+test-notebooks:
+	@for notebook in examples/*.ipynb; do \
+		echo "Executing $$notebook..."; \
+		PYTHONPATH=$$PYTHONPATH:. uv run jupyter nbconvert \
+			--to notebook --execute --inplace \
+			--ExecutePreprocessor.timeout=600 \
+			"$$notebook" || exit 1; \
+	done
+	@echo "All notebooks executed successfully."
 
 batch-evaluation-example:
 	uv run python $(filter-out $@,$(MAKECMDGOALS))
