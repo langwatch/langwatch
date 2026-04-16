@@ -19,6 +19,17 @@ const apiResponsePromptSchemaBase = z.object({
 });
 
 /**
+ * Tag association for a prompt version.
+ * `versionId` is the version this tag currently points to —
+ * included so callers can distinguish whether the tag points
+ * to the prompt/version they're looking at.
+ */
+export const apiResponsePromptTagSchema = z.object({
+  name: z.string(),
+  versionId: z.string(),
+});
+
+/**
  * Schema for version output responses
  * Derives configData fields from storage schema to prevent drift
  */
@@ -41,6 +52,7 @@ const apiResponseVersionOutputSchema = z.object({
   demonstrations: configDataSchema.shape.demonstrations,
   promptingTechnique: configDataSchema.shape.prompting_technique,
   responseFormat: configDataSchema.shape.response_format,
+  tags: z.array(apiResponsePromptTagSchema).default([]),
 });
 
 /**
