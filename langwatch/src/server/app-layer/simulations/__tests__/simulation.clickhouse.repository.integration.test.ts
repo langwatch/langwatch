@@ -5,6 +5,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "../../../event-sourcing/__tests__/integration/testContainers";
+import { createResilientClickHouseClient } from "../../clients/clickhouse";
 import { SimulationClickHouseRepository } from "../repositories/simulation.clickhouse.repository";
 
 const tenantId = `test-sim-repo-${nanoid()}`;
@@ -60,7 +61,11 @@ let repo: SimulationClickHouseRepository;
 beforeAll(async () => {
   const containers = await startTestContainers();
   ch = containers.clickHouseClient;
-  repo = new SimulationClickHouseRepository(async () => ch);
+  // Wrap with the resilient client so the `langwatch_*` ClickHouse settings
+  // the repository emits get stripped before they hit ClickHouse (matches the
+  // production factory path — bare clients would be rejected by ClickHouse).
+  const resilient = createResilientClickHouseClient({ client: ch });
+  repo = new SimulationClickHouseRepository(async () => resilient);
 }, 60_000);
 
 afterAll(async () => {
