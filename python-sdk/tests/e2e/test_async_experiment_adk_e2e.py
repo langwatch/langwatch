@@ -57,6 +57,9 @@ def configure_langwatch():
 
     import langwatch
 
+    prev_api_key = getattr(langwatch, "_api_key", None)
+    prev_endpoint = getattr(langwatch, "_endpoint", None)
+
     langwatch._api_key = api_key
     endpoint = os.environ.get("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
     langwatch._endpoint = endpoint
@@ -66,7 +69,11 @@ def configure_langwatch():
     except Exception:
         # Setup may already have been performed by a sibling test module.
         pass
-    yield
+    try:
+        yield
+    finally:
+        langwatch._api_key = prev_api_key
+        langwatch._endpoint = prev_endpoint
 
 
 def _poll_run_results(

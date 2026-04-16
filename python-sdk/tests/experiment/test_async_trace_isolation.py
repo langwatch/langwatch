@@ -23,6 +23,10 @@ from langwatch.experiment.experiment import Experiment
 
 @pytest.fixture(scope="module", autouse=True)
 def setup_langwatch():
+    prev_env_api_key = os.environ.get("LANGWATCH_API_KEY")
+    prev_api_key = getattr(langwatch, "_api_key", None)
+    prev_endpoint = getattr(langwatch, "_endpoint", None)
+
     os.environ["LANGWATCH_API_KEY"] = "test-key-for-async-tracing"
     langwatch._api_key = "test-key-for-async-tracing"
     langwatch._endpoint = "http://localhost:5560"
@@ -33,9 +37,15 @@ def setup_langwatch():
         # the existing provider is fine for these tests since trace_ids are
         # what we assert, not exporter state.
         pass
-    yield
-    if "LANGWATCH_API_KEY" in os.environ:
-        del os.environ["LANGWATCH_API_KEY"]
+    try:
+        yield
+    finally:
+        if prev_env_api_key is None:
+            os.environ.pop("LANGWATCH_API_KEY", None)
+        else:
+            os.environ["LANGWATCH_API_KEY"] = prev_env_api_key
+        langwatch._api_key = prev_api_key
+        langwatch._endpoint = prev_endpoint
 
 
 @pytest.fixture
