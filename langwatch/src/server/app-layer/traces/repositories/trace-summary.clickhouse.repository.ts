@@ -201,7 +201,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             ScenarioRoleCosts,
             ScenarioRoleLatencies,
             ScenarioRoleSpans,
-            SpanCosts
+            SpanCosts,
+            toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}

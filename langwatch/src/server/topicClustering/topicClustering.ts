@@ -210,7 +210,6 @@ async function fetchCountsFromClickHouse(
           SELECT TenantId, TraceId, max(UpdatedAt)
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
-            AND ArchivedAt IS NULL
             AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
           GROUP BY TenantId, TraceId
         )

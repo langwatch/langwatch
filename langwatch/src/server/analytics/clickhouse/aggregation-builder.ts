@@ -104,7 +104,6 @@ function dedupedTraceSummaries(
         SELECT TenantId, TraceId, max(UpdatedAt)
         FROM trace_summaries
         WHERE TenantId = {tenantId:String}
-          AND ArchivedAt IS NULL
           ${dateClause}
         GROUP BY TenantId, TraceId
       )

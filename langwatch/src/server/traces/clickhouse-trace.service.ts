@@ -1294,6 +1294,9 @@ export class ClickHouseTraceService {
           }),
         ]);
 
+        // Note: ClickHouse command() does not return affected row counts,
+        // so we report the requested count. Traces that don't exist or
+        // are already archived are safely no-ops (INSERT...SELECT finds 0 rows).
         this.logger.info(
           { projectId, traceCount: traceIds.length },
           "Archived traces in ClickHouse",
@@ -1480,7 +1483,6 @@ export class ClickHouseTraceService {
                   SELECT TenantId, TraceId, max(UpdatedAt)
                   FROM trace_summaries
                   WHERE TenantId = {tenantId:String}
-                    AND ArchivedAt IS NULL
                   GROUP BY TenantId, TraceId
                 )
               ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
@@ -1687,7 +1689,6 @@ export class ClickHouseTraceService {
             SELECT TenantId, TraceId, max(UpdatedAt)
             FROM trace_summaries
             WHERE TenantId = {tenantId:String}
-              AND ArchivedAt IS NULL
               AND TraceId IN ({traceIds:Array(String)})
             GROUP BY TenantId, TraceId
           )
