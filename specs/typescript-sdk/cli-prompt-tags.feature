@@ -158,23 +158,29 @@ Feature: CLI Prompt Tag Commands
   # --- Tag display in prompt list / get / versions ---
 
   @unit
-  Scenario: Prompt list renders a Tags column
+  Scenario: Prompt list renders a Tags column including the built-in latest tag
     Given "my-prompt" has "production" pointing to its latest version and "staging" pointing to an older version
     When I run "langwatch prompt list"
-    Then I see the row for "my-prompt" with a Tags column showing "production"
+    Then I see the row for "my-prompt" with a Tags column containing "latest, production"
     And the Tags column does not include tags pointing to older versions for the latest row
 
   @unit
-  Scenario: Prompt list JSON format includes tags array on each prompt
+  Scenario: Prompt list shows latest tag even when no custom tags exist
+    Given "my-prompt" has no custom tag assignments
+    When I run "langwatch prompt list"
+    Then the row for "my-prompt" shows "latest" in the Tags column
+
+  @unit
+  Scenario: Prompt list JSON format includes tags array with latest plus customs
     Given "my-prompt" has "production" pointing to its latest version
     When I run "langwatch prompt list --format json"
-    Then the JSON for "my-prompt" includes a tags array with name "production" and its versionId
+    Then the JSON for "my-prompt" includes a tags array with { name: "latest" } and { name: "production" }
 
   @unit
   Scenario: Prompt versions renders a Tags column per version
     Given "my-prompt" has "production" on v3 and "staging" on v2
     When I run "langwatch prompt versions my-prompt"
-    Then the row for v3 shows "production" in the Tags column
+    Then the row for v3 shows "latest, production" in the Tags column
     And the row for v2 shows "staging" in the Tags column
     And the row for v1 shows "—"
 
@@ -182,22 +188,30 @@ Feature: CLI Prompt Tag Commands
   Scenario: Prompt versions JSON format includes tags array on each version
     Given "my-prompt" has "production" on v2 and "staging" on v3
     When I run "langwatch prompt versions my-prompt --format json"
-    Then each version in the JSON array includes a tags field (possibly empty)
+    Then each version in the JSON array includes a tags field
+    And the latest version's tags include a { name: "latest" } entry
 
   @integration
-  Scenario: API get returns tags on the prompt response
-    Given a prompt with "production" assigned to version 2 and fetched without a tag filter
+  Scenario: API get returns latest plus custom tags on the latest version
+    Given a prompt with "production" assigned to its latest version
     When I GET /api/prompts/:id
-    Then the response includes a tags array containing { name: "production", versionId }
+    Then the response tags array contains { name: "latest", versionId } and { name: "production", versionId }
 
   @integration
-  Scenario: API versions returns tags per version
-    Given a prompt with "production" on v2 and "staging" on v3
+  Scenario: API get with ?tag=staging omits the latest tag for a non-latest version
+    Given a prompt with "staging" assigned to an older version
+    When I GET /api/prompts/:id?tag=staging
+    Then the response tags array contains only { name: "staging", versionId } (no latest)
+
+  @integration
+  Scenario: API versions marks the latest row with the latest tag
+    Given a prompt with "production" on the latest version and "staging" on an older one
     When I GET /api/prompts/:id/versions
-    Then each version includes a tags array with the names pointing to it
+    Then the latest row's tags include { name: "latest" } and { name: "production" }
+    And older rows do not include { name: "latest" }
 
   @integration
-  Scenario: API list returns tags per prompt latest version
+  Scenario: API list returns latest plus any custom tags on the latest version
     Given a prompt with "production" on its latest version
     When I GET /api/prompts
-    Then the prompt entry includes a tags array with "production"
+    Then the entry's tags array contains { name: "latest" } and { name: "production" }

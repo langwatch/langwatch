@@ -166,7 +166,7 @@ describe("Prompt tags appear in prompt responses", () => {
   });
 
   describe("GET /api/prompts", () => {
-    it("each entry includes only tags pointing at its latest version", async () => {
+    it("each entry includes the latest tag plus tags pointing at the latest version", async () => {
       const res = await get("/api/prompts");
       expect(res.status).toBe(200);
       const body = (await res.json()) as Array<{
@@ -179,13 +179,14 @@ describe("Prompt tags appear in prompt responses", () => {
       expect(row).toBeDefined();
       expect(row?.versionId).toBe(v2.id);
       expect(row?.tags).toEqual([
+        { name: "latest", versionId: v2.id },
         { name: "production", versionId: v2.id },
       ]);
     });
   });
 
   describe("GET /api/prompts/:id", () => {
-    it("returns tags pointing at the default (latest) version", async () => {
+    it("returns the latest tag plus custom tags on the default (latest) version", async () => {
       const res = await get(`/api/prompts/${promptConfig.id}`);
       expect(res.status).toBe(200);
       const body = (await res.json()) as {
@@ -193,10 +194,13 @@ describe("Prompt tags appear in prompt responses", () => {
         tags: Array<{ name: string; versionId: string }>;
       };
       expect(body.versionId).toBe(v2.id);
-      expect(body.tags).toEqual([{ name: "production", versionId: v2.id }]);
+      expect(body.tags).toEqual([
+        { name: "latest", versionId: v2.id },
+        { name: "production", versionId: v2.id },
+      ]);
     });
 
-    it("when fetched with ?tag=staging returns tags pointing at that version", async () => {
+    it("when fetched with ?tag=staging returns only tags pointing at that (non-latest) version", async () => {
       const res = await get(
         `/api/prompts/${promptConfig.id}?tag=staging`,
       );
@@ -211,7 +215,7 @@ describe("Prompt tags appear in prompt responses", () => {
   });
 
   describe("GET /api/prompts/:id/versions", () => {
-    it("each version row includes the tags pointing at it", async () => {
+    it("marks only the latest row with the latest tag alongside any custom tags", async () => {
       const res = await get(`/api/prompts/${promptConfig.id}/versions`);
       expect(res.status).toBe(200);
       const body = (await res.json()) as Array<{
@@ -223,7 +227,10 @@ describe("Prompt tags appear in prompt responses", () => {
       const v1Row = body.find((r) => r.version === 1);
       const v2Row = body.find((r) => r.version === 2);
       expect(v1Row?.tags).toEqual([{ name: "staging", versionId: v1.id }]);
-      expect(v2Row?.tags).toEqual([{ name: "production", versionId: v2.id }]);
+      expect(v2Row?.tags).toEqual([
+        { name: "latest", versionId: v2.id },
+        { name: "production", versionId: v2.id },
+      ]);
     });
   });
 });

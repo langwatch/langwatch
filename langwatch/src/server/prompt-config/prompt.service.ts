@@ -151,12 +151,17 @@ export class PromptService {
       projectId,
     });
 
-    return configs.map((config) =>
-      this.transformToVersionedPrompt(
+    return configs.map((config) => {
+      const latestVersionId = config.latestVersion.id ?? "";
+      return this.transformToVersionedPrompt(
         config,
-        tagsByVersionId.get(config.latestVersion.id ?? "") ?? [],
-      ),
-    );
+        this.withLatestTag({
+          tags: tagsByVersionId.get(latestVersionId) ?? [],
+          currentVersionId: latestVersionId,
+          latestVersionId,
+        }),
+      );
+    });
   }
 
   /**
@@ -250,10 +255,20 @@ export class PromptService {
       configIds: [config.id],
       projectId,
     });
-    const tagsForThisVersion =
-      tagsByVersionId.get(config.latestVersion.id ?? "") ?? [];
+    const currentVersionId = config.latestVersion.id ?? "";
+    const latestVersionId = await this.getLatestVersionIdForConfig({
+      configId: config.id,
+      projectId,
+    });
 
-    return this.transformToVersionedPrompt(config, tagsForThisVersion);
+    return this.transformToVersionedPrompt(
+      config,
+      this.withLatestTag({
+        tags: tagsByVersionId.get(currentVersionId) ?? [],
+        currentVersionId,
+        latestVersionId,
+      }),
+    );
   }
 
   /**
@@ -294,13 +309,20 @@ export class PromptService {
       projectId: params.projectId,
     });
 
+    // Repo returns versions sorted by createdAt desc, so versions[0] is latest.
+    const latestVersionId = versions[0]?.id ?? "";
+
     return versions.map((version) =>
       this.transformToVersionedPrompt(
         {
           ...config,
           latestVersion: version,
         },
-        tagsByVersionId.get(version.id ?? "") ?? [],
+        this.withLatestTag({
+          tags: tagsByVersionId.get(version.id ?? "") ?? [],
+          currentVersionId: version.id ?? "",
+          latestVersionId,
+        }),
       ),
     );
   }
@@ -1181,6 +1203,45 @@ export class PromptService {
     }
 
     return map;
+  }
+
+  /**
+   * Returns the id of the latest (by createdAt desc) version for a config,
+   * or an empty string when no version exists.
+   */
+  private async getLatestVersionIdForConfig(params: {
+    configId: string;
+    projectId: string;
+  }): Promise<string> {
+    const latest = await this.prisma.llmPromptConfigVersion.findFirst({
+      where: { configId: params.configId, projectId: params.projectId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    });
+    return latest?.id ?? "";
+  }
+
+  /**
+   * Prepends the built-in "latest" tag when the current version is the latest
+   * for its prompt. "latest" is a first-class, protected tag (see PromptTagService)
+   * that always resolves to the newest version, so it belongs in the response
+   * alongside any custom tags that happen to point at this version.
+   */
+  private withLatestTag(params: {
+    tags: Array<{ name: string; versionId: string }>;
+    currentVersionId: string;
+    latestVersionId: string;
+  }): Array<{ name: string; versionId: string }> {
+    if (
+      !params.currentVersionId ||
+      params.currentVersionId !== params.latestVersionId
+    ) {
+      return params.tags;
+    }
+    return [
+      { name: "latest", versionId: params.latestVersionId },
+      ...params.tags,
+    ];
   }
 
   /**
