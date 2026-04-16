@@ -399,6 +399,12 @@ export class ProjectionRouter<
         name,
         handler: {
           handle: async (event: EventType) => {
+            // Defer or skip if projection-replay is active for this aggregate
+            if (this.replayMarkerChecker) {
+              const decision = await this.replayMarkerChecker.check(name, event);
+              if (decision === "skip") return;
+            }
+
             const context = await this.buildStoreContext(event);
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, context),
@@ -665,6 +671,12 @@ export class ProjectionRouter<
           }
 
           try {
+            // Defer or skip if projection-replay is active for this aggregate
+            if (this.replayMarkerChecker) {
+              const decision = await this.replayMarkerChecker.check(name, event);
+              if (decision === "skip") continue;
+            }
+
             const storeContext = await this.buildStoreContext(event);
             const record = await withMetrics({
               fn: () => this.mapExecutor.execute(mapProj, event, storeContext),
