@@ -117,7 +117,7 @@ describe("SimulationClickHouseRepository", () => {
                   {
                     BatchRunId: "batch-1",
                     MaxCreatedAt: "1710000000000",
-                    ScenarioSetId: "default",
+                    NormalizedSetId: "default",
                   },
                 ];
               }
@@ -145,6 +145,34 @@ describe("SimulationClickHouseRepository", () => {
         );
         expect(batchQuery?.query).not.toMatch(
           /any\(ScenarioSetId\)\s+AS\s+ScenarioSetId/
+        );
+      });
+    });
+
+    // Regression: ClickHouse rejects queries where a SELECT alias shadows a
+    // column referenced in WHERE — the aggregate any(IF(...)) must NOT be
+    // aliased as ScenarioSetId because the dedup IN-tuple in WHERE references
+    // the underlying ScenarioSetId column.
+    // See: simulation.clickhouse.repository.ts getRunDataForAllSuites()
+    describe("when the outer SELECT aggregates the normalized set id", () => {
+      it("does not alias the aggregate as ScenarioSetId (would shadow the column in WHERE)", async () => {
+        const { client, getCapturedQueries } =
+          makeMockClientWithQueryCapture({
+            rowsForQuery: () => [],
+          });
+        const resolver = vi.fn().mockResolvedValue(client);
+        const repo = new SimulationClickHouseRepository(resolver);
+
+        await repo.getRunDataForAllSuites({ projectId: "project-1" });
+
+        const batchQuery = getCapturedQueries().find((q) =>
+          q.query.includes("GROUP BY BatchRunId")
+        );
+        expect(batchQuery?.query).not.toMatch(
+          /any\(IF\(ScenarioSetId[^)]*\)\)\s+AS\s+ScenarioSetId\b/
+        );
+        expect(batchQuery?.query).toMatch(
+          /any\(IF\(ScenarioSetId[^)]*\)\)\s+AS\s+NormalizedSetId\b/
         );
       });
     });
