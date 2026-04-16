@@ -32,6 +32,13 @@ import {
   useAdminUpdate,
 } from "../useAdminResource";
 
+/**
+ * Read-facing Project shape — does NOT include s3Endpoint / s3AccessKeyId /
+ * s3SecretAccessKey / s3Bucket. Project-level S3 overrides are credentials
+ * and the admin Hono route strips them from every list / getOne response
+ * (see ee/admin/safeSelects.ts). The edit drawer accepts new values,
+ * write-only.
+ */
 interface AdminProject {
   id: string;
   name: string;
@@ -50,10 +57,6 @@ interface AdminProject {
   defaultModel: string | null;
   topicClusteringModel: string | null;
   embeddingsModel: string | null;
-  s3Endpoint: string | null;
-  s3AccessKeyId: string | null;
-  s3SecretAccessKey: string | null;
-  s3Bucket: string | null;
   archivedAt: string | null;
   createdAt: string;
 }
@@ -224,10 +227,14 @@ function ProjectEditDrawer({
       defaultModel: project.defaultModel ?? "",
       topicClusteringModel: project.topicClusteringModel ?? "",
       embeddingsModel: project.embeddingsModel ?? "",
-      s3Endpoint: project.s3Endpoint ?? "",
-      s3AccessKeyId: project.s3AccessKeyId ?? "",
-      s3SecretAccessKey: project.s3SecretAccessKey ?? "",
-      s3Bucket: project.s3Bucket ?? "",
+      // S3 credentials are write-only: the server strips them from
+      // read payloads (ee/admin/safeSelects.ts), so the form always
+      // starts empty. Typing a value replaces the stored secret;
+      // leaving it blank keeps the current one untouched.
+      s3Endpoint: "",
+      s3AccessKeyId: "",
+      s3SecretAccessKey: "",
+      s3Bucket: "",
       archive: !!project.archivedAt,
     });
   }, [project]);
@@ -265,14 +272,16 @@ function ProjectEditDrawer({
       data.topicClusteringModel = nullIfEmpty(form.topicClusteringModel);
     if (form.embeddingsModel !== (project.embeddingsModel ?? ""))
       data.embeddingsModel = nullIfEmpty(form.embeddingsModel);
-    if (form.s3Endpoint !== (project.s3Endpoint ?? ""))
-      data.s3Endpoint = nullIfEmpty(form.s3Endpoint);
-    if (form.s3AccessKeyId !== (project.s3AccessKeyId ?? ""))
-      data.s3AccessKeyId = nullIfEmpty(form.s3AccessKeyId);
-    if (form.s3SecretAccessKey !== (project.s3SecretAccessKey ?? ""))
-      data.s3SecretAccessKey = nullIfEmpty(form.s3SecretAccessKey);
-    if (form.s3Bucket !== (project.s3Bucket ?? ""))
-      data.s3Bucket = nullIfEmpty(form.s3Bucket);
+    // Write-only credentials — only forward fields the user typed into;
+    // an empty input means "leave the stored secret alone". Nothing we
+    // received from the server can be compared against because the
+    // server never sends these fields back.
+    if (form.s3Endpoint.trim() !== "") data.s3Endpoint = form.s3Endpoint;
+    if (form.s3AccessKeyId.trim() !== "")
+      data.s3AccessKeyId = form.s3AccessKeyId;
+    if (form.s3SecretAccessKey.trim() !== "")
+      data.s3SecretAccessKey = form.s3SecretAccessKey;
+    if (form.s3Bucket.trim() !== "") data.s3Bucket = form.s3Bucket;
     const currentlyArchived = !!project.archivedAt;
     if (form.archive !== currentlyArchived) {
       data.archivedAt = form.archive
@@ -454,12 +463,17 @@ function ProjectEditDrawer({
               </Field.Root>
 
               <SectionHeading>Project S3</SectionHeading>
+              <Text fontSize="xs" color="fg.muted">
+                Credentials below are write-only — the server never reads them
+                back. Leave blank to keep the stored value; type to replace.
+              </Text>
               <Field.Root>
                 <Field.Label>Endpoint</Field.Label>
                 <Input
                   type="url"
                   value={form.s3Endpoint}
                   onChange={(e) => setField("s3Endpoint", e.target.value)}
+                  placeholder="Leave blank to keep current"
                 />
               </Field.Root>
               <Field.Root>
@@ -467,6 +481,7 @@ function ProjectEditDrawer({
                 <Input
                   value={form.s3Bucket}
                   onChange={(e) => setField("s3Bucket", e.target.value)}
+                  placeholder="Leave blank to keep current"
                 />
               </Field.Root>
               <Field.Root>
@@ -475,6 +490,8 @@ function ProjectEditDrawer({
                   type="password"
                   value={form.s3AccessKeyId}
                   onChange={(e) => setField("s3AccessKeyId", e.target.value)}
+                  placeholder="Leave blank to keep current"
+                  autoComplete="new-password"
                 />
               </Field.Root>
               <Field.Root>
@@ -485,6 +502,8 @@ function ProjectEditDrawer({
                   onChange={(e) =>
                     setField("s3SecretAccessKey", e.target.value)
                   }
+                  placeholder="Leave blank to keep current"
+                  autoComplete="new-password"
                 />
               </Field.Root>
 

@@ -8,7 +8,9 @@
 import {
   defaultHandler,
   getListHandler,
+  getOneHandler,
   type GetListRequest,
+  type GetOneRequest,
 } from "ra-data-simple-prisma";
 import { Prisma, PlanTypes, SubscriptionStatus } from "@prisma/client";
 import type { Organization, Project, Team, User } from "@prisma/client";
@@ -17,6 +19,10 @@ import { auth as betterAuth } from "~/server/better-auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { isAdmin } from "../../../ee/admin/isAdmin";
+import {
+  ORGANIZATION_SAFE_SELECT,
+  PROJECT_SAFE_SELECT,
+} from "../../../ee/admin/safeSelects";
 import { auditLog } from "~/server/auditLog";
 import { UserService } from "~/server/users/user.service";
 
@@ -272,6 +278,7 @@ app.post("/admin/:resource", async (c) => {
       body as GetListRequest,
       prisma.organization,
       {
+        select: ORGANIZATION_SAFE_SELECT,
         ...(query
           ? {
               where: {
@@ -288,6 +295,20 @@ app.post("/admin/:resource", async (c) => {
     return c.json(result);
   }
 
+  // Single-org detail fetch used by the edit drawer — same safe select as
+  // the list, so credentials never reach the admin UI.
+  if (
+    body.resource === "organization" &&
+    body.method === "getOne"
+  ) {
+    const result = await getOneHandler<Prisma.OrganizationFindUniqueArgs>(
+      body as GetOneRequest,
+      prisma.organization,
+      { select: ORGANIZATION_SAFE_SELECT },
+    );
+    return c.json(result);
+  }
+
   if (body.resource === "project" && body.method === "getList") {
     const query = body.params?.filter?.query;
     if (body.params?.filter?.query) delete body.params.filter.query;
@@ -296,6 +317,7 @@ app.post("/admin/:resource", async (c) => {
       body as GetListRequest,
       prisma.project,
       {
+        select: PROJECT_SAFE_SELECT,
         ...(query
           ? {
               where: {
@@ -308,6 +330,15 @@ app.post("/admin/:resource", async (c) => {
             }
           : {}),
       },
+    );
+    return c.json(result);
+  }
+
+  if (body.resource === "project" && body.method === "getOne") {
+    const result = await getOneHandler<Prisma.ProjectFindUniqueArgs>(
+      body as GetOneRequest,
+      prisma.project,
+      { select: PROJECT_SAFE_SELECT },
     );
     return c.json(result);
   }

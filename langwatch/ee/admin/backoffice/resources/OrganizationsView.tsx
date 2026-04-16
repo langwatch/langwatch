@@ -30,6 +30,14 @@ import {
   useAdminUpdate,
 } from "../useAdminResource";
 
+/**
+ * Read-facing Organization shape — intentionally does NOT include
+ * elasticsearchNodeUrl / elasticsearchApiKey / s3Endpoint / s3AccessKeyId /
+ * s3SecretAccessKey / s3Bucket. Those are credentials and the admin Hono
+ * route strips them from every list / getOne response (see
+ * ee/admin/safeSelects.ts). The edit drawer still accepts *new* values for
+ * those fields, write-only.
+ */
 interface AdminOrganization {
   id: string;
   name: string;
@@ -46,13 +54,7 @@ interface AdminOrganization {
   license: string | null;
   licenseExpiresAt: string | null;
   useCustomElasticsearch: boolean;
-  elasticsearchNodeUrl: string | null;
-  elasticsearchApiKey: string | null;
   useCustomS3: boolean;
-  s3Endpoint: string | null;
-  s3AccessKeyId: string | null;
-  s3SecretAccessKey: string | null;
-  s3Bucket: string | null;
   createdAt: string;
 }
 
@@ -220,13 +222,17 @@ function OrganizationEditDrawer({
       license: organization.license ?? "",
       licenseExpiresAt: toDateInputValue(organization.licenseExpiresAt),
       useCustomElasticsearch: !!organization.useCustomElasticsearch,
-      elasticsearchNodeUrl: organization.elasticsearchNodeUrl ?? "",
-      elasticsearchApiKey: organization.elasticsearchApiKey ?? "",
       useCustomS3: !!organization.useCustomS3,
-      s3Endpoint: organization.s3Endpoint ?? "",
-      s3AccessKeyId: organization.s3AccessKeyId ?? "",
-      s3SecretAccessKey: organization.s3SecretAccessKey ?? "",
-      s3Bucket: organization.s3Bucket ?? "",
+      // Credentials are write-only: the server doesn't echo them back in
+      // list/getOne responses (see ee/admin/safeSelects.ts), so the form
+      // always starts empty. A non-empty value on save is the user typing
+      // a *new* secret; an empty value is left unchanged.
+      elasticsearchNodeUrl: "",
+      elasticsearchApiKey: "",
+      s3Endpoint: "",
+      s3AccessKeyId: "",
+      s3SecretAccessKey: "",
+      s3Bucket: "",
     });
   }, [organization]);
 
@@ -268,27 +274,23 @@ function OrganizationEditDrawer({
     ) {
       data.useCustomElasticsearch = form.useCustomElasticsearch;
     }
-    if (
-      form.elasticsearchNodeUrl !==
-      (organization.elasticsearchNodeUrl ?? "")
-    ) {
-      data.elasticsearchNodeUrl = nullIfEmpty(form.elasticsearchNodeUrl);
-    }
-    if (
-      form.elasticsearchApiKey !== (organization.elasticsearchApiKey ?? "")
-    ) {
-      data.elasticsearchApiKey = nullIfEmpty(form.elasticsearchApiKey);
-    }
     if (form.useCustomS3 !== !!organization.useCustomS3)
       data.useCustomS3 = form.useCustomS3;
-    if (form.s3Endpoint !== (organization.s3Endpoint ?? ""))
-      data.s3Endpoint = nullIfEmpty(form.s3Endpoint);
-    if (form.s3AccessKeyId !== (organization.s3AccessKeyId ?? ""))
-      data.s3AccessKeyId = nullIfEmpty(form.s3AccessKeyId);
-    if (form.s3SecretAccessKey !== (organization.s3SecretAccessKey ?? ""))
-      data.s3SecretAccessKey = nullIfEmpty(form.s3SecretAccessKey);
-    if (form.s3Bucket !== (organization.s3Bucket ?? ""))
-      data.s3Bucket = nullIfEmpty(form.s3Bucket);
+    // Credentials are write-only — the form starts empty and the server
+    // never echoes the stored value. Only forward fields the user typed
+    // into; an empty input is treated as "leave the stored secret alone".
+    if (form.elasticsearchNodeUrl.trim() !== "") {
+      data.elasticsearchNodeUrl = form.elasticsearchNodeUrl;
+    }
+    if (form.elasticsearchApiKey.trim() !== "") {
+      data.elasticsearchApiKey = form.elasticsearchApiKey;
+    }
+    if (form.s3Endpoint.trim() !== "") data.s3Endpoint = form.s3Endpoint;
+    if (form.s3AccessKeyId.trim() !== "")
+      data.s3AccessKeyId = form.s3AccessKeyId;
+    if (form.s3SecretAccessKey.trim() !== "")
+      data.s3SecretAccessKey = form.s3SecretAccessKey;
+    if (form.s3Bucket.trim() !== "") data.s3Bucket = form.s3Bucket;
 
     if (Object.keys(data).length === 0) {
       onClose();
@@ -460,6 +462,10 @@ function OrganizationEditDrawer({
               </Field.Root>
 
               <SectionHeading>Custom Elasticsearch</SectionHeading>
+              <Text fontSize="xs" color="fg.muted">
+                Credentials below are write-only — the server never reads them
+                back. Leave blank to keep the stored value; type to replace.
+              </Text>
               <ToggleRow
                 label="Use custom Elasticsearch"
                 hint="Override the platform-managed ClickHouse/ES cluster for this tenant."
@@ -474,6 +480,7 @@ function OrganizationEditDrawer({
                   onChange={(e) =>
                     setField("elasticsearchNodeUrl", e.target.value)
                   }
+                  placeholder="Leave blank to keep current"
                   disabled={!form.useCustomElasticsearch}
                 />
               </Field.Root>
@@ -485,11 +492,17 @@ function OrganizationEditDrawer({
                   onChange={(e) =>
                     setField("elasticsearchApiKey", e.target.value)
                   }
+                  placeholder="Leave blank to keep current"
                   disabled={!form.useCustomElasticsearch}
+                  autoComplete="new-password"
                 />
               </Field.Root>
 
               <SectionHeading>Custom S3</SectionHeading>
+              <Text fontSize="xs" color="fg.muted">
+                Credentials below are write-only — the server never reads them
+                back. Leave blank to keep the stored value; type to replace.
+              </Text>
               <ToggleRow
                 label="Use custom S3"
                 hint="Store large blobs (datasets, uploads) in the tenant's own bucket."
@@ -502,6 +515,7 @@ function OrganizationEditDrawer({
                   type="url"
                   value={form.s3Endpoint}
                   onChange={(e) => setField("s3Endpoint", e.target.value)}
+                  placeholder="Leave blank to keep current"
                   disabled={!form.useCustomS3}
                 />
               </Field.Root>
@@ -510,6 +524,7 @@ function OrganizationEditDrawer({
                 <Input
                   value={form.s3Bucket}
                   onChange={(e) => setField("s3Bucket", e.target.value)}
+                  placeholder="Leave blank to keep current"
                   disabled={!form.useCustomS3}
                 />
               </Field.Root>
@@ -519,7 +534,9 @@ function OrganizationEditDrawer({
                   type="password"
                   value={form.s3AccessKeyId}
                   onChange={(e) => setField("s3AccessKeyId", e.target.value)}
+                  placeholder="Leave blank to keep current"
                   disabled={!form.useCustomS3}
+                  autoComplete="new-password"
                 />
               </Field.Root>
               <Field.Root>
@@ -530,6 +547,8 @@ function OrganizationEditDrawer({
                   onChange={(e) =>
                     setField("s3SecretAccessKey", e.target.value)
                   }
+                  placeholder="Leave blank to keep current"
+                  autoComplete="new-password"
                   disabled={!form.useCustomS3}
                 />
               </Field.Root>

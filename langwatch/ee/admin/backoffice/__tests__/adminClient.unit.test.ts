@@ -134,6 +134,11 @@ describe("impersonateUser", () => {
     const [url, init] = fetchMock.mock.calls[0]!;
     expect(url).toBe("/api/admin/impersonate");
     expect(init.method).toBe("POST");
+    // Cookie-mode auth: the admin session is carried via a same-site
+    // cookie, so we must explicitly send credentials. Pinning this here
+    // catches a silent regression where a refactor drops the flag and
+    // BetterAuth starts rejecting the impersonation as unauthenticated.
+    expect(init.credentials).toBe("include");
     expect(JSON.parse(init.body as string)).toEqual({
       userIdToImpersonate: "user_xyz",
       reason: "Investigating a stuck trace reported by support",
