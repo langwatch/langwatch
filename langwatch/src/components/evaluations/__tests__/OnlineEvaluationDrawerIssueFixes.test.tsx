@@ -94,11 +94,12 @@ describe.skip("OnlineEvaluationDrawer Issue Fixes", () => {
     user: ReturnType<typeof userEvent.setup>,
     level: "trace" | "thread" = "trace",
   ) => {
-    const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+    const levelName = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
-      expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
     });
-    await user.click(screen.getByLabelText(levelLabel));
+    const radio = screen.getByRole("radio", { name: levelName });
+    await user.click(radio.closest("label") ?? radio);
     await vi.advanceTimersByTimeAsync(50);
   };
 
@@ -662,8 +663,8 @@ describe.skip("OnlineEvaluationDrawer Issue Fixes", () => {
       );
 
       // Switch to thread level - should NOT auto-open editor anymore
-      const threadRadio = screen.getByLabelText(/thread level/i);
-      await user.click(threadRadio);
+      const threadRadio = screen.getByRole("radio", { name: /thread level/i });
+      await user.click(threadRadio.closest("label") ?? threadRadio);
 
       await vi.advanceTimersByTimeAsync(200);
 

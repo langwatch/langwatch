@@ -80,11 +80,12 @@ describe.skip("OnlineEvaluationDrawer + EvaluatorEditorDrawer Mapping Integratio
     user: ReturnType<typeof userEvent.setup>,
     level: "trace" | "thread" = "trace",
   ) => {
-    const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+    const levelName = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
-      expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
     });
-    await user.click(screen.getByLabelText(levelLabel));
+    const radio = screen.getByRole("radio", { name: levelName });
+    await user.click(radio.closest("label") ?? radio);
     await vi.advanceTimersByTimeAsync(50);
   };
 
