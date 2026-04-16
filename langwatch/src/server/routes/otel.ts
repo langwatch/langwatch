@@ -98,14 +98,7 @@ async function authenticateAndCheckLimit(c: {
     return { error: "Invalid auth token.", status: 401 as const };
   }
 
-  const project = await prisma.project.findUnique({
-    where: { id: resolved.project.id },
-    include: { team: true },
-  });
-
-  if (!resolved) {
-    return { error: "Invalid auth token.", status: 401 as const };
-  }
+  const project = resolved.project;
 
   // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
   // access on OTLP ingestion — same semantics as the collector path.

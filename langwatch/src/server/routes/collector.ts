@@ -94,14 +94,7 @@ app.post(
       return c.json({ message: "Invalid auth token." }, 401);
     }
 
-    const project = await prisma.project.findUnique({
-      where: { id: resolved.project.id },
-      include: { team: true },
-    });
-
-    if (!project) {
-      return c.json({ message: "Invalid auth token." }, 401);
-    }
+    const project = resolved.project;
 
     logger.info(
       { projectId: project.id },

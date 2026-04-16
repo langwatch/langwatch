@@ -94,10 +94,12 @@ export const personalAccessTokenRouter = createTRPCRouter({
               ? ({ type: "team" as const, id: binding.scopeId })
               : await (async () => {
                   const project = await ctx.prisma.project.findUnique({
-                    where: { id: binding.scopeId },
+                    where: { id: binding.scopeId, archivedAt: null },
                     include: { team: { select: { id: true, organizationId: true } } },
                   });
-                  if (!project) throw new Error(`Project ${binding.scopeId} not found`);
+                  if (!project) {
+                    throw new Error(`Project ${binding.scopeId} not found or archived`);
+                  }
                   if (project.team.organizationId !== input.organizationId) {
                     throw new Error(`Project ${binding.scopeId} does not belong to this organization`);
                   }
