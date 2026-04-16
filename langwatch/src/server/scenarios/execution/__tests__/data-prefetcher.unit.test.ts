@@ -675,5 +675,131 @@ describe("prefetchScenarioData", () => {
       });
     });
 
+    describe("when the DSL has a blank-template signature node with an undefined llm parameter value", () => {
+      // Regression test for issue #3160:
+      // Fresh workflow agents store value: undefined for the llm parameter in the
+      // blank template DSL. The scenario execution path must hydrate litellm_params
+      // onto each llm-type parameter before sending the DSL to the NLP service,
+      // otherwise litellm raises AuthenticationError: Incorrect API key provided: dummy.
+      const blankTemplateDsl = {
+        workflow_id: "wf_1",
+        nodes: [
+          {
+            id: "entry",
+            type: "entry",
+            data: {
+              name: "Entry",
+              outputs: [{ identifier: "question", type: "str" }],
+            },
+          },
+          {
+            id: "llm_call",
+            type: "signature",
+            data: {
+              name: "LLM Call",
+              parameters: [
+                {
+                  identifier: "llm",
+                  type: "llm",
+                  // value is undefined — this is the blank-template default
+                  value: undefined,
+                },
+                {
+                  identifier: "instructions",
+                  type: "str",
+                  value: undefined,
+                },
+              ],
+              inputs: [{ identifier: "question", type: "str" }],
+              outputs: [{ identifier: "answer", type: "str" }],
+            },
+          },
+          {
+            id: "end",
+            type: "end",
+            data: {
+              name: "End",
+              inputs: [{ identifier: "output", type: "str" }],
+            },
+          },
+        ],
+        edges: [
+          {
+            id: "e0-1",
+            source: "entry",
+            sourceHandle: "outputs.question",
+            target: "llm_call",
+            targetHandle: "inputs.question",
+          },
+          {
+            id: "e1-2",
+            source: "llm_call",
+            sourceHandle: "outputs.answer",
+            target: "end",
+            targetHandle: "inputs.output",
+          },
+        ],
+      };
+
+      it("hydrates the llm parameter value with litellm_params from the project's model providers", async () => {
+        const hydratedApiKey = "sk-real-project-key-abc123";
+
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue(workflowAgent),
+          },
+          workflowVersionFetcher: {
+            getLatestDsl: vi.fn().mockResolvedValue({
+              workflowId: "wf_1",
+              dsl: blankTemplateDsl,
+            }),
+          },
+          modelParamsProvider: {
+            prepare: vi.fn().mockResolvedValue({
+              success: true as const,
+              params: {
+                model: "openai/gpt-4",
+                api_key: hydratedApiKey,
+              },
+            }),
+          },
+        });
+
+        const result = await prefetchScenarioData(
+          defaultContext,
+          workflowTarget,
+          deps,
+        );
+
+        expect(result.success).toBe(true);
+        if (result.success && result.data.adapterData.type === "workflow") {
+          const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
+          const signatureNode = nodes.find(
+            (n) => (n as { type?: unknown }).type === "signature",
+          ) as Record<string, unknown> | undefined;
+
+          expect(signatureNode).toBeDefined();
+
+          const data = signatureNode?.data as Record<string, unknown> | undefined;
+          const parameters = data?.parameters as Array<Record<string, unknown>> | undefined;
+          const llmParam = parameters?.find(
+            (p) => p.identifier === "llm" && p.type === "llm",
+          );
+
+          expect(llmParam).toBeDefined();
+
+          // The value must be hydrated — not undefined and not using the dummy key
+          const value = llmParam?.value as Record<string, unknown> | undefined;
+          expect(value).toBeDefined();
+          expect(value?.litellm_params).toBeDefined();
+
+          const litellmParams = value?.litellm_params as Record<string, unknown> | undefined;
+          expect(litellmParams?.api_key).toBeDefined();
+          expect(litellmParams?.api_key).not.toBe("dummy");
+          expect(litellmParams?.api_key).toBe(hydratedApiKey);
+        }
+      });
+    });
+
 });
 });
