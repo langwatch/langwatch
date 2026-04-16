@@ -1,4 +1,4 @@
-import { afterEach, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import {
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
@@ -7,9 +7,16 @@ import type { ClickHouseClient } from "@clickhouse/client";
 /**
  * Integration tests for trace archival.
  *
- * These tests insert trace data directly into ClickHouse, archive it via
- * ALTER TABLE UPDATE mutations, and verify that all query patterns correctly
- * exclude archived traces.
+ * Archival is tracked only on trace_summaries.ArchivedAt (stored_spans has no
+ * archival column — span reads filter via a trace_summaries subquery).
+ *
+ * These tests insert trace_summaries rows directly as fixtures (simulating
+ * what the fold projection would produce), then verify that all production
+ * query patterns correctly exclude archived traces in the pre-merge state.
+ *
+ * We deliberately do NOT call OPTIMIZE TABLE ... FINAL: production queries
+ * must handle two rows per archived trace (one unarchived + one archived)
+ * via dedup subqueries. Running unmerged exercises that code path.
  */
 
 function generateTestId(prefix: string): string {
@@ -45,7 +52,6 @@ describe.skipIf(!hasTestcontainers)(
       await ch.command({ query: `ALTER TABLE trace_summaries ADD COLUMN IF NOT EXISTS ScenarioRoleLatencies Map(String, Float64) DEFAULT map()` });
       await ch.command({ query: `ALTER TABLE trace_summaries ADD COLUMN IF NOT EXISTS ScenarioRoleSpans Map(String, String) DEFAULT map()` });
       await ch.command({ query: `ALTER TABLE trace_summaries ADD COLUMN IF NOT EXISTS SpanCosts Map(String, Float64) DEFAULT map()` });
-      await ch.command({ query: `ALTER TABLE stored_spans ADD COLUMN IF NOT EXISTS ArchivedAt Nullable(DateTime64(3))` });
 
       // Insert two trace summaries: one active, one to be archived
       const baseSummary = {
@@ -92,44 +98,6 @@ describe.skipIf(!hasTestcontainers)(
         format: "JSONEachRow",
       });
 
-      // Insert stored_spans for both traces
-      await ch.insert({
-        table: "stored_spans",
-        values: [
-          {
-            TenantId: tenantId,
-            TraceId: activeTraceId,
-            SpanId: generateTestId("span"),
-            Sampled: 1,
-            StartTime: fiveMinAgo,
-            EndTime: now,
-            DurationMs: 100,
-            SpanName: "active-span",
-            SpanKind: 1,
-            ResourceAttributes: {},
-            SpanAttributes: { "langwatch.span.type": "llm" },
-            StatusCode: 1,
-            ScopeName: "test",
-          },
-          {
-            TenantId: tenantId,
-            TraceId: archivedTraceId,
-            SpanId: generateTestId("span"),
-            Sampled: 1,
-            StartTime: fiveMinAgo,
-            EndTime: now,
-            DurationMs: 200,
-            SpanName: "archived-span",
-            SpanKind: 1,
-            ResourceAttributes: {},
-            SpanAttributes: { "langwatch.span.type": "llm" },
-            StatusCode: 1,
-            ScopeName: "test",
-          },
-        ],
-        format: "JSONEachRow",
-      });
-
       // Wait for ClickHouse to flush async inserts and verify data landed
       await new Promise((resolve) => setTimeout(resolve, 1000));
 
@@ -144,7 +112,9 @@ describe.skipIf(!hasTestcontainers)(
         throw new Error(`Expected 2 traces, got ${verifyRows[0]?.cnt}. Data may not have flushed yet.`);
       }
 
-      // Archive one trace: insert a new row with ArchivedAt set and a newer UpdatedAt
+      // Archive one trace by inserting a new row with ArchivedAt set and a
+      // newer UpdatedAt. This mirrors what the trace_summaries fold projection
+      // writes in response to a TraceArchivedEvent.
       const archiveNow = new Date();
       await ch.insert({
         table: "trace_summaries",
@@ -163,27 +133,7 @@ describe.skipIf(!hasTestcontainers)(
         format: "JSONEachRow",
       });
 
-      await ch.command({
-        query: `
-          ALTER TABLE stored_spans
-          UPDATE ArchivedAt = now64(3)
-          WHERE TenantId = '${tenantId}'
-            AND TraceId = '${archivedTraceId}'
-            AND ArchivedAt IS NULL
-        `,
-      });
-
-      // Wait for stored_spans mutations to complete.
-      // IMPORTANT: we deliberately do NOT call OPTIMIZE TABLE ... FINAL here.
-      // Production queries must handle the pre-merge state (two rows per archived
-      // trace, one unarchived + one archived) by using dedup subqueries that pick
-      // the latest row via max(UpdatedAt). These tests run in the unmerged state
-      // so they exercise that code path.
-      await waitForMutations(ch, "stored_spans");
-    });
-
-    afterEach(async () => {
-      // Individual test cleanup not needed — data is tenant-scoped
+      await new Promise((resolve) => setTimeout(resolve, 500));
     });
 
     it("excludes archived traces from count queries (dedup, unmerged data)", async () => {
@@ -294,26 +244,6 @@ describe.skipIf(!hasTestcontainers)(
       const rows = await result.json<{ TopicId: string; cnt: string }>();
       // Only 1 trace should be counted (the active one) even in pre-merge state
       expect(Number(rows[0]?.cnt)).toBe(1);
-    });
-
-    it("excludes archived spans from stored_spans queries", async () => {
-      const result = await ch.query({
-        query: `
-          SELECT SpanName, TraceId
-          FROM stored_spans
-          WHERE TenantId = {tenantId:String}
-            AND ArchivedAt IS NULL
-        `,
-        query_params: { tenantId },
-        format: "JSONEachRow",
-      });
-      const rows = await result.json<{ SpanName: string; TraceId: string }>();
-      const spanNames = rows.map((r) => r.SpanName);
-      const traceIds = rows.map((r) => r.TraceId);
-
-      expect(spanNames).toContain("active-span");
-      expect(spanNames).not.toContain("archived-span");
-      expect(traceIds).not.toContain(archivedTraceId);
     });
 
     it("archived trace data still exists (soft delete)", async () => {
@@ -533,33 +463,4 @@ function makeMinimalSummary(
     SpanCosts: {},
     ArchivedAt: null,
   };
-}
-
-async function waitForMutations(
-  ch: ClickHouseClient,
-  table: string,
-  timeoutMs = 30000,
-): Promise<void> {
-  // Scope polling to the specific table under test so an unrelated suite
-  // running against a shared ClickHouse container cannot block or timeout us.
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    const result = await ch.query({
-      query: `
-        SELECT count() AS pending
-        FROM system.mutations
-        WHERE is_done = 0
-          AND database = currentDatabase()
-          AND table = {table:String}
-      `,
-      query_params: { table },
-      format: "JSONEachRow",
-    });
-    const rows = await result.json<{ pending: string }>();
-    if (Number(rows[0]?.pending ?? 0) === 0) return;
-    await new Promise((resolve) => setTimeout(resolve, 200));
-  }
-  throw new Error(
-    `Timeout waiting for ClickHouse mutations on ${table} to complete`,
-  );
 }

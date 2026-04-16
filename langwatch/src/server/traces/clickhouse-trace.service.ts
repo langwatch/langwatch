@@ -860,13 +860,21 @@ export class ClickHouseTraceService {
                 StatusMessage
               FROM stored_spans
               WHERE TenantId = {tenantId:String}
-                AND ArchivedAt IS NULL
                 AND TraceId = (
                   SELECT TraceId FROM stored_spans
                   WHERE TenantId = {tenantId:String}
                     AND SpanId = {spanId:String}
-                    AND ArchivedAt IS NULL
                   LIMIT 1
+                )
+                -- Exclude archived traces. ArchivedAt lives only on
+                -- trace_summaries (spans inherit archival from their trace);
+                -- argMax over unfiltered rows resolves the latest version.
+                AND TraceId IN (
+                  SELECT TraceId
+                  FROM trace_summaries
+                  WHERE TenantId = {tenantId:String}
+                  GROUP BY TraceId
+                  HAVING argMax(ArchivedAt, UpdatedAt) IS NULL
                 )
               LIMIT 1000
             `,
@@ -1145,10 +1153,21 @@ export class ClickHouseTraceService {
               SELECT DISTINCT SpanName
               FROM stored_spans
               WHERE TenantId = {tenantId:String}
-                AND ArchivedAt IS NULL
                 AND StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
                 AND SpanName != ''
+                -- Exclude span names belonging only to archived traces.
+                -- ArchivedAt lives on trace_summaries; argMax over unfiltered
+                -- rows resolves the latest version per trace.
+                AND TraceId IN (
+                  SELECT TraceId
+                  FROM trace_summaries
+                  WHERE TenantId = {tenantId:String}
+                    AND CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                    AND CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                  GROUP BY TraceId
+                  HAVING argMax(ArchivedAt, UpdatedAt) IS NULL
+                )
               ORDER BY SpanName ASC
               LIMIT 1000
             `,
@@ -1209,107 +1228,6 @@ export class ClickHouseTraceService {
           );
           throw new Error("Failed to fetch distinct field names");
         }
-      },
-    );
-  }
-
-  /**
-   * Archive traces by setting ArchivedAt on trace_summaries and stored_spans.
-   *
-   * Inserts new rows with ArchivedAt set; the ReplacingMergeTree engine
-   * ensures the archived version eventually replaces the original. Read
-   * queries filter with `ArchivedAt IS NULL` for immediate exclusion.
-   *
-   * @returns The number of traces archived
-   */
-  async archiveTraces(
-    projectId: string,
-    traceIds: string[],
-  ): Promise<number> {
-    return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.archiveTraces",
-      { attributes: { "tenant.id": projectId, "trace.count": traceIds.length } },
-      async () => {
-        const clickHouseClient = await this.resolveClient(projectId);
-        if (!clickHouseClient) {
-          throw new Error("ClickHouse client not available");
-        }
-
-        if (traceIds.length === 0) {
-          return 0;
-        }
-
-        // Insert new rows with ArchivedAt set and a newer UpdatedAt.
-        // ReplacingMergeTree(UpdatedAt) will eventually deduplicate,
-        // keeping only the archived version. Read queries use
-        // `ArchivedAt IS NULL` AND dedup patterns that pick the
-        // latest UpdatedAt, so archived traces are immediately excluded.
-        const [summaryResult] = await Promise.all([
-          clickHouseClient.command({
-            query: `
-              INSERT INTO trace_summaries (
-                ProjectionId, TenantId, TraceId, Version, Attributes,
-                OccurredAt, CreatedAt, UpdatedAt,
-                ComputedIOSchemaVersion, ComputedInput, ComputedOutput,
-                TimeToFirstTokenMs, TimeToLastTokenMs, TotalDurationMs, TokensPerSecond,
-                SpanCount, ContainsErrorStatus, ContainsOKStatus, ErrorMessage, Models,
-                TotalCost, TokensEstimated, TotalPromptTokenCount, TotalCompletionTokenCount,
-                OutputFromRootSpan, OutputSpanEndTimeMs, BlockedByGuardrail,
-                TopicId, SubTopicId, HasAnnotation,
-                AnnotationIds, ScenarioRoleCosts, ScenarioRoleLatencies, ScenarioRoleSpans, SpanCosts,
-                LastEventOccurredAt, ArchivedAt
-              )
-              SELECT
-                ProjectionId, TenantId, TraceId, Version, Attributes,
-                OccurredAt, CreatedAt, now64(3) AS UpdatedAt,
-                ComputedIOSchemaVersion, ComputedInput, ComputedOutput,
-                TimeToFirstTokenMs, TimeToLastTokenMs, TotalDurationMs, TokensPerSecond,
-                SpanCount, ContainsErrorStatus, ContainsOKStatus, ErrorMessage, Models,
-                TotalCost, TokensEstimated, TotalPromptTokenCount, TotalCompletionTokenCount,
-                OutputFromRootSpan, OutputSpanEndTimeMs, BlockedByGuardrail,
-                TopicId, SubTopicId, HasAnnotation,
-                AnnotationIds, ScenarioRoleCosts, ScenarioRoleLatencies, ScenarioRoleSpans, SpanCosts,
-                LastEventOccurredAt, now64(3) AS ArchivedAt
-              FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
-                AND TraceId IN ({traceIds:Array(String)})
-                AND ArchivedAt IS NULL
-                AND (TenantId, TraceId, UpdatedAt) IN (
-                  SELECT TenantId, TraceId, max(UpdatedAt)
-                  FROM trace_summaries
-                  WHERE TenantId = {tenantId:String}
-                    AND TraceId IN ({traceIds:Array(String)})
-                  GROUP BY TenantId, TraceId
-                )
-            `,
-            query_params: { tenantId: projectId, traceIds },
-          }),
-          clickHouseClient.command({
-            query: `
-              ALTER TABLE stored_spans
-              UPDATE ArchivedAt = now64(3)
-              WHERE TenantId = {tenantId:String}
-                AND TraceId IN ({traceIds:Array(String)})
-                AND ArchivedAt IS NULL
-            `,
-            query_params: { tenantId: projectId, traceIds },
-          }),
-        ]);
-
-        // Use the trace_summaries INSERT...SELECT written_rows as the archived
-        // count — it reflects how many distinct, previously-unarchived traces
-        // were actually affected. Duplicates in the input, nonexistent IDs,
-        // and already-archived traces are all safely excluded by the SELECT.
-        const writtenRaw = summaryResult.summary?.written_rows;
-        const archivedCount =
-          typeof writtenRaw === "string" ? Number(writtenRaw) : 0;
-
-        this.logger.info(
-          { projectId, requestedCount: traceIds.length, archivedCount },
-          "Archived traces in ClickHouse",
-        );
-
-        return Number.isFinite(archivedCount) ? archivedCount : 0;
       },
     );
   }
@@ -1738,8 +1656,10 @@ export class ClickHouseTraceService {
           \`Links.Attributes\` AS Links_Attributes
         FROM stored_spans AS t
         WHERE t.TenantId = {tenantId:String}
-          AND t.ArchivedAt IS NULL
           AND t.TraceId IN ({traceIds:Array(String)})
+          -- Archival is a trace-level fact held on trace_summaries; the caller
+          -- filters archived traces upstream so the TraceId list here is
+          -- already archive-clean.
           AND (t.TenantId, t.TraceId, t.SpanId, t.StartTime) IN (
             SELECT TenantId, TraceId, SpanId, max(StartTime)
             FROM stored_spans

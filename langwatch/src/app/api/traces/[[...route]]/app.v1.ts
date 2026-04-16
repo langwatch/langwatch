@@ -9,6 +9,7 @@ import type { Span, Trace } from "~/server/tracer/types";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { generateAsciiTree, formatTraceSummaryDigest } from "~/server/traces/trace-formatting";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
+import { getApp } from "~/server/app-layer/app";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
@@ -163,16 +164,16 @@ app.post(
   "/archive",
   describeRoute({
     description:
-      "Archive one or more traces by ID. Archived traces are excluded from all query results but the data is not deleted.",
+      "Archive one or more traces by ID. Dispatches an archiveTrace command per trace through the event-sourcing pipeline; the trace_summaries fold projection stamps ArchivedAt. Archived traces are excluded from query results but the underlying data is not deleted.",
     responses: {
       ...baseResponses,
-      200: {
-        description: "Traces archived successfully",
+      202: {
+        description: "Archive commands dispatched",
         content: {
           "application/json": {
             schema: resolver(
               z.object({
-                archived: z.number(),
+                dispatched: z.number(),
               }),
             ),
           },
@@ -196,13 +197,22 @@ app.post(
 
     logger.info(
       { projectId: project.id, traceCount: traceIds.length },
-      "Archiving traces",
+      "Dispatching archiveTrace commands",
     );
 
-    const traceService = TraceService.create(prisma);
-    const archived = await traceService.archiveTraces(project.id, traceIds);
+    const app = getApp();
+    const occurredAt = Date.now();
+    await Promise.all(
+      traceIds.map((traceId) =>
+        app.traces.archiveTrace({
+          tenantId: project.id,
+          traceId,
+          occurredAt,
+        }),
+      ),
+    );
 
-    return c.json({ archived });
+    return c.json({ dispatched: traceIds.length }, 202);
   },
 );
 
@@ -210,7 +220,8 @@ app.post(
 app.post(
   "/:traceId/archive",
   describeRoute({
-    description: "Archive a single trace by ID",
+    description:
+      "Archive a single trace by ID. Dispatches an archiveTrace command through the event-sourcing pipeline.",
     parameters: [
       {
         name: "traceId",
@@ -222,13 +233,13 @@ app.post(
     ],
     responses: {
       ...baseResponses,
-      200: {
-        description: "Trace archived successfully",
+      202: {
+        description: "Archive command dispatched",
         content: {
           "application/json": {
             schema: resolver(
               z.object({
-                archived: z.number(),
+                dispatched: z.number(),
               }),
             ),
           },
@@ -242,13 +253,17 @@ app.post(
 
     logger.info(
       { projectId: project.id, traceId },
-      "Archiving trace",
+      "Dispatching archiveTrace command",
     );
 
-    const traceService = TraceService.create(prisma);
-    const archived = await traceService.archiveTraces(project.id, [traceId]);
+    const app = getApp();
+    await app.traces.archiveTrace({
+      tenantId: project.id,
+      traceId,
+      occurredAt: Date.now(),
+    });
 
-    return c.json({ archived });
+    return c.json({ dispatched: 1 }, 202);
   },
 );
 

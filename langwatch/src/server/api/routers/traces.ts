@@ -120,13 +120,23 @@ export const tracesRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("traces:manage"))
-    .mutation(async ({ ctx, input }) => {
-      const traceService = TraceService.create(ctx.prisma);
-      const archived = await traceService.archiveTraces(
-        input.projectId,
-        input.traceIds,
+    .mutation(async ({ input }) => {
+      // Dispatch one archiveTrace command per trace through the event-sourcing
+      // pipeline. The trace_summaries fold projection handles the CH write via
+      // handleTraceTraceArchived. NEVER write archival state directly to CH —
+      // see CLAUDE.md "Direct ClickHouse writes on event-sourced aggregates".
+      const app = getApp();
+      const occurredAt = Date.now();
+      await Promise.all(
+        input.traceIds.map((traceId) =>
+          app.traces.archiveTrace({
+            tenantId: input.projectId,
+            traceId,
+            occurredAt,
+          }),
+        ),
       );
-      return { archived };
+      return { dispatched: input.traceIds.length };
     }),
 
   getTopicCounts: protectedProcedure

@@ -293,8 +293,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             \`Links.Attributes\` AS Links_Attributes
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
-            AND ArchivedAt IS NULL
             AND TraceId = {traceId:String}
+            -- Archival is trace-level state on trace_summaries (stored_spans
+            -- has no ArchivedAt column). Callers must archive-filter at the
+            -- trace layer before fetching spans by traceId.
             AND (TenantId, TraceId, SpanId, StartTime) IN (
               SELECT TenantId, TraceId, SpanId, max(StartTime)
               FROM ${TABLE_NAME}
@@ -407,8 +409,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             event_attrs AS attributes
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
-            AND ArchivedAt IS NULL
             AND TraceId = {traceId:String}
+            -- Archival is trace-level state on trace_summaries (stored_spans
+            -- has no ArchivedAt column). Callers must archive-filter at the
+            -- trace layer before fetching spans by traceId.
             AND (TenantId, TraceId, SpanId, StartTime) IN (
               SELECT TenantId, TraceId, SpanId, max(StartTime)
               FROM ${TABLE_NAME}

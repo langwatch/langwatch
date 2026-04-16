@@ -196,27 +196,6 @@ export class TraceService {
   }
 
   /**
-   * Archive traces (soft delete). Marks them as archived in ClickHouse
-   * so they are excluded from all read queries.
-   *
-   * @param projectId - The project ID
-   * @param traceIds - Array of trace IDs to archive
-   * @returns The number of traces archived
-   */
-  async archiveTraces(
-    projectId: string,
-    traceIds: string[],
-  ): Promise<number> {
-    return this.tracer.withActiveSpan(
-      "TraceService.archiveTraces",
-      { attributes: { "tenant.id": projectId, "trace.count": traceIds.length } },
-      async () => {
-        return this.clickHouseService.archiveTraces(projectId, traceIds);
-      },
-    );
-  }
-
-  /**
    * Get evaluations for multiple traces.
    *
    * @param projectId - The project ID

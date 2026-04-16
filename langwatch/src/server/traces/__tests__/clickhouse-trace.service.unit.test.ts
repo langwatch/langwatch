@@ -5,18 +5,15 @@ import type { GetAllTracesForProjectInput } from "../types";
 // ---------------------------------------------------------------------------
 // Hoisted mocks
 // ---------------------------------------------------------------------------
-const { mockClickHouseQuery, mockClickHouseCommand, mockPrismaFindUnique } =
-  vi.hoisted(() => ({
-    mockClickHouseQuery: vi.fn(),
-    mockClickHouseCommand: vi.fn(),
-    mockPrismaFindUnique: vi.fn(),
-  }));
+const { mockClickHouseQuery, mockPrismaFindUnique } = vi.hoisted(() => ({
+  mockClickHouseQuery: vi.fn(),
+  mockPrismaFindUnique: vi.fn(),
+}));
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
   getClickHouseClientForProject: () =>
     Promise.resolve({
       query: mockClickHouseQuery,
-      command: mockClickHouseCommand,
     }),
 }));
 
@@ -758,88 +755,4 @@ describe("ClickHouseTraceService", () => {
     });
   });
 
-  describe("archiveTraces()", () => {
-    it("returns 0 without issuing a command when traceIds is empty", async () => {
-      const service = new ClickHouseTraceService({
-        project: { findUnique: mockPrismaFindUnique },
-      } as never);
-
-      const archived = await service.archiveTraces("proj_123", []);
-
-      expect(archived).toBe(0);
-      expect(mockClickHouseCommand).not.toHaveBeenCalled();
-    });
-
-    it("returns written_rows from the trace_summaries INSERT result", async () => {
-      mockClickHouseCommand
-        // trace_summaries INSERT...SELECT
-        .mockResolvedValueOnce({ summary: { written_rows: "2" } })
-        // stored_spans ALTER TABLE UPDATE
-        .mockResolvedValueOnce({});
-
-      const service = new ClickHouseTraceService({
-        project: { findUnique: mockPrismaFindUnique },
-      } as never);
-
-      const archived = await service.archiveTraces("proj_123", [
-        "trace-1",
-        "trace-2",
-        "trace-does-not-exist",
-      ]);
-
-      // written_rows is the authoritative affected-row count from the DB,
-      // so duplicates and non-existent IDs are not over-counted.
-      expect(archived).toBe(2);
-      expect(mockClickHouseCommand).toHaveBeenCalledTimes(2);
-    });
-
-    it("returns 0 when the insert summary is missing (defensive fallback)", async () => {
-      mockClickHouseCommand
-        .mockResolvedValueOnce({}) // no summary at all
-        .mockResolvedValueOnce({});
-
-      const service = new ClickHouseTraceService({
-        project: { findUnique: mockPrismaFindUnique },
-      } as never);
-
-      const archived = await service.archiveTraces("proj_123", ["trace-1"]);
-
-      expect(archived).toBe(0);
-    });
-
-    it("issues INSERT...SELECT for trace_summaries and ALTER UPDATE for stored_spans", async () => {
-      mockClickHouseCommand
-        .mockResolvedValueOnce({ summary: { written_rows: "1" } })
-        .mockResolvedValueOnce({});
-
-      const service = new ClickHouseTraceService({
-        project: { findUnique: mockPrismaFindUnique },
-      } as never);
-
-      await service.archiveTraces("proj_123", ["trace-1"]);
-
-      const calls = mockClickHouseCommand.mock.calls;
-      const summariesCall = calls.find((c) =>
-        /INSERT INTO trace_summaries/i.test(c[0].query),
-      );
-      const spansCall = calls.find((c) =>
-        /ALTER TABLE stored_spans/i.test(c[0].query),
-      );
-
-      expect(summariesCall).toBeDefined();
-      expect(spansCall).toBeDefined();
-
-      // Trace_summaries: outer WHERE filters ArchivedAt IS NULL but the inner
-      // max(UpdatedAt) dedup MUST NOT — otherwise older unarchived rows leak.
-      const summariesQuery = summariesCall![0].query as string;
-      const innerSubquery = summariesQuery.match(
-        /SELECT TenantId, TraceId, max\(UpdatedAt\)[\s\S]*?GROUP BY TenantId, TraceId/,
-      );
-      expect(innerSubquery).not.toBeNull();
-      expect(innerSubquery![0]).not.toMatch(/ArchivedAt IS NULL/);
-
-      // stored_spans: guard against re-archiving rows already archived
-      expect(spansCall![0].query).toMatch(/ArchivedAt IS NULL/);
-    });
-  });
 });
