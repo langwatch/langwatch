@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listSuitesCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -66,13 +66,7 @@ export const listSuitesCommand = async (options?: { format?: string }): Promise<
       ),
     );
   } catch (error) {
-    // SuitesApiError.message already starts with "Failed to …" via
-    // formatApiErrorForOperation, so don't double-prefix.
-    const message =
-      error instanceof SuitesApiError
-        ? error.message
-        : `Failed to fetch suites: ${formatApiErrorMessage({ error })}`;
-    spinner.fail(chalk.red(message));
+    failSpinner({ spinner, error, action: "fetch suites" });
     process.exit(1);
   }
 };

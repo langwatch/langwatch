@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listAgentsCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -65,13 +65,7 @@ export const listAgentsCommand = async (options?: { format?: string }): Promise<
       ),
     );
   } catch (error) {
-    // AgentsApiError.message already starts with "Failed to list agents: …"
-    // via formatApiErrorForOperation, so don't double-prefix.
-    const message =
-      error instanceof AgentsApiError
-        ? error.message
-        : `Failed to fetch agents: ${formatApiErrorMessage({ error })}`;
-    spinner.fail(chalk.red(message));
+    failSpinner({ spinner, error, action: "fetch agents" });
     process.exit(1);
   }
 };

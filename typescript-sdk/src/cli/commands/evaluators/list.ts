@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listEvaluatorsCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -70,13 +70,7 @@ export const listEvaluatorsCommand = async (options?: { format?: string }): Prom
       ),
     );
   } catch (error) {
-    // EvaluatorsApiError.message already starts with "Failed to …" via
-    // formatApiErrorForOperation, so don't double-prefix.
-    const message =
-      error instanceof EvaluatorsApiError
-        ? error.message
-        : `Failed to fetch evaluators: ${formatApiErrorMessage({ error })}`;
-    spinner.fail(chalk.red(message));
+    failSpinner({ spinner, error, action: "fetch evaluators" });
     process.exit(1);
   }
 };

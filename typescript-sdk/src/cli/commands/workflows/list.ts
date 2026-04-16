@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/workflows/workflows-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listWorkflowsCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -64,13 +64,7 @@ export const listWorkflowsCommand = async (options?: { format?: string }): Promi
       ),
     );
   } catch (error) {
-    // WorkflowsApiError.message already starts with "Failed to …" via
-    // formatApiErrorForOperation, so don't double-prefix.
-    const message =
-      error instanceof WorkflowsApiError
-        ? error.message
-        : `Failed to fetch workflows: ${formatApiErrorMessage({ error })}`;
-    spinner.fail(chalk.red(message));
+    failSpinner({ spinner, error, action: "fetch workflows" });
     process.exit(1);
   }
 };

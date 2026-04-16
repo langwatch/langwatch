@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/model-providers/model-providers-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listModelProvidersCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -61,13 +61,7 @@ export const listModelProvidersCommand = async (options?: { format?: string }): 
       ),
     );
   } catch (error) {
-    // ModelProvidersApiError.message already starts with "Failed to …" via
-    // formatApiErrorForOperation, so don't double-prefix.
-    const message =
-      error instanceof ModelProvidersApiError
-        ? error.message
-        : `Failed to fetch model providers: ${formatApiErrorMessage({ error })}`;
-    spinner.fail(chalk.red(message));
+    failSpinner({ spinner, error, action: "fetch model providers" });
     process.exit(1);
   }
 };

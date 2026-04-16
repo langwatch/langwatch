@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listDashboardsCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -60,13 +60,7 @@ export const listDashboardsCommand = async (options?: { format?: string }): Prom
       ),
     );
   } catch (error) {
-    // DashboardsApiError.message already starts with "Failed to …" via
-    // formatApiErrorForOperation, so don't double-prefix.
-    const message =
-      error instanceof DashboardsApiError
-        ? error.message
-        : `Failed to fetch dashboards: ${formatApiErrorMessage({ error })}`;
-    spinner.fail(chalk.red(message));
+    failSpinner({ spinner, error, action: "fetch dashboards" });
     process.exit(1);
   }
 };

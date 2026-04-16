@@ -6,7 +6,7 @@ import {
 } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listScenariosCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -64,13 +64,7 @@ export const listScenariosCommand = async (options?: { format?: string }): Promi
       ),
     );
   } catch (error) {
-    // ScenariosApiError.message already starts with "Failed to …" via
-    // formatApiErrorForOperation, so don't double-prefix.
-    const message =
-      error instanceof ScenariosApiError
-        ? error.message
-        : `Failed to fetch scenarios: ${formatApiErrorMessage({ error })}`;
-    spinner.fail(chalk.red(message));
+    failSpinner({ spinner, error, action: "fetch scenarios" });
     process.exit(1);
   }
 };
