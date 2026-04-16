@@ -85,8 +85,11 @@ def _poll_run_results(
     expected_items: int,
     timeout: float = 60.0,
     interval: float = 2.0,
+    require_cost: bool = False,
 ) -> dict:
-    """Poll the run results API until every submitted item shows up."""
+    """Poll the run results API until every submitted item shows up. If
+    ``require_cost`` is True, keep polling until every row has a non-null
+    ``cost`` — the fold pipeline populates this a few seconds after ingest."""
     url = (
         f"{endpoint}/api/evaluations/v3/runs/{urllib.parse.quote(run_id)}/results"
         f"?experimentSlug={urllib.parse.quote(experiment_slug)}"
@@ -100,8 +103,10 @@ def _poll_run_results(
                 response = client.get(url, headers={"X-Auth-Token": api_key})
             if response.is_success:
                 last_body = response.json()
-                if len(last_body.get("dataset", [])) >= expected_items:
-                    return last_body
+                rows = last_body.get("dataset", [])
+                if len(rows) >= expected_items:
+                    if not require_cost or all(row.get("cost") for row in rows):
+                        return last_body
         except Exception as exc:
             # Tolerate transient polling errors but surface the latest one if
             # the deadline expires.
@@ -110,6 +115,7 @@ def _poll_run_results(
     raise AssertionError(
         f"Timed out after {timeout}s waiting for {expected_items} items "
         f"(saw {len(last_body.get('dataset', []))}) at {url}"
+        + ("; costs required" if require_cost else "")
         + (f"; last error: {last_error!r}" if last_error else "")
     )
 
@@ -125,13 +131,20 @@ class TestAsyncLoopAgainstLiveBackend:
         experiment = Experiment("e2e-async-loop")
         items = list(range(5))
 
-        # A lightweight async task. The regression guard is "no loop-affinity
-        # error raised" — any shared asyncio primitive here would have failed
-        # on the threading path.
+        # A lightweight async task. Regression guards:
+        #   - "no loop-affinity error raised" — any shared asyncio primitive
+        #     here would have failed on the threading path.
+        #   - cost rollup > 0 — fake LLM span metrics, validates that async
+        #     path feeds the platform's cost-fold pipeline end-to-end.
         gate = asyncio.Event()
 
         async def task(item: int) -> None:
             await gate.wait()
+            langwatch.get_current_span().update(
+                type="llm",
+                model="openai/gpt-5-mini",
+                metrics={"prompt_tokens": 40, "completion_tokens": 25},
+            )
             await asyncio.sleep(0.01)
 
         async def drive():
@@ -150,15 +163,79 @@ class TestAsyncLoopAgainstLiveBackend:
             experiment_slug=experiment.experiment_slug,
             run_id=experiment.run_id,
             expected_items=len(items),
+            require_cost=True,
         )
 
-        trace_ids = [row.get("traceId") for row in body["dataset"]]
+        dataset = body["dataset"]
+        trace_ids = [row.get("traceId") for row in dataset]
         assert len(trace_ids) == len(items)
         assert len(set(trace_ids)) == len(items), (
             f"Expected {len(items)} distinct trace IDs, got: {trace_ids}"
         )
         for tid in trace_ids:
             assert tid, f"Empty trace_id in platform response: {body}"
+
+        costs = [row.get("cost") for row in dataset]
+        assert all(c and c > 0 for c in costs), (
+            f"Expected every async-path row to have cost > 0 after fold; got {costs}"
+        )
+
+    @pytest.mark.asyncio
+    async def test_async_loop_with_target_folds_cost_per_target(self):
+        """async aloop + with_target: every target row must come out of the
+        fold with its own trace and its own positive cost, so the per-model
+        comparison view shows real numbers."""
+        import langwatch
+        from langwatch.experiment.experiment import Experiment
+
+        experiment = Experiment("e2e-async-multi-target")
+        items = list(range(4))
+        targets = [
+            ("gpt-5-mini", {"model": "openai/gpt-5-mini"}),
+            ("gpt-4o-mini", {"model": "openai/gpt-4o-mini"}),
+        ]
+
+        async def task(item: int) -> None:
+            for target_name, cfg in targets:
+                with experiment.target(target_name, cfg):
+                    langwatch.get_current_span().update(
+                        type="llm",
+                        model=cfg["model"],
+                        metrics={"prompt_tokens": 30, "completion_tokens": 20},
+                    )
+                    await asyncio.sleep(0.005)
+                    experiment.log_response(f"{target_name} -> {item}")
+                    experiment.log("quality", index=item, score=0.9)
+
+        async for item in experiment.aloop(items, concurrency=3):
+            experiment.asubmit(task, item)
+
+        expected_rows = len(items) * len(targets)
+        body = _poll_run_results(
+            endpoint=langwatch.get_endpoint(),
+            api_key=langwatch.get_api_key() or "",
+            experiment_slug=experiment.experiment_slug,
+            run_id=experiment.run_id,
+            expected_items=expected_rows,
+            require_cost=True,
+        )
+
+        dataset = body["dataset"]
+        trace_ids = [row["traceId"] for row in dataset]
+        assert len(set(trace_ids)) == expected_rows, (
+            f"Each with_target row must have its own trace; got {trace_ids}"
+        )
+        by_target: dict[str, list[float]] = {}
+        for row in dataset:
+            by_target.setdefault(row["targetId"], []).append(row["cost"])
+        assert set(by_target.keys()) == {"gpt-5-mini", "gpt-4o-mini"}
+        for target_name, costs in by_target.items():
+            assert len(costs) == len(items), (
+                f"{target_name} expected {len(items)} rows, got {len(costs)}"
+            )
+            assert all(c and c > 0 for c in costs), (
+                f"{target_name}: expected every cost > 0, got {costs}"
+            )
 
 
 @pytest.mark.skipif(not _has_adk(), reason="google-adk is not installed")
