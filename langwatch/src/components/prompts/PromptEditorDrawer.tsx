@@ -46,6 +46,7 @@ import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
+import { localConfigToFormValues } from "./utils/localConfigToFormValues";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
@@ -294,19 +295,12 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     return undefined;
   }, [promptQuery.data]);
 
-  // ============================================================================
-  // CONFIG VALUES STATE - Single Source of Truth for Form Initialization
-  // ============================================================================
-  //
-  // configValues: The baseline config that the form uses. Updated on:
-  //   1. Initialization (when drawer opens)
-  //   2. After save (with fresh server data)
-  //
-  // isFormInitialized: Tracks whether we've done the initial setup for this
-  //   drawer session. Prevents re-initialization when deps change.
-  //
+  // Seed configValues from initialLocalConfig so the form watch subscription's
+  // first synchronous fire carries the caller's edits, not defaults. Without
+  // this seed, the subscription fires on defaults before the init useEffect
+  // runs and clobbers the caller's local edits (#3155).
   const [configValues, setConfigValues] = useState<PromptConfigFormValues>(
-    buildDefaultFormValues,
+    () => localConfigToFormValues(props.initialLocalConfig),
   );
   const [isFormInitialized, setIsFormInitialized] = useState(false);
   // Ref set directly in init/reset effects so the watch subscription
