@@ -1292,7 +1292,7 @@ model RoleBinding {
     groupId        String?
     group          Group?               @relation("GroupBindings", fields: [groupId], references: [id], onDelete: Cascade)
     patId          String?
-    pat            PersonalAccessToken? @relation(fields: [patId], references: [id], onDelete: Cascade)
+    pat            PersonalAccessToken? @relation(fields: [patId], references: [id], onDelete: Restrict)
 
     // Role — built-in named role or custom
     role           TeamUserRole
@@ -1322,9 +1322,9 @@ model PersonalAccessToken {
     lookupId       String        @unique
     hashedSecret   String
     userId         String
-    user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+    user           User          @relation(fields: [userId], references: [id], onDelete: Restrict)
     organizationId String
-    organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
     roleBindings   RoleBinding[]
     expiresAt      DateTime?
     lastUsedAt     DateTime?

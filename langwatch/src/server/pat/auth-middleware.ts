@@ -2,9 +2,12 @@ import type { Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import { TokenResolver, type ResolvedToken } from "./token-resolver";
 import { prisma } from "~/server/db";
+import type { Permission } from "~/server/api/rbac";
+import { resolvePatPermission } from "~/server/rbac/role-binding-resolver";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:unified-auth");
+const permissionLogger = createLogger("langwatch:api:pat-ceiling");
 
 /**
  * Variables set by the unified auth middleware, extending the existing
@@ -160,3 +163,82 @@ export function createUnifiedAuthMiddleware(): MiddlewareHandler {
 
 // Re-export for backwards compatibility with existing auth middleware consumers
 export { extractCredentials };
+
+/**
+ * Enforces the PAT permission ceiling for an already-resolved token.
+ *
+ * Legacy tokens are granted full access (current behavior — project API keys
+ * bypass RBAC). PAT tokens must satisfy `effective = PAT ∩ user` at the
+ * project scope for the requested permission.
+ *
+ * Returns `null` when access is granted, or an error descriptor the caller
+ * can surface as a 403. This helper exists so both Hono middleware and
+ * inline route handlers (collector, otel) share one enforcement path.
+ */
+export async function enforcePatCeiling({
+  resolved,
+  permission,
+}: {
+  resolved: ResolvedToken;
+  permission: Permission;
+}): Promise<{ error: string; status: 403 } | null> {
+  if (resolved.type !== "pat") return null;
+
+  const allowed = await resolvePatPermission({
+    prisma,
+    patId: resolved.patId,
+    userId: resolved.userId,
+    organizationId: resolved.organizationId,
+    scope: {
+      type: "project",
+      id: resolved.project.id,
+      teamId: resolved.project.team.id,
+    },
+    permission,
+  });
+
+  if (!allowed) {
+    permissionLogger.warn(
+      {
+        patId: resolved.patId,
+        userId: resolved.userId,
+        projectId: resolved.project.id,
+        permission,
+      },
+      "PAT ceiling check failed",
+    );
+    return {
+      error: `PAT lacks required permission: ${permission}`,
+      status: 403,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Hono middleware that applies the PAT ceiling for a specific permission.
+ * Must be chained AFTER createUnifiedAuthMiddleware — reads `resolvedToken`
+ * from context.
+ */
+export function requirePatPermission(
+  permission: Permission,
+): MiddlewareHandler {
+  return async (c, next) => {
+    const resolved = c.get("resolvedToken") as ResolvedToken | undefined;
+    if (!resolved) {
+      // No token resolved — auth middleware should have run first.
+      return c.json(
+        { error: "Unauthorized", message: "Authentication required" },
+        401,
+      );
+    }
+
+    const denial = await enforcePatCeiling({ resolved, permission });
+    if (denial) {
+      return c.json({ error: "Forbidden", message: denial.error }, denial.status);
+    }
+
+    await next();
+  };
+}
