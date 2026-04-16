@@ -2,6 +2,8 @@ export { ReplayService, type ReplayLogWriter } from "./replayService";
 export { createReplayRuntime, type ReplayRuntime } from "./replayPreset";
 export type {
   RegisteredFoldProjection,
+  RegisteredMapProjection,
+  ProjectionKind,
   ReplayConfig,
   ReplayResult,
   ReplayCallbacks,

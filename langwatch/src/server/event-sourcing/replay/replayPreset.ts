@@ -1,7 +1,7 @@
 import IORedis from "ioredis";
 import { getApp } from "../../app-layer/app";
 import { ReplayService } from "./replayService";
-import type { RegisteredFoldProjection } from "./types";
+import type { RegisteredFoldProjection, RegisteredMapProjection } from "./types";
 import { TraceSummaryClickHouseRepository } from "../../app-layer/traces/repositories/trace-summary.clickhouse.repository";
 import { TraceSummaryStore } from "../pipelines/trace-processing/projections/traceSummary.store";
 import { EvaluationRunClickHouseRepository } from "../../app-layer/evaluations/repositories/evaluation-run.clickhouse.repository";
@@ -19,8 +19,17 @@ import type { FoldProjectionStore } from "../projections/foldProjection.types";
 export interface ReplayRuntime {
   service: ReplayService;
   projections: RegisteredFoldProjection[];
+  mapProjections: RegisteredMapProjection[];
   close: () => Promise<void>;
 }
+
+/**
+ * Map projection → target ClickHouse table for post-replay `OPTIMIZE TABLE`.
+ * Add entries here as more map projections become replay-able.
+ */
+const MAP_TARGET_TABLE: Record<string, string> = {
+  spanStorage: "stored_spans",
+};
 
 /**
  * Create a replay runtime using the app's tenant-aware ClickHouse resolver.
@@ -52,6 +61,7 @@ export function createReplayRuntime(config: {
 
   const definitions = getApp().eventSourcing?.definitions ?? [];
   const projections: RegisteredFoldProjection[] = [];
+  const mapProjections: RegisteredMapProjection[] = [];
 
   for (const def of definitions) {
     const { name: pipelineName, aggregateType } = def.metadata;
@@ -72,6 +82,20 @@ export function createReplayRuntime(config: {
         pauseKey: `${pipelineName}/projection/${foldDef.name}`,
       });
     }
+
+    for (const [, { definition: mapDef }] of def.mapProjections) {
+      // Map projections use their own AppendStore directly — it writes straight
+      // to ClickHouse with no Redis-cache layer to swap out, unlike folds.
+      mapProjections.push({
+        projectionName: mapDef.name,
+        pipelineName,
+        aggregateType,
+        source: "pipeline",
+        definition: mapDef,
+        pauseKey: `${pipelineName}/projection/${mapDef.name}`,
+        targetTable: MAP_TARGET_TABLE[mapDef.name],
+      });
+    }
   }
 
   const service = new ReplayService({ clickhouseClientResolver: clientResolver, redis });
@@ -79,6 +103,7 @@ export function createReplayRuntime(config: {
   return {
     service,
     projections,
+    mapProjections,
     close: async () => {
       redis.disconnect();
     },
