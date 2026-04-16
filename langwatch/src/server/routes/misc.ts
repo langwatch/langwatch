@@ -319,7 +319,13 @@ app.post(
           captureException(error, {
             extra: { projectId: project.id, param },
           });
-          return c.json({ error: "Internal server error" }, 500);
+          return c.json(
+            {
+              error:
+                error instanceof Error ? error.message : "Internal server error",
+            },
+            500,
+          );
         }
       }
     }
