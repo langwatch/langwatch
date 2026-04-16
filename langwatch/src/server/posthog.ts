@@ -1,5 +1,6 @@
 import { PostHog } from "posthog-node";
 import { createLogger } from "~/utils/logger/server";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { env } from "../env.mjs";
 
 const logger = createLogger("langwatch:posthog:client");
@@ -21,7 +22,10 @@ export function getPostHogInstance(): PostHog | null {
 
 /**
  * Fire-and-forget server-side event tracking.
+ *
  * Silently no-ops when POSTHOG_KEY is not set (self-hosted without PostHog).
+ * Never throws: any internal failure is reported to captureException so a
+ * broken analytics path can't break the caller's mutation/request.
  */
 export function trackServerEvent({
   userId,
@@ -34,16 +38,20 @@ export function trackServerEvent({
   properties?: Record<string, unknown>;
   projectId?: string;
 }) {
-  const posthog = getPostHogInstance();
-  if (!posthog) return;
-  posthog.capture({
-    distinctId: userId,
-    event,
-    properties: {
-      ...properties,
-      ...(projectId ? { projectId } : {}),
-    },
-  });
+  try {
+    const posthog = getPostHogInstance();
+    if (!posthog) return;
+    posthog.capture({
+      distinctId: userId,
+      event,
+      properties: {
+        ...properties,
+        ...(projectId ? { projectId } : {}),
+      },
+    });
+  } catch (error) {
+    captureException(error);
+  }
 }
 
 /**

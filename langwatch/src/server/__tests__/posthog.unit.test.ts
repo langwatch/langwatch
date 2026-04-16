@@ -10,14 +10,19 @@
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const { mockCapture } = vi.hoisted(() => ({
+const { mockCapture, mockCaptureException } = vi.hoisted(() => ({
   mockCapture: vi.fn(),
+  mockCaptureException: vi.fn(),
 }));
 
 vi.mock("posthog-node", () => ({
   PostHog: function () {
     return { capture: mockCapture, shutdown: vi.fn() };
   },
+}));
+
+vi.mock("~/utils/posthogErrorCapture", () => ({
+  captureException: mockCaptureException,
 }));
 
 vi.mock("~/utils/logger/server", () => ({
@@ -112,6 +117,21 @@ describe("trackServerEvent", () => {
         event: "team_member_invited",
         properties: { inviteCount: 3 },
       });
+    });
+  });
+
+  describe("when posthog.capture throws", () => {
+    it("swallows the error and reports it to captureException", () => {
+      const captureError = new Error("posthog internal failure");
+      mockCapture.mockImplementationOnce(() => {
+        throw captureError;
+      });
+
+      expect(() =>
+        trackServerEvent({ userId: "user-123", event: "limit_blocked" })
+      ).not.toThrow();
+
+      expect(mockCaptureException).toHaveBeenCalledWith(captureError);
     });
   });
 });
