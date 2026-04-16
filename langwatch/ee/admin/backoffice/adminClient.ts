@@ -1,7 +1,7 @@
 /**
  * Thin typed wrapper around the Hono `/api/admin/:resource` endpoints.
  *
- * The backend (see `src/server/routes/admin.ts`) is the same
+ * The backend (see `ee/admin/routes/admin.ts`) is the same
  * `ra-data-simple-prisma` handler that used to back the react-admin UI:
  * every call is a POST with `{ resource, method, params }`. We keep using it
  * untouched so all business logic (user deactivate/reactivate side effects,

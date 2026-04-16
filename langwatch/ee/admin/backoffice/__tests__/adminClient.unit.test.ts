@@ -11,7 +11,7 @@ import { adminClient, impersonateUser } from "../adminClient";
 
 /**
  * Pin the request-body shape the admin UI posts to `/api/admin/:resource`.
- * The Hono handler in `src/server/routes/admin.ts` reads these exact fields
+ * The Hono handler in `ee/admin/routes/admin.ts` reads these exact fields
  * (via ra-data-simple-prisma's `defaultHandler` / `getListHandler`), so any
  * drift here silently breaks the list/update/create flows across every
  * Backoffice resource view.

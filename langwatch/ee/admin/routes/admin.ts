@@ -1,9 +1,13 @@
 /**
- * Hono routes for admin endpoints.
+ * Hono routes for the Backoffice admin endpoints.
  *
- * Replaces:
- * - src/pages/api/admin/impersonate.ts
- * - src/pages/api/admin/[resource].ts
+ * Lives under `ee/admin/routes/` so the whole admin surface — routes,
+ * services, client, React views — is consolidated under the `ee/` boundary
+ * instead of leaking admin-only code back into `src/server/routes/`.
+ *
+ * Mounted by `src/server/api-router.ts`. Exposes:
+ *   - POST|DELETE /api/admin/impersonate
+ *   - POST        /api/admin/:resource   (react-admin / ra-data-simple-prisma)
  */
 import {
   defaultHandler,
@@ -12,19 +16,25 @@ import {
   type GetListRequest,
   type GetOneRequest,
 } from "ra-data-simple-prisma";
-import { Prisma, PlanTypes, SubscriptionStatus } from "@prisma/client";
-import type { Organization, Project, Team, User } from "@prisma/client";
+import { PlanTypes, Prisma, SubscriptionStatus } from "@prisma/client";
 import { Hono } from "hono";
 import { auth as betterAuth } from "~/server/better-auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
-import { isAdmin } from "../../../ee/admin/isAdmin";
+import { auditLog } from "~/server/auditLog";
+import { UserService } from "~/server/users/user.service";
+import { DomainError } from "~/server/app-layer/domain-error";
+import { isAdmin } from "../isAdmin";
 import {
   ORGANIZATION_SAFE_SELECT,
   PROJECT_SAFE_SELECT,
-} from "../../../ee/admin/safeSelects";
-import { auditLog } from "~/server/auditLog";
-import { UserService } from "~/server/users/user.service";
+} from "../safeSelects";
+import {
+  USER_BACKOFFICE_INCLUDE,
+  mapUserToBackofficeRow,
+  type UserWithBackofficeIncludes,
+} from "../backoffice/userVisibility";
+import { ImpersonationService } from "../impersonation.service";
 
 export const app = new Hono().basePath("/api");
 
@@ -42,13 +52,15 @@ const ALLOWED_RESOURCES = new Set([
 ]);
 
 // ---------- POST|DELETE /api/admin/impersonate ----------
-app.post("/admin/impersonate", async (c) => {
-  return handleImpersonate(c, "POST");
-});
+//
+// Both verbs share the same admin guard + BetterAuth session lookup, so we
+// route them through a single helper and let the service do the real work.
+// The service throws `DomainError` subclasses for business-rule rejections;
+// the helper below maps those to HTTP status codes, keeping the route
+// thin and leaving the rules in one testable place.
 
-app.delete("/admin/impersonate", async (c) => {
-  return handleImpersonate(c, "DELETE");
-});
+app.post("/admin/impersonate", async (c) => handleImpersonate(c, "POST"));
+app.delete("/admin/impersonate", async (c) => handleImpersonate(c, "DELETE"));
 
 async function handleImpersonate(c: any, method: "POST" | "DELETE") {
   const session = await getServerAuthSession({ req: c.req.raw as any });
@@ -70,77 +82,48 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
   }
   const sessionId = rawBetterAuth.session.id;
 
-  if (method === "POST") {
-    let body: Record<string, any>;
-    try {
-      body = await c.req.json();
-    } catch {
-      return c.json({ message: "Bad request" }, 400);
-    }
+  // Adapt the real `auditLog` (typed with NextApiRequest) to the service's
+  // structural `AuditLogFn`, which keeps Next/Hono types out of the service.
+  const service = ImpersonationService.create(prisma, async (entry) =>
+    auditLog({ ...entry, req: entry.req as any }),
+  );
 
-    const { userIdToImpersonate, reason } = body;
-    if (!userIdToImpersonate || !reason) {
-      return c.json({ message: "Missing required fields" }, 400);
-    }
-
-    const userToImpersonate = await prisma.user.findUnique({
-      where: { id: userIdToImpersonate },
-      select: {
-        id: true,
-        name: true,
-        email: true,
-        image: true,
-        deactivatedAt: true,
-      },
-    });
-
-    if (!userToImpersonate) {
-      return c.json({ message: "User to impersonate not found" }, 404);
-    }
-
-    if (userToImpersonate.deactivatedAt) {
-      return c.json(
-        { message: "Cannot impersonate a deactivated user" },
-        400,
-      );
-    }
-
-    if (isAdmin(userToImpersonate)) {
-      return c.json(
-        { message: "Cannot impersonate another admin" },
-        403,
-      );
-    }
-
-    await auditLog({
-      userId: user.id,
-      action: "admin/impersonate",
-      args: { userIdToImpersonate: userToImpersonate.id, reason },
-      req: c.req.raw as any,
-    });
-
-    await prisma.session.update({
-      where: { id: sessionId },
-      data: {
-        impersonating: {
-          id: userToImpersonate.id,
-          name: userToImpersonate.name,
-          email: userToImpersonate.email,
-          image: userToImpersonate.image,
-          expires: new Date(Date.now() + 1000 * 60 * 60),
-        },
-      },
-    });
-
-    return c.json({ message: "Impersonation started" });
-  } else {
-    await prisma.session.update({
-      where: { id: sessionId },
-      data: { impersonating: Prisma.DbNull },
-    });
-
+  if (method === "DELETE") {
+    await service.stop({ sessionId });
     return c.json({ message: "Impersonation ended" });
   }
+
+  let body: Record<string, any>;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json({ message: "Bad request" }, 400);
+  }
+
+  const { userIdToImpersonate, reason } = body;
+  if (!userIdToImpersonate || !reason) {
+    return c.json({ message: "Missing required fields" }, 400);
+  }
+
+  try {
+    await service.start({
+      sessionId,
+      impersonatorUserId: user.id,
+      userIdToImpersonate,
+      reason,
+      req: c.req.raw,
+    });
+  } catch (err) {
+    // Use `kind`, not `instanceof`, for the discriminant — survives the
+    // bundler duplicating class identities across module boundaries (see
+    // the rule in CLAUDE.md + domain-error.ts's doc comment).
+    if (DomainError.isHandled(err)) {
+      return c.json({ message: err.message }, err.httpStatus as any);
+    }
+    throw err;
+  }
+
+  return c.json({ message: "Impersonation started" });
 }
 
 // ---------- POST /api/admin/:resource ----------
@@ -247,80 +230,15 @@ app.post("/admin/:resource", async (c) => {
               },
             }
           : {}),
-        include: {
-          orgMemberships: {
-            include: {
-              organization: {
-                include: {
-                  teams: {
-                    where: { archivedAt: null },
-                    include: {
-                      projects: { where: { archivedAt: null } },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        map: (
-          users: (User & {
-            orgMemberships: {
-              organization: Organization & {
-                teams: (Team & { projects: Project[] })[];
-              };
-            }[];
-          })[],
-        ) =>
-          users.map((u) => {
-            // Dedupe orgs/projects across memberships so each chip only
-            // appears once in the Backoffice Users list.
-            //
-            // Projects follow the same rule the main app uses for project
-            // visibility (see organization.prisma.repository.ts#getAllForUser):
-            // org membership → org.teams → team.projects. A user gets a
-            // project chip for every non-archived project in every org they
-            // are a member of, regardless of TeamUser — matching exactly
-            // what shows up in their project switcher.
-            const orgMap = new Map<string, { id: string; name: string }>();
-            const projectMap = new Map<
-              string,
-              { id: string; name: string; slug: string }
-            >();
-            for (const om of u.orgMemberships ?? []) {
-              if (!orgMap.has(om.organization.id)) {
-                orgMap.set(om.organization.id, {
-                  id: om.organization.id,
-                  name: om.organization.name,
-                });
-              }
-              for (const team of om.organization.teams ?? []) {
-                for (const p of team.projects ?? []) {
-                  if (!projectMap.has(p.id)) {
-                    projectMap.set(p.id, {
-                      id: p.id,
-                      name: p.name,
-                      slug: p.slug,
-                    });
-                  }
-                }
-              }
-            }
-            return {
-              ...u,
-              organizations: Array.from(orgMap.values()),
-              projects: Array.from(projectMap.values()),
-            };
-          }),
+        include: USER_BACKOFFICE_INCLUDE,
+        map: (users: UserWithBackofficeIncludes[]) =>
+          users.map(mapUserToBackofficeRow),
       },
     );
     return c.json(result);
   }
 
-  if (
-    body.resource === "organization" &&
-    body.method === "getList"
-  ) {
+  if (body.resource === "organization" && body.method === "getList") {
     const query = body.params?.filter?.query;
     if (body.params?.filter?.query) delete body.params.filter.query;
 
@@ -347,10 +265,7 @@ app.post("/admin/:resource", async (c) => {
 
   // Single-org detail fetch used by the edit drawer — same safe select as
   // the list, so credentials never reach the admin UI.
-  if (
-    body.resource === "organization" &&
-    body.method === "getOne"
-  ) {
+  if (body.resource === "organization" && body.method === "getOne") {
     const result = await getOneHandler<Prisma.OrganizationFindUniqueArgs>(
       body as GetOneRequest,
       prisma.organization,
@@ -393,10 +308,7 @@ app.post("/admin/:resource", async (c) => {
     return c.json(result);
   }
 
-  if (
-    body.resource === "organizationFeature" &&
-    body.method === "getList"
-  ) {
+  if (body.resource === "organizationFeature" && body.method === "getList") {
     const query = body.params?.filter?.query;
     if (body.params?.filter?.query) delete body.params.filter.query;
 
@@ -533,10 +445,7 @@ app.post("/admin/:resource", async (c) => {
     }
   }
 
-  if (
-    body.resource === "subscription" &&
-    body.method === "getList"
-  ) {
+  if (body.resource === "subscription" && body.method === "getList") {
     const query = body.params?.filter?.query;
     if (body.params?.filter?.query) delete body.params.filter.query;
 
@@ -545,9 +454,7 @@ app.post("/admin/:resource", async (c) => {
       ? Object.values(PlanTypes).find((p) => p === upperQuery)
       : undefined;
     const matchingStatus = upperQuery
-      ? Object.values(SubscriptionStatus).find(
-          (s) => s === upperQuery,
-        )
+      ? Object.values(SubscriptionStatus).find((s) => s === upperQuery)
       : undefined;
 
     const orFilters: Prisma.SubscriptionWhereInput[] = [];
@@ -570,8 +477,7 @@ app.post("/admin/:resource", async (c) => {
           ],
         },
       });
-      if (matchingPlan)
-        orFilters.push({ plan: { equals: matchingPlan } });
+      if (matchingPlan) orFilters.push({ plan: { equals: matchingPlan } });
       if (matchingStatus)
         orFilters.push({ status: { equals: matchingStatus } });
     }
