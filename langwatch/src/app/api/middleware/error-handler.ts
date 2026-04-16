@@ -110,11 +110,11 @@ function determineErrorResponse(
     };
   }
 
-  // Treat unhandled errors as 500. The raw exception message can contain
-  // internal details (schema names, file paths, connection strings), so
-  // only surface it in non-production environments. Actual server logging
-  // happens in the logger middleware — nothing is lost in prod.
-  const isProd = process.env.NODE_ENV === "production";
+  // Treat unhandled errors as 500. Surface the underlying message — only
+  // API-key-holding callers see this, the codebase is public, and Prisma
+  // error messages don't leak credentials. Hiding the message behind a
+  // generic "Internal server error" in prod is exactly the problem this
+  // PR set out to fix.
   const underlying = error.message ?? "";
   const codeSuffix = error.code ? ` (${error.code})` : "";
   const nameSuffix =
@@ -124,7 +124,7 @@ function determineErrorResponse(
     statusCode: 500,
     response: errorSchema.parse({
       error: "Internal server error",
-      message: !isProd && descriptive ? descriptive : "Internal server error",
+      message: descriptive || "Internal server error",
     }),
   };
 }

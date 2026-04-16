@@ -107,7 +107,7 @@ describe("handleError()", () => {
   });
 
   describe("when error has no recognizable shape (fallback 500)", () => {
-    it("includes the underlying error message in non-production environments", async () => {
+    it("includes the underlying error message", async () => {
       const error = Object.assign(new Error("database connection refused"), {
         name: "DatabaseError",
         code: "ECONNREFUSED",
@@ -125,9 +125,12 @@ describe("handleError()", () => {
       expect(body.message).toContain("ECONNREFUSED");
     });
 
-    it("hides exception internals in production", async () => {
-      // Leaking raw error.message in production could expose schema
-      // names, file paths, or credentials. Keep the public shape generic.
+    it("surfaces the underlying message in production too", async () => {
+      // Hiding the message behind a generic string in prod is exactly
+      // the problem this error-handling PR set out to fix — API callers
+      // need a real message to diagnose. Prisma does not leak credentials
+      // via error.message, the codebase is public, and only API-key
+      // holders see these responses.
       const originalEnv = process.env.NODE_ENV;
       process.env.NODE_ENV = "production";
       try {
@@ -145,9 +148,9 @@ describe("handleError()", () => {
         expect(res.status).toBe(500);
         const body = await res.json();
         expect(body.error).toBe("Internal server error");
-        expect(body.message).toBe("Internal server error");
-        expect(body.message).not.toContain("10.0.0.42");
-        expect(body.message).not.toContain("P1001");
+        expect(body.message).toContain("ECONNREFUSED 10.0.0.42:5432");
+        expect(body.message).toContain("P1001");
+        expect(body.message).toContain("PrismaClientInitializationError");
       } finally {
         process.env.NODE_ENV = originalEnv;
       }
