@@ -25,7 +25,7 @@ describe("createEvaluatorEditorCallbacks()", () => {
           settings: { threshold: 0.8 },
         };
 
-        callbacks.onLocalConfigChange(config);
+        callbacks.onLocalConfigChange?.(config);
 
         expect(updateTarget).toHaveBeenCalledWith("target-1", {
           localEvaluatorConfig: config,
@@ -41,7 +41,7 @@ describe("createEvaluatorEditorCallbacks()", () => {
           updateTarget,
         });
 
-        callbacks.onLocalConfigChange(undefined);
+        callbacks.onLocalConfigChange?.(undefined);
 
         expect(updateTarget).toHaveBeenCalledWith("target-1", {
           localEvaluatorConfig: undefined,
@@ -57,11 +57,21 @@ describe("createEvaluatorEditorCallbacks()", () => {
           updateTarget,
         });
 
-        callbacks.onLocalConfigChange({ name: "Test" });
+        callbacks.onLocalConfigChange?.({ name: "Test" });
 
         expect(updateTarget).toHaveBeenCalledWith("eval-target-42", {
           localEvaluatorConfig: { name: "Test" },
         });
+      });
+    });
+
+    describe("when targetId is omitted", () => {
+      it("does not include onLocalConfigChange", () => {
+        const callbacks = createEvaluatorEditorCallbacks({
+          onMappingChange: vi.fn(),
+        });
+
+        expect(callbacks.onLocalConfigChange).toBeUndefined();
       });
     });
   });

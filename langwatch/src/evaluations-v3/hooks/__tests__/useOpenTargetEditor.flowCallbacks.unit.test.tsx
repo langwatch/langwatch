@@ -1,20 +1,14 @@
 /**
  * @vitest-environment jsdom
  *
- * Regression tests for issue #3087: useOpenTargetEditor passes onMappingChange
- * inside mappingsConfig (an ephemeral complexProps object) instead of via
- * setFlowCallbacks (which persists across navigation).
+ * Regression tests for issue #3087: useOpenTargetEditor must register
+ * `onMappingChange` via `setFlowCallbacks("evaluatorEditor")` (durable) rather
+ * than embedding it inside `mappingsConfig` (ephemeral complexProps). When the
+ * callback was nested in `mappingsConfig`, ErrorBoundary recovery / drawer
+ * navigation cleared it and mapping interactions crashed.
  *
- * The bug: when openTargetEditor is called for an evaluator target, it builds a
- * mappingsConfig object that contains onMappingChange and passes the whole object
- * to openDrawer(). The openDrawer() implementation detects mappingsConfig is a
- * non-serializable object and stores it in complexProps. After a page reload,
- * ErrorBoundary recovery, or any other complexProps clearance, onMappingChange
- * is lost and mapping interactions on the drawer crash.
- *
- * The fix: onMappingChange must be registered via setFlowCallbacks("evaluatorEditor")
- * so it survives across navigation, just like onLocalConfigChange already is.
- * The mappingsConfig passed to openDrawer must NOT contain onMappingChange.
+ * These tests mock the drawer store entirely, so they assert hook behavior in
+ * isolation (no real store, no DOM). Treat this file as unit-level.
  */
 
 import { act, renderHook, waitFor } from "@testing-library/react";
@@ -146,9 +140,8 @@ describe("useOpenTargetEditor", () => {
   describe("when opening an evaluator target editor", () => {
     describe("given the evaluator target has a targetEvaluatorId", () => {
       it("registers onMappingChange in flowCallbacks (durable) not in mappingsConfig (ephemeral)", async () => {
-        // The fix requires: onMappingChange goes to setFlowCallbacks("evaluatorEditor")
-        // so it persists after page reload (complexProps reset).
-        // Currently FAILS: onMappingChange is inside mappingsConfig passed to openDrawer.
+        // onMappingChange must be registered via setFlowCallbacks("evaluatorEditor")
+        // so it survives ErrorBoundary remount / drawer navigation.
         const target = createEvaluatorTarget("target-1", "evaluator-1");
         const { result } = renderHook(() => useOpenTargetEditor());
 
@@ -168,9 +161,8 @@ describe("useOpenTargetEditor", () => {
       });
 
       it("calls openDrawer with mappingsConfig that does NOT contain onMappingChange", async () => {
-        // The fix: onMappingChange must NOT be embedded in mappingsConfig
-        // (which ends up in ephemeral complexProps). It must be durable via flowCallbacks.
-        // Currently FAILS: openDrawer is called with mappingsConfig.onMappingChange set.
+        // onMappingChange must be durable via flowCallbacks — embedding it in
+        // mappingsConfig routes it through ephemeral complexProps.
         const target = createEvaluatorTarget("target-1", "evaluator-1");
         const { result } = renderHook(() => useOpenTargetEditor());
 

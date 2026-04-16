@@ -117,8 +117,12 @@ export type EvaluatorEditorDrawerProps = {
   onLocalConfigChange?: (config: LocalEvaluatorConfig | undefined) => void;
   /**
    * Callback for when a variable mapping changes.
-   * Registered via setFlowCallbacks (durable) rather than inside mappingsConfig
-   * (ephemeral complexProps) so it survives page reload / ErrorBoundary recovery.
+   *
+   * This prop exists so `setFlowCallbacks("evaluatorEditor", { onMappingChange })`
+   * is type-safe (the flow callbacks registry derives from drawer props).
+   * Callers must NOT pass it directly — it must go through setFlowCallbacks so
+   * the non-serializable function survives ErrorBoundary remounts and drawer
+   * navigation (it cannot be persisted through the ephemeral complexProps path).
    */
   onMappingChange?: (
     identifier: string,
@@ -156,25 +160,14 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     drawerParams.evaluatorId ??
     (complexProps.evaluatorId as string | undefined);
 
-  // Resolve onMappingChange: prefer top-level prop or flowCallbacks (both durable)
-  // over mappingsConfig.onMappingChange (ephemeral complexProps, lost on reload)
-  const resolvedOnMappingChange =
-    props.onMappingChange ??
-    flowCallbacks?.onMappingChange;
-
-  // Get mappingsConfig from props or complexProps, then inject the resolved callback
-  const rawMappingsConfig =
+  // onMappingChange is registered via setFlowCallbacks because it is a
+  // non-serializable function that must survive drawer lifecycle events
+  // (in-app navigation, ErrorBoundary remount) rather than being embedded
+  // in the ephemeral mappingsConfig/complexProps path.
+  const mappingsConfig =
     props.mappingsConfig ??
     (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
-  const mappingsConfig = rawMappingsConfig
-    ? { ...rawMappingsConfig, onMappingChange: resolvedOnMappingChange }
-    : undefined;
-
-  // Resolve onMappingChange: top-level prop → flowCallbacks → mappingsConfig
-  const onMappingChange =
-    props.onMappingChange ??
-    (flowCallbacks?.onMappingChange as EvaluatorEditorDrawerProps["onMappingChange"]) ??
-    mappingsConfig?.onMappingChange;
+  const onMappingChange = flowCallbacks?.onMappingChange;
 
   // Get custom save button text from props or complexProps
   const saveButtonText =

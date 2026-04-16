@@ -337,9 +337,10 @@ export const useOpenTargetEditor = () => {
           }
         };
 
-        // Set flow callbacks for the evaluator editor using the centralized helper
+        // Set flow callbacks for the evaluator editor using the centralized helper.
         // onMappingChange is registered here (durable) instead of inside mappingsConfig
-        // (ephemeral complexProps) so it survives page reload / ErrorBoundary recovery.
+        // (ephemeral complexProps) so it survives in-app drawer navigation and
+        // ErrorBoundary remounts (not hard browser reloads — those clear all state).
         setFlowCallbacks("evaluatorEditor",
           createEvaluatorEditorCallbacks({
             targetId: target.id,
