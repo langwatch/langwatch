@@ -25,6 +25,8 @@ fi
 # Helpers
 # ---------------------------------------------------------------------------
 
+LAST_STDERR_FILE=""
+
 assert_exit() {
   local expected="$1"
   local actual="$2"
@@ -34,6 +36,11 @@ assert_exit() {
     PASS=$((PASS + 1))
   else
     echo "FAIL: $desc — expected exit $expected, got $actual"
+    if [ -n "$LAST_STDERR_FILE" ] && [ -s "$LAST_STDERR_FILE" ]; then
+      echo "--- stderr ---"
+      cat "$LAST_STDERR_FILE"
+      echo "--- end stderr ---"
+    fi
     FAIL=$((FAIL + 1))
   fi
 }
@@ -52,6 +59,11 @@ assert_exit_nonzero() {
     PASS=$((PASS + 1))
   else
     echo "FAIL: $desc — expected non-zero exit, got 0"
+    if [ -n "$LAST_STDERR_FILE" ] && [ -s "$LAST_STDERR_FILE" ]; then
+      echo "--- stderr ---"
+      cat "$LAST_STDERR_FILE"
+      echo "--- end stderr ---"
+    fi
     FAIL=$((FAIL + 1))
   fi
 }
@@ -169,9 +181,12 @@ teardown_shims() {
 
 run_script() {
   local bin_dir="$1"
+  local stderr_file
+  stderr_file="$(mktemp)"
+  LAST_STDERR_FILE="$stderr_file"
   PATH="$bin_dir:$PATH" \
     CLICKHOUSE_PASSWORD="ci_password" \
-    bash "$SCRIPT" 2>/dev/null
+    bash "$SCRIPT" 2>"$stderr_file"
 }
 
 # ---------------------------------------------------------------------------

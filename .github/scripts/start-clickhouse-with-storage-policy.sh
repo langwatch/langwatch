@@ -56,12 +56,16 @@ docker run -d \
 echo "Waiting for ClickHouse to be ready..."
 READY=0
 for i in $(seq 1 60); do
-  if curl -sf "http://localhost:8123/?user=default&password=${CLICKHOUSE_PASSWORD}" -d "SELECT 1" >/dev/null 2>&1; then
+  set +e
+  curl -sf "http://localhost:8123/?user=default&password=${CLICKHOUSE_PASSWORD}" -d "SELECT 1" >/dev/null 2>&1
+  CURL_EXIT=$?
+  set -e
+  if [ $CURL_EXIT -eq 0 ]; then
     echo "ClickHouse is ready"
     READY=1
     break
   fi
-  echo "Attempt $i: Waiting for ClickHouse..."
+  echo "Attempt $i: Waiting for ClickHouse... (curl exit $CURL_EXIT)"
   sleep 1
 done
 
@@ -78,15 +82,18 @@ fi
 echo "Verifying storage policy..."
 VERIFIED=0
 for i in $(seq 1 30); do
+  set +e
   RESPONSE="$(curl -sf "http://localhost:8123/?user=default&password=${CLICKHOUSE_PASSWORD}" \
     -d "SELECT policy_name, volume_name, disks FROM system.storage_policies WHERE policy_name = 'local_primary'" \
-    2>/dev/null || true)"
-  if printf '%s' "$RESPONSE" | grep -qF "local_primary"; then
+    2>/dev/null)"
+  CURL_EXIT=$?
+  set -e
+  if [ $CURL_EXIT -eq 0 ] && printf '%s' "$RESPONSE" | grep -qE '^local_primary[[:space:]]'; then
     echo "Storage policy 'local_primary' verified"
     VERIFIED=1
     break
   fi
-  echo "Attempt $i: verifying storage policy..."
+  echo "Attempt $i: verifying storage policy... (curl exit $CURL_EXIT)"
   sleep 1
 done
 
