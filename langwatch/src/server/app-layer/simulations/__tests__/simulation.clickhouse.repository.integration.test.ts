@@ -239,8 +239,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
 
   describe("getRunDataForAllSuites()", () => {
     describe("when internal suite runs have metadata", () => {
-      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
-      it.skip("returns runs through the all-suites query", async () => {
+      it("returns runs through the all-suites query", async () => {
         const scenarioSetId = `__internal__allsuites_${nanoid()}__suite`;
         const batchRunId = `batch-allsuites-${nanoid()}`;
 
@@ -265,8 +264,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
 
     describe("when a batch has empty-string ScenarioSetId (legacy data)", () => {
-      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
-      it.skip("normalizes the empty-string to 'default' in the scenarioSetIds map", async () => {
+      it("normalizes the empty-string to 'default' in the scenarioSetIds map", async () => {
         const batchRunId = `batch-legacy-${nanoid()}`;
 
         await insertRow(ch, makeInsertRow({
@@ -287,8 +285,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
 
     describe("when batches have both empty-string and 'default' ScenarioSetId for different batches", () => {
-      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
-      it.skip("collapses both to 'default' and reports a single distinct set", async () => {
+      it("collapses both to 'default' and reports a single distinct set", async () => {
         const batchEmpty = `batch-empty-${nanoid()}`;
         const batchDefault = `batch-default-${nanoid()}`;
 
@@ -312,6 +309,36 @@ describe("SimulationClickHouseRepository (integration)", () => {
         if (!result.changed) throw new Error("expected changed");
         expect(result.scenarioSetIds[batchEmpty]).toBe("default");
         expect(result.scenarioSetIds[batchDefault]).toBe("default");
+      });
+    });
+
+    // Regression for langwatch/langwatch#3265:
+    // The previous outer SELECT aliased `any(IF(ScenarioSetId = '', 'default', ScenarioSetId))
+    // AS ScenarioSetId`. That alias shadowed the `ScenarioSetId` column referenced inside the
+    // dedup IN-tuple in WHERE, and ClickHouse rejected the query with
+    //   "Aggregate function any(...) AS ScenarioSetId is found in WHERE in query."
+    // This test proves the rewritten query (alias renamed to NormalizedSetId) actually
+    // executes against ClickHouse instead of throwing.
+    describe("when the query runs against real ClickHouse", () => {
+      it("does not throw 'Aggregate function ... found in WHERE' (regression for langwatch/langwatch#3265)", async () => {
+        const batchRunId = `batch-regression-3265-${nanoid()}`;
+
+        await insertRow(ch, makeInsertRow({
+          ScenarioRunId: `run-regression-3265-${nanoid()}`,
+          BatchRunId: batchRunId,
+          ScenarioSetId: "",
+        }));
+
+        // The assertion that matters is that this call resolves without throwing.
+        // Before the fix it threw a TRPCClientError wrapping the ClickHouse error.
+        const result = await repo.getRunDataForAllSuites({
+          projectId: tenantId,
+          limit: 20,
+        });
+
+        expect(result.changed).toBe(true);
+        if (!result.changed) throw new Error("expected changed");
+        expect(result.scenarioSetIds[batchRunId]).toBe("default");
       });
     });
   });
