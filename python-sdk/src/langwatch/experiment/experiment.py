@@ -483,7 +483,19 @@ class Experiment:
         All submitted work runs on the caller's event loop, so loop-bound singletons
         (gRPC channels, Firestore clients, ADK InMemoryRunner, etc.) stay usable
         across items. Use together with :meth:`asubmit` to schedule per-item work.
+
+        Cleanup is guaranteed on normal completion and when the caller breaks out
+        of the ``async for`` **and** explicitly calls ``aclose()`` on the generator.
+        Python's ``async for`` does not auto-close iterators on ``break``, so for
+        deterministic cancellation of in-flight ``asubmit`` tasks, hold the
+        generator in a variable and ``await generator.aclose()`` after the
+        early exit. If you iterate to completion the finally block runs on the
+        last ``__anext__`` automatically and no extra call is needed.
         """
+        if concurrency < 1:
+            raise ValueError(
+                f"concurrency must be >= 1, got {concurrency!r}"
+            )
         if not self.initialized:
             # init() does a blocking httpx.post — run it off-loop.
             await asyncio.to_thread(self.init)

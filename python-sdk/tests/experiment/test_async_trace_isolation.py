@@ -273,6 +273,73 @@ class TestAsyncFailureIsolation:
             assert e.error is None
 
 
+@pytest.mark.unit
+class TestAsyncLoopEdgeCases:
+    @pytest.mark.asyncio
+    async def test_empty_iterable_completes_cleanly(self, experiment):
+        """An empty iterable is a no-op but must not leave any state behind."""
+        async for _ in experiment.aloop([], concurrency=4):
+            raise AssertionError("should not yield for an empty iterable")
+
+        assert experiment.batch["dataset"] == []
+        assert experiment._async_tasks == []
+        assert experiment._async_semaphore is None
+        assert experiment._finished is True
+
+    @pytest.mark.asyncio
+    async def test_invalid_concurrency_raises(self, experiment):
+        with pytest.raises(ValueError, match="concurrency must be >= 1"):
+            async for _ in experiment.aloop([1, 2, 3], concurrency=0):
+                pass
+        with pytest.raises(ValueError, match="concurrency must be >= 1"):
+            async for _ in experiment.aloop([1, 2, 3], concurrency=-1):
+                pass
+
+    @pytest.mark.asyncio
+    async def test_asubmit_outside_aloop_raises(self, experiment):
+        async def task(item):
+            return item
+
+        with pytest.raises(RuntimeError, match="aloop"):
+            experiment.asubmit(task, "anything")
+
+    @pytest.mark.asyncio
+    async def test_early_break_with_aclose_cancels_pending_tasks(self, experiment):
+        """Closing the aloop generator drains background work via its finally block.
+
+        Python's `async for` does not automatically call `aclose()` on `break`
+        (the generator stays alive until garbage collected), so callers who
+        break early and need deterministic cleanup should hold the generator
+        in a local variable and `await generator.aclose()` themselves. This
+        test pins that contract.
+        """
+        started = asyncio.Event()
+        cancelled: list[int] = []
+
+        async def slow(item):
+            if item == 0:
+                started.set()
+            try:
+                await asyncio.sleep(5)
+            except asyncio.CancelledError:
+                cancelled.append(item)
+                raise
+
+        gen = experiment.aloop(range(10), concurrency=4)
+        async for item in gen:
+            experiment.asubmit(slow, item)
+            if item == 0:
+                await started.wait()
+                break
+        await gen.aclose()
+
+        # Cleanup ran: state is reset so another aloop could be started.
+        assert experiment._async_tasks == []
+        assert experiment._async_semaphore is None
+        # At least the first task was in-flight and got cancelled.
+        assert 0 in cancelled
+
+
 @pytest.mark.integration
 class TestAsyncHttpPayload:
     """HTTP-mocked integration guard: batch payloads carry unique trace_ids per item."""
