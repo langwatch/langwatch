@@ -22,7 +22,7 @@ import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { TokenResolver } from "~/server/pat/token-resolver";
-import { extractCredentials } from "~/server/pat/auth-middleware";
+import { enforcePatCeiling, extractCredentials } from "~/server/pat/auth-middleware";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 
@@ -96,6 +96,16 @@ async function authenticateAndCheckLimit(c: {
 
   if (!resolved) {
     return { error: "Invalid auth token.", status: 401 as const };
+  }
+
+  // Enforce PAT ceiling (legacy tokens bypass). See collector.ts for the
+  // rationale behind `traces:view` as the v1 primitive.
+  const denial = await enforcePatCeiling({
+    resolved,
+    permission: "traces:view",
+  });
+  if (denial) {
+    return { error: denial.error, status: denial.status };
   }
 
   const project = resolved.project;

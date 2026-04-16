@@ -36,8 +36,14 @@ export class PatRepository {
   }: {
     lookupId: string;
   }): Promise<PatWithBindings | null> {
-    return this.prisma.personalAccessToken.findUnique({
-      where: { lookupId },
+    // Reject PATs whose owning user has been deactivated. We use findFirst
+    // rather than findUnique because Prisma's findUnique does not accept
+    // related filters; lookupId is @unique so the result is still unique.
+    return this.prisma.personalAccessToken.findFirst({
+      where: {
+        lookupId,
+        user: { deactivatedAt: null },
+      },
       include: { roleBindings: true },
     });
   }

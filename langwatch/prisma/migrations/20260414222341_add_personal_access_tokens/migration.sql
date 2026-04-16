@@ -9,6 +9,7 @@ CREATE TABLE "PersonalAccessToken" (
     "hashedSecret" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3),
     "lastUsedAt" TIMESTAMP(3),
     "revokedAt" TIMESTAMP(3),
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -31,3 +32,4 @@ CREATE INDEX "PersonalAccessToken_lookupId_idx" ON "PersonalAccessToken"("lookup
 
 -- CreateIndex
 CREATE INDEX "RoleBinding_patId_idx" ON "RoleBinding"("patId");
+
