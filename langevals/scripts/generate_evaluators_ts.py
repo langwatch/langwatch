@@ -350,7 +350,10 @@ def generate_typescript_definitions(evaluators_info: Dict[str, Dict[str, Any]]) 
     for evaluator_name, evaluator_info in evaluators_info.items():
         zod_fields = evaluator_info.get("settingsZodFields", {})
         if len(zod_fields) == 0:
-            settings_zod = "z.object({})"
+            # Strict so unknown keys are rejected (matches typed evaluators).
+            # Currently no evaluator hits this branch, but this prevents silent
+            # key-stripping if one is added later.
+            settings_zod = "z.object({}).strict()"
         else:
             inner = stringify_zod_fields(zod_fields)
             settings_zod = f"z.object({{{inner}}})"
