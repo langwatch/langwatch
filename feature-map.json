@@ -48,7 +48,10 @@
           "description": "Query timeseries analytics — costs, latency, token usage, error rates",
           "surfaces": {
             "code": {
-              "sdk": null,
+              "sdk": {
+                "python": "langwatch.analytics",
+                "typescript": "langwatch.analytics"
+              },
               "cli": [
                 "analytics query"
               ],
@@ -102,7 +105,10 @@
           "description": "Expert labeling, trace review, and structured evaluation workflows",
           "surfaces": {
             "code": {
-              "sdk": null,
+              "sdk": {
+                "python": "langwatch.annotations",
+                "typescript": "langwatch.annotations"
+              },
               "cli": [
                 "annotation list",
                 "annotation get",
@@ -175,8 +181,8 @@
           "surfaces": {
             "code": {
               "sdk": {
-                "python": "langwatch.evaluation",
-                "typescript": null
+                "python": "langwatch.monitors",
+                "typescript": "langwatch.monitors"
               },
               "cli": [
                 "monitor list",
@@ -223,8 +229,8 @@
           "surfaces": {
             "code": {
               "sdk": {
-                "python": "langwatch-scenario",
-                "typescript": "@langwatch/scenario"
+                "python": "langwatch.scenarios",
+                "typescript": "langwatch.scenarios"
               },
               "cli": [
                 "scenario list",
@@ -261,7 +267,10 @@
           "description": "View and inspect simulation execution results",
           "surfaces": {
             "code": {
-              "sdk": null,
+              "sdk": {
+                "python": null,
+                "typescript": "langwatch.simulationRuns"
+              },
               "cli": [
                 "simulation-run list",
                 "simulation-run get"
@@ -289,7 +298,10 @@
           "description": "Bundle scenarios with targets for batch execution and repeated testing",
           "surfaces": {
             "code": {
-              "sdk": null,
+              "sdk": {
+                "python": "langwatch.suites",
+                "typescript": "langwatch.suites"
+              },
               "cli": [
                 "suite list",
                 "suite get",
@@ -416,7 +428,10 @@
           "description": "Agent definitions used in simulations and experiments",
           "surfaces": {
             "code": {
-              "sdk": null,
+              "sdk": {
+                "python": "langwatch.agents",
+                "typescript": "langwatch.agents"
+              },
               "cli": [
                 "agent list",
                 "agent get",
@@ -452,7 +467,10 @@
           "description": "Visual workflow builder for LLM pipelines",
           "surfaces": {
             "code": {
-              "sdk": null,
+              "sdk": {
+                "python": "langwatch.workflows",
+                "typescript": "langwatch.workflows"
+              },
               "cli": [
                 "workflow list",
                 "workflow get",
@@ -539,7 +557,7 @@
                 "dataset records update",
                 "dataset records delete"
               ],
-              "skill": "datasets",
+              "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/datasets/programmatic-access.md"
             },
             "platform": {
@@ -574,7 +592,10 @@
       "description": "Custom analytics dashboards with configurable graphs",
       "surfaces": {
         "code": {
-          "sdk": null,
+          "sdk": {
+            "python": "langwatch.dashboards",
+            "typescript": "langwatch.dashboards"
+          },
           "cli": [
             "dashboard list",
             "dashboard get",
@@ -613,7 +634,10 @@
       "description": "Automated actions triggered by conditions — email alerts, Slack notifications, dataset additions",
       "surfaces": {
         "code": {
-          "sdk": null,
+          "sdk": {
+            "python": "langwatch.triggers",
+            "typescript": "langwatch.triggers"
+          },
           "cli": [
             "trigger list",
             "trigger get",
@@ -651,7 +675,10 @@
           "description": "Configure LLM provider API keys for platform features",
           "surfaces": {
             "code": {
-              "sdk": null,
+              "sdk": {
+                "python": "langwatch.model_providers",
+                "typescript": "langwatch.modelProviders"
+              },
               "cli": [
                 "model-provider list",
                 "model-provider set"
@@ -679,7 +706,10 @@
           "description": "Manage encrypted environment variables for agents and workflows",
           "surfaces": {
             "code": {
-              "sdk": null,
+              "sdk": {
+                "python": "langwatch.secrets",
+                "typescript": "langwatch.secrets"
+              },
               "cli": [
                 "secret list",
                 "secret get",

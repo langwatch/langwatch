@@ -45,6 +45,8 @@ import { SUITE_RUN_PROJECTION_VERSIONS } from "./pipelines/suite-run-processing/
 import type { SuiteRunStateRepository } from "./pipelines/suite-run-processing/repositories/suiteRunState.repository";
 import { createTraceProcessingPipeline } from "./pipelines/trace-processing/pipeline";
 import { createSimulationMetricsSyncReactor } from "./pipelines/trace-processing/reactors/simulationMetricsSync.reactor";
+import { createExperimentMetricsSyncReactor } from "./pipelines/trace-processing/reactors/experimentMetricsSync.reactor";
+import type { ComputeExperimentRunMetricsCommandData } from "./pipelines/experiment-run-processing/schemas/commands";
 
 import { createElasticsearchBatchEvaluationRepository } from "../evaluations-v3/repositories/elasticsearchBatchEvaluation.repository";
 import type { EventSourcing } from "./eventSourcing";
@@ -150,11 +152,11 @@ export class PipelineRegistry {
     //      customerIoEvaluationSyncReactor, customerIoSimulationSyncReactor
 
     const evalPipeline = this.registerEvaluationPipeline();
-    const { pipeline: tracePipeline, traceSummaryStore, wireSimulationDeps } = this.registerTracePipeline(evalPipeline);
+    const { pipeline: tracePipeline, traceSummaryStore, wireSimulationDeps, wireExperimentDeps } = this.registerTracePipeline(evalPipeline);
     const suiteRunPipeline = this.registerSuiteRunPipeline();
     const { pipeline: simulationPipeline, scenarioExecutionHandle } = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, wireSimulationDeps });
 
-    const experimentRunPipeline = this.registerExperimentRunPipeline();
+    const experimentRunPipeline = this.registerExperimentRunPipeline({ wireExperimentDeps });
     const billingPipeline = this.registerBillingReportingPipeline();
 
     logger.info("All pipelines registered");
@@ -260,6 +262,29 @@ export class PipelineRegistry {
       },
     });
 
+    // Late-bound reference for experiment metrics sync reactor.
+    // The experiment pipeline is registered after the trace pipeline,
+    // so computeExperimentRunMetrics is wired after experiment pipeline registration.
+    let expComputeRunMetrics: ((data: ComputeExperimentRunMetricsCommandData) => Promise<void>) | null = null;
+    let expLookupExperimentId: ((tenantId: string, runId: string) => Promise<string | null>) | null = null;
+
+    const experimentMetricsSyncReactor = createExperimentMetricsSyncReactor({
+      computeExperimentRunMetrics: async (data) => {
+        if (!expComputeRunMetrics) {
+          logger.warn("experiment computeExperimentRunMetrics not yet initialized, skipping");
+          return;
+        }
+        return expComputeRunMetrics(data);
+      },
+      lookupExperimentId: async (tenantId, runId) => {
+        if (!expLookupExperimentId) {
+          logger.warn("experiment lookupExperimentId not yet initialized, skipping");
+          return null;
+        }
+        return expLookupExperimentId(tenantId, runId);
+      },
+    });
+
     const tracePipeline = this.deps.eventSourcing.register(
       createTraceProcessingPipeline({
         spanAppendStore: new SpanAppendStore(this.deps.traces.spans.repository),
@@ -272,6 +297,7 @@ export class PipelineRegistry {
         traceUpdateBroadcastReactor,
         projectMetadataReactor,
         simulationMetricsSyncReactor,
+        experimentMetricsSyncReactor,
         spanStorageBroadcastReactor,
       }),
     );
@@ -349,6 +375,18 @@ export class PipelineRegistry {
         computeRunMetrics: (data: any) => Promise<void>;
       }) => {
         simComputeRunMetrics = deps.computeRunMetrics;
+      },
+      /**
+       * Wires late-bound experiment computeExperimentRunMetrics and
+       * lookupExperimentId into the trace-side experimentMetricsSync reactor.
+       * Called after the experiment pipeline is registered.
+       */
+      wireExperimentDeps: (deps: {
+        computeExperimentRunMetrics: (data: ComputeExperimentRunMetricsCommandData) => Promise<void>;
+        lookupExperimentId: (tenantId: string, runId: string) => Promise<string | null>;
+      }) => {
+        expComputeRunMetrics = deps.computeExperimentRunMetrics;
+        expLookupExperimentId = deps.lookupExperimentId;
       },
     };
   }
@@ -514,13 +552,15 @@ export class PipelineRegistry {
     );
   }
 
-  private registerExperimentRunPipeline() {
+  private registerExperimentRunPipeline({ wireExperimentDeps }: {
+    wireExperimentDeps: ReturnType<PipelineRegistry["registerTracePipeline"]>["wireExperimentDeps"];
+  }) {
     const experimentRunStore = this.cached<ExperimentRunStateData>(
       createExperimentRunStateFoldStore(this.deps.repositories.experimentRunState),
       "experiment_runs",
     );
 
-    return this.deps.eventSourcing.register(
+    const experimentRunPipeline = this.deps.eventSourcing.register(
       createExperimentRunProcessingPipeline({
         experimentRunStateFoldStore: experimentRunStore,
         experimentRunItemAppendStore: this.deps.repositories.experimentRunItemStorage,
@@ -530,6 +570,47 @@ export class PipelineRegistry {
         }),
       }),
     );
+
+    // Wire the trace-side experimentMetricsSync reactor's late-bound deps
+    const expCommands = mapCommands(experimentRunPipeline.commands);
+
+    // Create the experimentId lookup function using the experiment run ClickHouse repository
+    const lookupExperimentId = async (tenantId: string, runId: string): Promise<string | null> => {
+      try {
+        const { getClickHouseClientForProject } = await import("../clickhouse/clickhouseClient");
+        const client = await getClickHouseClientForProject(tenantId);
+        if (!client) return null;
+
+        const result = await client.query({
+          query: `
+            SELECT ExperimentId
+            FROM experiment_runs
+            WHERE TenantId = {tenantId:String}
+              AND RunId = {runId:String}
+            ORDER BY UpdatedAt DESC
+            LIMIT 1
+          `,
+          query_params: { tenantId, runId },
+          format: "JSONEachRow",
+        });
+
+        const rows = await result.json<{ ExperimentId: string }>();
+        return rows[0]?.ExperimentId ?? null;
+      } catch (error) {
+        logger.warn(
+          { tenantId, runId, error },
+          "Failed to lookup experimentId for trace metrics sync",
+        );
+        return null;
+      }
+    };
+
+    wireExperimentDeps({
+      computeExperimentRunMetrics: expCommands.computeExperimentRunMetrics,
+      lookupExperimentId,
+    });
+
+    return experimentRunPipeline;
   }
 }
 
