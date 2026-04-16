@@ -13,9 +13,7 @@ This recipe uses the `langwatch` CLI to inspect your production traces and ident
 
 ## Prerequisites
 
-Set up the LangWatch CLI first — see [CLI Setup](_shared/cli-setup.md). The CLI is the only interface you need; it covers documentation (`langwatch docs ...`), trace search/get/export, and analytics queries.
-
-If you cannot run the `langwatch` CLI at all (e.g. you are inside ChatGPT or another shell-less environment), see [docs fallback](_shared/llms-txt-fallback.md).
+See [CLI Setup](_shared/cli-setup.md).
 
 ## Step 1: Fetch Recent Traces
 

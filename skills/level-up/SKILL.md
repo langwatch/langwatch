@@ -12,17 +12,17 @@ This skill sets up your agent with the full LangWatch stack: tracing, prompt ver
 
 ## Plan Limits
 
-See [Plan Limits](_shared/plan-limits.md). The free plan has limits on prompts, scenarios, evaluators, and experiments. Focus on delivering value at each step — make each creation count. Show the user what works before they hit any limits. If you reach a limit, summarize what was accomplished and suggest upgrading at https://app.langwatch.ai/settings/subscription
+See [Plan Limits](_shared/plan-limits.md).
 
 ## Prerequisites
 
-Set up the LangWatch CLI first — you'll use it throughout. See [CLI Setup](_shared/cli-setup.md). The CLI covers documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and every platform operation (prompts, evaluators, scenarios, monitors, traces, analytics).
-
-If you cannot run the `langwatch` CLI at all (e.g. you are inside ChatGPT or another shell-less environment), see [docs fallback](_shared/llms-txt-fallback.md).
+See [CLI Setup](_shared/cli-setup.md).
 
 ## Consultant Mode
 
-After completing all steps, don't just stop. See [Consultant Mode](_shared/consultant-mode.md) — summarize everything you set up, then suggest 2-3 ways to go deeper based on what you learned about the codebase.
+After completing all steps, don't just stop — summarize everything you set up and suggest 2-3 ways to go deeper based on what you learned about the codebase. Detailed guidance:
+
+See [Consultant Mode](_shared/consultant-mode.md).
 
 ## Step 1: Add Tracing
 
@@ -51,11 +51,10 @@ Move hardcoded prompts to LangWatch Prompts CLI for version control and collabor
    ```bash
    langwatch docs prompt-management/cli
    ```
-2. Install / log in: `npm install -g langwatch` then `langwatch login`
-3. Initialize: `langwatch prompt init`
-4. Create prompts: `langwatch prompt create <name>` for each prompt in the code
-5. Update application code to use `langwatch.prompts.get("name")` instead of hardcoded strings
-6. Sync: `langwatch prompt sync`
+2. Initialize: `langwatch prompt init`
+3. Create prompts: `langwatch prompt create <name>` for each prompt in the code
+4. Update application code to use `langwatch.prompts.get("name")` instead of hardcoded strings
+5. Sync: `langwatch prompt sync`
 
 **Verify**: `langwatch prompt list` (or check the Prompts section at https://app.langwatch.ai).
 

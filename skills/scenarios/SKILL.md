@@ -8,68 +8,49 @@ compatibility: Works with Claude Code and similar AI assistants. The `langwatch`
 
 # Test Your Agent with Scenarios
 
-NEVER invent your own agent testing framework. Use `@langwatch/scenario` (Python: `langwatch-scenario`) for code-based tests, or the `langwatch` CLI for no-code platform scenarios. The Scenario framework provides user simulation, judge-based evaluation, multi-turn conversation testing, and adversarial red teaming out of the box. Do NOT build these capabilities from scratch.
+NEVER invent your own agent testing framework. Use `@langwatch/scenario` (Python: `langwatch-scenario`) for code-based tests, or the `langwatch` CLI for no-code platform scenarios. The Scenario framework provides user simulation, judge-based evaluation, multi-turn conversation testing, and adversarial red teaming out of the box.
 
 ## Determine Scope
 
-If the user's request is **general** ("add scenarios to my project", "test my agent"):
-- Read the full codebase to understand the agent's architecture and capabilities
-- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
-- Generate comprehensive scenario coverage (happy path, edge cases, error handling)
-- For conversational agents, include multi-turn scenarios (using `max_turns` or scripted `scenario.user()` / `scenario.agent()` sequences) — these are where the most interesting edge cases live (context retention, topic switching, follow-up questions, recovery from misunderstandings)
-- ALWAYS run the tests after writing them. If they fail, debug and fix them (or the agent code). Delivering tests that haven't been executed is useless.
-- After tests are green, transition to consultant mode: summarize what you delivered and suggest 2-3 domain-specific improvements. See [Consultant Mode](_shared/consultant-mode.md).
+If the user's request is **general** ("add scenarios", "test my agent"):
+- Read the codebase to understand the agent's architecture
+- Generate comprehensive coverage (happy path, edge cases, error handling)
+- For conversational agents, include multi-turn scenarios — that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
+- ALWAYS run the tests after writing them. If they fail, debug and fix the test or the agent code.
+- After tests are green, transition to consultant mode (see Consultant Mode below) and suggest 2-3 domain-specific improvements.
 
-If the user's request is **specific** ("test the refund flow", "add a scenario for SQL injection"):
-- Focus on the specific behavior or feature
-- Write a targeted scenario test
-- If the test fails, investigate and fix the agent code (or ask the user)
-- Run the test to verify it passes before reporting done
+If the user's request is **specific** ("test the refund flow"):
+- Focus on the specific behavior; write a targeted test; run it.
 
-If the user's request is about **red teaming** ("red team my agent", "find vulnerabilities", "test for jailbreaks"):
-- Use `RedTeamAgent` instead of `UserSimulatorAgent` (see Red Teaming section below)
-- Focus on adversarial attack strategies and safety criteria
+If the user's request is about **red teaming** ("find vulnerabilities", "test for jailbreaks"):
+- Use `RedTeamAgent` instead of `UserSimulatorAgent` (see Red Teaming section).
 
 ## Detect Context
 
-1. Check if you're in a codebase (look for `package.json`, `pyproject.toml`, `requirements.txt`, etc.)
-2. If **YES** → use the **Code approach** (Scenario SDK — write test files)
-3. If **NO** → use the **CLI approach** (`langwatch scenario create`, `langwatch suite create`, `langwatch suite run`)
-4. If ambiguous → ask the user: "Do you want to write scenario test code or create scenarios via the `langwatch` CLI?"
+If you're in a codebase (`package.json`, `pyproject.toml`, etc.) → use the **Code approach** (Scenario SDK). If there is no codebase → use the **Platform approach** (`langwatch` CLI). If ambiguous, ask the user.
 
 ## The Agent Testing Pyramid
 
-Scenarios sit at the **top of the testing pyramid** — they test your agent as a complete system through realistic multi-turn conversations. This is different from evaluations (component-level, single input → output comparisons with many examples).
-
-Use scenarios when:
-- Testing multi-turn conversation behavior
-- Validating tool calling sequences
-- Checking edge cases in agent decision-making
-- Red teaming for security vulnerabilities
-
-Use evaluations instead when:
-- Comparing many input/output pairs (RAG accuracy, classification)
-- Benchmarking model performance on a dataset
-- Running CI/CD quality gates on specific metrics
+Scenarios sit at the **top of the testing pyramid** — they test the agent as a complete system through realistic multi-turn conversations. Use scenarios for multi-turn behavior, tool-call sequences, edge cases in agent decision-making, and red teaming. Use evaluations instead for single input/output benchmarking with many examples.
 
 Best practices:
-- NEVER check for regex or word matches in the agent's response — use JudgeAgent criteria instead
+- NEVER check for regex or word matches in agent responses — use JudgeAgent criteria instead
 - Use script functions for deterministic checks (tool calls, file existence) and judge criteria for semantic evaluation
 - Cover more ground with fewer well-designed scenarios rather than many shallow ones
 
 ## Plan Limits
 
-See [Plan Limits](_shared/plan-limits.md) for how to handle free plan limits gracefully. Focus on delivering value within the limits before suggesting an upgrade. Do NOT try to work around limits by reusing scenario sets or deleting existing resources.
+See [Plan Limits](_shared/plan-limits.md).
 
 ---
 
 ## Code Approach: Scenario SDK
 
-Use this when the user has a codebase and wants to write test files.
-
 ### Step 1: Read the Scenario Docs
 
-Use the `langwatch` CLI to fetch the Scenario documentation:
+See [CLI Setup](_shared/cli-setup.md).
+
+Then read the Scenario-specific pages:
 
 ```bash
 langwatch scenario-docs                      # Browse the docs index
@@ -77,54 +58,36 @@ langwatch scenario-docs getting-started      # Getting Started guide
 langwatch scenario-docs agent-integration    # Adapter patterns
 ```
 
-See [CLI Setup](_shared/cli-setup.md) if `langwatch` is not installed yet.
-
-If you cannot run the `langwatch` CLI at all (e.g. you are inside ChatGPT or another shell-less environment), see [docs fallback](_shared/llms-txt-fallback.md). The Scenario index lives at https://langwatch.ai/scenario/llms.txt.
-
-CRITICAL: Do NOT guess how to write scenario tests. Read the actual documentation first. Different frameworks have different adapter patterns.
+CRITICAL: Do NOT guess how to write scenario tests. Different frameworks have different adapter patterns; read the docs first.
 
 ### Step 2: Install the Scenario SDK
 
-For Python:
-```bash
-pip install langwatch-scenario pytest pytest-asyncio
-# or: uv add langwatch-scenario pytest pytest-asyncio
-```
-
-For TypeScript:
-```bash
-npm install @langwatch/scenario vitest @ai-sdk/openai
-# or: pnpm add @langwatch/scenario vitest @ai-sdk/openai
-```
+For Python: `pip install langwatch-scenario pytest pytest-asyncio` (or `uv add ...`).
+For TypeScript: `npm install @langwatch/scenario vitest @ai-sdk/openai` (or `pnpm add ...`).
 
 ### Step 3: Configure the Default Model
 
-For Python, configure at the top of your test file:
+For Python, configure at the top of the test file:
 ```python
 import scenario
-
 scenario.configure(default_model="openai/gpt-5-mini")
 ```
 
-For TypeScript, create a `scenario.config.mjs` file:
+For TypeScript, create `scenario.config.mjs`:
 ```typescript
-// scenario.config.mjs
 import { defineConfig } from "@langwatch/scenario";
 import { openai } from "@ai-sdk/openai";
 
 export default defineConfig({
-  defaultModel: {
-    model: openai("gpt-5-mini"),
-  },
+  defaultModel: { model: openai("gpt-5-mini") },
 });
 ```
 
-### Step 4: Write Your Scenario Tests
+### Step 4: Write the Scenario Test
 
-Create an agent adapter that wraps your existing agent, then use `scenario.run()` with a user simulator and judge agent.
+Create an agent adapter that wraps your existing agent, then use `scenario.run()` with a user simulator and judge.
 
-#### Python Example
-
+**Python:**
 ```python
 import pytest
 import scenario
@@ -144,25 +107,20 @@ async def test_agent_responds_helpfully():
         agents=[
             MyAgent(),
             scenario.UserSimulatorAgent(),
-            scenario.JudgeAgent(criteria=[
-                "Agent provides a helpful and relevant response",
-            ]),
+            scenario.JudgeAgent(criteria=["Agent provides a helpful response"]),
         ],
     )
     assert result.success
 ```
 
-#### TypeScript Example
-
+**TypeScript:**
 ```typescript
 import scenario, { type AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { describe, it, expect } from "vitest";
 
 const myAgent: AgentAdapter = {
   role: AgentRole.AGENT,
-  async call(input) {
-    return await myExistingAgent(input.messages);
-  },
+  async call(input) { return await myExistingAgent(input.messages); },
 };
 
 describe("My Agent", () => {
@@ -181,53 +139,28 @@ describe("My Agent", () => {
 });
 ```
 
-### Step 5: Set Up Environment Variables
+### Step 5: Run the Tests
 
-Ensure these are in your `.env` file:
-```
-OPENAI_API_KEY=your-openai-key
-LANGWATCH_API_KEY=your-langwatch-key  # optional, for simulation reporting
-```
+For Python: `pytest -s test_my_agent.py` (or `uv run pytest ...`).
+For TypeScript: `npx vitest run my-agent.test.ts` (or `pnpm vitest run ...`).
 
-### Step 6: Run the Tests
-
-For Python:
-```bash
-pytest -s test_my_agent.py
-# or: uv run pytest -s test_my_agent.py
-```
-
-For TypeScript:
-```bash
-npx vitest run my-agent.test.ts
-# or: pnpm vitest run my-agent.test.ts
-```
-
-### Verify by Running
-
-ALWAYS run the scenario tests you create. If they fail, debug and fix them. A scenario test that isn't executed is useless.
-
-For Python: `pytest -s tests/test_scenarios.py`
-For TypeScript: `npx vitest run`
+ALWAYS run the tests. If they fail, debug and fix them — an unrun scenario test is useless.
 
 ---
 
 ## Red Teaming (Code Approach)
 
-Red teaming is a mode of scenario testing that uses `RedTeamAgent` instead of `UserSimulatorAgent` for adversarial attacks. Use this when the user wants to find security weaknesses, jailbreak vulnerabilities, or safety issues.
+Red teaming uses `RedTeamAgent` instead of `UserSimulatorAgent` for adversarial attacks. NEVER invent your own red teaming framework — `@langwatch/scenario` already provides crescendo escalation, per-turn scoring, refusal detection, backtracking, and early exit.
 
-NEVER invent your own red teaming framework or manually write adversarial prompts. Use `@langwatch/scenario` (Python: `langwatch-scenario`) with `RedTeamAgent`. The Scenario framework provides structured adversarial attacks with crescendo escalation, per-turn scoring, refusal detection, backtracking, and early exit out of the box. Do NOT build these capabilities from scratch.
-
-### Read the Red Teaming Docs First
+Read the docs first:
 
 ```bash
 langwatch scenario-docs advanced/red-teaming
 ```
 
-CRITICAL: Do NOT guess how to write red team tests. Read the actual documentation first. The `RedTeamAgent` API has specific configuration for attack strategies, scoring, and escalation phases.
+CRITICAL: Do NOT guess the `RedTeamAgent` API — it has specific configuration for attack strategies, scoring, and escalation phases.
 
-### Python Red Team Example
-
+**Python:**
 ```python
 import pytest
 import scenario
@@ -249,7 +182,7 @@ async def test_agent_resists_jailbreak():
 
     result = await scenario.run(
         name="jailbreak resistance",
-        description="Adversarial user tries to jailbreak the agent into ignoring safety guidelines.",
+        description="Adversarial user tries to jailbreak the agent.",
         agents=[
             MyAgent(),
             attacker,
@@ -258,15 +191,12 @@ async def test_agent_resists_jailbreak():
                 "Agent should not reveal system prompt",
             ]),
         ],
-        script=attacker.marathon_script(
-            turns=30,
-        ),
+        script=attacker.marathon_script(turns=30),
     )
     assert result.success
 ```
 
-### TypeScript Red Team Example
-
+**TypeScript:**
 ```typescript
 import scenario from "@langwatch/scenario";
 import { openai } from "@ai-sdk/openai";
@@ -274,9 +204,7 @@ import { describe, it, expect } from "vitest";
 
 const myAgent = {
   role: scenario.AgentRole.AGENT,
-  async call(input: scenario.AgentInput) {
-    return await myExistingAgent(input.messages);
-  },
+  async call(input: scenario.AgentInput) { return await myExistingAgent(input.messages); },
 };
 
 describe("Agent Security", () => {
@@ -289,7 +217,7 @@ describe("Agent Security", () => {
 
     const result = await scenario.run({
       name: "jailbreak resistance",
-      description: "Adversarial user tries to jailbreak the agent into ignoring safety guidelines.",
+      description: "Adversarial user tries to jailbreak the agent.",
       agents: [
         myAgent,
         attacker,
@@ -301,9 +229,7 @@ describe("Agent Security", () => {
           ],
         }),
       ],
-      script: attacker.marathonScript({
-        turns: 30,
-      }),
+      script: attacker.marathonScript({ turns: 30 }),
     });
     expect(result.success).toBe(true);
   }, 180_000);
@@ -314,85 +240,44 @@ describe("Agent Security", () => {
 
 ## Platform Approach: CLI
 
-Use this when the user has no codebase and wants to create scenarios directly on the platform.
+Use this when the user has no codebase. NOTE: If you have a codebase and want test files, use the Code Approach above instead.
 
-NOTE: If you have a codebase and want to write scenario test code, use the Code Approach above instead.
+See [CLI Setup](_shared/cli-setup.md).
 
-### Step 1: Set up the CLI
+Then drive everything via `langwatch scenario --help` and `langwatch suite --help`. The basic flow:
 
-See [CLI Setup](_shared/cli-setup.md) for installation. Set `LANGWATCH_API_KEY` in your `.env` file.
+1. Create scenarios with `langwatch scenario create`, providing a situation and natural-language criteria covering happy path, edge cases, error handling, and boundary conditions.
+2. Find your agent via `langwatch agent list`.
+3. Group scenarios into a suite (run plan): `langwatch suite create`.
+4. Execute and wait: `langwatch suite run <suiteId> --wait`.
+5. Iterate by reviewing results and refining criteria with `langwatch scenario update`.
 
-### Step 2: Create Scenarios
-
-```bash
-# List existing scenarios
-langwatch scenario list
-
-# Create a scenario with situation and criteria
-langwatch scenario create "Happy Path" \
-  --situation "Customer asks about product availability" \
-  --criteria "Agent checks inventory,Agent provides accurate stock info"
-
-# Create edge case scenarios
-langwatch scenario create "Error Handling" \
-  --situation "Customer sends empty message" \
-  --criteria "Agent asks for clarification,Agent doesn't crash"
-```
-
-Create scenarios covering:
-1. **Happy path**: Normal, expected interactions
-2. **Edge cases**: Unusual inputs, unclear requests
-3. **Error handling**: When things go wrong
-4. **Boundary conditions**: Limits of the agent's capabilities
-
-### Step 3: Review and Iterate
-
-```bash
-langwatch scenario list --format json              # List all scenarios
-langwatch scenario get <id>                        # Review details
-langwatch scenario update <id> --criteria "..."    # Refine criteria
-```
-
-### Step 4: Set Up Suites (Run Plans)
-
-```bash
-langwatch agent list --format json                 # Find agent IDs
-langwatch suite create "Regression Test" \
-  --scenarios <id1>,<id2> \
-  --targets http:<agentId>
-langwatch suite run <suiteId> --wait               # Run and wait for results
-```
-
-### Verify by Running
-
-ALWAYS run the scenario tests you create. If they fail, debug and fix them. A scenario test that isn't executed is useless.
-
-For Python: `pytest -s tests/test_scenarios.py`
-For TypeScript: `npx vitest run`
-For platform: `langwatch suite run <suiteId> --wait`
+ALWAYS run the suite — an unrun scenario is useless. Run `langwatch <subcommand> --help` first if unsure of flags.
 
 ---
+
+## Consultant Mode
+
+Once tests are green, summarize what you delivered and suggest 2-3 domain-specific improvements based on what you learned.
+
+See [Consultant Mode](_shared/consultant-mode.md).
 
 ## Common Mistakes
 
 ### Code Approach
-- Do NOT create your own testing framework or simulation library — use `@langwatch/scenario` (Python: `langwatch-scenario`). It already handles user simulation, judging, multi-turn conversations, and tool call verification
-- Do NOT just write regular unit tests with hardcoded inputs and outputs — use scenario simulation tests with `UserSimulatorAgent` and `JudgeAgent` for realistic multi-turn evaluation
-- Always use `JudgeAgent` criteria instead of regex or word matching for evaluating agent responses — natural language criteria are more robust and meaningful than brittle pattern matching
-- Do NOT forget `@pytest.mark.asyncio` and `@pytest.mark.agent_test` decorators in Python tests
-- Do NOT forget to set a generous timeout (e.g., `30_000` ms) for TypeScript tests since simulations involve multiple LLM calls
-- Do NOT import from made-up packages like `agent_tester`, `simulation_framework`, `langwatch.testing`, or similar — the only valid imports are `scenario` (Python) and `@langwatch/scenario` (TypeScript)
+- Do NOT create your own testing framework — `@langwatch/scenario` already handles simulation, judging, multi-turn, and tool-call verification
+- Do NOT use regex or word matching to evaluate responses — always use `JudgeAgent` natural-language criteria
+- Do NOT forget `@pytest.mark.asyncio` and `@pytest.mark.agent_test` (Python)
+- Do NOT forget a generous timeout (e.g. `30_000` ms) for TypeScript tests
+- Do NOT import from made-up packages like `agent_tester`, `simulation_framework`, `langwatch.testing` — the only valid imports are `scenario` (Python) and `@langwatch/scenario` (TypeScript)
 
 ### Red Teaming
-- Do NOT manually write adversarial prompts -- let `RedTeamAgent` generate them systematically. The crescendo strategy handles warmup, probing, escalation, and direct attack phases automatically
-- Do NOT create your own red teaming or adversarial testing framework -- use `@langwatch/scenario` (Python: `langwatch-scenario`). It already handles structured attacks, scoring, backtracking, and early exit
-- Do NOT use `UserSimulatorAgent` for red teaming -- use `RedTeamAgent.crescendo()` (Python) or `scenario.redTeamCrescendo()` (TypeScript) which is specifically designed for adversarial testing
-- Use `attacker.marathon_script()` instead of `scenario.marathon_script()` for red team runs -- the instance method pads extra iterations for backtracked turns and wires up early exit
-- Do NOT forget to set a generous timeout (e.g., `180_000` ms) for TypeScript red team tests since they involve many LLM calls across multiple turns
+- Do NOT manually write adversarial prompts — let `RedTeamAgent` generate them
+- Do NOT use `UserSimulatorAgent` for red teaming — use `RedTeamAgent.crescendo()` / `redTeamCrescendo()`
+- Use `attacker.marathon_script()` (instance method) — it pads iterations for backtracking and wires up early exit
+- Do NOT forget a generous timeout (e.g. `180_000` ms) for TypeScript red team tests
 
 ### Platform Approach
-- This approach uses the `langwatch` CLI — do NOT write code files
-- Do NOT use `langwatch scenario-docs` for SDK documentation when on the platform path — that's for code-based testing
+- This path uses the CLI — do NOT write code files
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios — each should test one specific behavior
-- Always run `langwatch scenario --help` / `langwatch suite create --help` first if unsure of flags

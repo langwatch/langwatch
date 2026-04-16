@@ -3,7 +3,7 @@ name: analytics
 user-prompt: "How is my agent performing?"
 description: Analyze your AI agent's performance using LangWatch analytics. Use when the user wants to understand costs, latency, error rates, usage trends, or debug specific traces. Works with any LangWatch-instrumented agent.
 license: MIT
-compatibility: Works with Claude Code, Claude Web (with shell access), and similar AI assistants. The `langwatch` CLI is the only interface.
+compatibility: Works with Claude Code and similar AI assistants. The `langwatch` CLI is the only interface.
 ---
 
 # Analyze Agent Performance with LangWatch
@@ -12,9 +12,7 @@ This skill queries and presents analytics. It does NOT write code.
 
 ## Step 1: Set up the LangWatch CLI
 
-See [CLI Setup](_shared/cli-setup.md). Set `LANGWATCH_API_KEY` in `.env` (or run `langwatch login`).
-
-If you cannot run the `langwatch` CLI at all (e.g. you are inside ChatGPT or another shell-less environment), see [docs fallback](_shared/llms-txt-fallback.md). You can still read public docs that way, but actual analytics queries require an authenticated CLI.
+See [CLI Setup](_shared/cli-setup.md).
 
 ## Step 2: Get a Project Overview
 
