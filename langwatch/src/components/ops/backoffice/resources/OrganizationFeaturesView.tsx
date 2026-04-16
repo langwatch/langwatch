@@ -56,6 +56,23 @@ export default function OrganizationFeaturesView() {
     filter: debouncedSearch ? { query: debouncedSearch } : {},
   });
 
+  // The server's defaultHandler for organizationFeature getList doesn't
+  // include the organization relation, so rows arrive with a raw
+  // organizationId only. Resolve names client-side by fetching the org
+  // directory (first page of 200 is plenty for the small admin-facing
+  // tenant count) and mapping id → name. Rows whose org isn't in the
+  // map gracefully fall back to the raw ID.
+  const orgDirectory = useAdminList<OrgOption>("organization", {
+    pagination: { page: 1, perPage: 200 },
+    sort: { field: "name", order: "ASC" },
+    filter: {},
+  });
+  const orgNameById = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const org of orgDirectory.data?.data ?? []) map.set(org.id, org.name);
+    return map;
+  }, [orgDirectory.data]);
+
   return (
     <>
       <BackofficeTable
@@ -100,11 +117,14 @@ export default function OrganizationFeaturesView() {
                 </Table.Cell>
               </Table.Row>
             )}
-            {list.data?.data.map((item) => (
+            {list.data?.data.map((item) => {
+              const orgName =
+                item.organization?.name ?? orgNameById.get(item.organizationId);
+              return (
               <Table.Row key={item.id}>
                 <Table.Cell>{item.feature}</Table.Cell>
                 <Table.Cell>
-                  {item.organization?.name ?? (
+                  {orgName ?? (
                     <Text fontSize="xs" color="fg.muted">
                       {item.organizationId}
                     </Text>
@@ -128,7 +148,8 @@ export default function OrganizationFeaturesView() {
                   </Button>
                 </Table.Cell>
               </Table.Row>
-            ))}
+              );
+            })}
           </Table.Body>
         </Table.Root>
       </BackofficeTable>
