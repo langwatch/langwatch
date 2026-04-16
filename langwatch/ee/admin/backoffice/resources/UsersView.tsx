@@ -13,12 +13,13 @@ import {
   VStack,
   Wrap,
 } from "@chakra-ui/react";
-import { Pencil, UserCheck } from "lucide-react";
+import { MoreVertical, Pencil, UserCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
 import NextLink from "~/utils/compat/next-link";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
+import { Menu } from "~/components/ui/menu";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
 import {
@@ -70,6 +71,10 @@ export default function UsersView() {
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search, 300);
   const [editing, setEditing] = useState<AdminUser | null>(null);
+  // Impersonation is driven by a dialog opened from the row-action menu so
+  // there's exactly one Dialog instance at a time — avoids the "mount a
+  // Dialog per row" smell from the previous ImpersonateButton component.
+  const [impersonating, setImpersonating] = useState<AdminUser | null>(null);
 
   const list = useAdminList<AdminUser>("user", {
     pagination: { page, perPage: PAGE_SIZE },
@@ -108,9 +113,7 @@ export default function UsersView() {
               <Table.ColumnHeader>Created</Table.ColumnHeader>
               <Table.ColumnHeader>Last login</Table.ColumnHeader>
               <Table.ColumnHeader>Status</Table.ColumnHeader>
-              <Table.ColumnHeader width="160px" textAlign="right">
-                Actions
-              </Table.ColumnHeader>
+              <Table.ColumnHeader width="60px" textAlign="right" />
             </Table.Row>
           </Table.Header>
           <Table.Body>
@@ -170,16 +173,36 @@ export default function UsersView() {
                   )}
                 </Table.Cell>
                 <Table.Cell textAlign="right">
-                  <HStack gap={1} justify="end">
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => setEditing(user)}
-                    >
-                      <Pencil size={14} /> Edit
-                    </Button>
-                    <ImpersonateButton user={user} />
-                  </HStack>
+                  <Box
+                    width="full"
+                    height="full"
+                    display="flex"
+                    justifyContent="end"
+                  >
+                    <Menu.Root>
+                      <Menu.Trigger>
+                        <MoreVertical size={16} />
+                      </Menu.Trigger>
+                      <Menu.Content>
+                        <Menu.Item
+                          value="edit"
+                          onClick={() => setEditing(user)}
+                        >
+                          <Pencil size={16} />
+                          Edit
+                        </Menu.Item>
+                        {!user.deactivatedAt && (
+                          <Menu.Item
+                            value="impersonate"
+                            onClick={() => setImpersonating(user)}
+                          >
+                            <UserCheck size={16} />
+                            Impersonate
+                          </Menu.Item>
+                        )}
+                      </Menu.Content>
+                    </Menu.Root>
+                  </Box>
                 </Table.Cell>
               </Table.Row>
             ))}
@@ -188,16 +211,32 @@ export default function UsersView() {
       </BackofficeTable>
 
       <UserEditDrawer user={editing} onClose={() => setEditing(null)} />
+      <ImpersonateDialog
+        user={impersonating}
+        onClose={() => setImpersonating(null)}
+      />
     </>
   );
 }
 
-function ImpersonateButton({ user }: { user: AdminUser }) {
-  const [open, setOpen] = useState(false);
+function ImpersonateDialog({
+  user,
+  onClose,
+}: {
+  user: AdminUser | null;
+  onClose: () => void;
+}) {
   const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
 
+  // Re-seed the reason on every new target user — prevents leaking one
+  // reason across multiple impersonation attempts.
+  useEffect(() => {
+    if (user) setReason("");
+  }, [user]);
+
   const submit = async () => {
+    if (!user) return;
     const trimmed = reason.trim();
     if (!trimmed) {
       toaster.create({
@@ -229,67 +268,51 @@ function ImpersonateButton({ user }: { user: AdminUser }) {
   };
 
   return (
-    <>
-      <Button
-        size="xs"
-        variant="ghost"
-        onClick={() => {
-          setReason("");
-          setOpen(true);
-        }}
-      >
-        <UserCheck size={14} /> Impersonate
-      </Button>
-      <Dialog.Root
-        open={open}
-        onOpenChange={({ open: next }) => {
-          if (!next && !loading) setOpen(false);
-        }}
-      >
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>Impersonate user</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.CloseTrigger disabled={loading} />
-          <Dialog.Body>
-            <VStack gap={3} align="stretch">
-              <Text fontSize="sm" color="fg.muted">
-                You will sign in as{" "}
-                <Text as="span" fontWeight="semibold" color="fg">
-                  {user.name ?? user.email ?? user.id}
-                </Text>
-                . The reason below is saved to the audit log.
+    <Dialog.Root
+      open={!!user}
+      onOpenChange={({ open }) => {
+        if (!open && !loading) onClose();
+      }}
+    >
+      <Dialog.Content>
+        <Dialog.Header>
+          <Dialog.Title>Impersonate user</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.CloseTrigger disabled={loading} />
+        <Dialog.Body>
+          <VStack gap={3} align="stretch">
+            <Text fontSize="sm" color="fg.muted">
+              You will sign in as{" "}
+              <Text as="span" fontWeight="semibold" color="fg">
+                {user?.name ?? user?.email ?? user?.id}
               </Text>
-              <Field.Root required>
-                <Field.Label>Reason</Field.Label>
-                <Textarea
-                  rows={3}
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="e.g. Debugging a stuck trace reported by support ticket #…"
-                  disabled={loading}
-                />
-              </Field.Root>
-            </VStack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <HStack width="full">
-              <Spacer />
-              <Button
-                variant="ghost"
-                onClick={() => setOpen(false)}
+              . The reason below is saved to the audit log.
+            </Text>
+            <Field.Root required>
+              <Field.Label>Reason</Field.Label>
+              <Textarea
+                rows={3}
+                value={reason}
+                onChange={(e) => setReason(e.target.value)}
+                placeholder="e.g. Debugging a stuck trace reported by support ticket #…"
                 disabled={loading}
-              >
-                Cancel
-              </Button>
-              <Button onClick={submit} loading={loading} colorPalette="orange">
-                Impersonate
-              </Button>
-            </HStack>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
-    </>
+              />
+            </Field.Root>
+          </VStack>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <HStack width="full">
+            <Spacer />
+            <Button variant="ghost" onClick={onClose} disabled={loading}>
+              Cancel
+            </Button>
+            <Button onClick={submit} loading={loading} colorPalette="orange">
+              Impersonate
+            </Button>
+          </HStack>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }
 

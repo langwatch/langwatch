@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   Field,
   HStack,
@@ -9,10 +10,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Pencil } from "lucide-react";
+import { MoreVertical, Pencil } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
 import { Drawer } from "~/components/ui/drawer";
+import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import {
   BackofficeTable,
@@ -102,9 +104,7 @@ export default function OrganizationFeaturesView() {
               <Table.ColumnHeader>Organization</Table.ColumnHeader>
               <Table.ColumnHeader>Trial ends</Table.ColumnHeader>
               <Table.ColumnHeader>Created</Table.ColumnHeader>
-              <Table.ColumnHeader width="100px" textAlign="right">
-                Actions
-              </Table.ColumnHeader>
+              <Table.ColumnHeader width="60px" textAlign="right" />
             </Table.Row>
           </Table.Header>
           <Table.Body>
@@ -139,13 +139,27 @@ export default function OrganizationFeaturesView() {
                 </Table.Cell>
                 <Table.Cell>{formatDate(item.createdAt)}</Table.Cell>
                 <Table.Cell textAlign="right">
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => setEditing(item)}
+                  <Box
+                    width="full"
+                    height="full"
+                    display="flex"
+                    justifyContent="end"
                   >
-                    <Pencil size={14} /> Edit
-                  </Button>
+                    <Menu.Root>
+                      <Menu.Trigger>
+                        <MoreVertical size={16} />
+                      </Menu.Trigger>
+                      <Menu.Content>
+                        <Menu.Item
+                          value="edit"
+                          onClick={() => setEditing(item)}
+                        >
+                          <Pencil size={16} />
+                          Edit
+                        </Menu.Item>
+                      </Menu.Content>
+                    </Menu.Root>
+                  </Box>
                 </Table.Cell>
               </Table.Row>
               );

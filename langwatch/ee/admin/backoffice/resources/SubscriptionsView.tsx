@@ -1,5 +1,6 @@
 import {
   Badge,
+  Box,
   Button,
   Field,
   Heading,
@@ -13,10 +14,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { PlanTypes, SubscriptionStatus } from "@prisma/client";
-import { Pencil } from "lucide-react";
+import { MoreVertical, Pencil } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useDebounce } from "use-debounce";
 import { Drawer } from "~/components/ui/drawer";
+import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
 import {
   BackofficeTable,
@@ -159,9 +161,7 @@ export default function SubscriptionsView() {
               <Table.ColumnHeader>Stripe ID</Table.ColumnHeader>
               <Table.ColumnHeader>Start</Table.ColumnHeader>
               <Table.ColumnHeader>End</Table.ColumnHeader>
-              <Table.ColumnHeader width="100px" textAlign="right">
-                Actions
-              </Table.ColumnHeader>
+              <Table.ColumnHeader width="60px" textAlign="right" />
             </Table.Row>
           </Table.Header>
           <Table.Body>
@@ -199,13 +199,27 @@ export default function SubscriptionsView() {
                 <Table.Cell>{formatDate(sub.startDate)}</Table.Cell>
                 <Table.Cell>{formatDate(sub.endDate)}</Table.Cell>
                 <Table.Cell textAlign="right">
-                  <Button
-                    size="xs"
-                    variant="ghost"
-                    onClick={() => setEditing(sub)}
+                  <Box
+                    width="full"
+                    height="full"
+                    display="flex"
+                    justifyContent="end"
                   >
-                    <Pencil size={14} /> Edit
-                  </Button>
+                    <Menu.Root>
+                      <Menu.Trigger>
+                        <MoreVertical size={16} />
+                      </Menu.Trigger>
+                      <Menu.Content>
+                        <Menu.Item
+                          value="edit"
+                          onClick={() => setEditing(sub)}
+                        >
+                          <Pencil size={16} />
+                          Edit
+                        </Menu.Item>
+                      </Menu.Content>
+                    </Menu.Root>
+                  </Box>
                 </Table.Cell>
               </Table.Row>
             ))}
