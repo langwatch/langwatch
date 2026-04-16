@@ -1,7 +1,6 @@
 """Tests for Experiment.results DataFrame building from platform data."""
 
 import pandas as pd
-import pytest
 from langwatch.experiment.experiment import Experiment
 from langwatch.experiment.platform_run import (
     ExperimentRunResult,
