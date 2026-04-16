@@ -48,9 +48,16 @@ export function normalizeDocsUrl(input: string | undefined, kind: DocsKind): str
 }
 
 async function fetchAndPrint(url: string): Promise<void> {
-  const response = await fetch(url, {
-    headers: { Accept: "text/markdown, text/plain;q=0.9, */*;q=0.5" },
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: { Accept: "text/markdown, text/plain;q=0.9, */*;q=0.5" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(chalk.red(`Error fetching ${url}: ${message}`));
+    process.exit(1);
+  }
 
   if (!response.ok) {
     console.error(

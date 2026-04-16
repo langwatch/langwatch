@@ -698,8 +698,7 @@ Go to https://app.langwatch.ai and:
 - Do NOT skip running the experiment to verify it works
 - Monitors **measure** (async), guardrails **act** (sync, via code with \`as_guardrail=True\`) — both are online evaluation
 - Always set up \`LANGWATCH_API_KEY\` in \`.env\`
-- Always run \`langwatch evaluator create --help\` first if unsure which \`--type\` values are valid
-- Do NOT create prompts with \`langwatch prompt create\` CLI when using the platform approach — that's for code-based projects`,
+- Always run \`langwatch evaluator create --help\` first if unsure which \`--type\` values are valid`,
 
   scenarios: `Add scenario tests for my agent
 
@@ -3196,7 +3195,6 @@ Go to https://app.langwatch.ai and:
 - Monitors **measure** (async), guardrails **act** (sync, via code with \`as_guardrail=True\`) — both are online evaluation
 - Always set up \`LANGWATCH_API_KEY\` in \`.env\`
 - Always run \`langwatch evaluator create --help\` first if unsure which \`--type\` values are valid
-- Do NOT create prompts with \`langwatch prompt create\` CLI when using the platform approach — that's for code-based projects
 
 ---
 
@@ -5810,7 +5808,6 @@ Go to https://app.langwatch.ai and:
 - Do NOT skip running the experiment to verify it works
 - Monitors **measure** (async), guardrails **act** (sync, via code with \`as_guardrail=True\`) — both are online evaluation
 - Always set up \`LANGWATCH_API_KEY\` in \`.env\`
-- Always run \`langwatch evaluator create --help\` first if unsure which \`--type\` values are valid
-- Do NOT create prompts with \`langwatch prompt create\` CLI when using the platform approach — that's for code-based projects`,
+- Always run \`langwatch evaluator create --help\` first if unsure which \`--type\` values are valid`,
 
 };

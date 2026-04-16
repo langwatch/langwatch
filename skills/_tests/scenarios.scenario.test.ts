@@ -439,9 +439,15 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       // Provide an .env so the CLI is authenticated
+      const apiKey = process.env.LANGWATCH_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error(
+          "LANGWATCH_API_KEY must be set to run platform-mode scenario tests"
+        );
+      }
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`
+        `LANGWATCH_API_KEY=${apiKey}\n`
       );
 
       const result = await scenario.run({
