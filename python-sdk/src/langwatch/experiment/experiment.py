@@ -149,6 +149,10 @@ class Experiment:
         self.progress: int = 0
         self.created_at_nano: int = int(time.time() * 1000)
         self._futures: List[Future[Any]] = []
+        # Async-native execution state (used by aloop / asubmit). The threading
+        # path keeps these empty, so every check downstream is a no-op for it.
+        self._async_tasks: List["asyncio.Task[Any]"] = []
+        self._async_semaphore: Optional[asyncio.Semaphore] = None
 
         # Sending results
         self.lock = threading.Lock()
@@ -467,6 +471,122 @@ class Experiment:
         self._futures.append(future)
         return future
 
+    async def aloop(
+        self,
+        iterable: Union[Iterable[ItemT], pd.DataFrame],
+        *,
+        concurrency: int = 4,
+        total: Optional[int] = None,
+    ):
+        """Async-native sibling of ``loop()``.
+
+        All submitted work runs on the caller's event loop, so loop-bound singletons
+        (gRPC channels, Firestore clients, ADK InMemoryRunner, etc.) stay usable
+        across items. Use together with :meth:`asubmit` to schedule per-item work.
+        """
+        if not self.initialized:
+            self.init()
+
+        try:
+            total_ = (
+                total
+                if total
+                else (
+                    len(cast(Sized, iterable)) if hasattr(iterable, "__len__") else None
+                )
+            )
+            if total_ is None and "DataFrame.iterrows" in str(iterable):
+                iterable = cast(Iterable[ItemT], list(iterable))
+                total_ = len(cast(Sized, iterable))
+            progress_bar = tqdm(total=total_, desc="Evaluating")
+
+            if isinstance(iterable, pd.DataFrame):
+                iterable = cast(Iterable[ItemT], iterable.iterrows())  # type: ignore
+
+            self._async_semaphore = asyncio.Semaphore(concurrency)
+            self._async_tasks = []
+
+            for index, item in enumerate(iterable):
+                self._current_index = index
+                self._current_item = item
+
+                with self._execute_item_iteration(index, item, in_thread=False):
+                    yield item
+                if len(self._async_tasks) == 0 and len(self._futures) == 0:
+                    progress_bar.update(1)
+
+            if len(self._async_tasks) > 0:
+                for coro in asyncio.as_completed(self._async_tasks):
+                    try:
+                        await coro
+                    except Exception:
+                        # Per-item errors are already recorded via
+                        # _execute_item_iteration; swallow so siblings finish.
+                        pass
+                    progress_bar.update(1)
+
+            await self._await_completion()
+            progress_bar.close()
+            self._finished = True
+            self._auto_display_results()
+
+        except Exception as e:
+            self._finished = True
+            Experiment._log_results(
+                langwatch.get_api_key() or "",
+                {
+                    "experiment_slug": self.experiment_slug,
+                    "run_id": self.run_id,
+                    "timestamps": {
+                        "finished_at": int(time.time() * 1000),
+                        "stopped_at": int(time.time() * 1000),
+                    },
+                },
+            )
+            raise e
+
+    def asubmit(
+        self, func: Callable[..., Any], /, *args: Any, **kwargs: Any
+    ) -> "asyncio.Task[Any]":
+        """Async-native sibling of :meth:`submit`.
+
+        Captures the current loop iteration's index/item, enters the per-item
+        iteration context inside the spawned task, then awaits ``func``. Sync
+        callables are offloaded to ``asyncio.to_thread`` so they do not block the
+        event loop for concurrent async siblings.
+        """
+        if self._async_semaphore is None:
+            raise RuntimeError(
+                "asubmit() must be called from inside an `async for item in "
+                "experiment.aloop(...):` block"
+            )
+        _current_index = self._current_index
+        _current_item = self._current_item
+        semaphore = self._async_semaphore
+
+        async def wrapper() -> Any:
+            async with semaphore:
+                with self._execute_item_iteration(
+                    _current_index, _current_item, in_thread=True
+                ):
+                    if asyncio.iscoroutinefunction(func):
+                        return await func(*args, **kwargs)
+                    return await asyncio.to_thread(func, *args, **kwargs)
+
+        task = asyncio.create_task(wrapper())
+        self._async_tasks.append(task)
+        return task
+
+    async def _await_completion(self) -> None:
+        """Async-mode counterpart of ``_wait_for_completion``.
+
+        Sends any remaining batch and joins fire-and-forget batch-sender threads
+        without nesting ``asyncio.run`` inside a running loop.
+        """
+        self._send_batch(finished=True)
+        for thread in self.threads:
+            await asyncio.to_thread(thread.join)
+
     @contextmanager
     def _execute_item_iteration(
         self,
@@ -488,10 +608,13 @@ class Experiment:
 
         # Determine if we should create an iteration trace:
         # - Don't create if evaluation uses targets (each target creates its own trace)
-        # - Don't create if we're collecting submit() calls (not in_thread yet)
+        # - Don't create if we're collecting submit() / asubmit() calls (not in_thread yet)
+        has_pending_submissions = (
+            len(self._futures) > 0 or len(self._async_tasks) > 0
+        )
         should_create_iteration_trace = (
             not self._evaluation_uses_targets
-            and (in_thread or len(self._futures) == 0)
+            and (in_thread or not has_pending_submissions)
         )
 
         iteration: Optional[IterationInfo] = None
@@ -539,7 +662,9 @@ class Experiment:
 
                 # If we just started the parallel loop, we need to skip the first iteration
                 # from being added to the batch and change the trace name
-                if not in_thread and len(self._futures) > 0:
+                if not in_thread and (
+                    len(self._futures) > 0 or len(self._async_tasks) > 0
+                ):
                     iteration["trace"].update(name="evaluation.loop")
                 # Only add row-level entry if with_target was NOT used
                 # When with_target is used, it creates per-target dataset entries instead

@@ -1,3 +1,4 @@
+import asyncio
 import threading
 from typing import TYPE_CHECKING, Dict, List
 import contextvars
@@ -33,7 +34,11 @@ def get_current_trace(
     if trace is not None:
         return trace
 
-    if _is_on_child_thread() and len(main_thread_langwatch_trace) > 0:
+    if (
+        _is_on_child_thread()
+        and not _is_on_async_loop()
+        and len(main_thread_langwatch_trace) > 0
+    ):
         return main_thread_langwatch_trace[-1]
 
     from langwatch.telemetry.tracing import LangWatchTrace
@@ -76,6 +81,7 @@ def get_current_span() -> "LangWatchSpan":
     # If on a child thread and there is no parent, try to find a parent from the main thread
     if (
         _is_on_child_thread()
+        and not _is_on_async_loop()
         and len(main_thread_langwatch_span) > 0
         and otel_span_id == 0
     ):
@@ -89,7 +95,10 @@ def get_current_span() -> "LangWatchSpan":
 
 def _set_current_trace(trace: "LangWatchTrace"):
     global main_thread_langwatch_trace
-    if not _is_on_child_thread():
+    # Only touch the main-thread global fallback in the pure-threading path.
+    # In async mode, every asyncio.Task gets its own contextvar copy; the
+    # shared list would leak traces between concurrent sibling tasks.
+    if not _is_on_child_thread() and not _is_on_async_loop():
         main_thread_langwatch_trace.append(trace)
 
     try:
@@ -101,7 +110,7 @@ def _set_current_trace(trace: "LangWatchTrace"):
 
 def _set_current_span(span: "LangWatchSpan"):
     global main_thread_langwatch_span
-    if not _is_on_child_thread():
+    if not _is_on_child_thread() and not _is_on_async_loop():
         main_thread_langwatch_span.append(span)
 
     # Dummy token, just for the main thread span list
@@ -110,7 +119,7 @@ def _set_current_span(span: "LangWatchSpan"):
 
 def _reset_current_trace(token: contextvars.Token):
     global main_thread_langwatch_trace
-    if not _is_on_child_thread():
+    if not _is_on_child_thread() and not _is_on_async_loop():
         if len(main_thread_langwatch_trace) > 0:
             main_thread_langwatch_trace.pop()
 
@@ -124,10 +133,25 @@ def _reset_current_trace(token: contextvars.Token):
 
 def _reset_current_span(_token: str):
     global main_thread_langwatch_span
-    if not _is_on_child_thread():
+    if not _is_on_child_thread() and not _is_on_async_loop():
         if len(main_thread_langwatch_span) > 0:
             main_thread_langwatch_span.pop()
 
 
 def _is_on_child_thread() -> bool:
     return threading.current_thread() != threading.main_thread()
+
+
+def _is_on_async_loop() -> bool:
+    """True when called from inside a running asyncio event loop.
+
+    In async mode, ``asyncio.Task`` copies contextvars per task, so the
+    ``main_thread_langwatch_*`` global fallbacks are both redundant and
+    dangerous — two sibling tasks on the same thread would pollute each
+    other via the shared list.
+    """
+    try:
+        asyncio.get_running_loop()
+        return True
+    except RuntimeError:
+        return False
