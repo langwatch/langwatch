@@ -295,10 +295,10 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     return undefined;
   }, [promptQuery.data]);
 
-  // Seed configValues from initialLocalConfig (if any) so the form watch
-  // subscription's first synchronous fire carries the caller's edits, not
-  // defaults. The init useEffect below later resets with merged server data.
-  // See localConfigToFormValues for the #3155 rationale.
+  // Seed configValues from initialLocalConfig so the form watch subscription's
+  // first synchronous fire carries the caller's edits, not defaults. Without
+  // this seed, the subscription fires on defaults before the init useEffect
+  // runs and clobbers the caller's local edits (#3155).
   const [configValues, setConfigValues] = useState<PromptConfigFormValues>(
     () => localConfigToFormValues(props.initialLocalConfig),
   );
