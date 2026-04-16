@@ -34,6 +34,18 @@ export const tagDeleteCommand = async (
   checkApiKey();
 
   if (!options?.force) {
+    // In non-TTY environments (CI, piped stdin) readline.question either
+    // hangs forever or resolves immediately with an empty string — both
+    // are confusing. Tell the user to pass --force instead.
+    if (!process.stdin.isTTY) {
+      console.error(
+        chalk.red(
+          `Cannot prompt for confirmation — stdin is not a TTY. Re-run with ${chalk.cyan("--force")} to skip the confirmation prompt.`,
+        ),
+      );
+      process.exit(1);
+    }
+
     const confirmation = await promptConfirmation(tagName);
     if (confirmation !== tagName) {
       console.log(chalk.gray("Aborted."));

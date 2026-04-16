@@ -51,6 +51,24 @@ const handleConflict = async (
     return forceResolution;
   }
 
+  // In non-TTY environments (CI, piped stdin) readline.question() either
+  // hangs forever waiting for input or resolves immediately with an empty
+  // string — both are confusing. Fail loudly with an actionable message so
+  // the user knows to pass --force-local / --force-remote.
+  if (!process.stdin.isTTY) {
+    console.error(
+      chalk.red(
+        `\n✗ Cannot resolve conflict interactively — stdin is not a TTY.`,
+      ),
+    );
+    console.error(
+      chalk.gray(
+        `  Re-run with ${chalk.cyan("--force-local")} (push local over remote) or ${chalk.cyan("--force-remote")} (accept remote and abort push).`,
+      ),
+    );
+    return "abort";
+  }
+
   console.log(chalk.yellow("\nOptions:"));
   console.log("  [l] Use local version (overwrite remote)");
   console.log("  [r] Use remote version (overwrite local)");
