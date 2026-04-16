@@ -134,4 +134,32 @@ describe("trackServerEvent", () => {
       expect(mockCaptureException).toHaveBeenCalledWith(captureError);
     });
   });
+
+  describe("when POSTHOG_KEY is not set (self-hosted without PostHog)", () => {
+    // The singleton `_posthogInstance` is decided at module load based on
+    // env.POSTHOG_KEY, so we reset modules and re-mock env to exercise the
+    // null branch. This is the hot path for self-hosted deployments and must
+    // never call capture or throw.
+    it("no-ops without calling capture or throwing", async () => {
+      vi.resetModules();
+      vi.doMock("~/env.mjs", () => ({
+        env: { POSTHOG_KEY: undefined, POSTHOG_HOST: undefined },
+      }));
+
+      const { trackServerEvent: trackWithoutKey } = await import("../posthog");
+
+      expect(() =>
+        trackWithoutKey({
+          userId: "user-123",
+          event: "limit_blocked",
+          properties: { limitType: "workflows" },
+        })
+      ).not.toThrow();
+
+      expect(mockCapture).not.toHaveBeenCalled();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+
+      vi.doUnmock("~/env.mjs");
+    });
+  });
 });
