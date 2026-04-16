@@ -24,6 +24,7 @@ Run with: `pytest tests/e2e/test_async_experiment_adk_e2e.py -v -m e2e`
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import os
 import time
 import urllib.parse
@@ -60,15 +61,14 @@ def configure_langwatch():
     prev_api_key = getattr(langwatch, "_api_key", None)
     prev_endpoint = getattr(langwatch, "_endpoint", None)
 
-    langwatch._api_key = api_key
     endpoint = os.environ.get("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
+    langwatch._api_key = api_key
     langwatch._endpoint = endpoint
 
-    try:
-        langwatch.setup()
-    except Exception:
-        # Setup may already have been performed by a sibling test module.
-        pass
+    # Setup may already have been performed by a sibling test module; that
+    # path raises but is harmless here — we only need a configured client.
+    with contextlib.suppress(Exception):
+        langwatch.setup(api_key=api_key, endpoint_url=endpoint)
     try:
         yield
     finally:

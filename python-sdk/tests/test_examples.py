@@ -13,7 +13,7 @@ import asyncio
 # down the rest of the suite at collection time.
 try:
     import chainlit as cl  # noqa: F401
-    import chainlit.config as chainlit_config  # noqa: F401
+    import chainlit.config  # noqa: F401
     from chainlit.context import init_http_context  # noqa: F401
 except Exception as _chainlit_err:  # pragma: no cover - environment-dependent
     pytest.skip(

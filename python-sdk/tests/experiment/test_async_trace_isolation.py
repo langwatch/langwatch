@@ -8,6 +8,7 @@ ADK runners, Firestore clients) survive across items.
 """
 
 import asyncio
+import contextlib
 import json
 import os
 import threading
@@ -30,13 +31,11 @@ def setup_langwatch():
     os.environ["LANGWATCH_API_KEY"] = "test-key-for-async-tracing"
     langwatch._api_key = "test-key-for-async-tracing"
     langwatch._endpoint = "http://localhost:5560"
-    try:
+    # Tracer may already be installed by a previous test module; reusing the
+    # existing provider is fine since trace_ids are what we assert, not
+    # exporter state.
+    with contextlib.suppress(Exception):
         langwatch.setup()
-    except Exception:
-        # Tracer may already be installed by a previous test module; reusing
-        # the existing provider is fine for these tests since trace_ids are
-        # what we assert, not exporter state.
-        pass
     try:
         yield
     finally:

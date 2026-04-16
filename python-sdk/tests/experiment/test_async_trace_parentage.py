@@ -8,6 +8,7 @@ trace/parent relationships directly.
 """
 
 import asyncio
+import contextlib
 import json
 import os
 import time
@@ -50,10 +51,11 @@ def setup_langwatch():
     os.environ["LANGWATCH_API_KEY"] = "test-key-for-parentage"
     langwatch._api_key = "test-key-for-parentage"
     langwatch._endpoint = "http://localhost:5560"
-    try:
+    # Tracer may already be installed by a previous test module; the existing
+    # provider is fine for these assertions, which only look at trace/parent
+    # IDs collected by our own in-memory RecordingExporter.
+    with contextlib.suppress(Exception):
         langwatch.setup()
-    except Exception:
-        pass
     try:
         yield
     finally:
@@ -167,7 +169,7 @@ class TestTraceParentage:
         driver = asyncio.create_task(drive())
         await asyncio.sleep(0.02)
         gate.set()
-        await driver
+        _ = await driver
 
         inner_by_name = {s.name: _trace_id_hex(s) for s in exporter.spans if s.name.startswith("inner-")}
         assert set(inner_by_name.keys()) == {"inner-1", "inner-2"}
