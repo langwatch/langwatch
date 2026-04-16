@@ -21,6 +21,8 @@ export const createDashboardCommand = async (name: string, options?: { format?: 
 
     if (options?.format === "json") {
       console.log(JSON.stringify(dashboard, null, 2));
+    } else if (dashboard.platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(dashboard.platformUrl)}`);
     }
   } catch (error) {
     spinner.fail();

@@ -13,6 +13,7 @@ import {
   resourceLimitMiddleware,
 } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 
 const logger = createLogger("langwatch:api:scenarios");
 
@@ -28,6 +29,10 @@ const scenarioResponseSchema = z.object({
   situation: z.string(),
   criteria: z.array(z.string()),
   labels: z.array(z.string()),
+});
+
+const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
+  platformUrl: z.string().url(),
 });
 
 const createScenarioSchema = z.object({
@@ -64,7 +69,7 @@ app.get(
         description: "Success",
         content: {
           "application/json": {
-            schema: resolver(z.array(scenarioResponseSchema)),
+            schema: resolver(z.array(scenarioResponseWithPlatformUrlSchema)),
           },
         },
       },
@@ -77,7 +82,13 @@ app.get(
     const service = getService();
     const scenarios = await service.getAll({ projectId: project.id });
 
-    return c.json(scenarios.map(toScenarioResponse));
+    return c.json(scenarios.map((s) => ({
+      ...toScenarioResponse(s),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${s.id}`,
+      }),
+    })));
   },
 );
 
@@ -91,7 +102,7 @@ app.get(
         description: "Success",
         content: {
           "application/json": {
-            schema: resolver(scenarioResponseSchema),
+            schema: resolver(scenarioResponseWithPlatformUrlSchema),
           },
         },
       },
@@ -115,7 +126,13 @@ app.get(
       return c.json({ error: "Scenario not found" }, 404);
     }
 
-    return c.json(toScenarioResponse(scenario));
+    return c.json({
+      ...toScenarioResponse(scenario),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
+      }),
+    });
   },
 );
 
@@ -130,7 +147,7 @@ app.post(
         description: "Scenario created",
         content: {
           "application/json": {
-            schema: resolver(scenarioResponseSchema),
+            schema: resolver(scenarioResponseWithPlatformUrlSchema),
           },
         },
       },
@@ -152,7 +169,13 @@ app.post(
       labels: body.labels,
     });
 
-    return c.json(toScenarioResponse(scenario), 201);
+    return c.json({
+      ...toScenarioResponse(scenario),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
+      }),
+    }, 201);
   },
 );
 
@@ -166,7 +189,7 @@ app.put(
         description: "Scenario updated",
         content: {
           "application/json": {
-            schema: resolver(scenarioResponseSchema),
+            schema: resolver(scenarioResponseWithPlatformUrlSchema),
           },
         },
       },
@@ -202,7 +225,13 @@ app.put(
       ...(body.labels !== undefined && { labels: body.labels }),
     });
 
-    return c.json(toScenarioResponse(scenario));
+    return c.json({
+      ...toScenarioResponse(scenario),
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/simulations/scenarios?drawer.open=scenarioEditor&drawer.scenarioId=${scenario.id}`,
+      }),
+    });
   },
 );
 

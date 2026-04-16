@@ -48,6 +48,7 @@ function createMockFoldState(
     ScoreCount: 0,
     PassedCount: 0,
     GradedCount: 0,
+    TraceMetrics: {},
     ...overrides,
   };
 }

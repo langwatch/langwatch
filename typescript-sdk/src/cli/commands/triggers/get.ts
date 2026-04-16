@@ -34,6 +34,7 @@ export const getTriggerCommand = async (
       alertType: string | null;
       createdAt: string;
       updatedAt: string;
+      platformUrl?: string;
     };
 
     spinner.succeed(`Found trigger "${trigger.name}"`);
@@ -52,6 +53,9 @@ export const getTriggerCommand = async (
     console.log(`    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`);
     console.log(`    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`);
     console.log(`    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`);
+    if (trigger.platformUrl) {
+      console.log(`    ${chalk.bold("View:")}   ${chalk.underline(trigger.platformUrl)}`);
+    }
 
     if (Object.keys(trigger.filters).length > 0) {
       console.log();

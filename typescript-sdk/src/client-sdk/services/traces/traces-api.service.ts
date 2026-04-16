@@ -12,8 +12,17 @@ export type TraceSearchBody = NonNullable<
 export type TraceSearchResponse =
   paths["/api/traces/search"]["post"]["responses"]["200"]["content"]["application/json"];
 
-export type TraceGetResponse =
+type TraceGetResponseRaw =
   paths["/api/traces/{traceId}"]["get"]["responses"]["200"]["content"]["application/json"];
+
+export type TraceGetResponse = TraceGetResponseRaw extends string
+  ? TraceGetResponseRaw
+  : TraceGetResponseRaw extends object
+    ? TraceGetResponseRaw & {
+        /** URL to view this trace on the LangWatch platform */
+        platformUrl?: string;
+      }
+    : TraceGetResponseRaw;
 
 export class TracesApiError extends Error {
   constructor(
