@@ -327,8 +327,8 @@ describe("checkRoleBindingPermission()", () => {
     });
   });
 
-  describe("when falling back to TeamUser", () => {
-    it("uses TeamUser record when no RoleBindings exist", async () => {
+  describe("when no RoleBindings exist", () => {
+    it("returns false — TeamUser fallback is handled by checkPermissionFromBindings, not this resolver", async () => {
       const prisma = makePrisma({
         directBindings: [],
         groupBindings: [],
@@ -343,7 +343,7 @@ describe("checkRoleBindingPermission()", () => {
         permission: "team:manage",
       });
 
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
   });
 });

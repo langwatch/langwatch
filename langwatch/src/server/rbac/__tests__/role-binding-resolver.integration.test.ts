@@ -434,8 +434,8 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
   // Legacy TeamUser fallback
   // ──────────────────────────────────────────────────────────────────────────
 
-  describe("when falling back to TeamUser during migration", () => {
-    it("grants analytics:view via TeamUser when no RoleBinding exists for the user", async () => {
+  describe("when no RoleBinding exists for the user", () => {
+    it("denies analytics:view even when a TeamUser record exists (no TeamUser fallback)", async () => {
       await prisma.teamUser.create({
         data: {
           userId: alice.id,
@@ -457,7 +457,7 @@ describe("checkRoleBindingPermission() scope hierarchy integration", () => {
         permission: "analytics:view",
       });
 
-      expect(result).toBe(true);
+      expect(result).toBe(false);
     });
 
     it("ignores TeamUser and uses RoleBinding only when both exist — denies team:manage for VIEWER binding despite ADMIN TeamUser", async () => {

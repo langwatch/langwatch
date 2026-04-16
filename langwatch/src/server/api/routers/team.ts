@@ -18,6 +18,7 @@ import {
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
+import { TeamService } from "~/server/teams/team.service";
 
 // Reusable schema for team member role validation
 const teamMemberRoleSchema = z
@@ -92,6 +93,7 @@ export const teamRouter = createTRPCRouter({
         },
         include: {
           members: {
+            orderBy: [{ user: { name: "asc" } }, { user: { email: "asc" } }, { userId: "asc" }],
             include: {
               user: true,
               assignedRole: true,
@@ -119,169 +121,8 @@ export const teamRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-      const { organizationId } = input;
-
-      const teams = await prisma.team.findMany({
-        where: { organizationId, archivedAt: null },
-        include: {
-          projects: { where: { archivedAt: null }, orderBy: { name: "asc" } },
-        },
-        orderBy: { name: "asc" },
-      });
-
-      const results = await Promise.all(
-        teams.map(async (team) => {
-          const projectIds = team.projects.map((p) => p.id);
-
-          // ── Fetch all RoleBindings touching this team (team-level + project-level) ──
-          const [teamBindings, projectBindings] = await Promise.all([
-            prisma.roleBinding.findMany({
-              where: {
-                organizationId,
-                scopeType: RoleBindingScopeType.TEAM,
-                scopeId: team.id,
-              },
-              include: {
-                user: { select: { id: true, name: true, email: true } },
-                group: { select: { id: true, name: true, scimSource: true } },
-                customRole: { select: { id: true, name: true } },
-              },
-            }),
-            projectIds.length > 0
-              ? prisma.roleBinding.findMany({
-                  where: {
-                    organizationId,
-                    scopeType: RoleBindingScopeType.PROJECT,
-                    scopeId: { in: projectIds },
-                  },
-                  include: {
-                    user: { select: { id: true, name: true, email: true } },
-                    group: { select: { id: true, name: true, scimSource: true } },
-                    customRole: { select: { id: true, name: true } },
-                  },
-                })
-              : [],
-          ]);
-
-          // ── Build directMembers from team-level bindings ──
-          const directMembers = teamBindings.map((b) => ({
-            bindingId: b.id,
-            userId: b.userId,
-            groupId: b.groupId,
-            name: b.user?.name ?? b.group?.name ?? "Unknown",
-            email: b.user?.email ?? null,
-            role: b.role,
-            customRoleId: b.customRoleId,
-          }));
-
-          // ── Collect userIds that have a team-level binding ──
-          const teamBoundUserIds = new Set(
-            teamBindings.filter((b) => b.userId).map((b) => b.userId!),
-          );
-
-          // ── Build projectOnlyAccess: users with project bindings but NO team binding ──
-          const projectOnlyMap = new Map<string, {
-            bindingId: string;
-            userId: string;
-            name: string;
-            email: string | null;
-            role: TeamUserRole;
-            customRoleId: string | null;
-            projectId: string;
-            projectName: string;
-          }>();
-
-          for (const b of projectBindings) {
-            if (!b.userId) continue;
-            if (teamBoundUserIds.has(b.userId)) continue;
-            const project = team.projects.find((p) => p.id === b.scopeId);
-            if (!project) continue;
-            const key = `${b.userId}:${b.scopeId}`;
-            if (!projectOnlyMap.has(key)) {
-              projectOnlyMap.set(key, {
-                bindingId: b.id,
-                userId: b.userId,
-                name: b.user?.name ?? b.userId,
-                email: b.user?.email ?? null,
-                role: b.role,
-                customRoleId: b.customRoleId,
-                projectId: project.id,
-                projectName: project.name,
-              });
-            }
-          }
-
-          // ── Build per-project access list ──
-          const projectAccess: Record<string, Array<{
-            bindingId: string | null;
-            userId: string | null;
-            groupId: string | null;
-            name: string;
-            email: string | null;
-            role: TeamUserRole;
-            customRoleId: string | null;
-            source: "team" | "direct" | "override";
-            teamRole?: TeamUserRole;
-          }>> = {};
-
-          for (const proj of team.projects) {
-            const inherited = directMembers.map((m) => ({
-              bindingId: m.bindingId,
-              userId: m.userId,
-              groupId: m.groupId,
-              name: m.name,
-              email: m.email,
-              role: m.role,
-              customRoleId: m.customRoleId,
-              source: "team" as const,
-            }));
-
-            const projBindings = projectBindings.filter(
-              (b) => b.scopeId === proj.id,
-            );
-
-            const projectLevel = projBindings.map((b) => {
-              const teamBinding = teamBindings.find(
-                (tb) => tb.userId && tb.userId === b.userId,
-              );
-              return {
-                bindingId: b.id,
-                userId: b.userId,
-                groupId: b.groupId,
-                name: b.user?.name ?? b.group?.name ?? "Unknown",
-                email: b.user?.email ?? null,
-                role: b.role,
-                customRoleId: b.customRoleId,
-                source: teamBinding ? ("override" as const) : ("direct" as const),
-                teamRole: teamBinding?.role,
-              };
-            });
-
-            // Remove "inherited" entries that have a project-level override
-            const overriddenUserIds = new Set(
-              projBindings.filter((b) => b.userId).map((b) => b.userId!),
-            );
-            const filteredInherited = inherited.filter(
-              (m) => !m.userId || !overriddenUserIds.has(m.userId),
-            );
-
-            projectAccess[proj.id] = [...filteredInherited, ...projectLevel];
-          }
-
-          return {
-            id: team.id,
-            name: team.name,
-            slug: team.slug,
-            projects: team.projects,
-            directMembers,
-            projectOnlyAccess: [...projectOnlyMap.values()],
-            projectAccess,
-          };
-        }),
-      );
-
-      return results;
+      const service = new TeamService(ctx.prisma);
+      return service.getTeamsWithRoleBindings({ organizationId: input.organizationId });
     }),
 
   getTeamWithMembers: protectedProcedure
@@ -297,6 +138,7 @@ export const teamRouter = createTRPCRouter({
         },
         include: {
           members: {
+            orderBy: [{ user: { name: "asc" } }, { user: { email: "asc" } }, { userId: "asc" }],
             include: {
               user: true,
               assignedRole: true,
@@ -519,15 +361,6 @@ export const teamRouter = createTRPCRouter({
             ? TeamUserRole.CUSTOM
             : (member.role as TeamUserRole);
 
-          await tx.teamUser.create({
-            data: {
-              userId: member.userId,
-              teamId: team.id,
-              role: memberRole,
-              assignedRoleId: memberIsCustomRole ? member.customRoleId : null,
-            },
-          });
-
           if (memberIsCustomRole) {
             // Verify the custom role belongs to the same organization
             const customRole = await tx.customRole.findUnique({
@@ -559,10 +392,12 @@ export const teamRouter = createTRPCRouter({
           });
         }
 
-        // Post-creation validation: ensure we have at least one admin
-        const finalAdminCount = await tx.teamUser.count({
+        // Post-creation validation: ensure we have at least one admin (direct user or group binding)
+        const finalAdminCount = await tx.roleBinding.count({
           where: {
-            teamId: team.id,
+            organizationId: input.organizationId,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: team.id,
             role: TeamUserRole.ADMIN,
           },
         });
@@ -597,125 +432,11 @@ export const teamRouter = createTRPCRouter({
     )
     .use(checkTeamPermission("team:manage"))
     .mutation(async ({ input, ctx }) => {
-      const prisma = ctx.prisma;
-
-      return await prisma.$transaction(async (tx) => {
-        // Validate that the team exists
-        const team = await tx.team.findUnique({
-          where: { id: input.teamId },
-          select: { id: true, name: true, organizationId: true },
-        });
-
-        if (!team) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
-        }
-
-        // Lock and validate admin count within transaction
-        const adminBindings = await tx.roleBinding.findMany({
-          where: {
-            organizationId: team.organizationId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: input.teamId,
-            role: TeamUserRole.ADMIN,
-            userId: { not: null },
-          },
-          select: { userId: true },
-        });
-
-        const adminCount = adminBindings.length;
-
-        if (adminCount === 0) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "No admin found for this team",
-          });
-        }
-
-        // Check if the target user is currently a member
-        const targetBinding = await tx.roleBinding.findFirst({
-          where: {
-            organizationId: team.organizationId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: input.teamId,
-            userId: input.userId,
-          },
-          select: { role: true },
-        });
-
-        if (!targetBinding) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "User is not a member of this team",
-          });
-        }
-
-        const isTargetUserAdmin = targetBinding.role === TeamUserRole.ADMIN;
-
-        if (adminCount === 1 && isTargetUserAdmin) {
-          if (input.userId === ctx.session.user.id) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "You cannot remove yourself from the last admin position in this team",
-            });
-          }
-
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Cannot remove the last admin from this team",
-          });
-        }
-
-        // Remove RoleBinding and legacy TeamUser row (if any) atomically
-        await Promise.all([
-          tx.roleBinding.deleteMany({
-            where: {
-              organizationId: team.organizationId,
-              userId: input.userId,
-              scopeType: RoleBindingScopeType.TEAM,
-              scopeId: input.teamId,
-            },
-          }),
-          tx.teamUser.deleteMany({
-            where: { userId: input.userId, teamId: input.teamId },
-          }),
-        ]);
-
-        // Post-removal validation: ensure we still have at least one admin
-        const finalAdminCount = await tx.roleBinding.count({
-          where: {
-            organizationId: team.organizationId,
-            scopeType: RoleBindingScopeType.TEAM,
-            scopeId: input.teamId,
-            role: TeamUserRole.ADMIN,
-            userId: { not: null },
-          },
-        });
-
-        if (finalAdminCount === 0) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Operation would result in no admins for this team",
-          });
-        }
-
-        // Return updated team data for client cache invalidation
-        const updatedTeam = await tx.team.findUnique({
-          where: { id: input.teamId },
-          include: {
-            members: {
-              include: {
-                user: true,
-                assignedRole: true,
-              },
-            },
-          },
-        });
-
-        return {
-          success: true,
-          team: updatedTeam,
-          removedUserId: input.userId,
-        };
+      const service = new TeamService(ctx.prisma);
+      return service.removeMember({
+        teamId: input.teamId,
+        userId: input.userId,
+        currentUserId: ctx.session.user.id,
       });
     }),
 });

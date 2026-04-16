@@ -45,6 +45,7 @@ import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { signUpDataSchema } from "./onboarding";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
+import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 
 
 const customTeamRoleInputSchema = z
@@ -62,6 +63,7 @@ const teamRoleInputSchema = z.union([
   builtInTeamRoleInputSchema,
   customTeamRoleInputSchema,
 ]);
+
 
 export const organizationRouter = createTRPCRouter({
   createAndAssign: protectedProcedure
@@ -135,29 +137,7 @@ export const organizationRouter = createTRPCRouter({
       const orgIds = organizations.map((o) => o.id);
       const userRoleBindings =
         orgIds.length > 0
-          ? await ctx.prisma.roleBinding.findMany({
-              where: {
-                organizationId: { in: orgIds },
-                OR: [
-                  { userId },
-                  { group: { members: { some: { userId } } } },
-                ],
-                scopeType: {
-                  in: [
-                    RoleBindingScopeType.TEAM,
-                    RoleBindingScopeType.ORGANIZATION,
-                    RoleBindingScopeType.PROJECT,
-                  ],
-                },
-              },
-              select: {
-                organizationId: true,
-                scopeType: true,
-                scopeId: true,
-                role: true,
-                customRoleId: true,
-              },
-            })
+          ? await new PrismaRoleBindingRepository(ctx.prisma).listForOrganizationsAndUser({ orgIds, userId })
           : [];
 
       for (const organization of organizations) {
@@ -221,35 +201,15 @@ export const organizationRouter = createTRPCRouter({
               member.userId === userId || member.userId === demoProjectUserId,
           );
 
-          // If the user has no TeamUser row but has a RoleBinding for this team
-          // (direct or via a group), synthesize a member entry so downstream
-          // checks (userIsPartOfTeam, hasPermission) work correctly.
-          const userHasTeamMember = team.members.some(
-            (m) => m.userId === userId,
-          );
-          if (!userHasTeamMember) {
-            const teamProjectIds = new Set(team.projects.map((p) => p.id));
-            const binding = userRoleBindings.find(
-              (b) =>
-                b.organizationId === organization.id &&
-                ((b.scopeType === RoleBindingScopeType.TEAM &&
-                  b.scopeId === team.id) ||
-                  b.scopeType === RoleBindingScopeType.ORGANIZATION ||
-                  (b.scopeType === RoleBindingScopeType.PROJECT &&
-                    teamProjectIds.has(b.scopeId))),
-            );
-            if (binding) {
-              team.members.push({
-                userId,
-                teamId: team.id,
-                role: binding.role,
-                assignedRoleId: binding.customRoleId ?? null,
-                assignedRole: null,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-              });
-            }
-          }
+          // RoleBinding is authoritative for team membership and role.
+          // Always prefer a team-scoped RoleBinding over any stale TeamUser row,
+          // since dual-writes to TeamUser have been removed.
+          // Org-scoped bindings are intentionally excluded: org MEMBER/VIEWER bindings
+          // only grant organization:view — they don't give team-level access.
+          // Org admins are handled by the organizationRole === ADMIN shortcut in
+          // the frontend hasPermission and backend resolveTeamPermission.
+          const enriched = getApp().organizations.enrichTeamWithRoleBindings(team, userId, userRoleBindings, organization.id);
+          team.members = enriched.members;
 
           if (isDemoOrg) return true;
           return isExternal
@@ -1118,50 +1078,6 @@ export const organizationRouter = createTRPCRouter({
         }
 
         if (teamMembershipData.length > 0) {
-          // Handle custom roles separately since createMany doesn't support assignedRoleId
-          const builtInRoles = teamMembershipData.filter(
-            (data) => data.role !== TeamUserRole.CUSTOM,
-          );
-          const customRoles = teamMembershipData.filter(
-            (data) => data.role === TeamUserRole.CUSTOM && data.customRoleId,
-          );
-
-          // Create team memberships with built-in roles
-          if (builtInRoles.length > 0) {
-            await prisma.teamUser.createMany({
-              data: builtInRoles.map(
-                ({ customRoleId: _customRoleId, ...data }) => data,
-              ),
-              skipDuplicates: true,
-            });
-          }
-
-          // Create team memberships with custom roles (requires individual creates for assignedRoleId)
-          for (const customRole of customRoles) {
-            try {
-              await prisma.teamUser.create({
-                data: {
-                  userId: customRole.userId,
-                  teamId: customRole.teamId,
-                  role: TeamUserRole.CUSTOM,
-                  assignedRoleId: customRole.customRoleId!,
-                },
-              });
-            } catch (error: unknown) {
-              // Ignore unique constraint violations (concurrent inserts)
-              if (
-                error instanceof PrismaClientKnownRequestError &&
-                error.code === "P2002"
-              ) {
-                // Swallow the error - record already exists
-                continue;
-              }
-              // Rethrow other errors
-              throw error;
-            }
-          }
-
-          // Create TEAM-scoped RoleBindings for all team assignments
           for (const member of teamMembershipData) {
             await prisma.roleBinding.deleteMany({
               where: {
