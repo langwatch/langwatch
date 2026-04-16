@@ -187,7 +187,10 @@ export default function SettingsLayout({
           )}
 
           {hasOpsAccess && (
-            <NavSection label="Ops" paths={["/ops"]}>
+            <NavSection
+              label="Ops"
+              paths={["/ops"]}
+            >
               <MenuLink href="/ops">Dashboard</MenuLink>
               <MenuLink href="/ops/projections" includePath="/ops/projections">
                 Projection Replay
@@ -198,14 +201,41 @@ export default function SettingsLayout({
               <MenuLink href="/ops/dejaview" includePath="/ops/dejaview">
                 Deja View
               </MenuLink>
-              {isAdminUser && (
-                <MenuLink
-                  href="/ops/backoffice/users"
-                  includePath="/ops/backoffice"
-                >
-                  Backoffice
-                </MenuLink>
-              )}
+            </NavSection>
+          )}
+
+          {isAdminUser && (
+            <NavSection label="Backoffice" paths={["/ops/backoffice"]}>
+              <MenuLink
+                href="/ops/backoffice/users"
+                includePath="/ops/backoffice/users"
+              >
+                Users
+              </MenuLink>
+              <MenuLink
+                href="/ops/backoffice/organizations"
+                includePath="/ops/backoffice/organizations"
+              >
+                Organizations
+              </MenuLink>
+              <MenuLink
+                href="/ops/backoffice/projects"
+                includePath="/ops/backoffice/projects"
+              >
+                Projects
+              </MenuLink>
+              <MenuLink
+                href="/ops/backoffice/subscriptions"
+                includePath="/ops/backoffice/subscriptions"
+              >
+                Subscriptions
+              </MenuLink>
+              <MenuLink
+                href="/ops/backoffice/organization-features"
+                includePath="/ops/backoffice/organization-features"
+              >
+                Organization Features
+              </MenuLink>
             </NavSection>
           )}
         </VStack>

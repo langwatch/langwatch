@@ -59,7 +59,7 @@ interface AdminUser {
    * joined string.
    */
   organizations: OrgRef[];
-  /** Same treatment for projects (through teamMemberships → team.projects). */
+  /** Same treatment for projects (through org.teams → team.projects). */
   projects: ProjectRef[];
 }
 
@@ -97,7 +97,7 @@ export default function UsersView() {
           onPageChange: setPage,
         }}
       >
-        <Table.Root variant="line" size="sm" width="full">
+        <Table.Root variant="line" size="md" width="full">
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>ID</Table.ColumnHeader>

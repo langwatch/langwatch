@@ -1,19 +1,20 @@
 import { Center, Spinner, Text, VStack } from "@chakra-ui/react";
 import { useEffect, type PropsWithChildren } from "react";
-import BackofficeLayout from "~/components/ops/backoffice/BackofficeLayout";
-import { OpsPageShell } from "~/components/ops/shared/OpsPageShell";
+import SettingsLayout from "~/components/SettingsLayout";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
 
 /**
- * Admin-gated shell shared by every /ops/backoffice/:resource page.
+ * Admin-gated shell for every /ops/backoffice/:resource page.
  *
- * Two layers of defence:
- *  - OpsPageShell enforces the ops permission (which currently is admin-only
- *    per resolveOpsScope).
- *  - user.isAdmin explicitly re-checks the caller's admin email, decoupled
- *    from OPS access in case the ops:view scope ever broadens.
- * Errors from the isAdmin lookup also redirect so the page never hangs.
+ * Renders inside {@link SettingsLayout} so Backoffice uses the same left
+ * sidebar (with its Users / Organizations / Projects / Subscriptions /
+ * Organization Features sub-section) and the same Chakra design language as
+ * the rest of Settings — no more custom two-column Backoffice layout.
+ *
+ * Admin gating is decoupled from `ops:view` on purpose: if that scope ever
+ * broadens beyond admins, Backoffice stays strictly admin-only. Errors from
+ * the `isAdmin` lookup also redirect so the page never hangs in a spinner.
  */
 export default function BackofficeShell({ children }: PropsWithChildren) {
   const router = useRouter();
@@ -34,24 +35,18 @@ export default function BackofficeShell({ children }: PropsWithChildren) {
 
   if (!hasAccess) {
     return (
-      <OpsPageShell>
-        <BackofficeLayout>
-          <Center paddingY={20}>
-            <VStack gap={3}>
-              {!isDenied && <Spinner size="lg" />}
-              <Text color="fg.muted" fontSize="sm">
-                {isDenied ? "Access denied" : "Loading Backoffice…"}
-              </Text>
-            </VStack>
-          </Center>
-        </BackofficeLayout>
-      </OpsPageShell>
+      <SettingsLayout>
+        <Center paddingY={20}>
+          <VStack gap={3}>
+            {!isDenied && <Spinner size="lg" />}
+            <Text color="fg.muted" fontSize="sm">
+              {isDenied ? "Access denied" : "Loading Backoffice…"}
+            </Text>
+          </VStack>
+        </Center>
+      </SettingsLayout>
     );
   }
 
-  return (
-    <OpsPageShell>
-      <BackofficeLayout>{children}</BackofficeLayout>
-    </OpsPageShell>
-  );
+  return <SettingsLayout>{children}</SettingsLayout>;
 }

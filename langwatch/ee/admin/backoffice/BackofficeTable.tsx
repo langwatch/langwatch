@@ -12,6 +12,7 @@ import {
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import type { PropsWithChildren, ReactNode } from "react";
 import { SearchInput } from "~/components/ui/SearchInput";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
 
 export interface PaginationState {
   page: number;
@@ -31,15 +32,17 @@ interface BackofficeTableProps {
   error?: Error | null;
   onCreate?: () => void;
   createLabel?: string;
-  /** Slot for the <Table.Root>...</Table.Root> content. */
+  /** Slot for the <Table.Root>…</Table.Root> content. */
   children: ReactNode;
 }
 
 /**
- * Standard Backoffice list-view shell — title, search, optional Create button,
- * bordered card wrapping the table, loading/empty/error states, and pagination
- * controls. Keeps every resource page visually identical and cuts each view
- * down to "fetch data + render rows".
+ * Standard Backoffice list-view shell. Uses the same Heading + Card + Table
+ * rhythm as `/settings/members` so every admin resource page looks and feels
+ * like the rest of Settings — see `members.tsx` for the reference pattern.
+ *
+ * Intentionally thin: the view owns the table rows, this only handles the
+ * repeatable chrome (title, search, loading/empty/error, pagination).
  */
 export function BackofficeTable({
   title,
@@ -57,24 +60,23 @@ export function BackofficeTable({
   return (
     <VStack gap={6} width="full" align="start">
       <HStack width="full">
-        <Heading size="lg">{title}</Heading>
+        <Heading>{title}</Heading>
         <Spacer />
         {onCreate && (
-          <Button size="sm" onClick={onCreate}>
-            <Plus size={16} />
+          <PageLayout.HeaderButton onClick={onCreate}>
+            <Plus size={20} />
             {createLabel}
-          </Button>
+          </PageLayout.HeaderButton>
         )}
       </HStack>
 
-      <HStack width="full" maxWidth="480px">
-        <SearchInput
-          value={searchValue}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={searchPlaceholder}
-          size="sm"
-        />
-      </HStack>
+      <SearchInput
+        value={searchValue}
+        onChange={(e) => onSearchChange(e.target.value)}
+        placeholder={searchPlaceholder}
+        width="full"
+        maxWidth="480px"
+      />
 
       <Card.Root width="full" overflow="hidden">
         <Card.Body paddingY={0} paddingX={0}>
@@ -133,7 +135,7 @@ function PaginationBar({
       </Text>
       <HStack gap={1}>
         <Button
-          size="xs"
+          size="sm"
           variant="outline"
           disabled={!canPrev}
           onClick={() => onPageChange(page - 1)}
@@ -141,7 +143,7 @@ function PaginationBar({
           <ChevronLeft size={14} />
         </Button>
         <Button
-          size="xs"
+          size="sm"
           variant="outline"
           disabled={!canNext}
           onClick={() => onPageChange(page + 1)}
