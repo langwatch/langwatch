@@ -82,7 +82,7 @@ export default function OrganizationFeaturesView() {
           setSearch(v);
           setPage(1);
         }}
-        searchPlaceholder="Search features"
+        searchPlaceholder="Search by ID, feature, or organization"
         isLoading={list.isLoading}
         isFetching={list.isFetching}
         error={list.error}

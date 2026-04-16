@@ -2,9 +2,11 @@ import {
   Badge,
   Button,
   Field,
+  Heading,
   HStack,
   Input,
   NativeSelect,
+  SimpleGrid,
   Spacer,
   Table,
   Text,
@@ -36,11 +38,25 @@ interface AdminSubscription {
   stripeSubscriptionId: string | null;
   startDate: string | null;
   endDate: string | null;
+  lastPaymentFailedDate: string | null;
   maxMembers: number | null;
+  maxMembersLite: number | null;
+  maxTeams: number | null;
   maxProjects: number | null;
-  maxMessagesPerMonth: number | null;
-  evaluationsCredit: number | null;
   maxWorkflows: number | null;
+  maxPrompts: number | null;
+  maxAgents: number | null;
+  maxScenarios: number | null;
+  maxEvaluators: number | null;
+  maxExperiments: number | null;
+  maxOnlineEvaluations: number | null;
+  evaluationsCredit: number | null;
+  maxMessagesPerMonth: number | null;
+  maxRetentionDays: number | null;
+  maxDatasets: number | null;
+  maxDashboards: number | null;
+  maxCustomGraphs: number | null;
+  maxAutomations: number | null;
   organization?: { id: string; name: string; slug: string };
   createdAt: string;
 }
@@ -53,6 +69,51 @@ const statusColor: Record<SubscriptionStatus, string> = {
   FAILED: "red",
   CANCELLED: "gray",
 };
+
+/**
+ * Every numeric limit the server stores on a subscription, rendered as its own
+ * form field. Kept as a table so adding/removing a limit is a one-line change.
+ */
+const LIMIT_FIELDS: Array<{
+  key: keyof AdminSubscription;
+  label: string;
+  group: "Members" | "Resources" | "Evaluation" | "Observability" | "Analytics";
+}> = [
+  { key: "maxMembers", label: "Max members", group: "Members" },
+  { key: "maxMembersLite", label: "Max lite members", group: "Members" },
+  { key: "maxTeams", label: "Max teams", group: "Members" },
+
+  { key: "maxProjects", label: "Max projects", group: "Resources" },
+  { key: "maxWorkflows", label: "Max workflows", group: "Resources" },
+  { key: "maxPrompts", label: "Max prompts", group: "Resources" },
+  { key: "maxAgents", label: "Max agents", group: "Resources" },
+  { key: "maxScenarios", label: "Max scenarios", group: "Resources" },
+
+  { key: "maxEvaluators", label: "Max evaluators", group: "Evaluation" },
+  { key: "maxExperiments", label: "Max experiments", group: "Evaluation" },
+  {
+    key: "maxOnlineEvaluations",
+    label: "Max online evaluations",
+    group: "Evaluation",
+  },
+  { key: "evaluationsCredit", label: "Evaluations credit", group: "Evaluation" },
+
+  {
+    key: "maxMessagesPerMonth",
+    label: "Max traces per month",
+    group: "Observability",
+  },
+  {
+    key: "maxRetentionDays",
+    label: "Max retention days",
+    group: "Observability",
+  },
+  { key: "maxDatasets", label: "Max datasets", group: "Observability" },
+
+  { key: "maxDashboards", label: "Max dashboards", group: "Analytics" },
+  { key: "maxCustomGraphs", label: "Max custom graphs", group: "Analytics" },
+  { key: "maxAutomations", label: "Max automations", group: "Analytics" },
+];
 
 export default function SubscriptionsView() {
   const [page, setPage] = useState(1);
@@ -76,7 +137,7 @@ export default function SubscriptionsView() {
           setSearch(v);
           setPage(1);
         }}
-        searchPlaceholder="Search by Stripe ID, org, plan, or status"
+        searchPlaceholder="Search by ID, Stripe ID, org, plan, or status"
         isLoading={list.isLoading}
         isFetching={list.isFetching}
         error={list.error}
@@ -166,19 +227,42 @@ export default function SubscriptionsView() {
   );
 }
 
-interface FormState {
+type LimitKey =
+  | "maxMembers"
+  | "maxMembersLite"
+  | "maxTeams"
+  | "maxProjects"
+  | "maxWorkflows"
+  | "maxPrompts"
+  | "maxAgents"
+  | "maxScenarios"
+  | "maxEvaluators"
+  | "maxExperiments"
+  | "maxOnlineEvaluations"
+  | "evaluationsCredit"
+  | "maxMessagesPerMonth"
+  | "maxRetentionDays"
+  | "maxDatasets"
+  | "maxDashboards"
+  | "maxCustomGraphs"
+  | "maxAutomations";
+
+type FormState = {
   organizationId: string;
   plan: PlanTypes;
   status: SubscriptionStatus;
   stripeSubscriptionId: string;
-  startDate: string; // yyyy-MM-dd
+  startDate: string;
   endDate: string;
-  maxMembers: string;
-  maxProjects: string;
-  maxMessagesPerMonth: string;
-  evaluationsCredit: string;
-  maxWorkflows: string;
-}
+} & Record<LimitKey, string>;
+
+const EMPTY_LIMITS: Record<LimitKey, string> = LIMIT_FIELDS.reduce(
+  (acc, f) => {
+    acc[f.key as LimitKey] = "";
+    return acc;
+  },
+  {} as Record<LimitKey, string>,
+);
 
 const EMPTY_FORM: FormState = {
   organizationId: "",
@@ -187,11 +271,7 @@ const EMPTY_FORM: FormState = {
   stripeSubscriptionId: "",
   startDate: "",
   endDate: "",
-  maxMembers: "",
-  maxProjects: "",
-  maxMessagesPerMonth: "",
-  evaluationsCredit: "",
-  maxWorkflows: "",
+  ...EMPTY_LIMITS,
 };
 
 function toDateInputValue(value: string | null | undefined): string {
@@ -213,7 +293,6 @@ function SubscriptionDrawer({
   onClose,
 }: {
   mode: "create" | "edit";
-  /** edit: subscription to edit. create: null means open, undefined means closed. */
   subscription: AdminSubscription | null | undefined;
   onClose: () => void;
 }) {
@@ -228,6 +307,15 @@ function SubscriptionDrawer({
   useEffect(() => {
     if (!isOpen) return;
     if (mode === "edit" && subscription) {
+      const limitValues = LIMIT_FIELDS.reduce(
+        (acc, f) => {
+          const raw = subscription[f.key];
+          acc[f.key as LimitKey] =
+            typeof raw === "number" ? raw.toString() : "";
+          return acc;
+        },
+        {} as Record<LimitKey, string>,
+      );
       setForm({
         organizationId: subscription.organizationId,
         plan: subscription.plan,
@@ -235,12 +323,7 @@ function SubscriptionDrawer({
         stripeSubscriptionId: subscription.stripeSubscriptionId ?? "",
         startDate: toDateInputValue(subscription.startDate),
         endDate: toDateInputValue(subscription.endDate),
-        maxMembers: subscription.maxMembers?.toString() ?? "",
-        maxProjects: subscription.maxProjects?.toString() ?? "",
-        maxMessagesPerMonth:
-          subscription.maxMessagesPerMonth?.toString() ?? "",
-        evaluationsCredit: subscription.evaluationsCredit?.toString() ?? "",
-        maxWorkflows: subscription.maxWorkflows?.toString() ?? "",
+        ...limitValues,
       });
     } else if (mode === "create") {
       setForm(EMPTY_FORM);
@@ -269,12 +352,10 @@ function SubscriptionDrawer({
       stripeSubscriptionId: form.stripeSubscriptionId || null,
       startDate: dateInputToISO(form.startDate),
       endDate: dateInputToISO(form.endDate),
-      maxMembers: numOrNull(form.maxMembers),
-      maxProjects: numOrNull(form.maxProjects),
-      maxMessagesPerMonth: numOrNull(form.maxMessagesPerMonth),
-      evaluationsCredit: numOrNull(form.evaluationsCredit),
-      maxWorkflows: numOrNull(form.maxWorkflows),
     };
+    for (const f of LIMIT_FIELDS) {
+      payload[f.key] = numOrNull(form[f.key as LimitKey]);
+    }
 
     const onSuccess = () => {
       toaster.create({
@@ -301,13 +382,24 @@ function SubscriptionDrawer({
     }
   };
 
+  // Group limit fields by the "group" tag so the form renders tight sections.
+  const groupedLimits = useMemo(() => {
+    const map = new Map<string, typeof LIMIT_FIELDS>();
+    for (const f of LIMIT_FIELDS) {
+      const bucket = map.get(f.group) ?? [];
+      bucket.push(f);
+      map.set(f.group, bucket);
+    }
+    return Array.from(map.entries());
+  }, []);
+
   return (
     <Drawer.Root
       open={isOpen}
       onOpenChange={({ open }) => {
         if (!open) onClose();
       }}
-      size="md"
+      size="lg"
     >
       <Drawer.Content>
         <Drawer.Header>
@@ -316,47 +408,32 @@ function SubscriptionDrawer({
         <Drawer.CloseTrigger />
         <Drawer.Body>
           <VStack gap={4} align="stretch">
+            <SectionHeading>Subscription</SectionHeading>
             <OrganizationPicker
               value={form.organizationId}
               onChange={(id) => setField("organizationId", id)}
               currentName={subscription?.organization?.name}
             />
-            <Field.Root>
-              <Field.Label>Plan</Field.Label>
-              <NativeSelect.Root size="sm" width="full">
-                <NativeSelect.Field
+            <HStack gap={3} align="start">
+              <Field.Root>
+                <Field.Label>Plan</Field.Label>
+                <EnumSelect
                   value={form.plan}
-                  onChange={(e) =>
-                    setField("plan", e.target.value as PlanTypes)
-                  }
-                >
-                  {Object.values(PlanTypes).map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            </Field.Root>
-            <Field.Root>
-              <Field.Label>Status</Field.Label>
-              <NativeSelect.Root size="sm" width="full">
-                <NativeSelect.Field
+                  options={Object.values(PlanTypes)}
+                  onChange={(v) => setField("plan", v as PlanTypes)}
+                />
+              </Field.Root>
+              <Field.Root>
+                <Field.Label>Status</Field.Label>
+                <EnumSelect
                   value={form.status}
-                  onChange={(e) =>
-                    setField("status", e.target.value as SubscriptionStatus)
+                  options={Object.values(SubscriptionStatus)}
+                  onChange={(v) =>
+                    setField("status", v as SubscriptionStatus)
                   }
-                >
-                  {Object.values(SubscriptionStatus).map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            </Field.Root>
+                />
+              </Field.Root>
+            </HStack>
             <Field.Root>
               <Field.Label>Stripe subscription ID</Field.Label>
               <Input
@@ -384,41 +461,41 @@ function SubscriptionDrawer({
                 />
               </Field.Root>
             </HStack>
-            <Text fontSize="xs" fontWeight="semibold" color="fg.muted" pt={2}>
-              Limits
-            </Text>
-            <HStack gap={3}>
-              <NumberField
-                label="Max members"
-                value={form.maxMembers}
-                onChange={(v) => setField("maxMembers", v)}
-              />
-              <NumberField
-                label="Max projects"
-                value={form.maxProjects}
-                onChange={(v) => setField("maxProjects", v)}
-              />
-            </HStack>
-            <HStack gap={3}>
-              <NumberField
-                label="Max traces per month"
-                value={form.maxMessagesPerMonth}
-                onChange={(v) => setField("maxMessagesPerMonth", v)}
-              />
-              <NumberField
-                label="Evaluations credit"
-                value={form.evaluationsCredit}
-                onChange={(v) => setField("evaluationsCredit", v)}
-              />
-            </HStack>
-            <HStack gap={3}>
-              <NumberField
-                label="Max workflows"
-                value={form.maxWorkflows}
-                onChange={(v) => setField("maxWorkflows", v)}
-              />
-              <Spacer />
-            </HStack>
+
+            {groupedLimits.map(([group, fields]) => (
+              <VStack key={group} gap={3} align="stretch">
+                <SectionHeading>{group} limits</SectionHeading>
+                <SimpleGrid columns={2} gap={3}>
+                  {fields.map((f) => (
+                    <Field.Root key={f.key}>
+                      <Field.Label>{f.label}</Field.Label>
+                      <Input
+                        type="number"
+                        value={form[f.key as LimitKey]}
+                        onChange={(e) =>
+                          setField(f.key as LimitKey, e.target.value)
+                        }
+                        placeholder="—"
+                      />
+                    </Field.Root>
+                  ))}
+                </SimpleGrid>
+              </VStack>
+            ))}
+
+            {mode === "edit" && subscription && (
+              <VStack align="start" gap={0} pt={2}>
+                <Text fontSize="xs" color="fg.muted">
+                  Subscription ID: {subscription.id}
+                </Text>
+                {subscription.lastPaymentFailedDate && (
+                  <Text fontSize="xs" color="red.500">
+                    Last payment failed:{" "}
+                    {formatDate(subscription.lastPaymentFailedDate)}
+                  </Text>
+                )}
+              </VStack>
+            )}
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -437,24 +514,44 @@ function SubscriptionDrawer({
   );
 }
 
-function NumberField({
-  label,
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <Heading
+      as="h3"
+      size="xs"
+      color="fg.muted"
+      textTransform="uppercase"
+      letterSpacing="wider"
+      pt={2}
+    >
+      {children}
+    </Heading>
+  );
+}
+
+function EnumSelect({
   value,
+  options,
   onChange,
 }: {
-  label: string;
   value: string;
+  options: readonly string[];
   onChange: (value: string) => void;
 }) {
   return (
-    <Field.Root>
-      <Field.Label>{label}</Field.Label>
-      <Input
-        type="number"
+    <NativeSelect.Root size="sm" width="full">
+      <NativeSelect.Field
         value={value}
         onChange={(e) => onChange(e.target.value)}
-      />
-    </Field.Root>
+      >
+        {options.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </NativeSelect.Field>
+      <NativeSelect.Indicator />
+    </NativeSelect.Root>
   );
 }
 
@@ -465,7 +562,7 @@ interface OrgOption {
 }
 
 /**
- * Simple organization picker — fetches the first page by query (or first 100
+ * Simple organization picker — fetches the first page by query (or first 50
  * if empty) and lets the operator pick. Mirrors react-admin's AutocompleteInput
  * behaviour for the Subscription form.
  */

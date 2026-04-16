@@ -55,7 +55,7 @@ export default function ProjectsView() {
           setSearch(v);
           setPage(1);
         }}
-        searchPlaceholder="Search by name or slug"
+        searchPlaceholder="Search by ID, name, or slug"
         isLoading={list.isLoading}
         isFetching={list.isFetching}
         error={list.error}

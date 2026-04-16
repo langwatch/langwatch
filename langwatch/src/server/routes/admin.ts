@@ -181,16 +181,24 @@ app.post("/admin/:resource", async (c) => {
           ? {
               where: {
                 OR: [
+                  // ID: prefix/contains so operators can paste the full id or
+                  // a leading fragment (e.g. "user_abc") and still hit it.
+                  { id: { contains: query, mode: "insensitive" } },
                   { name: { contains: query, mode: "insensitive" } },
                   { email: { contains: query, mode: "insensitive" } },
                   {
                     orgMemberships: {
                       some: {
                         organization: {
-                          name: {
-                            contains: query,
-                            mode: "insensitive",
-                          },
+                          OR: [
+                            { id: { contains: query, mode: "insensitive" } },
+                            {
+                              name: {
+                                contains: query,
+                                mode: "insensitive",
+                              },
+                            },
+                          ],
                         },
                       },
                     },
@@ -201,10 +209,15 @@ app.post("/admin/:resource", async (c) => {
                         team: {
                           projects: {
                             some: {
-                              name: {
-                                contains: query,
-                                mode: "insensitive",
-                              },
+                              OR: [
+                                { id: { contains: query, mode: "insensitive" } },
+                                {
+                                  name: {
+                                    contains: query,
+                                    mode: "insensitive",
+                                  },
+                                },
+                              ],
                             },
                           },
                         },
@@ -263,6 +276,7 @@ app.post("/admin/:resource", async (c) => {
           ? {
               where: {
                 OR: [
+                  { id: { contains: query, mode: "insensitive" } },
                   { name: { contains: query, mode: "insensitive" } },
                   { slug: { contains: query, mode: "insensitive" } },
                 ],
@@ -286,12 +300,60 @@ app.post("/admin/:resource", async (c) => {
           ? {
               where: {
                 OR: [
+                  { id: { contains: query, mode: "insensitive" } },
                   { name: { contains: query, mode: "insensitive" } },
                   { slug: { contains: query, mode: "insensitive" } },
                 ],
               },
             }
           : {}),
+      },
+    );
+    return c.json(result);
+  }
+
+  if (
+    body.resource === "organizationFeature" &&
+    body.method === "getList"
+  ) {
+    const query = body.params?.filter?.query;
+    if (body.params?.filter?.query) delete body.params.filter.query;
+
+    const result = await getListHandler<Prisma.OrganizationFeatureFindManyArgs>(
+      body as GetListRequest,
+      prisma.organizationFeature,
+      {
+        ...(query
+          ? {
+              where: {
+                OR: [
+                  { id: { contains: query, mode: "insensitive" } },
+                  { feature: { contains: query, mode: "insensitive" } },
+                  {
+                    organization: {
+                      OR: [
+                        { id: { contains: query, mode: "insensitive" } },
+                        {
+                          name: { contains: query, mode: "insensitive" },
+                        },
+                        {
+                          slug: { contains: query, mode: "insensitive" },
+                        },
+                      ],
+                    },
+                  },
+                ],
+              },
+            }
+          : {}),
+        // Include the organization so the Backoffice table can render names
+        // instead of raw IDs. Admin-only endpoint, so exposing name/slug is
+        // fine.
+        include: {
+          organization: {
+            select: { id: true, name: true, slug: true },
+          },
+        },
       },
     );
     return c.json(result);
@@ -410,6 +472,9 @@ app.post("/admin/:resource", async (c) => {
     const orFilters: Prisma.SubscriptionWhereInput[] = [];
     if (query) {
       orFilters.push({
+        id: { contains: query, mode: "insensitive" },
+      });
+      orFilters.push({
         stripeSubscriptionId: {
           contains: query,
           mode: "insensitive",
@@ -417,7 +482,11 @@ app.post("/admin/:resource", async (c) => {
       });
       orFilters.push({
         organization: {
-          name: { contains: query, mode: "insensitive" },
+          OR: [
+            { id: { contains: query, mode: "insensitive" } },
+            { name: { contains: query, mode: "insensitive" } },
+            { slug: { contains: query, mode: "insensitive" } },
+          ],
         },
       });
       if (matchingPlan)

@@ -7,11 +7,13 @@ import {
   Spacer,
   Table,
   Text,
+  Textarea,
   VStack,
 } from "@chakra-ui/react";
 import { Pencil, UserCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
+import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
@@ -38,10 +40,12 @@ interface AdminUser {
   id: string;
   name: string | null;
   email: string | null;
+  image: string | null;
+  emailVerified: boolean;
+  pendingSsoSetup: boolean | null;
   createdAt: string;
   lastLoginAt: string | null;
   deactivatedAt: string | null;
-  pendingSsoSetup: boolean | null;
   orgMemberships: OrgMembership[];
   teamMemberships: TeamMembership[];
   /** Joined by the server-side mapper for display convenience. */
@@ -72,7 +76,7 @@ export default function UsersView() {
           setSearch(v);
           setPage(1);
         }}
-        searchPlaceholder="Search by name, email, org, or project"
+        searchPlaceholder="Search by ID, name, email, org, or project"
         isLoading={list.isLoading}
         isFetching={list.isFetching}
         error={list.error}
@@ -86,6 +90,7 @@ export default function UsersView() {
         <Table.Root variant="line" size="md" width="full">
           <Table.Header>
             <Table.Row>
+              <Table.ColumnHeader>ID</Table.ColumnHeader>
               <Table.ColumnHeader>Name</Table.ColumnHeader>
               <Table.ColumnHeader>Email</Table.ColumnHeader>
               <Table.ColumnHeader>Organizations</Table.ColumnHeader>
@@ -93,7 +98,7 @@ export default function UsersView() {
               <Table.ColumnHeader>Created</Table.ColumnHeader>
               <Table.ColumnHeader>Last login</Table.ColumnHeader>
               <Table.ColumnHeader>Status</Table.ColumnHeader>
-              <Table.ColumnHeader width="160px" textAlign="right">
+              <Table.ColumnHeader width="180px" textAlign="right">
                 Actions
               </Table.ColumnHeader>
             </Table.Row>
@@ -101,7 +106,7 @@ export default function UsersView() {
           <Table.Body>
             {list.data?.data.length === 0 && (
               <Table.Row>
-                <Table.Cell colSpan={8}>
+                <Table.Cell colSpan={9}>
                   <Text color="fg.muted" textAlign="center" paddingY={6}>
                     No users match your search.
                   </Text>
@@ -119,6 +124,9 @@ export default function UsersView() {
                   .join(", ");
               return (
                 <Table.Row key={user.id}>
+                  <Table.Cell fontSize="xs" color="fg.muted">
+                    {user.id}
+                  </Table.Cell>
                   <Table.Cell>{user.name ?? <EmptyCell />}</Table.Cell>
                   <Table.Cell>{user.email ?? <EmptyCell />}</Table.Cell>
                   <Table.Cell>
@@ -138,9 +146,13 @@ export default function UsersView() {
                       <Badge colorPalette="yellow" size="sm">
                         Pending SSO
                       </Badge>
-                    ) : (
+                    ) : user.emailVerified ? (
                       <Badge colorPalette="green" size="sm">
                         Active
+                      </Badge>
+                    ) : (
+                      <Badge colorPalette="gray" size="sm">
+                        Unverified
                       </Badge>
                     )}
                   </Table.Cell>
@@ -169,18 +181,27 @@ export default function UsersView() {
 }
 
 function ImpersonateButton({ user }: { user: AdminUser }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handle = async () => {
-    const reason = window.prompt(
-      "Reason for impersonating this user (saved to audit logs)",
-    );
-    if (!reason) return;
+  const submit = async () => {
+    const trimmed = reason.trim();
+    if (!trimmed) {
+      toaster.create({
+        title: "Reason is required",
+        description: "Saved to the audit log alongside the impersonation.",
+        type: "error",
+        duration: 3000,
+        meta: { closable: true },
+      });
+      return;
+    }
     setLoading(true);
     try {
       await impersonateUser({
         userIdToImpersonate: user.id,
-        reason,
+        reason: trimmed,
       });
       window.location.href = "/";
     } catch (err) {
@@ -196,9 +217,67 @@ function ImpersonateButton({ user }: { user: AdminUser }) {
   };
 
   return (
-    <Button size="xs" variant="ghost" onClick={handle} loading={loading}>
-      <UserCheck size={14} /> Impersonate
-    </Button>
+    <>
+      <Button
+        size="xs"
+        variant="ghost"
+        onClick={() => {
+          setReason("");
+          setOpen(true);
+        }}
+      >
+        <UserCheck size={14} /> Impersonate
+      </Button>
+      <Dialog.Root
+        open={open}
+        onOpenChange={({ open: next }) => {
+          if (!next && !loading) setOpen(false);
+        }}
+      >
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>Impersonate user</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.CloseTrigger disabled={loading} />
+          <Dialog.Body>
+            <VStack gap={3} align="stretch">
+              <Text fontSize="sm" color="fg.muted">
+                You will sign in as{" "}
+                <Text as="span" fontWeight="semibold" color="fg">
+                  {user.name ?? user.email ?? user.id}
+                </Text>
+                . The reason below is saved to the audit log.
+              </Text>
+              <Field.Root required>
+                <Field.Label>Reason</Field.Label>
+                <Textarea
+                  rows={3}
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="e.g. Debugging a stuck trace reported by support ticket #…"
+                  disabled={loading}
+                />
+              </Field.Root>
+            </VStack>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <HStack width="full">
+              <Spacer />
+              <Button
+                variant="ghost"
+                onClick={() => setOpen(false)}
+                disabled={loading}
+              >
+                Cancel
+              </Button>
+              <Button onClick={submit} loading={loading} colorPalette="orange">
+                Impersonate
+              </Button>
+            </HStack>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog.Root>
+    </>
   );
 }
 
@@ -212,16 +291,20 @@ function UserEditDrawer({
   const update = useAdminUpdate<AdminUser>("user");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [deactivate, setDeactivate] = useState(false);
+  const [image, setImage] = useState("");
+  const [emailVerified, setEmailVerified] = useState(false);
   const [pendingSsoSetup, setPendingSsoSetup] = useState(false);
+  const [deactivate, setDeactivate] = useState(false);
 
   // Re-seed the form every time the drawer opens on a different user.
   useEffect(() => {
     if (!user) return;
     setName(user.name ?? "");
     setEmail(user.email ?? "");
-    setDeactivate(!!user.deactivatedAt);
+    setImage(user.image ?? "");
+    setEmailVerified(!!user.emailVerified);
     setPendingSsoSetup(!!user.pendingSsoSetup);
+    setDeactivate(!!user.deactivatedAt);
   }, [user]);
 
   const handleSave = () => {
@@ -229,12 +312,16 @@ function UserEditDrawer({
     const data: Record<string, unknown> = {};
     if (name !== (user.name ?? "")) data.name = name;
     if (email !== (user.email ?? "")) data.email = email;
-    const currentlyDeactivated = !!user.deactivatedAt;
-    if (deactivate !== currentlyDeactivated) {
-      data.deactivatedAt = deactivate ? new Date().toISOString() : null;
+    if (image !== (user.image ?? "")) data.image = image || null;
+    if (emailVerified !== !!user.emailVerified) {
+      data.emailVerified = emailVerified;
     }
     if (pendingSsoSetup !== !!user.pendingSsoSetup) {
       data.pendingSsoSetup = pendingSsoSetup;
+    }
+    const currentlyDeactivated = !!user.deactivatedAt;
+    if (deactivate !== currentlyDeactivated) {
+      data.deactivatedAt = deactivate ? new Date().toISOString() : null;
     }
     if (Object.keys(data).length === 0) {
       onClose();
@@ -296,38 +383,43 @@ function UserEditDrawer({
                 />
               </Field.Root>
               <Field.Root>
-                <HStack width="full">
-                  <VStack align="start" gap={0}>
-                    <Field.Label>Deactivated</Field.Label>
-                    <Text fontSize="xs" color="fg.muted">
-                      Revokes sessions + blocks new logins until reactivated.
-                    </Text>
-                  </VStack>
-                  <Spacer />
-                  <Switch
-                    checked={deactivate}
-                    onCheckedChange={(e) => setDeactivate(e.checked)}
-                  />
-                </HStack>
+                <Field.Label>Avatar URL</Field.Label>
+                <Input
+                  type="url"
+                  value={image}
+                  onChange={(e) => setImage(e.target.value)}
+                  placeholder="https://…"
+                />
               </Field.Root>
-              <Field.Root>
-                <HStack width="full">
-                  <VStack align="start" gap={0}>
-                    <Field.Label>Pending SSO setup</Field.Label>
-                    <Text fontSize="xs" color="fg.muted">
-                      Allows first-time SSO provider linking.
-                    </Text>
-                  </VStack>
-                  <Spacer />
-                  <Switch
-                    checked={pendingSsoSetup}
-                    onCheckedChange={(e) => setPendingSsoSetup(e.checked)}
-                  />
-                </HStack>
-              </Field.Root>
-              <Text fontSize="xs" color="fg.muted">
-                User ID: {user.id}
-              </Text>
+              <ToggleRow
+                label="Email verified"
+                hint="Flip manually after an out-of-band verification."
+                checked={emailVerified}
+                onChange={setEmailVerified}
+              />
+              <ToggleRow
+                label="Pending SSO setup"
+                hint="Allows first-time SSO provider linking."
+                checked={pendingSsoSetup}
+                onChange={setPendingSsoSetup}
+              />
+              <ToggleRow
+                label="Deactivated"
+                hint="Revokes sessions + blocks new logins until reactivated."
+                checked={deactivate}
+                onChange={setDeactivate}
+              />
+              <VStack align="start" gap={0} pt={2}>
+                <Text fontSize="xs" color="fg.muted">
+                  User ID: {user.id}
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  Created: {formatDateTime(user.createdAt)}
+                </Text>
+                <Text fontSize="xs" color="fg.muted">
+                  Last login: {formatDateTime(user.lastLoginAt)}
+                </Text>
+              </VStack>
             </VStack>
           )}
         </Drawer.Body>
@@ -344,5 +436,35 @@ function UserEditDrawer({
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+function ToggleRow({
+  label,
+  hint,
+  checked,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
+  return (
+    <Field.Root>
+      <HStack width="full">
+        <VStack align="start" gap={0}>
+          <Field.Label>{label}</Field.Label>
+          <Text fontSize="xs" color="fg.muted">
+            {hint}
+          </Text>
+        </VStack>
+        <Spacer />
+        <Switch
+          checked={checked}
+          onCheckedChange={(e) => onChange(e.checked)}
+        />
+      </HStack>
+    </Field.Root>
   );
 }
