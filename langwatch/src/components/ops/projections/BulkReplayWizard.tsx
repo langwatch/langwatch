@@ -186,7 +186,7 @@ export function BulkReplayWizard({
           <EmptyState.Content>
             <EmptyState.Title>No projections registered</EmptyState.Title>
             <EmptyState.Description>
-              No fold projections were found in the pipeline registry.
+              No projections were found in the pipeline registry.
             </EmptyState.Description>
           </EmptyState.Content>
         </EmptyState.Root>
@@ -350,6 +350,28 @@ export function BulkReplayWizard({
                         <Table.Cell>
                           <HStack gap={2}>
                             <Text textStyle="sm">{proj.projectionName}</Text>
+                            {(() => {
+                              const meta = projectionsQuery.data?.projections.find(
+                                (p) => p.projectionName === proj.projectionName,
+                              );
+                              return meta?.kind === "map" ? (
+                                <Badge
+                                  size="sm"
+                                  variant="subtle"
+                                  colorPalette="purple"
+                                >
+                                  map
+                                </Badge>
+                              ) : (
+                                <Badge
+                                  size="sm"
+                                  variant="subtle"
+                                  colorPalette="blue"
+                                >
+                                  fold
+                                </Badge>
+                              );
+                            })()}
                             {!hasData && (
                               <Badge
                                 size="sm"
