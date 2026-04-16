@@ -145,9 +145,11 @@ export class PromptService {
       organizationId,
     });
 
-    const configIds = configs.map((c) => c.id);
-    const tagsByVersionId = await this.getTagsByVersionIdForConfigs({
-      configIds,
+    const latestVersionIds = configs
+      .map((c) => c.latestVersion.id)
+      .filter((id): id is string => !!id);
+    const tagsByVersionId = await this.getTagsByVersionIds({
+      versionIds: latestVersionIds,
       projectId,
     });
 
@@ -251,13 +253,24 @@ export class PromptService {
       return null;
     }
 
-    const tagsByVersionId = await this.getTagsByVersionIdForConfigs({
-      configIds: [config.id],
-      projectId,
-    });
     const currentVersionId = config.latestVersion.id ?? "";
     const latestVersionId = await this.getLatestVersionIdForConfig({
       configId: config.id,
+      projectId,
+    });
+
+    // Only fetch assignments for the versions we actually need (the returned
+    // version and, when it differs, the latest version for the "latest" tag
+    // comparison) — not the whole tag history for the config.
+    const versionIdsToQuery = Array.from(
+      new Set(
+        [currentVersionId, latestVersionId].filter(
+          (id): id is string => !!id,
+        ),
+      ),
+    );
+    const tagsByVersionId = await this.getTagsByVersionIds({
+      versionIds: versionIdsToQuery,
       projectId,
     });
 
@@ -304,8 +317,11 @@ export class PromptService {
         organizationId,
       })) as LatestConfigVersionSchema[];
 
-    const tagsByVersionId = await this.getTagsByVersionIdForConfigs({
-      configIds: [config.id],
+    const versionIds = versions
+      .map((v) => v.id)
+      .filter((id): id is string => !!id);
+    const tagsByVersionId = await this.getTagsByVersionIds({
+      versionIds,
       projectId: params.projectId,
     });
 
@@ -1170,27 +1186,22 @@ export class PromptService {
   }
 
   /**
-   * Batch-fetches all PromptTagAssignments for the given configs, grouped
-   * by versionId. Returned entries contain `{ name, versionId }`. Used by
-   * list/get/versions endpoints so tags can be shown alongside prompt data.
+   * Fetches the tag assignments pointing at exactly the given versionIds,
+   * grouped by versionId. Delegates to the repository so the service keeps
+   * no raw Prisma access. Callers should pass only the versionIds they
+   * actually need (not the full history of a config) to keep this bounded.
    */
-  private async getTagsByVersionIdForConfigs(params: {
-    configIds: string[];
+  private async getTagsByVersionIds(params: {
+    versionIds: string[];
     projectId: string;
   }): Promise<Map<string, Array<{ name: string; versionId: string }>>> {
     const map = new Map<string, Array<{ name: string; versionId: string }>>();
 
-    if (params.configIds.length === 0) {
-      return map;
-    }
+    if (params.versionIds.length === 0) return map;
 
-    const assignments = await this.prisma.promptTagAssignment.findMany({
-      where: {
-        projectId: params.projectId,
-        configId: { in: params.configIds },
-      },
-      include: { promptTag: true },
-      orderBy: { createdAt: "asc" },
+    const assignments = await this.tagRepository.findByVersionIds({
+      versionIds: params.versionIds,
+      projectId: params.projectId,
     });
 
     for (const assignment of assignments) {
@@ -1213,12 +1224,15 @@ export class PromptService {
     configId: string;
     projectId: string;
   }): Promise<string> {
-    const latest = await this.prisma.llmPromptConfigVersion.findFirst({
-      where: { configId: params.configId, projectId: params.projectId },
-      orderBy: { createdAt: "desc" },
-      select: { id: true },
-    });
-    return latest?.id ?? "";
+    try {
+      const latest = await this.repository.versions.getLatestVersion(
+        params.configId,
+        params.projectId,
+      );
+      return latest.id ?? "";
+    } catch {
+      return "";
+    }
   }
 
   /**
