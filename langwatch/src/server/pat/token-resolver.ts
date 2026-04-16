@@ -100,9 +100,6 @@ export class TokenResolver {
     // Verify the project belongs to the same organization as the PAT
     if (project.team.organizationId !== pat.organizationId) return null;
 
-    // Mark as used only after full authorization succeeds
-    this.patService.markUsed({ id: pat.id });
-
     return {
       type: "pat",
       patId: pat.id,
@@ -110,5 +107,14 @@ export class TokenResolver {
       organizationId: pat.organizationId,
       project,
     };
+  }
+
+  /**
+   * Marks a PAT as used. Callers should invoke this only after the request
+   * is fully validated (body parsed, params accepted) so lastUsedAt reflects
+   * successful authenticated use, not merely successful authentication.
+   */
+  markUsed({ patId }: { patId: string }): void {
+    this.patService.markUsed({ id: patId });
   }
 }

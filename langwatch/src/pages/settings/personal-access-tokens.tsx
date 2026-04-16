@@ -103,6 +103,14 @@ function PatSettingsContent({
   );
   const [expirationPreset, setExpirationPreset] = useState("");
   const [customDate, setCustomDate] = useState("");
+  const minCustomDate = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    const dd = String(d.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  }, []);
   const [newToken, setNewToken] = useState<string | null>(null);
   const [patToRevoke, setPatToRevoke] = useState<string | null>(null);
 
@@ -269,9 +277,10 @@ function PatSettingsContent({
                         size="xs"
                         variant="ghost"
                         colorPalette="red"
+                        aria-label={`Revoke token ${pat.name}`}
                         onClick={() => setPatToRevoke(pat.id)}
                       >
-                        <Trash2 size={14} />
+                        <Trash2 size={14} aria-hidden="true" />
                       </Button>
                     </Table.Cell>
                   </Table.Row>
@@ -372,7 +381,7 @@ function PatSettingsContent({
                   <Input
                     type="date"
                     value={customDate}
-                    min={new Date(Date.now() + 86400000).toISOString().split("T")[0]}
+                    min={minCustomDate}
                     onChange={(e) => setCustomDate(e.target.value)}
                   />
                 )}

@@ -98,14 +98,7 @@ async function authenticateAndCheckLimit(c: {
     return { error: "Invalid auth token.", status: 401 as const };
   }
 
-  const project = await prisma.project.findUnique({
-    where: { id: resolved.project.id },
-    include: { team: true },
-  });
-
-  if (!project) {
-    return { error: "Invalid auth token.", status: 401 as const };
-  }
+  const project = resolved.project;
 
   // Check usage limits
   try {
@@ -151,7 +144,7 @@ async function authenticateAndCheckLimit(c: {
     });
   }
 
-  return { project };
+  return { project, resolved };
 }
 
 // ── POST /traces ─────────────────────────────────────────────────────
@@ -170,7 +163,7 @@ app.post("/traces", async (c) => {
         return c.json({ message: authResult.error }, { status: authResult.status });
       }
 
-      const { project } = authResult;
+      const { project, resolved } = authResult;
       span.setAttribute("langwatch.project.id", project.id);
 
       const contentType = c.req.header("content-type");
@@ -226,6 +219,11 @@ app.post("/traces", async (c) => {
         }
       }
 
+      // Body successfully parsed — mark PAT as used
+      if (resolved.type === "pat") {
+        tokenResolver.markUsed({ patId: resolved.patId });
+      }
+
       const collectionResult =
         await getApp().traces.collection.handleOtlpTraceRequest(
           project.id,
@@ -260,7 +258,7 @@ app.post("/logs", async (c) => {
         return c.json({ message: authResult.error }, { status: authResult.status });
       }
 
-      const { project } = authResult;
+      const { project, resolved } = authResult;
       span.setAttribute("langwatch.project.id", project.id);
 
       const contentType = c.req.header("content-type");
@@ -304,6 +302,11 @@ app.post("/logs", async (c) => {
         }
       }
 
+      // Body successfully parsed — mark PAT as used
+      if (resolved.type === "pat") {
+        tokenResolver.markUsed({ patId: resolved.patId });
+      }
+
       await getApp().traces.logCollection.handleOtlpLogRequest({
         tenantId: project.id,
         logRequest,
@@ -331,7 +334,7 @@ app.post("/metrics", async (c) => {
         return c.json({ message: authResult.error }, { status: authResult.status });
       }
 
-      const { project } = authResult;
+      const { project, resolved } = authResult;
       span.setAttribute("langwatch.project.id", project.id);
 
       const contentType = c.req.header("content-type");
@@ -373,6 +376,11 @@ app.post("/metrics", async (c) => {
 
           return c.json({ error: "Failed to parse metrics" }, { status: 400 });
         }
+      }
+
+      // Body successfully parsed — mark PAT as used
+      if (resolved.type === "pat") {
+        tokenResolver.markUsed({ patId: resolved.patId });
       }
 
       await getApp().traces.metricCollection.handleOtlpMetricRequest({

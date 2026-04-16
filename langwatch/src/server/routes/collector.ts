@@ -94,14 +94,7 @@ app.post(
       return c.json({ message: "Invalid auth token." }, 401);
     }
 
-    const project = await prisma.project.findUnique({
-      where: { id: resolved.project.id },
-      include: { team: true },
-    });
-
-    if (!project) {
-      return c.json({ message: "Invalid auth token." }, 401);
-    }
+    const project = resolved.project;
 
     logger.info(
       { projectId: project.id },
@@ -247,6 +240,12 @@ app.post(
       );
 
       return c.json({ error: validationError.message }, 400);
+    }
+
+    // Body successfully validated — mark PAT as used if this request was
+    // authenticated via PAT
+    if (resolved.type === "pat") {
+      tokenResolver.markUsed({ patId: resolved.patId });
     }
 
     const { trace_id: nullableTraceId, expected_output: expectedOutput } =

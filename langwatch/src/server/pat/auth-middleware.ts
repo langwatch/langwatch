@@ -107,7 +107,11 @@ export function createUnifiedAuthMiddleware(): MiddlewareHandler {
         logger.warn(
           {
             hasToken: true,
-            tokenPrefix: credentials.token.substring(0, 10) + "...",
+            tokenType: credentials.token.startsWith("pat-lw-")
+              ? "pat"
+              : credentials.token.startsWith("sk-lw-")
+                ? "legacy"
+                : "unknown",
             hasProjectId: !!credentials.projectId,
           },
           "Authentication failed: invalid credentials",
@@ -124,6 +128,10 @@ export function createUnifiedAuthMiddleware(): MiddlewareHandler {
         c.set("patId", resolved.patId);
         c.set("patUserId", resolved.userId);
         c.set("patOrganizationId", resolved.organizationId);
+        // Middleware path: mark used after successful authentication.
+        // Downstream routes run their own validation; the audit trail
+        // here reflects "last successful authentication" per-route.
+        resolver.markUsed({ patId: resolved.patId });
       }
 
       c.set("resolvedToken", resolved);
