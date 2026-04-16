@@ -1242,7 +1242,7 @@ export class ClickHouseTraceService {
         // keeping only the archived version. Read queries use
         // `ArchivedAt IS NULL` AND dedup patterns that pick the
         // latest UpdatedAt, so archived traces are immediately excluded.
-        await Promise.all([
+        const [summaryResult] = await Promise.all([
           clickHouseClient.command({
             query: `
               INSERT INTO trace_summaries (
@@ -1294,15 +1294,20 @@ export class ClickHouseTraceService {
           }),
         ]);
 
-        // Note: ClickHouse command() does not return affected row counts,
-        // so we report the requested count. Traces that don't exist or
-        // are already archived are safely no-ops (INSERT...SELECT finds 0 rows).
+        // Use the trace_summaries INSERT...SELECT written_rows as the archived
+        // count — it reflects how many distinct, previously-unarchived traces
+        // were actually affected. Duplicates in the input, nonexistent IDs,
+        // and already-archived traces are all safely excluded by the SELECT.
+        const writtenRaw = summaryResult.summary?.written_rows;
+        const archivedCount =
+          typeof writtenRaw === "string" ? Number(writtenRaw) : 0;
+
         this.logger.info(
-          { projectId, traceCount: traceIds.length },
+          { projectId, requestedCount: traceIds.length, archivedCount },
           "Archived traces in ClickHouse",
         );
 
-        return traceIds.length;
+        return Number.isFinite(archivedCount) ? archivedCount : 0;
       },
     );
   }

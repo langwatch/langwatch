@@ -173,29 +173,37 @@ describe.skipIf(!hasTestcontainers)(
         `,
       });
 
-      // Wait for stored_spans mutations to complete
-      await waitForMutations(ch);
-
-      // Force merge so the ReplacingMergeTree deduplicates immediately.
-      // In production, queries use dedup subqueries (max(UpdatedAt)) that
-      // handle unmerged data correctly, but these tests verify both
-      // simple and dedup query patterns.
-      await ch.command({ query: `OPTIMIZE TABLE trace_summaries FINAL` });
-      await ch.command({ query: `OPTIMIZE TABLE stored_spans FINAL` });
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Wait for stored_spans mutations to complete.
+      // IMPORTANT: we deliberately do NOT call OPTIMIZE TABLE ... FINAL here.
+      // Production queries must handle the pre-merge state (two rows per archived
+      // trace, one unarchived + one archived) by using dedup subqueries that pick
+      // the latest row via max(UpdatedAt). These tests run in the unmerged state
+      // so they exercise that code path.
+      await waitForMutations(ch, "stored_spans");
     });
 
     afterEach(async () => {
       // Individual test cleanup not needed — data is tenant-scoped
     });
 
-    it("excludes archived traces from count queries", async () => {
+    it("excludes archived traces from count queries (dedup, unmerged data)", async () => {
+      // Production queries dedup via max(UpdatedAt) subquery so archival is
+      // visible immediately — before the ReplacingMergeTree merge runs.
+      // NOTE: The inner max(UpdatedAt) subquery must NOT filter ArchivedAt,
+      // otherwise older unarchived versions leak through when the latest
+      // version is archived (see PR #3272 review).
       const result = await ch.query({
         query: `
-          SELECT count(DISTINCT TraceId) AS total
+          SELECT count() AS total
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
             AND ArchivedAt IS NULL
+            AND (TenantId, TraceId, UpdatedAt) IN (
+              SELECT TenantId, TraceId, max(UpdatedAt)
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+              GROUP BY TenantId, TraceId
+            )
         `,
         query_params: { tenantId },
         format: "JSONEachRow",
@@ -204,7 +212,39 @@ describe.skipIf(!hasTestcontainers)(
       expect(Number(rows[0]?.total)).toBe(1);
     });
 
-    it("excludes archived traces from dedup queries", async () => {
+    it("excludes archived traces from dedup queries (pre-merge semantics)", async () => {
+      // CRITICAL: inner max(UpdatedAt) subquery must NOT filter ArchivedAt.
+      // Otherwise, for a trace whose latest row is archived, the max picks
+      // an older unarchived row and the trace leaks back into results.
+      const result = await ch.query({
+        query: `
+          SELECT TraceId
+          FROM trace_summaries
+          WHERE TenantId = {tenantId:String}
+            AND ArchivedAt IS NULL
+            AND (TenantId, TraceId, UpdatedAt) IN (
+              SELECT TenantId, TraceId, max(UpdatedAt)
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+              GROUP BY TenantId, TraceId
+            )
+        `,
+        query_params: { tenantId },
+        format: "JSONEachRow",
+      });
+      const rows = await result.json<{ TraceId: string }>();
+      const traceIds = rows.map((r) => r.TraceId);
+
+      expect(traceIds).toContain(activeTraceId);
+      expect(traceIds).not.toContain(archivedTraceId);
+    });
+
+    it("broken dedup pattern (ArchivedAt in inner subquery) would leak archived trace", async () => {
+      // Regression guard: the anti-pattern described in the PR review.
+      // If this test ever shows archivedTraceId, someone has reintroduced the
+      // bug where ArchivedAt filtering inside the max(UpdatedAt) subquery
+      // causes older unarchived versions to be selected. The correct pattern
+      // is covered by the sibling "pre-merge semantics" test above.
       const result = await ch.query({
         query: `
           SELECT TraceId
@@ -225,11 +265,14 @@ describe.skipIf(!hasTestcontainers)(
       const rows = await result.json<{ TraceId: string }>();
       const traceIds = rows.map((r) => r.TraceId);
 
+      // This is the broken behaviour — archivedTraceId DOES leak through
+      // because we fed the dedup from a filtered set. Encoded as a test so
+      // the failure mode is visible and cannot be silently restored.
       expect(traceIds).toContain(activeTraceId);
-      expect(traceIds).not.toContain(archivedTraceId);
+      expect(traceIds).toContain(archivedTraceId);
     });
 
-    it("excludes archived traces from topic count queries", async () => {
+    it("excludes archived traces from topic count queries (dedup, unmerged data)", async () => {
       const result = await ch.query({
         query: `
           SELECT TopicId, count() AS cnt
@@ -237,13 +280,19 @@ describe.skipIf(!hasTestcontainers)(
           WHERE TenantId = {tenantId:String}
             AND ArchivedAt IS NULL
             AND TopicId IS NOT NULL
+            AND (TenantId, TraceId, UpdatedAt) IN (
+              SELECT TenantId, TraceId, max(UpdatedAt)
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+              GROUP BY TenantId, TraceId
+            )
           GROUP BY TopicId
         `,
         query_params: { tenantId },
         format: "JSONEachRow",
       });
       const rows = await result.json<{ TopicId: string; cnt: string }>();
-      // Only 1 trace should be counted (the active one)
+      // Only 1 trace should be counted (the active one) even in pre-merge state
       expect(Number(rows[0]?.cnt)).toBe(1);
     });
 
@@ -354,10 +403,9 @@ describe.skipIf(!hasTestcontainers)(
       });
 
       await new Promise((resolve) => setTimeout(resolve, 500));
-      await ch.command({ query: `OPTIMIZE TABLE trace_summaries FINAL` });
-      await new Promise((resolve) => setTimeout(resolve, 300));
 
-      // Query by thread ID
+      // Query by thread ID in pre-merge state using the production dedup pattern.
+      // Inner max(UpdatedAt) must NOT filter ArchivedAt (see PR #3272 review).
       const result = await ch.query({
         query: `
           SELECT DISTINCT TraceId
@@ -365,6 +413,12 @@ describe.skipIf(!hasTestcontainers)(
           WHERE TenantId = {tenantId:String}
             AND ArchivedAt IS NULL
             AND Attributes['gen_ai.conversation.id'] = {threadId:String}
+            AND (TenantId, TraceId, UpdatedAt) IN (
+              SELECT TenantId, TraceId, max(UpdatedAt)
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+              GROUP BY TenantId, TraceId
+            )
         `,
         query_params: { tenantId, threadId },
         format: "JSONEachRow",
@@ -376,18 +430,23 @@ describe.skipIf(!hasTestcontainers)(
       expect(traceIds).not.toContain(archivedThreadTrace);
     });
 
-    it("excludes archived traces from paginated queries with argMax dedup", async () => {
+    it("excludes archived traces from paginated queries with argMax dedup (pre-merge)", async () => {
+      // argMax must be applied over UNFILTERED rows so it resolves the latest
+      // version, then the outer query filters on the archived state of that
+      // latest version. Filtering ArchivedAt IS NULL before argMax would
+      // cause argMax to pick an older unarchived version and leak the trace.
       const result = await ch.query({
         query: `
           SELECT TraceId
           FROM (
             SELECT TraceId,
-                   argMax(OccurredAt, UpdatedAt) AS _oa
+                   argMax(OccurredAt, UpdatedAt) AS _oa,
+                   argMax(ArchivedAt, UpdatedAt) AS _archived
             FROM trace_summaries
             WHERE TenantId = {tenantId:String}
-              AND ArchivedAt IS NULL
             GROUP BY TraceId
           )
+          WHERE _archived IS NULL
           ORDER BY _oa DESC
         `,
         query_params: { tenantId },
@@ -403,11 +462,6 @@ describe.skipIf(!hasTestcontainers)(
 );
 
 // --- Helpers ---
-
-/** Format Date for ClickHouse DateTime64(3) parameters (no trailing Z) */
-function toClickHouseDateTime(d: Date): string {
-  return d.toISOString().replace("Z", "");
-}
 
 function makeMinimalSummary(
   tenantId: string,
@@ -454,8 +508,11 @@ function makeMinimalSummary(
 
 async function waitForMutations(
   ch: ClickHouseClient,
+  table: string,
   timeoutMs = 30000,
 ): Promise<void> {
+  // Scope polling to the specific table under test so an unrelated suite
+  // running against a shared ClickHouse container cannot block or timeout us.
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
     const result = await ch.query({
@@ -464,12 +521,16 @@ async function waitForMutations(
         FROM system.mutations
         WHERE is_done = 0
           AND database = currentDatabase()
+          AND table = {table:String}
       `,
+      query_params: { table },
       format: "JSONEachRow",
     });
     const rows = await result.json<{ pending: string }>();
     if (Number(rows[0]?.pending ?? 0) === 0) return;
     await new Promise((resolve) => setTimeout(resolve, 200));
   }
-  throw new Error("Timeout waiting for ClickHouse mutations to complete");
+  throw new Error(
+    `Timeout waiting for ClickHouse mutations on ${table} to complete`,
+  );
 }

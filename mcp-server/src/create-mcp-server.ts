@@ -7,6 +7,7 @@ import {
   createDatasetSchema,
   datasetColumnDefinitionSchema,
 } from "./schemas/create-dataset.js";
+import { handleArchiveTraces } from "./tools/archive-traces.js";
 
 const modelSchema = z
   .string()
@@ -251,7 +252,6 @@ function registerTools(server: McpServer): void {
     },
     withToolLogging("archive_traces", async (params) => {
       requireApiKey();
-      const { handleArchiveTraces } = await import("./tools/archive-traces.js");
       return {
         content: [{ type: "text", text: await handleArchiveTraces(params) }],
       };
