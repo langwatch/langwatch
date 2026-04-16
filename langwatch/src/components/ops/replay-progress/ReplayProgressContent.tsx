@@ -149,10 +149,11 @@ function LiveRunView({
 }) {
   const throughputRate = useMemo(() => {
     if (!status.startedAt || !status.eventsProcessed) return null;
-    const elapsed = (Date.now() - new Date(status.startedAt).getTime()) / 1000;
+    const end = status.completedAt ? new Date(status.completedAt).getTime() : Date.now();
+    const elapsed = (end - new Date(status.startedAt).getTime()) / 1000;
     if (elapsed < 1) return null;
     return Math.round(status.eventsProcessed / elapsed);
-  }, [status.startedAt, status.eventsProcessed]);
+  }, [status.startedAt, status.completedAt, status.eventsProcessed]);
 
   const activeProjections = useMemo(
     () => new Set(status.currentProjection?.split("+").filter(Boolean) ?? []),
