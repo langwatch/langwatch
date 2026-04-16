@@ -72,38 +72,38 @@ def get_field_type_to_zod(field, definitions=None):
             definitions,
         )
         return f"z.object({{{inner}}})"
-    if field == str:
+    if field is str:
         return "z.string()"
-    elif field == int:
+    elif field is int:
         return "z.number()"
-    elif field == float:
+    elif field is float:
         return "z.number()"
-    elif field == bool:
+    elif field is bool:
         return "z.boolean()"
-    elif get_origin(field) == Literal:
+    elif get_origin(field) is Literal:
         args = get_args(field)
         if len(args) == 1:
             return f"z.literal({json.dumps(args[0])})"
         literals = ", ".join([f"z.literal({json.dumps(v)})" for v in args])
         return f"z.union([{literals}])"
-    elif get_origin(field) == Optional:
+    elif get_origin(field) is Optional:
         inner = get_field_type_to_zod(get_args(field)[0], definitions)
         return f"{inner}.optional()"
-    elif get_origin(field) == Union:
-        args = [a for a in get_args(field) if a != type(None)]
+    elif get_origin(field) is Union:
+        args = [a for a in get_args(field) if a is not type(None)]
         if len(args) == 1:
             # Optional[X] is Union[X, None]
             return f"{get_field_type_to_zod(args[0], definitions)}.optional()"
         parts = ", ".join([get_field_type_to_zod(a, definitions) for a in args])
         return f"z.union([{parts}])"
-    elif get_origin(field) == list:
+    elif get_origin(field) is list:
         inner = get_field_type_to_zod(get_args(field)[0], definitions)
         return f"z.array({inner})"
-    elif get_origin(field) == dict:
-        key_type, value_type = get_args(field)
+    elif get_origin(field) is dict:
+        _, value_type = get_args(field)
         value_zod = get_field_type_to_zod(value_type, definitions)
         return f"z.record(z.string(), {value_zod})"
-    elif field == type(None):
+    elif field is type(None):
         return "z.undefined()"
 
     evaluator_context = ""
