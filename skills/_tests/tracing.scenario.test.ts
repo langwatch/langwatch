@@ -60,7 +60,7 @@ describe("Tracing Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent should edit the main.py file to add LangWatch instrumentation",
-              "Agent should use the LangWatch MCP to check documentation",
+              "Agent used the `langwatch docs` CLI command to read documentation",
             ],
           }),
         ],
@@ -111,7 +111,7 @@ describe("Tracing Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent should edit the TypeScript file to add LangWatch instrumentation",
-              "Agent should use the LangWatch MCP to check documentation",
+              "Agent used the `langwatch docs` CLI command to read documentation",
             ],
           }),
         ],
@@ -161,7 +161,7 @@ describe("Tracing Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent should modify the Python file to add LangWatch tracing",
-              "Agent should use the LangWatch MCP to check LangGraph integration docs",
+              "Agent used the `langwatch docs` CLI command to read LangGraph integration docs",
             ],
           }),
         ],
@@ -211,7 +211,7 @@ describe("Tracing Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent should modify the TypeScript file to add LangWatch tracing",
-              "Agent should use the LangWatch MCP to check Mastra integration docs",
+              "Agent used the `langwatch docs` CLI command to read Mastra integration docs",
             ],
           }),
         ],
@@ -261,7 +261,7 @@ describe("Tracing Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent should modify the Python file to add LangWatch tracing",
-              "Agent should use the LangWatch MCP to check Google ADK integration docs",
+              "Agent used the `langwatch docs` CLI command to read Google ADK integration docs",
             ],
           }),
         ],
@@ -349,10 +349,10 @@ describe("Tracing Skill", () => {
   );
 
   it.skipIf(isCI)(
-    "instruments code without MCP — uses llms.txt fallback for docs",
+    "instruments code via llms.txt fallback when told the CLI is not available",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-tracing-nomcp-")
+        path.join(os.tmpdir(), "langwatch-skill-tracing-nocli-")
       );
       execSync(
         `cp -r ${path.resolve(__dirname, "fixtures/python-openai")}/* ${tempFolder}/`
@@ -366,26 +366,23 @@ describe("Tracing Skill", () => {
       );
 
       const result = await scenario.run({
-        name: "Tracing without MCP — llms.txt fallback",
+        name: "Tracing — llms.txt fallback when CLI is unavailable",
         description:
-          "Agent instruments code without MCP access, using direct URL fetching for docs.",
+          "Agent instruments code in an environment where the langwatch CLI cannot run; must fetch docs via the llms.txt fallback URLs.",
         agents: [
-          createClaudeCodeAgent({
-            workingDirectory: tempFolder,
-            skipMcp: true,
-          }),
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
               "Agent should have added LangWatch tracing to the code",
-              "Agent should have fetched documentation via URLs since MCP is not available",
+              "Agent should have fetched documentation via the langwatch.ai/docs llms.txt URLs since the CLI was unavailable",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "instrument my code with langwatch. The LangWatch MCP is not installed, but you can fetch docs directly from https://langwatch.ai/docs/llms.txt. My API key is in the .env file."
+            "instrument my code with langwatch. Pretend the langwatch CLI is not available in this environment, so do not run any `langwatch ...` shell commands; instead fetch docs directly from https://langwatch.ai/docs/llms.txt and follow the markdown links from there. My API key is in the .env file."
           ),
           scenario.agent(),
           (state) => {

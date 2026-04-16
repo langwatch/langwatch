@@ -70,7 +70,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
         ],
         script: [
           scenario.user(
-            "use the langwatch prompt cli to version my prompts. The langwatch cli is already installed globally via npm. Check the docs via the LangWatch MCP if needed."
+            "use the langwatch prompt cli to version my prompts. The langwatch cli is already installed globally via npm. Check the docs with `langwatch docs prompt-management/cli` if needed."
           ),
           scenario.agent(),
           (state) => {

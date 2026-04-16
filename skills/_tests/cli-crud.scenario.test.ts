@@ -15,9 +15,7 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, ".env") });
-// Also load typescript-sdk .env for LANGWATCH_ENDPOINT
-dotenv.config({ path: path.resolve(__dirname, "../../typescript-sdk/.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
@@ -60,7 +58,7 @@ Then run CLI commands directly:
         description:
           "Developer wants to manage agent test scenarios using the LangWatch CLI (not MCP).",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder, skipMcp: true }),
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -132,7 +130,7 @@ Then: \`langwatch dataset records list qa-test-set\`
         description:
           "Developer wants to upload a CSV dataset using the LangWatch CLI via Bash (not MCP).",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder, skipMcp: true }),
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -199,7 +197,7 @@ Then: \`langwatch trace search --limit 5\`
         description:
           "Developer wants to check analytics using the LangWatch CLI via Bash (not MCP).",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder, skipMcp: true }),
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,

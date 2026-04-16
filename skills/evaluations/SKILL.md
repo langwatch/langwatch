@@ -1,9 +1,9 @@
 ---
 name: evaluations
 user-prompt: "Set up evaluations for my agent"
-description: Set up comprehensive evaluations for your AI agent with LangWatch — experiments (batch testing), evaluators (scoring functions), datasets, online evaluation (production monitoring), and guardrails (real-time blocking). Supports both code (SDK) and platform (MCP) approaches. Use when the user wants to evaluate, test, benchmark, monitor, or safeguard their agent.
+description: Set up comprehensive evaluations for your AI agent with LangWatch — experiments (batch testing), evaluators (scoring functions), datasets, online evaluation (production monitoring), and guardrails (real-time blocking). Supports both code (SDK) and platform (CLI) approaches. Use when the user wants to evaluate, test, benchmark, monitor, or safeguard their agent.
 license: MIT
-compatibility: Requires Node.js for MCP setup. Works with Claude Code, Claude Web, and similar AI assistants.
+compatibility: Works with Claude Code and similar AI assistants. The `langwatch` CLI is the only interface for platform operations and documentation.
 ---
 
 # Set Up Evaluations for Your Agent
@@ -51,8 +51,8 @@ If the user's request is **specific** ("add a faithfulness evaluator", "create a
 ## Detect Context
 
 1. Check if you're in a codebase (look for `package.json`, `pyproject.toml`, `requirements.txt`, etc.)
-2. If **YES** → use the **Code approach** for experiments (SDK) and guardrails (code integration)
-3. If **NO** → use the **CLI approach** for evaluators, monitors, and datasets (preferred over MCP)
+2. If **YES** → use the **Code approach** for experiments (SDK) and guardrails (code integration); use the CLI for evaluators, datasets, and monitors
+3. If **NO** → use the **CLI approach** for evaluators, monitors, and datasets (everything platform-side is CLI-driven)
 4. If ambiguous → ask the user: "Do you want to write evaluation code or set things up via CLI?"
 
 Some features are code-only (experiments, guardrails) and some are platform-only (monitors). Evaluators work on both surfaces.
@@ -63,21 +63,24 @@ See [Plan Limits](_shared/plan-limits.md) for how to handle free plan limits gra
 
 ## Prerequisites
 
-**Preferred: Use the LangWatch CLI** (see [CLI Setup](_shared/cli-setup.md))
+Set up the LangWatch CLI first — see [CLI Setup](_shared/cli-setup.md). The CLI is the only interface; it covers documentation (`langwatch docs ...`), evaluator/dataset/monitor CRUD, and evaluation runs.
 
-The CLI is the primary interface for agents. If the CLI is not available, fall back to MCP tools.
+If you cannot run the `langwatch` CLI at all (e.g. you are inside ChatGPT or another shell-less environment), see [docs fallback](_shared/llms-txt-fallback.md).
 
-See [MCP Setup](_shared/mcp-setup.md) for MCP installation as an alternative.
+Read the evaluations overview first:
 
-If MCP installation fails, see [docs fallback](_shared/llms-txt-fallback.md).
-
-Read the evaluations overview first: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/overview.md`
+```bash
+langwatch docs evaluations/overview
+```
 
 ## Step A: Experiments (Batch Testing) — Code Approach
 
 Create a script or notebook that runs your agent against a dataset and measures quality.
 
-1. Read the SDK docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/experiments/sdk.md`
+1. Read the SDK docs:
+   ```bash
+   langwatch docs evaluations/experiments/sdk
+   ```
 2. Analyze the agent's code to understand what it does
 3. Create a dataset with representative examples that are as close to real-world inputs as possible. Focus on domain realism — the dataset should look like actual production data the agent would encounter.
 4. Create the experiment file:
@@ -151,17 +154,25 @@ Online evaluation has two modes:
 ### Platform mode: Monitors
 Set up monitors that continuously score production traffic.
 
-1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/online-evaluation/overview.md`
-2. Configure via the platform UI:
-   - Go to https://app.langwatch.ai → Evaluations → Monitors
-   - Create a new monitor with "When a message arrives" trigger
-   - Select evaluators (e.g., PII Detection, Faithfulness)
-   - Enable monitoring
+1. Read the docs:
+   ```bash
+   langwatch docs evaluations/online-evaluation/overview
+   ```
+2. Create monitors via the CLI:
+   ```bash
+   langwatch monitor list                                                # See existing monitors
+   langwatch monitor create "Toxicity Check" --check-type ragas/toxicity # Create one
+   langwatch monitor create "PII Detection" --check-type presidio/pii_detection --sample 0.5
+   ```
+3. Optionally configure further via the platform UI at https://app.langwatch.ai → Evaluations → Monitors.
 
 ### Code mode: Guardrails
 Add code to block harmful content before it reaches users (synchronous, real-time).
 
-1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/guardrails/code-integration.md`
+1. Read the docs:
+   ```bash
+   langwatch docs evaluations/guardrails/code-integration
+   ```
 2. Add guardrail checks in your agent code:
 
 ```python
@@ -186,15 +197,21 @@ Key distinction: Monitors **measure** (async, observability). Guardrails **act**
 
 Create or configure evaluators — the functions that score your agent's outputs.
 
-### Code Approach
-1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/evaluators/overview.md`
-2. Browse available evaluators: `https://langwatch.ai/docs/evaluations/evaluators/list.md`
-3. Use evaluators in experiments via the SDK:
-   ```python
-   evaluation.evaluate("ragas/faithfulness", index=idx, data={...})
-   ```
+### Read the Docs
 
-### CLI Approach (Preferred for Agents)
+```bash
+langwatch docs evaluations/evaluators/overview
+langwatch docs evaluations/evaluators/list      # Browse available evaluators
+```
+
+### Code Approach
+
+Use evaluators in experiments via the SDK:
+```python
+evaluation.evaluate("ragas/faithfulness", index=idx, data={...})
+```
+
+### CLI Approach
 ```bash
 langwatch evaluator list                                    # List evaluators
 langwatch evaluator create "My Evaluator" --type langevals/llm_judge
@@ -204,25 +221,13 @@ langwatch evaluation run <slug> --wait                      # Run evaluation and
 langwatch evaluation status <runId>                         # Check run status
 ```
 
-### Platform Approach (CLI preferred)
-```bash
-langwatch evaluator list                                      # List evaluators
-langwatch evaluator get <idOrSlug>                            # Get details
-langwatch evaluator create "Name" --type langevals/llm_judge  # Create
-langwatch evaluator update <idOrSlug> --name "New Name"       # Update
-```
-
-If the CLI is not available, use MCP tools as a fallback:
-1. Call `discover_schema` with category "evaluators" to see available types
-2. Use `platform_create_evaluator` to create an evaluator on the platform
-
 This is useful for setting up LLM-as-judge evaluators, custom evaluators, or configuring evaluators that will be used in platform experiments and monitors.
 
 ## Step D: Datasets
 
 Create test datasets for experiments.
 
-### CLI Approach (Preferred for Agents)
+### CLI Approach
 ```bash
 langwatch dataset list                                      # List datasets
 langwatch dataset create "My Dataset" -c input:string,output:string
@@ -231,9 +236,15 @@ langwatch dataset records list my-dataset                   # View records
 langwatch dataset download my-dataset -f csv                # Download
 ```
 
-### Docs Approach
-1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/datasets/overview.md`
-2. Generate a dataset tailored to your agent:
+### Read the Docs
+
+```bash
+langwatch docs datasets/overview
+langwatch docs datasets/programmatic-access     # Programmatic access
+langwatch docs datasets/ai-dataset-generation   # AI-generated datasets
+```
+
+Generate a dataset tailored to your agent:
 
 | Agent type | Dataset examples |
 |---|---|
@@ -256,15 +267,12 @@ Then generate data that reflects EXACTLY this agent's real-world usage. For exam
 
 NEVER use generic examples like "What is 2+2?", "What is the capital of France?", or "Explain quantum computing". These are useless for evaluating the specific agent. Every single example must be something a real user of THIS specific agent would actually say.
 
-3. For programmatic dataset access: `https://langwatch.ai/docs/datasets/programmatic-access.md`
-4. For AI-generated datasets: `https://langwatch.ai/docs/datasets/ai-dataset-generation.md`
-
 ---
 
 ## Platform Approach: Prompts + Evaluators (No Code)
 
 When the user has no codebase and wants to set up evaluation building blocks on the platform.
-Use the CLI as the primary interface:
+Use the CLI:
 
 ### Create or Update a Prompt
 
@@ -317,19 +325,12 @@ Go to https://app.langwatch.ai and:
 3. Use the Prompt Playground to test variations
 4. Set up an experiment in the Experiments section using your prompt, evaluator, and dataset
 
-### MCP Fallback
-
-If the CLI is not available, use MCP tools instead (`platform_create_prompt`, `platform_create_evaluator`, etc.).
-
 ## Common Mistakes
 
 - Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
 - Do NOT use generic/placeholder datasets — generate domain-specific examples
-- Do NOT use MCP tools for code-based features (experiments, guardrails) — write code
-- Prefer the `langwatch` CLI over MCP tools for platform features (evaluators, monitors, datasets)
-- Only use MCP tools as a fallback when the CLI is not available
 - Do NOT skip running the experiment to verify it works
 - Monitors **measure** (async), guardrails **act** (sync, via code with `as_guardrail=True`) — both are online evaluation
 - Always set up `LANGWATCH_API_KEY` in `.env`
-- Always call `discover_schema` before creating evaluators via MCP to understand available types
+- Always run `langwatch evaluator create --help` first if unsure which `--type` values are valid
 - Do NOT create prompts with `langwatch prompt create` CLI when using the platform approach — that's for code-based projects

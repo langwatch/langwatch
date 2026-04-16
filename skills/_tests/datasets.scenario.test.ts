@@ -83,12 +83,15 @@ describe("Dataset Generation Skill", () => {
       copySkillToWorkDir(tempFolder);
       setupLocalCli(tempFolder);
 
-      // Write a .env so CLI commands work
-      const envContent = [
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}`,
-        `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560"}`,
-      ].join("\n");
-      fs.writeFileSync(path.join(tempFolder, ".env"), envContent);
+      // Write a .env so CLI commands work. Only forward LANGWATCH_ENDPOINT
+      // when it's actually set in the parent process — otherwise the CLI
+      // falls back to its default (https://app.langwatch.ai/) instead of a
+      // dead local port.
+      const envLines = [`LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}`];
+      if (process.env.LANGWATCH_ENDPOINT) {
+        envLines.push(`LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}`);
+      }
+      fs.writeFileSync(path.join(tempFolder, ".env"), envLines.join("\n") + "\n");
 
       const result = await scenario.run({
         name: "Dataset generation for tweet-bot",
@@ -181,11 +184,14 @@ describe("Dataset Generation Skill", () => {
       copySkillToWorkDir(tempFolder);
       setupLocalCli(tempFolder);
 
-      const envContent = [
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}`,
-        `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560"}`,
-      ].join("\n");
-      fs.writeFileSync(path.join(tempFolder, ".env"), envContent);
+      // Only forward LANGWATCH_ENDPOINT when it's actually set in the parent
+      // process — otherwise the CLI uses its default (https://app.langwatch.ai/)
+      // instead of a dead local port.
+      const envLines2 = [`LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}`];
+      if (process.env.LANGWATCH_ENDPOINT) {
+        envLines2.push(`LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}`);
+      }
+      fs.writeFileSync(path.join(tempFolder, ".env"), envLines2.join("\n") + "\n");
 
       const result = await scenario.run({
         name: "RAG dataset generation for farm advisory",
@@ -275,11 +281,14 @@ describe("Dataset Generation Skill", () => {
       copySkillToWorkDir(tempFolder);
       setupLocalCli(tempFolder);
 
-      const envContent = [
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}`,
-        `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560"}`,
-      ].join("\n");
-      fs.writeFileSync(path.join(tempFolder, ".env"), envContent);
+      // Only forward LANGWATCH_ENDPOINT when it's actually set in the parent
+      // process — otherwise the CLI uses its default (https://app.langwatch.ai/)
+      // instead of a dead local port.
+      const envLines2 = [`LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}`];
+      if (process.env.LANGWATCH_ENDPOINT) {
+        envLines2.push(`LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}`);
+      }
+      fs.writeFileSync(path.join(tempFolder, ".env"), envLines2.join("\n") + "\n");
 
       const result = await scenario.run({
         name: "Multi-turn dataset generation flow",
@@ -340,11 +349,14 @@ describe("Dataset Generation Skill", () => {
       copySkillToWorkDir(tempFolder);
       setupLocalCli(tempFolder);
 
-      const envContent = [
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}`,
-        `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560"}`,
-      ].join("\n");
-      fs.writeFileSync(path.join(tempFolder, ".env"), envContent);
+      // Only forward LANGWATCH_ENDPOINT when it's actually set in the parent
+      // process — otherwise the CLI uses its default (https://app.langwatch.ai/)
+      // instead of a dead local port.
+      const envLines2 = [`LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}`];
+      if (process.env.LANGWATCH_ENDPOINT) {
+        envLines2.push(`LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}`);
+      }
+      fs.writeFileSync(path.join(tempFolder, ".env"), envLines2.join("\n") + "\n");
 
       const result = await scenario.run({
         name: "Hallucination-focused dataset for RAG agent",
@@ -429,11 +441,14 @@ describe("Dataset Generation Skill", () => {
       copySkillToWorkDir(tempFolder);
       setupLocalCli(tempFolder);
 
-      const envContent = [
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}`,
-        `LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT ?? "http://localhost:5560"}`,
-      ].join("\n");
-      fs.writeFileSync(path.join(tempFolder, ".env"), envContent);
+      // Only forward LANGWATCH_ENDPOINT when it's actually set in the parent
+      // process — otherwise the CLI uses its default (https://app.langwatch.ai/)
+      // instead of a dead local port.
+      const envLines2 = [`LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}`];
+      if (process.env.LANGWATCH_ENDPOINT) {
+        envLines2.push(`LANGWATCH_ENDPOINT=${process.env.LANGWATCH_ENDPOINT}`);
+      }
+      fs.writeFileSync(path.join(tempFolder, ".env"), envLines2.join("\n") + "\n");
 
       const result = await scenario.run({
         name: "Dataset generation with user-provided domain context",

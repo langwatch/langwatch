@@ -3,7 +3,7 @@ name: prompts
 user-prompt: "Version my prompts with LangWatch"
 description: Version and manage your agent's prompts with LangWatch Prompts CLI. Use for both onboarding (set up prompt versioning for an entire codebase) and targeted operations (version a specific prompt, create a new prompt version). Supports Python and TypeScript.
 license: MIT
-compatibility: Works with Claude Code and similar coding agents. CLI is the preferred interface.
+compatibility: Works with Claude Code and similar coding agents. The `langwatch` CLI is the only interface.
 ---
 
 # Version Your Prompts with LangWatch Prompts CLI
@@ -21,17 +21,15 @@ If the user's request is **specific** ("version this prompt", "create a new prom
 - Create or update the managed prompt
 - Update the relevant code to use `langwatch.prompts.get()`
 
-## Detect Context
-
-This skill is primarily code-path (CLI + SDK). If the user has no codebase and wants to create prompts on the platform, use the `langwatch` CLI (`langwatch prompt list`, `langwatch prompt create`, etc.). MCP tools are available as a fallback.
-
 ## Plan Limits
 
 See [Plan Limits](_shared/plan-limits.md) for how to handle free plan limits gracefully. The free plan has a limited number of prompts. Work within the limits and show value before suggesting an upgrade. Do NOT try to work around limits.
 
 ## Step 1: Set up the LangWatch CLI
 
-See [CLI Setup](_shared/cli-setup.md) for installation. The CLI provides all prompt management commands:
+See [CLI Setup](_shared/cli-setup.md) for installation. The CLI is the only interface — it covers documentation, prompt management, and every other LangWatch operation.
+
+The CLI provides all prompt management commands:
 
 ```bash
 langwatch prompt list                              # List prompts
@@ -45,15 +43,16 @@ langwatch prompt restore <handle> <versionId>      # Rollback to a version
 langwatch prompt tag assign <prompt> <tag>         # Tag a version
 ```
 
-If the CLI is not available, set up the MCP as a fallback:
-See [MCP Setup](_shared/mcp-setup.md) for installation instructions.
+If you cannot run the `langwatch` CLI at all (e.g. you are inside ChatGPT or another shell-less environment), see [docs fallback](_shared/llms-txt-fallback.md) for fetching the same docs over plain HTTP.
 
 ## Step 2: Read the Prompts CLI Docs
 
-Use `langwatch prompt --help` to see all available commands, or fetch documentation:
+Use `langwatch prompt --help` to see all available commands, or fetch documentation directly via the CLI:
 
-- Call `fetch_langwatch_docs` (MCP) to read the full Prompts CLI documentation
-- Or see [docs fallback](_shared/llms-txt-fallback.md) to fetch docs directly via URLs
+```bash
+langwatch docs prompt-management/cli                 # Prompts CLI guide
+langwatch docs                                       # Full docs index
+```
 
 CRITICAL: Do NOT guess how to use the Prompts CLI. Read the actual documentation or `--help` output first.
 
@@ -143,13 +142,11 @@ const prompt = await langwatch.prompts.get("my-agent", { tag: "production" });
 
 ### Assigning Tags
 
-Use the Deploy dialog in the LangWatch UI to assign `production` or `staging` tags to a version. For programmatic assignment, use the CLI or REST API:
+Use the CLI to assign `production` or `staging` tags to a specific version (or use the Deploy dialog in the LangWatch UI):
 
 ```bash
-curl -X PUT -H "X-Auth-Token: $LANGWATCH_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"versionId": "version-id-here"}' \
-  "https://app.langwatch.ai/api/prompts/my-agent/tags/production"
+langwatch prompt tag assign my-agent production              # Tag latest version
+langwatch prompt tag assign my-agent production --version 5  # Tag a specific version
 ```
 
 ### Shorthand Syntax
@@ -158,11 +155,11 @@ In config files or anywhere a prompt identifier is accepted, you can use shortha
 
 ### Custom Tags
 
-Create custom tags via `langwatch prompt tag create <name>` (or `POST /api/prompts/tags`) for workflows like canary releases or blue-green deployments.
+Create custom tags via `langwatch prompt tag create <name>` for workflows like canary releases or blue-green deployments.
 
 ## Step 9: Verify
 
-Check that your prompts appear on https://app.langwatch.ai in the Prompts section.
+Check that your prompts appear on https://app.langwatch.ai in the Prompts section, or run `langwatch prompt list` to see them from the terminal.
 
 ## Common Mistakes
 
@@ -170,3 +167,4 @@ Check that your prompts appear on https://app.langwatch.ai in the Prompts sectio
 - Do NOT duplicate prompt text as a fallback (no try/catch around `prompts.get` with a hardcoded string) — this silently defeats versioning
 - Do NOT manually edit `prompts.json` — use the CLI commands (`langwatch prompt init`, `langwatch prompt create`, `langwatch prompt sync`)
 - Do NOT skip `langwatch prompt sync` — prompts must be synced to the platform after creation
+- Do NOT skip reading the docs (`langwatch docs prompt-management/cli`) before editing — the YAML format and CLI flags evolve, do not rely on memory

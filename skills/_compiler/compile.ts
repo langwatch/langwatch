@@ -141,7 +141,15 @@ Once they provide it, use it wherever you see a placeholder below.`;
 function deduplicateSharedContent(sections: string[]): string {
   if (sections.length <= 1) return sections.join("\n\n---\n\n");
 
-  // Track which shared blocks we've already included
+  // Track which shared blocks we've already included.
+  // Skills are CLI-only, so the shared headers we deduplicate are CLI setup,
+  // API key setup, and the llms.txt doc fallback.
+  const SHARED_HEADERS = [
+    "# Using the LangWatch CLI",
+    "# LangWatch API Key Setup",
+    "# Fetching LangWatch Docs Without the CLI",
+  ];
+
   const seen = new Set<string>();
   const deduplicated: string[] = [];
 
@@ -152,10 +160,8 @@ function deduplicateSharedContent(sections: string[]): string {
     let currentSharedBlock = "";
 
     for (const line of lines) {
-      // Detect shared content blocks (MCP setup, API key setup, etc.)
-      if (line.startsWith("# Installing the LangWatch MCP") ||
-          line.startsWith("# LangWatch API Key Setup") ||
-          line.startsWith("# Fetching LangWatch Docs Without MCP")) {
+      const isSharedHeader = SHARED_HEADERS.some((h) => line.startsWith(h));
+      if (isSharedHeader) {
         if (seen.has(line)) {
           skipUntilNextHeader = true;
           currentSharedBlock = line;
@@ -169,7 +175,7 @@ function deduplicateSharedContent(sections: string[]): string {
         if (line.startsWith("## Step") || line.startsWith("## Common") || line.startsWith("# ")) {
           if (line !== currentSharedBlock) {
             skipUntilNextHeader = false;
-            filtered.push(`(See MCP/API key setup above)`);
+            filtered.push(`(See CLI/API key setup above)`);
             filtered.push("");
             filtered.push(line);
           }
@@ -260,9 +266,9 @@ function compile(options: CompileOptions): string {
     ? ``
     : `\n\nIMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.`;
 
-  const mcpNote = `\nFirst, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.\n`;
+  const cliNote = `\nUse the \`langwatch\` CLI for everything: documentation (\`langwatch docs ...\`, \`langwatch scenario-docs ...\`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with \`npm install -g langwatch\` (or run any command via \`npx langwatch\`).\n`;
 
-  return `${header}${apiKeyNote}${mcpNote}\n${combined}`;
+  return `${header}${apiKeyNote}${cliNote}\n${combined}`;
 }
 
 // ──────────────────────────────────────────────────

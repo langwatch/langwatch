@@ -61,7 +61,7 @@ describe("Level-up Skill", () => {
             criteria: [
               "Agent should have added LangWatch tracing to the code",
               "Agent should have set up some form of evaluation or experiment",
-              "Agent should have used the LangWatch MCP to check documentation",
+              "Agent should have used the `langwatch docs` and/or `langwatch scenario-docs` CLI commands to read documentation",
             ],
           }),
         ],
@@ -112,7 +112,7 @@ describe("Level-up Skill", () => {
             criteria: [
               "Agent should have added LangWatch tracing to the code",
               "Agent should have set up some form of evaluation or testing",
-              "Agent should have used the LangWatch MCP to check documentation",
+              "Agent should have used the `langwatch docs` and/or `langwatch scenario-docs` CLI commands to read documentation",
             ],
           }),
         ],

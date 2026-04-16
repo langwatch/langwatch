@@ -2,7 +2,7 @@
 name: evaluate-multimodal
 description: Evaluate multimodal AI agents that process images, audio, PDFs, or other files. Sets up evaluations using LangWatch's LLM-as-judge with image inputs, Scenario's multimodal testing, and document parsing evaluation patterns. Use when your agent handles non-text inputs.
 license: MIT
-compatibility: Requires LangWatch SDK and optionally @langwatch/scenario. Works with Claude Code and similar coding agents.
+compatibility: Requires LangWatch SDK and optionally @langwatch/scenario. Works with Claude Code and similar coding agents. Uses the `langwatch` CLI for documentation and platform operations.
 metadata:
   category: recipe
 ---
@@ -21,9 +21,16 @@ Read the codebase to understand what your agent processes:
 
 ## Step 2: Read the Relevant Docs
 
-Use the LangWatch MCP:
-- `fetch_scenario_docs` → search for multimodal pages (image analysis, audio testing, file analysis)
-- `fetch_langwatch_docs` → search for evaluation SDK docs
+Use the `langwatch` CLI to fetch the right pages:
+
+```bash
+langwatch scenario-docs                            # Index — locate multimodal pages
+langwatch scenario-docs multimodal/audio-to-text   # Audio testing patterns
+langwatch scenario-docs multimodal/multimodal-files # Generic file analysis patterns
+langwatch docs                                     # LangWatch docs index
+langwatch docs evaluations/experiments/sdk         # Experiment SDK basics
+langwatch docs evaluations/evaluators/list         # Browse evaluator types
+```
 
 For PDF evaluation specifically, reference the pattern from `python-sdk/examples/pdf_parsing_evaluation.ipynb`:
 - Download/load documents
@@ -63,7 +70,12 @@ for idx, entry in experiment.loop(enumerate(image_dataset)):
 Use Scenario's audio testing patterns:
 - Audio-to-text: verify transcription accuracy
 - Audio-to-audio: verify voice agent responses
-- Use `fetch_scenario_docs` with url for `multimodal/audio-to-text.md`
+
+Read the dedicated guide:
+
+```bash
+langwatch scenario-docs multimodal/audio-to-text
+```
 
 ### PDF/Document Evaluation
 Follow the pattern from the PDF parsing evaluation example:
@@ -73,9 +85,11 @@ Follow the pattern from the PDF parsing evaluation example:
 4. Use structured evaluation (exact match for fields, LLM judge for summaries)
 
 ### File Analysis
-For agents that process arbitrary files:
-- Use Scenario's file analysis patterns
-- `fetch_scenario_docs` with url for `multimodal/multimodal-files.md`
+For agents that process arbitrary files, read the file analysis guide:
+
+```bash
+langwatch scenario-docs multimodal/multimodal-files
+```
 
 ## Step 4: Generate Domain-Specific Test Data
 
@@ -93,3 +107,4 @@ Run the evaluation, review results, fix issues, re-run until quality is acceptab
 - Do NOT skip testing with real file formats — synthetic descriptions aren't enough
 - Do NOT forget to handle file loading errors in evaluations
 - Do NOT use generic test images — use domain-specific ones matching the agent's purpose
+- Always read the relevant `langwatch scenario-docs ...` page for the modality before writing code; multimodal patterns differ a lot from text-only ones

@@ -1,6 +1,6 @@
 # Using the LangWatch CLI
 
-The `langwatch` CLI gives full access to the LangWatch platform from the terminal. Install with `npm install -g langwatch` or use `npx langwatch`.
+The `langwatch` CLI gives full access to the LangWatch platform from the terminal — including documentation. Install with `npm install -g langwatch` or use `npx langwatch` (no install needed).
 
 ## Setup
 
@@ -24,6 +24,26 @@ langwatch <command> --help          # Help for any command
 
 All list/get commands support `--format json` for machine-readable output.
 
+## Read the Docs (do this BEFORE you start coding)
+
+The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+
+```bash
+langwatch docs                                       # LangWatch docs index (llms.txt)
+langwatch docs integration/python/guide              # Python integration guide
+langwatch docs integration/typescript/guide          # TypeScript integration guide
+langwatch docs prompt-management/cli                 # Prompts CLI guide
+langwatch docs evaluations/experiments/sdk           # Experiments SDK guide
+langwatch docs evaluations/online-evaluation/overview # Online evaluation
+langwatch docs evaluations/guardrails/code-integration # Guardrails
+
+langwatch scenario-docs                              # Scenario docs index
+langwatch scenario-docs agent-integration            # Adapter patterns
+langwatch scenario-docs advanced/red-teaming         # Red teaming guide
+```
+
+The path is forgiving: missing `.md` is appended automatically, leading slashes are stripped, and full URLs work too. If `langwatch` isn't available at all (e.g. inside ChatGPT or another web assistant with no shell), see [docs fallback](llms-txt-fallback.md) to fetch the same files via plain HTTP.
+
 ## Key Commands
 
 ### Resources (CRUD)
@@ -44,7 +64,7 @@ All list/get commands support `--format json` for machine-readable output.
 
 ### Execution
 - `langwatch evaluation run <slug> [--wait]` — run evaluations
-- `langwatch suite run <id> [--wait]` — run a suite (scenario x target matrix)
+- `langwatch suite run <id> [--wait]` — run a suite (scenario × target matrix)
 - `langwatch scenario run <id> --target <type>:<ref>` — run a scenario against a target
 - `langwatch agent run <id> --input <json>` — execute an agent
 - `langwatch workflow run <id> --input <json>` — execute a workflow
@@ -53,5 +73,3 @@ All list/get commands support `--format json` for machine-readable output.
 - `langwatch trace search|get|export` — search, inspect, and export traces
 - `langwatch analytics query --metric <preset>` — query metrics
 - `langwatch simulation-run list|get` — view simulation run results
-
-**Tip:** Prefer CLI over MCP tools when running in Claude Code or terminal environments.

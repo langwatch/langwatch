@@ -15,8 +15,7 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, ".env") });
-dotenv.config({ path: path.resolve(__dirname, "../../typescript-sdk/.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
@@ -57,7 +56,6 @@ Then run CLI commands:
         agents: [
           createClaudeCodeAgent({
             workingDirectory: tempFolder,
-            skipMcp: true,
           }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
@@ -130,7 +128,6 @@ Prompt management commands:
         agents: [
           createClaudeCodeAgent({
             workingDirectory: tempFolder,
-            skipMcp: true,
           }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({

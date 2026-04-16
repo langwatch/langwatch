@@ -342,6 +342,37 @@ program
     await impl(options);
   });
 
+// Docs commands - fetch markdown documentation for LangWatch and Scenario
+program
+  .command("docs [url]")
+  .description(
+    "Fetch LangWatch documentation as markdown. Pass no argument for the index (llms.txt), a path like 'integration/python/guide', or a full URL. Missing extensions default to .md.",
+  )
+  .action(async (url?: string) => {
+    try {
+      const { docsCommand: impl } = await import("./commands/docs.js");
+      await impl(url);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("scenario-docs [url]")
+  .description(
+    "Fetch LangWatch Scenario documentation as markdown. Pass no argument for the index, a path like 'advanced/red-teaming', or a full URL. Missing extensions default to .md.",
+  )
+  .action(async (url?: string) => {
+    try {
+      const { scenarioDocsCommand: impl } = await import("./commands/docs.js");
+      await impl(url);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
 // Add evaluator command group
 const evaluatorCmd = program
   .command("evaluator")

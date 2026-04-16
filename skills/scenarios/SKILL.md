@@ -1,9 +1,9 @@
 ---
 name: scenarios
 user-prompt: "Add scenario tests for my agent"
-description: Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios (CLI or MCP), and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.
+description: Test your AI agent with simulation-based scenarios. Covers writing scenario test code (Scenario SDK), creating platform scenarios via the `langwatch` CLI, and red teaming for security vulnerabilities. Auto-detects whether to use code or platform approach based on context.
 license: MIT
-compatibility: Works with Claude Code and similar AI assistants. CLI is the preferred interface for platform operations.
+compatibility: Works with Claude Code and similar AI assistants. The `langwatch` CLI is the only interface for platform operations.
 ---
 
 # Test Your Agent with Scenarios
@@ -34,8 +34,8 @@ If the user's request is about **red teaming** ("red team my agent", "find vulne
 
 1. Check if you're in a codebase (look for `package.json`, `pyproject.toml`, `requirements.txt`, etc.)
 2. If **YES** → use the **Code approach** (Scenario SDK — write test files)
-3. If **NO** → use the **CLI approach** (preferred) or MCP tools as fallback
-4. If ambiguous → ask the user: "Do you want to write scenario test code or create scenarios via CLI?"
+3. If **NO** → use the **CLI approach** (`langwatch scenario create`, `langwatch suite create`, `langwatch suite run`)
+4. If ambiguous → ask the user: "Do you want to write scenario test code or create scenarios via the `langwatch` CLI?"
 
 ## The Agent Testing Pyramid
 
@@ -69,15 +69,17 @@ Use this when the user has a codebase and wants to write test files.
 
 ### Step 1: Read the Scenario Docs
 
-Use the LangWatch MCP to fetch the Scenario documentation:
+Use the `langwatch` CLI to fetch the Scenario documentation:
 
-- Call `fetch_scenario_docs` with no arguments to see the docs index
-- Read the Getting Started guide for step-by-step instructions
-- Read the Agent Integration guide matching the project's framework
+```bash
+langwatch scenario-docs                      # Browse the docs index
+langwatch scenario-docs getting-started      # Getting Started guide
+langwatch scenario-docs agent-integration    # Adapter patterns
+```
 
-See [MCP Setup](_shared/mcp-setup.md) for installation instructions.
+See [CLI Setup](_shared/cli-setup.md) if `langwatch` is not installed yet.
 
-If MCP installation fails, see [docs fallback](_shared/llms-txt-fallback.md) to fetch docs directly via URLs. For Scenario docs specifically: https://langwatch.ai/scenario/llms.txt
+If you cannot run the `langwatch` CLI at all (e.g. you are inside ChatGPT or another shell-less environment), see [docs fallback](_shared/llms-txt-fallback.md). The Scenario index lives at https://langwatch.ai/scenario/llms.txt.
 
 CRITICAL: Do NOT guess how to write scenario tests. Read the actual documentation first. Different frameworks have different adapter patterns.
 
@@ -218,7 +220,9 @@ NEVER invent your own red teaming framework or manually write adversarial prompt
 
 ### Read the Red Teaming Docs First
 
-Call `fetch_scenario_docs` with url `https://langwatch.ai/scenario/advanced/red-teaming.md` to read the red teaming guide.
+```bash
+langwatch scenario-docs advanced/red-teaming
+```
 
 CRITICAL: Do NOT guess how to write red team tests. Read the actual documentation first. The `RedTeamAgent` API has specific configuration for attack strategies, scoring, and escalation phases.
 
@@ -308,7 +312,7 @@ describe("Agent Security", () => {
 
 ---
 
-## Platform Approach: CLI (preferred)
+## Platform Approach: CLI
 
 Use this when the user has no codebase and wants to create scenarios directly on the platform.
 
@@ -359,16 +363,13 @@ langwatch suite create "Regression Test" \
 langwatch suite run <suiteId> --wait               # Run and wait for results
 ```
 
-### MCP Fallback
-
-If the CLI is not available, use MCP tools instead (`platform_create_scenario`, `platform_list_scenarios`, etc.).
-
 ### Verify by Running
 
 ALWAYS run the scenario tests you create. If they fail, debug and fix them. A scenario test that isn't executed is useless.
 
 For Python: `pytest -s tests/test_scenarios.py`
 For TypeScript: `npx vitest run`
+For platform: `langwatch suite run <suiteId> --wait`
 
 ---
 
@@ -390,8 +391,8 @@ For TypeScript: `npx vitest run`
 - Do NOT forget to set a generous timeout (e.g., `180_000` ms) for TypeScript red team tests since they involve many LLM calls across multiple turns
 
 ### Platform Approach
-- This approach uses the `langwatch` CLI (or MCP tools as fallback) — do NOT write code files
-- Do NOT use `fetch_scenario_docs` for SDK documentation — that's for code-based testing
+- This approach uses the `langwatch` CLI — do NOT write code files
+- Do NOT use `langwatch scenario-docs` for SDK documentation when on the platform path — that's for code-based testing
 - Write criteria as natural language descriptions, not regex patterns
 - Create focused scenarios — each should test one specific behavior
-- Always call `discover_schema` first to understand the scenario format
+- Always run `langwatch scenario --help` / `langwatch suite create --help` first if unsure of flags

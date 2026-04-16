@@ -15,8 +15,7 @@ import {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, ".env") });
-dotenv.config({ path: path.resolve(__dirname, "../../typescript-sdk/.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
@@ -57,7 +56,7 @@ Then run these commands:
         description:
           "Developer wants to manage suites (run plans) using the LangWatch CLI.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder, skipMcp: true }),
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -124,7 +123,7 @@ If runs exist, get details: \`langwatch simulation-run get <runId>\`
         description:
           "Developer wants to inspect simulation run results using the CLI.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder, skipMcp: true }),
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -191,7 +190,7 @@ Then: \`langwatch trigger list --format json\`
         description:
           "Developer wants to manage triggers (automations) using the CLI.",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder, skipMcp: true }),
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,

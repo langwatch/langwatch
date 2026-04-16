@@ -79,7 +79,7 @@ describe("Prompts Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent set up prompt versioning using the LangWatch Prompts CLI",
-              "Agent should use the LangWatch MCP to check documentation",
+              "Agent used the `langwatch docs` CLI command to check documentation",
             ],
           }),
         ],
@@ -143,7 +143,7 @@ describe("Prompts Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent set up prompt versioning using the LangWatch Prompts CLI or SDK",
-              "Agent should use the LangWatch MCP to check documentation",
+              "Agent used the `langwatch docs` CLI command to check documentation",
             ],
           }),
         ],
@@ -393,13 +393,13 @@ describe("Prompts Skill", () => {
             criteria: [
               "Agent explains or sets up tag-based deployment (production/staging tags)",
               "Agent updates code to fetch prompts by tag instead of bare slug",
-              "Agent mentions the Deploy dialog or platform_assign_prompt_tag for assigning tags",
+              "Agent uses the `langwatch prompt tag assign` CLI command (or mentions the Deploy dialog) to assign production/staging tags",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "set up tag-based deployment for my prompts so I can use production and staging versions separately"
+            "set up tag-based deployment for my prompts so I can use production and staging versions separately. Update main.py end-to-end: initialize the prompts project, create a managed prompt for the system message, and update the OpenAI call so it fetches that prompt by tag (production)."
           ),
           scenario.agent(),
           (state) => {

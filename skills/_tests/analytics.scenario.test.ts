@@ -49,7 +49,7 @@ describe("Analytics Skill", () => {
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent used LangWatch MCP tools to query analytics or search traces",
+              "Agent used the `langwatch` CLI (e.g. `langwatch analytics query` or `langwatch trace search`) to query analytics or search traces",
               "Agent provided a summary of performance data",
             ],
           }),

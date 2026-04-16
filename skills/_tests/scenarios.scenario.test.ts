@@ -157,7 +157,7 @@ describe("Scenarios Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent created scenario test files using the LangWatch Scenario framework",
-              "Agent should use the LangWatch MCP to check Scenario documentation",
+              "Agent used the `langwatch scenario-docs` CLI command to read Scenario documentation",
             ],
           }),
         ],
@@ -221,7 +221,7 @@ describe("Scenarios Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent created scenario test files using the LangWatch Scenario framework",
-              "Agent should use the LangWatch MCP to check Scenario documentation",
+              "Agent used the `langwatch scenario-docs` CLI command to read Scenario documentation",
             ],
           }),
         ],
@@ -271,7 +271,7 @@ describe("Scenarios Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent created red team tests using Scenario's RedTeamAgent",
-              "Agent should use the LangWatch MCP to check Scenario documentation",
+              "Agent used the `langwatch scenario-docs` CLI command to read Scenario documentation",
             ],
           }),
         ],
@@ -334,7 +334,7 @@ describe("Scenarios Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent created red team tests using Scenario's RedTeamAgent",
-              "Agent should use the LangWatch MCP to check Scenario documentation",
+              "Agent used the `langwatch scenario-docs` CLI command to read Scenario documentation",
             ],
           }),
         ],
@@ -429,7 +429,7 @@ describe("Scenarios Skill", () => {
   );
 
   it.skipIf(isCI)(
-    "uses platform MCP tools when no codebase is present",
+    "uses the langwatch CLI to create scenarios when no codebase is present",
     async () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-scenarios-platform-")
@@ -438,17 +438,23 @@ describe("Scenarios Skill", () => {
       // No fixture copied — empty directory
       copySkillToWorkDir(tempFolder);
 
+      // Provide an .env so the CLI is authenticated
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`
+      );
+
       const result = await scenario.run({
-        name: "Platform scenario creation",
+        name: "Platform scenario creation via CLI",
         description:
-          "Creating scenarios on the LangWatch platform when there is no codebase.",
+          "Creating scenarios on the LangWatch platform via the `langwatch` CLI when there is no codebase.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent used platform MCP tools (platform_create_scenario or similar) to create scenarios",
+              "Agent used the `langwatch scenario create` CLI command (or related `langwatch scenario` / `langwatch suite` subcommands) to create scenarios",
               "Agent did NOT try to write code files",
             ],
           }),
@@ -461,10 +467,9 @@ describe("Scenarios Skill", () => {
           (state) => {
             toolCallFix(state);
             assertSkillWasRead(state, "scenarios");
-            // In platform mode, no test files should be created
-            // The agent should use MCP tools instead
+            // In platform mode, no test files should be created.
+            // The agent should use the langwatch CLI instead.
 
-            // Verify the agent actually used MCP platform tools
             const allContent = state.messages
               .map((m) =>
                 typeof m.content === "string"
@@ -474,10 +479,10 @@ describe("Scenarios Skill", () => {
               .join("\n");
 
             expect(
-              allContent.includes("platform_create_scenario") ||
-                allContent.includes("platform_list_scenarios") ||
-                allContent.includes("discover_schema"),
-              "Expected agent to use platform MCP tools (platform_create_scenario, platform_list_scenarios, or discover_schema)"
+              allContent.includes("langwatch scenario create") ||
+                allContent.includes("langwatch scenario list") ||
+                allContent.includes("langwatch suite create"),
+              "Expected agent to invoke `langwatch scenario create`, `langwatch scenario list`, or `langwatch suite create` via the CLI"
             ).toBe(true);
           },
           scenario.judge(),

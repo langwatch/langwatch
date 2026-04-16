@@ -1,6 +1,6 @@
-# Fetching LangWatch Docs Without MCP
+# Fetching LangWatch Docs Without the CLI
 
-If the LangWatch MCP cannot be installed, you can fetch docs directly:
+The `langwatch` CLI is the preferred way to read docs (see [CLI Setup](cli-setup.md)). If you cannot run the CLI for some reason — for example you're inside ChatGPT, Claude on the web, or another assistant with no shell — fetch the same markdown files directly with HTTP.
 
 1. Fetch the index: https://langwatch.ai/docs/llms.txt
 2. Follow links to specific pages, appending `.md` extension

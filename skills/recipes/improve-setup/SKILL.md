@@ -2,7 +2,7 @@
 name: improve-setup
 description: Expert AI engineering consultant for your LangWatch setup. Audits your codebase, traces, evaluations, and scenarios, then guides you to improve — starting from low-hanging fruit and going deeper. Use when you want to level up your agent's engineering quality.
 license: MIT
-compatibility: Requires LangWatch MCP with API key. Works with Claude Code and similar coding agents.
+compatibility: Requires the `langwatch` CLI with a valid `LANGWATCH_API_KEY`. Works with Claude Code and similar coding agents.
 metadata:
   category: recipe
 ---
@@ -20,12 +20,14 @@ Before suggesting anything, read EVERYTHING:
 2. Study `git log --oneline -50` — read commit messages for WHY things changed. Bug fixes reveal edge cases. Refactors reveal design decisions. These are goldmines for what to test and evaluate.
 3. Read README, docs, comments for domain context
 
-### LangWatch Audit (via MCP)
-4. Call `search_traces` — check trace quality (inputs/outputs populated? spans connected? labels present?)
-5. Call `platform_list_scenarios` — what scenarios exist? Are they comprehensive or shallow?
-6. Call `platform_list_evaluators` — what evaluators are configured?
-7. Call `platform_list_prompts` — are prompts versioned or hardcoded?
-8. Call `get_analytics` — what's the cost, latency, error rate?
+### LangWatch Audit (via CLI)
+4. `langwatch trace search --limit 25 --format json` — check trace quality (inputs/outputs populated? spans connected? labels present?)
+5. `langwatch scenario list --format json` — what scenarios exist? Are they comprehensive or shallow?
+6. `langwatch suite list --format json` — what suites (run plans) exist?
+7. `langwatch evaluator list --format json` — what evaluators are configured?
+8. `langwatch monitor list --format json` — any online evaluation monitors set up?
+9. `langwatch prompt list --format json` — are prompts versioned (or are they all hardcoded in code)?
+10. `langwatch analytics query --metric trace-count` and `--metric total-cost`, `--metric avg-latency`, `--metric eval-pass-rate` — what's the current cost, latency, error/pass rate?
 
 ### Gap Analysis
 Based on the audit, identify:
@@ -37,9 +39,9 @@ Based on the audit, identify:
 
 Fix the easiest, highest-impact issues first:
 - Broken instrumentation → fix traces (see `debug-instrumentation` recipe)
-- Hardcoded prompts → set up prompt versioning
-- No tests at all → create initial scenario tests
-- Generic datasets → generate domain-specific ones
+- Hardcoded prompts → set up prompt versioning (`langwatch prompt init`, see the `prompts` skill)
+- No tests at all → create initial scenario tests (see the `scenarios` skill)
+- Generic datasets → generate domain-specific ones (see the `datasets` skill)
 
 Deliver working results. Show the user what improved. This is the a-ha moment.
 
@@ -55,7 +57,7 @@ After Phase 2, DON'T STOP. Suggest 2-3 specific improvements based on what you l
 
 4. **CI/CD integration**: If no CI pipeline, suggest adding experiments. "Want me to set up experiments that run in CI to catch regressions?"
 
-5. **Production monitoring**: If no online evaluation, suggest monitors. "Your traces show no quality monitoring — want me to set up faithfulness checks on production traffic?"
+5. **Production monitoring**: If no online evaluation, suggest monitors. "Your traces show no quality monitoring — want me to set up faithfulness checks on production traffic with `langwatch monitor create`?"
 
 Ask light questions with options. Don't overwhelm — pick the top 2-3 most impactful.
 
@@ -63,7 +65,7 @@ Ask light questions with options. Don't overwhelm — pick the top 2-3 most impa
 
 After each improvement:
 1. Show what was accomplished
-2. Run any tests to verify
+2. Run any tests / re-query analytics to verify (`langwatch trace search`, `langwatch suite run --wait`, etc.)
 3. Ask what to tackle next
 4. Stop when the user says "that's enough"
 

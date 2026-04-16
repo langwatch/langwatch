@@ -274,7 +274,7 @@ describe("Recipes", () => {
   );
 
   it.skipIf(isCI)(
-    "uses MCP to debug instrumentation traces",
+    "uses the langwatch CLI to debug instrumentation traces",
     async () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-recipe-debug-instrumentation-")
@@ -285,17 +285,23 @@ describe("Recipes", () => {
       );
       copyRecipeSkillToWorkDir(tempFolder, "debug-instrumentation");
 
+      // Provide an .env so the CLI is authenticated
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`
+      );
+
       const result = await scenario.run({
-        name: "Debug instrumentation via MCP",
+        name: "Debug instrumentation via the langwatch CLI",
         description:
-          "Use the LangWatch MCP to inspect production traces and identify instrumentation issues or suggest improvements.",
+          "Use the `langwatch` CLI to inspect production traces and identify instrumentation issues or suggest improvements.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent used LangWatch MCP tools (search_traces or get_trace) to inspect traces",
+              "Agent used the `langwatch trace search` and/or `langwatch trace get` CLI commands to inspect traces",
               "Agent provided suggestions or identified issues with the current instrumentation",
             ],
           }),
@@ -309,7 +315,7 @@ describe("Recipes", () => {
             toolCallFix(state);
             assertSkillWasRead(state, "debug-instrumentation");
 
-            // Verify the agent used MCP trace tools
+            // Verify the agent used the langwatch CLI for trace inspection
             const allContent = state.messages
               .map((m) =>
                 typeof m.content === "string"
@@ -319,9 +325,9 @@ describe("Recipes", () => {
               .join("\n");
 
             expect(
-              allContent.includes("search_traces") ||
-                allContent.includes("get_trace"),
-              "Expected agent to use MCP tools (search_traces or get_trace) to inspect traces"
+              allContent.includes("langwatch trace search") ||
+                allContent.includes("langwatch trace get"),
+              "Expected agent to invoke `langwatch trace search` or `langwatch trace get` via the CLI"
             ).toBe(true);
           },
           scenario.judge(),
