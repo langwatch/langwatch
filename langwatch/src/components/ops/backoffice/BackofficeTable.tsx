@@ -1,0 +1,178 @@
+import {
+  Box,
+  Button,
+  Card,
+  HStack,
+  Heading,
+  Spacer,
+  Spinner,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import type { PropsWithChildren, ReactNode } from "react";
+import { SearchInput } from "~/components/ui/SearchInput";
+
+export interface PaginationState {
+  page: number;
+  perPage: number;
+  total: number;
+  onPageChange: (page: number) => void;
+}
+
+interface BackofficeTableProps {
+  title: string;
+  searchValue: string;
+  onSearchChange: (value: string) => void;
+  searchPlaceholder?: string;
+  pagination?: PaginationState;
+  isLoading?: boolean;
+  isFetching?: boolean;
+  error?: Error | null;
+  onCreate?: () => void;
+  createLabel?: string;
+  /** Slot for the <Table.Root>...</Table.Root> content. */
+  children: ReactNode;
+}
+
+/**
+ * Standard Backoffice list-view shell — title, search, optional Create button,
+ * bordered card wrapping the table, loading/empty/error states, and pagination
+ * controls. Keeps every resource page visually identical and cuts each view
+ * down to "fetch data + render rows".
+ */
+export function BackofficeTable({
+  title,
+  searchValue,
+  onSearchChange,
+  searchPlaceholder = "Search",
+  pagination,
+  isLoading,
+  isFetching,
+  error,
+  onCreate,
+  createLabel = "Create",
+  children,
+}: BackofficeTableProps) {
+  return (
+    <VStack gap={6} width="full" align="start">
+      <HStack width="full">
+        <Heading size="lg">{title}</Heading>
+        <Spacer />
+        {onCreate && (
+          <Button size="sm" onClick={onCreate}>
+            <Plus size={16} />
+            {createLabel}
+          </Button>
+        )}
+      </HStack>
+
+      <HStack width="full" maxWidth="480px">
+        <SearchInput
+          value={searchValue}
+          onChange={(e) => onSearchChange(e.target.value)}
+          placeholder={searchPlaceholder}
+          size="sm"
+        />
+      </HStack>
+
+      <Card.Root width="full" overflow="hidden">
+        <Card.Body paddingY={0} paddingX={0}>
+          {error ? (
+            <Box paddingY={10} paddingX={4}>
+              <Text color="red.500" fontSize="sm">
+                {error.message}
+              </Text>
+            </Box>
+          ) : isLoading ? (
+            <Box paddingY={10} textAlign="center">
+              <Spinner size="md" />
+            </Box>
+          ) : (
+            <Box position="relative" width="full" overflow="auto">
+              {isFetching && (
+                <Box
+                  position="absolute"
+                  top={2}
+                  right={2}
+                  zIndex={1}
+                  color="fg.muted"
+                >
+                  <Spinner size="xs" />
+                </Box>
+              )}
+              {children}
+            </Box>
+          )}
+        </Card.Body>
+      </Card.Root>
+
+      {pagination && pagination.total > 0 && (
+        <PaginationBar {...pagination} />
+      )}
+    </VStack>
+  );
+}
+
+function PaginationBar({
+  page,
+  perPage,
+  total,
+  onPageChange,
+}: PaginationState) {
+  const totalPages = Math.max(1, Math.ceil(total / perPage));
+  const canPrev = page > 1;
+  const canNext = page < totalPages;
+  const rangeStart = total === 0 ? 0 : (page - 1) * perPage + 1;
+  const rangeEnd = Math.min(total, page * perPage);
+
+  return (
+    <HStack width="full" justify="end" gap={4}>
+      <Text fontSize="sm" color="fg.muted">
+        {rangeStart}–{rangeEnd} of {total}
+      </Text>
+      <HStack gap={1}>
+        <Button
+          size="xs"
+          variant="outline"
+          disabled={!canPrev}
+          onClick={() => onPageChange(page - 1)}
+        >
+          <ChevronLeft size={14} />
+        </Button>
+        <Button
+          size="xs"
+          variant="outline"
+          disabled={!canNext}
+          onClick={() => onPageChange(page + 1)}
+        >
+          <ChevronRight size={14} />
+        </Button>
+      </HStack>
+    </HStack>
+  );
+}
+
+/** Dash placeholder for empty cell values — avoids `-` noise scattered across. */
+export function EmptyCell({ children }: PropsWithChildren) {
+  return (
+    <Text color="fg.muted" fontSize="sm">
+      {children ?? "—"}
+    </Text>
+  );
+}
+
+/** Human-readable date (respects locale, uses user's TZ). */
+export function formatDate(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString();
+}
+
+export function formatDateTime(value: string | Date | null | undefined): string {
+  if (!value) return "—";
+  const d = typeof value === "string" ? new Date(value) : value;
+  if (Number.isNaN(d.getTime())) return "—";
+  return `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
+}
