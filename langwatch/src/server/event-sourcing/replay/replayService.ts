@@ -37,7 +37,7 @@ import {
   unmarkBatchMulti,
 } from "./replayMarkers";
 import { pauseProjection, unpauseProjection, waitForActiveJobs, waitForAllActiveJobs } from "./replayDrain";
-import { FoldAccumulator } from "./replayExecutor";
+import { FoldAccumulator, MapAccumulator } from "./replayExecutor";
 
 /** Minimal log interface — CLI provides concrete implementation. */
 export interface ReplayLogWriter {
@@ -898,31 +898,45 @@ export class ReplayService {
     let firstError: string | undefined;
     const touchedTenants = new Set<string>();
 
-    // 1. Discover: merge all projections' aggregates into a unified map
+    const mapProjections = config.mapProjections ?? [];
+
+    // 1. Discover: single pass using the union of all event types (fold + map)
+    const allEventTypesForDiscovery = new Set<string>();
+    for (const p of config.projections) {
+      for (const et of p.definition.eventTypes) allEventTypesForDiscovery.add(et);
+    }
+    for (const p of mapProjections) {
+      for (const et of p.definition.eventTypes) allEventTypesForDiscovery.add(et);
+    }
+
+    const allProjectionNames = [
+      ...config.projections.map((p) => p.projectionName),
+      ...mapProjections.map((p) => p.projectionName),
+    ];
+
     const aggregateProjectionMap = new Map<
       string,
       { tenantId: string; aggregateId: string; aggregateType: string; projections: string[] }
     >();
 
-    for (const projection of config.projections) {
-      const discoveryTargets = config.tenantIds.length > 0 ? config.tenantIds : [undefined];
-      for (const tenantId of discoveryTargets) {
-        const discovery = await this.discover({ projection, since: config.since, tenantId });
-        for (const agg of discovery.aggregates) {
-          const key = aggregateKey(agg);
-          const existing = aggregateProjectionMap.get(key);
-          if (existing) {
-            if (!existing.projections.includes(projection.projectionName)) {
-              existing.projections.push(projection.projectionName);
-            }
-          } else {
-            aggregateProjectionMap.set(key, {
-              tenantId: agg.tenantId,
-              aggregateId: agg.aggregateId,
-              aggregateType: agg.aggregateType,
-              projections: [projection.projectionName],
-            });
-          }
+    const discoveryTargets = config.tenantIds.length > 0 ? config.tenantIds : [undefined];
+    for (const tenantId of discoveryTargets) {
+      const client = await this.resolveClient(tenantId ?? "default");
+      const aggregates = await discoverAffectedAggregates({
+        client,
+        eventTypes: [...allEventTypesForDiscovery],
+        sinceMs: new Date(config.since).getTime(),
+        tenantId,
+      });
+      for (const agg of aggregates) {
+        const key = aggregateKey(agg);
+        if (!aggregateProjectionMap.has(key)) {
+          aggregateProjectionMap.set(key, {
+            tenantId: agg.tenantId,
+            aggregateId: agg.aggregateId,
+            aggregateType: agg.aggregateType,
+            projections: [...allProjectionNames],
+          });
         }
       }
     }
@@ -945,15 +959,19 @@ export class ReplayService {
       return { aggregatesReplayed: 0, totalEvents: 0, batchErrors: 0 };
     }
 
-    // Build a lookup from projectionName to RegisteredFoldProjection
+    // Build lookups from projectionName to registered projection
     const projectionByName = new Map<string, RegisteredFoldProjection>();
     for (const p of config.projections) {
       projectionByName.set(p.projectionName, p);
     }
+    const mapProjectionByName = new Map<string, RegisteredMapProjection>();
+    for (const p of mapProjections) {
+      mapProjectionByName.set(p.projectionName, p);
+    }
 
-    // Get completed sets for all projections (union: skip only if completed across ALL projections)
+    // Get completed sets for all projections (fold + map)
     const completedSets = new Map<string, Set<string>>();
-    for (const p of config.projections) {
+    for (const p of [...config.projections, ...mapProjections]) {
       const completed = await getCompletedSet({ redis: this.deps.redis, projectionName: p.projectionName });
       completedSets.set(p.projectionName, completed);
     }
@@ -980,15 +998,16 @@ export class ReplayService {
       return { aggregatesReplayed: 0, totalEvents: 0, batchErrors: 0 };
     }
 
-    // 2. Pause ALL projections at once
-    for (const p of config.projections) {
+    // 2. Pause ALL projections at once (fold + map)
+    const allProjectionsToPause = [...config.projections, ...mapProjections];
+    for (const p of allProjectionsToPause) {
       await pauseProjection({
         redis: this.deps.redis,
         pipelineName: p.pipelineName,
         projectionName: p.projectionName,
       });
     }
-    log.write({ step: "pause-all", projections: config.projections.map((p) => p.projectionName) });
+    log.write({ step: "pause-all", projections: allProjectionsToPause.map((p) => p.projectionName) });
 
     // 3. Drain ALL active jobs across all projections
     const allDiscoveredAggregates: DiscoveredAggregate[] = remaining.map((key) => {
@@ -1003,7 +1022,7 @@ export class ReplayService {
       await waitForAllActiveJobs({
         redis: this.deps.redis,
         aggregates: allDiscoveredAggregates,
-        projections: config.projections,
+        projections: allProjectionsToPause,
       });
       log.write({ step: "drain-all", aggregateCount: allDiscoveredAggregates.length });
 
@@ -1014,10 +1033,10 @@ export class ReplayService {
 
         const progress: ReplayProgress = {
           phase: "replaying",
-          currentProjectionName: config.projections.map((p) => p.projectionName).join("+"),
+          currentProjectionName: allProjectionNames.join("+"),
           currentProjectionKind: "fold",
           currentProjectionIndex: 0,
-          totalProjections: config.projections.length,
+          totalProjections: allProjectionNames.length,
           totalAggregates: allAggregateKeys.length,
           tenantCount: new Set(allDiscoveredAggregates.map((a) => a.tenantId)).size,
           currentBatch: batchNum,
@@ -1045,6 +1064,7 @@ export class ReplayService {
             batchKeys,
             aggregateProjectionMap,
             projectionByName,
+            mapProjectionByName,
             aggregateBatchSize,
             concurrency,
             log,
@@ -1067,7 +1087,7 @@ export class ReplayService {
           }
 
           callbacks?.onBatchComplete?.({
-            projectionName: config.projections.map((p) => p.projectionName).join("+"),
+            projectionName: allProjectionNames.join("+"),
             projectionKind: "fold",
             batchNum,
             totalBatches,
@@ -1095,53 +1115,19 @@ export class ReplayService {
       }
     } finally {
       // 5. Unpause ALL projections — always runs, even on unexpected errors
-      for (const p of config.projections) {
+      for (const p of allProjectionsToPause) {
         await unpauseProjection({
           redis: this.deps.redis,
           pipelineName: p.pipelineName,
           projectionName: p.projectionName,
         }).catch(() => {});
       }
-      log.write({ step: "unpause-all", projections: config.projections.map((p) => p.projectionName) });
-    }
-
-    // 5b. Map projection replay — serial (optimized path is fold-specific;
-    // maps are stateless per-event so cross-projection batching gives no win).
-    // Each map projection manages its own full phase cycle internally.
-    const mapProjections = config.mapProjections ?? [];
-    if (mapProjections.length > 0 && totalBatchErrors === 0) {
-      const totalProjections = config.projections.length + mapProjections.length;
-      for (let mi = 0; mi < mapProjections.length; mi++) {
-        const projection = mapProjections[mi]!;
-        const result = await this.replayMapProjection({
-          projection,
-          projectionIndex: config.projections.length + mi,
-          totalProjections,
-          tenantIds: config.tenantIds,
-          since: config.since,
-          batchSize: config.batchSize ?? 5000,
-          aggregateBatchSize,
-          dryRun: false,
-          log,
-          onProgress: callbacks?.onProgress,
-          onBatchComplete: callbacks?.onBatchComplete,
-        });
-
-        totalEventsReplayed += result.totalEvents;
-        totalBatchErrors += result.batchErrors;
-        if (!firstError && result.firstError) firstError = result.firstError;
-        for (const tid of result.touchedTenants) touchedTenants.add(tid);
-
-        if (result.batchErrors > 0) break;
-      }
+      log.write({ step: "unpause-all", projections: allProjectionsToPause.map((p) => p.projectionName) });
     }
 
     // 6. Cleanup markers for all projections
-    for (const p of config.projections) {
-      await cleanupAll({ redis: this.deps.redis, projectionName: p.projectionName });
-    }
-    for (const p of mapProjections) {
-      await cleanupAll({ redis: this.deps.redis, projectionName: p.projectionName });
+    for (const name of allProjectionNames) {
+      await cleanupAll({ redis: this.deps.redis, projectionName: name });
     }
 
     // 7. Trigger OPTIMIZE TABLE on touched CH tables
@@ -1181,6 +1167,7 @@ export class ReplayService {
     batchKeys,
     aggregateProjectionMap,
     projectionByName,
+    mapProjectionByName,
     aggregateBatchSize: _aggregateBatchSize,
     concurrency,
     log,
@@ -1192,6 +1179,7 @@ export class ReplayService {
       { tenantId: string; aggregateId: string; aggregateType: string; projections: string[] }
     >;
     projectionByName: Map<string, RegisteredFoldProjection>;
+    mapProjectionByName: Map<string, RegisteredMapProjection>;
     aggregateBatchSize: number;
     concurrency: number;
     log: ReplayLogWriter;
@@ -1227,12 +1215,16 @@ export class ReplayService {
       list.push({ key, aggregateId: entry.aggregateId, aggregateType: entry.aggregateType, projections: entry.projections });
     }
 
-    // Collect ALL event types across all projections for cutoff queries
+    // Collect ALL event types across all projections (fold + map) for cutoff queries
     const allEventTypes = new Set<string>();
     for (const projName of projNames) {
-      const proj = projectionByName.get(projName)!;
-      for (const et of proj.definition.eventTypes) {
-        allEventTypes.add(et);
+      const foldProj = projectionByName.get(projName);
+      if (foldProj) {
+        for (const et of foldProj.definition.eventTypes) allEventTypes.add(et);
+      }
+      const mapProj = mapProjectionByName.get(projName);
+      if (mapProj) {
+        for (const et of mapProj.definition.eventTypes) allEventTypes.add(et);
       }
     }
 
@@ -1275,11 +1267,18 @@ export class ReplayService {
     // 3. REPLAY — load events per tenant, apply all relevant projections
     onBatchPhase("replay", 0);
 
-    // Create one accumulator per projection
-    const accumulators = new Map<string, FoldAccumulator>();
+    // Create one accumulator per projection (fold or map)
+    const foldAccumulators = new Map<string, FoldAccumulator>();
+    const mapAccumulators = new Map<string, MapAccumulator>();
     for (const projName of projNames) {
-      const proj = projectionByName.get(projName)!;
-      accumulators.set(projName, new FoldAccumulator(proj.definition));
+      const foldProj = projectionByName.get(projName);
+      if (foldProj) {
+        foldAccumulators.set(projName, new FoldAccumulator(foldProj.definition));
+      }
+      const mapProj = mapProjectionByName.get(projName);
+      if (mapProj) {
+        mapAccumulators.set(projName, new MapAccumulator(mapProj.definition));
+      }
     }
 
     // Load events grouped by tenant (one CH query per tenant)
@@ -1314,10 +1313,11 @@ export class ReplayService {
 
       for (const event of events) {
         for (const projName of entry.projections) {
-          const acc = accumulators.get(projName);
-          if (acc) {
-            acc.apply(event);
-          }
+          const foldAcc = foldAccumulators.get(projName);
+          if (foldAcc) foldAcc.apply(event);
+
+          const mapAcc = mapAccumulators.get(projName);
+          if (mapAcc) mapAcc.apply(event);
         }
         eventsProcessed++;
       }
@@ -1325,9 +1325,12 @@ export class ReplayService {
       onBatchPhase("replay", eventsProcessed);
     }, concurrency);
 
-    // 4. WRITE — flush all accumulators
+    // 4. WRITE — flush all accumulators (fold states + map records in bulk)
     onBatchPhase("write", eventsProcessed);
-    for (const [_projName, acc] of accumulators) {
+    for (const [_projName, acc] of foldAccumulators) {
+      await acc.flush();
+    }
+    for (const [_projName, acc] of mapAccumulators) {
       await acc.flush();
     }
 
