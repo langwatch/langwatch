@@ -176,3 +176,23 @@ export function formatDateTime(value: string | Date | null | undefined): string 
   if (Number.isNaN(d.getTime())) return "—";
   return `${d.toLocaleDateString()} ${d.toLocaleTimeString()}`;
 }
+
+/**
+ * Turn a `<input type="date">` string (always `YYYY-MM-DD`, always the user's
+ * local calendar date) into an ISO string without drifting the day.
+ *
+ * Background: `new Date("2026-04-16").toISOString()` parses as UTC midnight.
+ * A user in PST typing "2026-04-16" and saving gets `2026-04-15T23:00:00Z`
+ * back on read — shifting the calendar day. Parsing as local noon keeps the
+ * date stable regardless of timezone.
+ */
+export function dateInputToISO(value: string): string | null {
+  if (!value) return null;
+  const parts = value.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return null;
+  const [year, month, day] = parts;
+  // Noon local time — gives a 12h buffer either side of UTC so the calendar
+  // day stays correct in every real-world timezone.
+  const d = new Date(year!, month! - 1, day!, 12, 0, 0, 0);
+  return d.toISOString();
+}

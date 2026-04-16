@@ -19,6 +19,7 @@ import { toaster } from "~/components/ui/toaster";
 import {
   BackofficeTable,
   EmptyCell,
+  dateInputToISO,
   formatDate,
 } from "~/components/ops/backoffice/BackofficeTable";
 import {
@@ -266,10 +267,8 @@ function SubscriptionDrawer({
       plan: form.plan,
       status: form.status,
       stripeSubscriptionId: form.stripeSubscriptionId || null,
-      startDate: form.startDate
-        ? new Date(form.startDate).toISOString()
-        : null,
-      endDate: form.endDate ? new Date(form.endDate).toISOString() : null,
+      startDate: dateInputToISO(form.startDate),
+      endDate: dateInputToISO(form.endDate),
       maxMembers: numOrNull(form.maxMembers),
       maxProjects: numOrNull(form.maxProjects),
       maxMessagesPerMonth: numOrNull(form.maxMessagesPerMonth),

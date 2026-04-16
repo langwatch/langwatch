@@ -17,6 +17,7 @@ import { toaster } from "~/components/ui/toaster";
 import {
   BackofficeTable,
   EmptyCell,
+  dateInputToISO,
   formatDate,
 } from "~/components/ops/backoffice/BackofficeTable";
 import {
@@ -222,9 +223,7 @@ function OrgFeatureDrawer({
     const payload: Record<string, unknown> = {
       feature: feature.trim(),
       organizationId,
-      trialEndDate: trialEndDate
-        ? new Date(trialEndDate).toISOString()
-        : null,
+      trialEndDate: dateInputToISO(trialEndDate),
     };
     const onSuccess = () => {
       toaster.create({
