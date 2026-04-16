@@ -6,10 +6,14 @@
  */
 import { ExperimentType } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { globalForApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
+
+globalForApp.__langwatch_app = createTestApp();
 
 // Helper to create a valid persisted state
 const createValidState = (overrides: Record<string, unknown> = {}) => ({
