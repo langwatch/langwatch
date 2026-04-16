@@ -1,5 +1,5 @@
 import BackofficeShell from "./_shell";
-import OrganizationsView from "~/components/ops/backoffice/resources/OrganizationsView";
+import OrganizationsView from "../../../../ee/admin/backoffice/resources/OrganizationsView";
 
 export default function BackofficeOrganizationsPage() {
   return (

@@ -1,5 +1,5 @@
 import BackofficeShell from "./_shell";
-import ProjectsView from "~/components/ops/backoffice/resources/ProjectsView";
+import ProjectsView from "../../../../ee/admin/backoffice/resources/ProjectsView";
 
 export default function BackofficeProjectsPage() {
   return (

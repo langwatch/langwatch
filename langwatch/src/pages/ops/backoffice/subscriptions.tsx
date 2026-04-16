@@ -1,5 +1,5 @@
 import BackofficeShell from "./_shell";
-import SubscriptionsView from "~/components/ops/backoffice/resources/SubscriptionsView";
+import SubscriptionsView from "../../../../ee/admin/backoffice/resources/SubscriptionsView";
 
 export default function BackofficeSubscriptionsPage() {
   return (

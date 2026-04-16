@@ -24,11 +24,11 @@ import {
   EmptyCell,
   dateInputToISO,
   formatDate,
-} from "~/components/ops/backoffice/BackofficeTable";
+} from "../BackofficeTable";
 import {
   useAdminList,
   useAdminUpdate,
-} from "~/components/ops/backoffice/useAdminResource";
+} from "../useAdminResource";
 
 interface AdminOrganization {
   id: string;

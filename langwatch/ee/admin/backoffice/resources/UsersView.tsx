@@ -22,12 +22,12 @@ import {
   EmptyCell,
   formatDate,
   formatDateTime,
-} from "~/components/ops/backoffice/BackofficeTable";
-import { impersonateUser } from "~/components/ops/backoffice/adminClient";
+} from "../BackofficeTable";
+import { impersonateUser } from "../adminClient";
 import {
   useAdminList,
   useAdminUpdate,
-} from "~/components/ops/backoffice/useAdminResource";
+} from "../useAdminResource";
 
 interface OrgMembership {
   organization: { id: string; name: string };

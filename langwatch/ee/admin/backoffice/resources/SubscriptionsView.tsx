@@ -23,12 +23,12 @@ import {
   EmptyCell,
   dateInputToISO,
   formatDate,
-} from "~/components/ops/backoffice/BackofficeTable";
+} from "../BackofficeTable";
 import {
   useAdminCreate,
   useAdminList,
   useAdminUpdate,
-} from "~/components/ops/backoffice/useAdminResource";
+} from "../useAdminResource";
 
 interface AdminSubscription {
   id: string;
