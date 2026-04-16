@@ -86,11 +86,12 @@ describe("OnlineEvaluationDrawer", () => {
     user: ReturnType<typeof userEvent.setup>,
     level: "trace" | "thread" = "trace",
   ) => {
-    const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+    const levelName = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
-      expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
     });
-    await user.click(screen.getByLabelText(levelLabel));
+    const radio = screen.getByRole("radio", { name: levelName });
+    await user.click(radio.closest("label") ?? radio);
     await vi.advanceTimersByTimeAsync(50);
   };
 
@@ -261,11 +262,11 @@ describe("OnlineEvaluationDrawer", () => {
       );
 
       // Step 1: Select level first
-      const levelLabel = /Trace Level/i;
       await waitFor(() => {
-        expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+        expect(screen.getByRole("radio", { name: /Trace Level/i })).toBeInTheDocument();
       });
-      await user.click(screen.getByLabelText(levelLabel));
+      const r = screen.getByRole("radio", { name: /Trace Level/i });
+      await user.click(r.closest("label") ?? r);
       await vi.advanceTimersByTimeAsync(50);
 
       // Step 2: Click "Select Evaluator"
@@ -509,8 +510,10 @@ describe("OnlineEvaluationDrawer", () => {
         wrapper: Wrapper,
       });
 
-      // Make changes to trigger unsaved state
+      // Make changes to trigger unsaved state (two changes needed: drawer resets
+      // isInitialRenderRef on open, so the first change is skipped as "initial")
       await selectLevel(user, "trace");
+      await selectLevel(user, "thread");
 
       // Try to close - should show confirmation
       await user.click(screen.getByText("Cancel"));
@@ -565,8 +568,10 @@ describe("OnlineEvaluationDrawer", () => {
         wrapper: Wrapper,
       });
 
-      // Make changes to trigger unsaved state
+      // Make changes to trigger unsaved state (two changes needed: drawer resets
+      // isInitialRenderRef on open, so the first change is skipped as "initial")
       await selectLevel(user, "trace");
+      await selectLevel(user, "thread");
 
       // Try to close - user confirms
       await user.click(screen.getByText("Cancel"));
@@ -809,13 +814,13 @@ describe("OnlineEvaluationDrawer", () => {
       expect(threadRadio).not.toBeChecked();
 
       // Select trace level
-      await user.click(traceRadio);
+      await user.click(traceRadio.closest("label") ?? traceRadio);
       await vi.advanceTimersByTimeAsync(50);
       expect(traceRadio).toBeChecked();
       expect(threadRadio).not.toBeChecked();
 
       // Switch to Thread Level
-      await user.click(threadRadio);
+      await user.click(threadRadio.closest("label") ?? threadRadio);
       await waitFor(() => {
         expect(threadRadio).toBeChecked();
         expect(traceRadio).not.toBeChecked();
@@ -941,7 +946,7 @@ describe("OnlineEvaluationDrawer", () => {
 
       // Evaluator should remain selected after level change
       const threadRadio = screen.getByRole("radio", { name: /thread/i });
-      await user.click(threadRadio);
+      await user.click(threadRadio.closest("label") ?? threadRadio);
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {
