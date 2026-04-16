@@ -22,14 +22,11 @@ export function failSpinner({
   /** Short description of what was being done, e.g. "fetch agents". */
   action: string;
 }): void {
-  const isApiError =
+  const message =
     error instanceof Error &&
-    typeof error.name === "string" &&
     error.name.endsWith("ApiError") &&
-    typeof error.message === "string" &&
-    /^failed to /i.test(error.message);
-  const message = isApiError
-    ? (error as Error).message
-    : `Failed to ${action}: ${formatApiErrorMessage({ error })}`;
+    /^failed to /i.test(error.message)
+      ? error.message
+      : `Failed to ${action}: ${formatApiErrorMessage({ error })}`;
   spinner.fail(chalk.red(message));
 }

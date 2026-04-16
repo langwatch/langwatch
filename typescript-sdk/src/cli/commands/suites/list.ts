@@ -1,9 +1,6 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  SuitesApiService,
-  SuitesApiError,
-} from "@/client-sdk/services/suites";
+import { SuitesApiService } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";

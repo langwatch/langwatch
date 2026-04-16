@@ -1,9 +1,6 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  ScenariosApiService,
-  ScenariosApiError,
-} from "@/client-sdk/services/scenarios";
+import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";

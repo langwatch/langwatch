@@ -1,9 +1,6 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  WorkflowsApiService,
-  WorkflowsApiError,
-} from "@/client-sdk/services/workflows/workflows-api.service";
+import { WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";

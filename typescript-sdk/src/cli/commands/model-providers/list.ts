@@ -1,9 +1,6 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  ModelProvidersApiService,
-  ModelProvidersApiError,
-} from "@/client-sdk/services/model-providers/model-providers-api.service";
+import { ModelProvidersApiService } from "@/client-sdk/services/model-providers/model-providers-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
