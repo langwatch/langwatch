@@ -105,7 +105,7 @@ export const app = new Hono<{ Variables: Variables }>()
           updatedAt: d.updatedAt,
           platformUrl: platformUrl({
             projectSlug: project.slug,
-            path: `/analytics/custom/${d.id}`,
+            path: `/analytics/reports?dashboard=${d.id}`,
           }),
         })),
       });
@@ -136,7 +136,7 @@ export const app = new Hono<{ Variables: Variables }>()
           updatedAt: dashboard.updatedAt,
           platformUrl: platformUrl({
             projectSlug: project.slug,
-            path: `/analytics/custom/${dashboard.id}`,
+            path: `/analytics/reports?dashboard=${dashboard.id}`,
           }),
         },
         201,
@@ -188,7 +188,7 @@ export const app = new Hono<{ Variables: Variables }>()
           updatedAt: dashboard.updatedAt,
           platformUrl: platformUrl({
             projectSlug: project.slug,
-            path: `/analytics/custom/${dashboard.id}`,
+            path: `/analytics/reports?dashboard=${dashboard.id}`,
           }),
         });
       } catch (error) {
@@ -220,7 +220,7 @@ export const app = new Hono<{ Variables: Variables }>()
           updatedAt: dashboard.updatedAt,
           platformUrl: platformUrl({
             projectSlug: project.slug,
-            path: `/analytics/custom/${dashboard.id}`,
+            path: `/analytics/reports?dashboard=${dashboard.id}`,
           }),
         });
       } catch (error) {
