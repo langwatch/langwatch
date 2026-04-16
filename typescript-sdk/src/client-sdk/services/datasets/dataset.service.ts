@@ -22,6 +22,7 @@ import {
 import { DatasetApiError, DatasetNotFoundError, DatasetPlanLimitError } from "./errors";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { tracer } from "./tracing";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 type DatasetServiceConfig = {
   langwatchApiClient: LangwatchApiClient;
@@ -83,22 +84,7 @@ export class DatasetService {
    * Extracts a human-readable error message from an API error response.
    */
   private extractErrorMessage(error: unknown, status: number): string {
-    if (typeof error === "string") return error;
-
-    if (error != null && typeof error === "object") {
-      if ("message" in error && typeof (error as { message: unknown }).message === "string") {
-        return (error as { message: string }).message;
-      }
-      if ("error" in error) {
-        const inner = (error as { error: unknown }).error;
-        if (typeof inner === "string") return inner;
-        if (inner != null && typeof inner === "object" && "message" in inner) {
-          return (inner as { message: string }).message ?? JSON.stringify(inner);
-        }
-      }
-    }
-
-    return `HTTP ${status}`;
+    return formatApiErrorMessage(error, { status });
   }
 
   /**

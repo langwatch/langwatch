@@ -5,13 +5,20 @@ import type {
   Team,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   llmPromptConfigFactory,
   llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import {
+  PlanProviderService,
+  type PlanProvider,
+} from "~/server/app-layer/subscription/plan-provider";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 import { createHandle } from "./helpers";
 
@@ -38,6 +45,21 @@ describe("Prompts API", () => {
 
   // Setup and teardown
   beforeEach(async () => {
+    // Initialize the test App container so middleware that depends on it
+    // (resource-limit, license-enforcement) can run.
+    resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: vi
+          .fn()
+          .mockResolvedValue(FREE_PLAN) as PlanProvider["getActivePlan"],
+      }),
+      usageLimits: {
+        notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
+        checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
+      } as any,
+    });
+
     // Create organization first
     testOrganization = await prisma.organization.create({
       data: {
@@ -850,6 +872,112 @@ describe("Prompts API", () => {
         headers: { "X-Auth-Token": testApiKey },
       });
       expect(res.status).toBe(400); // Validation error
+    });
+  });
+
+  describe("archived prompt handle reuse", () => {
+    describe("when a prompt was previously created and then archived", () => {
+      it("allows creating a new prompt with the same handle", async () => {
+        const handle = `reuse-handle-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+
+        // 1) Create the original prompt with this handle.
+        const createRes = await helpers.api.post("/api/prompts", {
+          handle,
+          prompt: "Original prompt",
+        });
+        expect(createRes.status).toBe(200);
+        const original = await createRes.json();
+
+        // 2) Soft-delete it.
+        const deleteRes = await helpers.api.delete(
+          `/api/prompts/${original.id}`,
+        );
+        expect(deleteRes.status).toBe(200);
+
+        // 3) Create a fresh prompt with the same handle — this used to throw
+        // a "Prompt handle already exists" 409 because the unique constraint
+        // counted archived rows.
+        const recreateRes = await helpers.api.post("/api/prompts", {
+          handle,
+          prompt: "Reincarnated prompt",
+        });
+        expect(recreateRes.status).toBe(200);
+        const recreated = await recreateRes.json();
+
+        expect(recreated.id).not.toBe(original.id);
+        expect(recreated.handle).toBe(handle);
+      });
+
+      it("allows the CLI sync flow to recreate a prompt with the same handle", async () => {
+        const handle = `sync-reuse-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+
+        // 1) Sync creates the prompt.
+        const initialSync = await helpers.api.post(
+          `/api/prompts/${handle}/sync`,
+          {
+            configData: {
+              prompt: "v1",
+              messages: [],
+              inputs: [{ identifier: "input", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+              model: "openai/gpt-5-mini",
+            },
+          },
+        );
+        expect(initialSync.status).toBe(200);
+        const initialBody = await initialSync.json();
+        expect(initialBody.action).toBe("created");
+
+        // 2) Delete it.
+        const deleteRes = await helpers.api.delete(
+          `/api/prompts/${initialBody.prompt.id}`,
+        );
+        expect(deleteRes.status).toBe(200);
+
+        // 3) Sync again with the same handle — should create a new prompt.
+        const reSync = await helpers.api.post(
+          `/api/prompts/${handle}/sync`,
+          {
+            configData: {
+              prompt: "v2",
+              messages: [],
+              inputs: [{ identifier: "input", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+              model: "openai/gpt-5-mini",
+            },
+          },
+        );
+        expect(reSync.status).toBe(200);
+        const reBody = await reSync.json();
+        expect(reBody.action).toBe("created");
+        expect(reBody.prompt.id).not.toBe(initialBody.prompt.id);
+      });
+    });
+
+    describe("when a prompt with the handle is still active", () => {
+      it("returns a 409 with a descriptive message on POST /api/prompts", async () => {
+        const handle = `active-conflict-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+
+        const firstRes = await helpers.api.post("/api/prompts", {
+          handle,
+          prompt: "First",
+        });
+        expect(firstRes.status).toBe(200);
+
+        const secondRes = await helpers.api.post("/api/prompts", {
+          handle,
+          prompt: "Second",
+        });
+        expect(secondRes.status).toBe(409);
+        const body = await secondRes.json();
+        // Must NOT collapse to a generic 500/Internal server error.
+        expect(JSON.stringify(body).toLowerCase()).not.toContain(
+          "internal server error",
+        );
+        expect(JSON.stringify(body).toLowerCase()).toContain(
+          "handle already exists",
+        );
+      });
     });
   });
 });

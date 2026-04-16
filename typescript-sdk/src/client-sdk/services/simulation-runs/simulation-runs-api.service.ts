@@ -4,6 +4,10 @@ import {
   type LangwatchApiClient,
 } from "@/internal/api/client";
 import type { InternalConfig } from "@/client-sdk/types";
+import {
+  extractStatusFromResponse,
+  formatApiErrorForOperation,
+} from "@/client-sdk/services/_shared/format-api-error";
 
 export type SimulationRunsListResponse =
   paths["/api/simulation-runs"]["get"]["responses"]["200"]["content"]["application/json"];
@@ -40,26 +44,10 @@ export class SimulationRunsApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const errorMessage =
-      typeof error === "string"
-        ? error
-        : error != null &&
-            typeof error === "object" &&
-            "error" in error &&
-            error.error != null
-          ? typeof error.error === "string"
-            ? error.error
-            : (error.error as { message?: string }).message ??
-              JSON.stringify(error.error)
-          : error instanceof Error
-            ? error.message
-            : "Unknown error occurred";
-
-    throw new SimulationRunsApiError(
-      `Failed to ${operation}: ${errorMessage}`,
-      operation,
-      error,
-    );
+    const message = formatApiErrorForOperation(operation, error, {
+      status: extractStatusFromResponse(error),
+    });
+    throw new SimulationRunsApiError(message, operation, error);
   }
 
   async getAll(params?: SimulationRunsListParams): Promise<SimulationRunsListResponse> {

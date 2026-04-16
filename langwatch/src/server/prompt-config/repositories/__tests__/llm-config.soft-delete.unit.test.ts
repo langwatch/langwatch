@@ -25,20 +25,21 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
 describe("LlmConfigRepository", () => {
   describe("deleteConfig()", () => {
     describe("when prompt exists and belongs to the project", () => {
-      it("soft-deletes by setting deletedAt instead of hard-deleting", async () => {
+      it("soft-deletes by setting deletedAt and frees the handle for reuse", async () => {
         const mockUpdate = vi.fn(() =>
           Promise.resolve({ id: "prompt_1", deletedAt: new Date() }),
         );
         const prisma = makeMockPrisma({ update: mockUpdate });
 
-        // Mock getConfigByIdOrHandleWithLatestVersion to return a config
+        // Mock getConfigByIdOrHandleWithLatestVersion to return a config with
+        // a prefixed handle (what the DB actually stores).
         const repo = new LlmConfigRepository(prisma);
         vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",
-          name: "Support Bot",
-          handle: "support-bot",
+          name: "support-bot",
+          handle: "proj_1/support-bot",
           scope: "PROJECT",
           copiedFromPromptId: null,
           createdAt: new Date(),
@@ -49,9 +50,15 @@ describe("LlmConfigRepository", () => {
 
         await repo.deleteConfig("prompt_1", "proj_1", "org_1");
 
+        // Handle is nulled out to free it for future reuse; deletedAt is set;
+        // the unprefixed display name is preserved on `name`.
         expect(mockUpdate).toHaveBeenCalledWith({
           where: { id: "prompt_1", projectId: "proj_1" },
-          data: { deletedAt: expect.any(Date) },
+          data: {
+            deletedAt: expect.any(Date),
+            handle: null,
+            name: "support-bot",
+          },
         });
       });
 

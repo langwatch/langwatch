@@ -7,6 +7,11 @@ import { type InternalConfig } from "@/client-sdk/types";
 import { type CreatePromptBody, type UpdatePromptBody } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { PromptsApiError } from "./errors";
+import {
+  extractStatusFromResponse,
+  formatApiErrorForOperation,
+  formatApiErrorMessage,
+} from "@/client-sdk/services/_shared/format-api-error";
 
 export type SyncAction = "created" | "updated" | "conflict" | "up_to_date";
 
@@ -62,22 +67,12 @@ export class PromptsApiService {
    * @param error The error object returned from the API client.
    * @throws {PromptsApiError}
    */
-  private handleApiError(operation: string, error: any): never {
-    const errorMessage =
-      typeof error === "string"
-        ? error
-        : error?.error != null
-        ? typeof error.error === "string"
-          ? error.error
-          : error.error.message ??
-            JSON.stringify(error.error, Object.getOwnPropertyNames(error.error))
-        : error?.message ?? "Unknown error occurred";
+  private handleApiError(operation: string, error: any, status?: number): never {
+    const message = formatApiErrorForOperation(operation, error, {
+      status: status ?? extractStatusFromResponse(error),
+    });
 
-    throw new PromptsApiError(
-      `Failed to ${operation}: ${errorMessage}`,
-      operation,
-      error,
-    );
+    throw new PromptsApiError(message, operation, error);
   }
 
   /**
@@ -354,8 +349,9 @@ export class PromptsApiService {
     localVersion?: number;
     commitMessage?: string;
   }): Promise<SyncResult> {
+    let response: Awaited<ReturnType<LangwatchApiClient["POST"]>> | undefined;
     try {
-      const response = await this.apiClient.POST(
+      response = await this.apiClient.POST(
         "/api/prompts/{id}/sync",
         {
           params: { path: { id: params.name } },
@@ -365,23 +361,32 @@ export class PromptsApiService {
             commitMessage: params.commitMessage,
           },
         },
-      );
-
-      if (response.error) {
-        const errorMessage =
-          response.error?.error ?? JSON.stringify(response.error);
-        throw new Error(`Failed to sync prompt: ${errorMessage}`);
-      }
-
-      return {
-        action: response.data.action as SyncAction,
-        prompt: response.data.prompt,
-        conflictInfo: response.data.conflictInfo,
-      };
+      ) as any;
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown error occurred";
+      // Transport-level failures (network errors, timeouts, unresolved DNS)
+      // surface here. Preserve the underlying message so the user knows
+      // whether the API is reachable.
+      const message = formatApiErrorForOperation("sync prompt", error);
       throw new PromptsApiError(message, "sync", error);
     }
+
+    if (response && (response as any).error) {
+      const err = (response as any).error;
+      const status =
+        (response as any).response?.status ?? extractStatusFromResponse(err);
+      const message = formatApiErrorMessage(err, { status });
+      throw new PromptsApiError(
+        `Failed to sync prompt: ${message}`,
+        "sync",
+        err,
+      );
+    }
+
+    const data = (response as any).data;
+    return {
+      action: data.action as SyncAction,
+      prompt: data.prompt,
+      conflictInfo: data.conflictInfo,
+    };
   }
 }

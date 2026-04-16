@@ -1,4 +1,5 @@
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export interface SecretResponse {
   id: string;
@@ -45,9 +46,17 @@ export class SecretsApiService {
 
     if (!response.ok) {
       const errorText = await response.text();
+      let parsed: unknown = errorText;
+      try {
+        parsed = JSON.parse(errorText);
+      } catch {
+        // leave as raw text
+      }
+      const message = formatApiErrorMessage(parsed, { status: response.status });
       throw new SecretsApiError(
-        `HTTP ${response.status}: ${errorText}`,
+        `HTTP ${response.status}: ${message}`,
         options?.method ?? "GET",
+        parsed,
       );
     }
 
