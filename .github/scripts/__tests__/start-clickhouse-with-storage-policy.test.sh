@@ -68,6 +68,19 @@ assert_exit_nonzero() {
   fi
 }
 
+assert_eq() {
+  local expected="$1"
+  local actual="$2"
+  local desc="$3"
+  if [ "$actual" = "$expected" ]; then
+    echo "PASS: $desc ($actual)"
+    PASS=$((PASS + 1))
+  else
+    echo "FAIL: $desc — expected $expected, got $actual"
+    FAIL=$((FAIL + 1))
+  fi
+}
+
 # ---------------------------------------------------------------------------
 # Shim builder
 #
@@ -208,9 +221,17 @@ run_test_a() {
   EXIT_CODE=$?
   set -e
 
+  local verify_calls
+  verify_calls="$(cat "$tmpdir/state/verify_call")"
+
   teardown_shims "$tmpdir"
   assert_exit_zero "$EXIT_CODE" \
     "test a: readiness ready on attempt 3, verify flaps then recovers → exit 0"
+  # Pin down the retry-on-flap contract: verify must have been called exactly 3
+  # times (two transient failures, then success). If this drops to 1 the retry
+  # loop has regressed; if it's >3 we're retrying past a success.
+  assert_eq 3 "$verify_calls" \
+    "test a: verify retried exactly 3 times (2 flaps + 1 success)"
 }
 
 # ---------------------------------------------------------------------------
