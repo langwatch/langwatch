@@ -26,6 +26,7 @@ import { useForm } from "react-hook-form";
 import { LuListTree } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import { createEvaluatorEditorCallbacks } from "~/evaluations-v3/utils/evaluatorEditorCallbacks";
 import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
 import {
   getComplexProps,
@@ -632,15 +633,16 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const openEvaluatorEditorForMappings = useCallback(() => {
     if (!selectedEvaluator) return;
 
+    setFlowCallbacks(
+      "evaluatorEditor",
+      createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+    );
+
     const mappingsConfig: EvaluatorMappingsConfig = {
       level: level ?? undefined,
       initialMappings: mappings,
-      onMappingChange: handleMappingChange,
     };
 
-    setFlowCallbacks("evaluatorEditor", {
-      onMappingChange: handleMappingChange,
-    });
     openDrawer("evaluatorEditor", {
       evaluatorId: selectedEvaluator.id,
       mappingsConfig,
@@ -685,17 +687,20 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
           threadIdleTimeout,
         };
 
-        // Build mappings config and navigate to evaluator editor
+        // Build mappings config and navigate to evaluator editor.
+        // onMappingChange goes through flowCallbacks (durable) — never inside
+        // mappingsConfig (ephemeral complexProps, lost on ErrorBoundary remount).
+        setFlowCallbacks(
+          "evaluatorEditor",
+          createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+        );
+
         const newMappingsConfig: EvaluatorMappingsConfig = {
           level: level ?? undefined,
           initialMappings: autoMappings,
-          onMappingChange: handleMappingChange,
         };
 
         // Use "Select Evaluator" button text since we're selecting a different evaluator
-        setFlowCallbacks("evaluatorEditor", {
-          onMappingChange: handleMappingChange,
-        });
         openDrawer(
           "evaluatorEditor",
           {
@@ -708,17 +713,18 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       },
     });
 
+    setFlowCallbacks(
+      "evaluatorEditor",
+      createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+    );
+
     const mappingsConfig: EvaluatorMappingsConfig = {
       level: level ?? undefined,
       initialMappings: mappings,
-      onMappingChange: handleMappingChange,
     };
 
     // Open the evaluator editor directly - use default "Save Changes" text
     // since we're editing an already-selected evaluator
-    setFlowCallbacks("evaluatorEditor", {
-      onMappingChange: handleMappingChange,
-    });
     openDrawer("evaluatorEditor", {
       evaluatorId: selectedEvaluator.id,
       mappingsConfig,
@@ -763,19 +769,22 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         threadIdleTimeout,
       };
 
+      // onMappingChange goes through flowCallbacks (durable) — never inside
+      // mappingsConfig (ephemeral complexProps, lost on ErrorBoundary remount).
+      setFlowCallbacks(
+        "evaluatorEditor",
+        createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+      );
+
       // Build mappings config for the evaluator editor
       const mappingsConfig: EvaluatorMappingsConfig = {
         level: level ?? undefined,
         initialMappings: autoMappings,
-        onMappingChange: handleMappingChange,
       };
 
       // Open evaluator editor immediately (replaceCurrentInStack replaces evaluatorList with evaluatorEditor)
       // This way, Cancel/back from evaluatorEditor goes to onlineEvaluation, not evaluatorList
       // Use "Select Evaluator" button text since we're selecting, not editing
-      setFlowCallbacks("evaluatorEditor", {
-        onMappingChange: handleMappingChange,
-      });
       openDrawer(
         "evaluatorEditor",
         {
@@ -796,33 +805,36 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       const capturedPreconditions = preconditions;
       const capturedThreadIdleTimeout = threadIdleTimeout;
 
-      setFlowCallbacks("evaluatorEditor", {
-        onSave: (savedEvaluator: { id: string; name: string }) => {
-          // Store the new evaluator info in module-level state
-          // The evaluator will be loaded when the online evaluation drawer reopens
-          const newName = capturedName || savedEvaluator.name;
+      setFlowCallbacks(
+        "evaluatorEditor",
+        createEvaluatorEditorCallbacks({
+          onSave: (savedEvaluator) => {
+            // Store the new evaluator info in module-level state.
+            // The evaluator will be loaded when the online evaluation drawer reopens.
+            const newName = capturedName || savedEvaluator.name;
 
-          // Persist state with the new evaluator ID (the full evaluator will be loaded via query)
-          onlineEvaluationDrawerState = {
-            level: capturedLevel,
-            name: newName,
-            selectedEvaluator: null, // Will be loaded via query
-            sample: capturedSample,
-            mappings: {},
-            preconditions: capturedPreconditions,
-            threadIdleTimeout: capturedThreadIdleTimeout,
-            // Store the new evaluator ID to load it when the drawer reopens
-            pendingEvaluatorId: savedEvaluator.id,
-          };
+            // Persist state with the new evaluator ID (the full evaluator will be loaded via query)
+            onlineEvaluationDrawerState = {
+              level: capturedLevel,
+              name: newName,
+              selectedEvaluator: null, // Will be loaded via query
+              sample: capturedSample,
+              mappings: {},
+              preconditions: capturedPreconditions,
+              threadIdleTimeout: capturedThreadIdleTimeout,
+              // Store the new evaluator ID to load it when the drawer reopens
+              pendingEvaluatorId: savedEvaluator.id,
+            };
 
-          // Navigate directly to online evaluation drawer (resetting the stack)
-          // Use module-level navigation since the component may not be mounted
-          navigateToDrawer("onlineEvaluation", { resetStack: true });
+            // Navigate directly to online evaluation drawer (resetting the stack).
+            // Use module-level navigation since the component may not be mounted.
+            navigateToDrawer("onlineEvaluation", { resetStack: true });
 
-          // Return true to indicate we handled navigation (prevents default goBack())
-          return true;
-        },
-      });
+            // Return true to indicate we handled navigation (prevents default goBack())
+            return true;
+          },
+        }),
+      );
     };
 
     // Set flow callback for evaluator selection (when user selects an existing evaluator)
