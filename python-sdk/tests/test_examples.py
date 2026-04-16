@@ -12,7 +12,9 @@ import asyncio
 # `CodeSettings` is not fully defined. Skip the whole module rather than taking
 # down the rest of the suite at collection time.
 try:
-    import chainlit  # noqa: F401
+    # `import chainlit.config` is the actual failure site on incompatible
+    # pydantic versions; it also imports the parent `chainlit` package, so we
+    # don't need a separate `import chainlit` line.
     import chainlit.config  # noqa: F401
     from chainlit.context import init_http_context  # noqa: F401
 except Exception as _chainlit_err:  # pragma: no cover - environment-dependent
