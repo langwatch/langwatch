@@ -1237,65 +1237,33 @@ export class ClickHouseTraceService {
           return 0;
         }
 
-        const now = new Date();
-
-        // Archive trace_summaries: read latest rows, re-insert with ArchivedAt set
-        await clickHouseClient.query({
-          query: `
-            INSERT INTO trace_summaries
-            SELECT
-              *,
-              {archivedAt:DateTime64(3)} AS ArchivedAt
-            FROM (
-              SELECT * EXCEPT(ArchivedAt, UpdatedAt),
-                     now64(3) AS UpdatedAt
-              FROM trace_summaries
+        // Use ALTER TABLE UPDATE mutations to set ArchivedAt on all
+        // existing rows atomically. This is the correct pattern for
+        // ReplacingMergeTree — it modifies rows in-place so queries with
+        // `ArchivedAt IS NULL` exclude them immediately after the mutation
+        // completes, without waiting for background merges.
+        await Promise.all([
+          clickHouseClient.query({
+            query: `
+              ALTER TABLE trace_summaries
+              UPDATE ArchivedAt = now64(3), UpdatedAt = now64(3)
               WHERE TenantId = {tenantId:String}
                 AND TraceId IN ({traceIds:Array(String)})
-                AND (TenantId, TraceId, UpdatedAt) IN (
-                  SELECT TenantId, TraceId, max(UpdatedAt)
-                  FROM trace_summaries
-                  WHERE TenantId = {tenantId:String}
-                    AND TraceId IN ({traceIds:Array(String)})
-                  GROUP BY TenantId, TraceId
-                )
-            )
-          `,
-          query_params: {
-            tenantId: projectId,
-            traceIds,
-            archivedAt: now.toISOString(),
-          },
-        });
-
-        // Archive stored_spans: read latest rows, re-insert with ArchivedAt set
-        await clickHouseClient.query({
-          query: `
-            INSERT INTO stored_spans
-            SELECT
-              *,
-              {archivedAt:DateTime64(3)} AS ArchivedAt
-            FROM (
-              SELECT * EXCEPT(ArchivedAt, StartTime),
-                     StartTime
-              FROM stored_spans
+                AND ArchivedAt IS NULL
+            `,
+            query_params: { tenantId: projectId, traceIds },
+          }),
+          clickHouseClient.query({
+            query: `
+              ALTER TABLE stored_spans
+              UPDATE ArchivedAt = now64(3)
               WHERE TenantId = {tenantId:String}
                 AND TraceId IN ({traceIds:Array(String)})
-                AND (TenantId, TraceId, SpanId, StartTime) IN (
-                  SELECT TenantId, TraceId, SpanId, max(StartTime)
-                  FROM stored_spans
-                  WHERE TenantId = {tenantId:String}
-                    AND TraceId IN ({traceIds:Array(String)})
-                  GROUP BY TenantId, TraceId, SpanId
-                )
-            )
-          `,
-          query_params: {
-            tenantId: projectId,
-            traceIds,
-            archivedAt: now.toISOString(),
-          },
-        });
+                AND ArchivedAt IS NULL
+            `,
+            query_params: { tenantId: projectId, traceIds },
+          }),
+        ]);
 
         this.logger.info(
           { projectId, traceCount: traceIds.length },

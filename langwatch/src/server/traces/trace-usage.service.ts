@@ -159,6 +159,7 @@ export class TraceUsageService {
         SELECT TenantId, toString(count(DISTINCT TraceId)) AS Total
         FROM trace_summaries
         WHERE TenantId IN ({projectIds:Array(String)})
+          AND ArchivedAt IS NULL
           AND CreatedAt >= fromUnixTimestamp64Milli({monthStart:UInt64})
         GROUP BY TenantId
       `,

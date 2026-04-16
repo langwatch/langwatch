@@ -108,6 +108,7 @@ async function getChTraceCount(
       SELECT toString(count(DISTINCT TraceId)) AS Total
       FROM trace_summaries
       WHERE TenantId IN ({projectIds:Array(String)})
+        AND ArchivedAt IS NULL
     `,
     query_params: { projectIds },
     format: "JSONEachRow",
