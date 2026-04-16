@@ -70,15 +70,11 @@ function determineErrorResponse(
     };
   }
 
-  // Prisma unique-constraint violation — treat as 409 conflict with a
-  // descriptive message. Route-specific `handlePossibleConflictError` may
-  // already translate this into an HTTPException, but this global safety
-  // net catches cases where that wrapper isn't wired up yet.
-  // Tighten the check to require either the explicit P2002 code or a
-  // PrismaClientKnownRequestError shape — `meta.target` alone could appear
-  // on unrelated errors that happen to use the same field name.
-  const isPrismaKnownError = error.name === "PrismaClientKnownRequestError";
-  if (error.code === "P2002" || isPrismaKnownError) {
+  // Prisma unique-constraint violation → 409 with a descriptive message.
+  // Only P2002 should land here: other `PrismaClientKnownRequestError`
+  // codes (P2003 foreign-key, P2021 missing table, etc.) are real backend
+  // failures and must not be mislabeled as conflicts.
+  if (error.code === "P2002") {
     const target = (error as { meta?: { target?: unknown } }).meta?.target;
     const targetStr = Array.isArray(target)
       ? target.join(", ")
@@ -114,11 +110,11 @@ function determineErrorResponse(
     };
   }
 
-  // Otherwise treat as server error. We always include the underlying
-  // error message (and any `code`) in the `message` field — even in
-  // production — so the CLI and code assistants have something concrete
-  // to surface. The `error` kind stays generic on purpose so clients can
-  // still recognize the category.
+  // Treat unhandled errors as 500. The raw exception message can contain
+  // internal details (schema names, file paths, connection strings), so
+  // only surface it in non-production environments. Actual server logging
+  // happens in the logger middleware — nothing is lost in prod.
+  const isProd = process.env.NODE_ENV === "production";
   const underlying = error.message ?? "";
   const codeSuffix = error.code ? ` (${error.code})` : "";
   const nameSuffix =
@@ -128,7 +124,7 @@ function determineErrorResponse(
     statusCode: 500,
     response: errorSchema.parse({
       error: "Internal server error",
-      message: descriptive || "Internal server error",
+      message: !isProd && descriptive ? descriptive : "Internal server error",
     }),
   };
 }

@@ -171,7 +171,7 @@ const printPullResults = ({
 
   if (result.errors.length > 0) {
     for (const { name, error } of result.errors) {
-      console.log(chalk.red(`✗ Failed ${chalk.cyan(name)}: ${error}`));
+      console.error(chalk.red(`✗ Failed ${chalk.cyan(name)}: ${error}`));
     }
   }
 

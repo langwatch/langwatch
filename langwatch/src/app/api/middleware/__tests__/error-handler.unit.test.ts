@@ -85,8 +85,29 @@ describe("handleError()", () => {
     });
   });
 
+  describe("when error is a non-P2002 PrismaClientKnownRequestError", () => {
+    it("does NOT get mislabeled as 409 conflict", async () => {
+      // P2003 (foreign key violation) and similar should bubble as real
+      // 500s — labeling them 409 would hide genuine backend breakage.
+      const error = Object.assign(
+        new Error("Foreign key constraint failed on the field: projectId"),
+        {
+          name: "PrismaClientKnownRequestError",
+          code: "P2003",
+        },
+      );
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body.error).toBe("Internal server error");
+    });
+  });
+
   describe("when error has no recognizable shape (fallback 500)", () => {
-    it("still includes the underlying error message, not just 'Internal server error'", async () => {
+    it("includes the underlying error message in non-production environments", async () => {
       const error = Object.assign(new Error("database connection refused"), {
         name: "DatabaseError",
         code: "ECONNREFUSED",
@@ -102,6 +123,34 @@ describe("handleError()", () => {
       expect(body.error).toBe("Internal server error");
       expect(body.message).toContain("database connection refused");
       expect(body.message).toContain("ECONNREFUSED");
+    });
+
+    it("hides exception internals in production", async () => {
+      // Leaking raw error.message in production could expose schema
+      // names, file paths, or credentials. Keep the public shape generic.
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = "production";
+      try {
+        const error = Object.assign(
+          new Error("connect ECONNREFUSED 10.0.0.42:5432"),
+          {
+            name: "PrismaClientInitializationError",
+            code: "P1001",
+          },
+        );
+        const app = createTestApp(error);
+
+        const res = await app.request("/");
+
+        expect(res.status).toBe(500);
+        const body = await res.json();
+        expect(body.error).toBe("Internal server error");
+        expect(body.message).toBe("Internal server error");
+        expect(body.message).not.toContain("10.0.0.42");
+        expect(body.message).not.toContain("P1001");
+      } finally {
+        process.env.NODE_ENV = originalEnv;
+      }
     });
   });
 });

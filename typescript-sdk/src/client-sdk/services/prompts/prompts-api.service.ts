@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { paths, operations } from "@/internal/generated/openapi/api-client";
 import { type PromptResponse, type TagDefinition, type CreatedTag } from "./types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
@@ -13,7 +14,30 @@ import {
   formatApiErrorMessage,
 } from "@/client-sdk/services/_shared/format-api-error";
 
-export type SyncAction = "created" | "updated" | "conflict" | "up_to_date";
+const syncActionSchema = z.enum([
+  "created",
+  "updated",
+  "conflict",
+  "up_to_date",
+]);
+
+export type SyncAction = z.infer<typeof syncActionSchema>;
+
+const syncResultSchema = z.object({
+  action: syncActionSchema,
+  // `prompt` and `conflictInfo` are passed through untyped — they come from
+  // the OpenAPI-derived shape which is already validated on the server side.
+  prompt: z.unknown().optional(),
+  conflictInfo: z
+    .object({
+      localVersion: z.number(),
+      remoteVersion: z.number(),
+      differences: z.array(z.string()),
+      remoteConfigData: z.unknown(),
+    })
+    .passthrough()
+    .optional(),
+});
 
 export type AssignTagResult = NonNullable<
   operations["putApiPromptsByIdTagsByTag"]["responses"]["200"]["content"]["application/json"]
@@ -391,18 +415,21 @@ export class PromptsApiService {
       );
     }
 
-    const data = response?.data as SyncResult | undefined;
-    if (!data) {
+    // Validate the shape at the boundary so a malformed 2xx payload
+    // (e.g. `{ action: undefined }`) surfaces as a PromptsApiError here
+    // instead of crashing downstream code with a confusing stack trace.
+    const parsed = syncResultSchema.safeParse(response?.data);
+    if (!parsed.success) {
       throw new PromptsApiError(
-        "Failed to sync prompt: server returned no data",
+        "Failed to sync prompt: server returned an invalid response body",
         "sync",
-        response,
+        response?.data ?? response,
       );
     }
     return {
-      action: data.action,
-      prompt: data.prompt,
-      conflictInfo: data.conflictInfo,
+      action: parsed.data.action,
+      prompt: parsed.data.prompt as SyncResult["prompt"],
+      conflictInfo: parsed.data.conflictInfo as SyncResult["conflictInfo"],
     };
   }
 }
