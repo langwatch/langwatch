@@ -212,6 +212,22 @@ describe("Prompt tags appear in prompt responses", () => {
       expect(body.versionId).toBe(v1.id);
       expect(body.tags).toEqual([{ name: "staging", versionId: v1.id }]);
     });
+
+    it("when fetched with ?tag=latest resolves to the latest version (round-trip works)", async () => {
+      const res = await get(
+        `/api/prompts/${promptConfig.id}?tag=latest`,
+      );
+      expect(res.status).toBe(200);
+      const body = (await res.json()) as {
+        versionId: string;
+        tags: Array<{ name: string; versionId: string }>;
+      };
+      expect(body.versionId).toBe(v2.id);
+      expect(body.tags).toEqual([
+        { name: "latest", versionId: v2.id },
+        { name: "production", versionId: v2.id },
+      ]);
+    });
   });
 
   describe("GET /api/prompts/:id/versions", () => {
