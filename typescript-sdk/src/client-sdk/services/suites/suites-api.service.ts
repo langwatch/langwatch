@@ -7,7 +7,10 @@ import type { InternalConfig } from "@/client-sdk/types";
 
 export type SuiteResponse = NonNullable<
   paths["/api/suites"]["get"]["responses"]["200"]["content"]["application/json"]
->[number];
+>[number] & {
+  /** URL to view this suite on the LangWatch platform */
+  platformUrl?: string;
+};
 
 export type CreateSuiteBody = NonNullable<
   paths["/api/suites"]["post"]["requestBody"]

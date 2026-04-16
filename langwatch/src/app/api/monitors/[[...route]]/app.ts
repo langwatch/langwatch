@@ -14,6 +14,7 @@ import {
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import { badRequestSchema } from "../../shared/schemas";
 
 patchZodOpenapi();
@@ -40,6 +41,10 @@ const monitorResponseSchema = z.object({
   threadIdleTimeout: z.number().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+const monitorResponseWithPlatformUrlSchema = monitorResponseSchema.extend({
+  platformUrl: z.string().url(),
 });
 
 const createMonitorSchema = z.object({
@@ -124,7 +129,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(z.array(monitorResponseSchema)),
+              schema: resolver(z.array(monitorResponseWithPlatformUrlSchema)),
             },
           },
         },
@@ -139,7 +144,13 @@ export const app = new Hono<{ Variables: Variables }>()
         orderBy: { createdAt: "asc" },
       });
 
-      return c.json(monitors.map(toMonitorResponse));
+      return c.json(monitors.map((m) => ({
+        ...toMonitorResponse(m),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=${m.id}`,
+        }),
+      })));
     }
   )
 
@@ -154,7 +165,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(monitorResponseSchema),
+              schema: resolver(monitorResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -182,7 +193,13 @@ export const app = new Hono<{ Variables: Variables }>()
         return c.json({ error: "Monitor not found" }, 404);
       }
 
-      return c.json(toMonitorResponse(monitor));
+      return c.json({
+        ...toMonitorResponse(monitor),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=${monitor.id}`,
+        }),
+      });
     }
   )
 
@@ -197,7 +214,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Monitor created",
           content: {
             "application/json": {
-              schema: resolver(monitorResponseSchema),
+              schema: resolver(monitorResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -247,7 +264,13 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       });
 
-      return c.json(toMonitorResponse(monitor), 201);
+      return c.json({
+        ...toMonitorResponse(monitor),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=${monitor.id}`,
+        }),
+      }, 201);
     }
   )
 
@@ -263,7 +286,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Monitor updated",
           content: {
             "application/json": {
-              schema: resolver(monitorResponseSchema),
+              schema: resolver(monitorResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -330,7 +353,13 @@ export const app = new Hono<{ Variables: Variables }>()
         data,
       });
 
-      return c.json(toMonitorResponse(monitor));
+      return c.json({
+        ...toMonitorResponse(monitor),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/evaluations?drawer.open=onlineEvaluation&drawer.monitorId=${monitor.id}`,
+        }),
+      });
     }
   )
 

@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { prisma as globalPrisma } from "~/server/db";
 import { getClickHouseClientForProject, isClickHouseEnabled, type ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
@@ -113,7 +114,7 @@ export function initializeWorkerApp(): App {
 export function initializeDefaultApp(options?: { processRole?: ProcessRole }): App {
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
 
-  const { prisma } = require("../db") as { prisma: PrismaClient; };
+  const prisma = globalPrisma;
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
 
   const clickhouseEnabled = !!config.clickhouseUrl || isClickHouseEnabled();
@@ -464,7 +465,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
 /** Tests — noop commands, null-backed services. */
 export function createTestApp(overrides?: Partial<AppDependencies>): App {
-  const { prisma: testPrisma } = require("../db") as { prisma: PrismaClient; };
+  const testPrisma = globalPrisma;
   const noop = async () => { };
   const config: AppConfig = {
     nodeEnv: "test",

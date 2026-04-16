@@ -58,6 +58,10 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
     }
   }
 
+  if (evaluator.platformUrl) {
+    console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
+  }
+
   console.log();
 };
 

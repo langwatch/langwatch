@@ -32,6 +32,10 @@ const formatScenarioDetails = (scenario: ScenarioResponse): void => {
     });
   }
 
+  if (scenario.platformUrl) {
+    console.log(`  ${chalk.bold("View:")}  ${chalk.underline(scenario.platformUrl)}`);
+  }
+
   console.log();
 };
 
