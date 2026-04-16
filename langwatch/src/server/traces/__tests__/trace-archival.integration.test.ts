@@ -430,6 +430,35 @@ describe.skipIf(!hasTestcontainers)(
       expect(traceIds).not.toContain(archivedThreadTrace);
     });
 
+    it("pagination count via HAVING argMax excludes archived traces (pre-merge)", async () => {
+      // Mirrors the count pattern used in fetchTracesWithPagination: dedup by
+      // TraceId, then filter on argMax(ArchivedAt, UpdatedAt). An archived
+      // trace whose latest row is archived must not be counted, even though
+      // older unarchived rows still exist in storage. Scope to the two
+      // fixture trace IDs so sibling tests running in any order do not
+      // affect the expected count.
+      const result = await ch.query({
+        query: `
+          SELECT count() AS total
+          FROM (
+            SELECT TraceId
+            FROM trace_summaries
+            WHERE TenantId = {tenantId:String}
+              AND TraceId IN ({traceIds:Array(String)})
+            GROUP BY TraceId
+            HAVING argMax(ArchivedAt, UpdatedAt) IS NULL
+          )
+        `,
+        query_params: {
+          tenantId,
+          traceIds: [activeTraceId, archivedTraceId],
+        },
+        format: "JSONEachRow",
+      });
+      const rows = await result.json<{ total: string }>();
+      expect(Number(rows[0]?.total)).toBe(1);
+    });
+
     it("excludes archived traces from paginated queries with argMax dedup (pre-merge)", async () => {
       // argMax must be applied over UNFILTERED rows so it resolves the latest
       // version, then the outer query filters on the archived state of that
