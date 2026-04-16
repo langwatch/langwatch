@@ -70,6 +70,31 @@ function determineErrorResponse(
     };
   }
 
+  // Prisma unique-constraint violation — treat as 409 conflict with a
+  // descriptive message. Route-specific `handlePossibleConflictError` may
+  // already translate this into an HTTPException, but this global safety
+  // net catches cases where that wrapper isn't wired up yet.
+  if (
+    error.code === "P2002" ||
+    (error as { meta?: { target?: unknown } }).meta?.target
+  ) {
+    const target = (error as { meta?: { target?: unknown } }).meta?.target;
+    const targetStr = Array.isArray(target)
+      ? target.join(", ")
+      : typeof target === "string"
+        ? target
+        : undefined;
+    return {
+      statusCode: 409,
+      response: errorSchema.parse({
+        error: "Conflict",
+        message: targetStr
+          ? `Unique constraint violated on ${targetStr}`
+          : error.message || "Unique constraint violated",
+      }),
+    };
+  }
+
   // Handle HttpError instances (can be parsed directly)
   if (error instanceof HttpError) {
     return {
@@ -88,15 +113,21 @@ function determineErrorResponse(
     };
   }
 
-  // Otherwise treat as server error
+  // Otherwise treat as server error. We always include the underlying
+  // error message (and any `code`) in the `message` field — even in
+  // production — so the CLI and code assistants have something concrete
+  // to surface. The `error` kind stays generic on purpose so clients can
+  // still recognize the category.
+  const underlying = error.message ?? "";
+  const codeSuffix = error.code ? ` (${error.code})` : "";
+  const nameSuffix =
+    error.name && error.name !== "Error" ? ` [${error.name}]` : "";
+  const descriptive = (underlying + codeSuffix + nameSuffix).trim();
   return {
     statusCode: 500,
     response: errorSchema.parse({
       error: "Internal server error",
-      message:
-        process.env.NODE_ENV === "development"
-          ? error.message
-          : "Internal server error",
+      message: descriptive || "Internal server error",
     }),
   };
 }

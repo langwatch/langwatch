@@ -64,4 +64,44 @@ describe("handleError()", () => {
       expect(body).toHaveProperty("max", 5);
     });
   });
+
+  describe("when error is a Prisma P2002 unique-constraint violation", () => {
+    it("returns 409 conflict with the constrained field in the message", async () => {
+      const error = Object.assign(
+        new Error("Unique constraint failed on the fields: (`handle`)"),
+        {
+          code: "P2002",
+          meta: { target: ["handle"] },
+        },
+      );
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.error).toBe("Conflict");
+      expect(body.message).toContain("handle");
+    });
+  });
+
+  describe("when error has no recognizable shape (fallback 500)", () => {
+    it("still includes the underlying error message, not just 'Internal server error'", async () => {
+      const error = Object.assign(new Error("database connection refused"), {
+        name: "DatabaseError",
+        code: "ECONNREFUSED",
+      });
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      // Kind stays generic so clients can categorize, but message gains
+      // the actual cause so humans and assistants can act on it.
+      expect(body.error).toBe("Internal server error");
+      expect(body.message).toContain("database connection refused");
+      expect(body.message).toContain("ECONNREFUSED");
+    });
+  });
 });
