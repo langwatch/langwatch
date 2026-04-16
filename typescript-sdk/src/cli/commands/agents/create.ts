@@ -32,8 +32,8 @@ export const createAgentCommand = async (
 
     if (options.format === "json") {
       console.log(JSON.stringify(agent, null, 2));
-    } else if ((agent as unknown as Record<string, unknown>).platformUrl) {
-      console.log(`  ${chalk.bold("View:")}  ${chalk.underline((agent as unknown as Record<string, unknown>).platformUrl as string)}`);
+    } else if (agent.platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(agent.platformUrl)}`);
     }
   } catch (error) {
     spinner.fail();

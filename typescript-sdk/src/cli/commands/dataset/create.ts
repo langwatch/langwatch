@@ -67,7 +67,7 @@ export const createCommand = async (
         .join(", ");
       console.log(`  ${chalk.bold("Columns:")} ${colStr}`);
     }
-    const viewUrl = (dataset as Record<string, unknown>).platformUrl as string | undefined;
+    const viewUrl = dataset.platformUrl;
     if (viewUrl) {
       console.log(`  ${chalk.bold("View:")}  ${chalk.underline(viewUrl)}`);
     }

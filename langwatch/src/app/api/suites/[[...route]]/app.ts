@@ -45,6 +45,10 @@ const suiteResponseSchema = z.object({
   updatedAt: z.string(),
 });
 
+const suiteResponseWithPlatformUrlSchema = suiteResponseSchema.extend({
+  platformUrl: z.string().url(),
+});
+
 const createSuiteInputSchema = z.object({
   name: z.string().min(1, "name is required"),
   description: z.string().optional(),
@@ -130,7 +134,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(z.array(suiteResponseSchema)),
+              schema: resolver(z.array(suiteResponseWithPlatformUrlSchema)),
             },
           },
         },
@@ -164,7 +168,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(suiteResponseSchema),
+              schema: resolver(suiteResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -209,7 +213,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Suite created",
           content: {
             "application/json": {
-              schema: resolver(suiteResponseSchema),
+              schema: resolver(suiteResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -254,7 +258,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Suite updated",
           content: {
             "application/json": {
-              schema: resolver(suiteResponseSchema),
+              schema: resolver(suiteResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -307,7 +311,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Suite duplicated",
           content: {
             "application/json": {
-              schema: resolver(suiteResponseSchema),
+              schema: resolver(suiteResponseWithPlatformUrlSchema),
             },
           },
         },

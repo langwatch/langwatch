@@ -43,6 +43,10 @@ const monitorResponseSchema = z.object({
   updatedAt: z.string(),
 });
 
+const monitorResponseWithPlatformUrlSchema = monitorResponseSchema.extend({
+  platformUrl: z.string().url(),
+});
+
 const createMonitorSchema = z.object({
   name: z.string().min(1, "name is required"),
   checkType: z.string().min(1, "checkType is required"),
@@ -125,7 +129,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(z.array(monitorResponseSchema)),
+              schema: resolver(z.array(monitorResponseWithPlatformUrlSchema)),
             },
           },
         },
@@ -161,7 +165,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(monitorResponseSchema),
+              schema: resolver(monitorResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -210,7 +214,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Monitor created",
           content: {
             "application/json": {
-              schema: resolver(monitorResponseSchema),
+              schema: resolver(monitorResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -282,7 +286,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Monitor updated",
           content: {
             "application/json": {
-              schema: resolver(monitorResponseSchema),
+              schema: resolver(monitorResponseWithPlatformUrlSchema),
             },
           },
         },

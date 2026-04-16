@@ -31,6 +31,10 @@ const scenarioResponseSchema = z.object({
   labels: z.array(z.string()),
 });
 
+const scenarioResponseWithPlatformUrlSchema = scenarioResponseSchema.extend({
+  platformUrl: z.string().url(),
+});
+
 const createScenarioSchema = z.object({
   name: z.string().min(1, "name is required"),
   situation: z.string(),
@@ -65,7 +69,7 @@ app.get(
         description: "Success",
         content: {
           "application/json": {
-            schema: resolver(z.array(scenarioResponseSchema)),
+            schema: resolver(z.array(scenarioResponseWithPlatformUrlSchema)),
           },
         },
       },
@@ -98,7 +102,7 @@ app.get(
         description: "Success",
         content: {
           "application/json": {
-            schema: resolver(scenarioResponseSchema),
+            schema: resolver(scenarioResponseWithPlatformUrlSchema),
           },
         },
       },
@@ -143,7 +147,7 @@ app.post(
         description: "Scenario created",
         content: {
           "application/json": {
-            schema: resolver(scenarioResponseSchema),
+            schema: resolver(scenarioResponseWithPlatformUrlSchema),
           },
         },
       },
@@ -185,7 +189,7 @@ app.put(
         description: "Scenario updated",
         content: {
           "application/json": {
-            schema: resolver(scenarioResponseSchema),
+            schema: resolver(scenarioResponseWithPlatformUrlSchema),
           },
         },
       },

@@ -11,6 +11,7 @@ export interface AgentResponse {
   config: Record<string, unknown> | null;
   createdAt: string;
   updatedAt: string;
+  platformUrl?: string;
 }
 
 export interface AgentListResponse {

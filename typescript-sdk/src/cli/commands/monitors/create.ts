@@ -66,6 +66,7 @@ export const createMonitorCommand = async (
       name: string;
       checkType: string;
       executionMode: string;
+      platformUrl?: string;
     };
 
     spinner.succeed(`Monitor "${monitor.name}" created (${monitor.id})`);
@@ -79,8 +80,8 @@ export const createMonitorCommand = async (
     console.log(`  ${chalk.gray("ID:")}   ${chalk.green(monitor.id)}`);
     console.log(`  ${chalk.gray("Type:")} ${monitor.checkType}`);
     console.log(`  ${chalk.gray("Mode:")} ${monitor.executionMode}`);
-    if ((monitor as Record<string, unknown>).platformUrl) {
-      console.log(`  ${chalk.bold("View:")}  ${chalk.underline((monitor as Record<string, unknown>).platformUrl as string)}`);
+    if (monitor.platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(monitor.platformUrl)}`);
     }
     console.log();
   } catch (error) {

@@ -29,8 +29,8 @@ export const getTraceCommand = async (
       if (typeof trace === "string") {
         console.log(trace);
       } else {
-        if ((trace as Record<string, unknown>).platformUrl) {
-          console.log(`  ${chalk.bold("View:")}  ${chalk.underline((trace as Record<string, unknown>).platformUrl as string)}`);
+        if (trace.platformUrl) {
+          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(trace.platformUrl)}`);
           console.log();
         }
         console.log(JSON.stringify(trace, null, 2));

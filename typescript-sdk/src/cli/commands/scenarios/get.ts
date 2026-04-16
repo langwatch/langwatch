@@ -32,8 +32,8 @@ const formatScenarioDetails = (scenario: ScenarioResponse): void => {
     });
   }
 
-  if ((scenario as Record<string, unknown>).platformUrl) {
-    console.log(`  ${chalk.bold("View:")}  ${chalk.underline((scenario as Record<string, unknown>).platformUrl as string)}`);
+  if (scenario.platformUrl) {
+    console.log(`  ${chalk.bold("View:")}  ${chalk.underline(scenario.platformUrl)}`);
   }
 
   console.log();

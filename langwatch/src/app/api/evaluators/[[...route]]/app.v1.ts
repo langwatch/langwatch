@@ -26,6 +26,11 @@ import {
   updateEvaluatorInputSchema,
 } from "./schemas";
 
+const apiResponseEvaluatorWithPlatformUrlSchema =
+  apiResponseEvaluatorSchema.extend({
+    platformUrl: z.string().url(),
+  });
+
 const logger = createLogger("langwatch:api:evaluators");
 
 patchZodOpenapi();
@@ -53,7 +58,7 @@ app.get(
         description: "Success",
         content: {
           "application/json": {
-            schema: resolver(z.array(apiResponseEvaluatorSchema)),
+            schema: resolver(z.array(apiResponseEvaluatorWithPlatformUrlSchema)),
           },
         },
       },
@@ -90,7 +95,7 @@ app.get(
         description: "Success",
         content: {
           "application/json": {
-            schema: resolver(apiResponseEvaluatorSchema),
+            schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
           },
         },
       },
@@ -154,7 +159,7 @@ app.post(
         description: "Success",
         content: {
           "application/json": {
-            schema: resolver(apiResponseEvaluatorSchema),
+            schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
           },
         },
       },
@@ -209,7 +214,7 @@ app.put(
         description: "Success",
         content: {
           "application/json": {
-            schema: resolver(apiResponseEvaluatorSchema),
+            schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
           },
         },
       },

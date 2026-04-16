@@ -46,6 +46,10 @@ const scenarioRunResponseSchema = z.object({
   totalCost: z.number().optional(),
 });
 
+const scenarioRunResponseWithPlatformUrlSchema = scenarioRunResponseSchema.extend({
+  platformUrl: z.string().url(),
+});
+
 const batchSummarySchema = z.object({
   batchRunId: z.string(),
   totalCount: z.number(),
@@ -95,7 +99,7 @@ export const app = new Hono<{ Variables: Variables }>()
           content: {
             "application/json": {
               schema: resolver(z.object({
-                runs: z.array(scenarioRunResponseSchema),
+                runs: z.array(scenarioRunResponseWithPlatformUrlSchema),
                 hasMore: z.boolean().optional(),
                 nextCursor: z.string().optional(),
               })),
@@ -195,7 +199,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(scenarioRunResponseSchema),
+              schema: resolver(scenarioRunResponseWithPlatformUrlSchema),
             },
           },
         },

@@ -59,8 +59,8 @@ export const updateCommand = async (
         .join(", ");
       console.log(`  ${chalk.bold("Columns:")} ${colStr}`);
     }
-    if ((dataset as Record<string, unknown>).platformUrl) {
-      console.log(`  ${chalk.bold("View:")}  ${chalk.underline((dataset as Record<string, unknown>).platformUrl as string)}`);
+    if (dataset.platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(dataset.platformUrl)}`);
     }
   } catch (error) {
     spinner.fail("Failed to update dataset");

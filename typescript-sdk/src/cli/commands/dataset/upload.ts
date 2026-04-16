@@ -70,8 +70,8 @@ export const uploadCommand = async (
       console.log();
       console.log(`  ${chalk.bold("Slug:")}    ${result.dataset.slug}`);
       console.log(`  ${chalk.bold("ID:")}      ${result.dataset.id}`);
-      if ((result.dataset as Record<string, unknown>).platformUrl) {
-        console.log(`  ${chalk.bold("View:")}    ${chalk.underline((result.dataset as Record<string, unknown>).platformUrl as string)}`);
+      if (result.dataset.platformUrl) {
+        console.log(`  ${chalk.bold("View:")}    ${chalk.underline(result.dataset.platformUrl)}`);
       }
     } else {
       spinner.succeed(

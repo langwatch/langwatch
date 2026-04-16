@@ -11,6 +11,7 @@ export interface DashboardSummary {
   graphCount: number;
   createdAt: string;
   updatedAt: string;
+  platformUrl?: string;
 }
 
 export interface DashboardDetail {
@@ -20,6 +21,7 @@ export interface DashboardDetail {
   graphs: unknown[];
   createdAt: string;
   updatedAt: string;
+  platformUrl?: string;
 }
 
 export class DashboardsApiError extends Error {

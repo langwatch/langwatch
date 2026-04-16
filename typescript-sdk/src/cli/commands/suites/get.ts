@@ -48,9 +48,9 @@ export const getSuiteCommand = async (
       console.log(`    ${chalk.gray("•")} ${target.type}:${target.referenceId}`);
     }
 
-    if ((suite as Record<string, unknown>).platformUrl) {
+    if (suite.platformUrl) {
       console.log();
-      console.log(`  ${chalk.bold("View:")}  ${chalk.underline((suite as Record<string, unknown>).platformUrl as string)}`);
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(suite.platformUrl)}`);
     }
 
     console.log();

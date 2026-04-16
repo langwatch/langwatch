@@ -46,6 +46,10 @@ const triggerResponseSchema = z.object({
   updatedAt: z.string(),
 });
 
+const triggerResponseWithPlatformUrlSchema = triggerResponseSchema.extend({
+  platformUrl: z.string().url(),
+});
+
 const createTriggerSchema = z.object({
   name: z.string().min(1, "name is required"),
   action: triggerActionEnum,
@@ -108,7 +112,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(z.array(triggerResponseSchema)),
+              schema: resolver(z.array(triggerResponseWithPlatformUrlSchema)),
             },
           },
         },
@@ -144,7 +148,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(triggerResponseSchema),
+              schema: resolver(triggerResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -190,7 +194,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Trigger created",
           content: {
             "application/json": {
-              schema: resolver(triggerResponseSchema),
+              schema: resolver(triggerResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -237,7 +241,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Trigger updated",
           content: {
             "application/json": {
-              schema: resolver(triggerResponseSchema),
+              schema: resolver(triggerResponseWithPlatformUrlSchema),
             },
           },
         },

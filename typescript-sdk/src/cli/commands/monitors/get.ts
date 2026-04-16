@@ -38,6 +38,7 @@ export const getMonitorCommand = async (
       evaluatorId: string | null;
       preconditions: unknown;
       createdAt: string;
+      platformUrl?: string;
     };
 
     spinner.succeed(`Monitor "${monitor.name}"`);
@@ -66,8 +67,8 @@ export const getMonitorCommand = async (
     console.log(
       `  ${chalk.gray("Created:")}   ${new Date(monitor.createdAt).toLocaleString()}`
     );
-    if ((monitor as Record<string, unknown>).platformUrl) {
-      console.log(`  ${chalk.bold("View:")}     ${chalk.underline((monitor as Record<string, unknown>).platformUrl as string)}`);
+    if (monitor.platformUrl) {
+      console.log(`  ${chalk.bold("View:")}     ${chalk.underline(monitor.platformUrl)}`);
     }
     console.log();
   } catch (error) {

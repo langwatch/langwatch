@@ -34,6 +34,10 @@ const workflowResponseSchema = z.object({
   updatedAt: z.string(),
 });
 
+const workflowResponseWithPlatformUrlSchema = workflowResponseSchema.extend({
+  platformUrl: z.string().url(),
+});
+
 function toWorkflowResponse(workflow: Workflow) {
   return {
     id: workflow.id,
@@ -64,7 +68,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(z.array(workflowResponseSchema)),
+              schema: resolver(z.array(workflowResponseWithPlatformUrlSchema)),
             },
           },
         },
@@ -99,7 +103,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(workflowResponseSchema),
+              schema: resolver(workflowResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -144,7 +148,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Workflow updated",
           content: {
             "application/json": {
-              schema: resolver(workflowResponseSchema),
+              schema: resolver(workflowResponseWithPlatformUrlSchema),
             },
           },
         },
