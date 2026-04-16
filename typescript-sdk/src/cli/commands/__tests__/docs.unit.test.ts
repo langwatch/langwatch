@@ -75,6 +75,18 @@ describe("normalizeDocsUrl()", () => {
         "https://langwatch.ai/docs/integration/python/guide.md",
       );
     });
+
+    it("inserts .md before query string instead of appending after it", () => {
+      expect(normalizeDocsUrl("integration/python/guide?lang=en", "langwatch")).toBe(
+        "https://langwatch.ai/docs/integration/python/guide.md?lang=en",
+      );
+    });
+
+    it("inserts .md before url fragment instead of appending after it", () => {
+      expect(normalizeDocsUrl("integration/python/guide#install", "langwatch")).toBe(
+        "https://langwatch.ai/docs/integration/python/guide.md#install",
+      );
+    });
   });
 
   describe("for scenario docs", () => {

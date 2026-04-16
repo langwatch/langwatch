@@ -19,12 +19,14 @@ export function normalizeDocsUrl(input: string | undefined, kind: DocsKind): str
   url = url.replace(/^['"]|['"]$/g, "").trim();
   if (url === "") return indexUrl;
 
-  // Append .md if not already an .md/.txt file
-  const hasExt = /\.(md|txt)(\?|#|$)/i.test(url);
-  if (!hasExt) {
-    url = url.replace(/\/$/, "");
-    url += ".md";
+  // Append .md if not already an .md/.txt file (before any query/hash)
+  const match = url.match(/^([^?#]*)([?#].*)?$/);
+  let pathPart = match?.[1] ?? url;
+  const suffix = match?.[2] ?? "";
+  if (!/\.(md|txt)$/i.test(pathPart)) {
+    pathPart = pathPart.replace(/\/$/, "") + ".md";
   }
+  url = `${pathPart}${suffix}`;
 
   if (/^https?:\/\//i.test(url)) {
     return url;
