@@ -5,7 +5,7 @@ import {
   DatasetNotFoundError,
   DatasetPlanLimitError,
 } from "@/client-sdk/services/datasets/errors";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Centralized error handler for all dataset CLI commands.
@@ -41,11 +41,12 @@ export function handleDatasetCommandError({
       );
     }
   } else if (error instanceof DatasetApiError) {
-    spinner.fail(chalk.red(error.message));
+    // DatasetApiError.message is already built with formatApiErrorForOperation
+    // ("Failed to <op>: <detail>"), so forward it as-is via failSpinner to keep
+    // the double-prefix guard and single-line rendering consistent.
+    failSpinner({ spinner, error, action: context });
   } else {
-    spinner.fail(
-      chalk.red(`Failed to ${context}: ${formatApiErrorMessage({ error })}`),
-    );
+    failSpinner({ spinner, error, action: context });
   }
   process.exit(1);
 }
