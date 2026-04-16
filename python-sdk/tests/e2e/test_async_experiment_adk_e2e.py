@@ -182,9 +182,12 @@ class TestAsyncLoopWithGoogleAdk:
         def get_weather(city: str) -> dict:
             return {"status": "ok", "report": f"Sunny in {city}"}
 
+        from uuid import uuid4
+
+        model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
         agent = Agent(
             name="weather_agent",
-            model="gemini-2.0-flash-exp",
+            model=model,
             description="Replies with a short weather report.",
             instruction="Call get_weather and answer briefly.",
             tools=[get_weather],
@@ -193,9 +196,12 @@ class TestAsyncLoopWithGoogleAdk:
         cities = ["Amsterdam", "Berlin", "Cairo", "Delhi", "Edinburgh"]
 
         experiment = Experiment("e2e-async-adk")
+        # Unique session prefix per test run so reruns don't collide on ADK's
+        # in-memory session service.
+        run_id = uuid4().hex[:8]
 
         async def ask(city: str, *, item_index: int) -> str:
-            session_id = f"item-{item_index}"
+            session_id = f"run-{run_id}-item-{item_index}"
             await runner.session_service.create_session(
                 app_name="e2e-async-adk", user_id="user", session_id=session_id
             )
