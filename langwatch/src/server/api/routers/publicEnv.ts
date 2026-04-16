@@ -4,10 +4,19 @@ import { env } from "../../../env.mjs";
 import { skipPermissionCheck } from "../rbac";
 import { publicProcedure } from "../trpc";
 
+const isOpsSidebarEmail = (userEmail: string | null | undefined) => {
+  const allowList = env.SHOW_OPS_IN_MAIN_SIDEBAR;
+  if (!allowList || !userEmail) return false;
+  const normalized = userEmail.toLowerCase().trim();
+  return allowList
+    .split(",")
+    .some((e: string) => e.trim().toLowerCase() === normalized);
+};
+
 export const publicEnvRouter = publicProcedure
   .input(z.object({}).passthrough())
   .use(skipPermissionCheck)
-  .query(() => {
+  .query(({ ctx }) => {
     // Warning: be very careful with the env vars you expose here
 
     const publicEnvVars = {
@@ -19,6 +28,7 @@ export const publicEnvRouter = publicProcedure
       HAS_EMAIL_PROVIDER_KEY:
         !!env.SENDGRID_API_KEY || !!(env.USE_AWS_SES && env.AWS_REGION),
       IS_SAAS: env.IS_SAAS,
+      SHOW_OPS_IN_MAIN_SIDEBAR: isOpsSidebarEmail(ctx.session?.user?.email),
       POSTHOG_KEY: env.POSTHOG_KEY,
       POSTHOG_HOST: env.POSTHOG_HOST,
       HAS_LANGWATCH_NLP_SERVICE:

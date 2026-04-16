@@ -5,6 +5,7 @@ import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
 import { useOpsPermission } from "../hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "../hooks/usePublicEnv";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
@@ -266,13 +267,18 @@ export const MainMenu = React.memo(function MainMenu({
 const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
   const router = useRouter();
   const { hasAccess } = useOpsPermission();
+  const publicEnv = usePublicEnv();
+  const alwaysShow =
+    publicEnv.data?.SHOW_OPS_IN_MAIN_SIDEBAR ?? false;
+  const isOnOpsRoute = router.pathname.startsWith("/ops");
+  const shouldShow = hasAccess && (alwaysShow || isOnOpsRoute);
 
   const opsData = api.ops.getDashboardSnapshot.useQuery(undefined, {
-    enabled: hasAccess,
+    enabled: shouldShow,
     refetchInterval: 10000,
   });
 
-  if (!hasAccess) return null;
+  if (!shouldShow) return null;
 
   const blockedCount =
     opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ?? 0;
