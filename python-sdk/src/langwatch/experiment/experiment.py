@@ -351,7 +351,7 @@ class Experiment:
 
             if self._run_url:
                 print(f"\n  View details: {self._run_url}")
-            print(f"  Explore with: evaluation.results\n")
+            print(f"  Explore with: `evaluation.results`\n")
         except Exception:
             # Non-fatal: don't crash the experiment if result display fails
             if self._run_url:
