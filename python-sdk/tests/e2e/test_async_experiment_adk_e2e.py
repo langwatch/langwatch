@@ -208,7 +208,12 @@ class TestAsyncLoopWithGoogleAdk:
                 ),
             ):
                 if event.is_final_response():
-                    return event.content.parts[0].text.strip()
+                    # is_final_response() can fire with content=None for
+                    # state-delta events — guard before indexing parts[0].
+                    content = getattr(event, "content", None)
+                    parts = getattr(content, "parts", None) or []
+                    text = getattr(parts[0], "text", None) if parts else None
+                    return text.strip() if text else ""
             return ""
 
         idx = 0
