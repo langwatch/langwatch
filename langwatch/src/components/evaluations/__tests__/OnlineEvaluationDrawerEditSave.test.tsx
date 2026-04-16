@@ -96,8 +96,7 @@ describe("OnlineEvaluationDrawer", () => {
   };
 
   describe("Save functionality - Create mode", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("calls create mutation with correct data", async () => {
+    it("calls create mutation with correct data", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
@@ -128,8 +127,7 @@ describe("OnlineEvaluationDrawer", () => {
       );
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("calls onSave callback after successful create", async () => {
+    it("calls onSave callback after successful create", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       const mockOnSave = vi.fn();
       render(<OnlineEvaluationDrawer open={true} onSave={mockOnSave} />, {
@@ -154,8 +152,7 @@ describe("OnlineEvaluationDrawer", () => {
       expect(mockOnSave).toHaveBeenCalled();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("clears state after successful save so new drawer starts fresh", async () => {
+    it("clears state after successful save so new drawer starts fresh", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       const { unmount } = render(<OnlineEvaluationDrawer open={true} />, {
         wrapper: Wrapper,
@@ -199,8 +196,7 @@ describe("OnlineEvaluationDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("saves workflow evaluator with checkType 'workflow' instead of 'langevals/basic'", async () => {
+    it("saves workflow evaluator with checkType 'workflow' instead of 'langevals/basic'", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
@@ -239,8 +235,7 @@ describe("OnlineEvaluationDrawer", () => {
       );
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("CRITICAL: workflow evaluator Select Evaluator button works in EvaluatorEditorDrawer", async () => {
+    it("CRITICAL: workflow evaluator Select Evaluator button works in EvaluatorEditorDrawer", async () => {
       // This test verifies the full flow:
       // 1. User opens OnlineEvaluationDrawer
       // 2. Selects level
@@ -335,8 +330,7 @@ describe("OnlineEvaluationDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("built-in evaluator still saves with correct checkType from config", async () => {
+    it("built-in evaluator still saves with correct checkType from config", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       mockCreateMutate.mockClear();
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
@@ -585,8 +579,7 @@ describe("OnlineEvaluationDrawer", () => {
   });
 
   describe("Reset on reopen", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("resets form when drawer reopens in create mode after true close", async () => {
+    it("resets form when drawer reopens in create mode after true close", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       const { rerender } = render(<OnlineEvaluationDrawer open={true} />, {
         wrapper: Wrapper,
@@ -636,8 +629,7 @@ describe("OnlineEvaluationDrawer", () => {
   });
 
   describe("State persistence during navigation", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("preserves selected evaluator when navigating to evaluator list and back", async () => {
+    it("preserves selected evaluator when navigating to evaluator list and back", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
@@ -682,8 +674,7 @@ describe("OnlineEvaluationDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("updates evaluator when selecting a different one after navigation", async () => {
+    it("updates evaluator when selecting a different one after navigation", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
@@ -726,8 +717,7 @@ describe("OnlineEvaluationDrawer", () => {
   });
 
   describe("Integration with EvaluatorListDrawer", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("flow callback updates OnlineEvaluationDrawer state when evaluator selected", async () => {
+    it("flow callback updates OnlineEvaluationDrawer state when evaluator selected", async () => {
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -836,8 +826,7 @@ describe("OnlineEvaluationDrawer", () => {
   });
 
   describe("Mappings functionality", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("includes mappings data in create mutation", async () => {
+    it("includes mappings data in create mutation", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
@@ -925,8 +914,7 @@ describe("OnlineEvaluationDrawer", () => {
   });
 
   describe("Level change with evaluator selected", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("keeps evaluator selected when level changes", async () => {
+    it("keeps evaluator selected when level changes", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 

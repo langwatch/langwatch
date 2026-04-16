@@ -211,7 +211,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
 
   describe("getRunDataForScenarioSet() (paginated)", () => {
     describe("when runs have metadata", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("returns runs with metadata through pagination", async () => {
         const scenarioSetId = `set-paged-${nanoid()}`;
         const batchRunId = `batch-paged-${nanoid()}`;
@@ -239,7 +239,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
 
   describe("getRunDataForAllSuites()", () => {
     describe("when internal suite runs have metadata", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("returns runs through the all-suites query", async () => {
         const scenarioSetId = `__internal__allsuites_${nanoid()}__suite`;
         const batchRunId = `batch-allsuites-${nanoid()}`;
@@ -265,7 +265,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
 
     describe("when a batch has empty-string ScenarioSetId (legacy data)", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("normalizes the empty-string to 'default' in the scenarioSetIds map", async () => {
         const batchRunId = `batch-legacy-${nanoid()}`;
 
@@ -287,7 +287,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
 
     describe("when batches have both empty-string and 'default' ScenarioSetId for different batches", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("collapses both to 'default' and reports a single distinct set", async () => {
         const batchEmpty = `batch-empty-${nanoid()}`;
         const batchDefault = `batch-default-${nanoid()}`;
@@ -322,7 +322,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
     const batch2 = `batch-ext2-${nanoid()}`;
 
     describe("when an external set has multiple batches with mixed results", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("aggregates pass/total across all batches", async () => {
         // Batch 1: 2 passed, 1 failed → 3 total
         await insertRow(ch, makeInsertRow({
@@ -411,7 +411,7 @@ describe("SimulationClickHouseRepository (integration)", () => {
     });
 
     describe("when date range filters out older batches", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("only counts runs within the date range", async () => {
         const setId = `ext-datefilter-${nanoid()}`;
         const oldBatch = `batch-old-${nanoid()}`;

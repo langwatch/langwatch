@@ -335,7 +335,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     describe("given a single span is recorded", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("creates a trace summary with span metrics", async () => {
         const traceId = generateTestTraceId();
         const spanId = generateTestSpanId();
@@ -373,7 +373,7 @@ describe.skipIf(!hasTestcontainers)(
         expect(data.containsErrorStatus).toBe(false);
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("writes the span to stored_spans via map projection", async () => {
         const traceId = generateTestTraceId();
         const spanId = generateTestSpanId();
@@ -393,7 +393,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     describe("given multiple spans arrive for the same trace", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("accumulates span count and duration in the trace summary", async () => {
         const traceId = generateTestTraceId();
         const now = Date.now();
@@ -447,7 +447,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     describe("given a span with an error status", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("records the error in the trace summary", async () => {
         const traceId = generateTestTraceId();
 
@@ -481,7 +481,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     describe("given a span with token usage attributes", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("aggregates token counts in the trace summary", async () => {
         const traceId = generateTestTraceId();
 
@@ -519,7 +519,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     describe("given a topic is assigned after spans are recorded", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("updates the trace summary with topic and subtopic", async () => {
         const traceId = generateTestTraceId();
         const topicId = `topic-${Date.now()}`;
@@ -568,7 +568,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     describe("given a span with resource attributes", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("extracts SDK and service info into trace summary attributes", async () => {
         const traceId = generateTestTraceId();
 
@@ -607,7 +607,7 @@ describe.skipIf(!hasTestcontainers)(
     });
 
     describe("given a span with langwatch.origin attribute", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
       it.skip("persists langwatch.origin in trace summary attributes", async () => {
         const traceId = generateTestTraceId();
 

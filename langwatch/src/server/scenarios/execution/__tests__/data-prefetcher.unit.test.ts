@@ -9,7 +9,7 @@
  * Uses dependency injection for clean, fast tests without vi.mock.
  */
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   prefetchScenarioData,
   type DataPrefetcherDependencies,
@@ -471,32 +471,43 @@ describe("prefetchScenarioData", () => {
       };
 
       describe("when prefetching scenario data", () => {
-        // TODO(#3048): pre-existing failure unmasked by #3001
-        it.skip("returns success with complete data", async () => {
-          const deps = createMockDeps({
-            promptFetcher: {
-              getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
-            },
-          });
+        it("returns success with complete data", async () => {
+          // The source reads process.env.LANGWATCH_ENDPOINT directly (not via env.mjs)
+          const previousLangwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
+          process.env.LANGWATCH_ENDPOINT = "http://localhost:3000";
 
-          const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
-          const result = await prefetchScenarioData(defaultContext, target, deps);
+          try {
+            const deps = createMockDeps({
+              promptFetcher: {
+                getPromptByIdOrHandle: vi.fn().mockResolvedValue(promptWithModel),
+              },
+            });
 
-          expect(result.success).toBe(true);
-          if (result.success) {
-            expect(result.data.context).toEqual(defaultContext);
-            expect(result.data.scenario).toEqual(defaultScenario);
-            expect(result.data.adapterData).toMatchObject({
-              type: "prompt",
-              promptId: "prompt_123",
-              systemPrompt: "You are helpful",
-            });
-            expect(result.data.modelParams).toEqual(defaultModelParams);
-            expect(result.data.target).toEqual({ type: "prompt", referenceId: "prompt_123" });
-            expect(result.telemetry).toEqual({
-              endpoint: "http://localhost:3000",
-              apiKey: "test-api-key",
-            });
+            const target: TargetConfig = { type: "prompt", referenceId: "prompt_123" };
+            const result = await prefetchScenarioData(defaultContext, target, deps);
+
+            expect(result.success).toBe(true);
+            if (result.success) {
+              expect(result.data.context).toEqual(defaultContext);
+              expect(result.data.scenario).toEqual(defaultScenario);
+              expect(result.data.adapterData).toMatchObject({
+                type: "prompt",
+                promptId: "prompt_123",
+                systemPrompt: "You are helpful",
+              });
+              expect(result.data.modelParams).toEqual(defaultModelParams);
+              expect(result.data.target).toEqual({ type: "prompt", referenceId: "prompt_123" });
+              expect(result.telemetry).toEqual({
+                endpoint: "http://localhost:3000",
+                apiKey: "test-api-key",
+              });
+            }
+          } finally {
+            if (previousLangwatchEndpoint === undefined) {
+              delete process.env.LANGWATCH_ENDPOINT;
+            } else {
+              process.env.LANGWATCH_ENDPOINT = previousLangwatchEndpoint;
+            }
           }
         });
       });

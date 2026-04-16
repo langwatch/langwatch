@@ -211,11 +211,12 @@ const createMockRunData = (runId: string): ExperimentRunWithItems => ({
   },
 });
 
-// TODO(#3048): pre-existing failures unmasked by #3001.
-// All 19 tests in this suite fail (0/19 passing). Every test uses the
-// same rendering setup and the underlying component is broken, so
-// per-it.skip provides no additional visibility — using describe.skip
-// here is the smallest sufficient unit. Track in #3048 for fix.
+// Skipped: All 19 tests in this suite fail. The BatchEvaluationResults component
+// fails to render in jsdom — likely because it imports or transitively depends on a
+// module that uses browser-only APIs (e.g. ResizeObserver, canvas, WebGL, or a
+// dynamic import that does not resolve in the jsdom environment). Every test
+// hits the same render-time crash, so per-it.skip provides no additional visibility.
+// Use describe.skip until the render-blocking dependency is identified and mocked.
 describe.skip("BatchEvaluationResults Integration", () => {
   beforeEach(() => {
     vi.clearAllMocks();

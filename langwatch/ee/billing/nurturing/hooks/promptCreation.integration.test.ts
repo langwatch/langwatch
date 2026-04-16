@@ -122,7 +122,8 @@ describe("afterPromptCreated()", () => {
         });
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: source only fires trackEvent when orgPromptCount === 1 (see firePromptCreatedNurturing).
+      // Test intent is for CIO-side deduplication (always fire, CIO deduplicates per person) — not yet implemented.
       it.skip("sends first_prompt_created event (CIO Journey deduplicates per person)", async () => {
         const prisma = createMockPrisma({ promptCount: 5 });
 

@@ -211,7 +211,7 @@ describe("Prompts API", () => {
           expect(createBody.handle).toBe(handle);
         });
 
-        // TODO(#3048): pre-existing failure unmasked by #3001
+        // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
         it.skip("gets a single prompt by handle", async () => {
           // Get the prompt by handle
           const res = await app.request(`/api/prompts/${handle}`, {
@@ -242,7 +242,7 @@ describe("Prompts API", () => {
           expect(createBody.scope).toBe("ORGANIZATION");
         });
 
-        // TODO(#3048): pre-existing failure unmasked by #3001
+        // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
         it.skip("gets a single prompt by handle", async () => {
           // Get the prompt by handle
           const res = await app.request(`/api/prompts/${handle}`, {
@@ -322,7 +322,7 @@ describe("Prompts API", () => {
 
   // POST endpoints tests
   describe("POST endpoints", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
     it.skip("creates a new prompt", async () => {
       const res = await helpers.api.post(`/api/prompts`, {
         handle: "test-handle/chunky-bacon",
@@ -335,7 +335,7 @@ describe("Prompts API", () => {
       expect(body).toHaveProperty("handle", "test-handle/chunky-bacon");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
     it.skip("validates input when creating a prompt", async () => {
       const invalidData = {
         // Missing required name field
@@ -349,7 +349,7 @@ describe("Prompts API", () => {
     });
 
     describe("when scoping by project (default)", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
       it.skip("creates a new prompt with a handle scoped to project", async () => {
         const res = await helpers.api.post(`/api/prompts`, {
           handle: "my-custom-ref",
@@ -364,7 +364,7 @@ describe("Prompts API", () => {
     });
 
     describe("when scoping by organization", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
       it.skip("creates a new prompt with a handle scoped to organization", async () => {
         const res = await helpers.api.post(`/api/prompts`, {
           handle: "my-custom-ref",
@@ -383,7 +383,7 @@ describe("Prompts API", () => {
   // PUT endpoints tests
   describe("PUT endpoints", () => {
     describe("when updating a prompt", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
       it.skip("allows duplicate handles across different scopes", async () => {
         // Create first prompt with organization scope
         const prompt1Res = await helpers.api.post(`/api/prompts`, {
@@ -410,7 +410,7 @@ describe("Prompts API", () => {
       });
 
       describe("with project scope (default)", () => {
-        // TODO(#3048): pre-existing failure unmasked by #3001
+        // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
         it.skip("updates a prompt with a handle in correct format", async () => {
           // Create a valid prompt first
           const promptRes = await helpers.api.post(`/api/prompts`, {
@@ -440,7 +440,7 @@ describe("Prompts API", () => {
           );
         });
 
-        // TODO(#3048): pre-existing failure unmasked by #3001
+        // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
         it.skip("enforces unique handle constraint", async () => {
           // Create first prompt with handle
           const prompt1Res = await helpers.api.post(`/api/prompts`, {
@@ -472,7 +472,7 @@ describe("Prompts API", () => {
       });
 
       describe("when scoped to organization", () => {
-        // TODO(#3048): pre-existing failure unmasked by #3001
+        // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
         it.skip("prevents duplicate handles within the same organization", async () => {
           // Create first prompt with organization scope
           const prompt1Res = await helpers.api.post(`/api/prompts`, {
@@ -494,7 +494,7 @@ describe("Prompts API", () => {
         });
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
       it.skip("supports updating all supported fields", async () => {
         // Create initial prompt with all fields
         const createRes = await app.request(`/api/prompts`, {
@@ -581,7 +581,7 @@ describe("Prompts API", () => {
         expect(updatedPrompt.outputs[0].identifier).toBe("updated_response");
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
       it.skip("throws error when trying to set both system prompt message and prompt", async () => {
         // Create a prompt first
         const createRes = await helpers.api.post("/api/prompts", {
@@ -609,7 +609,7 @@ describe("Prompts API", () => {
         expect(errorBody.error).toContain("System prompt");
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
       it.skip("updates the prompt when system message is provided", async () => {
         // Create a prompt with initial prompt text
         const createRes = await helpers.api.post("/api/prompts", {
@@ -641,7 +641,7 @@ describe("Prompts API", () => {
         expect(updatedPrompt.messages[0].content).toBe("New system message");
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
       it.skip("updates the system message when prompt is provided", async () => {
         // Create a prompt with initial messages including system message
         const createRes = await helpers.api.post("/api/prompts", {
@@ -694,7 +694,7 @@ describe("Prompts API", () => {
       expect(createRes.status).toBe(200);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
     it.skip("requires authentication to delete a prompt", async () => {
       const deleteRes = await app.request(`/api/prompts/some-id`, {
         method: "DELETE",
@@ -703,7 +703,7 @@ describe("Prompts API", () => {
       expect(deleteRes.status).toBe(401);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
     it.skip("deletes a prompt by ID", async () => {
       // Delete the prompt by ID
       const deleteRes = await app.request(`/api/prompts/${promptToDelete.id}`, {
@@ -728,7 +728,7 @@ describe("Prompts API", () => {
       expect(getRes.status).toBe(404);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
     it.skip("deletes a prompt by handle", async () => {
       // Delete the prompt by handle
       const deleteRes = await app.request(
@@ -757,7 +757,7 @@ describe("Prompts API", () => {
       expect(getRes.status).toBe(404);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
     it.skip("returns 404 when trying to delete a non-existent prompt", async () => {
       const deleteRes = await app.request(`/api/prompts/non-existent-id`, {
         method: "DELETE",
@@ -772,7 +772,7 @@ describe("Prompts API", () => {
 
   // Validation/unhappy path tests
   describe("Validation tests", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
     it.skip("validates input when creating a prompt", async () => {
       const invalidData = {
         name: "", // Empty name should be rejected
@@ -792,7 +792,7 @@ describe("Prompts API", () => {
       expect(body).toHaveProperty("error");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
     it.skip("validates input when creating a prompt version", async () => {
       // Create a valid prompt first
       const promptRes = await helpers.api.post("/api/prompts", {
@@ -822,7 +822,7 @@ describe("Prompts API", () => {
       expect(body).toHaveProperty("error");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
     it.skip("strictly validates input when updating a prompt", async () => {
       // Create a valid prompt first
       const promptRes = await helpers.api.post("/api/prompts", {
