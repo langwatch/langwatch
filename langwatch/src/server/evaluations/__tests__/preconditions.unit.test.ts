@@ -631,7 +631,7 @@ describe("evaluatePreconditions()", () => {
     ];
 
     describe("when a trace arrives with no origin and input 'I need help'", () => {
-      it("fails because undefined origin does not match 'application'", () => {
+      it("passes because undefined origin defaults to 'application' and input contains 'help'", () => {
         const traceData = makeTraceData({
           origin: undefined,
           input: "I need help",
@@ -641,7 +641,7 @@ describe("evaluatePreconditions()", () => {
             traceData,
             preconditions,
           }),
-        ).toBe(false);
+        ).toBe(true);
       });
     });
 
@@ -661,7 +661,7 @@ describe("evaluatePreconditions()", () => {
     });
 
     describe("when a trace arrives with no origin and input 'goodbye'", () => {
-      it("skips the evaluation", () => {
+      it("fails because input does not contain 'help'", () => {
         const traceData = makeTraceData({
           origin: undefined,
           input: "goodbye",
