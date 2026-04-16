@@ -57,7 +57,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -372,7 +372,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -889,7 +889,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -1217,7 +1217,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -1437,7 +1437,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -1677,7 +1677,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -2274,7 +2274,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -2499,7 +2499,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -2868,7 +2868,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -3373,7 +3373,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -3694,7 +3694,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -3856,7 +3856,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -4541,7 +4541,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -4858,7 +4858,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -5186,7 +5186,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
@@ -5482,7 +5482,7 @@ All list/get commands support \`--format json\` for machine-readable output.
 
 ## Read the Docs (do this BEFORE you start coding)
 
-The CLI fetches documentation as markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
+The CLI fetches documentation as Markdown. Always read the relevant docs first; do NOT guess SDK APIs or CLI flags.
 
 \`\`\`bash
 langwatch docs                                       # LangWatch docs index (llms.txt)
