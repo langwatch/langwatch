@@ -6,6 +6,8 @@
  */
 import { ExperimentType } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { globalForApp, resetApp } from "../../../app-layer/app";
+import { createTestApp } from "../../../app-layer/presets";
 import { getTestUser } from "../../../../utils/testUtils";
 import { prisma } from "../../../db";
 import { appRouter } from "../../root";
@@ -39,6 +41,9 @@ describe("Evaluations V3 Endpoints", () => {
   const createdExperimentIds: string[] = [];
 
   beforeAll(async () => {
+    resetApp();
+    globalForApp.__langwatch_app = createTestApp();
+
     const user = await getTestUser();
 
     const ctx = createInnerTRPCContext({
@@ -57,6 +62,7 @@ describe("Evaluations V3 Endpoints", () => {
         where: { id: { in: createdExperimentIds }, projectId },
       });
     }
+    resetApp();
   });
 
   describe("saveEvaluationsV3", () => {
