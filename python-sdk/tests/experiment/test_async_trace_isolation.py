@@ -29,6 +29,9 @@ def setup_langwatch():
     try:
         langwatch.setup()
     except Exception:
+        # Tracer may already be installed by a previous test module; reusing
+        # the existing provider is fine for these tests since trace_ids are
+        # what we assert, not exporter state.
         pass
     yield
     if "LANGWATCH_API_KEY" in os.environ:
@@ -132,7 +135,8 @@ class TestAsyncLoopBoundResource:
         # Give the loop a chance to spin up all waiters.
         await asyncio.sleep(0.05)
         gate.set()
-        await driver_task
+        # Drain the driver so all submitted tasks have completed before we assert.
+        _ = await driver_task
 
         assert sorted(seen) == items
 

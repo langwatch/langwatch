@@ -64,6 +64,7 @@ def configure_langwatch():
     try:
         langwatch.setup()
     except Exception:
+        # Setup may already have been performed by a sibling test module.
         pass
     yield
 
@@ -85,6 +86,7 @@ def _poll_run_results(
     )
     deadline = time.time() + timeout
     last_body: dict = {"dataset": []}
+    last_error: Exception | None = None
     while time.time() < deadline:
         try:
             with httpx.Client(timeout=15) as client:
@@ -93,12 +95,15 @@ def _poll_run_results(
                 last_body = response.json()
                 if len(last_body.get("dataset", [])) >= expected_items:
                     return last_body
-        except Exception:
-            pass
+        except Exception as exc:
+            # Tolerate transient polling errors but surface the latest one if
+            # the deadline expires.
+            last_error = exc
         time.sleep(interval)
     raise AssertionError(
         f"Timed out after {timeout}s waiting for {expected_items} items "
         f"(saw {len(last_body.get('dataset', []))}) at {url}"
+        + (f"; last error: {last_error!r}" if last_error else "")
     )
 
 
@@ -129,7 +134,8 @@ class TestAsyncLoopAgainstLiveBackend:
         driver = asyncio.create_task(drive())
         await asyncio.sleep(0.05)
         gate.set()
-        await driver
+        # Drain the driver task so every submission has completed.
+        _ = await driver
 
         body = _poll_run_results(
             endpoint=langwatch.get_endpoint(),
