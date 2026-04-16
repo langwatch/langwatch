@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
+import type { Ora } from "ora";
 import {
   DatasetApiError,
   DatasetNotFoundError,
@@ -9,6 +10,8 @@ import { handleDatasetCommandError } from "../error-handler";
 describe("handleDatasetCommandError", () => {
   let consoleErrorSpy: MockInstance<typeof console.error>;
   let processExitSpy: MockInstance<typeof process.exit>;
+  let spinnerFail: ReturnType<typeof vi.fn>;
+  let spinner: Ora;
 
   beforeEach(() => {
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {
@@ -19,26 +22,31 @@ describe("handleDatasetCommandError", () => {
       .mockImplementation(((_code?: number | string | null) => {
         throw new Error("process.exit called");
       }) as (code?: number | string | null) => never);
+    spinnerFail = vi.fn();
+    spinner = { fail: spinnerFail } as unknown as Ora;
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  function callHandler(error: unknown, context: string): string[] {
+  function callHandler(error: unknown, context: string): { spinnerCalls: string[]; errorCalls: string[] } {
     try {
-      handleDatasetCommandError(error, context);
+      handleDatasetCommandError({ spinner, error, context });
     } catch {
       // expected
     }
-    return consoleErrorSpy.mock.calls.map((c) => String(c[0]));
+    return {
+      spinnerCalls: spinnerFail.mock.calls.map((c) => String(c[0])),
+      errorCalls: consoleErrorSpy.mock.calls.map((c) => String(c[0])),
+    };
   }
 
   describe("when the error is a DatasetNotFoundError", () => {
-    it("prefixes the output with 'Not found:'", () => {
-      const output = callHandler(new DatasetNotFoundError("my-ds"), "fetching");
-      expect(output.join("\n")).toContain("Not found");
-      expect(output.join("\n")).toContain("my-ds");
+    it("prefixes the spinner fail with 'Not found:'", () => {
+      const { spinnerCalls } = callHandler(new DatasetNotFoundError("my-ds"), "fetch dataset");
+      expect(spinnerCalls.join("\n")).toContain("Not found");
+      expect(spinnerCalls.join("\n")).toContain("my-ds");
     });
   });
 
@@ -48,46 +56,46 @@ describe("handleDatasetCommandError", () => {
         "Dataset limit reached for FREE plan (max 3)",
         { limitType: "datasets", current: 3, max: 3 },
       );
-      const output = callHandler(err, "creating");
-      expect(output.join("\n")).toContain("Plan limit reached");
-      expect(output.join("\n")).toContain("datasets");
-      expect(output.join("\n")).toContain("3");
-      expect(output.join("\n")).toContain("/ 3");
+      const { spinnerCalls, errorCalls } = callHandler(err, "create dataset");
+      expect(spinnerCalls.join("\n")).toContain("Plan limit reached");
+      const combined = [...spinnerCalls, ...errorCalls].join("\n");
+      expect(combined).toContain("datasets");
+      expect(combined).toContain("3");
+      expect(combined).toContain("/ 3");
     });
 
     it("works without current/max fields", () => {
       const err = new DatasetPlanLimitError(
         "Dataset limit reached for FREE plan (max 3)",
       );
-      const output = callHandler(err, "creating");
-      expect(output.join("\n")).toContain("Plan limit reached");
+      const { spinnerCalls } = callHandler(err, "create dataset");
+      expect(spinnerCalls.join("\n")).toContain("Plan limit reached");
     });
   });
 
   describe("when the error is a generic DatasetApiError", () => {
-    it("prefixes the output with 'Error:'", () => {
+    it("renders the error message on the spinner fail line", () => {
       const err = new DatasetApiError(
         "Failed to fetch dataset: unexpected payload",
         500,
         "fetch",
       );
-      const output = callHandler(err, "fetching");
-      expect(output.join("\n")).toContain("Error");
-      expect(output.join("\n")).toContain("unexpected payload");
+      const { spinnerCalls } = callHandler(err, "fetch dataset");
+      expect(spinnerCalls.join("\n")).toContain("unexpected payload");
     });
   });
 
   describe("when the error is unknown", () => {
-    it("includes the operation context in the message", () => {
-      const output = callHandler(new Error("something broke"), "deleting");
-      expect(output.join("\n")).toContain("deleting");
-      expect(output.join("\n")).toContain("something broke");
+    it("includes the operation context in the spinner fail message", () => {
+      const { spinnerCalls } = callHandler(new Error("something broke"), "delete dataset");
+      expect(spinnerCalls.join("\n")).toContain("delete dataset");
+      expect(spinnerCalls.join("\n")).toContain("something broke");
     });
   });
 
   it("always calls process.exit(1)", () => {
     try {
-      handleDatasetCommandError(new Error("x"), "y");
+      handleDatasetCommandError({ spinner, error: new Error("x"), context: "y" });
     } catch {
       /* ignore */
     }

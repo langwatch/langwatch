@@ -63,7 +63,6 @@ export const updateCommand = async (
       console.log(`  ${chalk.bold("View:")}  ${chalk.underline(dataset.platformUrl)}`);
     }
   } catch (error) {
-    spinner.fail("Failed to update dataset");
-    handleDatasetCommandError(error, "updating dataset");
+    handleDatasetCommandError({ spinner, error, context: "update dataset" });
   }
 };

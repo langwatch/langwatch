@@ -93,7 +93,6 @@ export const getCommand = async (slugOrId: string, options?: { format?: string }
       }
     }
   } catch (error) {
-    spinner.fail("Failed to fetch dataset");
-    handleDatasetCommandError(error, "fetching dataset");
+    handleDatasetCommandError({ spinner, error, context: "fetch dataset" });
   }
 };

@@ -30,7 +30,6 @@ export const recordsDeleteCommand = async (
       `Deleted ${result.deletedCount} record${result.deletedCount !== 1 ? "s" : ""} from "${chalk.cyan(slugOrId)}"`,
     );
   } catch (error) {
-    spinner.fail("Failed to delete records");
-    handleDatasetCommandError(error, "deleting records");
+    handleDatasetCommandError({ spinner, error, context: "delete records" });
   }
 };

@@ -38,7 +38,6 @@ export const recordsUpdateCommand = async (
 
     spinner.succeed(`Record updated: ${chalk.cyan(record.id)}`);
   } catch (error) {
-    spinner.fail("Failed to update record");
-    handleDatasetCommandError(error, "updating record");
+    handleDatasetCommandError({ spinner, error, context: "update record" });
   }
 };
