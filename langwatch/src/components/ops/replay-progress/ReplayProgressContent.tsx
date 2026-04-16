@@ -154,6 +154,11 @@ function LiveRunView({
     return Math.round(status.eventsProcessed / elapsed);
   }, [status.startedAt, status.eventsProcessed]);
 
+  const activeProjections = useMemo(
+    () => new Set(status.currentProjection?.split("+").filter(Boolean) ?? []),
+    [status.currentProjection],
+  );
+
   return (
     <VStack align="stretch" gap={4}>
       {/* Phase timeline */}
@@ -228,9 +233,9 @@ function LiveRunView({
                     ? "in progress"
                     : status.state}
                 </Text>
-                {status.currentProjection && isRunning && (
+                {activeProjections.size > 0 && isRunning && (
                   <Badge size="sm" variant="subtle">
-                    {status.currentProjection}
+                    {activeProjections.size} projection{activeProjections.size !== 1 ? "s" : ""}
                   </Badge>
                 )}
               </HStack>
@@ -269,7 +274,12 @@ function LiveRunView({
 
             <HStack gap={2} flexWrap="wrap">
               {status.projectionNames.map((name) => (
-                <Badge key={name} size="sm" variant="subtle">
+                <Badge
+                  key={name}
+                  size="sm"
+                  variant={activeProjections.has(name) ? "solid" : "subtle"}
+                  colorPalette={activeProjections.has(name) ? "orange" : "gray"}
+                >
                   {name}
                 </Badge>
               ))}
