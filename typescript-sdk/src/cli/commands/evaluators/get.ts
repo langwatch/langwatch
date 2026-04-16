@@ -1,12 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  EvaluatorsApiService,
-  EvaluatorsApiError,
-} from "@/client-sdk/services/evaluators";
+import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import type { EvaluatorResponse } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
   const config = evaluator.config as
@@ -81,16 +78,7 @@ export const getEvaluatorCommand = async (idOrSlug: string, options?: { format?:
     }
     formatEvaluatorDetails(evaluator);
   } catch (error) {
-    spinner.fail();
-    if (error instanceof EvaluatorsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching evaluator: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "fetch evaluator" });
     process.exit(1);
   }
 };

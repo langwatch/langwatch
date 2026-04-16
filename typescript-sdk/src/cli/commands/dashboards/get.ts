@@ -1,11 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  DashboardsApiService,
-  DashboardsApiError,
-} from "@/client-sdk/services/dashboards/dashboards-api.service";
+import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const getDashboardCommand = async (
   id: string,
@@ -38,16 +35,7 @@ export const getDashboardCommand = async (
     }
     console.log();
   } catch (error) {
-    spinner.fail();
-    if (error instanceof DashboardsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "fetch dashboard" });
     process.exit(1);
   }
 };
