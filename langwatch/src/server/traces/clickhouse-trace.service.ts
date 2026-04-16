@@ -1237,23 +1237,52 @@ export class ClickHouseTraceService {
           return 0;
         }
 
-        // Use ALTER TABLE UPDATE mutations to set ArchivedAt on all
-        // existing rows atomically. This is the correct pattern for
-        // ReplacingMergeTree — it modifies rows in-place so queries with
-        // `ArchivedAt IS NULL` exclude them immediately after the mutation
-        // completes, without waiting for background merges.
+        // Insert new rows with ArchivedAt set and a newer UpdatedAt.
+        // ReplacingMergeTree(UpdatedAt) will eventually deduplicate,
+        // keeping only the archived version. Read queries use
+        // `ArchivedAt IS NULL` AND dedup patterns that pick the
+        // latest UpdatedAt, so archived traces are immediately excluded.
         await Promise.all([
-          clickHouseClient.query({
+          clickHouseClient.command({
             query: `
-              ALTER TABLE trace_summaries
-              UPDATE ArchivedAt = now64(3), UpdatedAt = now64(3)
+              INSERT INTO trace_summaries (
+                ProjectionId, TenantId, TraceId, Version, Attributes,
+                OccurredAt, CreatedAt, UpdatedAt,
+                ComputedIOSchemaVersion, ComputedInput, ComputedOutput,
+                TimeToFirstTokenMs, TimeToLastTokenMs, TotalDurationMs, TokensPerSecond,
+                SpanCount, ContainsErrorStatus, ContainsOKStatus, ErrorMessage, Models,
+                TotalCost, TokensEstimated, TotalPromptTokenCount, TotalCompletionTokenCount,
+                OutputFromRootSpan, OutputSpanEndTimeMs, BlockedByGuardrail,
+                TopicId, SubTopicId, HasAnnotation,
+                AnnotationIds, ScenarioRoleCosts, ScenarioRoleLatencies, ScenarioRoleSpans, SpanCosts,
+                LastEventOccurredAt, ArchivedAt
+              )
+              SELECT
+                ProjectionId, TenantId, TraceId, Version, Attributes,
+                OccurredAt, CreatedAt, now64(3) AS UpdatedAt,
+                ComputedIOSchemaVersion, ComputedInput, ComputedOutput,
+                TimeToFirstTokenMs, TimeToLastTokenMs, TotalDurationMs, TokensPerSecond,
+                SpanCount, ContainsErrorStatus, ContainsOKStatus, ErrorMessage, Models,
+                TotalCost, TokensEstimated, TotalPromptTokenCount, TotalCompletionTokenCount,
+                OutputFromRootSpan, OutputSpanEndTimeMs, BlockedByGuardrail,
+                TopicId, SubTopicId, HasAnnotation,
+                AnnotationIds, ScenarioRoleCosts, ScenarioRoleLatencies, ScenarioRoleSpans, SpanCosts,
+                LastEventOccurredAt, now64(3) AS ArchivedAt
+              FROM trace_summaries
               WHERE TenantId = {tenantId:String}
                 AND TraceId IN ({traceIds:Array(String)})
                 AND ArchivedAt IS NULL
+                AND (TenantId, TraceId, UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE TenantId = {tenantId:String}
+                    AND TraceId IN ({traceIds:Array(String)})
+                  GROUP BY TenantId, TraceId
+                )
             `,
             query_params: { tenantId: projectId, traceIds },
           }),
-          clickHouseClient.query({
+          clickHouseClient.command({
             query: `
               ALTER TABLE stored_spans
               UPDATE ArchivedAt = now64(3)
