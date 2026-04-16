@@ -157,7 +157,21 @@ export function formatApiErrorMessage({
     const detail = [causeCode, causeMsg && causeMsg !== base ? causeMsg : undefined]
       .filter((s): s is string => typeof s === "string" && s.length > 0)
       .join(": ");
-    return detail ? `${base} (${detail})` : base;
+    const formatted = detail ? `${base} (${detail})` : base;
+
+    // Node fetch emits "TypeError: fetch failed" with `cause.message =
+    // "unknown scheme"` when the URL has no/invalid scheme (e.g. the user
+    // set LANGWATCH_ENDPOINT=localhost:5570 instead of http://localhost:5570).
+    // Add a hint — the raw phrase tells the user nothing actionable.
+    const combined = `${base} ${causeMsg ?? ""} ${causeCode ?? ""}`.toLowerCase();
+    if (
+      combined.includes("unknown scheme") ||
+      combined.includes("err_invalid_url") ||
+      combined.includes("failed to parse url")
+    ) {
+      return `${formatted} — check your LANGWATCH_ENDPOINT (must start with http:// or https://)`;
+    }
+    return formatted;
   }
 
   if (typeof error === "object") {

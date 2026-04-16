@@ -73,6 +73,33 @@ describe("formatApiErrorMessage", () => {
         "request timed out (ETIMEDOUT: timeout after 30s)",
       );
     });
+
+    it("adds an LANGWATCH_ENDPOINT hint when the URL has no scheme", () => {
+      // Node fetch: if LANGWATCH_ENDPOINT is `localhost:5570` (no scheme),
+      // node throws `TypeError: fetch failed` with `cause.message =
+      // "unknown scheme"`. "unknown scheme" is unactionable to an end user.
+      const cause = Object.assign(new Error("unknown scheme"), {});
+      const err = Object.assign(new TypeError("fetch failed"), { cause });
+      const out = formatApiErrorMessage({ error: err });
+      expect(out).toContain("unknown scheme");
+      expect(out).toContain("LANGWATCH_ENDPOINT");
+      expect(out).toContain("http://");
+    });
+
+    it("adds an LANGWATCH_ENDPOINT hint when the URL is unparseable", () => {
+      // `fetch("not a url at all!")` throws
+      // `TypeError: Failed to parse URL from ...` with `code = ERR_INVALID_URL`.
+      const cause = Object.assign(new Error("Invalid URL"), {
+        code: "ERR_INVALID_URL",
+      });
+      const err = Object.assign(
+        new TypeError("Failed to parse URL from not a url/api/prompts"),
+        { cause },
+      );
+      const out = formatApiErrorMessage({ error: err });
+      expect(out).toContain("LANGWATCH_ENDPOINT");
+      expect(out).toContain("http://");
+    });
   });
 
   describe("when given an API error body", () => {
