@@ -14,8 +14,8 @@ import {
 } from "@chakra-ui/react";
 import { Dialog } from "~/components/ui/dialog";
 import { Select } from "~/components/ui/select";
-import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { ChevronDown, ChevronRight, Pencil, Plus, RotateCcw, Users, X } from "lucide-react";
+import { useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
@@ -106,14 +106,12 @@ function AddToTeamDialog({
   teamId,
   teamName,
   organizationId,
-  existingMemberIds,
   open,
   onClose,
 }: {
   teamId: string;
   teamName: string;
   organizationId: string;
-  existingMemberIds: string[];
   open: boolean;
   onClose: () => void;
 }) {
@@ -139,25 +137,17 @@ function AddToTeamDialog({
     },
   });
 
-  const userItems = useMemo(
-    () => (orgMembers.data?.members ?? [])
-      .filter((m) => !existingMemberIds.includes(m.userId))
-      .map((m) => ({
-        label: `${m.user.name ?? m.user.email} (${m.user.email})`,
-        value: m.userId,
-      })),
-    [orgMembers.data, existingMemberIds],
-  );
-  const userCollection = useMemo(() => createListCollection({ items: userItems }), [userItems]);
+  const userItems = (orgMembers.data?.members ?? []).map((m) => ({
+    label: `${m.user.name ?? m.user.email} (${m.user.email})`,
+    value: m.userId,
+  }));
+  const userCollection = createListCollection({ items: userItems });
 
-  const allRoleItems = useMemo(
-    () => [
-      ...BASE_ROLE_ITEMS,
-      ...(customRoles.data ?? []).map((r) => ({ label: r.name, value: `CUSTOM:${r.id}` })),
-    ],
-    [customRoles.data],
-  );
-  const allRoleCollection = useMemo(() => createListCollection({ items: allRoleItems }), [allRoleItems]);
+  const allRoleItems = [
+    ...BASE_ROLE_ITEMS,
+    ...(customRoles.data ?? []).map((r) => ({ label: r.name, value: `CUSTOM:${r.id}` })),
+  ];
+  const allRoleCollection = createListCollection({ items: allRoleItems });
 
   return (
     <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
@@ -474,18 +464,17 @@ function ProjectSection({
                     opacity={0.5}
                     fontSize="sm"
                   >
-                    <RandomColorAvatar name={m.name} size="xs" />
+                    <RandomColorAvatar
+                      name={m.name}
+                      size="xs"
+                    />
                     <Text flex={1}>{m.name}</Text>
                     <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
-                      {m.customRoleName ?? m.role}
+                      {m.role}
                     </Badge>
-                    {m.viaGroupName ? (
-                      <Link href="/settings/groups" fontSize="xs" color="purple.400">
-                        via {m.viaGroupName}
-                      </Link>
-                    ) : (
-                      <Text fontSize="xs" color="gray.400">from team</Text>
-                    )}
+                    <Text fontSize="xs" color="gray.400">
+                      from team
+                    </Text>
                   </HStack>
                 ))}
               </Box>
@@ -634,8 +623,6 @@ function TeamCard({
     onError: (e) => toaster.create({ title: e.message, type: "error" }),
   });
 
-  const existingMemberIds = team.directMembers.flatMap((m) => m.userId ? [m.userId] : []);
-
   return (
     <>
       <Card.Root overflow="hidden">
@@ -658,8 +645,10 @@ function TeamCard({
             {team.projects.length}{" "}
             {team.projects.length === 1 ? "project" : "projects"}
             {" · "}
-            {team.directMembers.length}{" "}
-            {team.directMembers.length === 1 ? "member" : "members"}
+            {team.directMembers.filter((m) => m.userId).length}{" "}
+            {team.directMembers.filter((m) => m.userId).length === 1 ? "member" : "members"}
+            {team.directMembers.some((m) => m.groupId) &&
+              ` · ${team.directMembers.filter((m) => m.groupId).length} ${team.directMembers.filter((m) => m.groupId).length === 1 ? "group" : "groups"}`}
             {team.projectOnlyAccess.length > 0 &&
               ` · ${team.projectOnlyAccess.length} via projects`}
           </Text>
@@ -709,67 +698,57 @@ function TeamCard({
                 )}
               </HStack>
 
-              {team.directMembers.length === 0 ? (
+              {team.directMembers.filter((m) => m.userId).length === 0 ? (
                 <Text fontSize="sm" color="gray.400" fontStyle="italic">
                   No members yet.
                 </Text>
               ) : (
-                team.directMembers.map((m, i, arr) => (
+                team.directMembers.filter((m) => m.userId).map((m, i, arr) => (
                   <HStack
                     key={i}
                     py={2}
                     borderBottomWidth={i < arr.length - 1 ? "1px" : "0"}
                     borderColor="gray.100"
                     _dark={{ borderColor: "gray.700" }}
-                    opacity={m.viaGroupId ? 0.7 : 1}
                   >
                     <RandomColorAvatar name={m.name} size="xs" />
                     <Text fontSize="sm" flex={1}>
                       {m.name}
                     </Text>
-                    {m.viaGroupId ? (
-                      <>
-                        <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
-                          {m.customRoleName ?? m.role}
-                        </Badge>
-                        <Link href="/settings/groups" fontSize="xs" color="purple.400">
-                          via {m.viaGroupName}
-                        </Link>
-                      </>
-                    ) : canManage && m.bindingId ? (
-                      <>
-                        <RoleSelect
-                          value={m.role}
-                          customRoleId={m.customRoleId}
-                          organizationId={organizationId}
-                          onChange={(role, customRoleId) =>
-                            updateBinding.mutate({
-                              organizationId,
-                              bindingId: m.bindingId!,
-                              role: role as any,
-                              customRoleId,
-                            })
-                          }
-                        />
-                        <Button
-                          size="xs"
-                          variant="ghost"
-                          color="gray.400"
-                          loading={deleteBinding.isPending}
-                          onClick={() =>
-                            deleteBinding.mutate({
-                              organizationId,
-                              bindingId: m.bindingId!,
-                            })
-                          }
-                        >
-                          <X size={14} />
-                        </Button>
-                      </>
+                    {canManage && m.bindingId ? (
+                      <RoleSelect
+                        value={m.role}
+                        customRoleId={m.customRoleId}
+                        organizationId={organizationId}
+                        onChange={(role, customRoleId) =>
+                          updateBinding.mutate({
+                            organizationId,
+                            bindingId: m.bindingId!,
+                            role: role as any,
+                            customRoleId,
+                          })
+                        }
+                      />
                     ) : (
                       <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
-                        {m.customRoleName ?? m.role}
+                        {m.role}
                       </Badge>
+                    )}
+                    {canManage && m.bindingId && (
+                      <Button
+                        size="xs"
+                        variant="ghost"
+                        color="gray.400"
+                        loading={deleteBinding.isPending}
+                        onClick={() =>
+                          deleteBinding.mutate({
+                            organizationId,
+                            bindingId: m.bindingId!,
+                          })
+                        }
+                      >
+                        <X size={14} />
+                      </Button>
                     )}
                   </HStack>
                 ))
@@ -778,6 +757,42 @@ function TeamCard({
                 Editing a role here changes their team-level access, inherited
                 by all projects below.
               </Text>
+
+              {/* ── Groups with team-level bindings ── */}
+              {team.directMembers.some((m) => m.groupId) && (
+                <Box mt={4}>
+                  <Text
+                    fontSize="xs"
+                    fontWeight="semibold"
+                    color="gray.500"
+                    textTransform="uppercase"
+                    letterSpacing="wider"
+                    mb={3}
+                  >
+                    Groups
+                  </Text>
+                  {team.directMembers.filter((m) => m.groupId).map((m, i, arr) => (
+                    <HStack
+                      key={i}
+                      py={2}
+                      borderBottomWidth={i < arr.length - 1 ? "1px" : "0"}
+                      borderColor="gray.100"
+                      _dark={{ borderColor: "gray.700" }}
+                    >
+                      <Users size={16} color="gray" />
+                      <Text fontSize="sm" flex={1}>
+                        {m.name}
+                      </Text>
+                      <Badge colorPalette={roleBadgeColor(m.role)} size="sm">
+                        {m.role}
+                      </Badge>
+                      <Link href="/settings/groups" fontSize="xs" color="purple.400">
+                        Manage →
+                      </Link>
+                    </HStack>
+                  ))}
+                </Box>
+              )}
             </Box>
 
             {/* ── Project-only access (read-only at team level) ── */}
@@ -883,7 +898,6 @@ function TeamCard({
           teamId={team.id}
           teamName={team.name}
           organizationId={organizationId}
-          existingMemberIds={existingMemberIds}
           open={addingMember}
           onClose={() => setAddingMember(false)}
         />

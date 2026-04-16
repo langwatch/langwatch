@@ -1,12 +1,10 @@
 import {
-  OrganizationUserRole,
   RoleBindingScopeType,
   TeamUserRole,
   type PrismaClient,
 } from "@prisma/client";
 import {
   hasPermissionWithHierarchy,
-  organizationRoleHasPermission,
   teamRoleHasPermission,
   type Permission,
 } from "../api/rbac";
@@ -53,6 +51,10 @@ function ancestorScopes(
  * Collects all RoleBindings for a user that are relevant to the given scope
  * (i.e. at any ancestor scope: project → team → org).
  *
+ * Falls back to the legacy TeamUser table only when the user has NO RoleBindings
+ * in the org at all (migration guard — prevents privilege escalation when a user
+ * has bindings for some teams but not the one being checked).
+ *
  * @internal — use checkRoleBindingPermission for access-control decisions.
  */
 async function collectBindingsForScope({
@@ -65,7 +67,9 @@ async function collectBindingsForScope({
   userId: string;
   organizationId: string;
   scope: ScopeRef;
-}): Promise<Array<{ role: TeamUserRole; customRoleId: string | null; scopeType: RoleBindingScopeType }>> {
+}): Promise<Array<{ role: TeamUserRole; customRoleId: string | null; fromFallback: boolean }>> {
+  // Fetch ALL bindings for the user in this org (no scope filter) so we can
+  // decide whether to fall back to TeamUser.
   const [directBindings, groupBindings] = await Promise.all([
     prisma.roleBinding.findMany({
       where: { organizationId, userId },
@@ -82,14 +86,67 @@ async function collectBindingsForScope({
 
   const allOrgBindings = [...directBindings, ...groupBindings];
 
+  // If the user has NO bindings in this org at all, fall back to TeamUser
+  if (allOrgBindings.length === 0) {
+    const fallback = await resolveLegacyFallback({ prisma, userId, organizationId, scope });
+    return fallback ? [{ ...fallback }] : [];
+  }
+
+  // Filter to bindings at ancestor scopes of the requested scope
   const ancestorScopeList = ancestorScopes(scope);
   if (scope.type !== "org") {
     ancestorScopeList.push({ type: RoleBindingScopeType.ORGANIZATION, id: organizationId });
   }
 
-  return allOrgBindings
-    .filter((b) => ancestorScopeList.some((s) => s.type === b.scopeType && s.id === b.scopeId))
-    .map((b) => ({ role: b.role, customRoleId: b.customRoleId, scopeType: b.scopeType }));
+  const matching = allOrgBindings.filter((b) =>
+    ancestorScopeList.some((s) => s.type === b.scopeType && s.id === b.scopeId),
+  );
+
+  return matching.map((b) => ({ role: b.role, customRoleId: b.customRoleId, fromFallback: false }));
+}
+
+// ============================================================================
+// Legacy fallback (TeamUser)
+// ============================================================================
+
+/**
+ * Fallback to the legacy TeamUser model when no RoleBindings exist.
+ * This is removed once the migration is complete.
+ *
+ * @internal
+ */
+async function resolveLegacyFallback({
+  prisma,
+  userId,
+  organizationId,
+  scope,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+  scope: ScopeRef;
+}): Promise<{ role: TeamUserRole; customRoleId: string | null; fromFallback: boolean } | null> {
+  const teamId =
+    scope.type === "project"
+      ? scope.teamId
+      : scope.type === "team"
+        ? scope.id
+        : null;
+
+  if (!teamId) return null;
+
+  const teamUser = await prisma.teamUser.findFirst({
+    where: { userId, teamId },
+    select: { role: true, assignedRoleId: true },
+  });
+
+  if (!teamUser) return null;
+
+  return {
+    role: teamUser.role,
+    customRoleId: teamUser.assignedRoleId ?? null,
+    fromFallback: true,
+  };
 }
 
 // ============================================================================
@@ -132,16 +189,6 @@ export async function checkRoleBindingPermission({
         return true;
       }
       // Empty custom role — fall through to built-in VIEWER check below
-    }
-
-    // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only
-    if (
-      binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
-      binding.role !== TeamUserRole.CUSTOM
-    ) {
-      if (binding.role === TeamUserRole.ADMIN) return true;
-      if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)) return true;
-      continue;
     }
 
     if (teamRoleHasPermission(binding.role, permission)) {

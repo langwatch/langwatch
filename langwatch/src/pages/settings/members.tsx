@@ -1,7 +1,6 @@
 import {
   Badge,
   Box,
-  Button,
   Card,
   Heading,
   HStack,
@@ -18,8 +17,9 @@ import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { AddMembersForm } from "../../components/AddMembersForm";
-import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog";
 import { CopyInput } from "../../components/CopyInput";
+import { orgRoleOptions } from "../../components/settings/OrganizationUserRoleField";
+import { getOrgRoleOptionsForUser } from "../../components/members/getOrgRoleOptionsForUser";
 import { InvitesTable } from "../../components/members/InvitesTable";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
@@ -41,6 +41,11 @@ import type { RouterOutputs } from "../../utils/api";
 import { RoleBindingScopeType } from "@prisma/client";
 
 type Binding = RouterOutputs["roleBinding"]["listForOrg"][number];
+
+// Create a Map for fast O(1) lookups instead of O(n) .find() in render
+const roleLabelMap = new Map(
+  orgRoleOptions.map((option) => [option.value, option.label]),
+);
 
 function Members() {
   const { organization } = useOrganizationTeamProject();
@@ -89,6 +94,7 @@ function MembersList({
 }) {
   const { data: session } = useRequiredSession();
   const { hasPermission } = useOrganizationTeamProject();
+  const router = useRouter();
   const hasOrganizationManagePermission = hasPermission("organization:manage");
   const user = session?.user;
 
@@ -97,11 +103,6 @@ function MembersList({
     value: team.id,
   }));
   const queryClient = api.useContext();
-
-  const [selectedMember, setSelectedMember] = useState<{
-    userId: string;
-    user: { name: string | null; email: string | null };
-  } | null>(null);
 
   const {
     open: isAddMembersOpen,
@@ -238,9 +239,7 @@ function MembersList({
   const sortedMembers = useMemo(
     () =>
       [...organization.members].sort((a, b) =>
-        (a.user.name ?? a.user.email ?? "").localeCompare(
-          b.user.name ?? b.user.email ?? "",
-        ),
+        b.user.id.localeCompare(a.user.id),
       ),
     [organization.members],
   );
@@ -249,6 +248,11 @@ function MembersList({
     hasOrganizationManagePermission &&
     organization.members.length > 1 &&
     memberId !== user?.id;
+
+  const filteredOrgRoleOptions = useMemo(
+    () => getOrgRoleOptionsForUser({ isAdmin: hasOrganizationManagePermission }),
+    [hasOrganizationManagePermission],
+  );
 
   const sentInvites = useMemo(
     () =>
@@ -287,12 +291,19 @@ function MembersList({
                   <Table.ColumnHeader width="56px" />
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Email</Table.ColumnHeader>
+                  <Table.ColumnHeader>Org Role</Table.ColumnHeader>
                   <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
                   <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
                 {sortedMembers.map((member) => {
+                  const orgBinding = (bindingsByUser.get(member.userId) ?? []).find(
+                    (b) =>
+                      b.scopeType === RoleBindingScopeType.ORGANIZATION &&
+                      b.userId === member.userId,
+                  );
+
                   return (
                     <Table.Row key={member.userId}>
                       <Table.Cell>
@@ -303,28 +314,9 @@ function MembersList({
                       </Table.Cell>
                       <Table.Cell>
                         <HStack>
-                          <Button
-                            variant="plain"
-                            size="sm"
-                            padding={0}
-                            height="auto"
-                            fontWeight="normal"
-                            color="colorPalette.fg"
-                            colorPalette="blue"
-                            onClick={() => {
-                              setSelectedMember({
-                                userId: member.userId,
-                                user: { name: member.user.name ?? null, email: member.user.email ?? null },
-                              });
-                            }}
-                          >
+                          <Link href={`/settings/members/${member.userId}`}>
                             {member.user.name}
-                          </Button>
-                          {member.role === "EXTERNAL" && (
-                            <Badge colorPalette="gray" size="sm">
-                              Lite Member
-                            </Badge>
-                          )}
+                          </Link>
                           {member.user.deactivatedAt && (
                             <Badge colorPalette="red" size="sm">
                               Deactivated
@@ -334,8 +326,15 @@ function MembersList({
                       </Table.Cell>
                       <Table.Cell>{member.user.email}</Table.Cell>
                       <Table.Cell>
+                        <Badge colorPalette={roleBadgeColor(member.role)} size="sm">
+                          {orgBinding?.customRoleName ?? roleLabelMap.get(member.role) ?? member.role}
+                        </Badge>
+                      </Table.Cell>
+                      <Table.Cell>
                         <MemberAccessDisplay
-                          bindings={bindingsByUser.get(member.userId) ?? []}
+                          bindings={(bindingsByUser.get(member.userId) ?? []).filter(
+                            (b) => b.id !== orgBinding?.id,
+                          )}
                           isLoading={isBindingsLoading || isBindingsError}
                         />
                       </Table.Cell>
@@ -354,10 +353,7 @@ function MembersList({
                               <Menu.Item
                                 value="edit"
                                 onClick={() => {
-                                  setSelectedMember({
-                                    userId: member.userId,
-                                    user: { name: member.user.name ?? null, email: member.user.email ?? null },
-                                  });
+                                  void router.push(`/settings/members/${member.userId}`);
                                 }}
                               >
                                 <Pencil size={16} />
@@ -397,16 +393,6 @@ function MembersList({
           onDeleteInvite={deleteInvite}
         />
       </VStack>
-
-      {selectedMember && (
-        <MemberDetailDialog
-          member={selectedMember}
-          organizationId={organization.id}
-          canManage={hasOrganizationManagePermission}
-          open={!!selectedMember}
-          onClose={() => setSelectedMember(null)}
-        />
-      )}
 
       <Dialog.Root
         open={isInviteLinkOpen}
@@ -464,6 +450,7 @@ function MembersList({
           <Dialog.Body>
             <AddMembersForm
               teamOptions={teamOptions}
+              orgRoleOptions={filteredOrgRoleOptions}
               organizationId={organization.id}
               onSubmit={onSubmit}
               isLoading={isSubmitting}

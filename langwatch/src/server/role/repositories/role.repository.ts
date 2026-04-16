@@ -96,6 +96,11 @@ export class RoleRepository {
     });
 
     await this.prisma.$transaction(async (tx) => {
+      await tx.teamUser.update({
+        where: { userId_teamId: { userId, teamId } },
+        data: { role: TeamUserRole.CUSTOM, assignedRoleId: customRoleId },
+      });
+
       await tx.roleBinding.deleteMany({
         where: { organizationId: team.organizationId, userId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
       });
@@ -120,6 +125,11 @@ export class RoleRepository {
     });
 
     await this.prisma.$transaction(async (tx) => {
+      await tx.teamUser.update({
+        where: { userId_teamId: { userId, teamId } },
+        data: { role: TeamUserRole.VIEWER, assignedRoleId: null },
+      });
+
       await tx.roleBinding.deleteMany({
         where: { organizationId: team.organizationId, userId, scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
       });

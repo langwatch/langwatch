@@ -22,7 +22,7 @@ export const ProductScreen: React.FC = () => {
   const { organization, isLoading } = useOrganizationTeamProject({
     redirectToOnboarding: true,
   });
-  const { project: activeProject, slug: skipSlug } = useProjectBySlugOrLatest(organization);
+  const { project: activeProject } = useProjectBySlugOrLatest(organization);
 
   // Delay showing skeleton to avoid flicker on fast loads
   const [delayedLoading, setDelayedLoading] = useState(false);
@@ -70,7 +70,7 @@ export const ProductScreen: React.FC = () => {
         widthVariant={currentScreen.widthVariant ?? "narrow"}
         showBackButton={canGoBack}
         onBack={() => navigation.prevScreen()}
-        skipHref={skipSlug ? `/${skipSlug}` : undefined}
+        skipHref={activeProject?.slug ? `/${activeProject.slug}` : undefined}
       >
         <Box w="full">
           <ActiveProjectProvider

@@ -118,6 +118,20 @@ export const projectRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
 
+      const teamUser = await prisma.teamUser.findFirst({
+        where: {
+          userId: userId,
+          teamId: input.teamId,
+          role: "ADMIN",
+        },
+      });
+
+      if (!teamUser) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have the necessary permissions",
+        });
+      }
 
       const enforcement = createLicenseEnforcementService(prisma);
       try {
@@ -189,6 +203,14 @@ export const projectRouter = createTRPCRouter({
             organizationId: input.organizationId,
           },
         });
+        await prisma.teamUser.create({
+          data: {
+            userId: userId,
+            teamId: team.id,
+            role: "ADMIN",
+          },
+        });
+
         await prisma.roleBinding.create({
           data: {
             id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),

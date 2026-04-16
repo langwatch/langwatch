@@ -6,7 +6,7 @@
  *
  * Requires: PostgreSQL database (Prisma)
  */
-import { OrganizationUserRole, RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { nanoid } from "nanoid";
 import {
   afterAll,
@@ -246,128 +246,6 @@ describe.skipIf(isTestcontainersOnly)(
           success: true,
           projectSlug: expect.any(String),
         });
-      });
-    });
-  },
-);
-
-// Regression: BetterAuth uses RoleBinding for team membership — TeamUser is never populated.
-// A user must be able to create a project with only a RoleBinding, no TeamUser row.
-// Previously project.create checked teamUser.findFirst which always returned null, causing a 403.
-describe.skipIf(isTestcontainersOnly)(
-  "project.create with RoleBinding-only membership (no TeamUser)",
-  () => {
-    const testNamespace = `proj-rb-${nanoid(8)}`;
-    let organizationId: string;
-    let teamId: string;
-    let userId: string;
-
-    beforeAll(async () => {
-      const organization = await prisma.organization.create({
-        data: {
-          name: "RoleBinding Test Org",
-          slug: `--test-org-rb-${testNamespace}`,
-        },
-      });
-      organizationId = organization.id;
-
-      const team = await prisma.team.create({
-        data: {
-          name: "RoleBinding Test Team",
-          slug: `--test-team-rb-${testNamespace}`,
-          organizationId: organization.id,
-        },
-      });
-      teamId = team.id;
-
-      const user = await prisma.user.create({
-        data: {
-          name: "RoleBinding User",
-          email: `rb-${testNamespace}@example.com`,
-        },
-      });
-      userId = user.id;
-
-      await prisma.organizationUser.create({
-        data: {
-          userId: user.id,
-          organizationId: organization.id,
-          role: OrganizationUserRole.ADMIN,
-        },
-      });
-
-      // Only RoleBinding — no TeamUser row, mimicking the BetterAuth membership model
-      await prisma.roleBinding.create({
-        data: {
-          id: `rb-test-${nanoid(8)}`,
-          organizationId: organization.id,
-          userId: user.id,
-          role: TeamUserRole.ADMIN,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: organization.id,
-        },
-      });
-    });
-
-    beforeEach(() => {
-      resetApp();
-      globalForApp.__langwatch_app = createTestApp({
-        planProvider: PlanProviderService.create({
-          getActivePlan: vi.fn().mockResolvedValue({
-            ...FREE_PLAN,
-            maxProjects: 10,
-            overrideAddingLimitations: false,
-          }) as PlanProvider["getActivePlan"],
-        }),
-        usageLimits: {
-          notifyResourceLimitReached: vi.fn().mockResolvedValue(undefined),
-          checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
-        } as any,
-      });
-    });
-
-    afterEach(() => {
-      resetApp();
-    });
-
-    afterAll(async () => {
-      await prisma.project
-        .deleteMany({ where: { teamId } })
-        .catch(() => {});
-      await prisma.roleBinding
-        .deleteMany({ where: { organizationId, userId } })
-        .catch(() => {});
-      await prisma.team
-        .deleteMany({ where: { slug: `--test-team-rb-${testNamespace}` } })
-        .catch(() => {});
-      await prisma.organizationUser
-        .deleteMany({ where: { organizationId, userId } })
-        .catch(() => {});
-      await prisma.organization
-        .deleteMany({ where: { slug: `--test-org-rb-${testNamespace}` } })
-        .catch(() => {});
-      await prisma.user
-        .deleteMany({ where: { email: `rb-${testNamespace}@example.com` } })
-        .catch(() => {});
-    });
-
-    it("creates the project without a TeamUser row", async () => {
-      const ctx = createInnerTRPCContext({
-        session: { user: { id: userId }, expires: "1" },
-      });
-      const caller = appRouter.createCaller(ctx);
-
-      const result = await caller.project.create({
-        organizationId,
-        teamId,
-        name: "RoleBinding Project",
-        language: "en",
-        framework: "test",
-      });
-
-      expect(result).toEqual({
-        success: true,
-        projectSlug: expect.any(String),
       });
     });
   },

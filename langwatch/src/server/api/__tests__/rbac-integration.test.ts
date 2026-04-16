@@ -194,7 +194,7 @@ describe("RBAC Integration Tests", () => {
       expect(result).toBe(false);
     });
 
-    it("returns true for organization admin with org-scoped binding", async () => {
+    it("should return true for organization admin", async () => {
       mockPrisma.team.findUnique.mockResolvedValue({
         id: "team-123",
         organizationId: "org-123",
@@ -203,10 +203,6 @@ describe("RBAC Integration Tests", () => {
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
         role: OrganizationUserRole.ADMIN,
       });
-
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
-      ]);
 
       const result = await hasTeamPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -283,14 +279,10 @@ describe("RBAC Integration Tests", () => {
       expect(result).toBe(false);
     });
 
-    it("returns true for organization admin with org-scoped binding", async () => {
+    it("should return true for organization admin", async () => {
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
         role: OrganizationUserRole.ADMIN,
       });
-
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
-      ]);
 
       const result = await hasOrganizationPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -300,14 +292,10 @@ describe("RBAC Integration Tests", () => {
       expect(result).toBe(true);
     });
 
-    it("should return true for organization member with org-scoped binding and view permission", async () => {
+    it("should return true for organization member with view permission", async () => {
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
         role: OrganizationUserRole.MEMBER,
       });
-
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: "MEMBER", customRoleId: null, scopeType: "ORGANIZATION" },
-      ]);
 
       const result = await hasOrganizationPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -357,10 +345,6 @@ describe("RBAC Integration Tests", () => {
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
         role: OrganizationUserRole.ADMIN,
       });
-
-      mockPrisma.roleBinding.findMany.mockResolvedValue([
-        { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
-      ]);
 
       const result = await hasOrganizationPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -468,10 +452,6 @@ describe("RBAC Integration Tests", () => {
           role: OrganizationUserRole.ADMIN,
         });
 
-        mockPrisma.roleBinding.findMany.mockResolvedValue([
-          { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
-        ]);
-
         const middleware = checkTeamPermission("workflows:view" as Permission);
 
         const result = await middleware({
@@ -508,10 +488,6 @@ describe("RBAC Integration Tests", () => {
         mockPrisma.organizationUser.findFirst.mockResolvedValue({
           role: OrganizationUserRole.ADMIN,
         });
-
-        mockPrisma.roleBinding.findMany.mockResolvedValue([
-          { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
-        ]);
 
         const middleware = checkOrganizationPermission(
           "organization:view" as Permission,
@@ -930,16 +906,12 @@ describe("RBAC Integration Tests", () => {
       );
     }
 
-    describe("when user is an org ADMIN with an org-scoped binding", () => {
+    describe("when user is an org ADMIN (admin bypass, not a team member)", () => {
       it("grants permission and returns ADMIN org role", async () => {
         setupTeamMocks({
           orgRole: OrganizationUserRole.ADMIN,
           hasTeamUser: false,
         });
-
-        mockPrisma.roleBinding.findMany.mockResolvedValue([
-          { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
-        ]);
 
         const result = await resolveTeamPermission(
           { prisma: mockPrisma, session: mockSession },
@@ -1192,10 +1164,6 @@ describe("RBAC Integration Tests", () => {
         mockPrisma.organizationUser.findFirst.mockResolvedValue({
           role: OrganizationUserRole.ADMIN,
         });
-
-        mockPrisma.roleBinding.findMany.mockResolvedValue([
-          { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
-        ]);
 
         const mockNext = vi.fn().mockResolvedValue("success");
         const middleware = checkTeamPermission("team:view" as Permission);

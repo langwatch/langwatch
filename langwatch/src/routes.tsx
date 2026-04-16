@@ -123,6 +123,10 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/settings/members")),
   },
   {
+    path: "/settings/members/:userId",
+    ...page(() => import("./pages/settings/members/[userId]")),
+  },
+  {
     path: "/settings/model-costs",
     ...page(() => import("./pages/settings/model-costs")),
   },
