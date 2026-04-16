@@ -210,20 +210,33 @@ app.post("/admin/:resource", async (c) => {
                     },
                   },
                   {
-                    teamMemberships: {
+                    // Mirror the main app's project-visibility rule
+                    // (org membership → org.teams → team.projects). A user
+                    // should be searchable by any project they can see in
+                    // the project switcher, even without a TeamUser row.
+                    orgMemberships: {
                       some: {
-                        team: {
-                          projects: {
+                        organization: {
+                          teams: {
                             some: {
-                              OR: [
-                                { id: { contains: query, mode: "insensitive" } },
-                                {
-                                  name: {
-                                    contains: query,
-                                    mode: "insensitive",
-                                  },
+                              projects: {
+                                some: {
+                                  OR: [
+                                    {
+                                      id: {
+                                        contains: query,
+                                        mode: "insensitive",
+                                      },
+                                    },
+                                    {
+                                      name: {
+                                        contains: query,
+                                        mode: "insensitive",
+                                      },
+                                    },
+                                  ],
                                 },
-                              ],
+                              },
                             },
                           },
                         },
@@ -235,33 +248,70 @@ app.post("/admin/:resource", async (c) => {
             }
           : {}),
         include: {
-          orgMemberships: { include: { organization: true } },
-          teamMemberships: {
-            include: { team: { include: { projects: true } } },
+          orgMemberships: {
+            include: {
+              organization: {
+                include: {
+                  teams: {
+                    where: { archivedAt: null },
+                    include: {
+                      projects: { where: { archivedAt: null } },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
         map: (
           users: (User & {
-            orgMemberships: { organization: Organization }[];
-            teamMemberships: {
-              team: Team & { projects: Project[] };
+            orgMemberships: {
+              organization: Organization & {
+                teams: (Team & { projects: Project[] })[];
+              };
             }[];
           })[],
         ) =>
-          users.map((u) => ({
-            ...u,
-            organizations: u.orgMemberships
-              ?.map((om) => om.organization.name)
-              .join(", "),
-            teams: u.teamMemberships
-              ?.map((tm) => tm.team.name)
-              .join(", "),
-            projects: u.teamMemberships
-              ?.flatMap((tm) =>
-                tm.team.projects?.map((p) => p.name),
-              )
-              .join(", "),
-          })),
+          users.map((u) => {
+            // Dedupe orgs/projects across memberships so each chip only
+            // appears once in the Backoffice Users list.
+            //
+            // Projects follow the same rule the main app uses for project
+            // visibility (see organization.prisma.repository.ts#getAllForUser):
+            // org membership → org.teams → team.projects. A user gets a
+            // project chip for every non-archived project in every org they
+            // are a member of, regardless of TeamUser — matching exactly
+            // what shows up in their project switcher.
+            const orgMap = new Map<string, { id: string; name: string }>();
+            const projectMap = new Map<
+              string,
+              { id: string; name: string; slug: string }
+            >();
+            for (const om of u.orgMemberships ?? []) {
+              if (!orgMap.has(om.organization.id)) {
+                orgMap.set(om.organization.id, {
+                  id: om.organization.id,
+                  name: om.organization.name,
+                });
+              }
+              for (const team of om.organization.teams ?? []) {
+                for (const p of team.projects ?? []) {
+                  if (!projectMap.has(p.id)) {
+                    projectMap.set(p.id, {
+                      id: p.id,
+                      name: p.name,
+                      slug: p.slug,
+                    });
+                  }
+                }
+              }
+            }
+            return {
+              ...u,
+              organizations: Array.from(orgMap.values()),
+              projects: Array.from(projectMap.values()),
+            };
+          }),
       },
     );
     return c.json(result);

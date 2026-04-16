@@ -1,6 +1,17 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import { Activity, Anvil, Film, History, Shield } from "lucide-react";
+import {
+  Activity,
+  Anvil,
+  Building2,
+  CreditCard,
+  Film,
+  FolderKanban,
+  History,
+  Shield,
+  ToggleRight,
+  Users,
+} from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
 import { useOpsPermission } from "../hooks/useOpsPermission";
@@ -339,12 +350,48 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         showLabel={showExpanded}
       />
       {isAdminUser && (
-        <SideMenuLink
+        <CollapsibleMenuGroup
           icon={Shield}
           label="Backoffice"
-          href="/ops/backoffice"
-          isActive={router.pathname.startsWith("/ops/backoffice")}
           showLabel={showExpanded}
+          children={[
+            {
+              icon: Users,
+              label: "Users",
+              href: "/ops/backoffice/users",
+              isActive: router.pathname.startsWith("/ops/backoffice/users"),
+            },
+            {
+              icon: Building2,
+              label: "Organizations",
+              href: "/ops/backoffice/organizations",
+              isActive: router.pathname.startsWith(
+                "/ops/backoffice/organizations",
+              ),
+            },
+            {
+              icon: FolderKanban,
+              label: "Projects",
+              href: "/ops/backoffice/projects",
+              isActive: router.pathname.startsWith("/ops/backoffice/projects"),
+            },
+            {
+              icon: CreditCard,
+              label: "Subscriptions",
+              href: "/ops/backoffice/subscriptions",
+              isActive: router.pathname.startsWith(
+                "/ops/backoffice/subscriptions",
+              ),
+            },
+            {
+              icon: ToggleRight,
+              label: "Organization Features",
+              href: "/ops/backoffice/organization-features",
+              isActive: router.pathname.startsWith(
+                "/ops/backoffice/organization-features",
+              ),
+            },
+          ]}
         />
       )}
     </>

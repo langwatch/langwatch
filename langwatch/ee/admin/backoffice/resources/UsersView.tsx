@@ -1,18 +1,22 @@
 import {
   Badge,
+  Box,
   Button,
   Field,
   HStack,
   Input,
+  Link as ChakraLink,
   Spacer,
   Table,
   Text,
   Textarea,
   VStack,
+  Wrap,
 } from "@chakra-ui/react";
 import { Pencil, UserCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDebounce } from "use-debounce";
+import NextLink from "~/utils/compat/next-link";
 import { Dialog } from "~/components/ui/dialog";
 import { Drawer } from "~/components/ui/drawer";
 import { Switch } from "~/components/ui/switch";
@@ -29,11 +33,14 @@ import {
   useAdminUpdate,
 } from "../useAdminResource";
 
-interface OrgMembership {
-  organization: { id: string; name: string };
+interface OrgRef {
+  id: string;
+  name: string;
 }
-interface TeamMembership {
-  team: { id: string; name: string; projects: { id: string; name: string }[] };
+interface ProjectRef {
+  id: string;
+  name: string;
+  slug: string;
 }
 
 interface AdminUser {
@@ -46,11 +53,14 @@ interface AdminUser {
   createdAt: string;
   lastLoginAt: string | null;
   deactivatedAt: string | null;
-  orgMemberships: OrgMembership[];
-  teamMemberships: TeamMembership[];
-  /** Joined by the server-side mapper for display convenience. */
-  organizations?: string;
-  projects?: string;
+  /**
+   * Deduped `{id, name}` list the server maps from orgMemberships — lets the
+   * table render each org as its own clickable chip without re-parsing a
+   * joined string.
+   */
+  organizations: OrgRef[];
+  /** Same treatment for projects (through teamMemberships → team.projects). */
+  projects: ProjectRef[];
 }
 
 const PAGE_SIZE = 25;
@@ -87,7 +97,7 @@ export default function UsersView() {
           onPageChange: setPage,
         }}
       >
-        <Table.Root variant="line" size="md" width="full">
+        <Table.Root variant="line" size="sm" width="full">
           <Table.Header>
             <Table.Row>
               <Table.ColumnHeader>ID</Table.ColumnHeader>
@@ -98,7 +108,7 @@ export default function UsersView() {
               <Table.ColumnHeader>Created</Table.ColumnHeader>
               <Table.ColumnHeader>Last login</Table.ColumnHeader>
               <Table.ColumnHeader>Status</Table.ColumnHeader>
-              <Table.ColumnHeader width="180px" textAlign="right">
+              <Table.ColumnHeader width="160px" textAlign="right">
                 Actions
               </Table.ColumnHeader>
             </Table.Row>
@@ -113,64 +123,66 @@ export default function UsersView() {
                 </Table.Cell>
               </Table.Row>
             )}
-            {list.data?.data.map((user) => {
-              const orgNames =
-                user.organizations ??
-                user.orgMemberships?.map((m) => m.organization.name).join(", ");
-              const projectNames =
-                user.projects ??
-                user.teamMemberships
-                  ?.flatMap((m) => m.team.projects.map((p) => p.name))
-                  .join(", ");
-              return (
-                <Table.Row key={user.id}>
-                  <Table.Cell fontSize="xs" color="fg.muted">
-                    {user.id}
-                  </Table.Cell>
-                  <Table.Cell>{user.name ?? <EmptyCell />}</Table.Cell>
-                  <Table.Cell>{user.email ?? <EmptyCell />}</Table.Cell>
-                  <Table.Cell>
-                    {orgNames ? orgNames : <EmptyCell />}
-                  </Table.Cell>
-                  <Table.Cell>
-                    {projectNames ? projectNames : <EmptyCell />}
-                  </Table.Cell>
-                  <Table.Cell>{formatDate(user.createdAt)}</Table.Cell>
-                  <Table.Cell>{formatDateTime(user.lastLoginAt)}</Table.Cell>
-                  <Table.Cell>
-                    {user.deactivatedAt ? (
-                      <Badge colorPalette="red" size="sm">
-                        Deactivated
-                      </Badge>
-                    ) : user.pendingSsoSetup ? (
-                      <Badge colorPalette="yellow" size="sm">
-                        Pending SSO
-                      </Badge>
-                    ) : user.emailVerified ? (
-                      <Badge colorPalette="green" size="sm">
-                        Active
-                      </Badge>
-                    ) : (
-                      <Badge colorPalette="gray" size="sm">
-                        Unverified
-                      </Badge>
-                    )}
-                  </Table.Cell>
-                  <Table.Cell textAlign="right">
-                    <HStack gap={1} justify="end">
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        onClick={() => setEditing(user)}
-                      >
-                        <Pencil size={14} /> Edit
-                      </Button>
-                      <ImpersonateButton user={user} />
-                    </HStack>
-                  </Table.Cell>
-                </Table.Row>
-              );
-            })}
+            {list.data?.data.map((user) => (
+              <Table.Row key={user.id}>
+                <Table.Cell
+                  fontFamily="mono"
+                  fontSize="xs"
+                  color="fg.muted"
+                  maxW="110px"
+                  overflow="hidden"
+                  textOverflow="ellipsis"
+                  whiteSpace="nowrap"
+                  title={user.id}
+                >
+                  {user.id}
+                </Table.Cell>
+                <Table.Cell>{user.name ?? <EmptyCell />}</Table.Cell>
+                <Table.Cell>{user.email ?? <EmptyCell />}</Table.Cell>
+                <Table.Cell>
+                  <RefChipList
+                    refs={user.organizations}
+                    resource="organizations"
+                  />
+                </Table.Cell>
+                <Table.Cell>
+                  <RefChipList refs={user.projects} resource="projects" />
+                </Table.Cell>
+                <Table.Cell>{formatDate(user.createdAt)}</Table.Cell>
+                <Table.Cell>{formatDateTime(user.lastLoginAt)}</Table.Cell>
+                <Table.Cell>
+                  {user.deactivatedAt ? (
+                    <Badge colorPalette="red" size="sm">
+                      Deactivated
+                    </Badge>
+                  ) : user.pendingSsoSetup ? (
+                    <Badge colorPalette="yellow" size="sm">
+                      Pending SSO
+                    </Badge>
+                  ) : user.emailVerified ? (
+                    <Badge colorPalette="green" size="sm">
+                      Active
+                    </Badge>
+                  ) : (
+                    <Badge colorPalette="gray" size="sm">
+                      Unverified
+                    </Badge>
+                  )}
+                </Table.Cell>
+                <Table.Cell textAlign="right">
+                  <HStack gap={1} justify="end">
+                    <Button
+                      size="xs"
+                      variant="ghost"
+                      onClick={() => setEditing(user)}
+                    >
+                      <Pencil size={14} /> Edit
+                    </Button>
+                    <ImpersonateButton user={user} />
+                  </HStack>
+                </Table.Cell>
+              </Table.Row>
+            ))}
           </Table.Body>
         </Table.Root>
       </BackofficeTable>
@@ -436,6 +448,57 @@ function UserEditDrawer({
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/**
+ * Renders a wrapped list of clickable chips for the Users table's
+ * Organizations / Projects columns. Each chip deep-links to the matching
+ * Backoffice list page with the row's id pre-loaded into the `q` search
+ * param so the user lands on a single-row, filtered view — same one-click
+ * drill-down the old react-admin `ReferenceField` used to give us.
+ */
+function RefChipList({
+  refs,
+  resource,
+}: {
+  refs: { id: string; name: string }[] | string | null | undefined;
+  resource: "organizations" | "projects";
+}) {
+  // Defend against legacy shape: prior server versions returned a
+  // comma-joined string for these columns, and a cold dev server + cached
+  // response can still deliver that on first hit. Render it as plain text
+  // instead of crashing with `.map is not a function`.
+  if (typeof refs === "string") {
+    return refs ? <Text fontSize="xs">{refs}</Text> : <EmptyCell />;
+  }
+  if (!Array.isArray(refs) || refs.length === 0) return <EmptyCell />;
+  return (
+    <Wrap gap={1}>
+      {refs.map((ref) => (
+        <ChakraLink
+          key={ref.id}
+          asChild
+          fontSize="xs"
+          color="fg"
+          _hover={{ textDecoration: "underline" }}
+        >
+          <NextLink href={`/ops/backoffice/${resource}?q=${ref.id}`}>
+            <Box
+              as="span"
+              paddingX={2}
+              paddingY={0.5}
+              borderRadius="md"
+              borderWidth="1px"
+              borderColor="border.emphasized"
+              background="bg.subtle"
+            >
+              {ref.name}
+            </Box>
+          </NextLink>
+        </ChakraLink>
+      ))}
+    </Wrap>
   );
 }
 

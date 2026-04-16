@@ -14,8 +14,9 @@ import {
 } from "@chakra-ui/react";
 import { Currency, PricingModel } from "@prisma/client";
 import { Pencil } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
+import { useRouter } from "~/utils/compat/next-router";
 import { Drawer } from "~/components/ui/drawer";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
@@ -61,8 +62,15 @@ interface AdminOrganization {
 const PAGE_SIZE = 25;
 
 export default function OrganizationsView() {
+  const router = useRouter();
+  // `q` deep-links from other Backoffice pages (e.g. clicking an org chip on
+  // the Users table lands here with ?q=<orgId>). Seed once on mount so the
+  // list comes up pre-filtered without fighting the user's subsequent typing.
+  const initialQueryRef = useRef<string>(
+    typeof router.query.q === "string" ? router.query.q : "",
+  );
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialQueryRef.current);
   const [debouncedSearch] = useDebounce(search, 300);
   const [editing, setEditing] = useState<AdminOrganization | null>(null);
 

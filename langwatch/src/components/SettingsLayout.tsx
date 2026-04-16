@@ -9,6 +9,7 @@ import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { api } from "~/utils/api";
 import { PageLayout } from "./ui/layouts/PageLayout";
 
 // ── Collapsible nav section ───────────────────────────────────────────────────
@@ -72,6 +73,14 @@ export default function SettingsLayout({
   const { isEnterprise } = useActivePlan();
   const { isLiteMember } = useLiteMemberGuard();
   const { hasAccess: hasOpsAccess } = useOpsPermission();
+  // Backoffice is admin-only. Kept decoupled from `hasOpsAccess` so that if
+  // ops:view ever broadens beyond admin, Backoffice stays strictly admin.
+  // Query only runs when the OPS section would render.
+  const adminStatus = api.user.isAdmin.useQuery(
+    {},
+    { enabled: hasOpsAccess, retry: false, refetchOnWindowFocus: false },
+  );
+  const isAdminUser = adminStatus.data?.isAdmin ?? false;
 
   return (
     <DashboardLayout compactMenu>
@@ -189,6 +198,14 @@ export default function SettingsLayout({
               <MenuLink href="/ops/dejaview" includePath="/ops/dejaview">
                 Deja View
               </MenuLink>
+              {isAdminUser && (
+                <MenuLink
+                  href="/ops/backoffice/users"
+                  includePath="/ops/backoffice"
+                >
+                  Backoffice
+                </MenuLink>
+              )}
             </NavSection>
           )}
         </VStack>

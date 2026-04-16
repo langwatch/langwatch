@@ -17,8 +17,9 @@ import {
   ProjectSensitiveDataVisibilityLevel,
 } from "@prisma/client";
 import { Pencil } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
+import { useRouter } from "~/utils/compat/next-router";
 import { Drawer } from "~/components/ui/drawer";
 import { Switch } from "~/components/ui/switch";
 import { toaster } from "~/components/ui/toaster";
@@ -64,8 +65,15 @@ interface AdminProject {
 const PAGE_SIZE = 25;
 
 export default function ProjectsView() {
+  const router = useRouter();
+  // Deep-link support: /ops/backoffice/projects?q=<projectId> — seed the
+  // search input once from the URL so chips on the Users table drop the user
+  // straight onto the matching row.
+  const initialQueryRef = useRef<string>(
+    typeof router.query.q === "string" ? router.query.q : "",
+  );
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialQueryRef.current);
   const [debouncedSearch] = useDebounce(search, 300);
   const [editing, setEditing] = useState<AdminProject | null>(null);
 
