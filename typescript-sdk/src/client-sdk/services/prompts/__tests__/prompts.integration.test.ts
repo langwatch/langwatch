@@ -47,11 +47,12 @@ const handlers = [
     });
   }),
   http.put("/api/prompts/{id}", async ({ params, request, response }) => {
-    const body = await request.json();
+    const body = (await request.json()) as Record<string, unknown> | undefined;
+    const { tags: _inputTags, ...rest } = body ?? {};
     const prompt = promptResponseFactory.build({
-      ...body,
+      ...(rest as Parameters<typeof promptResponseFactory.build>[0]),
       id: params.id,
-      handle: body?.handle,
+      handle: (body?.handle ?? undefined) as string | undefined,
     });
     return response(200).json(prompt);
   }),

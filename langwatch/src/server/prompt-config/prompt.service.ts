@@ -100,6 +100,13 @@ export type VersionedPrompt = {
   _count?: {
     copiedPrompts?: number;
   };
+  /**
+   * Tags currently pointing at the version returned in this response.
+   * For list/get responses, these are the tags that resolve to the
+   * latest/requested version specifically — not the entire prompt's tag set.
+   * For versions endpoint, these are the tags pointing at the row's version.
+   */
+  tags: Array<{ name: string; versionId: string }>;
 };
 
 /**
@@ -138,7 +145,18 @@ export class PromptService {
       organizationId,
     });
 
-    return configs.map((config) => this.transformToVersionedPrompt(config));
+    const configIds = configs.map((c) => c.id);
+    const tagsByVersionId = await this.getTagsByVersionIdForConfigs({
+      configIds,
+      projectId,
+    });
+
+    return configs.map((config) =>
+      this.transformToVersionedPrompt(
+        config,
+        tagsByVersionId.get(config.latestVersion.id ?? "") ?? [],
+      ),
+    );
   }
 
   /**
@@ -228,7 +246,14 @@ export class PromptService {
       return null;
     }
 
-    return this.transformToVersionedPrompt(config);
+    const tagsByVersionId = await this.getTagsByVersionIdForConfigs({
+      configIds: [config.id],
+      projectId,
+    });
+    const tagsForThisVersion =
+      tagsByVersionId.get(config.latestVersion.id ?? "") ?? [];
+
+    return this.transformToVersionedPrompt(config, tagsForThisVersion);
   }
 
   /**
@@ -264,11 +289,19 @@ export class PromptService {
         organizationId,
       })) as LatestConfigVersionSchema[];
 
+    const tagsByVersionId = await this.getTagsByVersionIdForConfigs({
+      configIds: [config.id],
+      projectId: params.projectId,
+    });
+
     return versions.map((version) =>
-      this.transformToVersionedPrompt({
-        ...config,
-        latestVersion: version,
-      }),
+      this.transformToVersionedPrompt(
+        {
+          ...config,
+          latestVersion: version,
+        },
+        tagsByVersionId.get(version.id ?? "") ?? [],
+      ),
     );
   }
 
@@ -924,6 +957,7 @@ export class PromptService {
    */
   private transformToVersionedPrompt(
     config: Omit<LlmConfigWithLatestVersion, "deletedAt">,
+    tags: Array<{ name: string; versionId: string }> = [],
   ): VersionedPrompt {
     const prompt = config.latestVersion.configData.prompt;
 
@@ -983,6 +1017,7 @@ export class PromptService {
       commitMessage: config.latestVersion.commitMessage,
       copiedFromPromptId: config.copiedFromPromptId ?? null,
       _count: config._count ?? undefined,
+      tags,
     };
   }
 
@@ -1110,6 +1145,42 @@ export class PromptService {
       projectId: params.projectId,
       userId: params.userId,
     });
+  }
+
+  /**
+   * Batch-fetches all PromptTagAssignments for the given configs, grouped
+   * by versionId. Returned entries contain `{ name, versionId }`. Used by
+   * list/get/versions endpoints so tags can be shown alongside prompt data.
+   */
+  private async getTagsByVersionIdForConfigs(params: {
+    configIds: string[];
+    projectId: string;
+  }): Promise<Map<string, Array<{ name: string; versionId: string }>>> {
+    const map = new Map<string, Array<{ name: string; versionId: string }>>();
+
+    if (params.configIds.length === 0) {
+      return map;
+    }
+
+    const assignments = await this.prisma.promptTagAssignment.findMany({
+      where: {
+        projectId: params.projectId,
+        configId: { in: params.configIds },
+      },
+      include: { promptTag: true },
+      orderBy: { createdAt: "asc" },
+    });
+
+    for (const assignment of assignments) {
+      const bucket = map.get(assignment.versionId) ?? [];
+      bucket.push({
+        name: assignment.promptTag.name,
+        versionId: assignment.versionId,
+      });
+      map.set(assignment.versionId, bucket);
+    }
+
+    return map;
   }
 
   /**

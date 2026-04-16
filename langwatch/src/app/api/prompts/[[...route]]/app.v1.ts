@@ -685,6 +685,8 @@ app.post(
         "Successfully created prompt with initial version",
       );
 
+      let responseConfig: ApiResponsePrompt = newConfig;
+
       if (tags && tags.length > 0) {
         await Promise.all(
           tags.map((tag) =>
@@ -702,6 +704,15 @@ app.post(
           { promptId: newConfig.id, tags },
           "Assigned tags to initial version",
         );
+
+        const refetched = await service.getPromptByIdOrHandle({
+          idOrHandle: newConfig.id,
+          projectId: project.id,
+          organizationId: organization.id,
+        });
+        if (refetched) {
+          responseConfig = refetched;
+        }
       }
 
       afterPromptCreated({
@@ -710,7 +721,7 @@ app.post(
       });
 
       return c.json({
-        ...apiResponsePromptWithVersionDataSchema.parse(newConfig),
+        ...apiResponsePromptWithVersionDataSchema.parse(responseConfig),
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/prompts`,
@@ -905,6 +916,8 @@ app.put(
         });
       }
 
+      let responseConfig: ApiResponsePrompt = updatedConfig;
+
       if (tags && tags.length > 0) {
         await Promise.all(
           tags.map((tag) =>
@@ -922,6 +935,15 @@ app.put(
           { projectId, promptId: id, tags, versionId: updatedConfig.versionId },
           "Assigned tags to updated version",
         );
+
+        const refetched = await service.getPromptByIdOrHandle({
+          idOrHandle: updatedConfig.id,
+          projectId,
+          organizationId: organization.id,
+        });
+        if (refetched) {
+          responseConfig = refetched;
+        }
       }
 
       logger.info(
@@ -935,7 +957,7 @@ app.put(
       );
 
       return c.json({
-        ...apiResponsePromptWithVersionDataSchema.parse(updatedConfig),
+        ...apiResponsePromptWithVersionDataSchema.parse(responseConfig),
         platformUrl: platformUrl({
           projectSlug: project.slug,
           path: `/prompts`,

@@ -154,3 +154,50 @@ Feature: CLI Prompt Tag Commands
   Scenario: Tag subcommands appear in prompt help
     When I run "langwatch prompt --help"
     Then I see "tag" listed as a subcommand
+
+  # --- Tag display in prompt list / get / versions ---
+
+  @unit
+  Scenario: Prompt list renders a Tags column
+    Given "my-prompt" has "production" pointing to its latest version and "staging" pointing to an older version
+    When I run "langwatch prompt list"
+    Then I see the row for "my-prompt" with a Tags column showing "production"
+    And the Tags column does not include tags pointing to older versions for the latest row
+
+  @unit
+  Scenario: Prompt list JSON format includes tags array on each prompt
+    Given "my-prompt" has "production" pointing to its latest version
+    When I run "langwatch prompt list --format json"
+    Then the JSON for "my-prompt" includes a tags array with name "production" and its versionId
+
+  @unit
+  Scenario: Prompt versions renders a Tags column per version
+    Given "my-prompt" has "production" on v3 and "staging" on v2
+    When I run "langwatch prompt versions my-prompt"
+    Then the row for v3 shows "production" in the Tags column
+    And the row for v2 shows "staging" in the Tags column
+    And the row for v1 shows "—"
+
+  @unit
+  Scenario: Prompt versions JSON format includes tags array on each version
+    Given "my-prompt" has "production" on v2 and "staging" on v3
+    When I run "langwatch prompt versions my-prompt --format json"
+    Then each version in the JSON array includes a tags field (possibly empty)
+
+  @integration
+  Scenario: API get returns tags on the prompt response
+    Given a prompt with "production" assigned to version 2 and fetched without a tag filter
+    When I GET /api/prompts/:id
+    Then the response includes a tags array containing { name: "production", versionId }
+
+  @integration
+  Scenario: API versions returns tags per version
+    Given a prompt with "production" on v2 and "staging" on v3
+    When I GET /api/prompts/:id/versions
+    Then each version includes a tags array with the names pointing to it
+
+  @integration
+  Scenario: API list returns tags per prompt latest version
+    Given a prompt with "production" on its latest version
+    When I GET /api/prompts
+    Then the prompt entry includes a tags array with "production"

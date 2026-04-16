@@ -302,6 +302,7 @@ describe("versionedPromptToPromptConfigFormValues", () => {
     outputs: [{ identifier: "output", type: "str" }],
     updatedAt: new Date(),
     createdAt: new Date(),
+    tags: [],
   });
 
   describe("when prompt handle has no prefix", () => {
@@ -397,6 +398,7 @@ describe("versionedPromptToPromptConfigFormValuesWithSystemMessage", () => {
     outputs: [{ identifier: "output", type: "str" }],
     updatedAt: new Date(),
     createdAt: new Date(),
+    tags: [],
     ...overrides,
   });
 

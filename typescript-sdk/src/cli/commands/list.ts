@@ -51,17 +51,22 @@ export const listCommand = async (options?: { format?: string }): Promise<void> 
         Name: prompt.handle ?? `${prompt.name} ` + chalk.gray(`(${prompt.id})`),
         Version: prompt.version ? `${prompt.version}` : "N/A",
         Model: prompt.model ?? "N/A",
+        Tags:
+          prompt.tags && prompt.tags.length > 0
+            ? prompt.tags.map((t) => t.name).join(", ")
+            : chalk.gray("—"),
         Updated: formatRelativeTime(prompt.updatedAt),
       }));
 
       // Display table
       formatTable({
         data: tableData,
-        headers: ["Name", "Version", "Model", "Updated"],
+        headers: ["Name", "Version", "Model", "Tags", "Updated"],
         colorMap: {
           Name: chalk.cyan,
           Version: chalk.green,
           Model: chalk.yellow,
+          Tags: chalk.magenta,
         },
         emptyMessage: "No prompts found",
       });
