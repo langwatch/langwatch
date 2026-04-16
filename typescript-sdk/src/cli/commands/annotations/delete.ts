@@ -1,11 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  AnnotationsApiService,
-  AnnotationsApiError,
-} from "@/client-sdk/services/annotations/annotations-api.service";
+import { AnnotationsApiService } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const deleteAnnotationCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -21,16 +18,7 @@ export const deleteAnnotationCommand = async (id: string, options?: { format?: s
       console.log(JSON.stringify({ id, deleted: true }, null, 2));
     }
   } catch (error) {
-    spinner.fail();
-    if (error instanceof AnnotationsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error deleting annotation: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "delete annotation" });
     process.exit(1);
   }
 };

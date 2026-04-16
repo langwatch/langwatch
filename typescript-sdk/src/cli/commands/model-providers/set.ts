@@ -1,11 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  ModelProvidersApiService,
-  ModelProvidersApiError,
-} from "@/client-sdk/services/model-providers/model-providers-api.service";
+import { ModelProvidersApiService } from "@/client-sdk/services/model-providers/model-providers-api.service";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const setModelProviderCommand = async (
   provider: string,
@@ -46,16 +43,7 @@ export const setModelProviderCommand = async (
       console.log(JSON.stringify({ provider, enabled: options.enabled ?? true, defaultModel: options.defaultModel ?? null }, null, 2));
     }
   } catch (error) {
-    spinner.fail();
-    if (error instanceof ModelProvidersApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error configuring model provider: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "configure model provider" });
     process.exit(1);
   }
 };

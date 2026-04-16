@@ -1,11 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  AnnotationsApiService,
-  AnnotationsApiError,
-} from "@/client-sdk/services/annotations/annotations-api.service";
+import { AnnotationsApiService } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const createAnnotationCommand = async (
   traceId: string,
@@ -41,16 +38,7 @@ export const createAnnotationCommand = async (
       console.log(JSON.stringify(annotation, null, 2));
     }
   } catch (error) {
-    spinner.fail();
-    if (error instanceof AnnotationsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error creating annotation: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "create annotation" });
     process.exit(1);
   }
 };

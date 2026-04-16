@@ -5,6 +5,7 @@ import ora from "ora";
 import { FileManager } from "../utils/fileManager";
 import { PromptsError } from "@/client-sdk/services/prompts";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../utils/spinnerError";
 
 export const removeCommand = async (name: string): Promise<void> => {
   try {
@@ -101,12 +102,7 @@ export const removeCommand = async (name: string): Promise<void> => {
       }
 
     } catch (error) {
-      spinner.fail();
-      if (error instanceof PromptsError) {
-        console.error(chalk.red(`Error: ${error.message}`));
-      } else {
-        console.error(chalk.red(`Error removing prompt: ${formatApiErrorMessage({ error })}`));
-      }
+      failSpinner({ spinner, error, action: "remove prompt" });
       process.exit(1);
     }
 

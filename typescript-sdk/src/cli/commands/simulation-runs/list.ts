@@ -2,7 +2,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
-import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listSimulationRunsCommand = async (options: {
   scenarioSetId?: string;
@@ -95,12 +95,7 @@ export const listSimulationRunsCommand = async (options: {
       chalk.gray(`Use ${chalk.cyan("langwatch simulation-run get <runId>")} to view full details`),
     );
   } catch (error) {
-    spinner.fail();
-    console.error(
-      chalk.red(
-        `Error: ${formatApiErrorMessage({ error })}`,
-      ),
-    );
+    failSpinner({ spinner, error, action: "fetch simulation runs" });
     process.exit(1);
   }
 };

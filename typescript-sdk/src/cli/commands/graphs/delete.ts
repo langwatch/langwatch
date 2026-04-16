@@ -1,8 +1,7 @@
-import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
-import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const deleteGraphCommand = async (
   id: string,
@@ -34,8 +33,7 @@ export const deleteGraphCommand = async (
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    spinner.fail();
-    console.error(chalk.red(`Error: ${formatApiErrorMessage({ error })}`));
+    failSpinner({ spinner, error, action: "delete graph" });
     process.exit(1);
   }
 };

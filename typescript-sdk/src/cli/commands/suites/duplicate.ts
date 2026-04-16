@@ -1,11 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  SuitesApiService,
-  SuitesApiError,
-} from "@/client-sdk/services/suites";
+import { SuitesApiService } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const duplicateSuiteCommand = async (
   id: string,
@@ -32,16 +29,7 @@ export const duplicateSuiteCommand = async (
     console.log(`  ${chalk.gray("Slug:")}     ${chalk.yellow(suite.slug)}`);
     console.log();
   } catch (error) {
-    spinner.fail();
-    if (error instanceof SuitesApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "duplicate suite" });
     process.exit(1);
   }
 };

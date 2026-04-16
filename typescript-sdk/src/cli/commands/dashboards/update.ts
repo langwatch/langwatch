@@ -1,11 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  DashboardsApiService,
-  DashboardsApiError,
-} from "@/client-sdk/services/dashboards/dashboards-api.service";
+import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const updateDashboardCommand = async (
   id: string,
@@ -36,16 +33,7 @@ export const updateDashboardCommand = async (
     console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(dashboard.name)}`);
     console.log();
   } catch (error) {
-    spinner.fail();
-    if (error instanceof DashboardsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "update dashboard" });
     process.exit(1);
   }
 };

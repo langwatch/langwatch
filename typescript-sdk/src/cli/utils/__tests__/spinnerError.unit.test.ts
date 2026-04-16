@@ -77,4 +77,21 @@ describe("failSpinner", () => {
       );
     });
   });
+
+  describe("when error is a non-ApiError class with a 'Failed to …' message", () => {
+    it("still passes through without double-prefixing", () => {
+      class PromptsError extends Error {
+        constructor(msg: string) {
+          super(msg);
+          this.name = "PromptsError";
+        }
+      }
+      const err = new PromptsError("Failed to sync prompt: Internal server error");
+      const { spinner, calls } = makeSpinner();
+      failSpinner({ spinner, error: err, action: "sync prompt" });
+      expect(stripAnsi(String(calls[0]))).toBe(
+        "Failed to sync prompt: Internal server error",
+      );
+    });
+  });
 });

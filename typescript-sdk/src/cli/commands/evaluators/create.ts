@@ -1,11 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  EvaluatorsApiService,
-  EvaluatorsApiError,
-} from "@/client-sdk/services/evaluators";
+import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const createEvaluatorCommand = async (
   name: string,
@@ -34,16 +31,7 @@ export const createEvaluatorCommand = async (
       console.log(`  ${chalk.bold("View:")}  ${chalk.underline(evaluator.platformUrl)}`);
     }
   } catch (error) {
-    spinner.fail();
-    if (error instanceof EvaluatorsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error creating evaluator: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "create evaluator" });
     process.exit(1);
   }
 };

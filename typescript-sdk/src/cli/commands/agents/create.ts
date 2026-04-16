@@ -1,11 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  AgentsApiService,
-  AgentsApiError,
-} from "@/client-sdk/services/agents/agents-api.service";
+import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const createAgentCommand = async (
   name: string,
@@ -37,17 +34,10 @@ export const createAgentCommand = async (
       console.log(`  ${chalk.bold("View:")}  ${chalk.underline(agent.platformUrl)}`);
     }
   } catch (error) {
-    spinner.fail();
     if (error instanceof SyntaxError) {
-      console.error(chalk.red("Error: --config must be valid JSON"));
-    } else if (error instanceof AgentsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
+      spinner.fail(chalk.red("--config must be valid JSON"));
     } else {
-      console.error(
-        chalk.red(
-          `Error creating agent: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
+      failSpinner({ spinner, error, action: "create agent" });
     }
     process.exit(1);
   }

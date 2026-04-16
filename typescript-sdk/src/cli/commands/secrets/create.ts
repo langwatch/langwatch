@@ -2,7 +2,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
-import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const createSecretCommand = async (
   name: string,
@@ -58,12 +58,7 @@ export const createSecretCommand = async (
     console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(secret.name)}`);
     console.log();
   } catch (error) {
-    spinner.fail();
-    console.error(
-      chalk.red(
-        `Error: ${formatApiErrorMessage({ error })}`
-      )
-    );
+    failSpinner({ spinner, error, action: "create secret" });
     process.exit(1);
   }
 };

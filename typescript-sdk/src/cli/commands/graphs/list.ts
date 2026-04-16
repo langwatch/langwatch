@@ -3,7 +3,7 @@ import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
-import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listGraphsCommand = async (options: {
   dashboardId?: string;
@@ -77,8 +77,7 @@ export const listGraphsCommand = async (options: {
 
     console.log();
   } catch (error) {
-    spinner.fail();
-    console.error(chalk.red(`Error: ${formatApiErrorMessage({ error })}`));
+    failSpinner({ spinner, error, action: "fetch graphs" });
     process.exit(1);
   }
 };

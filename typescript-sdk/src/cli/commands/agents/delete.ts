@@ -1,11 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  AgentsApiService,
-  AgentsApiError,
-} from "@/client-sdk/services/agents/agents-api.service";
+import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const deleteAgentCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -23,16 +20,7 @@ export const deleteAgentCommand = async (id: string, options?: { format?: string
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    spinner.fail();
-    if (error instanceof AgentsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error archiving agent: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "archive agent" });
     process.exit(1);
   }
 };

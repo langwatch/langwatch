@@ -2,7 +2,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
-import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const updateGraphCommand = async (
   id: string,
@@ -71,17 +71,10 @@ export const updateGraphCommand = async (
     console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(graph.name)}`);
     console.log();
   } catch (error) {
-    spinner.fail();
     if (error instanceof SyntaxError) {
-      console.error(
-        chalk.red("Error: --graph and --filters must be valid JSON")
-      );
+      spinner.fail(chalk.red("--graph and --filters must be valid JSON"));
     } else {
-      console.error(
-        chalk.red(
-          `Error: ${formatApiErrorMessage({ error })}`
-        )
-      );
+      failSpinner({ spinner, error, action: "update graph" });
     }
     process.exit(1);
   }

@@ -2,7 +2,7 @@ import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
-import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const runWorkflowCommand = async (
   id: string,
@@ -58,15 +58,10 @@ export const runWorkflowCommand = async (
       console.log();
     }
   } catch (error) {
-    spinner.fail();
     if (error instanceof SyntaxError) {
-      console.error(chalk.red("Error: --input must be valid JSON"));
+      spinner.fail(chalk.red("--input must be valid JSON"));
     } else {
-      console.error(
-        chalk.red(
-          `Error running workflow: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
+      failSpinner({ spinner, error, action: "run workflow" });
     }
     process.exit(1);
   }

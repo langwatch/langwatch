@@ -1,12 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  TracesApiService,
-  TracesApiError,
-} from "@/client-sdk/services/traces/traces-api.service";
+import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
-import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const searchTracesCommand = async (options: {
   query?: string;
@@ -104,16 +101,7 @@ export const searchTracesCommand = async (options: {
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof TracesApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error searching traces: ${formatApiErrorMessage({ error })}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "search traces" });
     process.exit(1);
   }
 };
