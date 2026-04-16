@@ -1,12 +1,10 @@
 Feature: Scoped role bindings
   As a LangWatch platform
   I need to resolve a user's effective permissions at any scope (org, team, or project)
-  So that organizations can assign fine-grained access without changing the existing team model
+  So that organizations can assign fine-grained access to users and groups
 
   Role bindings attach a principal (user or group) to a named role at a specific scope.
   The most specific scope always wins. Group bindings are expanded via group membership.
-  During the migration period, the resolver falls back to TeamUser records when no
-  RoleBinding exists for the user at the requested scope.
 
   Background:
     Given an organization "acme"
@@ -91,22 +89,6 @@ Feature: Scoped role bindings
     Given user "carol" has a RoleBinding: Member on team "client-b"
     When the platform resolves carol's role on project "clienta-dev"
     Then the effective role is null
-
-  # ============================================================================
-  # Fallback to TeamUser during migration
-  # ============================================================================
-
-  Scenario: User with no RoleBinding falls back to TeamUser record
-    Given user "dave" has no RoleBindings
-    And user "dave" has a TeamUser record: Member on team "client-a"
-    When the platform resolves dave's role on project "clienta-dev"
-    Then the effective role is Member
-
-  Scenario: RoleBinding takes precedence over TeamUser when both exist
-    Given user "dave" has a RoleBinding: Viewer on team "client-a"
-    And user "dave" has a TeamUser record: Admin on team "client-a"
-    When the platform resolves dave's role on project "clienta-dev"
-    Then the effective role is Viewer
 
   # ============================================================================
   # Permission checking from effective role

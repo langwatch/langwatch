@@ -9,7 +9,11 @@ LangWatch provides role-based access control (RBAC) to manage user permissions a
 
 # Role-Based Access Control (RBAC) System
 
-LangWatch implements a comprehensive Role-Based Access Control (RBAC) system that manages permissions across organizations, teams, and projects. This system provides fine-grained control over what users can access and modify within the platform.
+LangWatch implements a comprehensive Role-Based Access Control (RBAC) system that manages permissions across organizations, teams, and projects. Role bindings can be assigned directly to users or to groups — including groups synced from your identity provider via SCIM.
+
+<Info>
+  For group-based access control and identity provider integration, see [SCIM Groups](/platform/scim-groups).
+</Info>
 
 ## Permission Structure
 
@@ -168,11 +172,37 @@ Once the role is created, you can attach it to a user under the teams page.
 
 - Custom roles cannot grant permissions that exceed the organization admin's capabilities
 - Custom roles are organization-scoped and cannot be shared across organizations
-- Users can only have one custom role assignment per team
-- Custom roles cannot be assigned to organization-level users (only team members)
 
 ### Public Sharing
 The system supports public sharing of traces, allowing access without authentication when resources are explicitly shared publicly.
+
+---
+
+## Scoped Role Bindings
+
+Roles in LangWatch are assigned via **role bindings** — a binding links a principal (user or group) to a role at a specific scope.
+
+### Scopes
+
+| Scope | What it grants |
+|-------|---------------|
+| **Organization** | Access across the entire organization at the specified role level |
+| **Team** | Access to a specific team and all its projects |
+| **Project** | Access to a single project only |
+
+### Resolution Rules
+
+- **Most specific scope wins** — a project-level binding overrides a team-level binding for that project
+- **Org Admin always wins** — an org-level Admin binding grants full access everywhere regardless of narrower bindings
+- **Multiple bindings at the same scope** — the highest role is used (e.g. Member + Viewer → Member)
+
+Role bindings can be assigned to users directly from **Settings → Members**, or to groups from **Settings → Groups**. Users inherit all bindings assigned to groups they belong to.
+
+<Tip>
+  Use group bindings (especially SCIM groups from your IdP) to manage access at scale — assigning a binding to a group is equivalent to assigning it to every member of that group. See [SCIM Groups](/platform/scim-groups).
+</Tip>
+
+---
 
 ## Security Considerations
 
