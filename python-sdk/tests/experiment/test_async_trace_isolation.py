@@ -280,7 +280,7 @@ class TestAsyncHttpPayload:
             await asyncio.sleep(0.005)
 
         with patch("httpx.post", side_effect=mock_post):
-            async for index, row in experiment.aloop(df.iterrows(), concurrency=3, total=6):
+            async for _index, row in experiment.aloop(df.iterrows(), concurrency=3, total=6):
                 experiment.asubmit(task, row)
 
         all_entries: list[dict] = []
