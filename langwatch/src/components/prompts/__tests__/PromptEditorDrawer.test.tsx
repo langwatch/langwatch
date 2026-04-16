@@ -938,7 +938,7 @@ describe("PromptEditorDrawer", () => {
   describe("when initialLocalConfig has custom inputs (#3155 regression)", () => {
     it("initializes form with custom inputs instead of default 'input' field", () => {
       const initialLocalConfig = {
-        llm: { model: "openai/gpt-4o" },
+        llm: { model: "openai/gpt-5-mini" },
         messages: [
           {
             role: "user" as const,
