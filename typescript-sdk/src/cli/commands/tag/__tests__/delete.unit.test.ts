@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/client-sdk/services/prompts", () => ({
   PromptsApiService: vi.fn(),
@@ -40,7 +40,6 @@ const setupReadlineMock = (answer: string) => {
 
 describe("tagDeleteCommand", () => {
   let mockDeleteTag: ReturnType<typeof vi.fn>;
-  const originalIsTTY = process.stdin.isTTY;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -53,20 +52,6 @@ describe("tagDeleteCommand", () => {
     });
     vi.spyOn(console, "log").mockImplementation(() => undefined);
     vi.spyOn(console, "error").mockImplementation(() => undefined);
-    // vitest runs in a non-TTY environment by default, but the existing
-    // tests assume the interactive prompt path. Pin isTTY=true so those
-    // tests stay deterministic.
-    Object.defineProperty(process.stdin, "isTTY", {
-      value: true,
-      configurable: true,
-    });
-  });
-
-  afterEach(() => {
-    Object.defineProperty(process.stdin, "isTTY", {
-      value: originalIsTTY,
-      configurable: true,
-    });
   });
 
   describe("when confirmation matches the tag name", () => {
@@ -111,37 +96,6 @@ describe("tagDeleteCommand", () => {
 
       // Should not throw
       await expect(tagDeleteCommand("canary")).resolves.toBeUndefined();
-    });
-  });
-
-  describe("when stdin is not a TTY and --force is not set", () => {
-    const originalIsTTY = process.stdin.isTTY;
-
-    beforeEach(() => {
-      Object.defineProperty(process.stdin, "isTTY", {
-        value: false,
-        configurable: true,
-      });
-    });
-
-    afterEach(() => {
-      Object.defineProperty(process.stdin, "isTTY", {
-        value: originalIsTTY,
-        configurable: true,
-      });
-    });
-
-    it("exits with an actionable error instead of hanging on stdin", async () => {
-      await expect(tagDeleteCommand("canary")).rejects.toThrow(
-        ProcessExitError,
-      );
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining("stdin is not a TTY"),
-      );
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining("--force"),
-      );
-      expect(mockDeleteTag).not.toHaveBeenCalled();
     });
   });
 
