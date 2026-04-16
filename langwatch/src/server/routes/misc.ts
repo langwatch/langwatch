@@ -724,6 +724,11 @@ app.post("/track_event", async (c) => {
     return c.json({ error: validationError.message }, 400);
   }
 
+  // Body successfully validated — mark PAT as used if authenticated via PAT
+  if (resolved.type === "pat") {
+    tokenResolver.markUsed({ patId: resolved.patId });
+  }
+
   if (predefinedEventTypes.includes(rawBody.event_type)) {
     try {
       predefinedEventsSchemas.parse(rawBody);

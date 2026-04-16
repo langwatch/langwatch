@@ -68,7 +68,6 @@ describe("TokenResolver", () => {
       };
 
       prisma.personalAccessToken.findUnique.mockResolvedValue(mockPat);
-      prisma.personalAccessToken.update.mockResolvedValue({});
       prisma.project.findUnique.mockResolvedValue(mockProject);
 
       const result = await resolver.resolve({
@@ -96,7 +95,6 @@ describe("TokenResolver", () => {
         revokedAt: null,
         roleBindings: [],
       });
-      prisma.personalAccessToken.update.mockResolvedValue({});
 
       const result = await resolver.resolve({ token });
       expect(result).toBeNull();
@@ -113,7 +111,6 @@ describe("TokenResolver", () => {
         revokedAt: null,
         roleBindings: [],
       });
-      prisma.personalAccessToken.update.mockResolvedValue({});
       prisma.project.findUnique.mockResolvedValue({
         id: "proj-1",
         archivedAt: null,
