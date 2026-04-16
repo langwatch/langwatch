@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.23.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.22.0...typescript-sdk@v0.23.0) (2026-04-16)
+
+
+### Features
+
+* add platformUrl to all API responses and CLI output ([#3242](https://github.com/langwatch/langwatch/issues/3242)) ([dffed28](https://github.com/langwatch/langwatch/commit/dffed28161f880c0682cf2e77ee906618c5dce6a))
+* expose all platform features via TypeScript and Python SDKs ([#3210](https://github.com/langwatch/langwatch/issues/3210)) ([d3148a8](https://github.com/langwatch/langwatch/commit/d3148a8839ecd9c10b725bcb00bc428795d5901d))
+
 ## [0.22.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.21.0...typescript-sdk@v0.22.0) (2026-04-14)
 
 
