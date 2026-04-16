@@ -83,9 +83,9 @@ describe("<OnlineEvaluationDrawer /> preconditions", () => {
 
     // Select trace level
     await waitFor(() => {
-      expect(screen.getByLabelText(/Trace Level/i)).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /Trace Level/i })).toBeInTheDocument();
     });
-    await user.click(screen.getByLabelText(/Trace Level/i));
+    await user.click(screen.getByRole("radio", { name: /Trace Level/i }));
     await vi.advanceTimersByTimeAsync(50);
 
     // Select evaluator via flow callback
