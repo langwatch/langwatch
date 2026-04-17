@@ -63,6 +63,13 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
 
     testApiKey = testProject.apiKey;
     testProjectId = testProject.id;
+
+    await prisma.promptTag.createMany({
+      data: [
+        { id: `ptag_${nanoid()}`, organizationId: testOrganization.id, name: "production" },
+        { id: `ptag_${nanoid()}`, organizationId: testOrganization.id, name: "staging" },
+      ],
+    });
   });
 
   afterEach(async () => {
@@ -71,6 +78,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
     await prisma.llmPromptConfig.deleteMany({ where: { projectId: testProjectId } });
     await prisma.project.delete({ where: { id: testProjectId } });
     await prisma.team.delete({ where: { id: testTeam.id } });
+    await prisma.promptTag.deleteMany({ where: { organizationId: testOrganization.id } });
     await prisma.organization.delete({ where: { id: testOrganization.id } });
   });
 
