@@ -9,6 +9,7 @@ import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOpsPermission } from "~/hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { api } from "~/utils/api";
 import { PageLayout } from "./ui/layouts/PageLayout";
 
 // ── Collapsible nav section ───────────────────────────────────────────────────
@@ -72,6 +73,14 @@ export default function SettingsLayout({
   const { isEnterprise } = useActivePlan();
   const { isLiteMember } = useLiteMemberGuard();
   const { hasAccess: hasOpsAccess } = useOpsPermission();
+  // Backoffice is admin-only. Kept decoupled from `hasOpsAccess` so that if
+  // ops:view ever broadens beyond admin, Backoffice stays strictly admin.
+  // Query only runs when the OPS section would render.
+  const adminStatus = api.user.isAdmin.useQuery(
+    {},
+    { enabled: hasOpsAccess, retry: false, refetchOnWindowFocus: false },
+  );
+  const isAdminUser = adminStatus.data?.isAdmin ?? false;
 
   return (
     <DashboardLayout compactMenu>
@@ -178,7 +187,10 @@ export default function SettingsLayout({
           )}
 
           {hasOpsAccess && (
-            <NavSection label="Ops" paths={["/ops"]}>
+            <NavSection
+              label="Ops"
+              paths={["/ops"]}
+            >
               <MenuLink href="/ops">Dashboard</MenuLink>
               <MenuLink href="/ops/projections" includePath="/ops/projections">
                 Projection Replay
@@ -188,6 +200,41 @@ export default function SettingsLayout({
               </MenuLink>
               <MenuLink href="/ops/dejaview" includePath="/ops/dejaview">
                 Deja View
+              </MenuLink>
+            </NavSection>
+          )}
+
+          {isAdminUser && (
+            <NavSection label="Backoffice" paths={["/ops/backoffice"]}>
+              <MenuLink
+                href="/ops/backoffice/users"
+                includePath="/ops/backoffice/users"
+              >
+                Users
+              </MenuLink>
+              <MenuLink
+                href="/ops/backoffice/organizations"
+                includePath="/ops/backoffice/organizations"
+              >
+                Organizations
+              </MenuLink>
+              <MenuLink
+                href="/ops/backoffice/projects"
+                includePath="/ops/backoffice/projects"
+              >
+                Projects
+              </MenuLink>
+              <MenuLink
+                href="/ops/backoffice/subscriptions"
+                includePath="/ops/backoffice/subscriptions"
+              >
+                Subscriptions
+              </MenuLink>
+              <MenuLink
+                href="/ops/backoffice/organization-features"
+                includePath="/ops/backoffice/organization-features"
+              >
+                Organization Features
               </MenuLink>
             </NavSection>
           )}
