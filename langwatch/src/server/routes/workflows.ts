@@ -27,6 +27,7 @@ import { hasProjectPermission } from "~/server/api/rbac";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
 import { getVercelAIModel } from "~/server/modelProviders/utils";
+import { trackProductAction } from "~/server/telemetry/productAction";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { studioBackendPostEvent } from "~/app/api/workflows/post_event/post-event";
@@ -161,6 +162,28 @@ app.post(
           { error: `Unknown event type on server: ${message.type}` },
           { status: 400 },
         );
+    }
+
+    if (
+      message.type === "execute_component" ||
+      message.type === "execute_flow" ||
+      message.type === "execute_evaluation" ||
+      message.type === "execute_optimization"
+    ) {
+      void trackProductAction({
+        action: "workflow_run",
+        projectId,
+        organizationId: async () => {
+          const t = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { team: { select: { organizationId: true } } },
+          });
+          return t?.team.organizationId;
+        },
+        userId: session.user?.id,
+        surface: "web",
+        route: "/api/workflows/post_event",
+      });
     }
 
     return streamSSE(c, async (stream) => {

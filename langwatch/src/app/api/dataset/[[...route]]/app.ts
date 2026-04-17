@@ -2,6 +2,11 @@ import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
+import { prisma } from "../../../../server/db";
+import {
+  readClientContext,
+  trackProductAction,
+} from "../../../../server/telemetry/productAction";
 import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord.utils";
 import { UploadValidationError } from "../../../../server/datasets/dataset.service";
 import type { DatasetColumns } from "../../../../server/datasets/types";
@@ -163,6 +168,20 @@ export const app = new Hono<{ Variables: Variables }>()
           projectId: project.id,
           name,
           columnTypes,
+        });
+
+        void trackProductAction({
+          action: "dataset_created",
+          projectId: project.id,
+          organizationId: async () => {
+            const t = await prisma.project.findUnique({
+              where: { id: project.id },
+              select: { team: { select: { organizationId: true } } },
+            });
+            return t?.team.organizationId;
+          },
+          route: "/api/dataset",
+          ...readClientContext((name) => c.req.header(name)),
         });
 
         return c.json(

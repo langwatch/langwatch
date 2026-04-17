@@ -12,6 +12,7 @@ import {
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { validatedPreconditionsSchema } from "../../evaluations/preconditionValidation";
 import { enforceLicenseLimit } from "../../license-enforcement";
+import { trackProductAction } from "../../telemetry/productAction";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -193,6 +194,21 @@ export const monitorsRouter = createTRPCRouter({
           level: level ?? "trace",
           threadIdleTimeout,
         },
+      });
+
+      void trackProductAction({
+        action: "monitor_created",
+        projectId,
+        organizationId: async () => {
+          const t = await prisma.project.findUnique({
+            where: { id: projectId },
+            select: { team: { select: { organizationId: true } } },
+          });
+          return t?.team.organizationId;
+        },
+        userId: ctx.session.user.id,
+        surface: "web",
+        route: "monitors.create",
       });
 
       return newCheck;
