@@ -38,13 +38,18 @@ export const PRODUCT_ACTIONS = [
 
 export type ProductAction = (typeof PRODUCT_ACTIONS)[number];
 
+/**
+ * Surface = who the caller is (the client that initiated the action), NOT the
+ * transport protocol. `otel` is intentionally excluded — OTel is a protocol a
+ * caller may use; a Python SDK can send via OTel. If we need to distinguish
+ * ingestion protocols later, add a separate `ingestion_protocol` property.
+ */
 export const SURFACES = [
   "web",
   "sdk-python",
   "sdk-ts",
   "cli",
   "mcp",
-  "otel",
   "unknown",
 ] as const;
 
@@ -104,7 +109,13 @@ async function shouldEmitToday({
 export interface TrackProductActionArgs {
   action: ProductAction;
   projectId: string;
-  organizationId?: string;
+  /**
+   * Either the org id directly (when cheap to obtain at the call site, e.g.
+   * a Hono route that already loaded `project.team.organizationId`) OR a lazy
+   * resolver called only *after* the dedup check passes. The resolver avoids
+   * a DB query on every deduped request.
+   */
+  organizationId?: string | (() => Promise<string | undefined>);
   userId?: string;
   surface: Surface;
   surfaceVersion?: string;
@@ -127,12 +138,19 @@ export async function trackProductAction(
     });
     if (!shouldEmit) return;
 
+    const organizationId =
+      typeof args.organizationId === "function"
+        ? await args.organizationId()
+        : args.organizationId;
+
+    const groups: Record<string, string> = { project: args.projectId };
+    if (organizationId) groups.organization = organizationId;
+
     trackServerEvent({
       event: "product_action",
       userId: args.userId,
       distinctId: args.userId ?? `project:${args.projectId}`,
-      projectId: args.projectId,
-      organizationId: args.organizationId,
+      groups,
       properties: {
         action: args.action,
         surface: args.surface,
@@ -142,9 +160,7 @@ export async function trackProductAction(
         is_ci: args.isCi ?? false,
         ...(args.route ? { route: args.route } : {}),
         project_id: args.projectId,
-        ...(args.organizationId
-          ? { organization_id: args.organizationId }
-          : {}),
+        ...(organizationId ? { organization_id: organizationId } : {}),
       },
     });
   } catch (err) {

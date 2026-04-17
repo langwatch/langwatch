@@ -99,17 +99,19 @@ export const evaluationsRouter = createTRPCRouter({
           projectId: input.projectId,
         });
 
-        const projectTeam = await prisma.project.findUnique({
-          where: { id: input.projectId },
-          select: { team: { select: { organizationId: true } } },
-        });
         void trackProductAction({
           action: "evaluation_run",
           projectId: input.projectId,
-          organizationId: projectTeam?.team.organizationId,
+          organizationId: async () => {
+            const projectTeam = await prisma.project.findUnique({
+              where: { id: input.projectId },
+              select: { team: { select: { organizationId: true } } },
+            });
+            return projectTeam?.team.organizationId;
+          },
           userId: ctx.session.user.id,
           surface: "web",
-          route: "trpc:evaluations.runEvaluation",
+          route: "evaluations.runEvaluation",
         });
       }
 

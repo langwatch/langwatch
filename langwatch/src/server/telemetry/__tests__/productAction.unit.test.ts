@@ -139,13 +139,49 @@ describe("trackProductAction", () => {
           route: "/api/collector",
           project_id: "proj-1",
           organization_id: "org-1",
-          projectId: "proj-1",
         },
         groups: {
           organization: "org-1",
           project: "proj-1",
         },
       });
+      // Must NOT also carry the legacy camelCase projectId — a single event
+      // carrying both shapes would split analytics queries downstream.
+      expect(call.properties.projectId).toBeUndefined();
+    });
+
+    it("resolves organizationId lazily only after dedup passes", async () => {
+      const resolver = vi.fn().mockResolvedValue("org-lazy");
+
+      await trackProductAction({
+        action: "trace_ingested",
+        projectId: "proj-lazy",
+        organizationId: resolver,
+        userId: "user-1",
+        surface: "web",
+      });
+
+      expect(resolver).toHaveBeenCalledTimes(1);
+      expect(mockCapture).toHaveBeenCalledWith(
+        expect.objectContaining({
+          groups: { organization: "org-lazy", project: "proj-lazy" },
+        }),
+      );
+    });
+
+    it("does not call the organizationId resolver when dedup rejects", async () => {
+      mockRedisSet.mockResolvedValueOnce(null);
+      const resolver = vi.fn();
+
+      await trackProductAction({
+        action: "trace_ingested",
+        projectId: "proj-1",
+        organizationId: resolver,
+        surface: "web",
+      });
+
+      expect(resolver).not.toHaveBeenCalled();
+      expect(mockCapture).not.toHaveBeenCalled();
     });
 
     it("uses project:<id> as distinctId when userId is absent", async () => {

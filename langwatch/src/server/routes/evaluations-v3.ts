@@ -147,18 +147,22 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
     );
   }
 
-  const projectTeam = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { team: { select: { organizationId: true } } },
-  });
-  void trackProductAction({
-    action: "evaluation_run",
-    projectId,
-    organizationId: projectTeam?.team.organizationId,
-    userId: session.user?.id,
-    surface: "web",
-    route: "/api/evaluations/v3/execute",
-  });
+  if (session.user?.id) {
+    void trackProductAction({
+      action: "evaluation_run",
+      projectId,
+      organizationId: async () => {
+        const projectTeam = await prisma.project.findUnique({
+          where: { id: projectId },
+          select: { team: { select: { organizationId: true } } },
+        });
+        return projectTeam?.team.organizationId;
+      },
+      userId: session.user.id,
+      surface: "web",
+      route: "/api/evaluations/v3/execute",
+    });
+  }
 
   const dataResult = await loadExecutionData(
     projectId,
