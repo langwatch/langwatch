@@ -288,19 +288,6 @@ export class EEWebhookService implements WebhookService {
       | Stripe.Checkout.Session
       | Stripe.Invoice;
 
-    const customerId =
-      typeof paymentIntent.customer === "string"
-        ? paymentIntent.customer
-        : paymentIntent.customer?.id;
-
-    if (!customerId) {
-      logger.info(
-        { eventType: event.type, eventId: event.id },
-        "[stripeWebhook] Event has no customer id — skipping",
-      );
-      return { status: "ok" };
-    }
-
     const subscriptionId =
       typeof paymentIntent.subscription === "string"
         ? paymentIntent.subscription
@@ -308,29 +295,34 @@ export class EEWebhookService implements WebhookService {
 
     if (!subscriptionId) {
       logger.info(
-        {
-          eventType: event.type,
-          eventId: event.id,
-          customerId: maskCustomerId(customerId),
-        },
+        { eventType: event.type, eventId: event.id },
         "[stripeWebhook] Event has no subscription id — skipping",
       );
       return { status: "ok" };
     }
 
-    const organization =
-      await this.organizationRepository.findByStripeCustomerId(customerId);
+    // Customer/organization lookup is best-effort for analytics only.
+    // Core handlers only need subscriptionId (+ client_reference_id for
+    // checkout) — dropping the work here would ACK the event to Stripe
+    // (no retry) while leaving the DB subscription PENDING.
+    const customerId =
+      typeof paymentIntent.customer === "string"
+        ? paymentIntent.customer
+        : paymentIntent.customer?.id;
 
-    if (!organization) {
-      logger.error(
+    const organization = customerId
+      ? await this.organizationRepository.findByStripeCustomerId(customerId)
+      : null;
+
+    if (customerId && !organization) {
+      logger.warn(
         {
           eventType: event.type,
           eventId: event.id,
           customerId: maskCustomerId(customerId),
         },
-        "[stripeWebhook] No organization found for customer",
+        "[stripeWebhook] No organization found for customer — proceeding without analytics",
       );
-      return { status: "ok" };
     }
 
     switch (event.type) {
@@ -339,7 +331,7 @@ export class EEWebhookService implements WebhookService {
           event: event as Stripe.Event & { type: "checkout.session.completed" },
           subscriptionId,
           customerId,
-          organizationId: organization.id,
+          organizationId: organization?.id ?? null,
         });
         return { status: "ok" };
 
@@ -361,8 +353,8 @@ export class EEWebhookService implements WebhookService {
   }: {
     event: Stripe.Event & { type: "checkout.session.completed" };
     subscriptionId: string;
-    customerId: string;
-    organizationId: string;
+    customerId?: string;
+    organizationId: string | null;
   }): Promise<void> {
     const checkoutSession = event.data.object as Stripe.Checkout.Session;
     const selectedCurrencyRaw = checkoutSession.metadata?.selectedCurrency;
@@ -382,18 +374,20 @@ export class EEWebhookService implements WebhookService {
       logger.error(
         {
           eventId: event.id,
-          customerId: maskCustomerId(customerId),
+          customerId: customerId ? maskCustomerId(customerId) : null,
         },
         "[stripeWebhook] No client_reference_id in checkout session",
       );
       return;
     }
 
-    this.emitCheckoutAnalytics({
-      checkoutSession,
-      subscriptionId,
-      organizationId,
-    });
+    if (organizationId) {
+      this.emitCheckoutAnalytics({
+        checkoutSession,
+        subscriptionId,
+        organizationId,
+      });
+    }
   }
 
   private emitCheckoutAnalytics({
