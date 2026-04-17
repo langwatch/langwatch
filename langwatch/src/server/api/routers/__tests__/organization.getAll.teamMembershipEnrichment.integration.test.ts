@@ -176,28 +176,6 @@ describe("organization.getAll — team membership enrichment via RoleBinding", (
           (m) => m.userId === memberUserId,
         );
 
-        // Diagnostic output on failure: dump the actual shape
-        if (!memberEntry) {
-          // eslint-disable-next-line no-console
-          console.error(
-            "ACTUAL team.members shape:",
-            JSON.stringify(teamInResponse?.members, null, 2),
-          );
-          // eslint-disable-next-line no-console
-          console.error(
-            "ACTUAL teams shape:",
-            JSON.stringify(
-              org?.teams.map((t) => ({
-                id: t.id,
-                memberCount: t.members.length,
-                members: t.members,
-              })),
-              null,
-              2,
-            ),
-          );
-        }
-
         expect(memberEntry).toBeDefined();
         expect(memberEntry?.userId).toBe(memberUserId);
         expect(memberEntry?.role).toBe(TeamUserRole.MEMBER);
