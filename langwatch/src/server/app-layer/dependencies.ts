@@ -19,6 +19,8 @@ import type { TraceRequestCollectionService } from "./traces/trace-request-colle
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { PlanProvider } from "./subscription/plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
+import type { WebhookService } from "../../../ee/billing/services/webhookService";
+import type Stripe from "stripe";
 import type { NotificationService } from "../../../ee/billing/notifications/notification.service";
 import type { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import type { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
@@ -70,6 +72,11 @@ export interface AppDependencies {
   usage: UsageService;
   planProvider: PlanProvider;
   subscription?: SubscriptionService;
+  /** Only present in SaaS — dispatches Stripe webhook events. */
+  webhookService?: WebhookService;
+  /** Only present in SaaS — Stripe client used by the webhook transport to
+   *  verify signatures before handing events to the service. */
+  stripeClient?: Stripe;
   notifications: NotificationService;
   nurturing?: NurturingService;
   usageLimits: UsageLimitService;
