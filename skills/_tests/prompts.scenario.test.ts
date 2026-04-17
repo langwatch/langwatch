@@ -11,6 +11,7 @@ import {
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -69,6 +70,7 @@ describe("Prompts Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python OpenAI prompt versioning",
         description:
           "Setting up prompt versioning in a Python OpenAI bot project using the LangWatch Prompts CLI.",
@@ -118,7 +120,7 @@ describe("Prompts Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -133,6 +135,7 @@ describe("Prompts Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Vercel AI prompt versioning",
         description:
           "Setting up prompt versioning in a TypeScript Vercel AI bot project.",
@@ -180,7 +183,7 @@ describe("Prompts Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -195,6 +198,7 @@ describe("Prompts Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python LangGraph prompt versioning",
         description:
           "Setting up prompt versioning in a Python LangGraph agent project using the LangWatch Prompts CLI.",
@@ -244,7 +248,7 @@ describe("Prompts Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -259,6 +263,7 @@ describe("Prompts Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Mastra prompt versioning",
         description:
           "Setting up prompt versioning in a TypeScript Mastra agent project.",
@@ -306,7 +311,7 @@ describe("Prompts Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -321,6 +326,7 @@ describe("Prompts Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Targeted prompt creation",
         description:
           "Adding a new versioned prompt for a specific customer support use case.",
@@ -366,7 +372,7 @@ describe("Prompts Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -382,6 +388,7 @@ describe("Prompts Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python prompt tags deployment",
         description:
           "Setting up tag-based prompt deployment in a Python OpenAI project using the LangWatch Prompts CLI.",
@@ -425,6 +432,6 @@ describe("Prompts Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 });

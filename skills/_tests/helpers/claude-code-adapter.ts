@@ -13,6 +13,13 @@ import chalk from "chalk";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+/**
+ * Scenario set ID for all skill scenario tests. Keeps these runs grouped together
+ * in the LangWatch UI and separate from the `default` set, where scenarios that
+ * the skills themselves create at runtime end up.
+ */
+export const SKILL_TESTS_SET_ID = "skill-tests";
+
 const cliDistPath = path.resolve(
   __dirname,
   "../../../typescript-sdk/dist/cli/index.js"

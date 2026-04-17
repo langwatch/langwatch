@@ -28,6 +28,7 @@ Use evaluations when you have many examples with clear correct answers, or for C
 
 If the user's request is **general** ("set up evaluations"):
 - Read the codebase to understand the agent
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Set up an experiment + evaluator + dataset
 - After the experiment is working, summarize results and suggest improvements (consultant mode — see end of skill).
 

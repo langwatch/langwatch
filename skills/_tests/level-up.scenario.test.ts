@@ -11,6 +11,7 @@ import {
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -50,6 +51,7 @@ describe("Level-up Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python OpenAI level-up",
         description:
           "Taking a Python OpenAI bot to the next level with full LangWatch integration.",
@@ -101,6 +103,7 @@ describe("Level-up Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Vercel AI level-up",
         description:
           "Taking a TypeScript Vercel AI bot to the next level with full LangWatch integration.",
@@ -150,6 +153,7 @@ describe("Level-up Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python LangGraph level-up",
         description:
           "Taking a Python LangGraph agent to the next level with full LangWatch integration.",
@@ -198,6 +202,7 @@ describe("Level-up Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Mastra level-up",
         description:
           "Taking a TypeScript Mastra agent to the next level with full LangWatch integration.",

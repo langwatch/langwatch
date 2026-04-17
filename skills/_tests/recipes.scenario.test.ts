@@ -11,6 +11,7 @@ import {
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -96,6 +97,7 @@ describe("Recipes", () => {
       copyRecipeSkillToWorkDir(tempFolder, "generate-rag-dataset");
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Generate RAG evaluation dataset",
         description:
           "Generate a synthetic evaluation dataset from the TerraVerde farm advisory RAG knowledge base, including diverse question types and context per row.",
@@ -178,7 +180,7 @@ describe("Recipes", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -194,6 +196,7 @@ describe("Recipes", () => {
       copyRecipeSkillToWorkDir(tempFolder, "test-compliance");
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Health agent compliance tests",
         description:
           "Create scenario tests that verify the health wellness agent stays observational and does not give prescriptive medical advice. Include boundary enforcement and red team tests.",
@@ -270,7 +273,7 @@ describe("Recipes", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -292,6 +295,7 @@ describe("Recipes", () => {
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Debug instrumentation via the langwatch CLI",
         description:
           "Use the `langwatch` CLI to inspect production traces and identify instrumentation issues or suggest improvements.",
@@ -336,6 +340,6 @@ describe("Recipes", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 });

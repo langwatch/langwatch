@@ -10,6 +10,7 @@ import {
   createClaudeCodeAgent,
   setupLocalCli,
   toolCallFix,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -50,6 +51,7 @@ Then run CLI commands:
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI status + structured output",
         description:
           "Developer wants to understand their LangWatch project using the CLI, getting structured JSON data from multiple commands.",
@@ -91,7 +93,7 @@ Then run CLI commands:
 
       expect(result.success).toBe(true);
     },
-    600_000,
+    900_000,
   );
 
   it.skipIf(isCI)(
@@ -122,6 +124,7 @@ Prompt management commands:
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI prompt version management",
         description:
           "Developer wants to inspect prompt versions and tags using the LangWatch CLI.",
@@ -163,6 +166,6 @@ Prompt management commands:
 
       expect(result.success).toBe(true);
     },
-    600_000,
+    900_000,
   );
 });

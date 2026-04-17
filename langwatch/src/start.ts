@@ -97,7 +97,9 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   const server = createServer(async (req, res) => {
     try {
-      const pathname = (req.url ?? "/").split("?")[0] ?? "/";
+      // Collapse runs of slashes so paths like `//authorize` resolve to `/authorize`
+      // instead of failing the absolute-path guard on the SPA fallback below.
+      const pathname = ((req.url ?? "/").split("?")[0] ?? "/").replace(/\/{2,}/g, "/");
 
       // Apply security headers to all responses
       for (const [key, value] of Object.entries(securityHeaders)) {

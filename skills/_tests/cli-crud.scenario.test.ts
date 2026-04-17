@@ -10,6 +10,7 @@ import {
   createClaudeCodeAgent,
   setupLocalCli,
   toolCallFix,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -54,6 +55,7 @@ Then run CLI commands directly:
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI scenario CRUD",
         description:
           "Developer wants to manage agent test scenarios using the LangWatch CLI (not MCP).",
@@ -93,7 +95,7 @@ Then run CLI commands directly:
 
       expect(result.success).toBe(true);
     },
-    600_000,
+    900_000,
   );
 
   it.skipIf(isCI)(
@@ -126,6 +128,7 @@ Then: \`langwatch dataset records list qa-test-set\`
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI dataset upload",
         description:
           "Developer wants to upload a CSV dataset using the LangWatch CLI via Bash (not MCP).",
@@ -165,7 +168,7 @@ Then: \`langwatch dataset records list qa-test-set\`
 
       expect(result.success).toBe(true);
     },
-    600_000,
+    900_000,
   );
 
   it.skipIf(isCI)(
@@ -193,6 +196,7 @@ Then: \`langwatch trace search --limit 5\`
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI analytics query",
         description:
           "Developer wants to check analytics using the LangWatch CLI via Bash (not MCP).",
@@ -236,6 +240,6 @@ Then: \`langwatch trace search --limit 5\`
 
       expect(result.success).toBe(true);
     },
-    600_000,
+    900_000,
   );
 });

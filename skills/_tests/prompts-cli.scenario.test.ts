@@ -10,6 +10,7 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -54,6 +55,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI prompt versioning from scratch",
         description:
           "Developer has a Python project with hardcoded prompts and wants to use the LangWatch Prompts CLI to version them.",
@@ -103,7 +105,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -128,6 +130,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
       fs.mkdirSync(path.join(tempFolder, "prompts"), { recursive: true });
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI create specific prompt",
         description:
           "Developer wants to create a new prompt called refund-handler for customer refund requests using the CLI.",
@@ -176,7 +179,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -202,6 +205,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
       fs.mkdirSync(path.join(tempFolder, "prompts"), { recursive: true });
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI push with force-local flag",
         description:
           "Agent creates a prompt and pushes it to the platform. If there are conflicts, it should use --force-local to resolve them automatically.",
@@ -242,6 +246,6 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 });

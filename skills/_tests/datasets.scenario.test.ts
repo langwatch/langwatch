@@ -12,6 +12,7 @@ import {
   toolCallFix,
   assertSkillWasRead,
   setupLocalCli,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -94,6 +95,7 @@ describe("Dataset Generation Skill", () => {
       fs.writeFileSync(path.join(tempFolder, ".env"), envLines.join("\n") + "\n");
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Dataset generation for tweet-bot",
         description:
           "Generate a realistic evaluation dataset for a Python OpenAI chatbot that replies with tweet-like responses and emojis. The skill should explore the codebase first, propose a plan, show a preview, and generate a CSV.",
@@ -194,6 +196,7 @@ describe("Dataset Generation Skill", () => {
       fs.writeFileSync(path.join(tempFolder, ".env"), envLines2.join("\n") + "\n");
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "RAG dataset generation for farm advisory",
         description:
           "Generate a RAG evaluation dataset for a farm advisory bot with a knowledge base about irrigation, frost protection, and pest management.",
@@ -291,6 +294,7 @@ describe("Dataset Generation Skill", () => {
       fs.writeFileSync(path.join(tempFolder, ".env"), envLines2.join("\n") + "\n");
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Multi-turn dataset generation flow",
         description:
           "Test that the agent follows the plan-preview-generate flow and asks for confirmation at each step.",
@@ -359,6 +363,7 @@ describe("Dataset Generation Skill", () => {
       fs.writeFileSync(path.join(tempFolder, ".env"), envLines2.join("\n") + "\n");
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Hallucination-focused dataset for RAG agent",
         description:
           "User specifically asks for a dataset to test hallucination in their RAG agent. " +
@@ -451,6 +456,7 @@ describe("Dataset Generation Skill", () => {
       fs.writeFileSync(path.join(tempFolder, ".env"), envLines2.join("\n") + "\n");
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Dataset generation with user-provided domain context",
         description:
           "The codebase is a generic 'helpful assistant' with no domain signal. " +

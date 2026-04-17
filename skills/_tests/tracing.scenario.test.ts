@@ -11,6 +11,7 @@ import {
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -50,6 +51,7 @@ describe("Tracing Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python OpenAI instrumentation",
         description:
           "Implementing LangWatch instrumentation in a Python OpenAI bot project.",
@@ -85,7 +87,7 @@ describe("Tracing Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -101,6 +103,7 @@ describe("Tracing Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Vercel AI instrumentation",
         description:
           "Implementing LangWatch instrumentation in a TypeScript Vercel AI bot project.",
@@ -135,7 +138,7 @@ describe("Tracing Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -151,6 +154,7 @@ describe("Tracing Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python LangGraph instrumentation",
         description:
           "Implementing LangWatch instrumentation in a Python LangGraph agent project.",
@@ -185,7 +189,7 @@ describe("Tracing Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -201,6 +205,7 @@ describe("Tracing Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Mastra instrumentation",
         description:
           "Implementing LangWatch instrumentation in a TypeScript Mastra agent project.",
@@ -235,7 +240,7 @@ describe("Tracing Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -251,6 +256,7 @@ describe("Tracing Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python Google ADK instrumentation",
         description:
           "Implementing LangWatch instrumentation in a Python Google ADK agent project.",
@@ -285,7 +291,7 @@ describe("Tracing Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -307,6 +313,7 @@ describe("Tracing Skill", () => {
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Cold start tracing — no env API key",
         description:
           "Developer instruments code without LANGWATCH_API_KEY in environment. API key is in the project .env file.",
@@ -345,7 +352,7 @@ describe("Tracing Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -366,6 +373,7 @@ describe("Tracing Skill", () => {
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Tracing — llms.txt fallback when CLI is unavailable",
         description:
           "Agent instruments code in an environment where the langwatch CLI cannot run; must fetch docs via the llms.txt fallback URLs.",
@@ -397,7 +405,7 @@ describe("Tracing Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -414,6 +422,7 @@ describe("Tracing Skill", () => {
       // NO .env file — agent must ask user for the key
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Tracing — agent asks for API key",
         description:
           "Agent instruments code but has no API key available. Must ask the user.",

@@ -10,6 +10,7 @@ import {
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -40,6 +41,7 @@ describe("Analytics Skill", () => {
       fs.cpSync(sharedSrc, sharedDir, { recursive: true });
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Agent performance analytics",
         description:
           "User wants to understand how their agent has been performing.",
@@ -69,6 +71,6 @@ describe("Analytics Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 });

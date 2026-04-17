@@ -12,7 +12,7 @@ compatibility: Works with Claude Code and similar coding agents. The `langwatch`
 
 If the user's request is **general** ("instrument my code", "add tracing", "set up observability"):
 - Read the full codebase to understand the agent's architecture
-- Study git history for context on prior changes
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Add comprehensive tracing across all LLM call sites
 
 If the user's request is **specific** ("add tracing to the payment function", "trace this endpoint"):

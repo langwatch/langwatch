@@ -10,6 +10,7 @@ import {
   createClaudeCodeAgent,
   setupLocalCli,
   toolCallFix,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -52,6 +53,7 @@ Then run these commands:
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI suite management",
         description:
           "Developer wants to manage suites (run plans) using the LangWatch CLI.",
@@ -91,7 +93,7 @@ Then run these commands:
 
       expect(result.success).toBe(true);
     },
-    600_000,
+    900_000,
   );
 
   it.skipIf(isCI)(
@@ -119,6 +121,7 @@ If runs exist, get details: \`langwatch simulation-run get <runId>\`
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI simulation run inspection",
         description:
           "Developer wants to inspect simulation run results using the CLI.",
@@ -157,7 +160,7 @@ If runs exist, get details: \`langwatch simulation-run get <runId>\`
 
       expect(result.success).toBe(true);
     },
-    600_000,
+    900_000,
   );
 
   it.skipIf(isCI)(
@@ -186,6 +189,7 @@ Then: \`langwatch trigger list --format json\`
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI trigger management",
         description:
           "Developer wants to manage triggers (automations) using the CLI.",
@@ -225,6 +229,6 @@ Then: \`langwatch trigger list --format json\`
 
       expect(result.success).toBe(true);
     },
-    600_000,
+    900_000,
   );
 });

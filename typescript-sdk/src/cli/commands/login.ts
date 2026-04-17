@@ -3,12 +3,8 @@ import * as path from "path";
 import chalk from "chalk";
 import ora from "ora";
 import prompts from "prompts";
-import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
-
-const getEndpoint = (): string => {
-  return process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
-};
+import { getEndpoint } from "@/cli/utils/endpoint";
 
 const updateEnvFile = (
   apiKey: string,

@@ -222,11 +222,15 @@ function compile(options: CompileOptions): string {
     ? `${userPrompt}\n\nYou are using LangWatch for your AI agent project. Follow these instructions.`
     : `You are using LangWatch for your AI agent project. Follow these instructions.`;
 
-  const apiKeyNote = mode === "platform"
-    ? ``
-    : `\n\nIMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.`;
+  // Both notes live as `_shared/*.md` partials so non-engineers can edit them
+  // without touching this script. They're injected in both docs and platform
+  // modes — even when the platform pre-populates a key, an agent that falls
+  // back to the CLI still needs to know LANGWATCH_API_KEY conventions.
+  const readSharedNote = (filename: string): string =>
+    fs.readFileSync(path.join(skillsRoot, "_shared", filename), "utf8").trim();
 
-  const cliNote = `\nUse the \`langwatch\` CLI for everything: documentation (\`langwatch docs ...\`, \`langwatch scenario-docs ...\`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with \`npm install -g langwatch\` (or run any command via \`npx langwatch\`).\n`;
+  const apiKeyNote = `\n\n${readSharedNote("api-key-setup.md")}`;
+  const cliNote = `\n${readSharedNote("cli-install.md")}\n`;
 
   return `${header}${apiKeyNote}${cliNote}\n${combined}`;
 }

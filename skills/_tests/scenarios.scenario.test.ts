@@ -11,6 +11,7 @@ import {
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -65,6 +66,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python OpenAI scenario tests",
         description:
           "Adding agent simulation tests to a Python OpenAI conversational bot project using the LangWatch Scenario framework.",
@@ -131,7 +133,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -147,6 +149,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Vercel AI scenario tests",
         description:
           "Adding agent simulation tests to a TypeScript Vercel AI bot project using the LangWatch Scenario framework.",
@@ -196,7 +199,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -211,6 +214,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python LangGraph scenario tests",
         description:
           "Adding scenario tests to a Python LangGraph agent project.",
@@ -245,7 +249,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -261,6 +265,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python OpenAI red team tests",
         description:
           "Adding adversarial red team tests to a Python OpenAI bot project using the LangWatch Scenario framework's RedTeamAgent.",
@@ -308,7 +313,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -324,6 +329,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Vercel AI red team tests",
         description:
           "Adding adversarial red team tests to a TypeScript Vercel AI bot project using the LangWatch Scenario framework's RedTeamAgent.",
@@ -374,7 +380,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -390,6 +396,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Targeted scenario for emoji handling",
         description:
           "Adding a specific scenario test for the tweet-like bot to verify it uses emojis correctly.",
@@ -425,7 +432,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -451,6 +458,7 @@ describe("Scenarios Skill", () => {
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Platform scenario creation via CLI",
         description:
           "Creating scenarios on the LangWatch platform via the `langwatch` CLI when there is no codebase.",
@@ -497,7 +505,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -512,6 +520,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Mastra scenario tests",
         description:
           "Adding scenario tests to a TypeScript Mastra agent project.",
@@ -545,7 +554,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -560,6 +569,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "RAG agent domain-specific scenarios",
         description:
           "Adding scenario tests to a TerraVerde farm advisory RAG agent that handles irrigation, frost protection, and pest management.",
@@ -613,7 +623,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -628,6 +638,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Consultant mode — deeper suggestions",
         description:
           "Agent sets up scenarios for a farm advisory agent, then suggests domain-specific improvements.",

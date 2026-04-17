@@ -125,7 +125,7 @@ program
 // Top-level commands
 program
   .command("login")
-  .description("Login to LangWatch and save API key")
+  .description("Login to LangWatch and save API key. Get a key from https://app.langwatch.ai/authorize (or ${LANGWATCH_ENDPOINT}/authorize for self-hosted).")
   .option("--api-key <key>", "Set API key non-interactively (for CI/CD and agents)")
   .action(async (options: { apiKey?: string }) => {
     try {
@@ -1162,9 +1162,11 @@ simulationRunCmd
   .description("List simulation runs (optionally filter by scenario set or batch)")
   .option("--scenario-set-id <id>", "Filter by scenario set ID")
   .option("--batch-run-id <id>", "Filter by batch run ID (requires --scenario-set-id)")
+  .option("--status <status>", "Filter by status (e.g. SUCCESS, FAILED, ERROR, IN_PROGRESS)")
+  .option("--name <substring>", "Filter by run name substring (case-insensitive)")
   .option("--limit <n>", "Max results (default: 20)")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
-  .action(async (options: { scenarioSetId?: string; batchRunId?: string; limit?: string; format?: string }) => {
+  .action(async (options: { scenarioSetId?: string; batchRunId?: string; status?: string; name?: string; limit?: string; format?: string }) => {
     const { listSimulationRunsCommand: impl } = await import("./commands/simulation-runs/list.js");
     await impl(options);
   });
@@ -1172,8 +1174,9 @@ simulationRunCmd
 simulationRunCmd
   .command("get <runId>")
   .description("Get full details of a simulation run (messages, results, costs)")
+  .option("--full", "Show full message content instead of truncating long lines")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
-  .action(async (runId: string, options: { format?: string }) => {
+  .action(async (runId: string, options: { format?: string; full?: boolean }) => {
     const { getSimulationRunCommand: impl } = await import("./commands/simulation-runs/get.js");
     await impl(runId, options);
   });

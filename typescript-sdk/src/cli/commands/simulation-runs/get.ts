@@ -4,9 +4,51 @@ import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 
+/**
+ * Flattens Anthropic-style content (string OR array of {type:text|tool_use|tool_result|thinking})
+ * into a readable single-line string. Thinking blocks are dropped; tool_use shows the tool name;
+ * tool_result inlines the result text. Falls back to JSON.stringify for unknown shapes.
+ */
+function renderContent(raw: unknown): string {
+  if (typeof raw === "string") {
+    // Try one round of JSON parse so single Anthropic blocks (`{"type":"thinking",...}`)
+    // and array-stringified content render as readable text instead of raw JSON.
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        return renderContent(JSON.parse(trimmed));
+      } catch {
+        return raw;
+      }
+    }
+    return raw;
+  }
+  if (Array.isArray(raw)) {
+    return raw.map(renderContent).filter(Boolean).join("\n");
+  }
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    switch (obj.type) {
+      case "thinking":
+        return ""; // drop reasoning blobs
+      case "text":
+        return String(obj.text ?? "");
+      case "tool_use":
+        return chalk.yellow(`[tool ${String(obj.name ?? "?")}]`);
+      case "tool_result": {
+        const inner = renderContent(obj.content);
+        return inner ? chalk.gray(`[result] `) + inner : "";
+      }
+      default:
+        try { return JSON.stringify(obj); } catch { return String(obj); }
+    }
+  }
+  return String(raw ?? "");
+}
+
 export const getSimulationRunCommand = async (
   runId: string,
-  options?: { format?: string },
+  options?: { format?: string; full?: boolean },
 ): Promise<void> => {
   checkApiKey();
 
@@ -100,13 +142,16 @@ export const getSimulationRunCommand = async (
     if (run.messages && run.messages.length > 0) {
       console.log();
       console.log(chalk.bold("  Conversation:"));
+      const truncate = !options?.full;
       for (const msg of run.messages) {
         const roleColor = msg.role === "user" ? chalk.blue
           : msg.role === "assistant" ? chalk.green
           : chalk.gray;
-        const content = msg.content.length > 200
-          ? msg.content.slice(0, 200) + "..."
-          : msg.content;
+        let content = renderContent(msg.content);
+        if (!content) continue;
+        if (truncate && content.length > 400) {
+          content = content.slice(0, 400) + chalk.gray("… (--full to see all)");
+        }
         console.log(`    ${roleColor(`[${msg.role}]`)} ${content}`);
       }
     }
