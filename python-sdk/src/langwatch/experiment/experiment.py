@@ -1,7 +1,7 @@
 from __future__ import annotations
 import asyncio
 from contextlib import contextmanager
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from dataclasses import dataclass
 import json
 import threading
@@ -62,6 +62,7 @@ class IterationContext:
 
     index: int
     item: Any
+    started_at: float = 0.0
 
 
 # ContextVar for target context isolation (works across threads)
@@ -73,6 +74,28 @@ _target_context: ContextVar[Optional[TargetContext]] = ContextVar(
 _iteration_context: ContextVar[Optional[IterationContext]] = ContextVar(
     "_iteration_context", default=None
 )
+
+# Active iteration trace, per iteration context. Stored in a ContextVar
+# (rather than on the Experiment instance) so concurrent async tasks don't
+# step on each other — otherwise task A's log_response / target() call would
+# close task B's iteration trace, leaving OTel context tokens dangling and
+# raising "Failed to detach context: Token was created in a different
+# Context" during async-gen cleanup.
+_active_iteration_trace_ctx: ContextVar[Optional[Any]] = ContextVar(
+    "_active_iteration_trace_ctx", default=None
+)
+
+
+def _scalar_or_json_entry(item: Any) -> Dict[str, Any]:
+    """Shape a loop item as a dataset ``entry`` payload.
+
+    Plain scalars (str/int/float/bool) are stored unwrapped — `"New York"`
+    comes back as `"New York"`, not the doubly-quoted `'"New York"'`.
+    Everything else is JSON-stringified with the fallback encoder.
+    """
+    if isinstance(item, (str, int, float, bool)) or item is None:
+        return {"entry": item}
+    return {"entry": json.dumps(item, cls=SerializableWithStringFallback)}
 
 ItemT = TypeVar("ItemT")
 
@@ -173,8 +196,10 @@ class Experiment:
         # Once set to True, we stop creating iteration-level traces
         self._evaluation_uses_targets: bool = False
 
-        # Store the active iteration trace so target() can close it early
-        self._active_iteration_trace: Optional[LangWatchTrace] = None
+        # Active iteration trace is stored in `_active_iteration_trace_ctx`
+        # (a module-level ContextVar) so concurrent asyncio tasks each see
+        # their OWN iteration trace — not a shared last-writer-wins field on
+        # the Experiment instance.
 
         self._finished: bool = False
         self._run_url: Optional[str] = None
@@ -626,9 +651,12 @@ class Experiment:
         # Reset with_target tracking for this iteration
         self._current_iteration_used_with_target = False
 
-        # Set iteration context (thread-safe via contextvars)
-        # This allows target() to access index/item without race conditions
-        iter_ctx = IterationContext(index=index, item=item)
+        # Set iteration context (thread-safe via contextvars).
+        # `started_at` lets implicit-target paths (log_response) compute a
+        # real duration instead of reporting 0.
+        iter_ctx = IterationContext(
+            index=index, item=item, started_at=time.time()
+        )
         iter_token = _iteration_context.set(iter_ctx)
 
         # Reset target context at the start of each iteration to prevent pollution
@@ -647,6 +675,7 @@ class Experiment:
         )
 
         iteration: Optional[IterationInfo] = None
+        _active_trace_token: Optional[Token[Optional[Any]]] = None
         if should_create_iteration_trace:
             iteration = IterationInfo(
                 trace=langwatch.trace(
@@ -666,8 +695,11 @@ class Experiment:
                 iteration["trace"].root_span.set_attributes(
                     {"langwatch.origin": "evaluation"}
                 )
-            # Store for target() to potentially close early
-            self._active_iteration_trace = iteration["trace"]
+            # Store for target() to potentially close early — in the current
+            # (per-task) contextvar copy so sibling tasks don't see it.
+            _active_trace_token = _active_iteration_trace_ctx.set(
+                iteration["trace"]
+            )
 
         start_time = time.time()
         try:
@@ -705,10 +737,18 @@ class Experiment:
             except Exception as e:
                 raise e
             finally:
-                iteration["trace"].__exit__(None, None, None)
+                # Only exit the trace if target()/log_response() didn't close
+                # it early (which resets the contextvar to None as its
+                # signal). If still active, close it here.
+                if _active_iteration_trace_ctx.get() is iteration["trace"]:
+                    iteration["trace"].__exit__(None, None, None)
 
-        # Clear active iteration trace reference
-        self._active_iteration_trace = None
+        # Clear active iteration trace reference for this task's context.
+        if _active_trace_token is not None:
+            try:
+                _active_iteration_trace_ctx.reset(_active_trace_token)
+            except (LookupError, ValueError):
+                pass
 
     def _add_to_batch(self, iteration: IterationInfo):
         entry: Any = (
@@ -725,11 +765,7 @@ class Experiment:
                         iteration["item"][1].__dict__
                         if type(iteration["item"]) == tuple
                         and hasattr(iteration["item"][1], "__dict__")
-                        else {
-                            "entry": json.dumps(
-                                iteration["item"], cls=SerializableWithStringFallback
-                            )
-                        }
+                        else _scalar_or_json_entry(iteration["item"])
                     )
                 )
             )
@@ -930,10 +966,12 @@ class Experiment:
         # - Close the active iteration trace if any (it won't have useful content)
         if not self._evaluation_uses_targets:
             self._evaluation_uses_targets = True
-            # Close the active iteration trace early
-            if self._active_iteration_trace is not None:
-                self._active_iteration_trace.__exit__(None, None, None)
-                self._active_iteration_trace = None
+        # Close the active iteration trace early — per-task via contextvar so
+        # we only touch the trace belonging to the task calling target().
+        active_trace = _active_iteration_trace_ctx.get()
+        if active_trace is not None:
+            active_trace.__exit__(None, None, None)
+            _active_iteration_trace_ctx.set(None)
 
         # Mark that target() was used in this iteration (for dataset entry logic)
         self._current_iteration_used_with_target = True
@@ -1022,11 +1060,7 @@ class Experiment:
                             current_item[1].__dict__
                             if type(current_item) == tuple
                             and hasattr(current_item[1], "__dict__")
-                            else {
-                                "entry": json.dumps(
-                                    current_item, cls=SerializableWithStringFallback
-                                )
-                            }
+                            else _scalar_or_json_entry(current_item)
                         )
                     )
                 )
@@ -1113,10 +1147,12 @@ class Experiment:
         # Mark that targets are being used
         if not self._evaluation_uses_targets:
             self._evaluation_uses_targets = True
-            # Close the active iteration trace if any
-            if self._active_iteration_trace is not None:
-                self._active_iteration_trace.__exit__(None, None, None)
-                self._active_iteration_trace = None
+        # Close the active iteration trace if any — per-task via contextvar
+        # so we don't accidentally close a sibling task's iteration trace.
+        active_trace = _active_iteration_trace_ctx.get()
+        if active_trace is not None:
+            active_trace.__exit__(None, None, None)
+            _active_iteration_trace_ctx.set(None)
 
         self._current_iteration_used_with_target = True
 
@@ -1128,9 +1164,11 @@ class Experiment:
         if iter_ctx is not None:
             index = iter_ctx.index
             current_item = iter_ctx.item
+            iter_started_at = iter_ctx.started_at
         else:
             index = self._current_index
             current_item = self._current_item
+            iter_started_at = 0.0
 
         # Create a trace for this implicit target
         tracer = trace.get_tracer("langwatch")
@@ -1174,20 +1212,24 @@ class Experiment:
                         current_item[1].__dict__
                         if type(current_item) == tuple
                         and hasattr(current_item[1], "__dict__")
-                        else {
-                            "entry": json.dumps(
-                                current_item, cls=SerializableWithStringFallback
-                            )
-                        }
+                        else _scalar_or_json_entry(current_item)
                     )
                 )
             )
         )
 
+        # Duration from iteration start (set in _execute_item_iteration) to
+        # this log_response() call. Falls back to 0 if we somehow have no
+        # iteration context (shouldn't happen in normal flow).
+        duration_ms = (
+            int((time.time() - iter_started_at) * 1000)
+            if iter_started_at
+            else 0
+        )
         batch_entry = BatchEntry(
             index=index,
             entry=entry_data,
-            duration=0,  # Duration not tracked for implicit targets
+            duration=duration_ms,
             error=None,
             trace_id=trace_id,
             target_id=target_name,

@@ -261,7 +261,7 @@ class TestAsyncLoopWithGoogleAdk:
 
         from uuid import uuid4
 
-        model = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+        model = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
         agent = Agent(
             name="weather_agent",
             model=model,
@@ -282,6 +282,11 @@ class TestAsyncLoopWithGoogleAdk:
             await runner.session_service.create_session(
                 app_name="e2e-async-adk", user_id="user", session_id=session_id
             )
+            # Drain the event stream fully — early-returning inside this
+            # async for leaves the generator for the event loop to GC in a
+            # different context, which trips ADK's OTel wrapper
+            # (`context.detach: Token was created in a different Context`).
+            response = ""
             async for event in runner.run_async(
                 user_id="user",
                 session_id=session_id,
@@ -290,14 +295,16 @@ class TestAsyncLoopWithGoogleAdk:
                     parts=[types.Part(text=f"What is the weather in {city}?")],
                 ),
             ):
-                if event.is_final_response():
-                    # is_final_response() can fire with content=None for
-                    # state-delta events — guard before indexing parts[0].
-                    content = getattr(event, "content", None)
-                    parts = getattr(content, "parts", None) or []
-                    text = getattr(parts[0], "text", None) if parts else None
-                    return text.strip() if text else ""
-            return ""
+                if not event.is_final_response():
+                    continue
+                # is_final_response() can fire with content=None for
+                # state-delta events — guard before indexing parts[0].
+                content = getattr(event, "content", None)
+                parts = getattr(content, "parts", None) or []
+                text = getattr(parts[0], "text", None) if parts else None
+                if text:
+                    response = text.strip()
+            return response
 
         idx = 0
         async for city in experiment.aloop(cities, concurrency=3):
