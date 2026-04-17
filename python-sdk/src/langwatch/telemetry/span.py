@@ -434,6 +434,19 @@ class LangWatchSpan:
             attributes[AttributeKey.LangWatchMetrics] = json.dumps(
                 self.metrics, cls=SerializableWithStringFallback
             )
+            # Also emit the OTel semantic-convention attributes so token counts
+            # survive any path that parses OTLP directly (e.g. the cost-fold
+            # pipeline). Keep the JSON `langwatch.metrics` blob for the fields
+            # the semconv doesn't cover (reasoning/cache tokens, explicit cost).
+            _merged = self.metrics
+            if isinstance(_merged.get("prompt_tokens"), (int, float)):
+                attributes["gen_ai.usage.prompt_tokens"] = int(
+                    _merged["prompt_tokens"]
+                )
+            if isinstance(_merged.get("completion_tokens"), (int, float)):
+                attributes["gen_ai.usage.completion_tokens"] = int(
+                    _merged["completion_tokens"]
+                )
 
         self.set_attributes(attributes)
 

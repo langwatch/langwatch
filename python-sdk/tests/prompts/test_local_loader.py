@@ -305,27 +305,29 @@ def test_load_prompt_warns_when_prompt_file_missing():
             assert "langwatch prompt pull" in str(w[0].message)
 
 
-def test_load_prompt_warns_once_when_no_base_path_and_no_prompts_json():
+def test_load_prompt_warns_once_when_no_base_path_and_no_prompts_json(monkeypatch):
     """
     GIVEN no base_path is configured (using cwd) and prompts.json doesn't exist
     WHEN LocalPromptLoader.load_prompt() is called multiple times
     THEN it warns once about configuring prompts_path via langwatch.setup()
     """
-    import os
-
     # Reset the warning flag and cache before test
     LocalPromptLoader._warned_no_prompts_path = False
     LocalPromptLoader._cached_project_root = None
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Change to temp directory (no prompts.json exists)
-        original_cwd = os.getcwd()
+        temp_path = Path(temp_dir).resolve()
+        # Point the project-root walk at a controlled location. Without this
+        # mock, `_find_project_root` walks up from cwd through shared dirs
+        # like /tmp or /var/folders and can trip over leaked prompts.json
+        # files from earlier runs on developer machines.
+        monkeypatch.setattr(
+            LocalPromptLoader, "_find_project_root", classmethod(lambda cls: temp_path)
+        )
+
+        loader = LocalPromptLoader()
+
         try:
-            os.chdir(temp_dir)
-
-            # Create loader without explicit base_path (will use cwd)
-            loader = LocalPromptLoader()
-
             with warnings.catch_warnings(record=True) as w:
                 warnings.simplefilter("always")
 
@@ -346,7 +348,6 @@ def test_load_prompt_warns_once_when_no_base_path_and_no_prompts_json():
                 assert len(prompts_path_warnings) == 1
                 assert "No prompts.json found" in str(prompts_path_warnings[0].message)
         finally:
-            os.chdir(original_cwd)
             # Reset for other tests
             LocalPromptLoader._warned_no_prompts_path = False
             LocalPromptLoader._cached_project_root = None
@@ -478,24 +479,36 @@ def test_find_project_root_caches_result():
             LocalPromptLoader._cached_project_root = None
 
 
-def test_find_project_root_falls_back_to_cwd():
+def test_find_project_root_falls_back_to_cwd(monkeypatch):
     """
     GIVEN no prompts.json exists anywhere in the directory tree
     WHEN _find_project_root is called
     THEN it falls back to cwd
     """
-    import os
-
     # Reset cache before test
     LocalPromptLoader._cached_project_root = None
 
     with tempfile.TemporaryDirectory() as temp_dir:
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(temp_dir)
+        temp_path = Path(temp_dir).resolve()
 
+        # Pretend the process is running in our clean sandbox.
+        monkeypatch.setattr(Path, "cwd", classmethod(lambda cls: temp_path))
+
+        # Isolate the walk-up from real filesystem state. Developer machines
+        # (and occasionally CI runners) can accumulate stray `/tmp/prompts.json`
+        # or similar leaks from earlier runs, which would cause this test to
+        # return the leak's parent directory instead of falling back to cwd.
+        real_exists = Path.exists
+
+        def isolated_exists(self, *args, **kwargs):
+            if self.name == "prompts.json":
+                return False
+            return real_exists(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "exists", isolated_exists)
+
+        try:
             root = LocalPromptLoader._find_project_root()
-            assert root == Path(temp_dir).resolve()
+            assert root == temp_path
         finally:
-            os.chdir(original_cwd)
             LocalPromptLoader._cached_project_root = None

@@ -1,7 +1,7 @@
 from __future__ import annotations
 import asyncio
 from contextlib import contextmanager
-from contextvars import ContextVar
+from contextvars import ContextVar, Token
 from dataclasses import dataclass
 import json
 import threading
@@ -62,6 +62,7 @@ class IterationContext:
 
     index: int
     item: Any
+    started_at: float = 0.0
 
 
 # ContextVar for target context isolation (works across threads)
@@ -73,6 +74,28 @@ _target_context: ContextVar[Optional[TargetContext]] = ContextVar(
 _iteration_context: ContextVar[Optional[IterationContext]] = ContextVar(
     "_iteration_context", default=None
 )
+
+# Active iteration trace, per iteration context. Stored in a ContextVar
+# (rather than on the Experiment instance) so concurrent async tasks don't
+# step on each other — otherwise task A's log_response / target() call would
+# close task B's iteration trace, leaving OTel context tokens dangling and
+# raising "Failed to detach context: Token was created in a different
+# Context" during async-gen cleanup.
+_active_iteration_trace_ctx: ContextVar[Optional[Any]] = ContextVar(
+    "_active_iteration_trace_ctx", default=None
+)
+
+
+def _scalar_or_json_entry(item: Any) -> Dict[str, Any]:
+    """Shape a loop item as a dataset ``entry`` payload.
+
+    Plain scalars (str/int/float/bool) are stored unwrapped — `"New York"`
+    comes back as `"New York"`, not the doubly-quoted `'"New York"'`.
+    Everything else is JSON-stringified with the fallback encoder.
+    """
+    if isinstance(item, (str, int, float, bool)) or item is None:
+        return {"entry": item}
+    return {"entry": json.dumps(item, cls=SerializableWithStringFallback)}
 
 ItemT = TypeVar("ItemT")
 
@@ -149,6 +172,10 @@ class Experiment:
         self.progress: int = 0
         self.created_at_nano: int = int(time.time() * 1000)
         self._futures: List[Future[Any]] = []
+        # Async-native execution state (used by aloop / asubmit). The threading
+        # path keeps these empty, so every check downstream is a no-op for it.
+        self._async_tasks: List["asyncio.Task[Any]"] = []
+        self._async_semaphore: Optional[asyncio.Semaphore] = None
 
         # Sending results
         self.lock = threading.Lock()
@@ -169,8 +196,10 @@ class Experiment:
         # Once set to True, we stop creating iteration-level traces
         self._evaluation_uses_targets: bool = False
 
-        # Store the active iteration trace so target() can close it early
-        self._active_iteration_trace: Optional[LangWatchTrace] = None
+        # Active iteration trace is stored in `_active_iteration_trace_ctx`
+        # (a module-level ContextVar) so concurrent asyncio tasks each see
+        # their OWN iteration trace — not a shared last-writer-wins field on
+        # the Experiment instance.
 
         self._finished: bool = False
         self._run_url: Optional[str] = None
@@ -467,6 +496,151 @@ class Experiment:
         self._futures.append(future)
         return future
 
+    async def aloop(
+        self,
+        iterable: Union[Iterable[ItemT], pd.DataFrame],
+        *,
+        concurrency: int = 4,
+        total: Optional[int] = None,
+    ):
+        """Async-native sibling of ``loop()``.
+
+        All submitted work runs on the caller's event loop, so loop-bound singletons
+        (gRPC channels, Firestore clients, ADK InMemoryRunner, etc.) stay usable
+        across items. Use together with :meth:`asubmit` to schedule per-item work.
+
+        Cleanup is guaranteed on normal completion and when the caller breaks out
+        of the ``async for`` **and** explicitly calls ``aclose()`` on the generator.
+        Python's ``async for`` does not auto-close iterators on ``break``, so for
+        deterministic cancellation of in-flight ``asubmit`` tasks, hold the
+        generator in a variable and ``await generator.aclose()`` after the
+        early exit. If you iterate to completion the finally block runs on the
+        last ``__anext__`` automatically and no extra call is needed.
+        """
+        if concurrency < 1:
+            raise ValueError(
+                f"concurrency must be >= 1, got {concurrency!r}"
+            )
+        if not self.initialized:
+            # init() does a blocking httpx.post — run it off-loop.
+            await asyncio.to_thread(self.init)
+
+        progress_bar: Optional[tqdm] = None
+        try:
+            total_ = (
+                total
+                if total
+                else (
+                    len(cast(Sized, iterable)) if hasattr(iterable, "__len__") else None
+                )
+            )
+            if total_ is None and "DataFrame.iterrows" in str(iterable):
+                iterable = cast(Iterable[ItemT], list(iterable))
+                total_ = len(cast(Sized, iterable))
+            progress_bar = tqdm(total=total_, desc="Evaluating")
+
+            if isinstance(iterable, pd.DataFrame):
+                iterable = cast(Iterable[ItemT], iterable.iterrows())  # type: ignore
+
+            self._async_semaphore = asyncio.Semaphore(concurrency)
+            self._async_tasks = []
+
+            for index, item in enumerate(iterable):
+                self._current_index = index
+                self._current_item = item
+
+                with self._execute_item_iteration(index, item, in_thread=False):
+                    yield item
+                if len(self._async_tasks) == 0 and len(self._futures) == 0:
+                    progress_bar.update(1)
+
+            if len(self._async_tasks) > 0:
+                for coro in asyncio.as_completed(self._async_tasks):
+                    try:
+                        await coro
+                    except Exception:
+                        # Per-item errors are already recorded via
+                        # _execute_item_iteration; swallow so siblings finish.
+                        pass
+                    progress_bar.update(1)
+
+            await self._await_completion()
+            self._finished = True
+            # _auto_display_results sleeps for several seconds and issues
+            # synchronous HTTP — keep it off the event loop.
+            await asyncio.to_thread(self._auto_display_results)
+
+        except Exception as e:
+            self._finished = True
+            Experiment._log_results(
+                langwatch.get_api_key() or "",
+                {
+                    "experiment_slug": self.experiment_slug,
+                    "run_id": self.run_id,
+                    "timestamps": {
+                        "finished_at": int(time.time() * 1000),
+                        "stopped_at": int(time.time() * 1000),
+                    },
+                },
+            )
+            raise e
+        finally:
+            # Guarantee cleanup on normal completion, early `break`, or
+            # exception. Without this, a consumer that breaks out of `async
+            # for` leaves _async_semaphore dangling (stale asubmit calls),
+            # background tasks running, and the tqdm bar open.
+            pending = [t for t in self._async_tasks if not t.done()]
+            for task in pending:
+                task.cancel()
+            if pending:
+                await asyncio.gather(*pending, return_exceptions=True)
+            self._async_tasks = []
+            self._async_semaphore = None
+            if progress_bar is not None:
+                progress_bar.close()
+
+    def asubmit(
+        self, func: Callable[..., Any], /, *args: Any, **kwargs: Any
+    ) -> "asyncio.Task[Any]":
+        """Async-native sibling of :meth:`submit`.
+
+        Captures the current loop iteration's index/item, enters the per-item
+        iteration context inside the spawned task, then awaits ``func``. Sync
+        callables are offloaded to ``asyncio.to_thread`` so they do not block the
+        event loop for concurrent async siblings.
+        """
+        if self._async_semaphore is None:
+            raise RuntimeError(
+                "asubmit() must be called from inside an `async for item in "
+                "experiment.aloop(...):` block"
+            )
+        _current_index = self._current_index
+        _current_item = self._current_item
+        semaphore = self._async_semaphore
+
+        async def wrapper() -> Any:
+            async with semaphore:
+                with self._execute_item_iteration(
+                    _current_index, _current_item, in_thread=True
+                ):
+                    if asyncio.iscoroutinefunction(func):
+                        return await func(*args, **kwargs)
+                    return await asyncio.to_thread(func, *args, **kwargs)
+
+        task = asyncio.create_task(wrapper())
+        self._async_tasks.append(task)
+        return task
+
+    async def _await_completion(self) -> None:
+        """Async-mode counterpart of ``_wait_for_completion``.
+
+        Sends any remaining batch and joins fire-and-forget batch-sender threads
+        without nesting ``asyncio.run`` inside a running loop.
+        """
+        self._send_batch(finished=True)
+        for thread in self.threads:
+            await asyncio.to_thread(thread.join)
+
     @contextmanager
     def _execute_item_iteration(
         self,
@@ -477,9 +651,12 @@ class Experiment:
         # Reset with_target tracking for this iteration
         self._current_iteration_used_with_target = False
 
-        # Set iteration context (thread-safe via contextvars)
-        # This allows target() to access index/item without race conditions
-        iter_ctx = IterationContext(index=index, item=item)
+        # Set iteration context (thread-safe via contextvars).
+        # `started_at` lets implicit-target paths (log_response) compute a
+        # real duration instead of reporting 0.
+        iter_ctx = IterationContext(
+            index=index, item=item, started_at=time.time()
+        )
         iter_token = _iteration_context.set(iter_ctx)
 
         # Reset target context at the start of each iteration to prevent pollution
@@ -488,13 +665,17 @@ class Experiment:
 
         # Determine if we should create an iteration trace:
         # - Don't create if evaluation uses targets (each target creates its own trace)
-        # - Don't create if we're collecting submit() calls (not in_thread yet)
+        # - Don't create if we're collecting submit() / asubmit() calls (not in_thread yet)
+        has_pending_submissions = (
+            len(self._futures) > 0 or len(self._async_tasks) > 0
+        )
         should_create_iteration_trace = (
             not self._evaluation_uses_targets
-            and (in_thread or len(self._futures) == 0)
+            and (in_thread or not has_pending_submissions)
         )
 
         iteration: Optional[IterationInfo] = None
+        _active_trace_token: Optional[Token[Optional[Any]]] = None
         if should_create_iteration_trace:
             iteration = IterationInfo(
                 trace=langwatch.trace(
@@ -514,8 +695,11 @@ class Experiment:
                 iteration["trace"].root_span.set_attributes(
                     {"langwatch.origin": "evaluation"}
                 )
-            # Store for target() to potentially close early
-            self._active_iteration_trace = iteration["trace"]
+            # Store for target() to potentially close early — in the current
+            # (per-task) contextvar copy so sibling tasks don't see it.
+            _active_trace_token = _active_iteration_trace_ctx.set(
+                iteration["trace"]
+            )
 
         start_time = time.time()
         try:
@@ -539,7 +723,9 @@ class Experiment:
 
                 # If we just started the parallel loop, we need to skip the first iteration
                 # from being added to the batch and change the trace name
-                if not in_thread and len(self._futures) > 0:
+                if not in_thread and (
+                    len(self._futures) > 0 or len(self._async_tasks) > 0
+                ):
                     iteration["trace"].update(name="evaluation.loop")
                 # Only add row-level entry if with_target was NOT used
                 # When with_target is used, it creates per-target dataset entries instead
@@ -551,10 +737,25 @@ class Experiment:
             except Exception as e:
                 raise e
             finally:
-                iteration["trace"].__exit__(None, None, None)
+                # Only exit the trace if target()/log_response() didn't close
+                # it early (which resets the contextvar to None as its
+                # signal). If still active, close it here.
+                if _active_iteration_trace_ctx.get() is iteration["trace"]:
+                    iteration["trace"].__exit__(None, None, None)
 
-        # Clear active iteration trace reference
-        self._active_iteration_trace = None
+        # Clear active iteration trace reference for this task's context.
+        if _active_trace_token is not None:
+            try:
+                _active_iteration_trace_ctx.reset(_active_trace_token)
+            except (LookupError, ValueError):
+                # Swallowed intentionally: `_active_trace_token` is created
+                # via `set()` in the same asyncio task, so `reset()` should
+                # always succeed. But if Python GCs an async generator in a
+                # different task's context during teardown, the token can
+                # look "from a different Context" and raise ValueError —
+                # that's a cleanup edge case, not a user-visible failure,
+                # so we don't let it mask the real iteration result.
+                pass
 
     def _add_to_batch(self, iteration: IterationInfo):
         entry: Any = (
@@ -571,11 +772,7 @@ class Experiment:
                         iteration["item"][1].__dict__
                         if type(iteration["item"]) == tuple
                         and hasattr(iteration["item"][1], "__dict__")
-                        else {
-                            "entry": json.dumps(
-                                iteration["item"], cls=SerializableWithStringFallback
-                            )
-                        }
+                        else _scalar_or_json_entry(iteration["item"])
                     )
                 )
             )
@@ -776,10 +973,12 @@ class Experiment:
         # - Close the active iteration trace if any (it won't have useful content)
         if not self._evaluation_uses_targets:
             self._evaluation_uses_targets = True
-            # Close the active iteration trace early
-            if self._active_iteration_trace is not None:
-                self._active_iteration_trace.__exit__(None, None, None)
-                self._active_iteration_trace = None
+        # Close the active iteration trace early — per-task via contextvar so
+        # we only touch the trace belonging to the task calling target().
+        active_trace = _active_iteration_trace_ctx.get()
+        if active_trace is not None:
+            active_trace.__exit__(None, None, None)
+            _active_iteration_trace_ctx.set(None)
 
         # Mark that target() was used in this iteration (for dataset entry logic)
         self._current_iteration_used_with_target = True
@@ -868,11 +1067,7 @@ class Experiment:
                             current_item[1].__dict__
                             if type(current_item) == tuple
                             and hasattr(current_item[1], "__dict__")
-                            else {
-                                "entry": json.dumps(
-                                    current_item, cls=SerializableWithStringFallback
-                                )
-                            }
+                            else _scalar_or_json_entry(current_item)
                         )
                     )
                 )
@@ -959,10 +1154,29 @@ class Experiment:
         # Mark that targets are being used
         if not self._evaluation_uses_targets:
             self._evaluation_uses_targets = True
-            # Close the active iteration trace if any
-            if self._active_iteration_trace is not None:
-                self._active_iteration_trace.__exit__(None, None, None)
-                self._active_iteration_trace = None
+
+        # If an iteration trace is still open for this task, reuse its
+        # trace_id so the dataset row points at the trace that actually
+        # contains the ADK / OpenAI / LangChain instrumentor spans recorded
+        # during the iteration. Capture the id BEFORE closing, then close.
+        trace_id: Optional[str] = None
+        active_trace = _active_iteration_trace_ctx.get()
+        if active_trace is not None:
+            try:
+                root_span = getattr(active_trace, "root_span", None)
+                otel_span = (
+                    getattr(root_span, "_span", None)
+                    if root_span is not None
+                    else None
+                )
+                if otel_span is not None:
+                    sc = otel_span.get_span_context()
+                    if sc and sc.trace_id:
+                        trace_id = format(sc.trace_id, "032x")
+            except Exception:
+                trace_id = None
+            active_trace.__exit__(None, None, None)
+            _active_iteration_trace_ctx.set(None)
 
         self._current_iteration_used_with_target = True
 
@@ -974,27 +1188,30 @@ class Experiment:
         if iter_ctx is not None:
             index = iter_ctx.index
             current_item = iter_ctx.item
+            iter_started_at = iter_ctx.started_at
         else:
             index = self._current_index
             current_item = self._current_item
+            iter_started_at = 0.0
 
-        # Create a trace for this implicit target
-        tracer = trace.get_tracer("langwatch")
-        root_context = otel_context.Context()
-
-        # Start span and get trace_id
-        with tracer.start_span(
-            f"evaluation.target.{target_name}",
-            context=root_context,
-            attributes={
-                "langwatch.origin": "evaluation",
-                "evaluation.run_id": self.run_id,
-                "evaluation.index": index,
-                "evaluation.target": target_name,
-            },
-        ) as span:
-            span_context = span.get_span_context()
-            trace_id = format(span_context.trace_id, "032x")
+        # Fallback: if we didn't capture a trace id from the iteration trace
+        # (e.g. log_response() was called outside an aloop/loop), open a
+        # fresh root trace so we still record *something* addressable.
+        if trace_id is None:
+            tracer = trace.get_tracer("langwatch")
+            root_context = otel_context.Context()
+            with tracer.start_span(
+                f"evaluation.target.{target_name}",
+                context=root_context,
+                attributes={
+                    "langwatch.origin": "evaluation",
+                    "evaluation.run_id": self.run_id,
+                    "evaluation.index": index,
+                    "evaluation.target": target_name,
+                },
+            ) as span:
+                span_context = span.get_span_context()
+                trace_id = format(span_context.trace_id, "032x")
 
         # Create and set target context (for subsequent log() calls)
         ctx = TargetContext(
@@ -1020,20 +1237,24 @@ class Experiment:
                         current_item[1].__dict__
                         if type(current_item) == tuple
                         and hasattr(current_item[1], "__dict__")
-                        else {
-                            "entry": json.dumps(
-                                current_item, cls=SerializableWithStringFallback
-                            )
-                        }
+                        else _scalar_or_json_entry(current_item)
                     )
                 )
             )
         )
 
+        # Duration from iteration start (set in _execute_item_iteration) to
+        # this log_response() call. Falls back to 0 if we somehow have no
+        # iteration context (shouldn't happen in normal flow).
+        duration_ms = (
+            int((time.time() - iter_started_at) * 1000)
+            if iter_started_at
+            else 0
+        )
         batch_entry = BatchEntry(
             index=index,
             entry=entry_data,
-            duration=0,  # Duration not tracked for implicit targets
+            duration=duration_ms,
             error=None,
             trace_id=trace_id,
             target_id=target_name,

@@ -18749,6 +18749,25 @@ for index, row in evaluation.loop(df.iterrows(), threads=4):
   By default, `threads=4`. Adjust based on your API rate limits and system resources.
 </Note>
 
+### Async-native mode
+
+If your task function awaits a resource that's bound to the event loop it was created on — Google ADK's `InMemoryRunner`, gRPC channels, Firestore clients, or any async singleton that opens an expensive connection once — use `aloop()` + `asubmit()` instead. Every submitted task stays on the caller's event loop, so shared singletons remain valid across concurrent items.
+
+```python
+evaluation = langwatch.experiment.init("async-eval-example")
+
+async def task(index, row):
+    result = await my_async_agent(row["question"])   # singleton safe to reuse
+    evaluation.log("response_quality", index=index, score=0.92)
+
+index = 0
+async for row in evaluation.aloop(dataset, concurrency=4):
+    evaluation.asubmit(task, index, row)
+    index += 1
+```
+
+Sync callables passed to `asubmit` are automatically offloaded to a worker thread so they don't block the event loop for concurrent async siblings. The `loop()` / `submit()` threading path still works unchanged — pick the one that matches your workload.
+
   ### TypeScript
 
 Pass the `concurrency` option to control how many items run in parallel:
