@@ -31,40 +31,18 @@ vi.mock("../../../src/utils/logger", () => ({
   }),
 }));
 
-vi.mock("micro", () => ({
-  buffer: vi.fn().mockResolvedValue(Buffer.from("raw-body")),
-}));
-
 vi.mock("../../../src/server/posthog", () => ({
   getPostHogInstance: vi.fn().mockReturnValue(null),
 }));
 
-import { handleLicensePurchase } from "../services/licensePurchaseHandler";
-import { createStripeWebhookHandlerFactory } from "../stripeWebhook";
-import { prisma } from "../../../src/server/db";
-import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import type Stripe from "stripe";
+import { handleLicensePurchase } from "../services/licensePurchaseHandler";
+import { processStripeWebhookEvent } from "../stripeWebhook";
+import { prisma } from "../../../src/server/db";
 
 const mockHandleLicensePurchase = handleLicensePurchase as ReturnType<
   typeof vi.fn
 >;
-
-const createMockReqRes = () => {
-  const req = {
-    method: "POST",
-    headers: { "stripe-signature": "sig_test" },
-  } as unknown as NextApiRequest;
-
-  const res = {
-    json: vi.fn().mockReturnThis(),
-    status: vi.fn().mockReturnThis(),
-    send: vi.fn().mockReturnThis(),
-    setHeader: vi.fn().mockReturnThis(),
-    end: vi.fn().mockReturnThis(),
-  } as unknown as NextApiResponse;
-
-  return { req, res };
-};
 
 const createMockWebhookService = () => ({
   handleCheckoutCompleted: vi.fn().mockResolvedValue({ earlyReturn: false }),
@@ -74,40 +52,28 @@ const createMockWebhookService = () => ({
   handleSubscriptionUpdated: vi.fn().mockResolvedValue(undefined),
 });
 
-describe("stripeWebhook license routing", () => {
-  let mockStripe: Record<string, any>;
+const createMockStripe = (): Stripe =>
+  ({
+    checkout: {
+      sessions: {
+        listLineItems: vi.fn().mockResolvedValue({ data: [] }),
+      },
+    },
+  } as unknown as Stripe);
+
+describe("processStripeWebhookEvent license routing", () => {
   let webhookService: ReturnType<typeof createMockWebhookService>;
+  let stripe: Stripe;
 
   beforeEach(() => {
     vi.clearAllMocks();
     webhookService = createMockWebhookService();
+    stripe = createMockStripe();
   });
-
-  const createHandler = (stripeOverrides: Record<string, any> = {}) => {
-    mockStripe = {
-      webhooks: {
-        constructEvent: vi.fn(),
-      },
-      checkout: {
-        sessions: {
-          listLineItems: vi.fn().mockResolvedValue({ data: [] }),
-        },
-      },
-      ...stripeOverrides,
-    };
-
-    return createStripeWebhookHandlerFactory({
-      stripe: mockStripe as any,
-      webhookService: webhookService as any,
-    });
-  };
 
   describe("when checkout.session.completed has a matching license payment link", () => {
     it("routes to license purchase handler", async () => {
-      const handler = createHandler();
-      const { req, res } = createMockReqRes();
-
-      mockStripe.webhooks.constructEvent.mockReturnValue({
+      const event = {
         type: "checkout.session.completed",
         data: {
           object: {
@@ -121,26 +87,27 @@ describe("stripeWebhook license routing", () => {
             currency: "usd",
           },
         },
+      } as unknown as Stripe.Event;
+
+      const result = await processStripeWebhookEvent({
+        event,
+        stripe,
+        webhookService: webhookService as any,
       });
 
-      await handler(req, res);
-
+      expect(result).toEqual({ status: "ok" });
       expect(mockHandleLicensePurchase).toHaveBeenCalledWith({
         checkoutSession: expect.objectContaining({
           id: "cs_test_123",
           payment_link: "plink_license_123",
         }),
-        stripe: mockStripe,
+        stripe,
         privateKey: "test-private-key-pem",
       });
-      expect(res.json).toHaveBeenCalledWith({ received: true });
     });
 
     it("does NOT execute the subscription checkout flow", async () => {
-      const handler = createHandler();
-      const { req, res } = createMockReqRes();
-
-      mockStripe.webhooks.constructEvent.mockReturnValue({
+      const event = {
         type: "checkout.session.completed",
         data: {
           object: {
@@ -149,9 +116,13 @@ describe("stripeWebhook license routing", () => {
             customer_details: { email: "buyer@acme.com", name: null },
           },
         },
-      });
+      } as unknown as Stripe.Event;
 
-      await handler(req, res);
+      await processStripeWebhookEvent({
+        event,
+        stripe,
+        webhookService: webhookService as any,
+      });
 
       expect(webhookService.handleCheckoutCompleted).not.toHaveBeenCalled();
       expect(prisma.organization.findFirst).not.toHaveBeenCalled();
@@ -160,15 +131,12 @@ describe("stripeWebhook license routing", () => {
 
   describe("when checkout.session.completed has no matching payment link", () => {
     it("continues with the subscription checkout flow", async () => {
-      const handler = createHandler();
-      const { req, res } = createMockReqRes();
-
       (prisma.organization.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
         id: "org-1",
         stripeCustomerId: "cus_test_123",
       });
 
-      mockStripe.webhooks.constructEvent.mockReturnValue({
+      const event = {
         type: "checkout.session.completed",
         data: {
           object: {
@@ -180,9 +148,13 @@ describe("stripeWebhook license routing", () => {
             metadata: {},
           },
         },
-      });
+      } as unknown as Stripe.Event;
 
-      await handler(req, res);
+      await processStripeWebhookEvent({
+        event,
+        stripe,
+        webhookService: webhookService as any,
+      });
 
       expect(mockHandleLicensePurchase).not.toHaveBeenCalled();
       expect(webhookService.handleCheckoutCompleted).toHaveBeenCalledWith({
@@ -195,15 +167,12 @@ describe("stripeWebhook license routing", () => {
 
   describe("when checkout.session.completed has a different payment link", () => {
     it("does NOT route to license handler", async () => {
-      const handler = createHandler();
-      const { req, res } = createMockReqRes();
-
       (prisma.organization.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
         id: "org-1",
         stripeCustomerId: "cus_test_123",
       });
 
-      mockStripe.webhooks.constructEvent.mockReturnValue({
+      const event = {
         type: "checkout.session.completed",
         data: {
           object: {
@@ -215,9 +184,13 @@ describe("stripeWebhook license routing", () => {
             metadata: {},
           },
         },
-      });
+      } as unknown as Stripe.Event;
 
-      await handler(req, res);
+      await processStripeWebhookEvent({
+        event,
+        stripe,
+        webhookService: webhookService as any,
+      });
 
       expect(mockHandleLicensePurchase).not.toHaveBeenCalled();
     });
@@ -225,10 +198,7 @@ describe("stripeWebhook license routing", () => {
 
   describe("when payment_link is a PaymentLink object instead of string", () => {
     it("extracts the id and routes correctly", async () => {
-      const handler = createHandler();
-      const { req, res } = createMockReqRes();
-
-      mockStripe.webhooks.constructEvent.mockReturnValue({
+      const event = {
         type: "checkout.session.completed",
         data: {
           object: {
@@ -237,25 +207,26 @@ describe("stripeWebhook license routing", () => {
             customer_details: { email: "buyer@acme.com", name: null },
           },
         },
-      });
+      } as unknown as Stripe.Event;
 
-      await handler(req, res);
+      await processStripeWebhookEvent({
+        event,
+        stripe,
+        webhookService: webhookService as any,
+      });
 
       expect(mockHandleLicensePurchase).toHaveBeenCalled();
     });
   });
 
   describe("when private key is missing", () => {
-    it("returns 500 error", async () => {
+    it("returns an error result with httpStatus 500", async () => {
       const originalKey = mockEnv.LANGWATCH_LICENSE_PRIVATE_KEY;
 
       try {
         mockEnv.LANGWATCH_LICENSE_PRIVATE_KEY = undefined;
 
-        const handler = createHandler();
-        const { req, res } = createMockReqRes();
-
-        mockStripe.webhooks.constructEvent.mockReturnValue({
+        const event = {
           type: "checkout.session.completed",
           data: {
             object: {
@@ -264,14 +235,19 @@ describe("stripeWebhook license routing", () => {
               customer_details: { email: "buyer@acme.com", name: null },
             },
           },
+        } as unknown as Stripe.Event;
+
+        const result = await processStripeWebhookEvent({
+          event,
+          stripe,
+          webhookService: webhookService as any,
         });
 
-        await handler(req, res);
-
-        expect(res.status).toHaveBeenCalledWith(500);
-        expect(res.send).toHaveBeenCalledWith(
-          expect.stringContaining("missing private key"),
-        );
+        expect(result).toEqual({
+          status: "error",
+          httpStatus: 500,
+          message: expect.stringContaining("missing private key"),
+        });
         expect(mockHandleLicensePurchase).not.toHaveBeenCalled();
       } finally {
         mockEnv.LANGWATCH_LICENSE_PRIVATE_KEY = originalKey;
@@ -280,11 +256,12 @@ describe("stripeWebhook license routing", () => {
   });
 
   describe("when license handler throws an error", () => {
-    it("returns 500 error", async () => {
-      const handler = createHandler();
-      const { req, res } = createMockReqRes();
+    it("returns an error result with httpStatus 500", async () => {
+      mockHandleLicensePurchase.mockRejectedValueOnce(
+        new Error("Email send failed"),
+      );
 
-      mockStripe.webhooks.constructEvent.mockReturnValue({
+      const event = {
         type: "checkout.session.completed",
         data: {
           object: {
@@ -293,30 +270,30 @@ describe("stripeWebhook license routing", () => {
             customer_details: { email: "buyer@acme.com", name: null },
           },
         },
+      } as unknown as Stripe.Event;
+
+      const result = await processStripeWebhookEvent({
+        event,
+        stripe,
+        webhookService: webhookService as any,
       });
 
-      mockHandleLicensePurchase.mockRejectedValueOnce(
-        new Error("Email send failed"),
-      );
-
-      await handler(req, res);
-
-      expect(res.status).toHaveBeenCalledWith(500);
-      expect(res.send).toHaveBeenCalledWith("Webhook processing error");
+      expect(result).toEqual({
+        status: "error",
+        httpStatus: 500,
+        message: "Webhook processing error",
+      });
     });
   });
 
   describe("when invoice.payment_succeeded event fires", () => {
     it("does NOT trigger license handling", async () => {
-      const handler = createHandler();
-      const { req, res } = createMockReqRes();
-
       (prisma.organization.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
         id: "org-1",
         stripeCustomerId: "cus_test_123",
       });
 
-      mockStripe.webhooks.constructEvent.mockReturnValue({
+      const event = {
         type: "invoice.payment_succeeded",
         data: {
           object: {
@@ -324,9 +301,13 @@ describe("stripeWebhook license routing", () => {
             subscription: "sub_test_123",
           },
         },
-      });
+      } as unknown as Stripe.Event;
 
-      await handler(req, res);
+      await processStripeWebhookEvent({
+        event,
+        stripe,
+        webhookService: webhookService as any,
+      });
 
       expect(mockHandleLicensePurchase).not.toHaveBeenCalled();
       expect(webhookService.handleInvoicePaymentSucceeded).toHaveBeenCalled();

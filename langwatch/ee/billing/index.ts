@@ -10,7 +10,9 @@ import { EEWebhookService } from "./services/webhookService";
 import { createStripeClient } from "./stripe/stripeClient";
 import { createCurrencyRouter } from "./currencyRouter";
 import { createSubscriptionRouterFactory } from "./subscriptionRouter";
-import { createStripeWebhookHandlerFactory } from "./stripeWebhook";
+import { processStripeWebhookEvent } from "./stripeWebhook";
+import type { WebhookService } from "./services/webhookService";
+import type Stripe from "stripe";
 
 export { PlanTypes, SubscriptionStatus } from "./planTypes";
 export { PLAN_LIMITS } from "./planLimits";
@@ -58,7 +60,13 @@ export const getSeatSyncService = () => {
   return seatSyncServiceInstance;
 };
 
-export const createStripeWebhookHandler = () => {
+export type StripeWebhookProcessor = {
+  stripe: Stripe;
+  webhookService: WebhookService;
+  process: typeof processStripeWebhookEvent;
+};
+
+export const createStripeWebhookProcessor = (): StripeWebhookProcessor => {
   const s = getStripe();
   const inviteApprover = InviteService.create(prisma);
   const webhookService = EEWebhookService.create({
@@ -68,7 +76,7 @@ export const createStripeWebhookHandler = () => {
     inviteApprover,
   });
 
-  return createStripeWebhookHandlerFactory({ stripe: s, webhookService });
+  return { stripe: s, webhookService, process: processStripeWebhookEvent };
 };
 
 let saasPlanProvider: ReturnType<typeof createSaaSPlanProvider> | null = null;
