@@ -1147,10 +1147,27 @@ class Experiment:
         # Mark that targets are being used
         if not self._evaluation_uses_targets:
             self._evaluation_uses_targets = True
-        # Close the active iteration trace if any — per-task via contextvar
-        # so we don't accidentally close a sibling task's iteration trace.
+
+        # If an iteration trace is still open for this task, reuse its
+        # trace_id so the dataset row points at the trace that actually
+        # contains the ADK / OpenAI / LangChain instrumentor spans recorded
+        # during the iteration. Capture the id BEFORE closing, then close.
+        trace_id: Optional[str] = None
         active_trace = _active_iteration_trace_ctx.get()
         if active_trace is not None:
+            try:
+                root_span = getattr(active_trace, "root_span", None)
+                otel_span = (
+                    getattr(root_span, "_span", None)
+                    if root_span is not None
+                    else None
+                )
+                if otel_span is not None:
+                    sc = otel_span.get_span_context()
+                    if sc and sc.trace_id:
+                        trace_id = format(sc.trace_id, "032x")
+            except Exception:
+                trace_id = None
             active_trace.__exit__(None, None, None)
             _active_iteration_trace_ctx.set(None)
 
@@ -1170,23 +1187,24 @@ class Experiment:
             current_item = self._current_item
             iter_started_at = 0.0
 
-        # Create a trace for this implicit target
-        tracer = trace.get_tracer("langwatch")
-        root_context = otel_context.Context()
-
-        # Start span and get trace_id
-        with tracer.start_span(
-            f"evaluation.target.{target_name}",
-            context=root_context,
-            attributes={
-                "langwatch.origin": "evaluation",
-                "evaluation.run_id": self.run_id,
-                "evaluation.index": index,
-                "evaluation.target": target_name,
-            },
-        ) as span:
-            span_context = span.get_span_context()
-            trace_id = format(span_context.trace_id, "032x")
+        # Fallback: if we didn't capture a trace id from the iteration trace
+        # (e.g. log_response() was called outside an aloop/loop), open a
+        # fresh root trace so we still record *something* addressable.
+        if trace_id is None:
+            tracer = trace.get_tracer("langwatch")
+            root_context = otel_context.Context()
+            with tracer.start_span(
+                f"evaluation.target.{target_name}",
+                context=root_context,
+                attributes={
+                    "langwatch.origin": "evaluation",
+                    "evaluation.run_id": self.run_id,
+                    "evaluation.index": index,
+                    "evaluation.target": target_name,
+                },
+            ) as span:
+                span_context = span.get_span_context()
+                trace_id = format(span_context.trace_id, "032x")
 
         # Create and set target context (for subsequent log() calls)
         ctx = TargetContext(
