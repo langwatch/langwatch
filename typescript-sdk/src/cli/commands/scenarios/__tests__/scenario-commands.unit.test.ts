@@ -52,6 +52,7 @@ const makeScenario = (overrides: Partial<ScenarioResponse> = {}): ScenarioRespon
   situation: "User attempts to log in with valid credentials",
   criteria: ["Responds with a welcome message", "Includes user name in greeting"],
   labels: ["auth", "happy-path"],
+  platformUrl: "https://app.langwatch.ai/proj-1/scenarios/scenario_abc123",
   ...overrides,
 });
 

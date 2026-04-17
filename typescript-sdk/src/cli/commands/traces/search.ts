@@ -1,11 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  TracesApiService,
-  TracesApiError,
-} from "@/client-sdk/services/traces/traces-api.service";
+import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const searchTracesCommand = async (options: {
   query?: string;
@@ -31,12 +29,15 @@ export const searchTracesCommand = async (options: {
       : now;
     const pageSize = options.limit ? parseInt(options.limit, 10) : 25;
 
+    // The `format` option controls CLI output (table vs json); the API's
+    // `format` parameter controls server response shape ("digest" | "json").
+    // Always request the richer "json" shape and render locally.
     const result = await service.search({
       query: options.query,
       startDate,
       endDate,
       pageSize,
-      format: (options.format as "digest" | "json") ?? "json",
+      format: "json",
     });
 
     const traces = result.traces as Array<Record<string, unknown>>;
@@ -100,16 +101,7 @@ export const searchTracesCommand = async (options: {
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof TracesApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error searching traces: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "search traces" });
     process.exit(1);
   }
 };

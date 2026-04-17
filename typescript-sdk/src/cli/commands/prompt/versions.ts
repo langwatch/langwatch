@@ -1,7 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
+import { PromptsApiService } from "@/client-sdk/services/prompts";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const promptVersionsCommand = async (
   handle: string,
@@ -9,33 +11,12 @@ export const promptVersionsCommand = async (
 ): Promise<void> => {
   checkApiKey();
 
-  const apiKey = process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+  const service = new PromptsApiService();
 
   const spinner = ora(`Fetching versions for "${handle}"...`).start();
 
   try {
-    const response = await fetch(
-      `${endpoint}/api/prompts/${encodeURIComponent(handle)}/versions`,
-      {
-        headers: { "X-Auth-Token": apiKey },
-      }
-    );
-
-    if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to fetch versions (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
-      process.exit(1);
-    }
-
-    const versions = (await response.json()) as Array<{
-      id: string;
-      version: number;
-      commitMessage: string | null;
-      createdAt: string;
-    }>;
+    const versions = await service.getVersions(handle);
 
     spinner.succeed(
       `Found ${versions.length} version${versions.length !== 1 ? "s" : ""} for "${handle}"`
@@ -56,17 +37,22 @@ export const promptVersionsCommand = async (
 
     const tableData = versions.map((v) => ({
       Version: `v${v.version}`,
-      ID: v.id,
+      ID: v.versionId,
+      Tags:
+        v.tags && v.tags.length > 0
+          ? v.tags.map((t) => t.name).join(", ")
+          : chalk.gray("—"),
       Message: v.commitMessage ?? chalk.gray("—"),
       Created: new Date(v.createdAt).toLocaleString(),
     }));
 
     formatTable({
       data: tableData,
-      headers: ["Version", "ID", "Message", "Created"],
+      headers: ["Version", "ID", "Tags", "Message", "Created"],
       colorMap: {
         Version: chalk.cyan,
         ID: chalk.green,
+        Tags: chalk.magenta,
       },
     });
 
@@ -78,12 +64,7 @@ export const promptVersionsCommand = async (
     );
     console.log();
   } catch (error) {
-    spinner.fail();
-    console.error(
-      chalk.red(
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
-      )
-    );
+    failSpinner({ spinner, error, action: "fetch prompt versions" });
     process.exit(1);
   }
 };

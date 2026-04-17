@@ -72,7 +72,8 @@ export const IconRadioCardGroup = <T extends string = string>({
         borderColor={isSelected ? "orange.emphasized" : "border.subtle"}
         borderRadius="xl"
         bg={isSelected ? "orange.subtle" : "bg.panel"}
-        p="3"
+        py="3"
+        px={isSelected ? "5" : "3"}
         h="auto"
         transition="all 0.2s ease"
         boxShadow={isSelected ? "0 0 0 1px var(--colors-orange-muted)" : "none"}
@@ -108,7 +109,7 @@ export const IconRadioCardGroup = <T extends string = string>({
             <Text
               textStyle="sm"
               fontWeight="medium"
-              color="fg.DEFAULT"
+              color={{ base: "black", _dark: "white" }}
               truncate
             >
               {item.title}

@@ -4,6 +4,7 @@ import {
   type FoldEventHandlers,
 } from "../../../projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+import { normalizeDurationMs } from "../utils/duration.utils";
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   ExperimentRunStartedEvent,
@@ -173,8 +174,9 @@ export class ExperimentRunStateFoldProjection
     }
 
     let totalDurationMs = state.TotalDurationMs;
-    if (event.data.duration != null) {
-      totalDurationMs = (totalDurationMs ?? 0) + event.data.duration;
+    const clampedDuration = normalizeDurationMs(event.data.duration);
+    if (clampedDuration != null) {
+      totalDurationMs = (totalDurationMs ?? 0) + clampedDuration;
     }
 
     const progress = completedCount + failedCount;

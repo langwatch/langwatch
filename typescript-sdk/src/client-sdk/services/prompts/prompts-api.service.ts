@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { paths, operations } from "@/internal/generated/openapi/api-client";
 import { type PromptResponse, type TagDefinition, type CreatedTag } from "./types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
@@ -7,8 +8,36 @@ import { type InternalConfig } from "@/client-sdk/types";
 import { type CreatePromptBody, type UpdatePromptBody } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { PromptsApiError } from "./errors";
+import {
+  extractStatusFromResponse,
+  formatApiErrorForOperation,
+  formatApiErrorMessage,
+} from "@/client-sdk/services/_shared/format-api-error";
 
-export type SyncAction = "created" | "updated" | "conflict" | "up_to_date";
+const syncActionSchema = z.enum([
+  "created",
+  "updated",
+  "conflict",
+  "up_to_date",
+]);
+
+export type SyncAction = z.infer<typeof syncActionSchema>;
+
+const syncResultSchema = z.object({
+  action: syncActionSchema,
+  // `prompt` and `conflictInfo` are passed through untyped — they come from
+  // the OpenAPI-derived shape which is already validated on the server side.
+  prompt: z.unknown().optional(),
+  conflictInfo: z
+    .object({
+      localVersion: z.number(),
+      remoteVersion: z.number(),
+      differences: z.array(z.string()),
+      remoteConfigData: z.unknown(),
+    })
+    .passthrough()
+    .optional(),
+});
 
 export type AssignTagResult = NonNullable<
   operations["putApiPromptsByIdTagsByTag"]["responses"]["200"]["content"]["application/json"]
@@ -62,22 +91,12 @@ export class PromptsApiService {
    * @param error The error object returned from the API client.
    * @throws {PromptsApiError}
    */
-  private handleApiError(operation: string, error: any): never {
-    const errorMessage =
-      typeof error === "string"
-        ? error
-        : error?.error != null
-        ? typeof error.error === "string"
-          ? error.error
-          : error.error.message ??
-            JSON.stringify(error.error, Object.getOwnPropertyNames(error.error))
-        : error?.message ?? "Unknown error occurred";
+  private handleApiError(operation: string, error: any, status?: number): never {
+    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
+      status: status ?? extractStatusFromResponse(error),
+    } });
 
-    throw new PromptsApiError(
-      `Failed to ${operation}: ${errorMessage}`,
-      operation,
-      error,
-    );
+    throw new PromptsApiError(message, operation, error);
   }
 
   /**
@@ -354,8 +373,18 @@ export class PromptsApiService {
     localVersion?: number;
     commitMessage?: string;
   }): Promise<SyncResult> {
+    // openapi-fetch returns `{ data?, error?, response }`; we only need
+    // these fields from the response so an explicit shape keeps the
+    // no-redundant-type-constituents lint happy (the generic POST return is
+    // widened to `any` by the generated types).
+    interface SyncApiResponse {
+      data?: unknown;
+      error?: unknown;
+      response?: { status?: number };
+    }
+    let response: SyncApiResponse | undefined;
     try {
-      const response = await this.apiClient.POST(
+      response = await this.apiClient.POST(
         "/api/prompts/{id}/sync",
         {
           params: { path: { id: params.name } },
@@ -366,22 +395,41 @@ export class PromptsApiService {
           },
         },
       );
-
-      if (response.error) {
-        const errorMessage =
-          response.error?.error ?? JSON.stringify(response.error);
-        throw new Error(`Failed to sync prompt: ${errorMessage}`);
-      }
-
-      return {
-        action: response.data.action as SyncAction,
-        prompt: response.data.prompt,
-        conflictInfo: response.data.conflictInfo,
-      };
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Unknown error occurred";
+      // Transport-level failures (network errors, timeouts, unresolved DNS)
+      // surface here. Preserve the underlying message so the user knows
+      // whether the API is reachable.
+      const message = formatApiErrorForOperation({ operation: "sync prompt", error: error });
       throw new PromptsApiError(message, "sync", error);
     }
+
+    if (response?.error) {
+      const err: unknown = response.error;
+      const status =
+        response.response?.status ?? extractStatusFromResponse(err);
+      const message = formatApiErrorMessage({ error: err, options: { status } });
+      throw new PromptsApiError(
+        `Failed to sync prompt: ${message}`,
+        "sync",
+        err,
+      );
+    }
+
+    // Validate the shape at the boundary so a malformed 2xx payload
+    // (e.g. `{ action: undefined }`) surfaces as a PromptsApiError here
+    // instead of crashing downstream code with a confusing stack trace.
+    const parsed = syncResultSchema.safeParse(response?.data);
+    if (!parsed.success) {
+      throw new PromptsApiError(
+        "Failed to sync prompt: server returned an invalid response body",
+        "sync",
+        response?.data ?? response,
+      );
+    }
+    return {
+      action: parsed.data.action,
+      prompt: parsed.data.prompt as SyncResult["prompt"],
+      conflictInfo: parsed.data.conflictInfo as SyncResult["conflictInfo"],
+    };
   }
 }

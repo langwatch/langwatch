@@ -1,28 +1,14 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+# Branch protection can require `es-migration-e2e-complete` as a single
+# check. The e2e job skips cleanly when paths don't match.
 name: es-migration-e2e
 
 on:
   push:
     branches:
       - main
-    paths:
-      - "langwatch/packages/es-migration/**"
-      - "langwatch/src/server/event-sourcing/**"
-      - "langwatch/src/server/app-layer/traces/**"
-      - "langwatch/src/server/app-layer/evaluations/**"
-      - "langwatch/src/server/app-layer/dspy-steps/**"
-      - "langwatch/src/server/clickhouse/migrations/**"
-      - "langwatch/elastic/migrations/**"
-      - ".github/workflows/es-migration-e2e.yml"
   pull_request:
-    paths:
-      - "langwatch/packages/es-migration/**"
-      - "langwatch/src/server/event-sourcing/**"
-      - "langwatch/src/server/app-layer/traces/**"
-      - "langwatch/src/server/app-layer/evaluations/**"
-      - "langwatch/src/server/app-layer/dspy-steps/**"
-      - "langwatch/src/server/clickhouse/migrations/**"
-      - "langwatch/elastic/migrations/**"
-      - ".github/workflows/es-migration-e2e.yml"
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -30,7 +16,29 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'langwatch/packages/es-migration/**'
+              - 'langwatch/src/server/event-sourcing/**'
+              - 'langwatch/src/server/app-layer/traces/**'
+              - 'langwatch/src/server/app-layer/evaluations/**'
+              - 'langwatch/src/server/app-layer/dspy-steps/**'
+              - 'langwatch/src/server/clickhouse/migrations/**'
+              - 'langwatch/elastic/migrations/**'
+              - '.github/workflows/es-migration-e2e.yml'
+
   e2e:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     name: Seed ES → Run Migration → Validate CH
     runs-on: ubuntu-latest
 
@@ -83,21 +91,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2
+      - uses: ./.github/actions/setup-pnpm-node
         with:
-          version: 10.24.0
-
-      - name: Setup Node
-        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6
-        with:
-          node-version: 24
-          cache: "pnpm"
           cache-dependency-path: "langwatch/pnpm-lock.yaml"
-
-      - name: Install dependencies
-        working-directory: langwatch
-        run: CI=true pnpm install --frozen-lockfile
+          install-dir: langwatch
 
       - name: Prepare generated files
         working-directory: langwatch
@@ -112,13 +109,7 @@ jobs:
         run: pnpm elastic:migrate
 
       - name: Install Goose migration tool
-        run: |
-          GOOSE_URL="https://github.com/pressly/goose/releases/download/v3.26.0/goose_linux_x86_64"
-          GOOSE_SHA256="8b3eee9845cd87d827ba1abddb85235fb3684f9fb1666426f647ddd12fd29efe"
-          curl -fsSL "$GOOSE_URL" -o /tmp/goose
-          echo "$GOOSE_SHA256  /tmp/goose" | sha256sum -c - || (rm -f /tmp/goose && exit 1)
-          sudo mv /tmp/goose /usr/local/bin/goose
-          chmod +x /usr/local/bin/goose
+        run: bash .github/scripts/install-goose.sh
 
       - name: Start ClickHouse
         run: |
@@ -175,3 +166,13 @@ jobs:
           echo "=== simulation_runs ==="
           curl -s "http://localhost:8123/?user=default&password=ci_password" \
             -d "SELECT count(DISTINCT ScenarioRunId) FROM default.simulation_runs WHERE TenantId = '${{ env.E2E_TENANT_ID }}'" || true
+
+  es-migration-e2e-complete:
+    needs: [changes, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: e2e

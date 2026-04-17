@@ -5,13 +5,20 @@ import type {
   Team,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   llmPromptConfigFactory,
   llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import {
+  PlanProviderService,
+  type PlanProvider,
+} from "~/server/app-layer/subscription/plan-provider";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 import { createHandle } from "./helpers";
 
@@ -38,6 +45,21 @@ describe("Prompts API", () => {
 
   // Setup and teardown
   beforeEach(async () => {
+    // Initialize the test App container so middleware that depends on it
+    // (resource-limit, license-enforcement) can run.
+    resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: vi
+          .fn()
+          .mockResolvedValue(FREE_PLAN) as PlanProvider["getActivePlan"],
+      }),
+      usageLimits: {
+        notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
+        checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
+      } as any,
+    });
+
     // Create organization first
     testOrganization = await prisma.organization.create({
       data: {
@@ -211,8 +233,7 @@ describe("Prompts API", () => {
           expect(createBody.handle).toBe(handle);
         });
 
-        // TODO(#3048): pre-existing failure unmasked by #3001
-        it.skip("gets a single prompt by handle", async () => {
+        it("gets a single prompt by handle", async () => {
           // Get the prompt by handle
           const res = await app.request(`/api/prompts/${handle}`, {
             headers: { "X-Auth-Token": testApiKey },
@@ -242,8 +263,7 @@ describe("Prompts API", () => {
           expect(createBody.scope).toBe("ORGANIZATION");
         });
 
-        // TODO(#3048): pre-existing failure unmasked by #3001
-        it.skip("gets a single prompt by handle", async () => {
+        it("gets a single prompt by handle", async () => {
           // Get the prompt by handle
           const res = await app.request(`/api/prompts/${handle}`, {
             headers: { "X-Auth-Token": testApiKey },
@@ -322,8 +342,7 @@ describe("Prompts API", () => {
 
   // POST endpoints tests
   describe("POST endpoints", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("creates a new prompt", async () => {
+    it("creates a new prompt", async () => {
       const res = await helpers.api.post(`/api/prompts`, {
         handle: "test-handle/chunky-bacon",
         prompt: "test",
@@ -335,8 +354,7 @@ describe("Prompts API", () => {
       expect(body).toHaveProperty("handle", "test-handle/chunky-bacon");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("validates input when creating a prompt", async () => {
+    it("validates input when creating a prompt", async () => {
       const invalidData = {
         // Missing required name field
         configData: { model: "gpt-4" },
@@ -349,8 +367,7 @@ describe("Prompts API", () => {
     });
 
     describe("when scoping by project (default)", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("creates a new prompt with a handle scoped to project", async () => {
+      it("creates a new prompt with a handle scoped to project", async () => {
         const res = await helpers.api.post(`/api/prompts`, {
           handle: "my-custom-ref",
           prompt: "test",
@@ -364,8 +381,7 @@ describe("Prompts API", () => {
     });
 
     describe("when scoping by organization", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("creates a new prompt with a handle scoped to organization", async () => {
+      it("creates a new prompt with a handle scoped to organization", async () => {
         const res = await helpers.api.post(`/api/prompts`, {
           handle: "my-custom-ref",
           scope: "ORGANIZATION",
@@ -383,8 +399,7 @@ describe("Prompts API", () => {
   // PUT endpoints tests
   describe("PUT endpoints", () => {
     describe("when updating a prompt", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("allows duplicate handles across different scopes", async () => {
+      it("allows duplicate handles across different scopes", async () => {
         // Create first prompt with organization scope
         const prompt1Res = await helpers.api.post(`/api/prompts`, {
           handle: "shared-ref",
@@ -410,8 +425,7 @@ describe("Prompts API", () => {
       });
 
       describe("with project scope (default)", () => {
-        // TODO(#3048): pre-existing failure unmasked by #3001
-        it.skip("updates a prompt with a handle in correct format", async () => {
+        it("updates a prompt with a handle in correct format", async () => {
           // Create a valid prompt first
           const promptRes = await helpers.api.post(`/api/prompts`, {
             handle: "my-custom-ref",
@@ -440,8 +454,7 @@ describe("Prompts API", () => {
           );
         });
 
-        // TODO(#3048): pre-existing failure unmasked by #3001
-        it.skip("enforces unique handle constraint", async () => {
+        it("enforces unique handle constraint", async () => {
           // Create first prompt with handle
           const prompt1Res = await helpers.api.post(`/api/prompts`, {
             handle: "first-ref",
@@ -472,8 +485,7 @@ describe("Prompts API", () => {
       });
 
       describe("when scoped to organization", () => {
-        // TODO(#3048): pre-existing failure unmasked by #3001
-        it.skip("prevents duplicate handles within the same organization", async () => {
+        it("prevents duplicate handles within the same organization", async () => {
           // Create first prompt with organization scope
           const prompt1Res = await helpers.api.post(`/api/prompts`, {
             handle: "org-duplicate-ref",
@@ -494,8 +506,7 @@ describe("Prompts API", () => {
         });
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("supports updating all supported fields", async () => {
+      it("supports updating all supported fields", async () => {
         // Create initial prompt with all fields
         const createRes = await app.request(`/api/prompts`, {
           method: "POST",
@@ -581,8 +592,7 @@ describe("Prompts API", () => {
         expect(updatedPrompt.outputs[0].identifier).toBe("updated_response");
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("throws error when trying to set both system prompt message and prompt", async () => {
+      it("throws error when trying to set both system prompt message and prompt", async () => {
         // Create a prompt first
         const createRes = await helpers.api.post("/api/prompts", {
           handle: "conflict-test",
@@ -609,8 +619,7 @@ describe("Prompts API", () => {
         expect(errorBody.error).toContain("System prompt");
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("updates the prompt when system message is provided", async () => {
+      it("updates the prompt when system message is provided", async () => {
         // Create a prompt with initial prompt text
         const createRes = await helpers.api.post("/api/prompts", {
           handle: "system-to-prompt-test",
@@ -641,8 +650,7 @@ describe("Prompts API", () => {
         expect(updatedPrompt.messages[0].content).toBe("New system message");
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("updates the system message when prompt is provided", async () => {
+      it("updates the system message when prompt is provided", async () => {
         // Create a prompt with initial messages including system message
         const createRes = await helpers.api.post("/api/prompts", {
           handle: "prompt-to-system-test",
@@ -694,8 +702,7 @@ describe("Prompts API", () => {
       expect(createRes.status).toBe(200);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("requires authentication to delete a prompt", async () => {
+    it("requires authentication to delete a prompt", async () => {
       const deleteRes = await app.request(`/api/prompts/some-id`, {
         method: "DELETE",
       });
@@ -703,8 +710,7 @@ describe("Prompts API", () => {
       expect(deleteRes.status).toBe(401);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("deletes a prompt by ID", async () => {
+    it("deletes a prompt by ID", async () => {
       // Delete the prompt by ID
       const deleteRes = await app.request(`/api/prompts/${promptToDelete.id}`, {
         method: "DELETE",
@@ -728,8 +734,7 @@ describe("Prompts API", () => {
       expect(getRes.status).toBe(404);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("deletes a prompt by handle", async () => {
+    it("deletes a prompt by handle", async () => {
       // Delete the prompt by handle
       const deleteRes = await app.request(
         `/api/prompts/${promptToDelete.handle}`,
@@ -757,8 +762,7 @@ describe("Prompts API", () => {
       expect(getRes.status).toBe(404);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("returns 404 when trying to delete a non-existent prompt", async () => {
+    it("returns 404 when trying to delete a non-existent prompt", async () => {
       const deleteRes = await app.request(`/api/prompts/non-existent-id`, {
         method: "DELETE",
         headers: {
@@ -772,8 +776,7 @@ describe("Prompts API", () => {
 
   // Validation/unhappy path tests
   describe("Validation tests", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("validates input when creating a prompt", async () => {
+    it("validates input when creating a prompt", async () => {
       const invalidData = {
         name: "", // Empty name should be rejected
       };
@@ -792,8 +795,7 @@ describe("Prompts API", () => {
       expect(body).toHaveProperty("error");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("validates input when creating a prompt version", async () => {
+    it("validates input when creating a prompt version", async () => {
       // Create a valid prompt first
       const promptRes = await helpers.api.post("/api/prompts", {
         handle: "test-handle",
@@ -822,8 +824,7 @@ describe("Prompts API", () => {
       expect(body).toHaveProperty("error");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("strictly validates input when updating a prompt", async () => {
+    it("strictly validates input when updating a prompt", async () => {
       // Create a valid prompt first
       const promptRes = await helpers.api.post("/api/prompts", {
         handle: "test-handle",
@@ -850,6 +851,112 @@ describe("Prompts API", () => {
         headers: { "X-Auth-Token": testApiKey },
       });
       expect(res.status).toBe(400); // Validation error
+    });
+  });
+
+  describe("archived prompt handle reuse", () => {
+    describe("when a prompt was previously created and then archived", () => {
+      it("allows creating a new prompt with the same handle", async () => {
+        const handle = `reuse-handle-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+
+        // 1) Create the original prompt with this handle.
+        const createRes = await helpers.api.post("/api/prompts", {
+          handle,
+          prompt: "Original prompt",
+        });
+        expect(createRes.status).toBe(200);
+        const original = await createRes.json();
+
+        // 2) Soft-delete it.
+        const deleteRes = await helpers.api.delete(
+          `/api/prompts/${original.id}`,
+        );
+        expect(deleteRes.status).toBe(200);
+
+        // 3) Create a fresh prompt with the same handle — this used to throw
+        // a "Prompt handle already exists" 409 because the unique constraint
+        // counted archived rows.
+        const recreateRes = await helpers.api.post("/api/prompts", {
+          handle,
+          prompt: "Reincarnated prompt",
+        });
+        expect(recreateRes.status).toBe(200);
+        const recreated = await recreateRes.json();
+
+        expect(recreated.id).not.toBe(original.id);
+        expect(recreated.handle).toBe(handle);
+      });
+
+      it("allows the CLI sync flow to recreate a prompt with the same handle", async () => {
+        const handle = `sync-reuse-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+
+        // 1) Sync creates the prompt.
+        const initialSync = await helpers.api.post(
+          `/api/prompts/${handle}/sync`,
+          {
+            configData: {
+              prompt: "v1",
+              messages: [],
+              inputs: [{ identifier: "input", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+              model: "openai/gpt-5-mini",
+            },
+          },
+        );
+        expect(initialSync.status).toBe(200);
+        const initialBody = await initialSync.json();
+        expect(initialBody.action).toBe("created");
+
+        // 2) Delete it.
+        const deleteRes = await helpers.api.delete(
+          `/api/prompts/${initialBody.prompt.id}`,
+        );
+        expect(deleteRes.status).toBe(200);
+
+        // 3) Sync again with the same handle — should create a new prompt.
+        const reSync = await helpers.api.post(
+          `/api/prompts/${handle}/sync`,
+          {
+            configData: {
+              prompt: "v2",
+              messages: [],
+              inputs: [{ identifier: "input", type: "str" }],
+              outputs: [{ identifier: "output", type: "str" }],
+              model: "openai/gpt-5-mini",
+            },
+          },
+        );
+        expect(reSync.status).toBe(200);
+        const reBody = await reSync.json();
+        expect(reBody.action).toBe("created");
+        expect(reBody.prompt.id).not.toBe(initialBody.prompt.id);
+      });
+    });
+
+    describe("when a prompt with the handle is still active", () => {
+      it("returns a 409 with a descriptive message on POST /api/prompts", async () => {
+        const handle = `active-conflict-${nanoid(6).toLowerCase().replace(/[^a-z0-9_-]/g, "x")}`;
+
+        const firstRes = await helpers.api.post("/api/prompts", {
+          handle,
+          prompt: "First",
+        });
+        expect(firstRes.status).toBe(200);
+
+        const secondRes = await helpers.api.post("/api/prompts", {
+          handle,
+          prompt: "Second",
+        });
+        expect(secondRes.status).toBe(409);
+        const body = await secondRes.json();
+        // Must NOT collapse to a generic 500/Internal server error.
+        expect(JSON.stringify(body).toLowerCase()).not.toContain(
+          "internal server error",
+        );
+        expect(JSON.stringify(body).toLowerCase()).toContain(
+          "handle already exists",
+        );
+      });
     });
   });
 });

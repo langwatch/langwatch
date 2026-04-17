@@ -1,10 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  AgentsApiService,
-  AgentsApiError,
-} from "@/client-sdk/services/agents/agents-api.service";
+import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const getAgentCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -41,16 +39,7 @@ export const getAgentCommand = async (id: string, options?: { format?: string })
 
     console.log();
   } catch (error) {
-    spinner.fail();
-    if (error instanceof AgentsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching agent: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "fetch agent" });
     process.exit(1);
   }
 };

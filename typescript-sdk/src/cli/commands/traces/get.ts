@@ -1,10 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  TracesApiService,
-  TracesApiError,
-} from "@/client-sdk/services/traces/traces-api.service";
+import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const getTraceCommand = async (
   traceId: string,
@@ -37,16 +35,7 @@ export const getTraceCommand = async (
       }
     }
   } catch (error) {
-    spinner.fail();
-    if (error instanceof TracesApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching trace: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "fetch trace" });
     process.exit(1);
   }
 };

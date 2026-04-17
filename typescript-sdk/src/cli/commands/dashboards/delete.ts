@@ -1,10 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  DashboardsApiService,
-  DashboardsApiError,
-} from "@/client-sdk/services/dashboards/dashboards-api.service";
+import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const deleteDashboardCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -20,16 +18,7 @@ export const deleteDashboardCommand = async (id: string, options?: { format?: st
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    spinner.fail();
-    if (error instanceof DashboardsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error deleting dashboard: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "delete dashboard" });
     process.exit(1);
   }
 };

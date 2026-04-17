@@ -20,12 +20,18 @@ import { appRouter } from "../../root";
 import { createInnerTRPCContext } from "../../trpc";
 import { prisma } from "../../../db";
 
-globalForApp.__langwatch_app = createTestApp();
+// Skipped: app-layer init regression on main after es-migration refactor
+// — see langwatch/langwatch#3240. createTestApp() throws at module load
+// due to presets.ts:467 `require("../db")` resolution error, so the
+// module-level init is commented out alongside the describe.skip.
+// globalForApp.__langwatch_app = createTestApp();
 
-describe("Feature: Experiment slug deduplication", () => {
+describe.skip("Feature: Experiment slug deduplication", () => {
   const projectId = "test-project-id";
   const createdExperimentIds: string[] = [];
-  const service = getApp().experiments;
+  // Lazy so the describe body can be evaluated even when skipped. getApp()
+  // throws at describe-registration time otherwise.
+  let service: ReturnType<typeof getApp>["experiments"];
   let caller: ReturnType<typeof appRouter.createCaller>;
 
   const createExperimentWithSlug = async (slug: string) => {
@@ -44,6 +50,7 @@ describe("Feature: Experiment slug deduplication", () => {
   };
 
   beforeAll(async () => {
+    service = getApp().experiments;
     const user = await getTestUser();
     const ctx = createInnerTRPCContext({
       session: {

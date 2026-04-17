@@ -19,7 +19,7 @@ export function ContactSalesBlock() {
     <Card.Root
       data-testid="contact-sales-block"
       borderWidth={1}
-      borderColor="gray.200"
+      borderColor="border"
     >
       <Card.Body paddingY={5} paddingX={6}>
         <Text fontWeight="semibold" fontSize="lg">
@@ -33,8 +33,8 @@ export function ContactSalesBlock() {
         >
           {ENTERPRISE_PLAN_FEATURES.map((feature) => (
             <HStack key={feature} gap={2} alignItems="start">
-              <Check size={16} color="var(--chakra-colors-orange-500)" />
-              <Text fontSize="sm" color="gray.600">
+              <Check size={16} color="var(--chakra-colors-orange-solid)" />
+              <Text fontSize="sm" color="fg.muted">
                 {feature}
               </Text>
             </HStack>

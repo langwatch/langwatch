@@ -57,6 +57,7 @@ describe("Tracer Integration Tests", () => {
     // Use spanProcessors instead of traceExporter as we don't want to wrap in a BatchSpanProcessor
     observabilityHandle = setupObservability({
       serviceName: "tracer-integration-test",
+      langwatch: "disabled",
       spanProcessors: [spanProcessor],
       debug: { logger: new NoOpLogger() },
       advanced: {

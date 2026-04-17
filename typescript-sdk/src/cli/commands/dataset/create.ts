@@ -72,7 +72,6 @@ export const createCommand = async (
       console.log(`  ${chalk.bold("View:")}  ${chalk.underline(viewUrl)}`);
     }
   } catch (error) {
-    spinner.fail("Failed to create dataset");
-    handleDatasetCommandError(error, "creating dataset");
+    handleDatasetCommandError({ spinner, error, context: "create dataset" });
   }
 };

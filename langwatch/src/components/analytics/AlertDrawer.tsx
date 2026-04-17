@@ -23,6 +23,7 @@ import {
   customGraphInputToFormData,
 } from "../../pages/[project]/analytics/custom/index";
 import { api } from "../../utils/api";
+import { createLogger } from "../../utils/logger";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Drawer } from "../ui/drawer";
 import { Radio, RadioGroup } from "../ui/radio";
@@ -30,6 +31,8 @@ import { toaster } from "../ui/toaster";
 import { Tooltip } from "../ui/tooltip";
 import { AlertDrawerMultiSelect } from "./AlertDrawerMultiSelect";
 import type { CustomGraphInput } from "./CustomGraph";
+
+const logger = createLogger("AlertDrawer");
 
 interface AlertDrawerProps {
   form?: UseFormReturn<CustomGraphFormData>;
@@ -149,6 +152,20 @@ export function AlertDrawer({ form: providedForm, graphId }: AlertDrawerProps) {
       setSelectedMembers(members);
     }
   }, [graphQuery.data, form]);
+
+  // Close drawer gracefully when form prop is missing (e.g., complexProps cleared
+  // on ErrorBoundary remount). Warn in dev so the root cause stays visible — if
+  // this fires in production, complexProps clearing is regressing somewhere.
+  useEffect(() => {
+    if (!providedForm) {
+      if (process.env.NODE_ENV !== "production") {
+        logger.warn(
+          "AlertDrawer closing: required `form` prop missing. This usually means complexProps was cleared before the drawer remounted (issue #3087). Investigate the surrounding drawer lifecycle.",
+        );
+      }
+      closeDrawer();
+    }
+  }, [providedForm, closeDrawer]);
 
   // Initialize alert fields with default values if not set
   useEffect(() => {

@@ -11,6 +11,7 @@ import type { PromptsConfig, PromptsLock, SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 /**
  * Core pull logic: fetches remote prompts and materializes them locally.
@@ -102,7 +103,7 @@ export const pullPrompts = async ({
         }
       } catch (error) {
         const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
+          formatApiErrorMessage({ error });
         result.errors.push({ name, error: errorMessage });
       }
     }
@@ -170,7 +171,7 @@ const printPullResults = ({
 
   if (result.errors.length > 0) {
     for (const { name, error } of result.errors) {
-      console.log(chalk.red(`✗ Failed ${chalk.cyan(name)}: ${error}`));
+      console.error(chalk.red(`✗ Failed ${chalk.cyan(name)}: ${error}`));
     }
   }
 
@@ -231,7 +232,7 @@ export const pullCommand = async (options?: { tag?: string }): Promise<void> => 
       console.error(
         chalk.red(
           `Unexpected error: ${
-            error instanceof Error ? error.message : "Unknown error"
+            formatApiErrorMessage({ error })
           }`
         )
       );

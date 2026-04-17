@@ -703,15 +703,19 @@ export class SimulationClickHouseRepository implements SimulationRepository {
     
     const combinedHaving = `HAVING ${[cursorPredicate, dateFilter.havingClause].filter(Boolean).join(" AND ")}`;
 
+    // NOTE: The aggregate is aliased as NormalizedSetId (not ScenarioSetId) on
+    // purpose — aliasing as ScenarioSetId would shadow the underlying column
+    // referenced in the dedup IN-tuple below, causing ClickHouse to reject the
+    // query with "Aggregate function ... is found in WHERE in query".
     const batchRows = await this.queryRows<{
       BatchRunId: string;
       MaxCreatedAt: string;
-      ScenarioSetId: string;
+      NormalizedSetId: string;
     }>(
       `SELECT
         BatchRunId,
         toString(toUnixTimestamp64Milli(max(CreatedAt))) AS MaxCreatedAt,
-        any(IF(ScenarioSetId = '', 'default', ScenarioSetId)) AS ScenarioSetId -- Must match DEFAULT_SET_ID from internal-set-id.ts
+        any(IF(ScenarioSetId = '', 'default', ScenarioSetId)) AS NormalizedSetId -- Must match DEFAULT_SET_ID from internal-set-id.ts
        FROM ${TABLE_NAME}
        WHERE TenantId = {tenantId:String}
          ${dateFilter.whereClause}
@@ -743,7 +747,7 @@ export class SimulationClickHouseRepository implements SimulationRepository {
 
     const scenarioSetIds: Record<string, string> = {};
     for (const row of pageRows) {
-      scenarioSetIds[row.BatchRunId] = row.ScenarioSetId;
+      scenarioSetIds[row.BatchRunId] = row.NormalizedSetId;
     }
 
     const batchRunIds = pageRows.map((r) => r.BatchRunId);

@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const runWorkflowCommand = async (
   id: string,
@@ -30,9 +32,8 @@ export const runWorkflowCommand = async (
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Workflow execution failed (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Workflow execution failed: ${message}`);
       process.exit(1);
     }
 
@@ -57,15 +58,10 @@ export const runWorkflowCommand = async (
       console.log();
     }
   } catch (error) {
-    spinner.fail();
     if (error instanceof SyntaxError) {
-      console.error(chalk.red("Error: --input must be valid JSON"));
+      spinner.fail(chalk.red("--input must be valid JSON"));
     } else {
-      console.error(
-        chalk.red(
-          `Error running workflow: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
+      failSpinner({ spinner, error, action: "run workflow" });
     }
     process.exit(1);
   }

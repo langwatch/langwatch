@@ -1,11 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  EvaluatorsApiService,
-  EvaluatorsApiError,
-} from "@/client-sdk/services/evaluators";
+import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import type { UpdateEvaluatorBody } from "@/client-sdk/services/evaluators";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const updateEvaluatorCommand = async (
   idOrSlug: string,
@@ -15,7 +13,6 @@ export const updateEvaluatorCommand = async (
 
   const service = new EvaluatorsApiService();
 
-  // First resolve the evaluator to get its ID
   const resolveSpinner = ora(`Finding evaluator "${idOrSlug}"...`).start();
 
   let evaluatorId: string;
@@ -24,16 +21,11 @@ export const updateEvaluatorCommand = async (
     evaluatorId = evaluator.id;
     resolveSpinner.succeed(`Found evaluator "${evaluator.name}"`);
   } catch (error) {
-    resolveSpinner.fail();
-    if (error instanceof EvaluatorsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error finding evaluator: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({
+      spinner: resolveSpinner,
+      error,
+      action: `find evaluator "${idOrSlug}"`,
+    });
     process.exit(1);
   }
 
@@ -56,17 +48,10 @@ export const updateEvaluatorCommand = async (
       console.log(JSON.stringify(updated, null, 2));
     }
   } catch (error) {
-    updateSpinner.fail();
     if (error instanceof SyntaxError) {
-      console.error(chalk.red("Error: --settings must be valid JSON"));
-    } else if (error instanceof EvaluatorsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
+      updateSpinner.fail(chalk.red("--settings must be valid JSON"));
     } else {
-      console.error(
-        chalk.red(
-          `Error updating evaluator: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
+      failSpinner({ spinner: updateSpinner, error, action: "update evaluator" });
     }
     process.exit(1);
   }

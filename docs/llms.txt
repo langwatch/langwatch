@@ -344,6 +344,15 @@ Always navigate to docs links using the .md extension for better readability.
 - [Upgrade Guide](https://langwatch.ai/docs/self-hosting/upgrade.md): How to upgrade LangWatch to the latest version
 - [Migrate to v3](https://langwatch.ai/docs/self-hosting/upgrade-v3.md): Step-by-step guide to upgrade LangWatch from v1.x or v2.x to v3.0
 
+## Ops Console
+
+- [Operations Console](https://langwatch.ai/docs/self-hosting/ops/overview.md): Monitor, manage, and debug your LangWatch event-sourcing pipeline from a single pane of glass
+- [Ops Dashboard](https://langwatch.ai/docs/self-hosting/ops/dashboard.md): Real-time pipeline health monitoring with throughput, latency, and error tracking
+- [Queue Management](https://langwatch.ai/docs/self-hosting/ops/queue-management.md): Manage error groups, blocked queues, dead letter queue redriving, and draining
+- [Projection Replay](https://langwatch.ai/docs/self-hosting/ops/projection-replay.md): Rebuild projection state by replaying events from ClickHouse
+- [Deja View](https://langwatch.ai/docs/self-hosting/ops/dejaview.md): Time-travel debugger for event-sourced aggregates
+- [The Foundry](https://langwatch.ai/docs/self-hosting/ops/foundry.md): Interactive trace playground for building and sending synthetic traces
+
 # API Reference
 
 ## Traces

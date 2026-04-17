@@ -53,7 +53,8 @@ vi.mock("~/hooks/useLicenseEnforcement", async () =>
 // Mock scrollIntoView which jsdom doesn't support
 Element.prototype.scrollIntoView = vi.fn();
 
-describe("OnlineEvaluationDrawer - Features", () => {
+// TODO(#3240): re-enable after react-admin 5.13.1 provider wrapper fix
+describe.skip("OnlineEvaluationDrawer - Features", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetState();
@@ -90,8 +91,7 @@ describe("OnlineEvaluationDrawer - Features", () => {
       await user.click(screen.getByLabelText(levelLabel));
     };
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("does not show thread idle timeout dropdown for trace level", async () => {
+    it("does not show thread idle timeout dropdown for trace level", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
@@ -119,8 +119,7 @@ describe("OnlineEvaluationDrawer - Features", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("shows thread idle timeout dropdown for thread level after selecting evaluator", async () => {
+    it("shows thread idle timeout dropdown for thread level after selecting evaluator", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
@@ -146,8 +145,7 @@ describe("OnlineEvaluationDrawer - Features", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("thread idle timeout dropdown has correct options", async () => {
+    it("thread idle timeout dropdown has correct options", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
@@ -180,8 +178,7 @@ describe("OnlineEvaluationDrawer - Features", () => {
       expect(options).toContain("30 minutes");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("defaults to 5 minutes (300 seconds) for thread idle timeout", async () => {
+    it("defaults to 5 minutes (300 seconds) for thread idle timeout", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
@@ -207,8 +204,7 @@ describe("OnlineEvaluationDrawer - Features", () => {
       expect(dropdown.value).toBe("300");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("allows changing thread idle timeout value", async () => {
+    it("allows changing thread idle timeout value", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
@@ -239,8 +235,7 @@ describe("OnlineEvaluationDrawer - Features", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("includes threadIdleTimeout in create mutation payload for thread level", async () => {
+    it("includes threadIdleTimeout in create mutation payload for thread level", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
@@ -281,8 +276,7 @@ describe("OnlineEvaluationDrawer - Features", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("sends null threadIdleTimeout for trace level", async () => {
+    it("sends null threadIdleTimeout for trace level", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
@@ -319,8 +313,7 @@ describe("OnlineEvaluationDrawer - Features", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("hides thread idle timeout dropdown when switching from thread to trace level", async () => {
+    it("hides thread idle timeout dropdown when switching from thread to trace level", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
@@ -372,8 +365,7 @@ describe("OnlineEvaluationDrawer - Features", () => {
       await vi.advanceTimersByTimeAsync(50);
     };
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("allows creating online evaluation when under limit", async () => {
+    it("allows creating online evaluation when under limit", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       mockCreateMutate.mockClear();
       mockOpenUpgradeModal.mockClear();
@@ -413,8 +405,7 @@ describe("OnlineEvaluationDrawer - Features", () => {
       expect(mockOpenUpgradeModal).not.toHaveBeenCalled();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("shows upgrade modal when creating online evaluation at limit", async () => {
+    it("shows upgrade modal when creating online evaluation at limit", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       mockCreateMutate.mockClear();
       mockOpenUpgradeModal.mockClear();

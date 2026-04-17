@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.20.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.19.0...python-sdk@v0.20.0) (2026-04-17)
+
+
+### Features
+
+* **python-sdk:** async-native experiment aloop + asubmit ([#3273](https://github.com/langwatch/langwatch/issues/3273)) ([6711d9e](https://github.com/langwatch/langwatch/commit/6711d9e83a9b9c8c3b0ac7050e2bd12f121b7d5e))
+
+## [0.19.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.18.0...python-sdk@v0.19.0) (2026-04-16)
+
+
+### Features
+
+* expose all platform features via TypeScript and Python SDKs ([#3210](https://github.com/langwatch/langwatch/issues/3210)) ([d3148a8](https://github.com/langwatch/langwatch/commit/d3148a8839ecd9c10b725bcb00bc428795d5901d))
+* full CLI, API, and MCP coverage for all platform features ([#3168](https://github.com/langwatch/langwatch/issues/3168)) ([921b7b9](https://github.com/langwatch/langwatch/commit/921b7b92d3ccc038556fe2241a3a90302786631e))
+
 ## [0.18.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.17.0...python-sdk@v0.18.0) (2026-04-10)
 
 

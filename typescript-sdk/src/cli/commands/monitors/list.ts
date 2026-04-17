@@ -1,7 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listMonitorsCommand = async (options?: {
   format?: string;
@@ -20,9 +22,8 @@ export const listMonitorsCommand = async (options?: {
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to fetch monitors (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to fetch monitors: ${message}`);
       process.exit(1);
     }
 
@@ -78,12 +79,7 @@ export const listMonitorsCommand = async (options?: {
 
     console.log();
   } catch (error) {
-    spinner.fail();
-    console.error(
-      chalk.red(
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
-      )
-    );
+    failSpinner({ spinner, error, action: "fetch monitors" });
     process.exit(1);
   }
 };

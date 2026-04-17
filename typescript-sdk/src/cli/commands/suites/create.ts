@@ -2,10 +2,10 @@ import chalk from "chalk";
 import ora from "ora";
 import {
   SuitesApiService,
-  SuitesApiError,
   type SuiteTarget,
 } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 function parseTargets(targetStrings: string[]): SuiteTarget[] {
   return targetStrings.map((t) => {
@@ -86,16 +86,7 @@ export const createSuiteCommand = async (
       chalk.gray(`Run it with: ${chalk.cyan(`langwatch suite run ${suite.id}`)}`),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof SuitesApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "create suite" });
     process.exit(1);
   }
 };

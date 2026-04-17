@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const getTriggerCommand = async (
   id: string,
@@ -19,7 +21,8 @@ export const getTriggerCommand = async (
     });
 
     if (!response.ok) {
-      spinner.fail(response.status === 404 ? `Trigger "${id}" not found` : `Failed (${response.status})`);
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to fetch trigger "${id}": ${message}`);
       process.exit(1);
     }
 
@@ -65,8 +68,7 @@ export const getTriggerCommand = async (
 
     console.log();
   } catch (error) {
-    spinner.fail();
-    console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`));
+    failSpinner({ spinner, error, action: "fetch trigger" });
     process.exit(1);
   }
 };

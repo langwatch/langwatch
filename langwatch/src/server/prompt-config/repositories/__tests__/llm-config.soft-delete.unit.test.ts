@@ -25,20 +25,57 @@ function makeMockPrisma(overrides: Record<string, unknown> = {}) {
 describe("LlmConfigRepository", () => {
   describe("deleteConfig()", () => {
     describe("when prompt exists and belongs to the project", () => {
-      it("soft-deletes by setting deletedAt instead of hard-deleting", async () => {
+      it("soft-deletes by setting deletedAt and frees the handle for reuse", async () => {
         const mockUpdate = vi.fn(() =>
           Promise.resolve({ id: "prompt_1", deletedAt: new Date() }),
         );
         const prisma = makeMockPrisma({ update: mockUpdate });
 
-        // Mock getConfigByIdOrHandleWithLatestVersion to return a config
+        // Mock getConfigByIdOrHandleWithLatestVersion to return a config with
+        // a prefixed handle (what the DB actually stores) and a non-empty name.
         const repo = new LlmConfigRepository(prisma);
         vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
           id: "prompt_1",
           projectId: "proj_1",
           organizationId: "org_1",
-          name: "Support Bot",
-          handle: "support-bot",
+          name: "Support Bot v2",
+          handle: "proj_1/support-bot",
+          scope: "PROJECT",
+          copiedFromPromptId: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          deletedAt: null,
+          latestVersion: {} as any,
+        });
+
+        await repo.deleteConfig("prompt_1", "proj_1", "org_1");
+
+        // Handle is nulled out to free it for future reuse; deletedAt is set;
+        // the existing display name is preserved (not overwritten with the
+        // slug) so suite/history listings keep showing the user's title.
+        expect(mockUpdate).toHaveBeenCalledWith({
+          where: { id: "prompt_1", projectId: "proj_1" },
+          data: {
+            deletedAt: expect.any(Date),
+            handle: null,
+            name: "Support Bot v2",
+          },
+        });
+      });
+
+      it("falls back to the unprefixed handle when name is empty", async () => {
+        const mockUpdate = vi.fn(() =>
+          Promise.resolve({ id: "prompt_1", deletedAt: new Date() }),
+        );
+        const prisma = makeMockPrisma({ update: mockUpdate });
+
+        const repo = new LlmConfigRepository(prisma);
+        vi.spyOn(repo, "getConfigByIdOrHandleWithLatestVersion").mockResolvedValue({
+          id: "prompt_1",
+          projectId: "proj_1",
+          organizationId: "org_1",
+          name: "",
+          handle: "proj_1/support-bot",
           scope: "PROJECT",
           copiedFromPromptId: null,
           createdAt: new Date(),
@@ -51,7 +88,11 @@ describe("LlmConfigRepository", () => {
 
         expect(mockUpdate).toHaveBeenCalledWith({
           where: { id: "prompt_1", projectId: "proj_1" },
-          data: { deletedAt: expect.any(Date) },
+          data: {
+            deletedAt: expect.any(Date),
+            handle: null,
+            name: "support-bot",
+          },
         });
       });
 

@@ -1,11 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  DashboardsApiService,
-  DashboardsApiError,
-} from "@/client-sdk/services/dashboards/dashboards-api.service";
+import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listDashboardsCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -59,16 +57,7 @@ export const listDashboardsCommand = async (options?: { format?: string }): Prom
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof DashboardsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching dashboards: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "fetch dashboards" });
     process.exit(1);
   }
 };

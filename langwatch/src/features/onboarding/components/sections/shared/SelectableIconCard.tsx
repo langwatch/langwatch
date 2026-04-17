@@ -1,7 +1,5 @@
 import {
   Box,
-  Card,
-  Icon,
   type IconProps,
   Text,
   VStack,
@@ -10,6 +8,7 @@ import type React from "react";
 import { useColorModeValue } from "../../../../../components/ui/color-mode";
 import { Tooltip } from "../../../../../components/ui/tooltip";
 import type { IconData } from "../../../regions/shared/types";
+import { iconSizeToPixels, type IconSizeKey } from "../../../../../utils/iconSize";
 
 interface SelectableIconCardProps {
   label: string;
@@ -34,20 +33,25 @@ export function SelectableIconCard(
     ariaLabel,
   } = props;
 
-  // Extract the actual icon from IconWithLabel if needed
   const actualIcon = icon?.type === "with-label" ? icon.icon : icon;
   const iconLabel = icon?.type === "with-label" ? icon.label : undefined;
+
+  const resolvedSize =
+    iconSizeToPixels[(iconSize ?? "md") as IconSizeKey] ?? "24px";
 
   const themedIconSrc = useColorModeValue(
     actualIcon?.type === "themed" ? actualIcon.lightSrc : "",
     actualIcon?.type === "themed" ? actualIcon.darkSrc : "",
   );
-  const selectedBorderColor = useColorModeValue("orange.400", "orange.300");
+  const selectedBorderColor = useColorModeValue("orange.400", "orange.800");
   const selectedBg = useColorModeValue("orange.50", "orange.950/30");
+  const isDark = useColorModeValue(false, true);
 
   const iconSrc =
     actualIcon?.type === "themed" ? themedIconSrc : actualIcon?.src;
   const iconAlt = actualIcon?.alt;
+
+  const cardSize = size === "sm" ? "72px" : "96px";
 
   return (
     <Tooltip
@@ -56,53 +60,71 @@ export function SelectableIconCard(
       showArrow
       openDelay={0}
     >
-      <Card.Root
+      <Box
         role="button"
+        tabIndex={0}
         aria-label={ariaLabel}
         aria-pressed={selected}
         onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
         cursor="pointer"
-        borderWidth={selected ? "2px" : "1px"}
-        borderColor={
-          selected ? selectedBorderColor : "border.subtle"
-        }
+        w={cardSize}
+        h={cardSize}
+        flexShrink={0}
+        borderRadius="lg"
+        borderWidth={isDark ? "1px" : selected ? "2px" : "1px"}
+        borderStyle="solid"
+        borderColor={selected ? selectedBorderColor : "border.subtle"}
         bg={selected ? selectedBg : "bg.panel"}
         boxShadow={
           selected
-            ? "0 0 0 1px var(--chakra-colors-orange-100)"
+            ? isDark
+              ? "0 6px 28px rgba(237,137,38,0.06)"
+              : "0 0 0 1px var(--chakra-colors-orange-100)"
             : "none"
         }
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
         transition="all 0.2s ease"
         _hover={{
           borderColor: selected
-            ? selectedBorderColor
+            ? isDark
+              ? "orange.emphasized"
+              : selectedBorderColor
             : "border.emphasized",
-          bg: selected ? selectedBg : "gray.50",
+          bg: selected ? selectedBg : isDark ? "bg.muted" : "gray.50",
           boxShadow: selected
-            ? "0 0 0 1px var(--chakra-colors-orange-100)"
+            ? isDark
+              ? "0 6px 28px rgba(237,137,38,0.06)"
+              : "0 0 0 1px var(--chakra-colors-orange-100)"
             : "sm",
           transform: "translateY(-1px)",
         }}
-        aspectRatio="1 / 1"
-        display="flex"
-        maxW={size === "sm" ? "75px" : "100px"}
-        minW={size === "sm" ? "65px" : "90px"}
-        alignItems="center"
-        justifyContent="center"
       >
         <VStack
-          filter={selected ? "grayscale(0%)" : "grayscale(100%)"}
-          transition="filter 0.2s ease"
-          alignItems="center"
-          justifyContent="center"
-          gap={iconLabel ? "0px" : "0"}
+          gap={iconLabel ? 1 : 0}
+          align="center"
+          justify="center"
+          style={{ filter: selected ? "grayscale(0%)" : "grayscale(100%)", transition: "filter 0.2s ease" }}
         >
           {icon ? (
             <>
-              <Icon size={iconSize ?? "md"}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={iconSrc} alt={iconAlt} />
-              </Icon>
+              {iconSrc ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={iconSrc}
+                  alt={iconAlt}
+                  style={{ width: resolvedSize, height: resolvedSize, objectFit: "contain", display: "block" }}
+                />
+              ) : (
+                <Box w={resolvedSize} h={resolvedSize} aria-hidden />
+              )}
               {iconLabel && (
                 <Text
                   textStyle={size === "sm" ? "2xs" : "xs"}
@@ -126,7 +148,7 @@ export function SelectableIconCard(
             </Text>
           )}
         </VStack>
-      </Card.Root>
+      </Box>
     </Tooltip>
   );
 }

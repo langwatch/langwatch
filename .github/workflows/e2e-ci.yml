@@ -1,3 +1,8 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+# `e2e-complete` is NOT required in branch protection (e2e is slow and
+# flaky) but follows the same pattern for consistency — if anything in
+# this workflow ever becomes a required check, the pattern is already
+# in place.
 name: e2e-ci
 
 on:
@@ -5,11 +10,7 @@ on:
     branches:
       - main
   pull_request:
-    paths:
-      - "langwatch/**"
-      - "python-sdk/**"
-      - "agentic-e2e-tests/**"
-      - ".github/workflows/e2e-ci.yml"
+  merge_group:
   workflow_dispatch:
   # Optional: run nightly for regression detection
   # schedule:
@@ -20,7 +21,25 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'langwatch/**'
+              - 'python-sdk/**'
+              - 'agentic-e2e-tests/**'
+              - '.github/workflows/e2e-ci.yml'
+
   e2e:
+    needs: changes
+    if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
     env:
       # App configuration
@@ -137,13 +156,7 @@ jobs:
         run: pnpm start:prepare:files
 
       - name: Install goose
-        run: |
-          GOOSE_URL="https://github.com/pressly/goose/releases/download/v3.26.0/goose_linux_x86_64"
-          GOOSE_SHA256="8b3eee9845cd87d827ba1abddb85235fb3684f9fb1666426f647ddd12fd29efe"
-          curl -fsSL "$GOOSE_URL" -o /tmp/goose
-          echo "$GOOSE_SHA256  /tmp/goose" | sha256sum -c - || (rm -f /tmp/goose && exit 1)
-          sudo mv /tmp/goose /usr/local/bin/goose
-          chmod +x /usr/local/bin/goose
+        run: bash .github/scripts/install-goose.sh
 
       - name: Setup database
         working-directory: langwatch
@@ -205,3 +218,13 @@ jobs:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
         run: bash .github/scripts/notify-slack-job-failure.sh e2e
+
+  e2e-complete:
+    needs: [changes, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: e2e

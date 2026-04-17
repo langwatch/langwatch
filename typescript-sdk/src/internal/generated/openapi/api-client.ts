@@ -1442,6 +1442,114 @@ export interface paths {
         patch: operations["patchApiTriggersById"];
         trace?: never;
     };
+    "/api/prompts/{id}/versions/{versionId}/restore": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Restore a prompt to a previous version. Creates a new version with the same config data as the specified version. */
+        post: operations["postApiPromptsByIdVersionsByVersionIdRestore"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/monitors": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all online evaluation monitors for the project */
+        get: operations["getApiMonitors"];
+        put?: never;
+        /** @description Create a new online evaluation monitor */
+        post: operations["postApiMonitors"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/monitors/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a monitor by its ID */
+        get: operations["getApiMonitorsById"];
+        put?: never;
+        post?: never;
+        /** @description Delete a monitor */
+        delete: operations["deleteApiMonitorsById"];
+        options?: never;
+        head?: never;
+        /** @description Update a monitor (name, enabled state, settings, etc.) */
+        patch: operations["patchApiMonitorsById"];
+        trace?: never;
+    };
+    "/api/monitors/{id}/toggle": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Enable or disable a monitor */
+        post: operations["postApiMonitorsByIdToggle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all secrets for the project (values are never returned) */
+        get: operations["getApiSecrets"];
+        put?: never;
+        /** @description Create a new project secret. The value is encrypted at rest and never returned. */
+        post: operations["postApiSecrets"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/secrets/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a secret by its ID (value is never returned) */
+        get: operations["getApiSecretsById"];
+        /** @description Update a secret's value */
+        put: operations["putApiSecretsById"];
+        post?: never;
+        /** @description Delete a secret */
+        delete: operations["deleteApiSecretsById"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1824,6 +1932,11 @@ export interface operations {
                                 };
                             } | null;
                         };
+                        /** @default [] */
+                        tags: {
+                            name: string;
+                            versionId: string;
+                        }[];
                     };
                 };
             };
@@ -2025,6 +2138,11 @@ export interface operations {
                                 };
                             } | null;
                         };
+                        /** @default [] */
+                        tags: {
+                            name: string;
+                            versionId: string;
+                        }[];
                     };
                 };
             };
@@ -2285,6 +2403,11 @@ export interface operations {
                                 };
                             } | null;
                         };
+                        /** @default [] */
+                        tags: {
+                            name: string;
+                            versionId: string;
+                        }[];
                     }[];
                 };
             };
@@ -2541,6 +2664,11 @@ export interface operations {
                                     };
                                 } | null;
                             };
+                            /** @default [] */
+                            tags: {
+                                name: string;
+                                versionId: string;
+                            }[];
                         };
                         conflictInfo?: {
                             localVersion: number;
@@ -2922,6 +3050,11 @@ export interface operations {
                                 };
                             } | null;
                         };
+                        /** @default [] */
+                        tags: {
+                            name: string;
+                            versionId: string;
+                        }[];
                     }[];
                 };
             };
@@ -3112,6 +3245,11 @@ export interface operations {
                                 };
                             } | null;
                         };
+                        /** @default [] */
+                        tags: {
+                            name: string;
+                            versionId: string;
+                        }[];
                     };
                 };
             };
@@ -3239,18 +3377,21 @@ export interface operations {
                         role: "developer";
                         content: string;
                         name?: string;
+                        encryptedValue?: string;
                     } | {
                         id: string;
                         /** @constant */
                         role: "system";
                         content: string;
                         name?: string;
+                        encryptedValue?: string;
                     } | {
                         id: string;
                         /** @constant */
                         role: "assistant";
                         content?: string;
                         name?: string;
+                        encryptedValue?: string;
                         toolCalls?: {
                             id: string;
                             /** @constant */
@@ -3259,13 +3400,87 @@ export interface operations {
                                 name: string;
                                 arguments: string;
                             };
+                            encryptedValue?: string;
                         }[];
                     } | {
                         id: string;
                         /** @constant */
                         role: "user";
-                        content: string;
+                        content: string | ({
+                            /** @constant */
+                            type: "text";
+                            text: string;
+                        } | {
+                            /** @constant */
+                            type: "image";
+                            source: {
+                                /** @constant */
+                                type: "data";
+                                value: string;
+                                mimeType: string;
+                            } | {
+                                /** @constant */
+                                type: "url";
+                                value: string;
+                                mimeType?: string;
+                            };
+                            metadata?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "audio";
+                            source: {
+                                /** @constant */
+                                type: "data";
+                                value: string;
+                                mimeType: string;
+                            } | {
+                                /** @constant */
+                                type: "url";
+                                value: string;
+                                mimeType?: string;
+                            };
+                            metadata?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "video";
+                            source: {
+                                /** @constant */
+                                type: "data";
+                                value: string;
+                                mimeType: string;
+                            } | {
+                                /** @constant */
+                                type: "url";
+                                value: string;
+                                mimeType?: string;
+                            };
+                            metadata?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "document";
+                            source: {
+                                /** @constant */
+                                type: "data";
+                                value: string;
+                                mimeType: string;
+                            } | {
+                                /** @constant */
+                                type: "url";
+                                value: string;
+                                mimeType?: string;
+                            };
+                            metadata?: unknown;
+                        } | {
+                            /** @constant */
+                            type: "binary";
+                            mimeType: string;
+                            id?: string;
+                            url?: string;
+                            data?: string;
+                            filename?: string;
+                        })[];
                         name?: string;
+                        encryptedValue?: string;
                     } | {
                         id: string;
                         content: string;
@@ -3273,6 +3488,21 @@ export interface operations {
                         role: "tool";
                         toolCallId: string;
                         error?: string;
+                        encryptedValue?: string;
+                    } | {
+                        id: string;
+                        /** @constant */
+                        role: "activity";
+                        activityType: string;
+                        content: {
+                            [key: string]: unknown;
+                        };
+                    } | {
+                        id: string;
+                        /** @constant */
+                        role: "reasoning";
+                        content: string;
+                        encryptedValue?: string;
                     }) | {
                         role?: "system" | "user" | "assistant" | "function" | "tool" | "unknown";
                         content?: string | ({
@@ -4423,6 +4653,8 @@ export interface operations {
                         }[];
                         workflowName?: string;
                         workflowIcon?: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     }[];
                 };
             };
@@ -4525,6 +4757,8 @@ export interface operations {
                         }[];
                         workflowName?: string;
                         workflowIcon?: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -4620,6 +4854,8 @@ export interface operations {
                         }[];
                         workflowName?: string;
                         workflowIcon?: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -5116,6 +5352,8 @@ export interface operations {
                         }[];
                         workflowName?: string;
                         workflowIcon?: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -5286,6 +5524,8 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        /** Format: uri */
+                        platformUrl: string;
                     }[];
                 };
             };
@@ -5371,6 +5611,8 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -5447,6 +5689,8 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -5544,6 +5788,8 @@ export interface operations {
                         situation: string;
                         criteria: string[];
                         labels: string[];
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -6497,6 +6743,8 @@ export interface operations {
                         isComponent: boolean;
                         createdAt: string;
                         updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     }[];
                 };
             };
@@ -6576,6 +6824,8 @@ export interface operations {
                         isComponent: boolean;
                         createdAt: string;
                         updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -6760,6 +7010,8 @@ export interface operations {
                         isComponent: boolean;
                         createdAt: string;
                         updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -7348,6 +7600,8 @@ export interface operations {
                             updatedAt: number;
                             durationInMs: number;
                             totalCost?: number;
+                            /** Format: uri */
+                            platformUrl: string;
                         }[];
                         hasMore?: boolean;
                         nextCursor?: string;
@@ -7443,6 +7697,8 @@ export interface operations {
                         updatedAt: number;
                         durationInMs: number;
                         totalCost?: number;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -7625,6 +7881,8 @@ export interface operations {
                         labels: string[];
                         createdAt: string;
                         updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     }[];
                 };
             };
@@ -7725,6 +7983,8 @@ export interface operations {
                         labels: string[];
                         createdAt: string;
                         updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -7810,6 +8070,8 @@ export interface operations {
                         labels: string[];
                         createdAt: string;
                         updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -8007,6 +8269,8 @@ export interface operations {
                         labels: string[];
                         createdAt: string;
                         updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -8104,6 +8368,8 @@ export interface operations {
                         labels: string[];
                         createdAt: string;
                         updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -8308,6 +8574,8 @@ export interface operations {
                         alertType: "CRITICAL" | "WARNING" | "INFO" | null;
                         createdAt: string;
                         updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     }[];
                 };
             };
@@ -8412,6 +8680,8 @@ export interface operations {
                         alertType: "CRITICAL" | "WARNING" | "INFO" | null;
                         createdAt: string;
                         updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -8499,6 +8769,8 @@ export interface operations {
                         alertType: "CRITICAL" | "WARNING" | "INFO" | null;
                         createdAt: string;
                         updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -8699,6 +8971,8 @@ export interface operations {
                         alertType: "CRITICAL" | "WARNING" | "INFO" | null;
                         createdAt: string;
                         updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
                     };
                 };
             };
@@ -8727,6 +9001,1214 @@ export interface operations {
                 };
             };
             /** @description Trigger not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiPromptsByIdVersionsByVersionIdRestore: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                versionId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        handle: string | null;
+                        /** @enum {string} */
+                        scope: "ORGANIZATION" | "PROJECT";
+                        name: string;
+                        updatedAt: string;
+                        projectId: string;
+                        organizationId: string;
+                        versionId: string;
+                        authorId?: string | null;
+                        version: number;
+                        createdAt: string;
+                        commitMessage?: string | null;
+                        prompt: string;
+                        /** @default [] */
+                        messages: {
+                            /** @enum {string} */
+                            role: "user" | "assistant" | "system";
+                            content: string;
+                        }[];
+                        /** @default [] */
+                        inputs: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "float" | "bool" | "image" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "chat_messages";
+                        }[];
+                        outputs: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "float" | "bool" | "json_schema";
+                            json_schema?: {
+                                type: string;
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        model: string;
+                        temperature?: number;
+                        maxTokens?: number;
+                        demonstrations?: {
+                            id?: string;
+                            name?: string;
+                            inline?: {
+                                records: {
+                                    [key: string]: unknown[];
+                                };
+                                columnTypes: {
+                                    id?: string;
+                                    name: string;
+                                    type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                }[];
+                            };
+                        };
+                        promptingTechnique?: {
+                            /** @enum {string} */
+                            type: "few_shot" | "in_context" | "chain_of_thought";
+                            demonstrations?: {
+                                id?: string;
+                                name?: string;
+                                inline?: {
+                                    records: {
+                                        [key: string]: unknown[];
+                                    };
+                                    columnTypes: {
+                                        id?: string;
+                                        name: string;
+                                        type: "string" | "boolean" | "number" | "date" | "list" | "json" | "spans" | "rag_contexts" | "chat_messages" | "annotations" | "evaluations" | "image";
+                                    }[];
+                                };
+                            };
+                        };
+                        responseFormat?: {
+                            /** @enum {string} */
+                            type: "json_schema";
+                            json_schema: {
+                                name: string;
+                                schema: {
+                                    [key: string]: unknown;
+                                };
+                            } | null;
+                        };
+                        /** @default [] */
+                        tags: {
+                            name: string;
+                            versionId: string;
+                        }[];
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Prompt or version not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiMonitors: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        checkType: string;
+                        enabled: boolean;
+                        /** @enum {string} */
+                        executionMode: "ON_MESSAGE" | "AS_GUARDRAIL" | "MANUALLY";
+                        sample: number;
+                        level: string;
+                        evaluatorId: string | null;
+                        preconditions?: unknown;
+                        parameters?: unknown;
+                        mappings?: null;
+                        threadIdleTimeout: number | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    }[];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiMonitors: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                    checkType: string;
+                    /**
+                     * @default ON_MESSAGE
+                     * @enum {string}
+                     */
+                    executionMode?: "ON_MESSAGE" | "AS_GUARDRAIL" | "MANUALLY";
+                    /** @default [] */
+                    preconditions?: unknown[];
+                    /** @default {} */
+                    parameters?: {
+                        [key: string]: unknown;
+                    };
+                    mappings?: {
+                        [key: string]: unknown;
+                    };
+                    /** @default 1 */
+                    sample?: number;
+                    evaluatorId?: string;
+                    /**
+                     * @default trace
+                     * @enum {string}
+                     */
+                    level?: "trace" | "thread";
+                    threadIdleTimeout?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Monitor created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        checkType: string;
+                        enabled: boolean;
+                        /** @enum {string} */
+                        executionMode: "ON_MESSAGE" | "AS_GUARDRAIL" | "MANUALLY";
+                        sample: number;
+                        level: string;
+                        evaluatorId: string | null;
+                        preconditions?: unknown;
+                        parameters?: unknown;
+                        mappings?: null;
+                        threadIdleTimeout: number | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiMonitorsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        checkType: string;
+                        enabled: boolean;
+                        /** @enum {string} */
+                        executionMode: "ON_MESSAGE" | "AS_GUARDRAIL" | "MANUALLY";
+                        sample: number;
+                        level: string;
+                        evaluatorId: string | null;
+                        preconditions?: unknown;
+                        parameters?: unknown;
+                        mappings?: null;
+                        threadIdleTimeout: number | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Monitor not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    deleteApiMonitorsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Monitor deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        deleted: boolean;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Monitor not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    patchApiMonitorsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name?: string;
+                    enabled?: boolean;
+                    checkType?: string;
+                    /** @enum {string} */
+                    executionMode?: "ON_MESSAGE" | "AS_GUARDRAIL" | "MANUALLY";
+                    preconditions?: unknown[];
+                    parameters?: {
+                        [key: string]: unknown;
+                    };
+                    mappings?: {
+                        [key: string]: unknown;
+                    };
+                    sample?: number;
+                    evaluatorId?: string | null;
+                    /** @enum {string} */
+                    level?: "trace" | "thread";
+                    threadIdleTimeout?: number | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Monitor updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        checkType: string;
+                        enabled: boolean;
+                        /** @enum {string} */
+                        executionMode: "ON_MESSAGE" | "AS_GUARDRAIL" | "MANUALLY";
+                        sample: number;
+                        level: string;
+                        evaluatorId: string | null;
+                        preconditions?: unknown;
+                        parameters?: unknown;
+                        mappings?: null;
+                        threadIdleTimeout: number | null;
+                        createdAt: string;
+                        updatedAt: string;
+                        /** Format: uri */
+                        platformUrl: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Monitor not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiMonitorsByIdToggle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    enabled: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description Monitor toggled */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        enabled: boolean;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Monitor not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiSecrets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        projectId: string;
+                        name: string;
+                        createdAt: string;
+                        updatedAt: string;
+                    }[];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    postApiSecrets: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    name: string;
+                    value: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Secret created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        projectId: string;
+                        name: string;
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Secret with this name already exists */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    getApiSecretsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        projectId: string;
+                        name: string;
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Secret not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    putApiSecretsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": {
+                    value: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Secret updated */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        projectId: string;
+                        name: string;
+                        createdAt: string;
+                        updatedAt: string;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Secret not found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+        };
+    };
+    deleteApiSecretsById: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Secret deleted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        deleted: boolean;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        message?: string;
+                    };
+                };
+            };
+            /** @description Secret not found */
             404: {
                 headers: {
                     [name: string]: unknown;
