@@ -381,8 +381,8 @@ describe("RBAC Permission System", () => {
         expect(canManage(TeamUserRole.ADMIN, Resources.EVALUATIONS)).toBe(true);
         expect(canManage(TeamUserRole.ADMIN, Resources.DATASETS)).toBe(true);
         expect(canManage(TeamUserRole.ADMIN, Resources.ANALYTICS)).toBe(true);
-        // Traces only has view and share, not manage
-        expect(canManage(TeamUserRole.ADMIN, Resources.TRACES)).toBe(false);
+        // Traces gained manage (archive) in PR #3272
+        expect(canManage(TeamUserRole.ADMIN, Resources.TRACES)).toBe(true);
       });
 
       it("returns true for MEMBER role on most resources", () => {
@@ -391,8 +391,8 @@ describe("RBAC Permission System", () => {
         );
         expect(canManage(TeamUserRole.MEMBER, Resources.DATASETS)).toBe(true);
         expect(canManage(TeamUserRole.MEMBER, Resources.ANALYTICS)).toBe(true);
-        // Traces only has view and share, not manage
-        expect(canManage(TeamUserRole.MEMBER, Resources.TRACES)).toBe(false);
+        // Traces gained manage (archive) in PR #3272
+        expect(canManage(TeamUserRole.MEMBER, Resources.TRACES)).toBe(true);
       });
 
       it("returns false for MEMBER role on project resource", () => {
