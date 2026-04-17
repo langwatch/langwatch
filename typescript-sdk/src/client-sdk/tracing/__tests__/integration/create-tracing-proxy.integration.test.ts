@@ -31,7 +31,6 @@ describe("createTracingProxy Integration Tests", () => {
     spanProcessor = new SimpleSpanProcessor(spanExporter);
 
     // Setup observability with real OpenTelemetry SDK
-    // langwatch: 'disabled' prevents shutdown from flushing a real OTLP exporter (which times out in CI)
     observabilityHandle = setupObservability({
       serviceName: "tracing-proxy-integration-test",
       langwatch: "disabled",

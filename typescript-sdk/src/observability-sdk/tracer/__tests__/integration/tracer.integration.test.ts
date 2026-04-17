@@ -55,7 +55,6 @@ describe("Tracer Integration Tests", () => {
 
     // Setup observability with real OpenTelemetry SDK
     // Use spanProcessors instead of traceExporter as we don't want to wrap in a BatchSpanProcessor
-    // langwatch: 'disabled' prevents shutdown from flushing a real OTLP exporter (which times out in CI)
     observabilityHandle = setupObservability({
       serviceName: "tracer-integration-test",
       langwatch: "disabled",
