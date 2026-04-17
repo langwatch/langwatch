@@ -748,6 +748,13 @@ class Experiment:
             try:
                 _active_iteration_trace_ctx.reset(_active_trace_token)
             except (LookupError, ValueError):
+                # Swallowed intentionally: `_active_trace_token` is created
+                # via `set()` in the same asyncio task, so `reset()` should
+                # always succeed. But if Python GCs an async generator in a
+                # different task's context during teardown, the token can
+                # look "from a different Context" and raise ValueError —
+                # that's a cleanup edge case, not a user-visible failure,
+                # so we don't let it mask the real iteration result.
                 pass
 
     def _add_to_batch(self, iteration: IterationInfo):
