@@ -42,21 +42,27 @@ function RootLayout() {
  * React Router's lazy keeps the OLD route visible while the new module loads,
  * eliminating the gray flash that React.lazy + Suspense causes.
  */
+// Minimum gap between self-triggered reloads. Short enough that a second
+// deploy mid-session still reloads; long enough to avoid a loop if the server
+// is genuinely returning broken chunks.
+const CHUNK_RELOAD_COOLDOWN_MS = 10_000;
+
 const page = (importFn: () => Promise<{ default: React.ComponentType }>) => ({
   lazy: () =>
     importFn().then((m) => ({ Component: m.default })).catch((err: unknown) => {
       const msg = err instanceof Error ? err.message.toLowerCase() : "";
       const isChunkError =
         msg.includes("loading chunk") ||
-        msg.includes("failed to fetch dynamically imported module");
+        msg.includes("dynamically imported module") ||
+        msg.includes("importing a module script failed");
 
       if (!isChunkError) throw err;
 
-      // Chunk failed to load — likely a stale build after deployment.
-      // Reload once so the browser fetches the new index.html with current chunk URLs.
-      const alreadyReloaded = sessionStorage.getItem("chunk-reload");
-      if (!alreadyReloaded) {
-        sessionStorage.setItem("chunk-reload", "1");
+      const lastReloadAt = Number(
+        sessionStorage.getItem("chunk-reload-at") ?? "0"
+      );
+      if (Date.now() - lastReloadAt > CHUNK_RELOAD_COOLDOWN_MS) {
+        sessionStorage.setItem("chunk-reload-at", String(Date.now()));
         window.location.reload();
       }
       throw err;
