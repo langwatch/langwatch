@@ -57,6 +57,11 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
   async process(
     request: CopilotRuntimeChatCompletionRequest,
   ): Promise<CopilotRuntimeChatCompletionResponse> {
+    // Allocate traceId first so the error stream and the (potential) backend
+    // trace share the same id. Anything that can throw must come after this
+    // line — the catch block below relies on it being defined. See #853.
+    const traceId = generateOtelTraceId();
+
     const {
       eventSource,
       messages,
@@ -65,10 +70,6 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     } = request;
 
     const fallbackThreadId = threadIdFromRequest ?? randomUUID();
-
-    // Allocate traceId before any throwable preparation so the error stream
-    // and the (potential) backend trace share the same id. See issue #853.
-    const traceId = generateOtelTraceId();
 
     // Try to prepare the workflow; if it fails, stream error to chat
     let preparedEvent: StudioClientEvent;
@@ -144,7 +145,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         this.projectId,
       );
     } catch (earlyError: any) {
-      logger.error({ earlyError }, "error");
+      logger.error({ err: earlyError }, "early error preparing prompt workflow");
       // Use the pre-allocated traceId so the frontend's TraceMessage queries
       // the same id the backend would have used for tracing (issue #853).
       const messageId = traceId;

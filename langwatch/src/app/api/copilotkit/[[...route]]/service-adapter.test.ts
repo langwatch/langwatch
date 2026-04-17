@@ -52,9 +52,27 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
 }));
 
+// Mock the trace id generator so tests can assert call count and deterministic ids.
+// vi.hoisted() lets the mock fn be referenced inside the hoisted vi.mock factory.
+const { generateOtelTraceIdMock } = vi.hoisted(() => ({
+  generateOtelTraceIdMock: vi.fn<() => string>(),
+}));
+vi.mock("~/utils/trace", async () => {
+  const actual = await vi.importActual<typeof import("~/utils/trace")>(
+    "~/utils/trace",
+  );
+  return {
+    ...actual,
+    generateOtelTraceId: generateOtelTraceIdMock,
+  };
+});
+
 // ── Imports ───────────────────────────────────────────────────────────────────
+import type {
+  CopilotRuntimeChatCompletionRequest,
+  CopilotRuntimeChatCompletionResponse,
+} from "@copilotkit/runtime";
 import { beforeEach, describe, expect, it } from "vitest";
-import * as traceUtils from "~/utils/trace";
 import { PromptStudioAdapter } from "./service-adapter";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -65,15 +83,15 @@ type StreamEvent =
   | { type: "TextMessageEnd"; messageId: string };
 
 /**
- * A minimal stub for RuntimeEventSource that captures stream events.
- * RuntimeEventSource is not exported from @copilotkit/runtime, so we build
- * a duck-typed object that satisfies the interface PromptStudioAdapter.process() uses.
+ * Minimal duck-typed stand-in for RuntimeEventSource. The real type is not
+ * exported from @copilotkit/runtime; PromptStudioAdapter.process() only ever
+ * calls `.stream(cb)` and the eventStream$ methods used inside the callback,
+ * so we satisfy that surface.
  */
 type MockEventSource = {
   stream: (
     callback: (eventStream$: MockEventStream) => Promise<void>,
   ) => Promise<void>;
-  _events: StreamEvent[];
 };
 
 type MockEventStream = {
@@ -85,6 +103,13 @@ type MockEventStream = {
   sendTextMessageEnd: (args: { messageId: string }) => void;
   complete: () => void;
 };
+
+// `process()` typing requires the real RuntimeEventSource; our duck-typed mock
+// satisfies the runtime surface but not the structural type.
+type RequestForProcess = Omit<
+  CopilotRuntimeChatCompletionRequest,
+  "eventSource"
+> & { eventSource: MockEventSource };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -103,7 +128,6 @@ function createMockEventSource(): {
   });
 
   const eventSource: MockEventSource = {
-    _events: events,
     stream: async (callback) => {
       const eventStream$: MockEventStream = {
         sendTextMessageStart: ({ messageId }) => {
@@ -126,24 +150,29 @@ function createMockEventSource(): {
   return { eventSource, collect: () => collectPromise };
 }
 
-/**
- * Builds a minimal CopilotRuntimeChatCompletionRequest with the given model string
- * (the adapter reads it as the serialised additionalParams blob).
- */
 function buildRequest({
   model,
   eventSource,
 }: {
   model: string;
   eventSource: MockEventSource;
-}) {
+}): RequestForProcess {
   return {
     eventSource,
     messages: [],
     actions: [],
     threadId: "thread-test-123",
-    forwardedParameters: { model },
-  };
+    forwardedParameters: { model } as CopilotRuntimeChatCompletionRequest["forwardedParameters"],
+  } as RequestForProcess;
+}
+
+async function runProcess(
+  adapter: PromptStudioAdapter,
+  request: RequestForProcess,
+): Promise<CopilotRuntimeChatCompletionResponse> {
+  return adapter.process(
+    request as unknown as CopilotRuntimeChatCompletionRequest,
+  );
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -153,107 +182,73 @@ describe("PromptStudioAdapter", () => {
 
   beforeEach(() => {
     adapter = new PromptStudioAdapter({ projectId: "proj-test" });
-    vi.restoreAllMocks();
+    generateOtelTraceIdMock.mockReset();
+    let callCount = 0;
+    generateOtelTraceIdMock.mockImplementation(() => {
+      callCount++;
+      return `trace-mock-${callCount}`;
+    });
   });
 
   describe("when forwardedParameters.model contains malformed JSON", () => {
     it("streams a Configuration Error message", async () => {
       const { eventSource, collect } = createMockEventSource();
 
-      await adapter.process(
-        buildRequest({ model: "{not valid json", eventSource }) as any,
+      await runProcess(
+        adapter,
+        buildRequest({ model: "{not valid json", eventSource }),
       );
 
       const events = await collect();
 
       const contentEvent = events.find((e) => e.type === "TextMessageContent");
       expect(contentEvent).toBeDefined();
-      expect((contentEvent as any).content).toContain("Configuration Error");
+      if (contentEvent?.type === "TextMessageContent") {
+        expect(contentEvent.content).toContain("Configuration Error");
+      }
     });
 
-    it("allocates traceId BEFORE attempting JSON.parse so the error stream uses a stable traceId", async () => {
+    it("uses the pre-allocated traceId as the streamed messageId so the frontend can find the trace", async () => {
       /**
-       * With the current (buggy) code, generateOtelTraceId is called at line 89,
-       * which comes AFTER JSON.parse at line 79. When line 79 throws, the generator
-       * is never reached in the try block — the catch at line 147 calls it instead.
+       * Regression for #853. With the buggy code, the catch block called
+       * generateOtelTraceId() a SECOND time to mint a fresh messageId, which
+       * had no relationship to anything traceable. The fix allocates traceId
+       * once at the top of process() and reuses it in the catch block.
        *
-       * The fix hoists `traceId = generateOtelTraceId()` to BEFORE the try block
-       * (or at least before JSON.parse). At that point, when JSON.parse's spy fires,
-       * the generator will already have been called.
-       *
-       * This test FAILS with the buggy code and PASSES after the fix.
+       * Assertion: generateOtelTraceId is called exactly once, AND the streamed
+       * messageId equals that single id. Buggy code would either call it twice
+       * (and the streamed id would equal call #2, not #1) or use the wrong id.
        */
-      let generateCalledCount = 0;
-      let generateCalledBeforeParseAttempt = false;
-
-      vi.spyOn(traceUtils, "generateOtelTraceId").mockImplementation(() => {
-        generateCalledCount++;
-        return `trace-fixed-${generateCalledCount}`;
-      });
-
-      // Override JSON.parse to capture the ordering, then throw as if malformed JSON
-      vi.spyOn(JSON, "parse").mockImplementation(() => {
-        generateCalledBeforeParseAttempt = generateCalledCount > 0;
-        throw new SyntaxError("Unexpected token in JSON");
-      });
-
       const { eventSource, collect } = createMockEventSource();
 
-      await adapter.process(
-        buildRequest({ model: "{not valid json", eventSource }) as any,
+      await runProcess(
+        adapter,
+        buildRequest({ model: "{not valid json", eventSource }),
       );
 
-      await collect();
+      const events = await collect();
+      const startEvent = events.find((e) => e.type === "TextMessageStart");
 
-      // FAILS with buggy code: generateOtelTraceId is called AFTER JSON.parse in
-      // the try block (line 89 > line 79), so when JSON.parse's spy fires,
-      // generateCalledCount is still 0.
-      expect(generateCalledBeforeParseAttempt).toBe(true);
+      expect(generateOtelTraceIdMock).toHaveBeenCalledTimes(1);
+      expect(startEvent).toBeDefined();
+      if (startEvent?.type === "TextMessageStart") {
+        expect(startEvent.messageId).toBe("trace-mock-1");
+      }
     });
 
-    it("uses exactly one generateOtelTraceId call and pipes its result as the error messageId", async () => {
-      /**
-       * In the early-error path (JSON.parse throws), generateOtelTraceId must be
-       * called exactly once and the resulting id must flow through as the
-       * sendTextMessageStart messageId.
-       *
-       * This assertion is satisfied by both buggy and fixed code (in both cases the
-       * generator is called once and its result is used), but it guards against
-       * regressions where the id is dropped or a second random id is introduced.
-       */
-      let callCount = 0;
-      vi.spyOn(traceUtils, "generateOtelTraceId").mockImplementation(() => {
-        callCount++;
-        return callCount === 1 ? "trace-first-call" : "trace-second-call";
-      });
-
-      const capturedMessageIds: string[] = [];
+    it("uses the same messageId across start, content, and end events", async () => {
       const { eventSource, collect } = createMockEventSource();
 
-      // Intercept sendTextMessageStart to capture the messageId
-      const origStream = eventSource.stream.bind(eventSource);
-      eventSource.stream = async (callback) => {
-        return origStream(async (eventStream$) => {
-          const wrapped: MockEventStream = {
-            ...eventStream$,
-            sendTextMessageStart: ({ messageId }) => {
-              capturedMessageIds.push(messageId);
-              eventStream$.sendTextMessageStart({ messageId });
-            },
-          };
-          await callback(wrapped);
-        });
-      };
-
-      await adapter.process(
-        buildRequest({ model: "{not valid json", eventSource }) as any,
+      await runProcess(
+        adapter,
+        buildRequest({ model: "{not valid json", eventSource }),
       );
 
-      await collect();
+      const events = await collect();
+      const ids = new Set(events.map((e) => e.messageId));
 
-      expect(capturedMessageIds).toHaveLength(1);
-      expect(capturedMessageIds[0]).toBe("trace-first-call");
-      expect(callCount).toBe(1);
+      expect(ids.size).toBe(1);
+      expect(ids.has("trace-mock-1")).toBe(true);
     });
   });
 });
