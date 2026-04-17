@@ -1,6 +1,7 @@
 import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import {
+  afterAccountUpdate,
   afterSessionCreate,
   afterUserCreate,
   beforeAccountCreate,
@@ -199,6 +200,58 @@ describe("beforeAccountCreate", () => {
       });
 
       expect(prisma.$transaction).toHaveBeenCalled();
+    });
+
+    it("deletes stale accounts for OTHER OAuth providers (wrong-method cleanup)", async () => {
+      // Scenario: user previously signed in with Google while the org's
+      // configured SSO is Auth0. That Google row flagged pendingSsoSetup.
+      // When they now complete sign-in with the correct provider (Auth0),
+      // the stale Google account row must be cleaned up.
+      const deleteMany = vi.fn().mockResolvedValue(undefined);
+      const update = vi.fn().mockResolvedValue(undefined);
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "user_1",
+            email: "existing@acme.com",
+            deactivatedAt: null,
+          }),
+          update,
+        },
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+            ssoProvider: "auth0",
+          }),
+        },
+        account: { deleteMany },
+        $transaction: vi.fn().mockImplementation(async (ops: unknown[]) => ops),
+      });
+
+      await beforeAccountCreate({
+        prisma,
+        account: { userId: "user_1", providerId: "auth0", accountId: "auth0|sub-1" },
+      });
+
+      // The deleteMany where clause must match rows for the same user that are
+      // NOT the current account (different provider OR different accountId),
+      // while preserving credential rows.
+      expect(deleteMany).toHaveBeenCalledWith({
+        where: {
+          userId: "user_1",
+          provider: { not: "credential" },
+          OR: [
+            { provider: { not: "auth0" } },
+            { providerAccountId: { not: "auth0|sub-1" } },
+          ],
+        },
+      });
+
+      expect(update).toHaveBeenCalledWith({
+        where: { id: "user_1" },
+        data: { pendingSsoSetup: false },
+      });
     });
   });
 
@@ -513,6 +566,177 @@ describe("afterSessionCreate", () => {
           userId: "user_1",
           fireActivityTrackingNurturing: vi.fn(),
           ensureUserSyncedToCio: vi.fn(),
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+});
+
+describe("afterAccountUpdate", () => {
+  describe("when the user has pendingSsoSetup=true and the updated account matches the org's SSO provider", () => {
+    it("clears pendingSsoSetup and deletes stale non-credential accounts", async () => {
+      const deleteMany = vi.fn().mockResolvedValue(undefined);
+      const update = vi.fn().mockResolvedValue(undefined);
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "user_1",
+            email: "existing@acme.com",
+            pendingSsoSetup: true,
+          }),
+          update,
+        },
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+            ssoProvider: "auth0",
+          }),
+        },
+        account: { deleteMany },
+        $transaction: vi.fn().mockImplementation(async (ops: unknown[]) => ops),
+      });
+
+      await afterAccountUpdate({
+        prisma,
+        account: {
+          userId: "user_1",
+          providerId: "auth0",
+          accountId: "auth0|sub-1",
+        },
+      });
+
+      expect(deleteMany).toHaveBeenCalledWith({
+        where: {
+          userId: "user_1",
+          provider: { not: "credential" },
+          OR: [
+            { provider: { not: "auth0" } },
+            { providerAccountId: { not: "auth0|sub-1" } },
+          ],
+        },
+      });
+      expect(update).toHaveBeenCalledWith({
+        where: { id: "user_1" },
+        data: { pendingSsoSetup: false },
+      });
+    });
+  });
+
+  describe("when the user does not have pendingSsoSetup set", () => {
+    it("is a no-op (does not touch accounts or user)", async () => {
+      const deleteMany = vi.fn();
+      const update = vi.fn();
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "user_1",
+            email: "existing@acme.com",
+            pendingSsoSetup: false,
+          }),
+          update,
+        },
+        account: { deleteMany },
+      });
+
+      await afterAccountUpdate({
+        prisma,
+        account: {
+          userId: "user_1",
+          providerId: "auth0",
+          accountId: "auth0|sub-1",
+        },
+      });
+
+      expect(deleteMany).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the updated account does NOT match the org's SSO provider", () => {
+    it("is a no-op (we do not clear the flag on wrong-provider sign-in)", async () => {
+      const deleteMany = vi.fn();
+      const update = vi.fn();
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "user_1",
+            email: "existing@acme.com",
+            pendingSsoSetup: true,
+          }),
+          update,
+        },
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+            ssoProvider: "auth0",
+          }),
+        },
+        account: { deleteMany },
+      });
+
+      await afterAccountUpdate({
+        prisma,
+        account: {
+          userId: "user_1",
+          providerId: "google",
+          accountId: "google-sub-1",
+        },
+      });
+
+      expect(deleteMany).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the user's email domain does not match any SSO org", () => {
+    it("is a no-op", async () => {
+      const deleteMany = vi.fn();
+      const update = vi.fn();
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "user_1",
+            email: "user@personal.com",
+            pendingSsoSetup: true,
+          }),
+          update,
+        },
+        organization: { findUnique: vi.fn().mockResolvedValue(null) },
+        account: { deleteMany },
+      });
+
+      await afterAccountUpdate({
+        prisma,
+        account: {
+          userId: "user_1",
+          providerId: "auth0",
+          accountId: "auth0|sub-1",
+        },
+      });
+
+      expect(deleteMany).not.toHaveBeenCalled();
+      expect(update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when reconciliation throws", () => {
+    it("does not throw (logged and swallowed)", async () => {
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockRejectedValue(new Error("db down")),
+        },
+      });
+
+      await expect(
+        afterAccountUpdate({
+          prisma,
+          account: {
+            userId: "user_1",
+            providerId: "auth0",
+            accountId: "auth0|sub-1",
+          },
         }),
       ).resolves.toBeUndefined();
     });

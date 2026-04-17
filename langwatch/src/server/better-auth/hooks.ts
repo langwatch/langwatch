@@ -172,14 +172,27 @@ export const beforeAccountCreate = async ({
   });
 
   if (matchesSso) {
+    // Clean up every OAuth account row that isn't the one being linked right
+    // now. Two cases are covered:
+    //   1) Same provider with a different providerAccountId — e.g. the user's
+    //      SSO subject rotated (Auth0 connection change).
+    //   2) A different OAuth provider — e.g. the user previously signed in
+    //      with Google while the org's configured SSO is Auth0; that Google
+    //      row left `pendingSsoSetup=true` and blocks the "remove their old
+    //      method" expectation when they complete via the correct provider.
+    //
+    // Credential accounts are preserved: on-prem / email-mode deployments
+    // don't have SSO configured, so we never reach this branch there; but
+    // preserving them is the safe default for mixed setups.
     await prisma.$transaction([
-      // Clear any stale account rows for this provider with a different
-      // providerAccountId (user's SSO subject changed, e.g. Auth0 connection rotation)
       prisma.account.deleteMany({
         where: {
           userId: user.id,
-          provider: account.providerId,
-          providerAccountId: { not: account.accountId },
+          provider: { not: "credential" },
+          OR: [
+            { provider: { not: account.providerId } },
+            { providerAccountId: { not: account.accountId } },
+          ],
         },
       }),
       prisma.user.update({
@@ -229,6 +242,82 @@ export const beforeAccountCreate = async ({
     },
     "Flagged existing user with pendingSsoSetup (wrong SSO provider)",
   );
+};
+
+/**
+ * Called after an existing Account row is updated. On an OAuth sign-in via
+ * `handleOAuthUserInfo`, BetterAuth refreshes tokens on the linked Account row
+ * (`internalAdapter.updateAccount`), which fires this hook.
+ *
+ * Closes the dual-account edge case for pendingSsoSetup:
+ * - User previously signed in with WRONG provider → pendingSsoSetup=true,
+ *   wrong Account row exists.
+ * - User later signs in with the CORRECT provider for the first time →
+ *   `beforeAccountCreate` fires and clears the flag / deletes the stale row.
+ * - BUT if the correct-provider Account already exists (e.g. user bounced
+ *   between the two methods), no new Account is created on subsequent correct
+ *   sign-ins, so `beforeAccountCreate` never fires and pendingSsoSetup stays
+ *   stuck.
+ *
+ * This hook runs on every account token refresh, so when the user signs in via
+ * the correct SSO provider — even without a new Account — we detect the
+ * reconciliation opportunity and clean up.
+ */
+export const afterAccountUpdate = async ({
+  prisma,
+  account,
+}: {
+  prisma: PrismaClient;
+  account: { userId: string; providerId: string; accountId: string };
+}): Promise<void> => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: account.userId },
+      select: { id: true, email: true, pendingSsoSetup: true },
+    });
+    if (!user?.email || !user.pendingSsoSetup) return;
+
+    const domain = extractEmailDomain(user.email);
+    if (!domain) return;
+
+    const org = await prisma.organization.findUnique({
+      where: { ssoDomain: domain },
+    });
+    if (!org) return;
+
+    const matchesSso = isSsoProviderMatch(org, {
+      providerId: account.providerId,
+      accountId: account.accountId,
+    });
+    if (!matchesSso) return;
+
+    await prisma.$transaction([
+      prisma.account.deleteMany({
+        where: {
+          userId: user.id,
+          provider: { not: "credential" },
+          OR: [
+            { provider: { not: account.providerId } },
+            { providerAccountId: { not: account.accountId } },
+          ],
+        },
+      }),
+      prisma.user.update({
+        where: { id: user.id },
+        data: { pendingSsoSetup: false },
+      }),
+    ]);
+
+    logger.info(
+      { userId: user.id, providerId: account.providerId },
+      "Cleared pendingSsoSetup and removed stale accounts after sign-in via correct SSO provider",
+    );
+  } catch (err) {
+    logger.error(
+      { err, userId: account.userId },
+      "Failed to reconcile pendingSsoSetup after account update",
+    );
+  }
 };
 
 /**
