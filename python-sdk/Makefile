@@ -51,10 +51,9 @@ install:
 # examples in this same env. Typical usage: a dedicated virtualenv for the
 # async-ADK notebook.
 install-adk-examples: install
-	uv pip install \
+	uv pip install -U \
 		'google-adk>=1.20.0,<2.0.0' \
-		'openinference-instrumentation-google-adk>=0.1.4,<0.2.0' \
-		'opentelemetry-semantic-conventions>=0.62b0'
+		'openinference-instrumentation-google-adk>=0.1.4,<0.2.0'
 
 build:
 	uv pip install build
