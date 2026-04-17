@@ -55,8 +55,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
   });
 
   describe("when resolving shorthand in the path", () => {
-    // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
-    it.skip("resolves tag shorthand to the tagged version, not latest", async () => {
+    it("resolves tag shorthand to the tagged version, not latest", async () => {
       // Create prompt (v1)
       const createRes = await makeRequest("/api/prompts", {
         method: "POST",
@@ -93,8 +92,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
   });
 
   describe("when shorthand path conflicts with tag query param", () => {
-    // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
-    it.skip("returns 422 error explaining the conflict", async () => {
+    it("returns 422 error explaining the conflict", async () => {
       // Create prompt first so it exists
       const createRes = await makeRequest("/api/prompts", {
         method: "POST",
@@ -112,8 +110,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
   });
 
   describe("when shorthand path conflicts with version query param", () => {
-    // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
-    it.skip("returns 422 error explaining the conflict", async () => {
+    it("returns 422 error explaining the conflict", async () => {
       const createRes = await makeRequest("/api/prompts", {
         method: "POST",
         body: JSON.stringify({ handle: "pizza-prompt", prompt: "v1" }),
@@ -146,8 +143,7 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
   });
 
   describe("when shorthand is used in the tag-assignment route", () => {
-    // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
-    it.skip("does not parse shorthand from the prompt ID", async () => {
+    it("does not parse shorthand from the prompt ID", async () => {
       // Create prompt
       const createRes = await makeRequest("/api/prompts", {
         method: "POST",
