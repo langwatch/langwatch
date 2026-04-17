@@ -33,8 +33,8 @@ const SAMPLE_PROMPTS = [
   "Suggest an evaluator for measuring RAG hallucinations",
 ];
 
-export interface SageProposal {
-  sageProposal: true;
+export interface LangyProposal {
+  langyProposal: true;
   kind: string;
   summary: string;
   rationale?: string;
@@ -56,15 +56,15 @@ export type ProposalHandlers = Record<
   (payload: Record<string, unknown>) => Promise<AppliedOutcome>
 >;
 
-interface SageDrawerProps {
+interface LangyDrawerProps {
   proposalHandlers?: ProposalHandlers;
   experimentSlug?: string;
 }
 
-export function SageDrawer({
+export function LangyDrawer({
   proposalHandlers,
   experimentSlug,
-}: SageDrawerProps) {
+}: LangyDrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const handleRef = useRef<HTMLButtonElement>(null);
@@ -84,12 +84,12 @@ export function SageDrawer({
 
   return (
     <>
-      <SageHandle
+      <LangyHandle
         ref={handleRef}
         isOpen={isOpen}
         onToggle={() => setIsOpen((v) => !v)}
       />
-      <SagePanel
+      <LangyPanel
         ref={panelRef}
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
@@ -100,16 +100,16 @@ export function SageDrawer({
   );
 }
 
-const SageHandle = forwardRef<
+const LangyHandle = forwardRef<
   HTMLButtonElement,
   { isOpen: boolean; onToggle: () => void }
->(function SageHandle({ isOpen, onToggle }, ref) {
+>(function LangyHandle({ isOpen, onToggle }, ref) {
   return (
     <Box
       ref={ref}
       as="button"
       onClick={onToggle}
-      aria-label={isOpen ? "Close Sage" : "Open Sage"}
+      aria-label={isOpen ? "Close Langy" : "Open Langy"}
       position="fixed"
       right={isOpen ? `${DRAWER_WIDTH}px` : 0}
       top="50%"
@@ -146,14 +146,14 @@ const SageHandle = forwardRef<
             transform: "rotate(180deg)",
           }}
         >
-          SAGE
+          LANGY
         </Text>
       </VStack>
     </Box>
   );
 });
 
-const SagePanel = forwardRef<
+const LangyPanel = forwardRef<
   HTMLDivElement,
   {
     isOpen: boolean;
@@ -161,7 +161,7 @@ const SagePanel = forwardRef<
     proposalHandlers?: ProposalHandlers;
     experimentSlug?: string;
   }
->(function SagePanel(
+>(function LangyPanel(
   { isOpen, onClose, proposalHandlers, experimentSlug },
   ref,
 ) {
@@ -184,7 +184,7 @@ const SagePanel = forwardRef<
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const transport = useMemo(
-    () => new DefaultChatTransport({ api: "/api/sage/chat" }),
+    () => new DefaultChatTransport({ api: "/api/langy/chat" }),
     [],
   );
   const { messages, sendMessage, stop, status } = useChat({
@@ -192,7 +192,7 @@ const SagePanel = forwardRef<
     onError: (error) => {
       if (isHandledByGlobalHandler(error)) return;
       toaster.create({
-        title: "Sage error",
+        title: "Langy error",
         description: error.message,
         type: "error",
         duration: 5000,
@@ -219,7 +219,7 @@ const SagePanel = forwardRef<
 
   const applyProposal = async (
     proposalId: string,
-    proposal: SageProposal,
+    proposal: LangyProposal,
   ) => {
     if (applyingProposals.has(proposalId)) return;
     if (proposalId in appliedOutcomes) return;
@@ -353,7 +353,7 @@ function PanelHeader({ onClose }: { onClose: () => void }) {
       </Box>
       <VStack align="start" gap={0}>
         <Text fontSize="sm" fontWeight="600" color="fg">
-          Sage
+          Langy
         </Text>
         <Text fontSize="xs" color="fg.muted">
           Propose &amp; apply
@@ -363,7 +363,7 @@ function PanelHeader({ onClose }: { onClose: () => void }) {
       <IconButton
         size="xs"
         variant="ghost"
-        aria-label="Close Sage"
+        aria-label="Close Langy"
         onClick={onClose}
       >
         <LuX size={14} />
@@ -395,7 +395,7 @@ function ThinkingIndicator({ messages }: { messages: UIMessage[] }) {
       alignSelf="flex-start"
     >
       <Spinner size="xs" colorPalette="blue" />
-      <Text>Sage is {label}…</Text>
+      <Text>Langy is {label}…</Text>
     </HStack>
   );
 }
@@ -427,7 +427,7 @@ function Composer({
       <HStack gap={2}>
         <Input
           placeholder={
-            isBusy ? "Sage is working…" : "Ask Sage or describe what you want…"
+            isBusy ? "Langy is working…" : "Ask Langy or describe what you want…"
           }
           value={input}
           onChange={(e) => onInputChange(e.target.value)}
@@ -474,7 +474,7 @@ function EmptyState({ onPick }: { onPick: (prompt: string) => void }) {
     <VStack align="stretch" gap={3} paddingTop={2}>
       <VStack align="start" gap={1}>
         <Text fontSize="sm" fontWeight="600" color="fg">
-          Hey, I&apos;m Sage.
+          Hey, I&apos;m Langy.
         </Text>
         <Text fontSize="xs" color="fg.muted" lineHeight="1.55">
           I can propose evaluators, help you pick the right one for your
@@ -532,7 +532,7 @@ function MessageContent({
   >;
   discardedProposals: Set<string>;
   applyingProposals: Set<string>;
-  onApply: (proposalId: string, proposal: SageProposal) => Promise<void>;
+  onApply: (proposalId: string, proposal: LangyProposal) => Promise<void>;
   onDiscard: (proposalId: string) => void;
 }) {
   const isUser = message.role === "user";
@@ -615,7 +615,7 @@ function ProposalCard({
   onApply,
   onDiscard,
 }: {
-  proposal: SageProposal;
+  proposal: LangyProposal;
   appliedOutcome?: { href?: string; label?: string; onOpen?: () => void };
   isDiscarded: boolean;
   isApplying: boolean;
@@ -636,8 +636,8 @@ function ProposalCard({
           ? "Deleting…"
           : "Applying…"
         : destructive
-          ? "Sage wants to delete"
-          : "Sage proposes";
+          ? "Langy wants to delete"
+          : "Langy proposes";
   const accentPalette = isApplied
     ? destructive
       ? "gray"
@@ -774,12 +774,12 @@ function ProposalCard({
 
 function extractProposals(
   message: UIMessage,
-): Array<{ id: string; proposal: SageProposal }> {
-  const result: Array<{ id: string; proposal: SageProposal }> = [];
+): Array<{ id: string; proposal: LangyProposal }> {
+  const result: Array<{ id: string; proposal: LangyProposal }> = [];
   for (const part of message.parts) {
     if (!part.type?.startsWith("tool-")) continue;
     const output = (part as { output?: unknown }).output;
-    if (!isSageProposal(output)) continue;
+    if (!isLangyProposal(output)) continue;
     const id =
       (part as { toolCallId?: string }).toolCallId ??
       `${message.id}:${result.length}`;
@@ -788,11 +788,11 @@ function extractProposals(
   return result;
 }
 
-function isSageProposal(value: unknown): value is SageProposal {
+function isLangyProposal(value: unknown): value is LangyProposal {
   if (!value || typeof value !== "object") return false;
   const v = value as Record<string, unknown>;
   return (
-    v.sageProposal === true &&
+    v.langyProposal === true &&
     typeof v.kind === "string" &&
     typeof v.summary === "string"
   );

@@ -1,12 +1,10 @@
 /**
- * Hono route for the SAGE assistant.
+ * Hono route for the Langy assistant.
  *
- * POST /api/sage/chat — streams an AI chat response with access to
+ * POST /api/langy/chat — streams an AI chat response with access to
  * read-only evaluator tools scoped to the caller's project.
  *
- * SAGE = Scenarios, Analysis, Guidance, Evaluation.
- *
- * v1 is read-only: Sage proposes actions, it does not run evaluators,
+ * v1 is read-only: Langy proposes actions, it does not run evaluators,
  * mutate experiments, or modify project state.
  */
 import {
@@ -36,11 +34,11 @@ import { parseEvaluationResult } from "~/utils/evaluationResults";
 import { createLogger } from "~/utils/logger/server";
 import type { NextRequestShim as any } from "./types";
 
-const logger = createLogger("langwatch:api:sage");
+const logger = createLogger("langwatch:api:langy");
 
-const SAGE_MODEL = "openai/gpt-5";
+const LANGY_MODEL = "openai/gpt-5";
 
-const SAGE_SYSTEM_PROMPT = `You are Sage, the in-product AI assistant for LangWatch. You live in a right-side sidebar inside the experiment workbench. The name stands for Scenarios, Analysis, Guidance, Evaluation.
+const LANGY_SYSTEM_PROMPT = `You are Langy, the in-product AI assistant for LangWatch. You live in a right-side sidebar inside the experiment workbench.
 
 ## What you can do
 - **Read** the project's evaluators, prompts, and datasets. Use these tools autonomously whenever they help you answer.
@@ -85,10 +83,10 @@ const SAGE_SYSTEM_PROMPT = `You are Sage, the in-product AI assistant for LangWa
 - Mention the chosen model briefly in your reply so the user can catch it before applying.`;
 
 export const app = new Hono().basePath("/api");
-app.use(tracerMiddleware({ name: "sage" }));
+app.use(tracerMiddleware({ name: "langy" }));
 app.use(loggerMiddleware());
 
-app.post("/sage/chat", async (c) => {
+app.post("/langy/chat", async (c) => {
   const session = await getServerAuthSession({ req: c.req.raw as any });
   if (!session) {
     return c.json(
@@ -114,7 +112,7 @@ app.post("/sage/chat", async (c) => {
   );
   if (!hasPermission) {
     return c.json(
-      { error: "You do not have permission to use Sage for this project." },
+      { error: "You do not have permission to use Langy for this project." },
       { status: 403 },
     );
   }
@@ -440,7 +438,7 @@ app.post("/sage/chat", async (c) => {
             ? mergedSettings.model
             : undefined;
         return {
-          sageProposal: true,
+          langyProposal: true,
           kind: "evaluators.create",
           summary: `Create evaluator "${name}" (${evaluatorType})`,
           rationale: chosenModel
@@ -570,7 +568,7 @@ app.post("/sage/chat", async (c) => {
         rationale,
       }) => {
         return {
-          sageProposal: true,
+          langyProposal: true,
           kind: "prompts.create",
           summary: `Create prompt "${handle}"`,
           rationale,
@@ -626,7 +624,7 @@ app.post("/sage/chat", async (c) => {
           return { error: `No prompt found with id '${id}'.` };
         }
         return {
-          sageProposal: true,
+          langyProposal: true,
           kind: "prompts.update",
           summary: `Update prompt "${(existing as { handle?: string }).handle ?? id}"`,
           rationale,
@@ -673,7 +671,7 @@ app.post("/sage/chat", async (c) => {
       }),
       execute: async ({ name, columns, initialRows, rationale }) => {
         return {
-          sageProposal: true,
+          langyProposal: true,
           kind: "datasets.create",
           summary: `Create dataset "${name}"${
             initialRows?.length ? ` with ${initialRows.length} row(s)` : ""
@@ -709,7 +707,7 @@ app.post("/sage/chat", async (c) => {
           return { error: `No dataset found with id '${datasetId}'.` };
         }
         return {
-          sageProposal: true,
+          langyProposal: true,
           kind: "datasets.addRows",
           summary: `Add ${rows.length} row(s) to "${dataset.name}"`,
           rationale,
@@ -754,7 +752,7 @@ app.post("/sage/chat", async (c) => {
         if (name && name !== evaluator.name) changedFields.push("name");
         if (settings) changedFields.push(...Object.keys(settings));
         return {
-          sageProposal: true,
+          langyProposal: true,
           kind: "evaluators.update",
           summary: `Update evaluator "${evaluator.name}"${
             changedFields.length ? ` (${changedFields.join(", ")})` : ""
@@ -790,7 +788,7 @@ app.post("/sage/chat", async (c) => {
           return { error: `No project evaluator with slug '${slug}'.` };
         }
         return {
-          sageProposal: true,
+          langyProposal: true,
           kind: "evaluators.delete",
           destructive: true,
           summary: `Archive evaluator "${evaluator.name}"`,
@@ -815,7 +813,7 @@ app.post("/sage/chat", async (c) => {
       }),
       execute: async ({ rationale }) => {
         return {
-          sageProposal: true,
+          langyProposal: true,
           kind: "workbench.run",
           summary: "Run the evaluation on all targets and evaluators",
           rationale,
@@ -846,7 +844,7 @@ app.post("/sage/chat", async (c) => {
           (enriched.config as { evaluatorType?: string } | null)
             ?.evaluatorType ?? `custom/${enriched.slug}`;
         return {
-          sageProposal: true,
+          langyProposal: true,
           kind: "workbench.addEvaluator",
           summary: `Add "${enriched.name}" to this workbench`,
           rationale,
@@ -861,25 +859,25 @@ app.post("/sage/chat", async (c) => {
     }),
   };
 
-  const model = await getVercelAIModel(projectId, SAGE_MODEL);
+  const model = await getVercelAIModel(projectId, LANGY_MODEL);
 
   const result = streamText({
     model,
-    system: SAGE_SYSTEM_PROMPT,
+    system: LANGY_SYSTEM_PROMPT,
     messages: convertToModelMessages(messages),
     tools,
     stopWhen: stepCountIs(8),
     maxRetries: 2,
     experimental_telemetry: {
       isEnabled: true,
-      functionId: "sage.chat",
+      functionId: "langy.chat",
       metadata: {
         "langwatch.project_id": projectId,
         "langwatch.user_id": session.user.id,
       },
     },
     onError: (error) => {
-      logger.error({ error }, "error in sage chat stream");
+      logger.error({ error }, "error in langy chat stream");
     },
   });
 

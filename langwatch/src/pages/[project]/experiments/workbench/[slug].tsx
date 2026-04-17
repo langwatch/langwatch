@@ -5,9 +5,9 @@ import { useEffect, useMemo, useState } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import {
-  SageDrawer,
+  LangyDrawer,
   type ProposalHandlers,
-} from "~/components/sage/SageSidebar";
+} from "~/components/langy/LangySidebar";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { AutosaveStatus } from "~/evaluations-v3/components/AutosaveStatus";
 import { EditableHeading } from "~/evaluations-v3/components/EditableHeading";
@@ -385,7 +385,7 @@ export default function ExperimentsWorkbenchPage() {
         </Box>
       </VStack>
 
-      <SageDrawer
+      <LangyDrawer
         proposalHandlers={proposalHandlers}
         experimentSlug={slug}
       />
