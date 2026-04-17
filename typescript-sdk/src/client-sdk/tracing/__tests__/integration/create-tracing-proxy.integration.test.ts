@@ -30,9 +30,14 @@ describe("createTracingProxy Integration Tests", () => {
     spanExporter = new InMemorySpanExporter();
     spanProcessor = new SimpleSpanProcessor(spanExporter);
 
-    // Setup observability with real OpenTelemetry SDK
+    // Setup observability with real OpenTelemetry SDK.
+    // `langwatch: "disabled"` prevents the default BatchSpanProcessor + LangWatchTraceExporter
+    // from being attached — without it, test spans get buffered into the batch exporter and
+    // never reach the InMemorySpanExporter, causing widespread "expected 1 span, got 0" flakes
+    // (see langwatch/langwatch#3097).
     observabilityHandle = setupObservability({
       serviceName: "tracing-proxy-integration-test",
+      langwatch: "disabled",
       spanProcessors: [spanProcessor],
       debug: { logger: new NoOpLogger() },
       advanced: {
@@ -55,8 +60,7 @@ describe("createTracingProxy Integration Tests", () => {
   });
 
   describe("basic functionality", () => {
-    // Skipped due to OTLP integration flake — see langwatch/langwatch#3240.
-    it.skip("should create a proxy that traces public methods", async () => {
+    it("should create a proxy that traces public methods", async () => {
       class TestClass {
         publicMethod() {
           return 'public result';
@@ -91,8 +95,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(span.attributes["code.namespace"]).toBe("TestClass");
     });
 
-    // Skip: times out on OTLP HTTP request in CI — see #3097
-    it.skip("should not trace private methods", async () => {
+    it("should not trace private methods", async () => {
       class TestClass {
         publicMethod() {
           return 'public result';
@@ -349,8 +352,7 @@ describe("createTracingProxy Integration Tests", () => {
       expect(span.status.message).toBe("test error");
     });
 
-    // Skipped due to OTLP exporter timeout flake — see langwatch/langwatch#3240.
-    it.skip("should handle async methods that throw errors", async () => {
+    it("should handle async methods that throw errors", async () => {
       class TestClass {
         async publicMethod() {
           throw new Error('async error');
@@ -378,8 +380,7 @@ describe("createTracingProxy Integration Tests", () => {
   });
 
   describe("decorator span access", () => {
-    // Skipped due to span-flush race flake — see langwatch/langwatch#3240.
-    it.skip("should call decorator method with correct context", async () => {
+    it("should call decorator method with correct context", async () => {
       class TestClass {
         publicMethod() {
           return 'original result';
@@ -796,7 +797,7 @@ describe("createTracingProxy Integration Tests", () => {
       });
     });
 
-    it.skip("should handle methods with destructuring parameters", async () => { // TODO: flaky in CI — see #3097
+    it("should handle methods with destructuring parameters", async () => {
       class TestClass {
         publicMethod({ name, age }: { name: string; age: number }) {
           return `${name}-${age}`;
@@ -819,7 +820,7 @@ describe("createTracingProxy Integration Tests", () => {
   });
 
   describe("performance and concurrency", () => {
-    it.skip("should handle concurrent method calls efficiently", async () => { // TODO: flaky in CI — see #3097
+    it("should handle concurrent method calls efficiently", async () => {
       class TestClass {
         async publicMethod(index: number) {
           // Simulate some async work
