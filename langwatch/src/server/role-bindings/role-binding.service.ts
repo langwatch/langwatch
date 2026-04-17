@@ -231,11 +231,17 @@ export class RoleBindingService {
           : [];
       }
       if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
-        const orgRole =
-          binding.role === TeamUserRole.ADMIN
-            ? OrganizationUserRole.ADMIN
-            : OrganizationUserRole.MEMBER;
-        return getOrganizationRolePermissions(orgRole);
+        if (binding.role === TeamUserRole.ADMIN) {
+          return getOrganizationRolePermissions(OrganizationUserRole.ADMIN);
+        }
+        if (binding.role === TeamUserRole.MEMBER) {
+          return getOrganizationRolePermissions(OrganizationUserRole.MEMBER);
+        }
+        // VIEWER or CUSTOM (with no resolvable customRole) at the ORG scope:
+        // fall back to the minimal EXTERNAL permission set rather than silently
+        // elevating to MEMBER. Today nothing writes these bindings, but this
+        // prevents accidental promotion if that ever changes.
+        return getOrganizationRolePermissions(OrganizationUserRole.EXTERNAL);
       }
       return getTeamRolePermissions(binding.role);
     };
@@ -264,7 +270,9 @@ export class RoleBindingService {
       groupBindingsByGroupId.get(gid)!.push(b);
     }
 
-    const orgRole = orgMember?.role ?? "MEMBER";
+    // The router gates this on `organization:view`, so `orgMember` is always
+    // present in practice. The fallback is defensive only.
+    const orgRole = orgMember?.role ?? OrganizationUserRole.MEMBER;
 
     return {
       user: {
@@ -272,9 +280,7 @@ export class RoleBindingService {
         name: userName,
         email: userEmail,
         orgRole: orgRole as string,
-        orgRolePermissions: getOrganizationRolePermissions(
-          orgMember?.role ?? "MEMBER",
-        ),
+        orgRolePermissions: getOrganizationRolePermissions(orgRole),
       },
       groups: groupMemberships.map((gm) => ({
         id: gm.group.id,

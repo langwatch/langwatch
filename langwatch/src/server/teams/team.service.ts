@@ -172,9 +172,14 @@ export class TeamService {
           );
 
           const projectLevel = projBindings.map((b) => {
-            const teamBinding = teamBindings.find(
+            // A user "overrides" team access if they have team-level membership
+            // via any path — direct or group-expanded. `teamBinding` only finds
+            // direct team bindings; `teamBoundUserIds` covers both.
+            const directTeamBinding = teamBindings.find(
               (tb) => tb.userId && tb.userId === b.userId,
             );
+            const inheritsFromTeam =
+              !!b.userId && teamBoundUserIds.has(b.userId);
             return {
               bindingId: b.id,
               userId: b.userId,
@@ -185,8 +190,10 @@ export class TeamService {
               role: b.role,
               customRoleId: b.customRoleId,
               customRoleName: b.customRole?.name ?? null,
-              source: teamBinding ? ("override" as const) : ("direct" as const),
-              teamRole: teamBinding?.role,
+              source: inheritsFromTeam
+                ? ("override" as const)
+                : ("direct" as const),
+              teamRole: directTeamBinding?.role,
             };
           });
 

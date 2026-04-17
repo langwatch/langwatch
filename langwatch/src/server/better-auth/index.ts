@@ -11,6 +11,7 @@ import { createLogger } from "../../utils/logger/server";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
 import {
+  afterAccountCreate,
   afterAccountUpdate,
   afterSessionCreate,
   afterUserCreate,
@@ -413,6 +414,17 @@ export const auth = betterAuth({
               userId: account.userId,
               providerId: account.providerId,
               accountId: account.accountId,
+            },
+          });
+        },
+        after: async (account) => {
+          if (!account.userId || !account.providerId || !account.accountId) return;
+          await afterAccountCreate({
+            prisma,
+            account: {
+              userId: account.userId as string,
+              providerId: account.providerId as string,
+              accountId: account.accountId as string,
             },
           });
         },

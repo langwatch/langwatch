@@ -209,21 +209,10 @@ export const beforeAccountCreate = async ({
   });
 
   if (matchesSso) {
-    // Clean up every OAuth account row that isn't the one being linked right
-    // now. Two cases are covered:
-    //   1) Same provider with a different providerAccountId — e.g. the user's
-    //      SSO subject rotated (Auth0 connection change).
-    //   2) A different OAuth provider — e.g. the user previously signed in
-    //      with Google while the org's configured SSO is Auth0; that Google
-    //      row left `pendingSsoSetup=true` and blocks the "remove their old
-    //      method" expectation when they complete via the correct provider.
-    //
-    await reconcileSsoAccounts({
-      prisma,
-      userId: user.id,
-      providerId: account.providerId,
-      accountId: account.accountId,
-    });
+    // Correct SSO provider — let BetterAuth create the Account row. Stale-row
+    // reconciliation is deferred to `afterAccountCreate` so it only runs after
+    // the new Account row has committed, avoiding a window where the user has
+    // `pendingSsoSetup=false` and zero OAuth rows if account creation fails.
     return;
   }
 
@@ -266,6 +255,63 @@ export const beforeAccountCreate = async ({
     },
     "Flagged existing user with pendingSsoSetup (wrong SSO provider)",
   );
+};
+
+/**
+ * Called after a new Account row is created. Runs the SSO reconciliation that
+ * `beforeAccountCreate` used to perform inline, but deferred to this hook so
+ * the cleanup only commits once the new Account row exists.
+ *
+ * Handles the two stale-row cases from the beforeAccountCreate comment:
+ *   1) Same provider with a different providerAccountId (SSO subject rotated).
+ *   2) A different OAuth provider (user had Google linked while the org's
+ *      configured SSO is Auth0).
+ *
+ * Credential accounts (providerId = "credential") skip this entirely — on-prem
+ * email-mode deployments don't configure SSO.
+ */
+export const afterAccountCreate = async ({
+  prisma,
+  account,
+}: {
+  prisma: PrismaClient;
+  account: { userId: string; providerId: string; accountId: string };
+}): Promise<void> => {
+  try {
+    if (account.providerId === "credential") return;
+
+    const user = await prisma.user.findUnique({
+      where: { id: account.userId },
+      select: { id: true, email: true },
+    });
+    if (!user?.email) return;
+
+    const domain = extractEmailDomain(user.email);
+    if (!domain) return;
+
+    const org = await prisma.organization.findUnique({
+      where: { ssoDomain: domain },
+    });
+    if (!org) return;
+
+    const matchesSso = isSsoProviderMatch(org, {
+      providerId: account.providerId,
+      accountId: account.accountId,
+    });
+    if (!matchesSso) return;
+
+    await reconcileSsoAccounts({
+      prisma,
+      userId: user.id,
+      providerId: account.providerId,
+      accountId: account.accountId,
+    });
+  } catch (err) {
+    logger.error(
+      { err, userId: account.userId },
+      "Failed to reconcile SSO accounts after account create",
+    );
+  }
 };
 
 /**
