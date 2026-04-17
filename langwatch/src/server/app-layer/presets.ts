@@ -269,7 +269,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       db: prisma,
       stripe: stripeClient,
       itemCalculator: subscriptionItemCalculator,
-      inviteApprover: InviteService.create(prisma),
+      // Pass planProvider explicitly — InviteService.create defaults to
+      // getApp().planProvider, but we're still inside initializeDefaultApp
+      // so the App singleton isn't available yet.
+      inviteApprover: InviteService.create(prisma, { planProvider }),
       licensePurchaseHandler: { handle: handleLicensePurchase },
       licensePaymentLinkId: env.STRIPE_LICENSE_PAYMENT_LINK_ID,
       licensePrivateKey: env.LANGWATCH_LICENSE_PRIVATE_KEY,
