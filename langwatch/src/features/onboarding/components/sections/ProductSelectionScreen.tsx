@@ -17,6 +17,14 @@ interface ProductOption {
 
 const productOptions: ProductOption[] = [
   {
+    key: "via-platform",
+    title: "Via the Platform",
+    description: "Configure everything directly from the LangWatch dashboard",
+    icon: Monitor,
+    gradient:
+      "linear-gradient(135deg, rgba(49,130,206,0.05) 0%, transparent 50%)",
+  },
+  {
     key: "via-claude-code",
     title: "Via Coding Agent",
     description:
@@ -24,14 +32,6 @@ const productOptions: ProductOption[] = [
     icon: Terminal,
     gradient:
       "linear-gradient(135deg, rgba(237,137,38,0.06) 0%, transparent 50%)",
-  },
-  {
-    key: "via-platform",
-    title: "Via the Platform",
-    description: "Configure everything directly from the LangWatch dashboard",
-    icon: Monitor,
-    gradient:
-      "linear-gradient(135deg, rgba(49,130,206,0.05) 0%, transparent 50%)",
   },
   {
     key: "via-claude-desktop",
