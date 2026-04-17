@@ -105,7 +105,10 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
       // Create v2 (which becomes the latest)
       const updateRes = await makeRequest(`/api/prompts/${v1.handle}`, {
         method: "PUT",
-        body: JSON.stringify({ prompt: "v2 prompt" }),
+        body: JSON.stringify({
+          commitMessage: "v2",
+          prompt: "v2 prompt",
+        }),
       });
       expect(updateRes.status).toBe(200);
       const v2 = await updateRes.json();
