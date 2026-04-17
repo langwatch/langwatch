@@ -6,6 +6,8 @@ Provides:
   cleanup in teardown, even when the test body raises (issue #3164).
 - _session_prompt_registry: session-scoped safety-net that deletes any prompts
   created by this session that were not cleaned up by their per-test teardown.
+- tag_factory: function-scoped fixture that creates prompt tags and deletes
+  them on teardown (issue #3108).
 """
 
 import logging
@@ -137,3 +139,28 @@ def prompt_factory(_session_prompt_registry: List[str]) -> Callable[..., Any]:
             _session_prompt_registry.remove(prompt_id)
         except ValueError:
             pass  # already removed or never added (shouldn't happen)
+
+
+@pytest.fixture
+def tag_factory() -> Callable[[str], Any]:
+    """
+    Function-scoped factory fixture for creating prompt tags with guaranteed cleanup.
+
+    Returns a callable that accepts a tag ``name`` and creates it via
+    ``langwatch.prompts.tags.create(name)``.  Every tag created through the
+    factory is deleted during fixture teardown, even when the test body raises.
+    """
+    tracked_names: List[str] = []
+
+    def _create(name: str) -> Any:
+        tag = langwatch.prompts.tags.create(name)
+        tracked_names.append(name)
+        return tag
+
+    yield _create
+
+    for name in tracked_names:
+        try:
+            langwatch.prompts.tags.delete(name)
+        except Exception as exc:
+            logger.warning("Failed to delete tag %s during teardown: %s", name, exc)
