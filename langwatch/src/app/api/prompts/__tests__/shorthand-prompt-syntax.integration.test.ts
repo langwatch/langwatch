@@ -3,6 +3,13 @@ import { nanoid } from "nanoid";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
+import { globalForApp, resetApp } from "~/server/app-layer/app";
+import { createTestApp } from "~/server/app-layer/presets";
+import {
+  PlanProviderService,
+  type PlanProvider,
+} from "~/server/app-layer/subscription/plan-provider";
+import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { app } from "../[[...route]]/app";
 
@@ -24,6 +31,19 @@ describe("Feature: Shorthand prompt tag syntax (REST API)", () => {
     });
 
   beforeEach(async () => {
+    resetApp();
+    globalForApp.__langwatch_app = createTestApp({
+      planProvider: PlanProviderService.create({
+        getActivePlan: vi
+          .fn()
+          .mockResolvedValue(FREE_PLAN) as PlanProvider["getActivePlan"],
+      }),
+      usageLimits: {
+        notifyPlanLimitReached: vi.fn().mockResolvedValue(undefined),
+        checkAndSendWarning: vi.fn().mockResolvedValue(undefined),
+      } as any,
+    });
+
     testOrganization = await prisma.organization.create({
       data: { name: "Test Organization", slug: `test-org-${nanoid()}` },
     });
