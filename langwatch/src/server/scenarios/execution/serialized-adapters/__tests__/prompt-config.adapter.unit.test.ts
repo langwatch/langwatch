@@ -59,6 +59,7 @@ describe("SerializedPromptConfigAdapter", () => {
    * fieldMappings are only applicable to code and HTTP adapters where input
    * fields are explicitly declared. Verify the constructor does not accept them.
    */
+  /** @scenario Prompt adapter uses conversation messages directly */
   it("does not accept fieldMappings in its constructor", () => {
     // SerializedPromptConfigAdapter constructor: (config, litellmParams, nlpServiceUrl)
     // Verify it constructs successfully with the expected constructor params only.
