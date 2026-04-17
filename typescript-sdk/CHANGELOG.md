@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.24.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.23.0...typescript-sdk@v0.24.0) (2026-04-17)
+
+
+### Features
+
+* **prompts:** expose tags on prompt list/get/versions ([#3271](https://github.com/langwatch/langwatch/issues/3271)) ([023c2d5](https://github.com/langwatch/langwatch/commit/023c2d5c4cb30296411740a5da3a8526d94a8f1c))
+
+
+### Bug Fixes
+
+* surface meaningful CLI errors + allow archived prompt handle reuse ([#3263](https://github.com/langwatch/langwatch/issues/3263)) ([ffe2e75](https://github.com/langwatch/langwatch/commit/ffe2e75422773368610cbfcec6906a7fe4ffb7ff))
+
+
+### Code Refactoring
+
+* **ci:** consolidate *-ci.yml and *-ci-unmodified.yml pairs ([#3231](https://github.com/langwatch/langwatch/issues/3231)) ([bcea648](https://github.com/langwatch/langwatch/commit/bcea64835bbb3dd00d7431f278da23d0b47de827))
+
 ## [0.23.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.22.0...typescript-sdk@v0.23.0) (2026-04-16)
 
 
