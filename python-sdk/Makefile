@@ -1,4 +1,4 @@
-.PHONY: test test-tracing test-notebooks install example
+.PHONY: test test-tracing test-notebooks install install-adk-examples example
 
 test-unit:
 	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration and not e2e" -k "not test_example and not test_prompt_service_tracing and not test_prompt_tracing and not test_context and not test_tracing" $(filter-out $@,$(MAKECMDGOALS))
@@ -42,7 +42,15 @@ install:
 	@if ! command -v uv &> /dev/null; then \
 		curl -LsSf https://astral.sh/uv/install.sh | sh; \
 	fi
-	uv sync --all-groups --all-extras
+	uv sync --group dev --group examples --group tests --all-extras
+
+# ADK examples need pydantic>=2.11 which conflicts with chainlit in the main
+# `examples` group; install them into a separate env with this target.
+install-adk-examples:
+	@if ! command -v uv &> /dev/null; then \
+		curl -LsSf https://astral.sh/uv/install.sh | sh; \
+	fi
+	uv sync --only-group adk-examples --all-extras
 
 build:
 	uv pip install build
