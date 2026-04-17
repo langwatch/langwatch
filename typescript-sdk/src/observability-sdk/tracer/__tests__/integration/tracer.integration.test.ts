@@ -55,8 +55,10 @@ describe("Tracer Integration Tests", () => {
 
     // Setup observability with real OpenTelemetry SDK
     // Use spanProcessors instead of traceExporter as we don't want to wrap in a BatchSpanProcessor
+    // langwatch: 'disabled' prevents shutdown from flushing a real OTLP exporter (which times out in CI)
     observabilityHandle = setupObservability({
       serviceName: "tracer-integration-test",
+      langwatch: "disabled",
       spanProcessors: [spanProcessor],
       debug: { logger: new NoOpLogger() },
       advanced: {
@@ -200,8 +202,7 @@ describe("Tracer Integration Tests", () => {
       expect(child2Span.attributes[semconv.ATTR_LANGWATCH_SPAN_TYPE]).toBe("tool");
     });
 
-    // Skipped due to OTLP integration flake — see langwatch/langwatch#3240.
-    it.skip("should handle errors and exceptions properly", async () => {
+    it("should handle errors and exceptions properly", async () => {
       const tracer = getLangWatchTracer("error-handling-test");
 
       await expect(
