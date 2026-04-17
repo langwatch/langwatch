@@ -21,7 +21,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const REPO_ROOT = resolve(__dirname, "../..");
-const LANGWATCH_ROOT = resolve(__dirname, "..");
 
 interface WatchedFeature {
   featurePath: string;
@@ -68,6 +67,13 @@ interface Report {
     bindings: BindingRef[];
   }[];
   unbound: Scenario[];
+  /** Annotations that reference a title not present in any watched feature file. */
+  unknownAnnotations: { title: string; ref: BindingRef }[];
+}
+
+interface CollectedBinding {
+  title: string;
+  ref: BindingRef;
 }
 
 function parseFeature(absPath: string): Scenario[] {
@@ -109,12 +115,13 @@ function parseFeature(absPath: string): Scenario[] {
   return scenarios;
 }
 
-function walkTestFiles(root: string, out: string[]): void {
+function walkTestFiles(root: string): string[] {
+  const out: string[] = [];
   let entries: string[];
   try {
     entries = readdirSync(root);
   } catch {
-    return;
+    return out;
   }
   for (const entry of entries) {
     if (SKIP_DIR.has(entry) || entry.startsWith(".")) continue;
@@ -126,45 +133,57 @@ function walkTestFiles(root: string, out: string[]): void {
       continue;
     }
     if (s.isDirectory()) {
-      walkTestFiles(full, out);
+      out.push(...walkTestFiles(full));
     } else if (TEST_FILE_RE.test(entry)) {
       out.push(full);
     }
   }
+  return out;
 }
 
-function collectBindings(testRoots: string[]): Map<string, BindingRef[]> {
-  const byTitle = new Map<string, BindingRef[]>();
-  const files: string[] = [];
-  for (const r of testRoots) walkTestFiles(resolve(REPO_ROOT, r), files);
+// Match an @scenario annotation inside a JSDoc comment that is eventually
+// followed by an it(...) or test(...) call, with nothing between the
+// annotation's closing `*/` and the call except whitespace and additional
+// JSDoc blocks (so multiple stacked annotations all bind the same test).
+//
+// The trailing lookahead enforces proximity — a stray @scenario in a helper,
+// import docblock, or unrelated JSDoc cannot pose as a binding. The lookahead
+// also keeps lastIndex immediately after the annotation so the next iteration
+// can pick up a sibling annotation on the following line.
+const BINDING_RE =
+  /@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|(?:\n[ \t]*\*[^\n]*)*[ \t]*\n[ \t]*\*\/)(?=[ \t]*\n(?:[ \t]*\/\*[\s\S]*?\*\/[ \t]*\n)*[ \t]*(?:it|test)(?:\.[a-zA-Z]+)?\s*\()/g;
 
-  // Match `@scenario <title>` where <title> may be quoted or plain up to EOL
-  // (stripping a trailing ` */` if the annotation sits inside a JSDoc block).
-  // Plain form: text after `@scenario ` up to end of line, minus any trailing
-  // ` */` or `*/`.
-  const annotationRe = /@scenario[ \t]+(?:"([^"]+)"|'([^']+)'|([^\n]+?))[ \t]*$/gm;
+function collectAllBindings(testRoots: string[]): CollectedBinding[] {
+  const bindings: CollectedBinding[] = [];
+  const files: string[] = [];
+  for (const r of testRoots) files.push(...walkTestFiles(resolve(REPO_ROOT, r)));
 
   for (const file of files) {
     const src = readFileSync(file, "utf8");
 
     let m: RegExpExecArray | null;
-    annotationRe.lastIndex = 0;
-    while ((m = annotationRe.exec(src)) !== null) {
-      const rawTitle = (m[1] ?? m[2] ?? m[3] ?? "").trim();
-      // Strip trailing JSDoc close or leading star/space remnants.
-      const title = rawTitle.replace(/\*\/\s*$/, "").trim();
+    BINDING_RE.lastIndex = 0;
+    while ((m = BINDING_RE.exec(src)) !== null) {
+      const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
       if (!title) continue;
       const line = src.slice(0, m.index).split("\n").length;
-      const ref: BindingRef = {
-        file: relative(REPO_ROOT, file),
-        line,
-      };
-      const existing = byTitle.get(title) ?? [];
-      existing.push(ref);
-      byTitle.set(title, existing);
+      bindings.push({
+        title,
+        ref: { file: relative(REPO_ROOT, file), line },
+      });
     }
   }
 
+  return bindings;
+}
+
+function indexByTitle(bindings: CollectedBinding[]): Map<string, BindingRef[]> {
+  const byTitle = new Map<string, BindingRef[]>();
+  for (const b of bindings) {
+    const existing = byTitle.get(b.title) ?? [];
+    existing.push(b.ref);
+    byTitle.set(b.title, existing);
+  }
   return byTitle;
 }
 
@@ -175,7 +194,9 @@ function buildReport(watched: WatchedFeature): Report {
     s.tags.some((t) => BOUND_TAGS.has(t))
   );
 
-  const bindings = collectBindings(watched.testRoots);
+  const knownTitles = new Set(allScenarios.map((s) => s.title));
+  const collected = collectAllBindings(watched.testRoots);
+  const bindings = indexByTitle(collected);
 
   const unbound: Scenario[] = [];
   const annotated = scenarios.map((s) => {
@@ -184,10 +205,15 @@ function buildReport(watched: WatchedFeature): Report {
     return { ...s, bindings: binds };
   });
 
+  const unknownAnnotations = collected
+    .filter((b) => !knownTitles.has(b.title))
+    .map((b) => ({ title: b.title, ref: b.ref }));
+
   return {
     feature: watched.featurePath,
     scenarios: annotated,
     unbound,
+    unknownAnnotations,
   };
 }
 
@@ -197,20 +223,33 @@ function printHuman(report: Report): void {
   console.log(`\n▸ ${report.feature}`);
   console.log(`  ${boundCount}/${total} scenarios bound`);
 
-  if (report.unbound.length === 0) {
+  if (report.unbound.length === 0 && report.unknownAnnotations.length === 0) {
     console.log(`  ✓ all bound\n`);
     return;
   }
 
-  console.log(`\n  Unbound scenarios:`);
-  for (const s of report.unbound) {
-    const tags = s.tags.join(" ");
-    console.log(`    ✗ [${tags}] ${s.title}`);
-    console.log(`      ${report.feature}:${s.line}`);
-    console.log(
-      `      Add: /** @scenario ${s.title} */ above an it(...) test that exercises this behavior`
-    );
+  if (report.unbound.length > 0) {
+    console.log(`\n  Unbound scenarios:`);
+    for (const s of report.unbound) {
+      const tags = s.tags.join(" ");
+      console.log(`    ✗ [${tags}] ${s.title}`);
+      console.log(`      ${report.feature}:${s.line}`);
+      console.log(
+        `      Add: /** @scenario ${s.title} */ directly above an it(...) test that exercises this behavior`
+      );
+    }
   }
+
+  if (report.unknownAnnotations.length > 0) {
+    console.log(
+      `\n  Annotations referencing unknown scenarios (typo? renamed scenario? stale binding?):`
+    );
+    for (const a of report.unknownAnnotations) {
+      console.log(`    ✗ @scenario ${a.title}`);
+      console.log(`      ${a.ref.file}:${a.ref.line}`);
+    }
+  }
+
   console.log("");
 }
 
@@ -228,14 +267,19 @@ function main(): void {
     for (const r of reports) printHuman(r);
   }
 
-  const anyUnbound = reports.some((r) => r.unbound.length > 0);
-  if (anyUnbound) {
+  const unboundCount = reports.reduce((sum, r) => sum + r.unbound.length, 0);
+  const unknownCount = reports.reduce(
+    (sum, r) => sum + r.unknownAnnotations.length,
+    0
+  );
+
+  if (unboundCount > 0 || unknownCount > 0) {
     if (!asJson) {
+      const parts: string[] = [];
+      if (unboundCount > 0) parts.push(`${unboundCount} unbound scenario(s)`);
+      if (unknownCount > 0) parts.push(`${unknownCount} unknown annotation(s)`);
       console.error(
-        `FAIL: ${reports.reduce(
-          (sum, r) => sum + r.unbound.length,
-          0
-        )} scenario(s) unbound. See spec-binding convention in dev/docs/TESTING_PHILOSOPHY.md.`
+        `FAIL: ${parts.join(", ")}. See spec-binding convention in dev/docs/TESTING_PHILOSOPHY.md.`
       );
     }
     process.exit(1);
