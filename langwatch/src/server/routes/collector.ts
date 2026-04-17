@@ -12,20 +12,18 @@ import { evaluationNameAutoslug } from "../background/workers/collector/evaluati
 import { maybeAddIdsToContextList } from "../background/workers/collector/rag";
 import { fetchExistingMD5s } from "../background/workers/collectorWorker";
 import { prisma } from "../db";
-import type {
-  CollectorRESTParamsValidator,
-  CustomMetadata,
-  ReservedTraceMetadata,
-  Span,
-} from "../tracer/types";
 import {
+  type CollectorRESTParamsValidator,
+  type CustomMetadata,
+  type ReservedTraceMetadata,
+  type Span,
   collectorRESTParamsValidatorSchema,
   customMetadataSchema,
   reservedTraceMetadataSchema,
   spanMetricsSchema,
   spanSchema,
   spanValidatorSchema,
-} from "../tracer/types.generated";
+} from "../tracer/types";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
 import { createLogger } from "../../utils/logger/server";
 

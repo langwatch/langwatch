@@ -131,8 +131,7 @@ services:
         fi &&
         (cd /mcp-server && pnpm install --ignore-scripts && pnpm run build) &&
         pnpm -w install &&
-        pnpm -w exec prisma generate &&
-        pnpm run types:zod:generate
+        pnpm -w exec prisma generate
       "
     environment:
       COREPACK_ENABLE_DOWNLOAD_PROMPT: "0"
@@ -159,7 +158,6 @@ services:
         export PATH=/opt/goose-bin:$$PATH &&
         corepack enable &&
         pnpm -w exec prisma generate &&
-        pnpm run types:zod:generate &&
         pnpm run start:prepare:db &&
         pnpm run dev
       "

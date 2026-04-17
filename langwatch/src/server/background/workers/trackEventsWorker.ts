@@ -2,9 +2,10 @@ import { type Job, Worker } from "bullmq";
 import { BullMQOtel } from "bullmq-otel";
 import type { TrackEventJob } from "~/server/background/types";
 import { withJobContext } from "../../context/asyncContext";
-import type {
-  ElasticSearchEvent,
-  ElasticSearchTrace,
+import {
+  type ElasticSearchEvent,
+  type ElasticSearchTrace,
+  elasticSearchEventSchema,
 } from "../../../server/tracer/types";
 import { createLogger } from "../../../utils/logger/server";
 import {
@@ -18,7 +19,6 @@ import {
   getJobProcessingDurationHistogram,
 } from "../../metrics";
 import { connection } from "../../redis";
-import { elasticSearchEventSchema } from "../../tracer/types.generated";
 import { TRACK_EVENTS_QUEUE } from "../queues/trackEventsQueue";
 
 const logger = createLogger("langwatch:workers:trackEventWorker");

@@ -37,8 +37,7 @@ import type {
 } from "../../server/evaluations/evaluators.generated";
 import {
   evaluatorsSchema,
-  evaluatorTypesSchema,
-} from "../../server/evaluations/evaluators.zod.generated";
+} from "../../server/evaluations/evaluators.generated";
 import {
   getEvaluatorDefaultSettings,
   getEvaluatorDefinitions,
@@ -103,7 +102,7 @@ export default function CheckConfigForm({
     resolver: (data, context, options) => {
       const schema = z.object({
         name: z.string().min(1).max(255).refine(validateNameUniqueness),
-        checkType: evaluatorTypesSchema,
+        checkType: z.any(),
         sample: z.number().min(0.01).max(1),
         preconditions: checkPreconditionsSchema,
         settings: data.checkType?.startsWith("custom/")

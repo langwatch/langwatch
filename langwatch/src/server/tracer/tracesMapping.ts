@@ -2,13 +2,13 @@ import type { Annotation, AnnotationScore, User } from "@prisma/client";
 import { z } from "zod";
 import { getSpanNameOrModel } from "../../utils/trace";
 import { datasetSpanSchema } from "../datasets/types";
-import type {
-  Trace as BaseTrace,
-  DatasetSpan,
-  Evaluation,
-  Span,
+import {
+  type Trace as BaseTrace,
+  type DatasetSpan,
+  type Evaluation,
+  type Span,
+  reservedTraceMetadataSchema,
 } from "./types";
-import { reservedTraceMetadataSchema } from "./types.generated";
 import { getRAGChunks, getRAGInfo } from "./utils";
 
 // Define a Trace type that includes annotations for use within this file

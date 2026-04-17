@@ -1,9 +1,10 @@
 import { z } from "zod";
 import {
+  type ChatMessage,
+  type SpanInputOutput,
   chatMessageSchema,
   spanInputOutputSchema,
-} from "../../internal/generated/types/tracer.generated";
-import { type ChatMessage, type SpanInputOutput } from "../../internal/generated/types/tracer";
+} from "../../internal/generated/types/tracer";
 import { type SimpleChatMessage, type JsonSerializable, type InputOutputType, INPUT_OUTPUT_TYPES } from "./types";
 
 /**

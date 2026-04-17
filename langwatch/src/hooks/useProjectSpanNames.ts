@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { reservedTraceMetadataSchema } from "../server/tracer/types.generated";
+import { reservedTraceMetadataSchema } from "../server/tracer/types";
 import { api } from "../utils/api";
 
 /**

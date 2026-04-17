@@ -7,8 +7,7 @@ import {
   batchEvaluationId,
   esClient,
 } from "~/server/elasticsearch";
-import type { ESBatchEvaluation } from "~/server/experiments/types";
-import { eSBatchEvaluationSchema } from "~/server/experiments/types.generated";
+import { type ESBatchEvaluation, eSBatchEvaluationSchema } from "~/server/experiments/types";
 import { createLogger } from "~/utils/logger/server";
 import type {
   BatchEvaluation,

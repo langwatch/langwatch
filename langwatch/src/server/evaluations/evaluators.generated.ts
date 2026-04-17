@@ -1,3 +1,925 @@
+import { z } from "zod";
+
+export const moneySchema = z.object({
+  currency: z.string(),
+  amount: z.number(),
+});
+
+export const evaluationResultSkippedSchema = z.object({
+  status: z.literal("skipped"),
+  details: z.union([z.string(), z.undefined()]).optional(),
+});
+
+export const evaluationResultErrorSchema = z.object({
+  status: z.literal("error"),
+  error_type: z.string(),
+  details: z.string(),
+  traceback: z.array(z.string()),
+});
+
+export const evaluationResultSchema = z.object({
+  status: z.literal("processed"),
+  score: z.union([z.number(), z.undefined()]).optional(),
+  passed: z.union([z.boolean(), z.undefined()]).optional(),
+  label: z.union([z.string(), z.undefined()]).optional(),
+  details: z.union([z.string(), z.undefined()]).optional(),
+  cost: z.union([moneySchema, z.undefined()]).optional(),
+  raw_response: z.any().optional(),
+});
+
+export const singleEvaluationResultSchema = z.union([
+  evaluationResultSchema,
+  evaluationResultSkippedSchema,
+  evaluationResultErrorSchema,
+]);
+
+export const evaluatorsSchema = z.object({
+  "legacy/ragas_answer_correctness": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      embeddings_model: z
+        .string()
+        .describe("The model to use for embeddings.")
+        .default("openai/text-embedding-ada-002"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "legacy/ragas_answer_relevancy": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      embeddings_model: z
+        .string()
+        .describe("The model to use for embeddings.")
+        .default("openai/text-embedding-ada-002"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "legacy/ragas_context_precision": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      embeddings_model: z
+        .string()
+        .describe("The model to use for embeddings.")
+        .default("openai/text-embedding-ada-002"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "legacy/ragas_context_recall": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      embeddings_model: z
+        .string()
+        .describe("The model to use for embeddings.")
+        .default("openai/text-embedding-ada-002"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "legacy/ragas_context_relevancy": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      embeddings_model: z
+        .string()
+        .describe("The model to use for embeddings.")
+        .default("openai/text-embedding-ada-002"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "legacy/ragas_context_utilization": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      embeddings_model: z
+        .string()
+        .describe("The model to use for embeddings.")
+        .default("openai/text-embedding-ada-002"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "legacy/ragas_faithfulness": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      embeddings_model: z
+        .string()
+        .describe("The model to use for embeddings.")
+        .default("openai/text-embedding-ada-002"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "presidio/pii_detection": z.object({
+    settings: z.object({
+      entities: z
+        .object({
+          credit_card: z.boolean().default(true),
+          crypto: z.boolean().default(true),
+          email_address: z.boolean().default(true),
+          iban_code: z.boolean().default(true),
+          ip_address: z.boolean().default(true),
+          location: z.boolean().default(false),
+          person: z.boolean().default(false),
+          phone_number: z.boolean().default(true),
+          medical_license: z.boolean().default(true),
+          us_bank_number: z.boolean().default(false),
+          us_driver_license: z.boolean().default(false),
+          us_itin: z.boolean().default(false),
+          us_passport: z.boolean().default(false),
+          us_ssn: z.boolean().default(false),
+          uk_nhs: z.boolean().default(false),
+          sg_nric_fin: z.boolean().default(false),
+          au_abn: z.boolean().default(false),
+          au_acn: z.boolean().default(false),
+          au_tfn: z.boolean().default(false),
+          au_medicare: z.boolean().default(false),
+          in_pan: z.boolean().default(false),
+          in_aadhaar: z.boolean().default(false),
+          in_vehicle_registration: z.boolean().default(false),
+          in_voter: z.boolean().default(false),
+          in_passport: z.boolean().default(false),
+        })
+        .describe("The types of PII to check for in the input.")
+        .default({
+          credit_card: true,
+          crypto: true,
+          email_address: true,
+          iban_code: true,
+          ip_address: true,
+          location: false,
+          person: false,
+          phone_number: true,
+          medical_license: true,
+          us_bank_number: false,
+          us_driver_license: false,
+          us_itin: false,
+          us_passport: false,
+          us_ssn: false,
+          uk_nhs: false,
+          sg_nric_fin: false,
+          au_abn: false,
+          au_acn: false,
+          au_tfn: false,
+          au_medicare: false,
+          in_pan: false,
+          in_aadhaar: false,
+          in_vehicle_registration: false,
+          in_voter: false,
+          in_passport: false,
+        }),
+      min_threshold: z
+        .number()
+        .describe(
+          "The minimum confidence required for failing the evaluation on a PII match.",
+        )
+        .default(0.5),
+    }),
+  }),
+  "lingua/language_detection": z.object({
+    settings: z.object({
+      check_for: z
+        .union([
+          z.literal("input_matches_output"),
+          z.literal("output_matches_language"),
+        ])
+        .describe("What should be checked")
+        .default("input_matches_output"),
+      expected_language: z
+        .union([
+          z.literal("AF"),
+          z.literal("AR"),
+          z.literal("AZ"),
+          z.literal("BE"),
+          z.literal("BG"),
+          z.literal("BN"),
+          z.literal("BS"),
+          z.literal("CA"),
+          z.literal("CS"),
+          z.literal("CY"),
+          z.literal("DA"),
+          z.literal("DE"),
+          z.literal("EL"),
+          z.literal("EN"),
+          z.literal("EO"),
+          z.literal("ES"),
+          z.literal("ET"),
+          z.literal("EU"),
+          z.literal("FA"),
+          z.literal("FI"),
+          z.literal("FR"),
+          z.literal("GA"),
+          z.literal("GU"),
+          z.literal("HE"),
+          z.literal("HI"),
+          z.literal("HR"),
+          z.literal("HU"),
+          z.literal("HY"),
+          z.literal("ID"),
+          z.literal("IS"),
+          z.literal("IT"),
+          z.literal("JA"),
+          z.literal("KA"),
+          z.literal("KK"),
+          z.literal("KO"),
+          z.literal("LA"),
+          z.literal("LG"),
+          z.literal("LT"),
+          z.literal("LV"),
+          z.literal("MI"),
+          z.literal("MK"),
+          z.literal("MN"),
+          z.literal("MR"),
+          z.literal("MS"),
+          z.literal("NB"),
+          z.literal("NL"),
+          z.literal("NN"),
+          z.literal("PA"),
+          z.literal("PL"),
+          z.literal("PT"),
+          z.literal("RO"),
+          z.literal("RU"),
+          z.literal("SK"),
+          z.literal("SL"),
+          z.literal("SN"),
+          z.literal("SO"),
+          z.literal("SQ"),
+          z.literal("SR"),
+          z.literal("ST"),
+          z.literal("SV"),
+          z.literal("SW"),
+          z.literal("TA"),
+          z.literal("TE"),
+          z.literal("TH"),
+          z.literal("TL"),
+          z.literal("TN"),
+          z.literal("TR"),
+          z.literal("TS"),
+          z.literal("UK"),
+          z.literal("UR"),
+          z.literal("VI"),
+          z.literal("XH"),
+          z.literal("YO"),
+          z.literal("ZH"),
+          z.literal("ZU"),
+        ])
+        .optional()
+        .describe("The specific language that the output is expected to be"),
+      min_words: z
+        .number()
+        .describe(
+          "Minimum number of words to check, as the language detection can be unreliable for very short texts. Inputs shorter than the minimum will be skipped.",
+        )
+        .default(7),
+      threshold: z
+        .number()
+        .describe(
+          "Minimum confidence threshold for the language detection. If the confidence is lower than this, the evaluation will be skipped.",
+        )
+        .default(0.25),
+    }),
+  }),
+  "openai/moderation": z.object({
+    settings: z.object({
+      model: z
+        .union([
+          z.literal("text-moderation-stable"),
+          z.literal("text-moderation-latest"),
+        ])
+        .describe(
+          "The model version to use, `text-moderation-latest` will be automatically upgraded over time, while `text-moderation-stable` will only be updated with advanced notice by OpenAI.",
+        )
+        .default("text-moderation-stable"),
+      categories: z
+        .object({
+          harassment: z.boolean().default(true),
+          harassment_threatening: z.boolean().default(true),
+          hate: z.boolean().default(true),
+          hate_threatening: z.boolean().default(true),
+          self_harm: z.boolean().default(true),
+          self_harm_instructions: z.boolean().default(true),
+          self_harm_intent: z.boolean().default(true),
+          sexual: z.boolean().default(true),
+          sexual_minors: z.boolean().default(true),
+          violence: z.boolean().default(true),
+          violence_graphic: z.boolean().default(true),
+        })
+        .describe("The categories of content to check for moderation.")
+        .default({
+          harassment: true,
+          harassment_threatening: true,
+          hate: true,
+          hate_threatening: true,
+          self_harm: true,
+          self_harm_instructions: true,
+          self_harm_intent: true,
+          sexual: true,
+          sexual_minors: true,
+          violence: true,
+          violence_graphic: true,
+        }),
+    }),
+  }),
+  "ragas/bleu_score": z.object({
+    settings: z.record(z.string(), z.never()),
+  }),
+  "ragas/context_f1": z.object({
+    settings: z.object({
+      distance_measure: z
+        .union([
+          z.literal("levenshtein"),
+          z.literal("hamming"),
+          z.literal("jaro"),
+          z.literal("jaro_winkler"),
+        ])
+        .default("levenshtein"),
+    }),
+  }),
+  "ragas/context_precision": z.object({
+    settings: z.object({
+      distance_measure: z
+        .union([
+          z.literal("levenshtein"),
+          z.literal("hamming"),
+          z.literal("jaro"),
+          z.literal("jaro_winkler"),
+        ])
+        .default("levenshtein"),
+    }),
+  }),
+  "ragas/context_recall": z.object({
+    settings: z.object({
+      distance_measure: z
+        .union([
+          z.literal("levenshtein"),
+          z.literal("hamming"),
+          z.literal("jaro"),
+          z.literal("jaro_winkler"),
+        ])
+        .default("levenshtein"),
+    }),
+  }),
+  "ragas/factual_correctness": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+      mode: z
+        .union([z.literal("f1"), z.literal("precision"), z.literal("recall")])
+        .describe("The mode to use for the factual correctness metric.")
+        .default("f1"),
+      atomicity: z
+        .union([z.literal("low"), z.literal("high")])
+        .describe("The level of atomicity for claim decomposition.")
+        .default("low"),
+      coverage: z
+        .union([z.literal("low"), z.literal("high")])
+        .describe("The level of coverage for claim decomposition.")
+        .default("low"),
+    }),
+  }),
+  "ragas/faithfulness": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+      autodetect_dont_know: z
+        .boolean()
+        .describe(
+          "Whether to autodetect 'I don't know' in the output to avoid failing the evaluation.",
+        )
+        .default(true),
+    }),
+  }),
+  "ragas/response_context_precision": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "ragas/response_context_recall": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "ragas/response_relevancy": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+      embeddings_model: z
+        .string()
+        .describe("The model to use for embeddings.")
+        .default("openai/text-embedding-ada-002"),
+    }),
+  }),
+  "ragas/rouge_score": z.object({
+    settings: z.object({
+      rouge_type: z
+        .union([z.literal("rouge1"), z.literal("rougeL")])
+        .describe("ROUGE type")
+        .default("rouge1"),
+      measure_type: z
+        .union([
+          z.literal("fmeasure"),
+          z.literal("precision"),
+          z.literal("recall"),
+        ])
+        .describe("ROUGE measure type")
+        .default("fmeasure"),
+    }),
+  }),
+  "ragas/rubrics_based_scoring": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+      rubrics: z
+        .array(
+          z.object({
+            description: z.string(),
+          }),
+        )
+        .default([
+          { description: "The response is incorrect, irrelevant." },
+          {
+            description:
+              "The response partially answers the question but includes significant errors, omissions, or irrelevant information.",
+          },
+          {
+            description:
+              "The response partially answers the question but includes minor errors, omissions, or irrelevant information.",
+          },
+          {
+            description:
+              "The response fully answers the question and includes minor errors, omissions, or irrelevant information.",
+          },
+          {
+            description:
+              "The response fully answers the question and includes no errors, omissions, or irrelevant information.",
+          },
+        ]),
+    }),
+  }),
+  "ragas/sql_query_equivalence": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "ragas/summarization_score": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation.")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe(
+          "The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.",
+        )
+        .default(2048),
+    }),
+  }),
+  "azure/content_safety": z.object({
+    settings: z.object({
+      severity_threshold: z
+        .union([
+          z.literal(1),
+          z.literal(2),
+          z.literal(3),
+          z.literal(4),
+          z.literal(5),
+          z.literal(6),
+          z.literal(7),
+        ])
+        .describe(
+          "The minimum severity level to consider content as unsafe, from 1 to 7.",
+        )
+        .default(1),
+      categories: z
+        .object({
+          Hate: z.boolean().default(true),
+          SelfHarm: z.boolean().default(true),
+          Sexual: z.boolean().default(true),
+          Violence: z.boolean().default(true),
+        })
+        .describe("The categories of moderation to check for.")
+        .default({ Hate: true, SelfHarm: true, Sexual: true, Violence: true }),
+      output_type: z
+        .union([
+          z.literal("FourSeverityLevels"),
+          z.literal("EightSeverityLevels"),
+        ])
+        .describe(
+          "The type of severity levels to return on the full 0-7 severity scale, it can be either the trimmed version with four values (0, 2, 4, 6 scores) or the whole range.",
+        )
+        .default("FourSeverityLevels"),
+    }),
+  }),
+  "azure/jailbreak": z.object({
+    settings: z.record(z.string(), z.never()),
+  }),
+  "azure/prompt_injection": z.object({
+    settings: z.record(z.string(), z.never()),
+  }),
+  "langevals/basic": z.object({
+    settings: z.object({
+      rules: z
+        .array(
+          z.object({
+            field: z
+              .union([z.literal("input"), z.literal("output")])
+              .default("output"),
+            rule: z.union([
+              z.literal("contains"),
+              z.literal("not_contains"),
+              z.literal("matches_regex"),
+              z.literal("not_matches_regex"),
+            ]),
+            value: z.string(),
+          }),
+        )
+        .describe("List of rules to check, the message must pass all of them")
+        .default([
+          {
+            field: "output",
+            rule: "not_contains",
+            value: "artificial intelligence",
+          },
+        ]),
+    }),
+  }),
+  "langevals/competitor_blocklist": z.object({
+    settings: z.object({
+      competitors: z
+        .array(z.string())
+        .describe("The competitors that must not be mentioned.")
+        .default(["OpenAI", "Google", "Microsoft"]),
+    }),
+  }),
+  "langevals/competitor_llm": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe("Max tokens allowed for evaluation")
+        .default(128000),
+      name: z
+        .string()
+        .describe("The name of your company")
+        .default("LangWatch"),
+      description: z
+        .string()
+        .describe("Description of what your company is specializing at")
+        .default(
+          "We are providing an LLM observability and evaluation platform",
+        ),
+    }),
+  }),
+  "langevals/competitor_llm_function_call": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe("Max tokens allowed for evaluation")
+        .default(128000),
+      name: z
+        .string()
+        .describe("The name of your company")
+        .default("LangWatch"),
+      description: z
+        .string()
+        .describe("Description of what your company is specializing at")
+        .default(
+          "We are providing an LLM observability and evaluation platform",
+        ),
+      competitors: z
+        .array(z.string())
+        .describe("The competitors that must not be mentioned.")
+        .default(["OpenAI", "Google", "Microsoft"]),
+    }),
+  }),
+  "langevals/exact_match": z.object({
+    settings: z.object({
+      case_sensitive: z
+        .boolean()
+        .describe(
+          "True if the comparison should be case-sensitive, False otherwise",
+        )
+        .default(false),
+      trim_whitespace: z
+        .boolean()
+        .describe(
+          "True if the comparison should trim whitespace, False otherwise",
+        )
+        .default(true),
+      remove_punctuation: z
+        .boolean()
+        .describe(
+          "True if the comparison should remove punctuation, False otherwise",
+        )
+        .default(true),
+    }),
+  }),
+  "langevals/llm_answer_match": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe("Max tokens allowed for evaluation")
+        .default(128000),
+      prompt: z
+        .string()
+        .describe("Prompt for the comparison")
+        .default(
+          "Verify that the predicted answer matches the gold answer for the question. Style does not matter, for example the gold answer may be more direct while the predicted answer more verbose and still be correct.",
+        ),
+    }),
+  }),
+  "langevals/llm_boolean": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe("Max tokens allowed for evaluation")
+        .default(128000),
+      prompt: z
+        .string()
+        .describe("The system prompt to use for the LLM to run the evaluation")
+        .default(
+          "You are an LLM evaluator. We need the guarantee that the output answers what is being asked on the input, please evaluate as False if it doesn't",
+        ),
+    }),
+  }),
+  "langevals/llm_category": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe("Max tokens allowed for evaluation")
+        .default(128000),
+      prompt: z
+        .string()
+        .describe("The system prompt to use for the LLM to run the evaluation")
+        .default(
+          "You are an LLM category evaluator. Please categorize the message in one of the following categories",
+        ),
+      categories: z
+        .array(
+          z.object({
+            name: z.string(),
+            description: z.string(),
+          }),
+        )
+        .describe("The categories to use for the evaluation")
+        .default([
+          { name: "smalltalk", description: "Smalltalk with the user" },
+          {
+            name: "company",
+            description: "Questions about the company, what we do, etc",
+          },
+        ]),
+    }),
+  }),
+  "langevals/llm_score": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe("Max tokens allowed for evaluation")
+        .default(128000),
+      prompt: z
+        .string()
+        .describe("The system prompt to use for the LLM to run the evaluation")
+        .default(
+          "You are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied",
+        ),
+    }),
+  }),
+  "langevals/off_topic": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe("Max tokens allowed for evaluation")
+        .default(128000),
+      allowed_topics: z
+        .array(
+          z.object({
+            topic: z.string(),
+            description: z.string(),
+          }),
+        )
+        .describe(
+          "The list of topics and their short descriptions that the chatbot is allowed to talk about",
+        )
+        .default([
+          { topic: "simple_chat", description: "Smalltalk with the user" },
+          {
+            topic: "company",
+            description: "Questions about the company, what we do, etc",
+          },
+        ]),
+    }),
+  }),
+  "langevals/query_resolution": z.object({
+    settings: z.object({
+      model: z
+        .string()
+        .describe("The model to use for evaluation")
+        .default("openai/gpt-5"),
+      max_tokens: z
+        .number()
+        .describe("Max tokens allowed for evaluation")
+        .default(128000),
+    }),
+  }),
+  "langevals/sentiment": z.object({
+    settings: z.object({
+      embeddings_model: z
+        .string()
+        .describe("The embeddings model to use for sentiment analysis")
+        .default("openai/text-embedding-3-small"),
+      positive_reference: z
+        .string()
+        .describe(
+          "Reference phrase representing the positive end of the sentiment scale",
+        )
+        .default("Comment of a very happy and satisfied user"),
+      negative_reference: z
+        .string()
+        .describe(
+          "Reference phrase representing the negative end of the sentiment scale",
+        )
+        .default("Comment of a user who is extremely dissatisfied"),
+      normalization_factor: z
+        .number()
+        .describe(
+          "Controls sentiment sensitivity. Decrease to make scores more extreme (fewer neutrals), increase to make scores more moderate (more neutrals)",
+        )
+        .default(0.1),
+    }),
+  }),
+  "langevals/similarity": z.object({
+    settings: z.object({
+      field: z
+        .union([z.literal("input"), z.literal("output")])
+        .default("output"),
+      rule: z
+        .union([z.literal("is_not_similar_to"), z.literal("is_similar_to")])
+        .default("is_not_similar_to"),
+      value: z.string().default("example"),
+      threshold: z.number().default(0.3),
+      embeddings_model: z.string().default("openai/text-embedding-3-small"),
+    }),
+  }),
+  "langevals/valid_format": z.object({
+    settings: z.object({
+      format: z
+        .union([
+          z.literal("json"),
+          z.literal("markdown"),
+          z.literal("python"),
+          z.literal("sql"),
+        ])
+        .default("json"),
+      json_schema: z
+        .string()
+        .optional()
+        .describe("JSON schema to validate against when format is 'json'"),
+    }),
+  }),
+});
+
+export const batchEvaluationResultSchema = z.array(
+  singleEvaluationResultSchema,
+);
+
 export type EvaluatorDefinition<T extends EvaluatorTypes> = {
     name: string;
     description: string;
@@ -28,871 +950,18 @@ export type EvaluatorDefinition<T extends EvaluatorTypes> = {
 
 export type EvaluatorTypes = keyof Evaluators;
 
-export type EvaluationResult = {
-    status: 'processed';
-    score?: number | undefined;
-    passed?: boolean | undefined;
-    label?: string | undefined;
-    details?: string | undefined;
-    cost?: Money | undefined;
-    raw_response?: any;
-};
+export type EvaluationResult = z.infer<typeof evaluationResultSchema>;
 
-export type EvaluationResultSkipped = {
-    status: 'skipped';
-    details?: string | undefined;
-};
+export type EvaluationResultSkipped = z.infer<typeof evaluationResultSkippedSchema>;
 
-export type EvaluationResultError = {
-    status: 'error';
-    error_type: string;
-    details: string;
-    traceback: string[];
-};
+export type EvaluationResultError = z.infer<typeof evaluationResultErrorSchema>;
 
 export type SingleEvaluationResult = EvaluationResult | EvaluationResultSkipped | EvaluationResultError;
 export type BatchEvaluationResult = SingleEvaluationResult[];
 
-export type Money = {
-    currency: string;
-    amount: number;
-};
+export type Money = z.infer<typeof moneySchema>;
 
-export type Evaluators = {
-  "legacy/ragas_answer_correctness": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The model to use for embeddings.
-        * @default "openai/text-embedding-ada-002"
-        */
-        embeddings_model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-      };
-  };
-  "legacy/ragas_answer_relevancy": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The model to use for embeddings.
-        * @default "openai/text-embedding-ada-002"
-        */
-        embeddings_model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-      };
-  };
-  "legacy/ragas_context_precision": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The model to use for embeddings.
-        * @default "openai/text-embedding-ada-002"
-        */
-        embeddings_model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-      };
-  };
-  "legacy/ragas_context_recall": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The model to use for embeddings.
-        * @default "openai/text-embedding-ada-002"
-        */
-        embeddings_model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-      };
-  };
-  "legacy/ragas_context_relevancy": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The model to use for embeddings.
-        * @default "openai/text-embedding-ada-002"
-        */
-        embeddings_model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-      };
-  };
-  "legacy/ragas_context_utilization": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The model to use for embeddings.
-        * @default "openai/text-embedding-ada-002"
-        */
-        embeddings_model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-      };
-  };
-  "legacy/ragas_faithfulness": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The model to use for embeddings.
-        * @default "openai/text-embedding-ada-002"
-        */
-        embeddings_model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-      };
-  };
-  "presidio/pii_detection": {
-    settings: {
-        /**
-        * @description The types of PII to check for in the input.
-        * @default {"credit_card": true, "crypto": true, "email_address": true, "iban_code": true, "ip_address": true, "location": false, "person": false, "phone_number": true, "medical_license": true, "us_bank_number": false, "us_driver_license": false, "us_itin": false, "us_passport": false, "us_ssn": false, "uk_nhs": false, "sg_nric_fin": false, "au_abn": false, "au_acn": false, "au_tfn": false, "au_medicare": false, "in_pan": false, "in_aadhaar": false, "in_vehicle_registration": false, "in_voter": false, "in_passport": false}
-        */
-        entities: {
-        /**
-        * @default true
-        */
-        credit_card: boolean;
-        /**
-        * @default true
-        */
-        crypto: boolean;
-        /**
-        * @default true
-        */
-        email_address: boolean;
-        /**
-        * @default true
-        */
-        iban_code: boolean;
-        /**
-        * @default true
-        */
-        ip_address: boolean;
-        /**
-        * @default false
-        */
-        location: boolean;
-        /**
-        * @default false
-        */
-        person: boolean;
-        /**
-        * @default true
-        */
-        phone_number: boolean;
-        /**
-        * @default true
-        */
-        medical_license: boolean;
-        /**
-        * @default false
-        */
-        us_bank_number: boolean;
-        /**
-        * @default false
-        */
-        us_driver_license: boolean;
-        /**
-        * @default false
-        */
-        us_itin: boolean;
-        /**
-        * @default false
-        */
-        us_passport: boolean;
-        /**
-        * @default false
-        */
-        us_ssn: boolean;
-        /**
-        * @default false
-        */
-        uk_nhs: boolean;
-        /**
-        * @default false
-        */
-        sg_nric_fin: boolean;
-        /**
-        * @default false
-        */
-        au_abn: boolean;
-        /**
-        * @default false
-        */
-        au_acn: boolean;
-        /**
-        * @default false
-        */
-        au_tfn: boolean;
-        /**
-        * @default false
-        */
-        au_medicare: boolean;
-        /**
-        * @default false
-        */
-        in_pan: boolean;
-        /**
-        * @default false
-        */
-        in_aadhaar: boolean;
-        /**
-        * @default false
-        */
-        in_vehicle_registration: boolean;
-        /**
-        * @default false
-        */
-        in_voter: boolean;
-        /**
-        * @default false
-        */
-        in_passport: boolean;
-      };
-        /**
-        * @description The minimum confidence required for failing the evaluation on a PII match.
-        * @default 0.5
-        */
-        min_threshold: number;
-      };
-  };
-  "lingua/language_detection": {
-    settings: {
-        /**
-        * @description What should be checked
-        * @default "input_matches_output"
-        */
-        check_for: "input_matches_output" | "output_matches_language";
-        /**
-        * @description The specific language that the output is expected to be
-        */
-        expected_language?: "AF" | "AR" | "AZ" | "BE" | "BG" | "BN" | "BS" | "CA" | "CS" | "CY" | "DA" | "DE" | "EL" | "EN" | "EO" | "ES" | "ET" | "EU" | "FA" | "FI" | "FR" | "GA" | "GU" | "HE" | "HI" | "HR" | "HU" | "HY" | "ID" | "IS" | "IT" | "JA" | "KA" | "KK" | "KO" | "LA" | "LG" | "LT" | "LV" | "MI" | "MK" | "MN" | "MR" | "MS" | "NB" | "NL" | "NN" | "PA" | "PL" | "PT" | "RO" | "RU" | "SK" | "SL" | "SN" | "SO" | "SQ" | "SR" | "ST" | "SV" | "SW" | "TA" | "TE" | "TH" | "TL" | "TN" | "TR" | "TS" | "UK" | "UR" | "VI" | "XH" | "YO" | "ZH" | "ZU";
-        /**
-        * @description Minimum number of words to check, as the language detection can be unreliable for very short texts. Inputs shorter than the minimum will be skipped.
-        * @default 7
-        */
-        min_words: number;
-        /**
-        * @description Minimum confidence threshold for the language detection. If the confidence is lower than this, the evaluation will be skipped.
-        * @default 0.25
-        */
-        threshold: number;
-      };
-  };
-  "openai/moderation": {
-    settings: {
-        /**
-        * @description The model version to use, `text-moderation-latest` will be automatically upgraded over time, while `text-moderation-stable` will only be updated with advanced notice by OpenAI.
-        * @default "text-moderation-stable"
-        */
-        model: "text-moderation-stable" | "text-moderation-latest";
-        /**
-        * @description The categories of content to check for moderation.
-        * @default {"harassment": true, "harassment_threatening": true, "hate": true, "hate_threatening": true, "self_harm": true, "self_harm_instructions": true, "self_harm_intent": true, "sexual": true, "sexual_minors": true, "violence": true, "violence_graphic": true}
-        */
-        categories: {
-        /**
-        * @default true
-        */
-        harassment: boolean;
-        /**
-        * @default true
-        */
-        harassment_threatening: boolean;
-        /**
-        * @default true
-        */
-        hate: boolean;
-        /**
-        * @default true
-        */
-        hate_threatening: boolean;
-        /**
-        * @default true
-        */
-        self_harm: boolean;
-        /**
-        * @default true
-        */
-        self_harm_instructions: boolean;
-        /**
-        * @default true
-        */
-        self_harm_intent: boolean;
-        /**
-        * @default true
-        */
-        sexual: boolean;
-        /**
-        * @default true
-        */
-        sexual_minors: boolean;
-        /**
-        * @default true
-        */
-        violence: boolean;
-        /**
-        * @default true
-        */
-        violence_graphic: boolean;
-      };
-      };
-  };
-  "ragas/bleu_score": {
-    settings: Record<string, never>;
-  };
-  "ragas/context_f1": {
-    settings: {
-        /**
-        * @default "levenshtein"
-        */
-        distance_measure: "levenshtein" | "hamming" | "jaro" | "jaro_winkler";
-      };
-  };
-  "ragas/context_precision": {
-    settings: {
-        /**
-        * @default "levenshtein"
-        */
-        distance_measure: "levenshtein" | "hamming" | "jaro" | "jaro_winkler";
-      };
-  };
-  "ragas/context_recall": {
-    settings: {
-        /**
-        * @default "levenshtein"
-        */
-        distance_measure: "levenshtein" | "hamming" | "jaro" | "jaro_winkler";
-      };
-  };
-  "ragas/factual_correctness": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-        /**
-        * @description The mode to use for the factual correctness metric.
-        * @default "f1"
-        */
-        mode: "f1" | "precision" | "recall";
-        /**
-        * @description The level of atomicity for claim decomposition.
-        * @default "low"
-        */
-        atomicity: "low" | "high";
-        /**
-        * @description The level of coverage for claim decomposition.
-        * @default "low"
-        */
-        coverage: "low" | "high";
-      };
-  };
-  "ragas/faithfulness": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-        /**
-        * @description Whether to autodetect 'I don't know' in the output to avoid failing the evaluation.
-        * @default true
-        */
-        autodetect_dont_know: boolean;
-      };
-  };
-  "ragas/response_context_precision": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-      };
-  };
-  "ragas/response_context_recall": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-      };
-  };
-  "ragas/response_relevancy": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-        /**
-        * @description The model to use for embeddings.
-        * @default "openai/text-embedding-ada-002"
-        */
-        embeddings_model: string;
-      };
-  };
-  "ragas/rouge_score": {
-    settings: {
-        /**
-        * @description ROUGE type
-        * @default "rouge1"
-        */
-        rouge_type: "rouge1" | "rougeL";
-        /**
-        * @description ROUGE measure type
-        * @default "fmeasure"
-        */
-        measure_type: "fmeasure" | "precision" | "recall";
-      };
-  };
-  "ragas/rubrics_based_scoring": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-        /**
-        * @default [{"description": "The response is incorrect, irrelevant."}, {"description": "The response partially answers the question but includes significant errors, omissions, or irrelevant information."}, {"description": "The response partially answers the question but includes minor errors, omissions, or irrelevant information."}, {"description": "The response fully answers the question and includes minor errors, omissions, or irrelevant information."}, {"description": "The response fully answers the question and includes no errors, omissions, or irrelevant information."}]
-        */
-        rubrics: {
-        description: string;
-      }[];
-      };
-  };
-  "ragas/sql_query_equivalence": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-      };
-  };
-  "ragas/summarization_score": {
-    settings: {
-        /**
-        * @description The model to use for evaluation.
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description The maximum number of tokens allowed for evaluation, a too high number can be costly. Entries above this amount will be skipped.
-        * @default 2048
-        */
-        max_tokens: number;
-      };
-  };
-  "azure/content_safety": {
-    settings: {
-        /**
-        * @description The minimum severity level to consider content as unsafe, from 1 to 7.
-        * @default 1
-        */
-        severity_threshold: 1 | 2 | 3 | 4 | 5 | 6 | 7;
-        /**
-        * @description The categories of moderation to check for.
-        * @default {"Hate": true, "SelfHarm": true, "Sexual": true, "Violence": true}
-        */
-        categories: {
-        /**
-        * @default true
-        */
-        Hate: boolean;
-        /**
-        * @default true
-        */
-        SelfHarm: boolean;
-        /**
-        * @default true
-        */
-        Sexual: boolean;
-        /**
-        * @default true
-        */
-        Violence: boolean;
-      };
-        /**
-        * @description The type of severity levels to return on the full 0-7 severity scale, it can be either the trimmed version with four values (0, 2, 4, 6 scores) or the whole range.
-        * @default "FourSeverityLevels"
-        */
-        output_type: "FourSeverityLevels" | "EightSeverityLevels";
-      };
-  };
-  "azure/jailbreak": {
-    settings: Record<string, never>;
-  };
-  "azure/prompt_injection": {
-    settings: Record<string, never>;
-  };
-  "langevals/basic": {
-    settings: {
-        /**
-        * @description List of rules to check, the message must pass all of them
-        * @default [{"field": "output", "rule": "not_contains", "value": "artificial intelligence"}]
-        */
-        rules: {
-        /**
-        * @default "output"
-        */
-        field: "input" | "output";
-        rule: "contains" | "not_contains" | "matches_regex" | "not_matches_regex";
-        value: string;
-      }[];
-      };
-  };
-  "langevals/competitor_blocklist": {
-    settings: {
-        /**
-        * @description The competitors that must not be mentioned.
-        * @default ["OpenAI", "Google", "Microsoft"]
-        */
-        competitors: string[];
-      };
-  };
-  "langevals/competitor_llm": {
-    settings: {
-        /**
-        * @description The model to use for evaluation
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description Max tokens allowed for evaluation
-        * @default 128000
-        */
-        max_tokens: number;
-        /**
-        * @description The name of your company
-        * @default "LangWatch"
-        */
-        name: string;
-        /**
-        * @description Description of what your company is specializing at
-        * @default "We are providing an LLM observability and evaluation platform"
-        */
-        description: string;
-      };
-  };
-  "langevals/competitor_llm_function_call": {
-    settings: {
-        /**
-        * @description The model to use for evaluation
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description Max tokens allowed for evaluation
-        * @default 128000
-        */
-        max_tokens: number;
-        /**
-        * @description The name of your company
-        * @default "LangWatch"
-        */
-        name: string;
-        /**
-        * @description Description of what your company is specializing at
-        * @default "We are providing an LLM observability and evaluation platform"
-        */
-        description: string;
-        /**
-        * @description The competitors that must not be mentioned.
-        * @default ["OpenAI", "Google", "Microsoft"]
-        */
-        competitors: string[];
-      };
-  };
-  "langevals/exact_match": {
-    settings: {
-        /**
-        * @description True if the comparison should be case-sensitive, False otherwise
-        * @default false
-        */
-        case_sensitive: boolean;
-        /**
-        * @description True if the comparison should trim whitespace, False otherwise
-        * @default true
-        */
-        trim_whitespace: boolean;
-        /**
-        * @description True if the comparison should remove punctuation, False otherwise
-        * @default true
-        */
-        remove_punctuation: boolean;
-      };
-  };
-  "langevals/llm_answer_match": {
-    settings: {
-        /**
-        * @description The model to use for evaluation
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description Max tokens allowed for evaluation
-        * @default 128000
-        */
-        max_tokens: number;
-        /**
-        * @description Prompt for the comparison
-        * @default "Verify that the predicted answer matches the gold answer for the question. Style does not matter, for example the gold answer may be more direct while the predicted answer more verbose and still be correct."
-        */
-        prompt: string;
-      };
-  };
-  "langevals/llm_boolean": {
-    settings: {
-        /**
-        * @description The model to use for evaluation
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description Max tokens allowed for evaluation
-        * @default 128000
-        */
-        max_tokens: number;
-        /**
-        * @description The system prompt to use for the LLM to run the evaluation
-        * @default "You are an LLM evaluator. We need the guarantee that the output answers what is being asked on the input, please evaluate as False if it doesn't"
-        */
-        prompt: string;
-      };
-  };
-  "langevals/llm_category": {
-    settings: {
-        /**
-        * @description The model to use for evaluation
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description Max tokens allowed for evaluation
-        * @default 128000
-        */
-        max_tokens: number;
-        /**
-        * @description The system prompt to use for the LLM to run the evaluation
-        * @default "You are an LLM category evaluator. Please categorize the message in one of the following categories"
-        */
-        prompt: string;
-        /**
-        * @description The categories to use for the evaluation
-        * @default [{"name": "smalltalk", "description": "Smalltalk with the user"}, {"name": "company", "description": "Questions about the company, what we do, etc"}]
-        */
-        categories: {
-        name: string;
-        description: string;
-      }[];
-      };
-  };
-  "langevals/llm_score": {
-    settings: {
-        /**
-        * @description The model to use for evaluation
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description Max tokens allowed for evaluation
-        * @default 128000
-        */
-        max_tokens: number;
-        /**
-        * @description The system prompt to use for the LLM to run the evaluation
-        * @default "You are an LLM evaluator. Please score from 0.0 to 1.0 how likely the user is to be satisfied with this answer, from 0.0 being not satisfied at all to 1.0 being completely satisfied"
-        */
-        prompt: string;
-      };
-  };
-  "langevals/off_topic": {
-    settings: {
-        /**
-        * @description The model to use for evaluation
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description Max tokens allowed for evaluation
-        * @default 128000
-        */
-        max_tokens: number;
-        /**
-        * @description The list of topics and their short descriptions that the chatbot is allowed to talk about
-        * @default [{"topic": "simple_chat", "description": "Smalltalk with the user"}, {"topic": "company", "description": "Questions about the company, what we do, etc"}]
-        */
-        allowed_topics: {
-        topic: string;
-        description: string;
-      }[];
-      };
-  };
-  "langevals/query_resolution": {
-    settings: {
-        /**
-        * @description The model to use for evaluation
-        * @default "openai/gpt-5"
-        */
-        model: string;
-        /**
-        * @description Max tokens allowed for evaluation
-        * @default 128000
-        */
-        max_tokens: number;
-      };
-  };
-  "langevals/sentiment": {
-    settings: {
-        /**
-        * @description The embeddings model to use for sentiment analysis
-        * @default "openai/text-embedding-3-small"
-        */
-        embeddings_model: string;
-        /**
-        * @description Reference phrase representing the positive end of the sentiment scale
-        * @default "Comment of a very happy and satisfied user"
-        */
-        positive_reference: string;
-        /**
-        * @description Reference phrase representing the negative end of the sentiment scale
-        * @default "Comment of a user who is extremely dissatisfied"
-        */
-        negative_reference: string;
-        /**
-        * @description Controls sentiment sensitivity. Decrease to make scores more extreme (fewer neutrals), increase to make scores more moderate (more neutrals)
-        * @default 0.1
-        */
-        normalization_factor: number;
-      };
-  };
-  "langevals/similarity": {
-    settings: {
-        /**
-        * @default "output"
-        */
-        field: "input" | "output";
-        /**
-        * @default "is_not_similar_to"
-        */
-        rule: "is_not_similar_to" | "is_similar_to";
-        /**
-        * @default "example"
-        */
-        value: string;
-        /**
-        * @default 0.3
-        */
-        threshold: number;
-        /**
-        * @default "openai/text-embedding-3-small"
-        */
-        embeddings_model: string;
-      };
-  };
-  "langevals/valid_format": {
-    settings: {
-        /**
-        * @default "json"
-        */
-        format: "json" | "markdown" | "python" | "sql";
-        /**
-        * @description JSON schema to validate against when format is 'json'
-        */
-        json_schema?: string;
-      };
-  };
-};
+export type Evaluators = z.infer<typeof evaluatorsSchema>;
 
 export const AVAILABLE_EVALUATORS: {
   [K in EvaluatorTypes]: EvaluatorDefinition<K>;

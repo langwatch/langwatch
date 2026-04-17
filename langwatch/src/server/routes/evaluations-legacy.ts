@@ -46,7 +46,7 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "~/server/evaluations/evaluators.generated";
-import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
+import { evaluatorsSchema } from "~/server/evaluations/evaluators.generated";
 import { getEvaluatorDefaultSettings } from "~/server/evaluations/getEvaluator";
 import {
   type EvaluationRESTParams,
@@ -54,19 +54,17 @@ import {
   evaluationInputSchema,
 } from "~/server/evaluations/types";
 import { mapEsTargetsToTargets } from "~/server/evaluations-v3/services/mappers";
-import type {
-  ESBatchEvaluation,
-  ESBatchEvaluationRESTParams,
-  ESBatchEvaluationTarget,
-  ESBatchEvaluationTargetType,
-} from "~/server/experiments/types";
 import {
+  type ESBatchEvaluation,
+  type ESBatchEvaluationRESTParams,
+  type ESBatchEvaluationTarget,
+  type ESBatchEvaluationTargetType,
   eSBatchEvaluationRESTParamsSchema,
   eSBatchEvaluationSchema,
   eSBatchEvaluationTargetTypeSchema,
-} from "~/server/experiments/types.generated";
+} from "~/server/experiments/types";
 import { getPayloadSizeHistogram } from "~/server/metrics";
-import { rAGChunkSchema } from "~/server/tracer/types.generated";
+import { rAGChunkSchema } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 
