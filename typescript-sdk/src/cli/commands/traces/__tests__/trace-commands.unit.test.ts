@@ -25,6 +25,7 @@ vi.mock("ora", () => ({
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { searchTracesCommand } from "../search";
 import { getTraceCommand } from "../get";
+import { archiveTracesCommand } from "../archive";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -143,6 +144,62 @@ describe("getTraceCommand()", () => {
       );
 
       await expect(getTraceCommand("nonexistent", {})).rejects.toThrow(ProcessExitError);
+    });
+  });
+});
+
+describe("archiveTracesCommand()", () => {
+  let mockArchive: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockArchive = vi.fn();
+    vi.mocked(TracesApiService).mockImplementation(() => ({
+      search: vi.fn(),
+      get: vi.fn(),
+      archive: mockArchive,
+    }) as unknown as TracesApiService);
+    vi.spyOn(console, "log").mockImplementation(noop);
+    vi.spyOn(console, "error").mockImplementation(noop);
+    mockProcessExit();
+  });
+
+  describe("when archiving a single trace", () => {
+    it("calls archive with the trace ID array", async () => {
+      mockArchive.mockResolvedValue({ dispatched: 1 });
+
+      await archiveTracesCommand(["trace_abc"]);
+
+      expect(mockArchive).toHaveBeenCalledWith(["trace_abc"]);
+    });
+  });
+
+  describe("when archiving multiple traces", () => {
+    it("passes all IDs through in one call", async () => {
+      mockArchive.mockResolvedValue({ dispatched: 3 });
+
+      await archiveTracesCommand(["t1", "t2", "t3"]);
+
+      expect(mockArchive).toHaveBeenCalledWith(["t1", "t2", "t3"]);
+    });
+  });
+
+  describe("when no trace IDs are provided", () => {
+    it("exits with code 1 before hitting the API", async () => {
+      await expect(archiveTracesCommand([])).rejects.toThrow(ProcessExitError);
+      expect(mockArchive).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the API call fails", () => {
+    it("exits with code 1", async () => {
+      mockArchive.mockRejectedValue(
+        new TracesApiError("Forbidden", "archive 1 trace(s)"),
+      );
+
+      await expect(archiveTracesCommand(["trace_abc"])).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });

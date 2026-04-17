@@ -24,6 +24,9 @@ export type TraceGetResponse = TraceGetResponseRaw extends string
       }
     : TraceGetResponseRaw;
 
+export type TraceArchiveResponse =
+  paths["/api/traces/archive"]["post"]["responses"]["202"]["content"]["application/json"];
+
 export class TracesApiError extends Error {
   constructor(
     message: string,
@@ -84,6 +87,14 @@ export class TracesApiService {
       },
     );
     if (error) this.handleApiError(`get trace "${traceId}"`, error);
+    return data;
+  }
+
+  async archive(traceIds: string[]): Promise<TraceArchiveResponse> {
+    const { data, error } = await this.apiClient.POST("/api/traces/archive", {
+      body: { traceIds },
+    });
+    if (error) this.handleApiError(`archive ${traceIds.length} trace(s)`, error);
     return data;
   }
 }
