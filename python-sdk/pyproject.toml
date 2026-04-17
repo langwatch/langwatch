@@ -114,23 +114,3 @@ tests = [
     "pytest-asyncio>=0.21.2",
     "python-dotenv==1.2.1"
 ]
-
-# Separate group because google-adk requires pydantic>=2.11.1 which conflicts
-# with the `examples` group's chainlit-compatibility pin (pydantic<2.10.2).
-# Install with: `uv sync --only-group adk-examples` (must be installed alone).
-adk-examples = [
-    "google-adk>=1.20.0,<2.0.0",
-    "openinference-instrumentation-google-adk>=0.1.4,<0.2.0",
-    "jupyter>=1.0.0,<2.0.0",
-]
-
-[tool.uv]
-# Declare `examples` and `adk-examples` as mutually exclusive so resolution
-# doesn't fail when both are declared in the project — pick one per
-# environment.
-conflicts = [
-    [
-        { group = "examples" },
-        { group = "adk-examples" },
-    ],
-]

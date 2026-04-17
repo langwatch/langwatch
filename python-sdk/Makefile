@@ -42,15 +42,19 @@ install:
 	@if ! command -v uv &> /dev/null; then \
 		curl -LsSf https://astral.sh/uv/install.sh | sh; \
 	fi
-	uv sync --group dev --group examples --group tests --all-extras
+	uv sync --all-groups --all-extras
 
-# ADK examples need pydantic>=2.11 which conflicts with chainlit in the main
-# `examples` group; install them into a separate env with this target.
-install-adk-examples:
-	@if ! command -v uv &> /dev/null; then \
-		curl -LsSf https://astral.sh/uv/install.sh | sh; \
-	fi
-	uv sync --only-group adk-examples --all-extras
+# ADK needs pydantic>=2.11 (clashes with the chainlit pin in `examples`) and
+# a newer opentelemetry-semantic-conventions that carries GEN_AI_INPUT_MESSAGES.
+# Install on top of a normal sync via `uv pip install` (bypasses the lockfile
+# resolver) — accepts that pydantic + otel upgrade and may break other
+# examples in this same env. Typical usage: a dedicated virtualenv for the
+# async-ADK notebook.
+install-adk-examples: install
+	uv pip install \
+		'google-adk>=1.20.0,<2.0.0' \
+		'openinference-instrumentation-google-adk>=0.1.4,<0.2.0' \
+		'opentelemetry-semantic-conventions>=0.62b0'
 
 build:
 	uv pip install build
