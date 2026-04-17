@@ -146,6 +146,15 @@ describe("AgentHttpEditorDrawer", () => {
           expect(screen.getByText("New HTTP Agent")).toBeInTheDocument();
         });
       });
+
+      /** @scenario HTTP agent editor renders Scenario Mappings section */
+      it("renders the Scenario Mappings section", async () => {
+        renderHttpDrawer();
+
+        await waitFor(() => {
+          expect(screen.getByText("Scenario Mappings")).toBeInTheDocument();
+        });
+      });
     });
   });
 });

@@ -278,6 +278,7 @@ describe("SerializedHttpAgentAdapter", () => {
   });
 
   describe("when scenarioMappings are on the agent config", () => {
+    /** @scenario HTTP agent adapter uses resolved fieldMappings for template variables */
     it("merges resolved mappings into the template context, overriding defaults", async () => {
       const config: HttpAgentData = {
         ...defaultConfig,
@@ -299,6 +300,7 @@ describe("SerializedHttpAgentAdapter", () => {
   });
 
   describe("when no scenarioMappings are on the agent config", () => {
+    /** @scenario HTTP agent adapter falls back to legacy behavior without mappings */
     it("falls back to legacy template context with input, messages, threadId", async () => {
       const config: HttpAgentData = {
         ...defaultConfig,

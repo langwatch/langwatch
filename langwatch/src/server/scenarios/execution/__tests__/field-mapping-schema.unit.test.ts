@@ -48,6 +48,7 @@ describe("CodeAgentDataSchema", () => {
 
 describe("suiteTargetSchema", () => {
   describe("when type is code with a referenceId", () => {
+    /** @scenario Suite target schema accepts fieldMappings */
     it("validates successfully", () => {
       const result = suiteTargetSchema.safeParse({
         type: "code",
@@ -59,6 +60,8 @@ describe("suiteTargetSchema", () => {
   });
 
   describe("when only type and referenceId are provided", () => {
+    /** @scenario fieldMappings is optional for backwards compatibility */
+    /** @scenario Existing suites without fieldMappings parse successfully */
     it("validates successfully without fieldMappings", () => {
       const result = suiteTargetSchema.safeParse({
         type: "prompt",
@@ -99,10 +102,12 @@ describe("TargetConfigSchema", () => {
       expect(TargetConfigSchema.safeParse({ type: "prompt", referenceId: "p1" }).success).toBe(true);
     });
 
+    /** @scenario Simulation target schema accepts fieldMappings */
     it("accepts http type", () => {
       expect(TargetConfigSchema.safeParse({ type: "http", referenceId: "h1" }).success).toBe(true);
     });
 
+    /** @scenario Suite target schema allows code agent type */
     it("accepts code type", () => {
       expect(TargetConfigSchema.safeParse({ type: "code", referenceId: "c1" }).success).toBe(true);
     });
@@ -111,6 +116,8 @@ describe("TargetConfigSchema", () => {
 
 describe("ChildProcessJobDataSchema", () => {
   describe("when scenarioMappings are on adapterData", () => {
+    /** @scenario fieldMappings threads through scenario job schema */
+    /** @scenario fieldMappings threads through child process data schema */
     it("validates and preserves scenarioMappings in parsed output", () => {
       const payload = {
         context: {
