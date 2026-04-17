@@ -66,10 +66,13 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
 
     const fallbackThreadId = threadIdFromRequest ?? randomUUID();
 
+    // Allocate traceId before any throwable preparation so the error stream
+    // and the (potential) backend trace share the same id. See issue #853.
+    const traceId = generateOtelTraceId();
+
     // Try to prepare the workflow; if it fails, stream error to chat
     let preparedEvent: StudioClientEvent;
     let nodeId: string;
-    let traceId: string;
     let threadId: string;
     let outputConfigs: OutputConfig[] | undefined;
 
@@ -86,7 +89,6 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         { identifier: "output", type: "str" },
       ];
       nodeId = "prompt_node";
-      traceId = generateOtelTraceId();
       const workflowId = `prompt_execution_${randomUUID().slice(0, 6)}`;
 
       // Prepend form messages (excluding system) to Copilot messages
@@ -143,8 +145,9 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       );
     } catch (earlyError: any) {
       logger.error({ earlyError }, "error");
-      // Handle errors that occur before streaming starts
-      const messageId = generateOtelTraceId();
+      // Use the pre-allocated traceId so the frontend's TraceMessage queries
+      // the same id the backend would have used for tracing (issue #853).
+      const messageId = traceId;
       void eventSource.stream(async (eventStream$) => {
         eventStream$.sendTextMessageStart({ messageId });
         eventStream$.sendTextMessageContent({
