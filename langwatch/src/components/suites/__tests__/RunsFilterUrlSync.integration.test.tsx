@@ -36,8 +36,11 @@ import { useRouter } from "~/utils/compat/next-router";
 type Store = ReturnType<typeof createRunHistoryStore>;
 
 /**
- * Mirrors RunHistoryPanel's syncToUrl-on-filter-change pattern without
- * pulling in its heavy dependencies (tRPC hooks, Chakra, etc).
+ * Mirrors the syncToUrl-on-filter-change effect in RunHistoryPanel
+ * (src/components/suites/RunHistoryPanel.tsx, look for the prevFilters/
+ * prevGroupBy useRef + useEffect). Must be kept in sync with that component.
+ * Extracting into a shared hook would be cleaner, but the effect is small
+ * enough that duplication is cheaper than the indirection for now.
  */
 function Harness({ store }: { store: Store }) {
   const { selectedSuiteSlug } = useSuiteRouting();
