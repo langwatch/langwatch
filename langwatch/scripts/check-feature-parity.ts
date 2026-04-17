@@ -141,17 +141,54 @@ function walkTestFiles(root: string): string[] {
   return out;
 }
 
-// Match an @scenario annotation inside a JSDoc comment that is eventually
-// followed by an it(...) or test(...) call, with nothing between the
-// annotation's closing `*/` and the call except whitespace and additional
-// JSDoc blocks (so multiple stacked annotations all bind the same test).
-//
-// The trailing lookahead enforces proximity — a stray @scenario in a helper,
-// import docblock, or unrelated JSDoc cannot pose as a binding. The lookahead
-// also keeps lastIndex immediately after the annotation so the next iteration
-// can pick up a sibling annotation on the following line.
-const BINDING_RE =
-  /@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|(?:\n[ \t]*\*[^\n]*)*[ \t]*\n[ \t]*\*\/)(?=[ \t]*\n(?:[ \t]*\/\*[\s\S]*?\*\/[ \t]*\n)*[ \t]*(?:it|test)(?:\.[a-zA-Z]+)?\s*\()/g;
+// A simple, non-backtracking regex that only finds `@scenario <title>` tokens.
+// Proximity to an `it(...)` / `test(...)` call is verified with a linear
+// forward scan in `isFollowedByTestCall` below — doing it in the regex is
+// tempting but invites ReDoS via nested quantifiers around repeated JSDoc
+// blocks.
+const ANNOTATION_RE =
+  /@scenario[ \t]+(?:"([^"\n]+)"|'([^'\n]+)'|([^\n*]+?))[ \t]*(?:\*\/|$)/gm;
+
+/**
+ * Starting at `start` (inclusive), scan forward and return true iff the next
+ * non-trivial token is an `it(` / `test(` / `it.only(` / `test.skip(` call.
+ *
+ * "Trivial" here means: whitespace (including newlines) and complete JSDoc
+ * blocks `/* ... *\/`. Anything else — code, line comments, import statements
+ * — means the annotation isn't acting as a binding and we skip it.
+ */
+function isFollowedByTestCall(src: string, start: number): boolean {
+  const len = src.length;
+  let i = start;
+  while (i < len) {
+    const ch = src[i];
+    // Whitespace
+    if (ch === " " || ch === "\t" || ch === "\n" || ch === "\r") {
+      i++;
+      continue;
+    }
+    // Sibling JSDoc / block comment
+    if (ch === "/" && src[i + 1] === "*") {
+      const close = src.indexOf("*/", i + 2);
+      if (close === -1) return false;
+      i = close + 2;
+      continue;
+    }
+    // Line comment (uncommon here, but tolerate)
+    if (ch === "/" && src[i + 1] === "/") {
+      const nl = src.indexOf("\n", i);
+      if (nl === -1) return false;
+      i = nl + 1;
+      continue;
+    }
+    // Anything else: must be the start of an it/test call identifier.
+    // Match `it` or `test`, optionally followed by `.something`, then `(`.
+    const rest = src.slice(i);
+    const m = rest.match(/^(?:it|test)(?:\.[a-zA-Z]+)?\s*\(/);
+    return m !== null;
+  }
+  return false;
+}
 
 function collectAllBindings(testRoots: string[]): CollectedBinding[] {
   const bindings: CollectedBinding[] = [];
@@ -162,10 +199,11 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
     const src = readFileSync(file, "utf8");
 
     let m: RegExpExecArray | null;
-    BINDING_RE.lastIndex = 0;
-    while ((m = BINDING_RE.exec(src)) !== null) {
+    ANNOTATION_RE.lastIndex = 0;
+    while ((m = ANNOTATION_RE.exec(src)) !== null) {
       const title = (m[1] ?? m[2] ?? m[3] ?? "").trim();
       if (!title) continue;
+      if (!isFollowedByTestCall(src, m.index + m[0].length)) continue;
       const line = src.slice(0, m.index).split("\n").length;
       bindings.push({
         title,
