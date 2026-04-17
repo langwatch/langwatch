@@ -17509,9 +17509,6 @@ for idx, row in experiment.loop(dataset.iterrows()):
             "contexts": row["contexts"],
         },
     )
-
-# Print summary and exit on failure
-experiment.print_summary()
 ```
 
   ### TypeScript
@@ -17546,9 +17543,6 @@ await experiment.run(
   },
   { concurrency: 4 }
 );
-
-// Print summary and exit on failure
-experiment.printSummary();
 ```
 
 
@@ -17619,8 +17613,6 @@ for idx, row in experiment.loop(dataset.iterrows()):
             })
 
     experiment.submit(compare, idx, row)
-
-experiment.print_summary()
 ```
 
 ---
