@@ -21,6 +21,10 @@ import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import {
+  readClientContext,
+  trackProductAction,
+} from "~/server/telemetry/productAction";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 
@@ -166,6 +170,14 @@ app.post("/traces", async (c) => {
 
       const { project } = authResult;
       span.setAttribute("langwatch.project.id", project.id);
+
+      void trackProductAction({
+        action: "trace_ingested",
+        projectId: project.id,
+        organizationId: project.team.organizationId,
+        route: "/api/otel/v1/traces",
+        ...readClientContext((name) => c.req.header(name)),
+      });
 
       const contentType = c.req.header("content-type");
       const body = await readBody(c.req.raw);

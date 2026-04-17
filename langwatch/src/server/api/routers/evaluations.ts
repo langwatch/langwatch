@@ -5,6 +5,7 @@ import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { trackServerEvent } from "~/server/posthog";
+import { trackProductAction } from "~/server/telemetry/productAction";
 
 import { createLogger } from "~/utils/logger/server";
 import {
@@ -96,6 +97,19 @@ export const evaluationsRouter = createTRPCRouter({
           userId: ctx.session.user.id,
           event: "evaluation_ran",
           projectId: input.projectId,
+        });
+
+        const projectTeam = await prisma.project.findUnique({
+          where: { id: input.projectId },
+          select: { team: { select: { organizationId: true } } },
+        });
+        void trackProductAction({
+          action: "evaluation_run",
+          projectId: input.projectId,
+          organizationId: projectTeam?.team.organizationId,
+          userId: ctx.session.user.id,
+          surface: "web",
+          route: "trpc:evaluations.runEvaluation",
         });
       }
 

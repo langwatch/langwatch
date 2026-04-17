@@ -22,27 +22,57 @@ export function getPostHogInstance(): PostHog | null {
 /**
  * Fire-and-forget server-side event tracking.
  * Silently no-ops when POSTHOG_KEY is not set (self-hosted without PostHog).
+ *
+ * Identity: pass `userId` for session-backed calls (web). For non-session callers
+ * (API key → SDK/CLI/MCP) pass `distinctId` explicitly (e.g. `project:<id>`). When
+ * `organizationId` is provided it is emitted as `$groups.organization` so org-level
+ * analytics work regardless of which identity path was used.
  */
 export function trackServerEvent({
   userId,
+  distinctId,
   event,
   properties,
   projectId,
+  organizationId,
+  groups,
 }: {
-  userId: string;
+  userId?: string;
+  distinctId?: string;
   event: string;
   properties?: Record<string, unknown>;
   projectId?: string;
+  organizationId?: string;
+  groups?: Record<string, string>;
 }) {
   const posthog = getPostHogInstance();
   if (!posthog) return;
+
+  const resolvedDistinctId = userId ?? distinctId;
+  if (!resolvedDistinctId) {
+    logger.warn(
+      { event },
+      "trackServerEvent called without userId or distinctId; skipping",
+    );
+    return;
+  }
+
+  const resolvedGroups: Record<string, string> = {
+    ...(organizationId ? { organization: organizationId } : {}),
+    ...(projectId ? { project: projectId } : {}),
+    ...(groups ?? {}),
+  };
+
   posthog.capture({
-    distinctId: userId,
+    distinctId: resolvedDistinctId,
     event,
     properties: {
       ...properties,
       ...(projectId ? { projectId } : {}),
     },
+    ...(Object.keys(resolvedGroups).length > 0
+      ? { groups: resolvedGroups }
+      : {}),
   });
 }
 

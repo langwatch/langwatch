@@ -43,6 +43,10 @@ import {
 } from "~/server/evaluations-v3/execution/types";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { trackServerEvent } from "~/server/posthog";
+import {
+  readClientContext,
+  trackProductAction,
+} from "~/server/telemetry/productAction";
 import { fireExperimentRanNurturing } from "../../../ee/billing/nurturing/hooks/featureAdoption";
 import { generateHumanReadableId } from "~/utils/humanReadableId";
 import { createLogger } from "~/utils/logger/server";
@@ -70,6 +74,7 @@ const authenticateApiKey = async (c: {
 
   const project = await prisma.project.findUnique({
     where: { apiKey, archivedAt: null },
+    include: { team: { select: { organizationId: true } } },
   });
 
   if (!project) {
@@ -141,6 +146,19 @@ app.post("/execute", zValidator("json", executionRequestSchema), async (c) => {
       { status: 403 },
     );
   }
+
+  const projectTeam = await prisma.project.findUnique({
+    where: { id: projectId },
+    select: { team: { select: { organizationId: true } } },
+  });
+  void trackProductAction({
+    action: "evaluation_run",
+    projectId,
+    organizationId: projectTeam?.team.organizationId,
+    userId: session.user?.id,
+    surface: "web",
+    route: "/api/evaluations/v3/execute",
+  });
 
   const dataResult = await loadExecutionData(
     projectId,
@@ -291,6 +309,14 @@ app.post("/:slug/run", async (c) => {
     return c.json({ error: authResult.error }, { status: authResult.status });
   }
   const { project } = authResult;
+
+  void trackProductAction({
+    action: "evaluation_run",
+    projectId: project.id,
+    organizationId: project.team.organizationId,
+    route: "/api/evaluations/v3/:slug/run",
+    ...readClientContext((name) => c.req.header(name)),
+  });
 
   const experiment = await prisma.experiment.findFirst({
     where: {

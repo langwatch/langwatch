@@ -71,7 +71,7 @@ describe("trackServerEvent", () => {
       });
     });
 
-    it("includes projectId in properties when provided", () => {
+    it("includes projectId in properties and as a PostHog group when provided", () => {
       trackServerEvent({
         userId: "user-123",
         event: "scenario_created",
@@ -82,10 +82,11 @@ describe("trackServerEvent", () => {
         distinctId: "user-123",
         event: "scenario_created",
         properties: { projectId: "proj-456" },
+        groups: { project: "proj-456" },
       });
     });
 
-    it("merges projectId with other properties", () => {
+    it("merges projectId with other properties and sets the project group", () => {
       trackServerEvent({
         userId: "user-123",
         event: "team_member_invited",
@@ -97,6 +98,7 @@ describe("trackServerEvent", () => {
         distinctId: "user-123",
         event: "team_member_invited",
         properties: { inviteCount: 3, projectId: "proj-456" },
+        groups: { project: "proj-456" },
       });
     });
 
@@ -111,6 +113,46 @@ describe("trackServerEvent", () => {
         distinctId: "user-123",
         event: "team_member_invited",
         properties: { inviteCount: 3 },
+      });
+    });
+
+    describe("when organizationId is provided", () => {
+      it("emits it as a PostHog group", () => {
+        trackServerEvent({
+          userId: "user-123",
+          event: "product_action",
+          organizationId: "org-9",
+          projectId: "proj-9",
+        });
+
+        expect(mockCapture).toHaveBeenCalledWith(
+          expect.objectContaining({
+            distinctId: "user-123",
+            event: "product_action",
+            groups: { organization: "org-9", project: "proj-9" },
+          }),
+        );
+      });
+    });
+
+    describe("when only distinctId is provided (no userId)", () => {
+      it("uses distinctId for capture", () => {
+        trackServerEvent({
+          distinctId: "project:proj-9",
+          event: "product_action",
+          projectId: "proj-9",
+        });
+
+        expect(mockCapture).toHaveBeenCalledWith(
+          expect.objectContaining({ distinctId: "project:proj-9" }),
+        );
+      });
+    });
+
+    describe("when neither userId nor distinctId is provided", () => {
+      it("silently skips", () => {
+        trackServerEvent({ event: "product_action" });
+        expect(mockCapture).not.toHaveBeenCalled();
       });
     });
   });
