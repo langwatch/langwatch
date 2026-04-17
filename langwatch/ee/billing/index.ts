@@ -2,17 +2,12 @@ import { prisma } from "../../src/server/db";
 import { createSaaSPlanProvider } from "./planProvider";
 import { createCustomerService } from "./services/customerService";
 import { createSeatEventSubscriptionFns } from "./services/seatEventSubscription";
-import { InviteService } from "../../src/server/invites/invite.service";
 import { createSeatSyncService } from "./services/seatSyncService";
 import * as subscriptionItemCalculator from "./services/subscriptionItemCalculator";
 import { EESubscriptionService } from "./services/subscription.service";
-import { EEWebhookService } from "./services/webhookService";
 import { createStripeClient } from "./stripe/stripeClient";
 import { createCurrencyRouter } from "./currencyRouter";
 import { createSubscriptionRouterFactory } from "./subscriptionRouter";
-import { processStripeWebhookEvent } from "./stripeWebhook";
-import type { WebhookService } from "./services/webhookService";
-import type Stripe from "stripe";
 
 export { PlanTypes, SubscriptionStatus } from "./planTypes";
 export { PLAN_LIMITS } from "./planLimits";
@@ -58,25 +53,6 @@ export const getSeatSyncService = () => {
     seatSyncServiceInstance = createSeatSyncService({ seatEventFns, db: prisma });
   }
   return seatSyncServiceInstance;
-};
-
-export type StripeWebhookProcessor = {
-  stripe: Stripe;
-  webhookService: WebhookService;
-  process: typeof processStripeWebhookEvent;
-};
-
-export const createStripeWebhookProcessor = (): StripeWebhookProcessor => {
-  const s = getStripe();
-  const inviteApprover = InviteService.create(prisma);
-  const webhookService = EEWebhookService.create({
-    db: prisma,
-    stripe: s,
-    itemCalculator: subscriptionItemCalculator,
-    inviteApprover,
-  });
-
-  return { stripe: s, webhookService, process: processStripeWebhookEvent };
 };
 
 let saasPlanProvider: ReturnType<typeof createSaaSPlanProvider> | null = null;

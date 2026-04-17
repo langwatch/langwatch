@@ -57,7 +57,12 @@ import { PlanProviderService } from "./subscription/plan-provider";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { EESubscriptionService } from "../../../ee/billing/services/subscription.service";
+import { EEWebhookService, type WebhookService } from "../../../ee/billing/services/webhookService";
+import { handleLicensePurchase } from "../../../ee/billing/services/licensePurchaseHandler";
 import { getSaaSPlanProvider } from "../../../ee/billing";
+import { InviteService } from "../invites/invite.service";
+import { env } from "~/env.mjs";
+import { getPostHogInstance } from "~/server/posthog";
 import { getLicenseHandler } from "../subscriptionHandler";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
 import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
@@ -248,8 +253,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
   let subscription: SubscriptionService | undefined;
   let usageReportingService: StripeUsageReportingService | undefined;
+  let webhookService: WebhookService | undefined;
+  let stripeClient: ReturnType<typeof createStripeClient> | undefined;
   if (config.isSaas) {
-    const stripeClient = createStripeClient();
+    stripeClient = createStripeClient();
     usageReportingService = new StripeUsageReportingService({ stripe: stripeClient, meterId: meters.BILLABLE_EVENTS });
     const seatEventFns = createSeatEventSubscriptionFns({ stripe: stripeClient, db: prisma });
     subscription = EESubscriptionService.create({
@@ -257,6 +264,16 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       db: prisma,
       itemCalculator: subscriptionItemCalculator,
       seatEventFns,
+    });
+    webhookService = EEWebhookService.create({
+      db: prisma,
+      stripe: stripeClient,
+      itemCalculator: subscriptionItemCalculator,
+      inviteApprover: InviteService.create(prisma),
+      licensePurchaseHandler: { handle: handleLicensePurchase },
+      licensePaymentLinkId: env.STRIPE_LICENSE_PAYMENT_LINK_ID,
+      licensePrivateKey: env.LANGWATCH_LICENSE_PRIVATE_KEY,
+      getPostHog: () => getPostHogInstance(),
     });
   }
 
@@ -453,6 +470,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     usage,
     planProvider,
     subscription,
+    webhookService,
+    stripeClient,
     notifications,
     nurturing,
     usageLimits,

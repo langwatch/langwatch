@@ -70,10 +70,6 @@ import {
 } from "~/server/background/queues/trackEventsQueue";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
 import type Stripe from "stripe";
-import {
-  createStripeWebhookProcessor,
-  type StripeWebhookProcessor,
-} from "../../../ee/billing";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { slugify } from "~/utils/slugify";
@@ -1011,10 +1007,9 @@ async function handleWorkflowRun(
 // =============================================
 // POST /api/webhooks/stripe
 // =============================================
-let webhookProcessor: StripeWebhookProcessor | null = null;
-
 app.post("/webhooks/stripe", async (c) => {
-  if (!env.IS_SAAS) {
+  const { webhookService, stripeClient } = getApp();
+  if (!env.IS_SAAS || !webhookService || !stripeClient) {
     return c.json({ error: "Not Found" }, 404);
   }
 
@@ -1028,15 +1023,10 @@ app.post("/webhooks/stripe", async (c) => {
     return c.text("Webhook Error: Missing signature or secret", 400);
   }
 
-  if (!webhookProcessor) {
-    webhookProcessor = createStripeWebhookProcessor();
-  }
-  const { stripe, webhookService, process } = webhookProcessor;
-
   let event: Stripe.Event;
   try {
     const rawBody = Buffer.from(await c.req.arrayBuffer());
-    event = stripe.webhooks.constructEvent(rawBody, sig, secret);
+    event = stripeClient.webhooks.constructEvent(rawBody, sig, secret);
   } catch (error) {
     logger.error(
       { error: (error as Error).message },
@@ -1045,9 +1035,9 @@ app.post("/webhooks/stripe", async (c) => {
     return c.text("Webhook Error: Invalid payload or signature", 400);
   }
 
-  const result = await process({ event, stripe, webhookService });
+  const result = await webhookService.handleEvent(event);
   if (result.status === "error") {
-    return c.text(result.message, result.httpStatus as any);
+    return c.text(result.message, result.httpStatus);
   }
   return c.json({ received: true });
 });
