@@ -141,15 +141,6 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     return org?.stripeCustomerId ?? null;
   }
 
-  async findByStripeCustomerId(
-    stripeCustomerId: string,
-  ): Promise<{ id: string } | null> {
-    return this.prisma.organization.findFirst({
-      where: { stripeCustomerId },
-      select: { id: true },
-    });
-  }
-
   async findNameById(
     organizationId: string,
   ): Promise<{ id: string; name: string } | null> {

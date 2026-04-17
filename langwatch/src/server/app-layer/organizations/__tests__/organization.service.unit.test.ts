@@ -22,7 +22,6 @@ describe("OrganizationService", () => {
     updateCurrency: vi.fn(),
     getPricingModel: vi.fn(),
     getStripeCustomerId: vi.fn(),
-    findByStripeCustomerId: vi.fn(),
     findNameById: vi.fn(),
     getOrganizationForBilling: vi.fn(),
     createAndAssign: vi.fn(),

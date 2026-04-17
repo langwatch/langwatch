@@ -24,8 +24,6 @@ export class App {
   readonly usage: AppDependencies["usage"];
   readonly planProvider: AppDependencies["planProvider"];
   readonly subscription?: AppDependencies["subscription"];
-  readonly webhookService?: AppDependencies["webhookService"];
-  readonly stripeClient?: AppDependencies["stripeClient"];
   readonly notifications: AppDependencies["notifications"];
   readonly nurturing?: AppDependencies["nurturing"];
   readonly usageLimits: AppDependencies["usageLimits"];
@@ -51,8 +49,6 @@ export class App {
     this.usage = deps.usage;
     this.planProvider = deps.planProvider;
     this.subscription = deps.subscription;
-    this.webhookService = deps.webhookService;
-    this.stripeClient = deps.stripeClient;
     this.notifications = deps.notifications;
     this.nurturing = deps.nurturing;
     this.usageLimits = deps.usageLimits;
