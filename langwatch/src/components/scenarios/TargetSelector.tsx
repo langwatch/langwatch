@@ -44,6 +44,7 @@ export function TargetSelector({
   const [searchValue, setSearchValue] = useState("");
   const [open, setOpen] = useState(false);
   const [maxDropdownHeight, setMaxDropdownHeight] = useState(400);
+  const [dropUp, setDropUp] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -111,11 +112,16 @@ export function TargetSelector({
     const next = !open;
     setOpen(next);
     if (next) {
-      // Cap dropdown height to available space below the trigger
+      // Pick the larger of space below/above the trigger and drop up when needed,
+      // so the dropdown stays usable at the bottom of the viewport (dialogs, drawers).
       const triggerRect = triggerRef.current?.getBoundingClientRect();
       if (triggerRect) {
         const spaceBelow = window.innerHeight - triggerRect.bottom - 8; // 8px padding from viewport edge
-        setMaxDropdownHeight(Math.min(400, Math.max(40, spaceBelow)));
+        const spaceAbove = triggerRect.top - 8;
+        const openUp = spaceAbove > spaceBelow;
+        const available = openUp ? spaceAbove : spaceBelow;
+        setDropUp(openUp);
+        setMaxDropdownHeight(Math.min(400, Math.max(40, available)));
       }
       setTimeout(() => {
         inputRef.current?.focus();
@@ -150,11 +156,12 @@ export function TargetSelector({
       {open && (
         <Box
           position="absolute"
-          top="100%"
+          {...(dropUp
+            ? { bottom: "100%", marginBottom: 1 }
+            : { top: "100%", marginTop: 1 })}
           left={0}
           width="300px"
           maxHeight={`${maxDropdownHeight}px`}
-          marginTop={1}
           borderRadius="lg"
           borderWidth="1px"
           borderColor="border"
