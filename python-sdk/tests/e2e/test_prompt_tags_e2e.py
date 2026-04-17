@@ -147,7 +147,7 @@ class TestPromptTagsE2E:
         """
         handle = f"e2e-update-tags-{uuid4().hex[:8]}"
 
-        created = prompt_factory(
+        prompt_factory(
             handle=handle,
             prompt="Original content",
         )
