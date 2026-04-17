@@ -61,14 +61,26 @@ export class TeamService {
         const directUserBindings = teamBindings.filter((b) => b.userId);
         const directUserIds = new Set(directUserBindings.map((b) => b.userId!));
 
-        const expandedGroupMembers = groupBindings.flatMap((b) => {
-          const seenInThisExpansion = new Set<string>();
-          return groupMemberships
+        // When a user belongs to multiple team-bound groups, keep only the
+        // highest-privilege entry. Order: ADMIN > MEMBER > VIEWER > CUSTOM.
+        const rolePriority: Record<TeamUserRole, number> = {
+          [TeamUserRole.ADMIN]: 0,
+          [TeamUserRole.MEMBER]: 1,
+          [TeamUserRole.VIEWER]: 2,
+          [TeamUserRole.CUSTOM]: 3,
+        };
+        const sortedGroupBindings = [...groupBindings].sort(
+          (a, b) => rolePriority[a.role] - rolePriority[b.role],
+        );
+
+        const seenExpandedUserIds = new Set<string>();
+        const expandedGroupMembers = sortedGroupBindings.flatMap((b) =>
+          groupMemberships
             .filter((gm) => gm.groupId === b.groupId)
             .filter((gm) => {
               if (directUserIds.has(gm.userId)) return false; // direct binding takes priority
-              if (seenInThisExpansion.has(gm.userId)) return false;
-              seenInThisExpansion.add(gm.userId);
+              if (seenExpandedUserIds.has(gm.userId)) return false;
+              seenExpandedUserIds.add(gm.userId);
               return true;
             })
             .map((gm) => ({
@@ -82,8 +94,8 @@ export class TeamService {
               role: b.role,
               customRoleId: b.customRoleId,
               customRoleName: b.customRole?.name ?? null,
-            }));
-        });
+            })),
+        );
 
         const directMembers = [
           ...directUserBindings.map((b) => ({
@@ -316,22 +328,8 @@ export class TeamService {
         throw new ValidationError("Operation would result in no admins for this team");
       }
 
-      // Return updated team data for client cache invalidation
-      const updatedTeam = await tx.team.findUnique({
-        where: { id: teamId },
-        include: {
-          members: {
-            include: {
-              user: true,
-              assignedRole: true,
-            },
-          },
-        },
-      });
-
       return {
         success: true,
-        team: updatedTeam,
         removedUserId: userId,
       };
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
