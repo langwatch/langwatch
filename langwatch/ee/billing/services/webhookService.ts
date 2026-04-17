@@ -1,6 +1,5 @@
 import { Currency, type PrismaClient } from "@prisma/client";
 import type Stripe from "stripe";
-import type { PostHog } from "posthog-node";
 import { createLogger } from "../../../src/utils/logger";
 import { getApp } from "../../../src/server/app-layer/app";
 import type {
@@ -19,9 +18,6 @@ import { fireSubscriptionSyncNurturing } from "../nurturing/hooks/subscriptionSy
 
 const logger = createLogger("langwatch:billing:webhookService");
 
-const VALID_CURRENCIES_FOR_CHECKOUT = new Set<string>(Object.values(Currency));
-const maskCustomerId = (id: string) => `${id.slice(0, 7)}...${id.slice(-4)}`;
-
 type ItemCalculator = {
   calculateQuantityForPrice: typeof calculateQuantityForPrice;
   prices: typeof prices;
@@ -34,23 +30,6 @@ type InviteApprover = {
   }): Promise<unknown>;
 };
 
-/**
- * License purchase events originate from a specific Stripe payment link and
- * target self-hosted buyers who have no organization in the SaaS database.
- * The webhook service routes these before any org lookup.
- */
-export interface LicensePurchaseHandler {
-  handle(params: {
-    checkoutSession: Stripe.Checkout.Session;
-    stripe: Stripe;
-    privateKey: string;
-  }): Promise<void>;
-}
-
-export type HandleEventResult =
-  | { status: "ok" }
-  | { status: "error"; httpStatus: 400 | 500; message: string };
-
 /** Stripe webhooks can arrive before subscription state is fully consistent. */
 const STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS = 2000;
 // TECH-DEBT: This fixed delay should become a retry loop with backoff.
@@ -58,23 +37,6 @@ const waitForStripeConsistency = () =>
   new Promise((resolve) => setTimeout(resolve, STRIPE_EVENTUAL_CONSISTENCY_DELAY_MS));
 
 export type WebhookService = {
-  /**
-   * Dispatches a verified Stripe event to the right handler.
-   *
-   * Signature verification happens at the transport layer (the Hono route);
-   * this method is transport-agnostic so it can be reused from workers,
-   * replays, and tests.
-   *
-   * Retry policy:
-   * - Returns `{ status: "ok" }` for no-op events (unknown types, events we
-   *   do not care about). Stripe will mark delivery successful — no retry.
-   * - Returns `{ status: "error", httpStatus: 500 }` on unexpected throws.
-   *   Stripe retries with backoff — correct for transient infra failures
-   *   and for bugs that will succeed after a deploy.
-   * - Every non-action branch logs at INFO/ERROR — nothing returns silently.
-   */
-  handleEvent(event: Stripe.Event): Promise<HandleEventResult>;
-
   handleCheckoutCompleted(params: {
     subscriptionId: string;
     clientReferenceId: string | null;
@@ -105,10 +67,6 @@ export class EEWebhookService implements WebhookService {
   private readonly stripe: Stripe;
   private readonly itemCalculator: ItemCalculator;
   private readonly inviteApprover?: InviteApprover;
-  private readonly licensePurchaseHandler?: LicensePurchaseHandler;
-  private readonly licensePaymentLinkId?: string;
-  private readonly licensePrivateKey?: string;
-  private readonly getPostHog?: () => PostHog | null;
 
   constructor({
     subscriptionRepository,
@@ -116,30 +74,18 @@ export class EEWebhookService implements WebhookService {
     stripe,
     itemCalculator,
     inviteApprover,
-    licensePurchaseHandler,
-    licensePaymentLinkId,
-    licensePrivateKey,
-    getPostHog,
   }: {
     subscriptionRepository: SubscriptionRepository;
     organizationRepository: OrganizationRepository;
     stripe: Stripe;
     itemCalculator: ItemCalculator;
     inviteApprover?: InviteApprover;
-    licensePurchaseHandler?: LicensePurchaseHandler;
-    licensePaymentLinkId?: string;
-    licensePrivateKey?: string;
-    getPostHog?: () => PostHog | null;
   }) {
     this.subscriptionRepository = subscriptionRepository;
     this.organizationRepository = organizationRepository;
     this.stripe = stripe;
     this.itemCalculator = itemCalculator;
     this.inviteApprover = inviteApprover;
-    this.licensePurchaseHandler = licensePurchaseHandler;
-    this.licensePaymentLinkId = licensePaymentLinkId;
-    this.licensePrivateKey = licensePrivateKey;
-    this.getPostHog = getPostHog;
   }
 
   static create({
@@ -147,19 +93,11 @@ export class EEWebhookService implements WebhookService {
     stripe,
     itemCalculator,
     inviteApprover,
-    licensePurchaseHandler,
-    licensePaymentLinkId,
-    licensePrivateKey,
-    getPostHog,
   }: {
     db: PrismaClient;
     stripe: Stripe;
     itemCalculator: ItemCalculator;
     inviteApprover?: InviteApprover;
-    licensePurchaseHandler?: LicensePurchaseHandler;
-    licensePaymentLinkId?: string;
-    licensePrivateKey?: string;
-    getPostHog?: () => PostHog | null;
   }): WebhookService {
     return traced(
       new EEWebhookService({
@@ -168,283 +106,9 @@ export class EEWebhookService implements WebhookService {
         stripe,
         itemCalculator,
         inviteApprover,
-        licensePurchaseHandler,
-        licensePaymentLinkId,
-        licensePrivateKey,
-        getPostHog,
       }),
       "EEWebhookService",
     );
-  }
-
-  async handleEvent(event: Stripe.Event): Promise<HandleEventResult> {
-    try {
-      if (event.type === "checkout.session.completed") {
-        const licenseResult = await this.tryRouteLicensePurchase(event);
-        if (licenseResult) return licenseResult;
-      }
-
-      if (
-        event.type === "checkout.session.completed" ||
-        event.type === "invoice.payment_succeeded" ||
-        event.type === "invoice.payment_failed"
-      ) {
-        return await this.routeCheckoutOrInvoice(event);
-      }
-
-      if (
-        event.type === "customer.subscription.deleted" ||
-        event.type === "customer.subscription.updated"
-      ) {
-        return await this.routeSubscriptionLifecycle(event);
-      }
-
-      logger.info(
-        { eventType: event.type, eventId: event.id },
-        "[stripeWebhook] Ignoring unhandled event type",
-      );
-      return { status: "ok" };
-    } catch (error) {
-      logger.error(
-        {
-          error: (error as Error).message,
-          stack: (error as Error).stack,
-          eventType: event.type,
-          eventId: event.id,
-        },
-        "[stripeWebhook] Unhandled error processing event",
-      );
-      return {
-        status: "error",
-        httpStatus: 500,
-        message: "Webhook processing error",
-      };
-    }
-  }
-
-  /**
-   * Returns a result when the session is a license purchase, otherwise null
-   * so `handleEvent` falls through to the subscription flow.
-   */
-  private async tryRouteLicensePurchase(
-    event: Stripe.Event & { type: "checkout.session.completed" },
-  ): Promise<HandleEventResult | null> {
-    const checkoutSession = event.data.object as Stripe.Checkout.Session;
-
-    const paymentLinkId =
-      typeof checkoutSession.payment_link === "string"
-        ? checkoutSession.payment_link
-        : checkoutSession.payment_link?.id;
-
-    if (
-      !this.licensePaymentLinkId ||
-      paymentLinkId !== this.licensePaymentLinkId
-    ) {
-      return null;
-    }
-
-    if (!this.licensePurchaseHandler) {
-      logger.error(
-        { eventId: event.id },
-        "[stripeWebhook] License purchase handler is not configured",
-      );
-      return {
-        status: "error",
-        httpStatus: 500,
-        message: "License generation error: handler not configured",
-      };
-    }
-
-    if (!this.licensePrivateKey) {
-      logger.error(
-        { eventId: event.id },
-        "[stripeWebhook] LANGWATCH_LICENSE_PRIVATE_KEY is not configured",
-      );
-      return {
-        status: "error",
-        httpStatus: 500,
-        message: "License generation error: missing private key",
-      };
-    }
-
-    await this.licensePurchaseHandler.handle({
-      checkoutSession,
-      stripe: this.stripe,
-      privateKey: this.licensePrivateKey,
-    });
-
-    return { status: "ok" };
-  }
-
-  private async routeCheckoutOrInvoice(
-    event: Stripe.Event & {
-      type:
-        | "checkout.session.completed"
-        | "invoice.payment_succeeded"
-        | "invoice.payment_failed";
-    },
-  ): Promise<HandleEventResult> {
-    const paymentIntent = event.data.object as
-      | Stripe.Checkout.Session
-      | Stripe.Invoice;
-
-    const subscriptionId =
-      typeof paymentIntent.subscription === "string"
-        ? paymentIntent.subscription
-        : paymentIntent.subscription?.id;
-
-    if (!subscriptionId) {
-      logger.info(
-        { eventType: event.type, eventId: event.id },
-        "[stripeWebhook] Event has no subscription id — skipping",
-      );
-      return { status: "ok" };
-    }
-
-    // Customer/organization lookup is best-effort for analytics only.
-    // Core handlers only need subscriptionId (+ client_reference_id for
-    // checkout) — dropping the work here would ACK the event to Stripe
-    // (no retry) while leaving the DB subscription PENDING.
-    const customerId =
-      typeof paymentIntent.customer === "string"
-        ? paymentIntent.customer
-        : paymentIntent.customer?.id;
-
-    const organization = customerId
-      ? await this.organizationRepository.findByStripeCustomerId(customerId)
-      : null;
-
-    if (customerId && !organization) {
-      logger.warn(
-        {
-          eventType: event.type,
-          eventId: event.id,
-          customerId: maskCustomerId(customerId),
-        },
-        "[stripeWebhook] No organization found for customer — proceeding without analytics",
-      );
-    }
-
-    switch (event.type) {
-      case "checkout.session.completed":
-        await this.dispatchCheckoutCompleted({
-          event: event as Stripe.Event & { type: "checkout.session.completed" },
-          subscriptionId,
-          customerId,
-          organizationId: organization?.id ?? null,
-        });
-        return { status: "ok" };
-
-      case "invoice.payment_succeeded":
-        await this.handleInvoicePaymentSucceeded({ subscriptionId });
-        return { status: "ok" };
-
-      case "invoice.payment_failed":
-        await this.handleInvoicePaymentFailed({ subscriptionId });
-        return { status: "ok" };
-    }
-  }
-
-  private async dispatchCheckoutCompleted({
-    event,
-    subscriptionId,
-    customerId,
-    organizationId,
-  }: {
-    event: Stripe.Event & { type: "checkout.session.completed" };
-    subscriptionId: string;
-    customerId?: string;
-    organizationId: string | null;
-  }): Promise<void> {
-    const checkoutSession = event.data.object as Stripe.Checkout.Session;
-    const selectedCurrencyRaw = checkoutSession.metadata?.selectedCurrency;
-    const selectedCurrency =
-      selectedCurrencyRaw &&
-      VALID_CURRENCIES_FOR_CHECKOUT.has(selectedCurrencyRaw)
-        ? selectedCurrencyRaw
-        : null;
-
-    const result = await this.handleCheckoutCompleted({
-      subscriptionId,
-      clientReferenceId: checkoutSession.client_reference_id ?? null,
-      selectedCurrency,
-    });
-
-    if (result.earlyReturn) {
-      logger.error(
-        {
-          eventId: event.id,
-          customerId: customerId ? maskCustomerId(customerId) : null,
-        },
-        "[stripeWebhook] No client_reference_id in checkout session",
-      );
-      return;
-    }
-
-    if (organizationId) {
-      this.emitCheckoutAnalytics({
-        checkoutSession,
-        subscriptionId,
-        organizationId,
-      });
-    }
-  }
-
-  private emitCheckoutAnalytics({
-    checkoutSession,
-    subscriptionId,
-    organizationId,
-  }: {
-    checkoutSession: Stripe.Checkout.Session;
-    subscriptionId: string;
-    organizationId: string;
-  }): void {
-    const posthog = this.getPostHog?.() ?? null;
-    if (!posthog) return;
-
-    posthog.capture({
-      distinctId: organizationId,
-      event: "subscription_created",
-      properties: {
-        subscriptionId,
-        $groups: { organization: organizationId },
-      },
-    });
-    posthog.groupIdentify({
-      groupType: "organization",
-      groupKey: organizationId,
-      properties: {
-        subscriptionCreatedAt: new Date(
-          checkoutSession.created * 1000,
-        ).toISOString(),
-        hasActiveSubscription: true,
-      },
-    });
-  }
-
-  private async routeSubscriptionLifecycle(
-    event: Stripe.Event & {
-      type: "customer.subscription.deleted" | "customer.subscription.updated";
-    },
-  ): Promise<HandleEventResult> {
-    const subscription = event.data.object as Stripe.Subscription;
-    if (!subscription.id) {
-      logger.info(
-        { eventType: event.type, eventId: event.id },
-        "[stripeWebhook] Subscription event has no id — skipping",
-      );
-      return { status: "ok" };
-    }
-
-    if (event.type === "customer.subscription.deleted") {
-      await this.handleSubscriptionDeleted({
-        stripeSubscriptionId: subscription.id,
-      });
-    } else {
-      await this.handleSubscriptionUpdated({ subscription });
-    }
-
-    return { status: "ok" };
   }
 
   async handleCheckoutCompleted({

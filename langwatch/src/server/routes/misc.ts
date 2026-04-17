@@ -69,7 +69,7 @@ import {
   trackEventsQueue,
 } from "~/server/background/queues/trackEventsQueue";
 import { runWorkflow as runWorkflowFn } from "~/server/workflows/runWorkflow";
-import type Stripe from "stripe";
+import { createStripeWebhookHandler } from "../../../ee/billing";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { encrypt } from "~/utils/encryption";
 import { slugify } from "~/utils/slugify";
@@ -1007,39 +1007,27 @@ async function handleWorkflowRun(
 // =============================================
 // POST /api/webhooks/stripe
 // =============================================
+let webhookHandler: ReturnType<typeof createStripeWebhookHandler> | null =
+  null;
+
 app.post("/webhooks/stripe", async (c) => {
-  const { webhookService, stripeClient } = getApp();
-  if (!env.IS_SAAS || !webhookService || !stripeClient) {
+  if (!env.IS_SAAS) {
     return c.json({ error: "Not Found" }, 404);
   }
 
-  const sig = c.req.header("stripe-signature");
-  const secret = env.STRIPE_WEBHOOK_SECRET;
-  if (!sig || !secret) {
-    logger.error(
-      { sig: !!sig, secret: !!secret },
-      "[stripeWebhook] Missing signature or secret",
-    );
-    return c.text("Webhook Error: Missing signature or secret", 400);
+  if (!webhookHandler) {
+    webhookHandler = createStripeWebhookHandler();
   }
 
-  let event: Stripe.Event;
-  try {
-    const rawBody = Buffer.from(await c.req.arrayBuffer());
-    event = stripeClient.webhooks.constructEvent(rawBody, sig, secret);
-  } catch (error) {
-    logger.error(
-      { error: (error as Error).message },
-      "[stripeWebhook] Failed to construct event",
-    );
-    return c.text("Webhook Error: Invalid payload or signature", 400);
-  }
-
-  const result = await webhookService.handleEvent(event);
-  if (result.status === "error") {
-    return c.text(result.message, result.httpStatus);
-  }
-  return c.json({ received: true });
+  // Stripe needs raw body — convert Hono request to a Node-like shim
+  // that `micro`'s `buffer()` / the stripe handler can consume.
+  // The webhook handler expects NextApiRequest/NextApiResponse, so we
+  // bridge it through a promise-based wrapper.
+  return new Promise<Response>((resolve) => {
+    const nodeReq = c.req.raw as any;
+    const fakeRes = createFakeNextRes(resolve);
+    webhookHandler!(nodeReq, fakeRes);
+  });
 });
 
 // =============================================
@@ -1382,6 +1370,54 @@ const secondChatMessage = async (
   );
   return completion.choices[0]!.message.content;
 };
+
+/**
+ * Creates a fake NextApiResponse-like object that captures the response
+ * and resolves the promise with a proper Response. Used for the Stripe
+ * webhook handler which expects NextApiRequest/NextApiResponse.
+ */
+function createFakeNextRes(
+  resolve: (value: Response) => void,
+): any {
+  let statusCode = 200;
+  const headers = new Headers();
+
+  return {
+    status(code: number) {
+      statusCode = code;
+      return this;
+    },
+    setHeader(name: string, value: string | string[]) {
+      if (Array.isArray(value)) {
+        for (const v of value) {
+          headers.append(name, v);
+        }
+      } else {
+        headers.set(name, value);
+      }
+      return this;
+    },
+    json(data: any) {
+      headers.set("Content-Type", "application/json");
+      resolve(
+        new Response(JSON.stringify(data), {
+          status: statusCode,
+          headers,
+        }),
+      );
+    },
+    end(body?: string) {
+      resolve(
+        new Response(body ?? null, { status: statusCode, headers }),
+      );
+    },
+    send(body: string) {
+      resolve(
+        new Response(body, { status: statusCode, headers }),
+      );
+    },
+  };
+}
 
 // =============================================
 // GET /image-proxy — SSRF-safe image proxy
