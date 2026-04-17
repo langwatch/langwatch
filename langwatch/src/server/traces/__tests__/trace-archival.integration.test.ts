@@ -2,6 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import {
   getTestClickHouseClient,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
+import { buildTraceSummariesConditions } from "~/server/filters/clickhouse/query-helpers";
 import type { ClickHouseClient } from "@clickhouse/client";
 
 /**
@@ -387,6 +388,41 @@ describe.skipIf(!hasTestcontainers)(
       });
       const rows = await result.json<{ total: string }>();
       expect(Number(rows[0]?.total)).toBe(1);
+    });
+
+    it("buildTraceSummariesConditions excludes archived traces pre-merge", async () => {
+      // Proves the shared filter helper used by every filter-dropdown query
+      // (topics.topics, metadata.user_id, metadata.customer_id, metadata.labels,
+      // traces.origin, etc.) does not leak archived traces in the pre-merge
+      // state. Outer ArchivedAt IS NULL + inner IN-tuple dedup subquery
+      // guarantees the latest version is the one whose archived state we check.
+      const now = Date.now();
+      const whereClause = buildTraceSummariesConditions({
+        tenantId,
+        startDate: now - 10 * 60_000,
+        endDate: now + 10 * 60_000,
+      });
+      const result = await ch.query({
+        query: `
+          SELECT ts.TraceId
+          FROM trace_summaries ts
+          WHERE ${whereClause}
+            AND ts.TraceId IN ({traceIds:Array(String)})
+          ORDER BY ts.TraceId
+        `,
+        query_params: {
+          tenantId,
+          startDate: now - 10 * 60_000,
+          endDate: now + 10 * 60_000,
+          traceIds: [activeTraceId, archivedTraceId],
+        },
+        format: "JSONEachRow",
+      });
+      const rows = await result.json<{ TraceId: string }>();
+      const traceIds = rows.map((r) => r.TraceId);
+
+      expect(traceIds).toContain(activeTraceId);
+      expect(traceIds).not.toContain(archivedTraceId);
     });
 
     it("excludes archived traces from paginated queries with argMax dedup (pre-merge)", async () => {
