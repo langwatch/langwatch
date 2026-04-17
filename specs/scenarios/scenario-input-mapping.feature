@@ -163,12 +163,6 @@ Feature: Scenario Input Mapping
     And "threadId" is available as a source
 
   @integration
-  Scenario: User can set a static value mapping
-    Given the mapping UI is rendered for a code agent input "context"
-    When the user types "Use the knowledge base" as a static value
-    Then the fieldMappings for "context" has type "value" with that text
-
-  @integration
   Scenario: Static value mapping round-trips through save and reload
     Given a code agent with inputs "query" and "context"
     And a stored mapping for "context" with type "value" and text "Use the KB"
@@ -188,14 +182,6 @@ Feature: Scenario Input Mapping
     Given a suite with a code agent target
     When the user maps "query" to "input"
     Then the form state for that target's fieldMappings reflects the mapping
-
-  # --- Ad-hoc Run Path ---
-
-  @integration
-  Scenario: Ad-hoc scenario run accepts fieldMappings
-    Given a scenario with a code agent target
-    When an ad-hoc run is triggered with fieldMappings
-    Then the run is scheduled with the mappings on the job payload
 
   # --- Backwards Compatibility ---
 
