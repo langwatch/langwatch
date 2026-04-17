@@ -23,12 +23,16 @@ describe("replayEventLoader", () => {
 
     const client = getTestClickHouseClient()!;
 
-    // Insert test events into event_log
+    // Insert test events into event_log.
+    // IdempotencyKey must be unique per event — event_log is a ReplacingMergeTree
+    // keyed by (TenantId, AggregateType, AggregateId, IdempotencyKey), so events
+    // sharing that tuple get collapsed to a single row on merge.
     const events = [
       {
         TenantId: tenantId,
         AggregateType: "test",
         AggregateId: "agg-1",
+        IdempotencyKey: "evt-001",
         EventId: "evt-001",
         EventType: "test.event",
         EventTimestamp: 1700000000000,
@@ -40,6 +44,7 @@ describe("replayEventLoader", () => {
         TenantId: tenantId,
         AggregateType: "test",
         AggregateId: "agg-1",
+        IdempotencyKey: "evt-002",
         EventId: "evt-002",
         EventType: "test.event",
         EventTimestamp: 1700000001000,
@@ -51,6 +56,7 @@ describe("replayEventLoader", () => {
         TenantId: tenantId,
         AggregateType: "test",
         AggregateId: "agg-2",
+        IdempotencyKey: "evt-003",
         EventId: "evt-003",
         EventType: "test.event",
         EventTimestamp: 1700000002000,
@@ -63,6 +69,7 @@ describe("replayEventLoader", () => {
         TenantId: otherTenantId,
         AggregateType: "test",
         AggregateId: "agg-1",
+        IdempotencyKey: "evt-other-001",
         EventId: "evt-other-001",
         EventType: "test.event",
         EventTimestamp: 1700000000500,
@@ -137,8 +144,7 @@ describe("replayEventLoader", () => {
   });
 
   describe("countEventsForAggregates", () => {
-    // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
-    it.skip("counts all events for discovered aggregates", async () => {
+    it("counts all events for discovered aggregates", async () => {
       const client = getTestClickHouseClient()!;
       const count = await countEventsForAggregates({
         client,
@@ -204,8 +210,7 @@ describe("replayEventLoader", () => {
   });
 
   describe("batchLoadAggregateEvents", () => {
-    // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
-    it.skip("loads events up to cutoff", async () => {
+    it("loads events up to cutoff", async () => {
       const client = getTestClickHouseClient()!;
       const events = await batchLoadAggregateEvents({
         client,
@@ -261,8 +266,7 @@ describe("replayEventLoader", () => {
     });
 
     describe("when batchSize limits results", () => {
-      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
-      it.skip("returns at most batchSize events", async () => {
+      it("returns at most batchSize events", async () => {
         const client = getTestClickHouseClient()!;
         const events = await batchLoadAggregateEvents({
           client,
@@ -280,8 +284,7 @@ describe("replayEventLoader", () => {
     });
 
     describe("when another tenant has the same aggregateId", () => {
-      // Skipped: requires live ClickHouse. Run with testcontainers or make dev-full to enable.
-      it.skip("returns only the requested tenant's events", async () => {
+      it("returns only the requested tenant's events", async () => {
         const client = getTestClickHouseClient()!;
         const events = await batchLoadAggregateEvents({
           client,
