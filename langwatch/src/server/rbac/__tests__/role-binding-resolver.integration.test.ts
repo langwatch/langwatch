@@ -7,8 +7,8 @@
  * - Scope hierarchy (project → team → org)
  * - Group-expanded bindings
  * - Permission union across all matching bindings
- * - Fallback to TeamUser when no RoleBindings exist
- * - RoleBinding takes precedence over TeamUser when both exist
+ * - No fallback to TeamUser when no RoleBindings exist
+ * - RoleBinding is authoritative: TeamUser is ignored even when both exist
  */
 import {
   RoleBindingScopeType,

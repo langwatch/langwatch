@@ -1,8 +1,17 @@
-import { RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+  type PrismaClient,
+} from "@prisma/client";
 import { generate } from "@langwatch/ksuid";
 import { TRPCError } from "@trpc/server";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type { RoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
+import {
+  getOrganizationRolePermissions,
+  getTeamRolePermissions,
+} from "~/server/api/rbac";
 
 export class RoleBindingService {
   constructor(
@@ -75,15 +84,18 @@ export class RoleBindingService {
       .filter((b) => b.scopeType === RoleBindingScopeType.PROJECT)
       .map((b) => b.scopeId);
 
+    // Keep scope-name lookups symmetric with listForUser and defense-in-depth
+    // against any stray binding whose scopeId points outside the org (historical
+    // data, failed migrations). Bindings are already filtered by organizationId.
     const [orgs, teams, projects] = await Promise.all([
       orgIds.length > 0
         ? this.prisma.organization.findMany({ where: { id: { in: orgIds } }, select: { id: true, name: true } })
         : [],
       teamIds.length > 0
-        ? this.prisma.team.findMany({ where: { id: { in: teamIds } }, select: { id: true, name: true } })
+        ? this.prisma.team.findMany({ where: { id: { in: teamIds }, organizationId }, select: { id: true, name: true } })
         : [],
       projectIds.length > 0
-        ? this.prisma.project.findMany({ where: { id: { in: projectIds } }, select: { id: true, name: true } })
+        ? this.prisma.project.findMany({ where: { id: { in: projectIds }, team: { organizationId } }, select: { id: true, name: true } })
         : [],
     ]);
 
@@ -125,6 +137,156 @@ export class RoleBindingService {
       memberUserIds: b.groupId ? (membersByGroup.get(b.groupId) ?? []) : [],
       createdAt: b.createdAt,
     }));
+  }
+
+  async getMyAccessBreakdown({
+    organizationId,
+    userId,
+    userName,
+    userEmail,
+  }: {
+    organizationId: string;
+    userId: string;
+    userName: string | null;
+    userEmail: string | null;
+  }) {
+    const [orgMember, groupMemberships] = await Promise.all([
+      this.prisma.organizationUser.findFirst({
+        where: { userId, organizationId },
+        select: { role: true },
+      }),
+      this.prisma.groupMembership.findMany({
+        where: { userId, group: { organizationId } },
+        include: {
+          group: {
+            select: { id: true, name: true, slug: true, scimSource: true },
+          },
+        },
+      }),
+    ]);
+
+    const groupIds = groupMemberships.map((gm) => gm.groupId);
+
+    const allBindings = await this.prisma.roleBinding.findMany({
+      where: {
+        organizationId,
+        OR: [
+          { userId },
+          ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
+        ],
+      },
+      include: {
+        customRole: { select: { id: true, name: true, permissions: true } },
+        group: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    const orgScopeIds = allBindings
+      .filter((b) => b.scopeType === RoleBindingScopeType.ORGANIZATION)
+      .map((b) => b.scopeId);
+    const teamScopeIds = allBindings
+      .filter((b) => b.scopeType === RoleBindingScopeType.TEAM)
+      .map((b) => b.scopeId);
+    const projectScopeIds = allBindings
+      .filter((b) => b.scopeType === RoleBindingScopeType.PROJECT)
+      .map((b) => b.scopeId);
+
+    const [orgs, teams, projects] = await Promise.all([
+      orgScopeIds.length > 0
+        ? this.prisma.organization.findMany({
+            where: { id: organizationId },
+            select: { id: true, name: true },
+          })
+        : [],
+      teamScopeIds.length > 0
+        ? this.prisma.team.findMany({
+            where: { id: { in: [...new Set(teamScopeIds)] }, organizationId },
+            select: { id: true, name: true },
+          })
+        : [],
+      projectScopeIds.length > 0
+        ? this.prisma.project.findMany({
+            where: {
+              id: { in: [...new Set(projectScopeIds)] },
+              team: { organizationId },
+            },
+            select: { id: true, name: true },
+          })
+        : [],
+    ]);
+
+    const scopeNames = new Map<string, string>();
+    for (const o of orgs) scopeNames.set(o.id, o.name);
+    for (const t of teams) scopeNames.set(t.id, t.name);
+    for (const p of projects) scopeNames.set(p.id, p.name);
+
+    const resolvePermissions = (
+      binding: (typeof allBindings)[number],
+    ): string[] => {
+      if (binding.role === TeamUserRole.CUSTOM && binding.customRole) {
+        const perms = binding.customRole.permissions;
+        return Array.isArray(perms)
+          ? perms.filter((p): p is string => typeof p === "string")
+          : [];
+      }
+      if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
+        const orgRole =
+          binding.role === TeamUserRole.ADMIN
+            ? OrganizationUserRole.ADMIN
+            : OrganizationUserRole.MEMBER;
+        return getOrganizationRolePermissions(orgRole);
+      }
+      return getTeamRolePermissions(binding.role);
+    };
+
+    const toBindingSummary = (b: (typeof allBindings)[number]) => ({
+      id: b.id,
+      role: b.role as string,
+      customRoleName: b.customRole?.name ?? null,
+      scopeType: b.scopeType,
+      scopeId: b.scopeId,
+      scopeName: scopeNames.get(b.scopeId) ?? null,
+      permissions: resolvePermissions(b),
+    });
+
+    const directBindings = allBindings
+      .filter((b) => b.userId === userId)
+      .map(toBindingSummary);
+
+    const groupBindingsByGroupId = new Map<
+      string,
+      (typeof allBindings)[number][]
+    >();
+    for (const b of allBindings.filter((b) => b.groupId != null)) {
+      const gid = b.groupId!;
+      if (!groupBindingsByGroupId.has(gid)) groupBindingsByGroupId.set(gid, []);
+      groupBindingsByGroupId.get(gid)!.push(b);
+    }
+
+    const orgRole = orgMember?.role ?? "MEMBER";
+
+    return {
+      user: {
+        id: userId,
+        name: userName,
+        email: userEmail,
+        orgRole: orgRole as string,
+        orgRolePermissions: getOrganizationRolePermissions(
+          orgMember?.role ?? "MEMBER",
+        ),
+      },
+      groups: groupMemberships.map((gm) => ({
+        id: gm.group.id,
+        name: gm.group.name,
+        slug: gm.group.slug,
+        scimSource: gm.group.scimSource,
+        bindings: (groupBindingsByGroupId.get(gm.groupId) ?? []).map(
+          toBindingSummary,
+        ),
+      })),
+      directBindings,
+    };
   }
 
   async create({

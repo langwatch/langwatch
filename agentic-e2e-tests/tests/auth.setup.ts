@@ -119,13 +119,11 @@ setup("authenticate", async ({ page, request }) => {
     console.log("initializeOrganization status:", initResponse.status());
     const initData = await initResponse.json().catch(() => null);
     if (!initResponse.ok() || initData?.["0"]?.error) {
-      console.log(
-        "WARNING: initializeOrganization failed:",
-        JSON.stringify(initData).slice(0, 500),
+      throw new Error(
+        `initializeOrganization failed: ${JSON.stringify(initData).slice(0, 500)}`,
       );
-    } else {
-      console.log("Org + project created successfully.");
     }
+    console.log("Org + project created successfully.");
   } else {
     console.log("Org/project already exists, skipping setup.");
   }
@@ -136,17 +134,15 @@ setup("authenticate", async ({ page, request }) => {
   await page.goto("/");
 
   const homeLink = page.getByRole("link", { name: "Home", exact: true });
-  await homeLink
-    .waitFor({ state: "visible", timeout: 30000 })
-    .catch(async () => {
-      console.log(
-        "WARNING: Home link not visible. URL:",
-        page.url(),
-      );
-      await page.screenshot({
-        path: path.join(__dirname, "..", "debug-post-setup.png"),
-      });
+  try {
+    await homeLink.waitFor({ state: "visible", timeout: 30000 });
+  } catch (err) {
+    console.log("Home link not visible. URL:", page.url());
+    await page.screenshot({
+      path: path.join(__dirname, "..", "debug-post-setup.png"),
     });
+    throw err;
+  }
 
   // Step 5: Save authentication state
   await page.context().storageState({ path: AUTH_FILE });

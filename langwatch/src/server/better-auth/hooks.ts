@@ -8,6 +8,43 @@ import { isSsoProviderMatch, extractEmailDomain } from "./sso";
 const logger = createLogger("langwatch:better-auth:hooks");
 
 /**
+ * Atomically deletes every OAuth account row for the user EXCEPT the one being
+ * linked/refreshed, and clears `pendingSsoSetup`. Used by both
+ * `beforeAccountCreate` (first time the correct SSO provider is linked) and
+ * `afterAccountUpdate` (subsequent sign-ins via the correct provider when the
+ * Account row already exists). Credential accounts are preserved for on-prem /
+ * email-mode deployments.
+ */
+const reconcileSsoAccounts = async ({
+  prisma,
+  userId,
+  providerId,
+  accountId,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  providerId: string;
+  accountId: string;
+}): Promise<void> => {
+  await prisma.$transaction([
+    prisma.account.deleteMany({
+      where: {
+        userId,
+        provider: { not: "credential" },
+        OR: [
+          { provider: { not: providerId } },
+          { providerAccountId: { not: accountId } },
+        ],
+      },
+    }),
+    prisma.user.update({
+      where: { id: userId },
+      data: { pendingSsoSetup: false },
+    }),
+  ]);
+};
+
+/**
  * Called before a new user is created (via OAuth signup or email+password signup).
  *
  * Ports the "new user with matching SSO domain" branch from the old NextAuth
@@ -181,25 +218,12 @@ export const beforeAccountCreate = async ({
     //      row left `pendingSsoSetup=true` and blocks the "remove their old
     //      method" expectation when they complete via the correct provider.
     //
-    // Credential accounts are preserved: on-prem / email-mode deployments
-    // don't have SSO configured, so we never reach this branch there; but
-    // preserving them is the safe default for mixed setups.
-    await prisma.$transaction([
-      prisma.account.deleteMany({
-        where: {
-          userId: user.id,
-          provider: { not: "credential" },
-          OR: [
-            { provider: { not: account.providerId } },
-            { providerAccountId: { not: account.accountId } },
-          ],
-        },
-      }),
-      prisma.user.update({
-        where: { id: user.id },
-        data: { pendingSsoSetup: false },
-      }),
-    ]);
+    await reconcileSsoAccounts({
+      prisma,
+      userId: user.id,
+      providerId: account.providerId,
+      accountId: account.accountId,
+    });
     return;
   }
 
@@ -291,22 +315,12 @@ export const afterAccountUpdate = async ({
     });
     if (!matchesSso) return;
 
-    await prisma.$transaction([
-      prisma.account.deleteMany({
-        where: {
-          userId: user.id,
-          provider: { not: "credential" },
-          OR: [
-            { provider: { not: account.providerId } },
-            { providerAccountId: { not: account.accountId } },
-          ],
-        },
-      }),
-      prisma.user.update({
-        where: { id: user.id },
-        data: { pendingSsoSetup: false },
-      }),
-    ]);
+    await reconcileSsoAccounts({
+      prisma,
+      userId: user.id,
+      providerId: account.providerId,
+      accountId: account.accountId,
+    });
 
     logger.info(
       { userId: user.id, providerId: account.providerId },

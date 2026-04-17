@@ -558,6 +558,10 @@ async function checkPermissionFromBindings({
       binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
       binding.role !== TeamUserRole.CUSTOM
     ) {
+      // Defense-in-depth: EXTERNAL (Lite Member) users must never be promoted
+      // by this fast path even if an ORG-scoped MEMBER binding exists — the
+      // OrganizationUser role is authoritative for EXTERNAL restrictions.
+      if (organizationRole === OrganizationUserRole.EXTERNAL) continue;
       if (binding.role === TeamUserRole.ADMIN) return true;
       if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)) return true;
       continue;

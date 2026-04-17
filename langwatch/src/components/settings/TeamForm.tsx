@@ -134,9 +134,10 @@ export const TeamForm = ({
   const watchedMembers = useWatch({ control, name: "members" });
 
   const perRowCollections = useMemo(() => {
-    return members.fields.map((_, index) => {
+    const rows = watchedMembers ?? [];
+    return rows.map((_, index) => {
       const selectedIds = new Set(
-        (watchedMembers ?? [])
+        rows
           .filter((_, i) => i !== index)
           .map((m) => m.userId?.value)
           .filter(Boolean),
@@ -144,7 +145,7 @@ export const TeamForm = ({
       const filtered = userOptions.filter((o) => !selectedIds.has(o.value));
       return createListCollection({ items: filtered });
     });
-  }, [watchedMembers, userOptions, members.fields]);
+  }, [watchedMembers, userOptions]);
 
   return (
     // eslint-disable-next-line @typescript-eslint/no-misused-promises

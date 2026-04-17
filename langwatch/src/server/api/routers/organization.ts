@@ -193,7 +193,19 @@ export const organizationRouter = createTRPCRouter({
           );
         }
 
+        // A user can be an org admin via either the legacy OrganizationUser row
+        // OR via an ORGANIZATION-scoped ADMIN RoleBinding (direct or via group).
+        // Without this, users onboarded through the RoleBinding flow with no
+        // OrganizationUser row are treated as external and lose access to every
+        // team that lacks an explicit team/project binding.
+        const isOrgAdminViaBinding = userRoleBindings.some(
+          (b) =>
+            b.organizationId === organization.id &&
+            b.scopeType === RoleBindingScopeType.ORGANIZATION &&
+            b.role === TeamUserRole.ADMIN,
+        );
         const isExternal =
+          !isOrgAdminViaBinding &&
           organization.members[0]?.role !== "ADMIN" &&
           organization.members[0]?.role !== "MEMBER";
 

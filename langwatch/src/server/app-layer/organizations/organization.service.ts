@@ -45,13 +45,23 @@ export function enrichTeamWithRoleBindings<
   organizationId: string,
 ): T {
   const teamProjectIds = new Set(team.projects.map((p) => p.id));
-  const binding = userRoleBindings.find(
+  // TEAM scope takes precedence over PROJECT scope so the synthesized role is
+  // deterministic when a user has both kinds of binding for the same team.
+  const teamBinding = userRoleBindings.find(
     (b) =>
       b.organizationId === organizationId &&
-      ((b.scopeType === RoleBindingScopeType.TEAM && b.scopeId === team.id) ||
-        (b.scopeType === RoleBindingScopeType.PROJECT &&
-          teamProjectIds.has(b.scopeId))),
+      b.scopeType === RoleBindingScopeType.TEAM &&
+      b.scopeId === team.id,
   );
+  const projectBinding = teamBinding
+    ? undefined
+    : userRoleBindings.find(
+        (b) =>
+          b.organizationId === organizationId &&
+          b.scopeType === RoleBindingScopeType.PROJECT &&
+          teamProjectIds.has(b.scopeId),
+      );
+  const binding = teamBinding ?? projectBinding;
   if (!binding) return team;
 
   const bindingMember = {

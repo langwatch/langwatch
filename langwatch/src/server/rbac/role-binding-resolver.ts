@@ -131,7 +131,8 @@ export async function checkRoleBindingPermission({
       if (perms.length > 0 && hasPermissionWithHierarchy(perms, permission)) {
         return true;
       }
-      // Empty custom role — fall through to built-in VIEWER check below
+      // Empty/missing custom role — fall through to the built-in CUSTOM permission
+      // set below, which grants the same `*:view` permissions as a VIEWER binding.
     }
 
     // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only

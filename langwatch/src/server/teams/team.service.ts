@@ -1,4 +1,4 @@
-import { RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
+import { Prisma, RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
 import { NotFoundError, ValidationError } from "~/server/app-layer/domain-error";
 
 export class TeamService {
@@ -327,6 +327,6 @@ export class TeamService {
         team: updatedTeam,
         removedUserId: userId,
       };
-    });
+    }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   }
 }

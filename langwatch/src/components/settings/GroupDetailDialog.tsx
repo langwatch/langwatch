@@ -211,7 +211,13 @@ export function GroupDetailDialog({
               <HStack>
                 <SourceBadge scimSource={d.scimSource} />
                 <Text fontSize="sm" color="fg.muted">
-                  {d.members.length} members
+                  {Math.max(
+                    0,
+                    d.members.length -
+                      pendingRemovals.size +
+                      pendingAdditions.length,
+                  )}{" "}
+                  members
                 </Text>
               </HStack>
 

@@ -139,15 +139,22 @@ export const ProjectSelector = React.memo(function ProjectSelector({
             <Menu.Content>
               <>
                 {projectGroups
-                  .filter((projectGroup) =>
+                  .filter((projectGroup) => {
                     // Org admins created via RoleBinding-only flow have no TeamUser row
-                    // but still have full access. Use the per-org role from organization.members
-                    // (which is pre-filtered to the current user by getAllForUser).
-                    projectGroup.organization.members[0]?.role === OrganizationUserRole.ADMIN ||
-                    (projectGroup.team.members?.some(
-                      (member) => member.userId === session?.user.id,
-                    ) ?? false),
-                  )
+                    // but still have full access. Resolve the current user's
+                    // organization role explicitly rather than relying on
+                    // members[0] being pre-filtered.
+                    const currentUserOrgRole =
+                      projectGroup.organization.members.find(
+                        (m) => m.userId === session?.user.id,
+                      )?.role;
+                    return (
+                      currentUserOrgRole === OrganizationUserRole.ADMIN ||
+                      (projectGroup.team.members?.some(
+                        (member) => member.userId === session?.user.id,
+                      ) ?? false)
+                    );
+                  })
                   .map((projectGroup) => (
                     <Menu.ItemGroup
                       key={projectGroup.team.id}
