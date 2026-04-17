@@ -4,17 +4,9 @@ sidebarTitle: LangWatch CLI
 description: The `langwatch` CLI is a single tool that gives you—and your coding assistant—full access to LangWatch from the terminal. Instrument code, version prompts, run scenarios, inspect traces, query analytics, and more.
 ---
 
-The `langwatch` CLI is a unified terminal tool for working with LangWatch. Everything you can do in the LangWatch app, you can also do from the CLI: fetch documentation, version prompts, run scenario tests, inspect traces and simulation runs, query analytics, manage evaluators, and trigger automations.
+Everything in the LangWatch app is available from the CLI, and it's designed to be driven by a coding assistant as well as a human.
 
-It's designed to be agent-friendly — Claude Code, Cursor, Codex, and even chat assistants with a shell tool can drive it directly. A coding assistant can authenticate you, read the docs it needs, wire up instrumentation, and keep your prompts in sync without any glue code.
-
-- **Read docs on demand** — `langwatch docs` and `langwatch scenario-docs` fetch guides as plain Markdown, perfect for piping into an agent's context.
-- **Version prompts as code** — initialize a prompt project, create prompts, sync with the platform, tag versions for staging / production.
-- **Run and inspect scenario tests** — list suites and simulation runs, drill into any conversation, and trigger runs from CI.
-- **Inspect traces and analytics** — search traces, export them, query usage and cost analytics.
-- **Manage every platform resource** — evaluators, monitors, datasets, agents, dashboards, triggers, secrets — all via subcommands with consistent `list | get | create | update | delete` verbs.
-
-Every subcommand supports `--help`, and list/get commands accept `--format json` for scripting. If you're not sure where to start, `langwatch --help` shows the full command tree.
+Every subcommand supports `--help`, and list/get commands accept `--format json`. Run `langwatch --help` to see the full command tree.
 
 ## Install
 
