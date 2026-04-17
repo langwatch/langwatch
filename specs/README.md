@@ -45,12 +45,18 @@ See `dev/docs/TESTING_PHILOSOPHY.md` for detailed testing workflow and decision 
 ## Binding Scenarios to Tests
 
 Scenarios are bound to their executing tests via a `@scenario` JSDoc annotation
-above the matching `it(...)` call:
+directly above the matching `it(...)` call:
 
 ```typescript
-/** @scenario Suite target schema accepts fieldMappings */
-it("validates successfully", () => { /* ... */ });
+/** @scenario Code agent adapter falls back to legacy behavior without mappings */
+it("falls back to legacy behavior: first input gets last user message, rest get empty string", async () => {
+  /* ... */
+});
 ```
+
+The annotation must sit immediately above the `it(...)` it binds (no intervening
+code). The `it()` description stays in whatever form the BDD describe/it tree
+requires — the annotation is what the parity checker reads.
 
 Annotations live in the normal test files (`*.unit.test.ts`, `*.integration.test.tsx`).
 One `it` block may carry multiple `@scenario` annotations if it covers several scenarios;
