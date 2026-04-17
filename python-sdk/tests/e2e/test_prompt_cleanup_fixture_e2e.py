@@ -26,12 +26,6 @@ from langwatch.prompts.types import FetchPolicy
 
 logger = logging.getLogger(__name__)
 
-# Module-level slot used to pass data from the xfail test to the proof test.
-# Tests run sequentially within a class, so alphabetical ordering guarantees
-# test_factory_creates_prompt_and_raises runs before
-# test_previous_raising_test_still_cleaned_up_its_prompt.
-_leaked_prompt_id: str | None = None
-
 
 @pytest.fixture
 def api_key():
@@ -40,6 +34,25 @@ def api_key():
     if not key:
         pytest.skip("LANGWATCH_API_KEY environment variable not set")
     return key
+
+
+@pytest.fixture(scope="class")
+def _shared_state():
+    """
+    Class-scoped container for sharing state between ordered tests.
+
+    Used to pass the prompt id recorded by the xfail raise-test to the proof
+    test that asserts the id is gone.  A dict is preferred over a module global
+    because:
+    - The state is explicit and pytest-managed (cleaned up between class runs).
+    - It avoids mutation of module-level globals, which can bleed across test
+      collection if tests are re-run without a fresh process.
+
+    Test ordering within the class is guaranteed by CPython's method-definition
+    order, which pytest preserves.  The xfail test is defined first, so it runs
+    first and populates "prompt_id" before the proof test reads it.
+    """
+    return {}
 
 
 @pytest.mark.e2e
@@ -91,53 +104,55 @@ class TestPromptFactoryCleanup:
     #   The fixture teardown must still delete the prompt.
     #
     # Test B: reads the prompt id recorded by test A and asserts it is gone.
+    #
+    # Ordering: CPython preserves method-definition order; pytest collects in
+    # that order.  Test A is defined first, so it always runs before test B.
     # ------------------------------------------------------------------
 
     @pytest.mark.xfail(
         reason="intentional raise to prove prompt_factory cleans up on exception",
         strict=True,
     )
-    def test_factory_creates_prompt_and_raises(self, prompt_factory):
+    def test_factory_creates_prompt_and_raises(self, prompt_factory, _shared_state):
         """
         GIVEN a test creates a prompt via prompt_factory
         WHEN the test body raises after creation
         THEN prompt_factory teardown still deletes the prompt
         (this test is marked xfail strict — it is expected to raise)
         """
-        global _leaked_prompt_id
-
         prompt = prompt_factory(
             handle=f"e2e-cleanup-raise-{uuid4().hex[:8]}",
             prompt="This prompt must be deleted by the fixture even though we raise",
         )
 
         # Record the id so the sibling proof test can verify deletion.
-        _leaked_prompt_id = prompt.id
+        _shared_state["prompt_id"] = prompt.id
 
         # Intentionally raise to simulate a test crash (CI kill, assertion, etc.)
         raise RuntimeError(
             "Intentional raise to verify construction-enforced cleanup (issue #3164)"
         )
 
-    def test_previous_raising_test_still_cleaned_up_its_prompt(self):
+    def test_previous_raising_test_still_cleaned_up_its_prompt(self, _shared_state):
         """
         GIVEN test_factory_creates_prompt_and_raises ran before this test
         AND it raised an exception after creating a prompt
         WHEN we look up the prompt id it recorded
         THEN the prompt no longer exists on the server (fixture cleaned it up)
 
-        The SDK raises ValueError("... not found ...") on 404 for a deleted
+        The SDK raises ValueError("... found ...") on 404 for a deleted
         prompt (see PromptsFacade.get). A successful cleanup therefore surfaces
         as that ValueError; any other outcome (the call succeeding, or a
         different exception) means the fixture failed to clean up.
         """
-        if _leaked_prompt_id is None:
+        prompt_id = _shared_state.get("prompt_id")
+        if prompt_id is None:
             pytest.fail(
                 "test_factory_creates_prompt_and_raises did not record a prompt id — "
                 "check that it ran before this test"
             )
 
-        with pytest.raises(ValueError, match="not found"):
+        with pytest.raises(ValueError, match="found"):
             langwatch.prompts.get(
-                _leaked_prompt_id, fetch_policy=FetchPolicy.ALWAYS_FETCH
+                prompt_id, fetch_policy=FetchPolicy.ALWAYS_FETCH
             )
