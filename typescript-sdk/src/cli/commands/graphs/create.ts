@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const createGraphCommand = async (
   name: string,
@@ -43,9 +45,8 @@ export const createGraphCommand = async (
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to create graph (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to create graph: ${message}`);
       process.exit(1);
     }
 
@@ -62,11 +63,10 @@ export const createGraphCommand = async (
     console.log(`  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`);
     console.log();
   } catch (error) {
-    spinner.fail();
     if (error instanceof SyntaxError) {
-      console.error(chalk.red("Error: --graph must be valid JSON"));
+      spinner.fail(chalk.red("--graph must be valid JSON"));
     } else {
-      console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`));
+      failSpinner({ spinner, error, action: "create graph" });
     }
     process.exit(1);
   }

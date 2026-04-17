@@ -2,10 +2,10 @@ import chalk from "chalk";
 import ora from "ora";
 import {
   SuitesApiService,
-  SuitesApiError,
   type SuiteTarget,
 } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 function parseTargets(targetStrings: string[]): SuiteTarget[] {
   return targetStrings.map((t) => {
@@ -68,16 +68,7 @@ export const updateSuiteCommand = async (
     console.log(`  ${chalk.gray("Repeat:")}    ${suite.repeatCount}`);
     console.log();
   } catch (error) {
-    spinner.fail();
-    if (error instanceof SuitesApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "update suite" });
     process.exit(1);
   }
 };

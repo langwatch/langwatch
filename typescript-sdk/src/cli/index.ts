@@ -6,6 +6,7 @@ config();
 
 import { Command } from "commander";
 import { parsePromptSpec } from "./types";
+import { formatApiErrorMessage } from "../client-sdk/services/_shared/format-api-error";
 
 declare const __CLI_VERSION__: string;
 
@@ -130,7 +131,7 @@ program
     try {
       await loginCommand(options);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -147,7 +148,7 @@ promptCmd
     try {
       await initCommand();
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -159,7 +160,7 @@ promptCmd
     try {
       await createCommand(name, {});
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -176,7 +177,7 @@ promptCmd
         await addCommand(name, { version });
       }
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -188,7 +189,7 @@ promptCmd
     try {
       await removeCommand(name);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -201,7 +202,7 @@ promptCmd
     try {
       await listCommand(options);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -213,7 +214,7 @@ promptCmd
     try {
       await syncCommand();
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -226,7 +227,7 @@ promptCmd
     try {
       await pullCommand(options);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -240,7 +241,7 @@ promptCmd
     try {
       await pushCommand({ forceLocal: options.forceLocal, forceRemote: options.forceRemote });
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -276,7 +277,7 @@ tagCmd
     try {
       await tagListCommand(options);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -288,7 +289,7 @@ tagCmd
     try {
       await tagCreateCommand(name);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -300,7 +301,7 @@ tagCmd
     try {
       await tagRenameCommand(oldName, newName);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -313,7 +314,7 @@ tagCmd
     try {
       await tagAssignCommand(prompt, tag, options);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -326,7 +327,7 @@ tagCmd
     try {
       await tagDeleteCommand(name, options);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -354,7 +355,7 @@ evaluatorCmd
     try {
       await listEvaluatorsCommand(options);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -367,7 +368,7 @@ evaluatorCmd
     try {
       await getEvaluatorCommand(idOrSlug, options);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -381,7 +382,7 @@ evaluatorCmd
     try {
       await createEvaluatorCommand(name, options);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -396,7 +397,7 @@ evaluatorCmd
     try {
       await updateEvaluatorCommand(idOrSlug, options);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });
@@ -409,7 +410,7 @@ evaluatorCmd
     try {
       await deleteEvaluatorCommand(idOrSlug, options);
     } catch (error) {
-      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
       process.exit(1);
     }
   });

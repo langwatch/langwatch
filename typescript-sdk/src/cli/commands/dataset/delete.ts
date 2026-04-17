@@ -24,7 +24,6 @@ export const deleteCommand = async (slugOrId: string, options?: { format?: strin
       console.log(JSON.stringify(dataset, null, 2));
     }
   } catch (error) {
-    spinner.fail("Failed to delete dataset");
-    handleDatasetCommandError(error, "deleting dataset");
+    handleDatasetCommandError({ spinner, error, context: "delete dataset" });
   }
 };

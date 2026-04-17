@@ -1,10 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  WorkflowsApiService,
-  WorkflowsApiError,
-} from "@/client-sdk/services/workflows/workflows-api.service";
+import { WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const getWorkflowCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -34,16 +32,7 @@ export const getWorkflowCommand = async (id: string, options?: { format?: string
     console.log(`  ${chalk.gray("Updated:")}     ${new Date(workflow.updatedAt).toLocaleString()}`);
     console.log();
   } catch (error) {
-    spinner.fail();
-    if (error instanceof WorkflowsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching workflow: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "fetch workflow" });
     process.exit(1);
   }
 };

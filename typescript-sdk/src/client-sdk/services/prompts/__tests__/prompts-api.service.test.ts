@@ -93,6 +93,71 @@ describe("PromptsApiService.get", () => {
   });
 });
 
+describe("PromptsApiService.sync", () => {
+  let service: PromptsApiService;
+  let mockPost: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    mockPost = vi.fn();
+    const apiClient = {
+      POST: mockPost,
+    } as unknown as LangwatchApiClient;
+    service = new PromptsApiService({
+      langwatchApiClient: apiClient,
+      logger: mock(),
+    } as InternalConfig);
+  });
+
+  const syncArgs = {
+    name: "x",
+    configData: { handle: "x" } as any,
+    localVersion: 1,
+    commitMessage: "test",
+  };
+
+  describe("when the server returns a valid payload", () => {
+    it("parses and returns the sync result", async () => {
+      mockPost.mockResolvedValue({
+        data: { action: "up_to_date" },
+        error: undefined,
+      });
+
+      const result = await service.sync(syncArgs);
+
+      expect(result.action).toBe("up_to_date");
+    });
+  });
+
+  describe("when the server returns a malformed 2xx payload", () => {
+    it("throws PromptsApiError instead of letting undefined fields leak downstream", async () => {
+      mockPost.mockResolvedValue({
+        data: { action: undefined },
+        error: undefined,
+      });
+
+      await expect(service.sync(syncArgs)).rejects.toThrow(PromptsApiError);
+      await expect(service.sync(syncArgs)).rejects.toThrow(
+        /invalid response body/,
+      );
+    });
+
+    it("throws PromptsApiError when data is missing entirely", async () => {
+      mockPost.mockResolvedValue({ data: undefined, error: undefined });
+
+      await expect(service.sync(syncArgs)).rejects.toThrow(PromptsApiError);
+    });
+
+    it("throws PromptsApiError when action is an unknown enum value", async () => {
+      mockPost.mockResolvedValue({
+        data: { action: "exploded" },
+        error: undefined,
+      });
+
+      await expect(service.sync(syncArgs)).rejects.toThrow(PromptsApiError);
+    });
+  });
+});
+
 describe("PromptsApiService.handleApiError", () => {
   let service: PromptsApiService;
   let handleApiError: typeof PromptsApiService.prototype["handleApiError"];

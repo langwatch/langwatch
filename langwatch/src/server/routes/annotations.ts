@@ -50,7 +50,10 @@ app.get("/annotations", async (c) => {
       "error fetching annotations",
     );
     return c.json(
-      { status: "error", message: "Internal server error." },
+      {
+        status: "error",
+        message: e instanceof Error ? e.message : "Internal server error.",
+      },
       500,
     );
   }
@@ -88,7 +91,10 @@ app.get("/annotations/:id", async (c) => {
       "error fetching annotation",
     );
     return c.json(
-      { status: "error", message: "Internal server error." },
+      {
+        status: "error",
+        message: e instanceof Error ? e.message : "Internal server error.",
+      },
       500,
     );
   }
@@ -118,7 +124,13 @@ app.delete("/annotations/:id", async (c) => {
       { error: e, projectId: project.id },
       "error deleting annotation",
     );
-    return c.json({ status: "error", message: "ID not found." }, 500);
+    return c.json(
+      {
+        status: "error",
+        message: e instanceof Error ? e.message : "ID not found.",
+      },
+      500,
+    );
   }
 });
 
@@ -178,7 +190,13 @@ app.patch("/annotations/:id", async (c) => {
       { error: e, projectId: project.id },
       "error patching annotation",
     );
-    return c.json({ status: "error", message: "Not found" }, 500);
+    return c.json(
+      {
+        status: "error",
+        message: e instanceof Error ? e.message : "Not found",
+      },
+      500,
+    );
   }
 });
 
@@ -216,7 +234,10 @@ app.get("/annotations/trace/:trace", async (c) => {
       "error fetching annotations for trace",
     );
     return c.json(
-      { status: "error", message: "Internal server error." },
+      {
+        status: "error",
+        message: e instanceof Error ? e.message : "Internal server error.",
+      },
       500,
     );
   }
@@ -290,7 +311,10 @@ app.post("/annotations/trace/:trace", async (c) => {
       "error creating annotation",
     );
     return c.json(
-      { status: "error", message: "Internal server error." },
+      {
+        status: "error",
+        message: e instanceof Error ? e.message : "Internal server error.",
+      },
       500,
     );
   }

@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listSimulationRunsCommand = async (options: {
   scenarioSetId?: string;
@@ -30,9 +32,8 @@ export const listSimulationRunsCommand = async (options: {
     );
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to fetch simulation runs (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to fetch simulation runs: ${message}`);
       process.exit(1);
     }
 
@@ -94,12 +95,7 @@ export const listSimulationRunsCommand = async (options: {
       chalk.gray(`Use ${chalk.cyan("langwatch simulation-run get <runId>")} to view full details`),
     );
   } catch (error) {
-    spinner.fail();
-    console.error(
-      chalk.red(
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-      ),
-    );
+    failSpinner({ spinner, error, action: "fetch simulation runs" });
     process.exit(1);
   }
 };

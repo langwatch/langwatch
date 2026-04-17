@@ -849,6 +849,16 @@ app.post(
         });
       }
 
+      if (error instanceof TagValidationError) {
+        throw new HTTPException(422, {
+          message: error.message,
+        });
+      }
+
+      // Translate Prisma unique-constraint violations on handle into a
+      // readable 409 instead of bubbling up as "Internal server error".
+      handlePossibleConflictError(error);
+
       // Re-throw other errors to be handled by the error middleware
       throw error;
     }

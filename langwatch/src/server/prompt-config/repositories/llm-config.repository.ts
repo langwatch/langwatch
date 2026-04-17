@@ -404,9 +404,30 @@ export class LlmConfigRepository {
 
     // Soft-delete: set deletedAt instead of hard-deleting, so existing
     // suite references can still identify the prompt as deleted.
+    //
+    // Null out handle to free it for reuse — the @@unique([handle]) constraint
+    // treats NULL as distinct per row in Postgres, so future prompts can
+    // reclaim the same handle. Preserve the existing display name; only fall
+    // back to the (unprefixed) handle when the stored name is empty, so any
+    // custom title the user gave the prompt survives archival in suite/history
+    // listings.
+    const displayName = this.removeHandlePrefixes(
+      config.handle,
+      projectId,
+      organizationId,
+    );
+    const archivedName =
+      config.name && config.name.trim() !== ""
+        ? config.name
+        : (displayName ?? config.name);
+
     await this.prisma.llmPromptConfig.update({
       where: { id: config.id, projectId },
-      data: { deletedAt: new Date() },
+      data: {
+        deletedAt: new Date(),
+        handle: null,
+        name: archivedName,
+      },
     });
 
     return { success: true };

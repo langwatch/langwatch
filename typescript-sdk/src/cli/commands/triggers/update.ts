@@ -1,6 +1,7 @@
-import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const updateTriggerCommand = async (
   id: string,
@@ -41,9 +42,8 @@ export const updateTriggerCommand = async (
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to update trigger (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to update trigger: ${message}`);
       process.exit(1);
     }
 
@@ -54,8 +54,7 @@ export const updateTriggerCommand = async (
       console.log(JSON.stringify(trigger, null, 2));
     }
   } catch (error) {
-    spinner.fail();
-    console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`));
+    failSpinner({ spinner, error, action: "update trigger" });
     process.exit(1);
   }
 };

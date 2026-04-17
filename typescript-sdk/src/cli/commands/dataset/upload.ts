@@ -79,7 +79,6 @@ export const uploadCommand = async (
       );
     }
   } catch (error) {
-    spinner.fail("Failed to upload file");
-    handleDatasetCommandError(error, "uploading file");
+    handleDatasetCommandError({ spinner, error, context: "upload file" });
   }
 };

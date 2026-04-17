@@ -1,10 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  AgentsApiService,
-  AgentsApiError,
-} from "@/client-sdk/services/agents/agents-api.service";
+import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const runAgentCommand = async (
   id: string,
@@ -22,12 +21,11 @@ export const runAgentCommand = async (
     agent = await service.get(id);
     resolveSpinner.succeed(`Found agent "${agent.name}" (type: ${agent.type})`);
   } catch (error) {
-    resolveSpinner.fail();
-    if (error instanceof AgentsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`));
-    }
+    failSpinner({
+      spinner: resolveSpinner,
+      error,
+      action: `fetch agent "${id}"`,
+    });
     process.exit(1);
   }
 
@@ -71,8 +69,7 @@ export const runAgentCommand = async (
         console.log();
       }
     } catch (error) {
-      runSpinner.fail();
-      console.error(chalk.red(`Error calling agent: ${error instanceof Error ? error.message : "Unknown error"}`));
+      failSpinner({ spinner: runSpinner, error, action: "call HTTP agent" });
       process.exit(1);
     }
   } else {
@@ -106,9 +103,8 @@ export const runAgentCommand = async (
       );
 
       if (!response.ok) {
-        const errorBody = await response.text();
-        runSpinner.fail(`Agent execution failed (${response.status})`);
-        console.error(chalk.red(`Error: ${errorBody}`));
+        const message = await formatFetchError(response);
+        runSpinner.fail(`Agent execution failed: ${message}`);
         process.exit(1);
       }
 
@@ -132,8 +128,11 @@ export const runAgentCommand = async (
         console.log();
       }
     } catch (error) {
-      runSpinner.fail();
-      console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`));
+      failSpinner({
+        spinner: runSpinner,
+        error,
+        action: `run agent "${agent.name}"`,
+      });
       process.exit(1);
     }
   }

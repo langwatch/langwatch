@@ -1,11 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  ScenariosApiService,
-  ScenariosApiError,
-} from "@/client-sdk/services/scenarios";
+import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import type { ScenarioResponse } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 const formatScenarioDetails = (scenario: ScenarioResponse): void => {
   console.log();
@@ -54,16 +52,7 @@ export const getScenarioCommand = async (id: string, options?: { format?: string
     }
     formatScenarioDetails(scenario);
   } catch (error) {
-    spinner.fail();
-    if (error instanceof ScenariosApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching scenario: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "fetch scenario" });
     process.exit(1);
   }
 };

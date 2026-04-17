@@ -1,10 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  EvaluationsApiService,
-  EvaluationsApiError,
-} from "@/client-sdk/services/evaluations/evaluations-api.service";
+import { EvaluationsApiService } from "@/client-sdk/services/evaluations/evaluations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const runEvaluationCommand = async (
   slug: string,
@@ -72,16 +70,7 @@ export const runEvaluationCommand = async (
       console.log(JSON.stringify(runResult, null, 2));
     }
   } catch (error) {
-    spinner.fail();
-    if (error instanceof EvaluationsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error running evaluation: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "run evaluation" });
     process.exit(1);
   }
 };

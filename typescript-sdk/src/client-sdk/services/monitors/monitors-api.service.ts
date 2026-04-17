@@ -1,4 +1,5 @@
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export interface MonitorResponse {
   id: string;
@@ -76,9 +77,17 @@ export class MonitorsApiService {
 
     if (!response.ok) {
       const errorText = await response.text();
+      let parsed: unknown = errorText;
+      try {
+        parsed = JSON.parse(errorText);
+      } catch {
+        // leave as raw text
+      }
+      const message = formatApiErrorMessage({ error: parsed, options: { status: response.status } });
       throw new MonitorsApiError(
-        `HTTP ${response.status}: ${errorText}`,
+        `HTTP ${response.status}: ${message}`,
         options?.method ?? "GET",
+        parsed,
       );
     }
 

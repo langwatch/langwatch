@@ -1,11 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  ModelProvidersApiService,
-  ModelProvidersApiError,
-} from "@/client-sdk/services/model-providers/model-providers-api.service";
+import { ModelProvidersApiService } from "@/client-sdk/services/model-providers/model-providers-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listModelProvidersCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -60,16 +58,7 @@ export const listModelProvidersCommand = async (options?: { format?: string }): 
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof ModelProvidersApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching model providers: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "fetch model providers" });
     process.exit(1);
   }
 };

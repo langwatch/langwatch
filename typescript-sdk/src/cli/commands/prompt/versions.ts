@@ -1,8 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
+import { PromptsApiService } from "@/client-sdk/services/prompts";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const promptVersionsCommand = async (
   handle: string,
@@ -63,16 +64,7 @@ export const promptVersionsCommand = async (
     );
     console.log();
   } catch (error) {
-    spinner.fail();
-    if (error instanceof PromptsError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`
-        )
-      );
-    }
+    failSpinner({ spinner, error, action: "fetch prompt versions" });
     process.exit(1);
   }
 };
