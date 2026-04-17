@@ -9,22 +9,8 @@ import { UserService } from "~/server/users/user.service";
 import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
 import { rateLimit } from "~/server/rateLimit";
 import { getClientIp } from "~/utils/getClientIp";
-import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 
 export const userRouter = createTRPCRouter({
-  /**
-   * Whether the current user is a platform admin (email listed in ADMIN_EMAILS).
-   * Exposed so the client can decide whether to render admin-only UI surfaces
-   * like the OPS Backoffice sidebar entry. This is NOT an authorization gate —
-   * server-side admin routes enforce access independently via isAdmin.
-   */
-  isAdmin: protectedProcedure
-    .input(z.object({}))
-    .use(skipPermissionCheck)
-    .query(({ ctx }) => {
-      const user = ctx.session.user.impersonator ?? ctx.session.user;
-      return { isAdmin: checkIsAdmin({ email: user.email }) };
-    }),
   register: publicProcedure
     .input(
       z.object({
