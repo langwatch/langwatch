@@ -154,13 +154,21 @@ export class TraceUsageService {
   ): Promise<Array<{ projectId: string; count: number }>> {
     const client = await getClickHouseClientForProject(projectIds[0]!);
     if (!client) return [];
+    // Dedup by (TenantId, TraceId) and check archival via HAVING argMax so a
+    // trace whose latest row is archived isn't counted even if older unarchived
+    // rows still exist (pre-merge state). CreatedAt range stays in the inner
+    // WHERE — it's immutable per trace so any version has the same CreatedAt.
     const result = await client.query({
       query: `
-        SELECT TenantId, toString(count(DISTINCT TraceId)) AS Total
-        FROM trace_summaries
-        WHERE TenantId IN ({projectIds:Array(String)})
-          AND ArchivedAt IS NULL
-          AND CreatedAt >= fromUnixTimestamp64Milli({monthStart:UInt64})
+        SELECT TenantId, toString(count()) AS Total
+        FROM (
+          SELECT TenantId, TraceId
+          FROM trace_summaries
+          WHERE TenantId IN ({projectIds:Array(String)})
+            AND CreatedAt >= fromUnixTimestamp64Milli({monthStart:UInt64})
+          GROUP BY TenantId, TraceId
+          HAVING argMax(ArchivedAt, UpdatedAt) IS NULL
+        )
         GROUP BY TenantId
       `,
       query_params: {

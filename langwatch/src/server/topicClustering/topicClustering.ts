@@ -339,7 +339,13 @@ async function fetchTracesFromClickHouse(
     )`);
   }
 
-  const baseWhereClause = baseConditions.join(" AND ");
+  // Inner dedup subquery must NOT filter ArchivedAt — otherwise max(UpdatedAt)
+  // is computed over unarchived rows and archived traces leak back when the
+  // latest row is archived. ArchivedAt IS NULL stays in the outer whereClause.
+  const dedupBaseConditions = baseConditions.filter(
+    (c) => c !== "ArchivedAt IS NULL",
+  );
+  const baseWhereClause = dedupBaseConditions.join(" AND ");
   const whereClause = conditions.join(" AND ");
 
   const result = await clickhouse.query({

@@ -15,6 +15,12 @@ export const ATTRIBUTE_KEYS = {
 
 /**
  * Build common WHERE conditions for trace_summaries queries.
+ *
+ * Includes an IN-tuple dedup clause so we only consider the latest version of
+ * each trace (by UpdatedAt) — critical pre-merge, otherwise archived traces
+ * leak back via older unarchived rows in the ReplacingMergeTree. Inner dedup
+ * subquery intentionally omits ArchivedAt — filtering it there makes
+ * max(UpdatedAt) pick a stale version and lets archived traces reappear.
  */
 export function buildTraceSummariesConditions(
   _params: ClickHouseFilterQueryParams,
@@ -24,6 +30,14 @@ export function buildTraceSummariesConditions(
     "ArchivedAt IS NULL",
     "OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
     "OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
+    `(TenantId, TraceId, UpdatedAt) IN (
+      SELECT TenantId, TraceId, max(UpdatedAt)
+      FROM trace_summaries
+      WHERE TenantId = {tenantId:String}
+        AND OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+        AND OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+      GROUP BY TenantId, TraceId
+    )`,
   ];
   return conditions.join(" AND ");
 }

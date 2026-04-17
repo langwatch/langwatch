@@ -197,8 +197,10 @@ export class ClickHouseTraceService {
         );
 
         try {
-          // Query trace_summaries for traces with matching thread_id
-          // Thread ID can be stored under different attribute keys
+          // Query trace_summaries for traces with matching thread_id.
+          // Dedup via IN-tuple so the latest row (by UpdatedAt) is the one whose
+          // ArchivedAt we check — otherwise an older unarchived row leaks in
+          // before CH merges land.
           const result = await clickHouseClient.query({
             query: `
               SELECT DISTINCT TraceId
@@ -206,6 +208,13 @@ export class ClickHouseTraceService {
               WHERE TenantId = {tenantId:String}
                 AND ArchivedAt IS NULL
                 AND Attributes['gen_ai.conversation.id'] = {threadId:String}
+                AND (TenantId, TraceId, UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE TenantId = {tenantId:String}
+                    AND Attributes['gen_ai.conversation.id'] = {threadId:String}
+                  GROUP BY TenantId, TraceId
+                )
               ORDER BY CreatedAt ASC
               LIMIT 1000
             `,
@@ -297,8 +306,10 @@ export class ClickHouseTraceService {
         );
 
         try {
-          // Query trace_summaries for traces with matching thread_ids
-          // Thread ID can be stored under different attribute keys
+          // Query trace_summaries for traces with matching thread_ids.
+          // Dedup via IN-tuple so the latest row (by UpdatedAt) is the one whose
+          // ArchivedAt we check — otherwise an older unarchived row leaks in
+          // before CH merges land.
           const result = await clickHouseClient.query({
             query: `
               SELECT DISTINCT TraceId
@@ -306,6 +317,13 @@ export class ClickHouseTraceService {
               WHERE TenantId = {tenantId:String}
                 AND ArchivedAt IS NULL
                 AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
+                AND (TenantId, TraceId, UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE TenantId = {tenantId:String}
+                    AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
+                  GROUP BY TenantId, TraceId
+                )
               ORDER BY CreatedAt ASC
               LIMIT 1000
             `,
@@ -630,6 +648,12 @@ export class ClickHouseTraceService {
           }
 
           const whereClause = conditions.join(" AND ");
+          // Inner dedup subquery must NOT filter ArchivedAt — otherwise
+          // max(UpdatedAt) picks an older unarchived row and the archived
+          // trace leaks back. CreatedAt range stays (it's version-invariant).
+          const dedupWhereClause = conditions
+            .filter((c) => c !== "ArchivedAt IS NULL")
+            .join(" AND ");
 
           const result = await clickHouseClient.query({
             query: `
@@ -640,6 +664,12 @@ export class ClickHouseTraceService {
               FROM trace_summaries
               WHERE ${whereClause}
                 AND (TopicId IS NOT NULL OR SubTopicId IS NOT NULL)
+                AND (TenantId, TraceId, UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE ${dedupWhereClause}
+                  GROUP BY TenantId, TraceId
+                )
               GROUP BY TopicId, SubTopicId
               LIMIT 10000
             `,
@@ -735,6 +765,12 @@ export class ClickHouseTraceService {
           }
 
           const whereClause = conditions.join(" AND ");
+          // Inner dedup subquery omits ArchivedAt so max(UpdatedAt) resolves
+          // to the true latest row; the outer ArchivedAt IS NULL then excludes
+          // traces whose latest version is archived even in pre-merge state.
+          const dedupWhereClause = conditions
+            .filter((c) => c !== "ArchivedAt IS NULL")
+            .join(" AND ");
 
           // Query for unique customer IDs
           const customerResult = await clickHouseClient.query({
@@ -743,6 +779,12 @@ export class ClickHouseTraceService {
               FROM trace_summaries
               WHERE ${whereClause}
                 AND Attributes['langwatch.customer_id'] != ''
+                AND (TenantId, TraceId, UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE ${dedupWhereClause}
+                  GROUP BY TenantId, TraceId
+                )
               LIMIT 10000
             `,
             query_params: {
@@ -765,6 +807,12 @@ export class ClickHouseTraceService {
               FROM trace_summaries
               WHERE ${whereClause}
                 AND Attributes['langwatch.labels'] != ''
+                AND (TenantId, TraceId, UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE ${dedupWhereClause}
+                  GROUP BY TenantId, TraceId
+                )
               LIMIT 10000
             `,
             query_params: {
