@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.20.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.19.0...python-sdk@v0.20.0) (2026-04-17)
+
+
+### Features
+
+* **python-sdk:** async-native experiment aloop + asubmit ([#3273](https://github.com/langwatch/langwatch/issues/3273)) ([6711d9e](https://github.com/langwatch/langwatch/commit/6711d9e83a9b9c8c3b0ac7050e2bd12f121b7d5e))
+
 ## [0.19.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.18.0...python-sdk@v0.19.0) (2026-04-16)
 
 
