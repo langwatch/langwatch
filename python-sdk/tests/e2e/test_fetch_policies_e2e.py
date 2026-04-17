@@ -175,7 +175,7 @@ class TestFetchPoliciesE2E:
             langwatch.setup(debug=True)
 
             # Create prompt on server
-            created_prompt = prompt_factory(
+            prompt_factory(
                 handle=handle,
                 prompt=prompt_content,
             )
@@ -212,7 +212,7 @@ class TestFetchPoliciesE2E:
             langwatch.setup(debug=True)
 
             # Create prompt on server
-            created_prompt = prompt_factory(
+            prompt_factory(
                 handle=handle,
                 prompt=prompt_content,
             )
@@ -298,7 +298,7 @@ class TestFetchPoliciesE2E:
             langwatch.setup(debug=True)
 
             # Create prompt on server
-            created_prompt = prompt_factory(
+            prompt_factory(
                 handle=handle,
                 prompt=prompt_content,
             )
