@@ -1,40 +1,24 @@
 /**
- * Hono routes for the Backoffice admin endpoints.
+ * Hono routes for admin endpoints.
  *
- * Lives under `ee/admin/routes/` so the whole admin surface — routes,
- * services, client, React views — is consolidated under the `ee/` boundary
- * instead of leaking admin-only code back into `src/server/routes/`.
- *
- * Mounted by `src/server/api-router.ts`. Exposes:
- *   - POST|DELETE /api/admin/impersonate
- *   - POST        /api/admin/:resource   (react-admin / ra-data-simple-prisma)
+ * Replaces:
+ * - src/pages/api/admin/impersonate.ts
+ * - src/pages/api/admin/[resource].ts
  */
 import {
   defaultHandler,
   getListHandler,
-  getOneHandler,
   type GetListRequest,
-  type GetOneRequest,
 } from "ra-data-simple-prisma";
-import { PlanTypes, Prisma, SubscriptionStatus } from "@prisma/client";
+import { Prisma, PlanTypes, SubscriptionStatus } from "@prisma/client";
+import type { Organization, Project, Team, User } from "@prisma/client";
 import { Hono } from "hono";
 import { auth as betterAuth } from "~/server/better-auth";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { isAdmin } from "../../../ee/admin/isAdmin";
 import { auditLog } from "~/server/auditLog";
 import { UserService } from "~/server/users/user.service";
-import { DomainError } from "~/server/app-layer/domain-error";
-import { isAdmin } from "../isAdmin";
-import {
-  ORGANIZATION_SAFE_SELECT,
-  PROJECT_SAFE_SELECT,
-} from "../safeSelects";
-import {
-  USER_BACKOFFICE_INCLUDE,
-  mapUserToBackofficeRow,
-  type UserWithBackofficeIncludes,
-} from "../backoffice/userVisibility";
-import { ImpersonationService } from "../impersonation.service";
 
 export const app = new Hono().basePath("/api");
 
@@ -52,15 +36,13 @@ const ALLOWED_RESOURCES = new Set([
 ]);
 
 // ---------- POST|DELETE /api/admin/impersonate ----------
-//
-// Both verbs share the same admin guard + BetterAuth session lookup, so we
-// route them through a single helper and let the service do the real work.
-// The service throws `DomainError` subclasses for business-rule rejections;
-// the helper below maps those to HTTP status codes, keeping the route
-// thin and leaving the rules in one testable place.
+app.post("/admin/impersonate", async (c) => {
+  return handleImpersonate(c, "POST");
+});
 
-app.post("/admin/impersonate", async (c) => handleImpersonate(c, "POST"));
-app.delete("/admin/impersonate", async (c) => handleImpersonate(c, "DELETE"));
+app.delete("/admin/impersonate", async (c) => {
+  return handleImpersonate(c, "DELETE");
+});
 
 async function handleImpersonate(c: any, method: "POST" | "DELETE") {
   const session = await getServerAuthSession({ req: c.req.raw as any });
@@ -82,48 +64,77 @@ async function handleImpersonate(c: any, method: "POST" | "DELETE") {
   }
   const sessionId = rawBetterAuth.session.id;
 
-  // Adapt the real `auditLog` (typed with NextApiRequest) to the service's
-  // structural `AuditLogFn`, which keeps Next/Hono types out of the service.
-  const service = ImpersonationService.create(prisma, async (entry) =>
-    auditLog({ ...entry, req: entry.req as any }),
-  );
+  if (method === "POST") {
+    let body: Record<string, any>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ message: "Bad request" }, 400);
+    }
 
-  if (method === "DELETE") {
-    await service.stop({ sessionId });
+    const { userIdToImpersonate, reason } = body;
+    if (!userIdToImpersonate || !reason) {
+      return c.json({ message: "Missing required fields" }, 400);
+    }
+
+    const userToImpersonate = await prisma.user.findUnique({
+      where: { id: userIdToImpersonate },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        deactivatedAt: true,
+      },
+    });
+
+    if (!userToImpersonate) {
+      return c.json({ message: "User to impersonate not found" }, 404);
+    }
+
+    if (userToImpersonate.deactivatedAt) {
+      return c.json(
+        { message: "Cannot impersonate a deactivated user" },
+        400,
+      );
+    }
+
+    if (isAdmin(userToImpersonate)) {
+      return c.json(
+        { message: "Cannot impersonate another admin" },
+        403,
+      );
+    }
+
+    await auditLog({
+      userId: user.id,
+      action: "admin/impersonate",
+      args: { userIdToImpersonate: userToImpersonate.id, reason },
+      req: c.req.raw as any,
+    });
+
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: {
+        impersonating: {
+          id: userToImpersonate.id,
+          name: userToImpersonate.name,
+          email: userToImpersonate.email,
+          image: userToImpersonate.image,
+          expires: new Date(Date.now() + 1000 * 60 * 60),
+        },
+      },
+    });
+
+    return c.json({ message: "Impersonation started" });
+  } else {
+    await prisma.session.update({
+      where: { id: sessionId },
+      data: { impersonating: Prisma.DbNull },
+    });
+
     return c.json({ message: "Impersonation ended" });
   }
-
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
-
-  const { userIdToImpersonate, reason } = body;
-  if (!userIdToImpersonate || !reason) {
-    return c.json({ message: "Missing required fields" }, 400);
-  }
-
-  try {
-    await service.start({
-      sessionId,
-      impersonatorUserId: user.id,
-      userIdToImpersonate,
-      reason,
-      req: c.req.raw,
-    });
-  } catch (err) {
-    // Use `kind`, not `instanceof`, for the discriminant — survives the
-    // bundler duplicating class identities across module boundaries (see
-    // the rule in CLAUDE.md + domain-error.ts's doc comment).
-    if (DomainError.isHandled(err)) {
-      return c.json({ message: err.message }, err.httpStatus as any);
-    }
-    throw err;
-  }
-
-  return c.json({ message: "Impersonation started" });
 }
 
 // ---------- POST /api/admin/:resource ----------
@@ -170,55 +181,29 @@ app.post("/admin/:resource", async (c) => {
           ? {
               where: {
                 OR: [
-                  // ID: prefix/contains so operators can paste the full id or
-                  // a leading fragment (e.g. "user_abc") and still hit it.
-                  { id: { contains: query, mode: "insensitive" } },
                   { name: { contains: query, mode: "insensitive" } },
                   { email: { contains: query, mode: "insensitive" } },
                   {
                     orgMemberships: {
                       some: {
                         organization: {
-                          OR: [
-                            { id: { contains: query, mode: "insensitive" } },
-                            {
-                              name: {
-                                contains: query,
-                                mode: "insensitive",
-                              },
-                            },
-                          ],
+                          name: {
+                            contains: query,
+                            mode: "insensitive",
+                          },
                         },
                       },
                     },
                   },
                   {
-                    // Mirror the main app's project-visibility rule
-                    // (org membership → org.teams → team.projects). A user
-                    // should be searchable by any project they can see in
-                    // the project switcher, even without a TeamUser row.
-                    orgMemberships: {
+                    teamMemberships: {
                       some: {
-                        organization: {
-                          teams: {
+                        team: {
+                          projects: {
                             some: {
-                              projects: {
-                                some: {
-                                  OR: [
-                                    {
-                                      id: {
-                                        contains: query,
-                                        mode: "insensitive",
-                                      },
-                                    },
-                                    {
-                                      name: {
-                                        contains: query,
-                                        mode: "insensitive",
-                                      },
-                                    },
-                                  ],
-                                },
+                              name: {
+                                contains: query,
+                                mode: "insensitive",
                               },
                             },
                           },
@@ -230,15 +215,43 @@ app.post("/admin/:resource", async (c) => {
               },
             }
           : {}),
-        include: USER_BACKOFFICE_INCLUDE,
-        map: (users: UserWithBackofficeIncludes[]) =>
-          users.map(mapUserToBackofficeRow),
+        include: {
+          orgMemberships: { include: { organization: true } },
+          teamMemberships: {
+            include: { team: { include: { projects: true } } },
+          },
+        },
+        map: (
+          users: (User & {
+            orgMemberships: { organization: Organization }[];
+            teamMemberships: {
+              team: Team & { projects: Project[] };
+            }[];
+          })[],
+        ) =>
+          users.map((u) => ({
+            ...u,
+            organizations: u.orgMemberships
+              ?.map((om) => om.organization.name)
+              .join(", "),
+            teams: u.teamMemberships
+              ?.map((tm) => tm.team.name)
+              .join(", "),
+            projects: u.teamMemberships
+              ?.flatMap((tm) =>
+                tm.team.projects?.map((p) => p.name),
+              )
+              .join(", "),
+          })),
       },
     );
     return c.json(result);
   }
 
-  if (body.resource === "organization" && body.method === "getList") {
+  if (
+    body.resource === "organization" &&
+    body.method === "getList"
+  ) {
     const query = body.params?.filter?.query;
     if (body.params?.filter?.query) delete body.params.filter.query;
 
@@ -246,12 +259,10 @@ app.post("/admin/:resource", async (c) => {
       body as GetListRequest,
       prisma.organization,
       {
-        select: ORGANIZATION_SAFE_SELECT,
         ...(query
           ? {
               where: {
                 OR: [
-                  { id: { contains: query, mode: "insensitive" } },
                   { name: { contains: query, mode: "insensitive" } },
                   { slug: { contains: query, mode: "insensitive" } },
                 ],
@@ -259,17 +270,6 @@ app.post("/admin/:resource", async (c) => {
             }
           : {}),
       },
-    );
-    return c.json(result);
-  }
-
-  // Single-org detail fetch used by the edit drawer — same safe select as
-  // the list, so credentials never reach the admin UI.
-  if (body.resource === "organization" && body.method === "getOne") {
-    const result = await getOneHandler<Prisma.OrganizationFindUniqueArgs>(
-      body as GetOneRequest,
-      prisma.organization,
-      { select: ORGANIZATION_SAFE_SELECT },
     );
     return c.json(result);
   }
@@ -282,71 +282,16 @@ app.post("/admin/:resource", async (c) => {
       body as GetListRequest,
       prisma.project,
       {
-        select: PROJECT_SAFE_SELECT,
         ...(query
           ? {
               where: {
                 OR: [
-                  { id: { contains: query, mode: "insensitive" } },
                   { name: { contains: query, mode: "insensitive" } },
                   { slug: { contains: query, mode: "insensitive" } },
                 ],
               },
             }
           : {}),
-      },
-    );
-    return c.json(result);
-  }
-
-  if (body.resource === "project" && body.method === "getOne") {
-    const result = await getOneHandler<Prisma.ProjectFindUniqueArgs>(
-      body as GetOneRequest,
-      prisma.project,
-      { select: PROJECT_SAFE_SELECT },
-    );
-    return c.json(result);
-  }
-
-  if (body.resource === "organizationFeature" && body.method === "getList") {
-    const query = body.params?.filter?.query;
-    if (body.params?.filter?.query) delete body.params.filter.query;
-
-    const result = await getListHandler<Prisma.OrganizationFeatureFindManyArgs>(
-      body as GetListRequest,
-      prisma.organizationFeature,
-      {
-        ...(query
-          ? {
-              where: {
-                OR: [
-                  { id: { contains: query, mode: "insensitive" } },
-                  { feature: { contains: query, mode: "insensitive" } },
-                  {
-                    organization: {
-                      OR: [
-                        { id: { contains: query, mode: "insensitive" } },
-                        {
-                          name: { contains: query, mode: "insensitive" },
-                        },
-                        {
-                          slug: { contains: query, mode: "insensitive" },
-                        },
-                      ],
-                    },
-                  },
-                ],
-              },
-            }
-          : {}),
-        // Include the organization so the Backoffice table can render names
-        // instead of raw IDs. Admin-only endpoint, so exposing name/slug is
-        // fine.
-        include: {
-          organization: {
-            select: { id: true, name: true, slug: true },
-          },
-        },
       },
     );
     return c.json(result);
@@ -445,7 +390,10 @@ app.post("/admin/:resource", async (c) => {
     }
   }
 
-  if (body.resource === "subscription" && body.method === "getList") {
+  if (
+    body.resource === "subscription" &&
+    body.method === "getList"
+  ) {
     const query = body.params?.filter?.query;
     if (body.params?.filter?.query) delete body.params.filter.query;
 
@@ -454,14 +402,13 @@ app.post("/admin/:resource", async (c) => {
       ? Object.values(PlanTypes).find((p) => p === upperQuery)
       : undefined;
     const matchingStatus = upperQuery
-      ? Object.values(SubscriptionStatus).find((s) => s === upperQuery)
+      ? Object.values(SubscriptionStatus).find(
+          (s) => s === upperQuery,
+        )
       : undefined;
 
     const orFilters: Prisma.SubscriptionWhereInput[] = [];
     if (query) {
-      orFilters.push({
-        id: { contains: query, mode: "insensitive" },
-      });
       orFilters.push({
         stripeSubscriptionId: {
           contains: query,
@@ -470,14 +417,11 @@ app.post("/admin/:resource", async (c) => {
       });
       orFilters.push({
         organization: {
-          OR: [
-            { id: { contains: query, mode: "insensitive" } },
-            { name: { contains: query, mode: "insensitive" } },
-            { slug: { contains: query, mode: "insensitive" } },
-          ],
+          name: { contains: query, mode: "insensitive" },
         },
       });
-      if (matchingPlan) orFilters.push({ plan: { equals: matchingPlan } });
+      if (matchingPlan)
+        orFilters.push({ plan: { equals: matchingPlan } });
       if (matchingStatus)
         orFilters.push({ status: { equals: matchingStatus } });
     }

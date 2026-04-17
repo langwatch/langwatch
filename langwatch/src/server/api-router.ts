@@ -34,7 +34,7 @@ import { app as scimApp } from "./routes/scim";
 import { app as webhooksApp } from "./routes/webhooks";
 import { app as workflowsApp } from "./routes/workflows";
 
-import { app as adminApp } from "../../ee/admin/routes/admin";
+import { app as adminApp } from "./routes/admin";
 import { app as annotationsApp } from "./routes/annotations";
 import { app as authApp } from "./routes/auth";
 import { app as collectorApp } from "./routes/collector";
