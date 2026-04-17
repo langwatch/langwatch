@@ -46,6 +46,7 @@ import { signUpDataSchema } from "./onboarding";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
+import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
 
 
 const customTeamRoleInputSchema = z
@@ -140,6 +141,7 @@ export const organizationRouter = createTRPCRouter({
           ? await new PrismaRoleBindingRepository(ctx.prisma).listForOrganizationsAndUser({ orgIds, userId })
           : [];
 
+
       for (const organization of organizations) {
         for (const project of organization.teams.flatMap(
           (team) => team.projects,
@@ -208,7 +210,11 @@ export const organizationRouter = createTRPCRouter({
           // only grant organization:view — they don't give team-level access.
           // Org admins are handled by the organizationRole === ADMIN shortcut in
           // the frontend hasPermission and backend resolveTeamPermission.
-          const enriched = getApp().organizations.enrichTeamWithRoleBindings(team, userId, userRoleBindings, organization.id);
+          //
+          // NOTE: imported as a standalone function (not a service method) because
+          // getApp().organizations is wrapped by traced() which would turn this
+          // sync call into a Promise and silently drop team.members.
+          const enriched = enrichTeamWithRoleBindings(team, userId, userRoleBindings, organization.id);
           team.members = enriched.members;
 
           if (isDemoOrg) return true;

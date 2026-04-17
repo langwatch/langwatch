@@ -24,6 +24,57 @@ import type { User } from "@prisma/client";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
 import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
 
+/**
+ * Pure function that returns a team enriched with a synthesized member entry
+ * for the given user if they have a RoleBinding for this team or one of its
+ * projects but no TeamUser row yet.
+ *
+ * This is intentionally a standalone function — NOT a method on
+ * `OrganizationService` — because the service instance is wrapped with the
+ * `traced()` proxy (see `app-layer/tracing.ts`) which turns every method call
+ * into an async call that returns a Promise. Callers expecting a synchronous
+ * return value would silently get a Promise with `members === undefined`,
+ * causing team membership enrichment to fail invisibly.
+ */
+export function enrichTeamWithRoleBindings<
+  T extends { members: any[]; id: string; projects: { id: string }[] },
+>(
+  team: T,
+  userId: string,
+  userRoleBindings: RoleBindingForSynthesis[],
+  organizationId: string,
+): T {
+  const teamProjectIds = new Set(team.projects.map((p) => p.id));
+  const binding = userRoleBindings.find(
+    (b) =>
+      b.organizationId === organizationId &&
+      ((b.scopeType === RoleBindingScopeType.TEAM && b.scopeId === team.id) ||
+        (b.scopeType === RoleBindingScopeType.PROJECT &&
+          teamProjectIds.has(b.scopeId))),
+  );
+  if (!binding) return team;
+
+  const bindingMember = {
+    userId,
+    teamId: team.id,
+    role: binding.role,
+    assignedRoleId: binding.customRoleId ?? null,
+    assignedRole: binding.customRole ?? null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  const existingIndex = team.members.findIndex(
+    (m: { userId: string }) => m.userId === userId,
+  );
+  const newMembers =
+    existingIndex >= 0
+      ? team.members.map((m: unknown, i: number) =>
+          i === existingIndex ? bindingMember : m,
+        )
+      : [...team.members, bindingMember];
+  return { ...team, members: newMembers };
+}
+
 export type OrganizationFeatureName = "billable_events_usage";
 
 /**
@@ -307,40 +358,4 @@ export class OrganizationService {
     return this.repo.getAuditLogs(filters);
   }
 
-  /**
-   * Returns a team enriched with a synthesized member entry for the given user
-   * if the user has a RoleBinding for this team or one of its projects but no
-   * TeamUser row yet. This is a pure function — it does not mutate the input.
-   */
-  enrichTeamWithRoleBindings(
-    team: { members: any[]; id: string; projects: { id: string }[] },
-    userId: string,
-    userRoleBindings: RoleBindingForSynthesis[],
-    organizationId: string,
-  ): typeof team {
-    const teamProjectIds = new Set(team.projects.map((p) => p.id));
-    const binding = userRoleBindings.find(
-      (b) =>
-        b.organizationId === organizationId &&
-        ((b.scopeType === RoleBindingScopeType.TEAM && b.scopeId === team.id) ||
-          (b.scopeType === RoleBindingScopeType.PROJECT && teamProjectIds.has(b.scopeId))),
-    );
-    if (!binding) return team;
-
-    const bindingMember = {
-      userId,
-      teamId: team.id,
-      role: binding.role,
-      assignedRoleId: binding.customRoleId ?? null,
-      assignedRole: binding.customRole ?? null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-    const existingIndex = team.members.findIndex((m: { userId: string }) => m.userId === userId);
-    const newMembers =
-      existingIndex >= 0
-        ? team.members.map((m: unknown, i: number) => (i === existingIndex ? bindingMember : m))
-        : [...team.members, bindingMember];
-    return { ...team, members: newMembers };
-  }
 }
