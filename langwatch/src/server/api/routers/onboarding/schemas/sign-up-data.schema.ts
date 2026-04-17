@@ -17,4 +17,11 @@ export const signUpDataSchema = z.object({
   utmCampaign: z.string().optional().nullable(),
   yourRole: z.string().optional().nullable(),
   featureUsage: z.string().optional().nullable(),
+  // First-touch attribution (from landing URL / document.referrer)
+  leadSource: z.string().optional().nullable(),
+  utmSource: z.string().optional().nullable(),
+  utmMedium: z.string().optional().nullable(),
+  utmTerm: z.string().optional().nullable(),
+  utmContent: z.string().optional().nullable(),
+  referrer: z.string().optional().nullable(),
 });

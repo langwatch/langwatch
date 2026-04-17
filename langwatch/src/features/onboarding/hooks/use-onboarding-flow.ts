@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { readAttribution } from "~/hooks/attribution";
 import { getOnboardingFlowConfig } from "../constants/onboarding-flow";
 import {
   type CompanySize,
@@ -67,6 +68,11 @@ export const useOnboardingFlow = () => {
   const { currentScreenIndex, direction, navigation } =
     useGenericOnboardingFlow(flow, canProceed);
 
+  // Snapshot first-touch attribution once per mount. `readAttribution` is a
+  // pure sessionStorage read; memoizing keeps getFormData / formContextValue
+  // consuming the same object and avoids six storage reads per render.
+  const attribution = useMemo(() => readAttribution(), []);
+
   const getFormData = (): OnboardingFormData => ({
     organizationName,
     agreement,
@@ -76,10 +82,7 @@ export const useOnboardingFlow = () => {
     solutionType,
     selectedDesires,
     role,
-    utmCampaign:
-      typeof window !== "undefined"
-        ? window.sessionStorage.getItem("utm_campaign")
-        : null,
+    ...attribution,
   });
 
   const getFlowState = (): OnboardingFlowState => ({
@@ -97,10 +100,7 @@ export const useOnboardingFlow = () => {
       solutionType,
       selectedDesires,
       role,
-      utmCampaign:
-        typeof window !== "undefined"
-          ? window.sessionStorage.getItem("utm_campaign")
-          : null,
+      ...attribution,
       setOrganizationName,
       setAgreement,
       setUsageStyle,
@@ -121,6 +121,7 @@ export const useOnboardingFlow = () => {
       solutionType,
       selectedDesires,
       role,
+      attribution,
     ],
   );
   return {

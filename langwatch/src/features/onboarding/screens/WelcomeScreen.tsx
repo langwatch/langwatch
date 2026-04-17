@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { toaster } from "~/components/ui/toaster";
+import { pickAttribution } from "~/hooks/attribution";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 import { trackEventOnce } from "~/utils/tracking";
@@ -84,7 +85,7 @@ export const WelcomeScreen: React.FC = () => {
           companySize: form.companySize,
           yourRole: form.role,
           featureUsage: form.selectedDesires.join("\n"),
-          utmCampaign: form.utmCampaign,
+          ...pickAttribution(form),
         },
       },
       {

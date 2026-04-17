@@ -7,13 +7,6 @@ export default function Index() {
   const { project, team } = useOrganizationTeamProject();
   const router = useRouter();
 
-  if (router.query.utm_campaign && typeof window !== "undefined") {
-    window.sessionStorage.setItem(
-      "utm_campaign",
-      router.query.utm_campaign as string,
-    );
-  }
-
   useEffect(() => {
     if (project) {
       void router.replace(`/${project.slug}`);
