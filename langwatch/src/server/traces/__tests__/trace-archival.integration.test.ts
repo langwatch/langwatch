@@ -24,6 +24,51 @@ function generateTestId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/**
+ * Poll trace_summaries until the expected row count is visible.
+ *
+ * ClickHouse acks inserts before the parts are always available to SELECT (at
+ * least on a shared dev container), so tests used to sleep 500ms as a crude
+ * safety margin. A real visibility check is load-independent and fails fast
+ * with a clear error instead of producing a flaky assertion further down.
+ *
+ * `predicate` should be a WHERE fragment that narrows rows via parameters
+ * passed in `queryParams` (e.g. by TenantId and TraceId). It MUST always
+ * include the tenant filter so the poll is scoped to the test's data.
+ */
+async function waitForSummaryRows({
+  ch,
+  predicate,
+  queryParams,
+  expectedRows,
+  timeoutMs = 5000,
+  pollIntervalMs = 25,
+}: {
+  ch: ClickHouseClient;
+  predicate: string;
+  queryParams: Record<string, unknown>;
+  expectedRows: number;
+  timeoutMs?: number;
+  pollIntervalMs?: number;
+}): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  let lastCount = -1;
+  while (Date.now() < deadline) {
+    const result = await ch.query({
+      query: `SELECT count() AS total FROM trace_summaries WHERE ${predicate}`,
+      query_params: queryParams,
+      format: "JSONEachRow",
+    });
+    const rows = await result.json<{ total: string }>();
+    lastCount = parseInt(rows[0]?.total ?? "0", 10);
+    if (lastCount >= expectedRows) return;
+    await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
+  }
+  throw new Error(
+    `Timed out waiting for trace_summaries rows (predicate: ${predicate}): expected >= ${expectedRows}, saw ${lastCount}`,
+  );
+}
+
 const hasTestcontainers = !!(
   process.env.TEST_CLICKHOUSE_URL || process.env.CI_CLICKHOUSE_URL
 );
@@ -99,19 +144,13 @@ describe.skipIf(!hasTestcontainers)(
         format: "JSONEachRow",
       });
 
-      // Wait for ClickHouse to flush async inserts and verify data landed
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Verify both traces exist before archiving
-      const verifyResult = await ch.query({
-        query: `SELECT count(DISTINCT TraceId) AS cnt FROM trace_summaries FINAL WHERE TenantId = {tenantId:String}`,
-        query_params: { tenantId },
-        format: "JSONEachRow",
+      // Poll until both traces are visible instead of sleeping — load-independent
+      await waitForSummaryRows({
+        ch,
+        predicate: "TenantId = {tenantId:String} AND TraceId IN ({traceIds:Array(String)})",
+        queryParams: { tenantId, traceIds: [activeTraceId, archivedTraceId] },
+        expectedRows: 2,
       });
-      const verifyRows = await verifyResult.json<{ cnt: string }>();
-      if (Number(verifyRows[0]?.cnt) < 2) {
-        throw new Error(`Expected 2 traces, got ${verifyRows[0]?.cnt}. Data may not have flushed yet.`);
-      }
 
       // Archive one trace by inserting a new row with ArchivedAt set and a
       // newer UpdatedAt. This mirrors what the trace_summaries fold projection
@@ -134,7 +173,13 @@ describe.skipIf(!hasTestcontainers)(
         format: "JSONEachRow",
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Poll until the archive row is visible (2 original + 1 archived version)
+      await waitForSummaryRows({
+        ch,
+        predicate: "TenantId = {tenantId:String} AND TraceId IN ({traceIds:Array(String)})",
+        queryParams: { tenantId, traceIds: [activeTraceId, archivedTraceId] },
+        expectedRows: 3,
+      });
     });
 
     it("excludes archived traces from count queries (dedup, unmerged data)", async () => {
@@ -317,7 +362,14 @@ describe.skipIf(!hasTestcontainers)(
         format: "JSONEachRow",
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Poll for both thread traces instead of sleeping
+      await waitForSummaryRows({
+        ch,
+        predicate:
+          "TenantId = {tenantId:String} AND Attributes['gen_ai.conversation.id'] = {threadId:String}",
+        queryParams: { tenantId, threadId },
+        expectedRows: 2,
+      });
 
       // Archive one via direct INSERT with newer UpdatedAt and ArchivedAt set
       const archiveNow = new Date();
@@ -333,7 +385,14 @@ describe.skipIf(!hasTestcontainers)(
         format: "JSONEachRow",
       });
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      // Poll until the archive row is visible (2 original + 1 archived version)
+      await waitForSummaryRows({
+        ch,
+        predicate:
+          "TenantId = {tenantId:String} AND Attributes['gen_ai.conversation.id'] = {threadId:String}",
+        queryParams: { tenantId, threadId },
+        expectedRows: 3,
+      });
 
       // Query by thread ID in pre-merge state using the production dedup pattern.
       // Inner max(UpdatedAt) must NOT filter ArchivedAt (see PR #3272 review).
