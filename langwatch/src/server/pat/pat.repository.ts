@@ -1,13 +1,26 @@
-import type { PrismaClient, PersonalAccessToken, RoleBinding } from "@prisma/client";
+import type {
+  PersonalAccessToken,
+  Prisma,
+  PrismaClient,
+  RoleBinding,
+} from "@prisma/client";
 
 export type PatWithBindings = PersonalAccessToken & {
   roleBindings: RoleBinding[];
 };
 
-export class PatRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+/**
+ * The subset of the Prisma surface we rely on here. Accepting both the root
+ * `PrismaClient` and the transaction client lets callers share one repository
+ * implementation between normal calls and `$transaction` blocks without
+ * casting the transaction handle back up to `PrismaClient`.
+ */
+export type PatPrismaDelegate = PrismaClient | Prisma.TransactionClient;
 
-  static create(prisma: PrismaClient): PatRepository {
+export class PatRepository {
+  constructor(private readonly prisma: PatPrismaDelegate) {}
+
+  static create(prisma: PatPrismaDelegate): PatRepository {
     return new PatRepository(prisma);
   }
 
