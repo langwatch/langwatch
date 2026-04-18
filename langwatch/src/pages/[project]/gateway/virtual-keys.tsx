@@ -18,6 +18,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
+import { Link } from "~/components/ui/link";
 import { VirtualKeyCreateDrawer } from "~/components/gateway/VirtualKeyCreateDrawer";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
@@ -154,7 +155,13 @@ function VirtualKeysPage() {
                   <Table.Row key={vk.id}>
                     <Table.Cell>
                       <VStack align="start" gap={0}>
-                        <Text fontWeight="medium">{vk.name}</Text>
+                        <Link
+                          href={`/${project?.slug}/gateway/virtual-keys/${vk.id}`}
+                          fontWeight="medium"
+                          color="orange.600"
+                        >
+                          {vk.name}
+                        </Link>
                         {vk.description && (
                           <Text fontSize="xs" color="fg.muted">
                             {vk.description}
