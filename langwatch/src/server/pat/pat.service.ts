@@ -5,6 +5,11 @@ import {
   splitPatToken,
   verifySecret,
 } from "./pat-token.utils";
+import {
+  PatAlreadyRevokedError,
+  PatNotFoundError,
+  PatNotOwnedError,
+} from "./errors";
 
 export class PatService {
   private readonly repo: PatRepository;
@@ -134,9 +139,9 @@ export class PatService {
   }): Promise<PersonalAccessToken> {
     // Verify ownership
     const pat = await this.repo.findById({ id });
-    if (!pat) throw new Error("PAT not found");
-    if (pat.userId !== userId) throw new Error("Not authorized to revoke this PAT");
-    if (pat.revokedAt) throw new Error("PAT is already revoked");
+    if (!pat) throw new PatNotFoundError(id);
+    if (pat.userId !== userId) throw new PatNotOwnedError(id);
+    if (pat.revokedAt) throw new PatAlreadyRevokedError(id);
 
     return this.repo.revoke({ id });
   }

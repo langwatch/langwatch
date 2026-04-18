@@ -197,7 +197,7 @@ describe("PatService", () => {
 
       await expect(
         service.revoke({ id: "nonexistent", userId: "user-1" }),
-      ).rejects.toThrow("PAT not found");
+      ).rejects.toThrow("not found");
     });
 
     it("throws when user does not own the PAT", async () => {
