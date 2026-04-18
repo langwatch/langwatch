@@ -10,6 +10,7 @@ import { z } from "zod";
 
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { virtualKeyConfigSchema } from "~/server/gateway/virtualKey.config";
+import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -155,29 +156,5 @@ export const virtualKeysRouter = createTRPCRouter({
     }),
 });
 
-function toListItem(vk: import("~/server/gateway/virtualKey.repository").VirtualKeyWithChain) {
-  return {
-    id: vk.id,
-    name: vk.name,
-    description: vk.description,
-    environment: vk.environment.toLowerCase() as "live" | "test",
-    status: vk.status.toLowerCase() as "active" | "revoked",
-    displayPrefix: vk.displayPrefix,
-    createdAt: vk.createdAt.toISOString(),
-    lastUsedAt: vk.lastUsedAt?.toISOString() ?? null,
-    principalUserId: vk.principalUserId,
-    fallbackChainLength: vk.providerCredentials.length,
-    revokedAt: vk.revokedAt?.toISOString() ?? null,
-  };
-}
-
-function toDetail(vk: import("~/server/gateway/virtualKey.repository").VirtualKeyWithChain) {
-  return {
-    ...toListItem(vk),
-    providerCredentialIds: vk.providerCredentials
-      .sort((a, b) => a.priority - b.priority)
-      .map((p) => p.providerCredentialId),
-    config: vk.config,
-    revision: vk.revision.toString(),
-  };
-}
+const toListItem = toVirtualKeyCamelDto;
+const toDetail = toVirtualKeyCamelDto;

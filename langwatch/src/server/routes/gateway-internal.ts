@@ -25,6 +25,7 @@ import {
   GatewayBudgetRepository,
   type DebitLineItem,
 } from "~/server/gateway/budget.repository";
+import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
 import { signGatewayJwt } from "~/server/gateway/gatewayJwt";
@@ -264,6 +265,7 @@ app.post("/resolve-key", async (c) => {
 
   const project = await prisma.project.findUnique({
     where: { id: vk.projectId },
+    include: { team: true },
   });
   if (!project) {
     return c.json(
@@ -282,7 +284,7 @@ app.post("/resolve-key", async (c) => {
     vk_id: vk.id,
     project_id: project.id,
     team_id: project.teamId,
-    org_id: project.organizationId,
+    org_id: project.team.organizationId,
     principal_id: vk.principalUserId,
     revision: vk.revision.toString(),
   });
@@ -419,7 +421,89 @@ app.get("/changes", async (c) => {
  * Request:  { vk_id, gateway_request_id, projected_cost_usd, model }
  * Response: { decision: allow|soft_warn|hard_block, warnings[], block_reason }
  */
-app.post("/budget/check", (c) => notImplemented(c));
+app.post("/budget/check", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as {
+    vk_id?: string;
+    gateway_request_id?: string;
+    projected_cost_usd?: number | string;
+    model?: string;
+  };
+  if (!body.vk_id || body.projected_cost_usd === undefined) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "missing_required_fields",
+          message: "vk_id and projected_cost_usd are required",
+        },
+      },
+      400,
+    );
+  }
+
+  const vk = await prisma.virtualKey.findUnique({
+    where: { id: body.vk_id },
+  });
+  if (!vk) {
+    return c.json(
+      {
+        error: {
+          type: "invalid_api_key",
+          code: "virtual_key_not_found",
+          message: "unknown virtual key",
+        },
+      },
+      404,
+    );
+  }
+  const project = await prisma.project.findUnique({
+    where: { id: vk.projectId },
+    include: { team: true },
+  });
+  if (!project) {
+    return c.json(
+      {
+        error: {
+          type: "internal_error",
+          code: "project_orphaned",
+          message: "virtual key references missing project",
+        },
+      },
+      500,
+    );
+  }
+
+  const service = GatewayBudgetService.create(prisma);
+  const result = await service.check({
+    organizationId: project.organizationId,
+    teamId: project.teamId,
+    projectId: project.id,
+    virtualKeyId: vk.id,
+    principalUserId: vk.principalUserId,
+    projectedCostUsd: body.projected_cost_usd,
+  });
+
+  return c.json(
+    {
+      decision: result.decision,
+      warnings: result.warnings.map((w) => ({
+        scope: w.scope,
+        pct_used: w.pctUsed,
+        limit_usd: w.limitUsd,
+      })),
+      block_reason: result.blockReason,
+      blocked_by: result.blockedBy.map((b) => ({
+        budget_id: b.budgetId,
+        scope: b.scope,
+        scope_id: b.scopeId,
+        window: b.window,
+        limit_usd: b.limitUsd,
+        spent_usd: b.spentUsd,
+      })),
+    },
+    200,
+  );
+});
 
 /**
  * §4.5 — idempotent post-response debit. Outbox pattern on the platform side;
@@ -476,6 +560,7 @@ app.post("/budget/debit", async (c) => {
   }
   const project = await prisma.project.findUnique({
     where: { id: vk.projectId },
+    include: { team: true },
   });
   if (!project) {
     return c.json(
@@ -501,7 +586,7 @@ app.post("/budget/debit", async (c) => {
   const lines: DebitLineItem[] = await prisma.$transaction(async (tx) => {
     const applicable = await repo.applicableForRequest(
       {
-        organizationId: project.organizationId,
+        organizationId: project.team.organizationId,
         teamId: project.teamId,
         projectId: project.id,
         virtualKeyId: vk.id,

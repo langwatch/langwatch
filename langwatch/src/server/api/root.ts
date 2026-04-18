@@ -51,6 +51,7 @@ import { roleBindingRouter } from "./routers/roleBinding";
 import { personalAccessTokenRouter } from "./routers/personalAccessToken";
 import { groupRouter } from "./routers/group";
 import { userRouter } from "./routers/user";
+import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayProvidersRouter } from "./routers/gatewayProviders";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { workflowRouter } from "./routers/workflows";
@@ -111,6 +112,7 @@ const coreRouters = {
   ops: opsRouter,
   virtualKeys: virtualKeysRouter,
   gatewayProviders: gatewayProvidersRouter,
+  gatewayBudgets: gatewayBudgetsRouter,
 };
 
 const eeRouters = {
