@@ -22,7 +22,11 @@ import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { TokenResolver } from "~/server/pat/token-resolver";
-import { enforcePatCeiling, extractCredentials } from "~/server/pat/auth-middleware";
+import {
+  enforcePatCeiling,
+  extractCredentials,
+  patCeilingDenialResponse,
+} from "~/server/pat/auth-middleware";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 
@@ -100,13 +104,15 @@ async function authenticateAndCheckLimit(c: {
 
   // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
   // access on OTLP ingestion — same semantics as the collector path.
-  const denial = await enforcePatCeiling({
-    prisma,
-    resolved,
-    permission: "traces:create",
-  });
-  if (denial) {
-    return { error: denial.error, status: denial.status };
+  try {
+    await enforcePatCeiling({
+      prisma,
+      resolved,
+      permission: "traces:create",
+    });
+  } catch (error) {
+    const denial = patCeilingDenialResponse(error);
+    return { error: denial.message, status: denial.status };
   }
 
   const project = resolved.project;
