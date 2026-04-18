@@ -42,6 +42,8 @@ vi.mock("../../components/PeriodSelector", () => ({
 
 vi.mock("../../server/analytics/utils", () => ({
   filterOutEmptyFilters: (filters: Record<string, unknown>) => filters,
+  countActiveFilters: (filters: Record<string, unknown> | undefined) =>
+    filters ? Object.keys(filters).length : 0,
 }));
 
 vi.mock("../../server/filters/registry", () => ({
