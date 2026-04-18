@@ -60,6 +60,51 @@ The gateway reads these on each request and attaches its own span as a child of 
 
 <Note>`get_gateway_headers()` ships in LangWatch Python SDK ≥ `v0.22.0` alongside the gateway GA. Check your installed version with `pip show langwatch`.</Note>
 
+### Response headers for correlation
+
+Every gateway response carries these headers so clients can stitch the span back into their own trace without needing the LangWatch SDK:
+
+| Header | Value |
+|---|---|
+| `X-LangWatch-Trace-Id` | 32-hex trace id. Matches the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted trace id |
+| `X-LangWatch-Span-Id` | 16-hex gateway span id |
+| `traceparent` | W3C traceparent re-injected for downstream stitching — pass it to any further hop you call |
+| `X-LangWatch-Request-Id` | ULID, gateway-scoped. Use this in support tickets |
+
+```python
+resp = client.chat.completions.with_raw_response.create(
+    model="gpt-5-mini",
+    messages=[{"role": "user", "content": "Hi"}],
+)
+headers = resp.http_response.headers
+print(f"trace_id = {headers['X-LangWatch-Trace-Id']}")
+print(f"span_id  = {headers['X-LangWatch-Span-Id']}")
+# Use the traceparent to stitch a downstream service:
+# requests.post(next_service, headers={"traceparent": headers["traceparent"]}, ...)
+```
+
+### Without the LangWatch SDK — raw traceparent
+
+If you don't use the LangWatch Python SDK but still want trace continuity (e.g. you're traced via OpenTelemetry directly):
+
+```python
+from opentelemetry import trace
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
+def _traceparent_headers() -> dict[str, str]:
+    carrier: dict[str, str] = {}
+    TraceContextTextMapPropagator().inject(carrier)
+    return carrier  # {"traceparent": "00-<tid>-<sid>-01"} when a span is active
+
+client = OpenAI(
+    base_url="https://gateway.langwatch.ai/v1",
+    api_key="lw_vk_live_...",
+    default_headers=_traceparent_headers(),
+)
+```
+
+The gateway honours the standard W3C `traceparent` contract — any OTel-instrumented app already emits this; no LangWatch-specific code needed.
+
 ### Per-call overrides
 
 Every OpenAI SDK method accepts `extra_headers={}`:

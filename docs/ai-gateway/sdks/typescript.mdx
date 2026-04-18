@@ -43,6 +43,50 @@ const openai = new OpenAI({
 
 <Note>`getGatewayHeaders()` ships in langwatch npm ≥ `v0.26.0` alongside the gateway GA. Check with `npm ls langwatch`.</Note>
 
+### Response headers for correlation
+
+Every gateway response carries these headers so clients can stitch the gateway span into their own trace tooling without the LangWatch SDK:
+
+| Header | Value |
+|---|---|
+| `X-LangWatch-Trace-Id` | 32-hex trace id. Equals the incoming `traceparent` trace id if one was supplied; otherwise a freshly-minted id |
+| `X-LangWatch-Span-Id` | 16-hex gateway span id |
+| `traceparent` | W3C traceparent re-injected for downstream stitching — forward to any further hop |
+| `X-LangWatch-Request-Id` | ULID, use in support tickets |
+
+```ts
+const raw = await openai.chat.completions.withResponse().create({
+  model: "gpt-5-mini",
+  messages: [{ role: "user", content: "Hi" }],
+});
+const traceparent = raw.response.headers.get("traceparent");
+const traceId = raw.response.headers.get("X-LangWatch-Trace-Id");
+// Forward traceparent on the next outbound call to preserve the trace:
+// await fetch(nextService, { headers: { traceparent } });
+```
+
+### Without the LangWatch SDK — raw traceparent
+
+Using OpenTelemetry JS directly:
+
+```ts
+import { propagation, context } from "@opentelemetry/api";
+
+function traceparentHeaders(): Record<string, string> {
+  const carrier: Record<string, string> = {};
+  propagation.inject(context.active(), carrier);
+  return carrier; // { traceparent: "00-<tid>-<sid>-01" }
+}
+
+const openai = new OpenAI({
+  baseURL: "https://gateway.langwatch.ai/v1",
+  apiKey: process.env.LW_VK,
+  defaultHeaders: traceparentHeaders(),
+});
+```
+
+The gateway honours W3C `traceparent` — any OTel-instrumented Node.js app already emits this.
+
 ### Per-call overrides
 
 ```ts
