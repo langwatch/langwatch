@@ -2,6 +2,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { PatService } from "../pat.service";
 import { generatePatToken, hashSecret } from "../pat-token.utils";
 
+// Stub the RBAC check — the create path now validates bindings against the
+// creator's ceiling before persisting. These tests focus on persistence
+// semantics; the ceiling is exhaustively covered in integration tests.
+vi.mock("~/server/rbac/role-binding-resolver", () => ({
+  checkRoleBindingPermission: vi.fn().mockResolvedValue(true),
+}));
+
 // Mock PrismaClient
 function createMockPrisma() {
   const mock = {
@@ -11,6 +18,18 @@ function createMockPrisma() {
       findUnique: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
+    },
+    organizationUser: {
+      findFirst: vi.fn().mockResolvedValue({ userId: "user-1" }),
+    },
+    team: {
+      findFirst: vi.fn(),
+    },
+    project: {
+      findUnique: vi.fn(),
+    },
+    customRole: {
+      findUnique: vi.fn(),
     },
     roleBinding: {
       create: vi.fn(),
