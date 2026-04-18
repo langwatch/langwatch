@@ -1,0 +1,118 @@
+# Lane C — Cumulative Summary (iters 1–11)
+
+Single source of truth for Lane C (@ai_gateway_andr = specs + docs + CLI + QA). Supersedes LANE-C-ITER-{1..4}.md for quick ramp-up; the per-iter memos remain for granular history.
+
+## Artifacts shipped
+
+### BDD specs (15 files)
+
+Contract + shared:
+- `specs/ai-gateway/_shared/contract.md` — v0.1 canonical wire contract (13 sections incl. public REST §12, trace propagation §11c, dual-shape /budget/check §4.4)
+- `specs/ai-gateway/_shared/competitors.md` — Bifrost + Portkey + Nexos synthesis, feature matrix, differentiators
+
+Feature specs:
+- `epic.feature` — 11 cross-cutting E2E scenarios
+- `virtual-keys.feature` (by Alexis, edited for VK format + RBAC convention drift)
+- `budgets.feature` (by Alexis)
+- `gateway-provider-settings.feature` (by Alexis)
+- `gateway-service.feature`, `health-checks.feature`, `auth-cache.feature`, `provider-routing.feature`, `caching-passthrough.feature`, `fallback.feature`, `streaming.feature`, `guardrails.feature` (by Sergey)
+- `trace-propagation.feature` (by Sergey, 8 scenarios)
+- `cli-integrations.feature` — 14 scenarios for Claude Code / Codex / opencode / Cursor / Aider incl. Codex wire_api matrix
+- `cli-virtualkeys.feature` — langwatch CLI subcommand scenarios
+- `public-rest-api.feature` — 9 scenarios locking /api/gateway/v1/* auth, VK/budget/provider CRUD, DTO parity with tRPC, machine-actor audit, hono-openapi roadmap
+- `advanced-routing.feature` — 11 scenarios for v1.1 weighted/canary/sticky/composable routing (competitive gap vs Portkey)
+
+### Docs (~45 pages under `docs/ai-gateway/`)
+
+Foundation:
+- `overview.mdx`, `quickstart.mdx`, `concepts.mdx`
+
+Primitives:
+- `virtual-keys.mdx`, `budgets.mdx` (tier 1/2 budget flow per Sergey iter 4 pt3), `rbac.mdx`
+- `security.mdx` (threat model + secrets-at-rest + tenant isolation)
+- `troubleshooting.mdx` (SRE runbook for 11 failure modes)
+
+Features:
+- `caching-passthrough.mdx`, `guardrails.mdx`, `blocked-patterns.mdx`, `streaming.mdx` (incl. include_usage gotcha + SSE error frame lock), `model-aliases.mdx`, `observability.mdx` (per-project OTLP routing), `security.mdx`
+
+Providers (8):
+- `openai.mdx`, `anthropic.mdx`, `bedrock.mdx`, `azure-openai.mdx`, `vertex.mdx`, `gemini.mdx`, `custom-openai-compatible.mdx`, `overview.mdx`
+- `fallback-chains.mdx` (incl. 30s/10/60s circuit defaults + LW_GATEWAY_CIRCUIT_* env)
+
+API reference (6):
+- `api/chat-completions.mdx`, `api/messages.mdx`, `api/embeddings.mdx`, `api/models.mdx`, `api/errors.mdx`, `api/management.mdx` (public REST /api/gateway/v1/* reference)
+
+CLI integrations (7):
+- `cli/overview.mdx`, `cli/langwatch-cli.mdx` (synced with shipped flag surface), `cli/claude-code.mdx`, `cli/codex.mdx` (wire_api matrix), `cli/opencode.mdx`, `cli/cursor.mdx`, `cli/aider.mdx`
+
+SDK integration (2):
+- `sdks/python.mdx`, `sdks/typescript.mdx` (both with trace-propagation section citing concrete response headers)
+
+Self-hosting (4):
+- `self-hosting/helm.mdx`, `self-hosting/config.mdx` (full env-var reference incl. per-project OTLP routing + LW_GATEWAY_BUDGET_LIVE_* + LW_GATEWAY_CIRCUIT_*), `self-hosting/health-checks.mdx`, `self-hosting/scaling.mdx`
+
+Cookbooks (4):
+- `cookbooks/ci-smoke-test.mdx` — VK mint → curl → trace-id verify → revoke
+- `cookbooks/migrate-from-direct.mdx` — from direct OpenAI/Anthropic calls to gateway, rollback plan
+- `cookbooks/multi-tenant-reseller.mdx` — SaaS B2B2C pattern
+- `cookbooks/prometheus-alerts.mdx` — 11 alert rules, Alertmanager routing, promtool unit tests
+
+### CLI (13 subcommands, 3 groups, shipped in typescript-sdk/)
+
+**`langwatch virtual-keys` (alias `vk`):**
+- `list / get <id> / create --name ... --provider ... / update <id> / rotate <id> / revoke <id>`
+- Backing: `VirtualKeysApiService` hitting /api/gateway/v1/virtual-keys/*
+
+**`langwatch gateway-budgets`:**
+- `list / create --scope ... --window ... --limit ... / update <id> / archive <id>`
+- Backing: `GatewayBudgetsApiService` hitting /api/gateway/v1/budgets/*
+
+**`langwatch gateway-providers`:**
+- `list / create --model-provider ... --slot ... / disable <id>`
+- Backing: `GatewayProvidersApiService` hitting /api/gateway/v1/providers/*
+
+All use direct `fetch` (secrets/list.ts pattern). Retrofit to openapi-typed client is pending Alexis's describeRoute completion (partial in iter 7).
+
+### Docs navigation
+
+`docs/docs.json` adds AI Gateway anchor with 8 groups: Overview / Virtual Keys & Budgets / Providers / Features / Coding CLI / SDK / API Reference / Self-Hosting / Cookbooks. Integrations → Observability and Documentation → Platform renames landed iter 1.
+
+## Team coordination facts (as of iter 11)
+
+- @ai_gateway_alexis (Lane B — platform / Hono / Prisma / UI) — 7 iters shipped. Key: public REST (`4e95415da`), VK+Budget+Provider edit drawers (`c34577f2f` + `6cda472ec`), LOCAL_DEV_BYPASS_AUTH + describeRoute (partial) (`8f142e274`). Remaining: complete describeRoute on all CRUD endpoints, client-side dev-bypass session fix, Project.observabilityEndpoint migration.
+- @ai_gateway_sergey (Lane A — Go gateway / bifrost / OTel / budget / fallback) — 4 iters + 6 parts shipped. Full scoreboard: OTel + traceparent ✅, fallback + circuit ✅, live /budget/check ✅, per-project OTLP ✅, streaming usage extraction ✅, streaming fallback ✅. Remaining: terraform gateway.langwatch.ai cert + ALB ingress.
+
+## Active blockers
+
+- **Dogfooding UI screenshots** — client-side still bounces to Auth0 despite LOCAL_DEV_BYPASS_AUTH cookie being set (server is correct, frontend session check isn't reading better-auth cookie). Flagged to Alexis; screenshot evidence at `.claude/lane-c-iter10-01-post-dev-bypass.png`.
+- **`langwatch vk update` config partial-merge semantics** — shipped in iter 6 assuming server-side merge. Verify with live dev server once dogfood works.
+- **CLI OpenAPI retrofit** — pending Alexis completing describeRoute on all CRUD (iter 8 Lane B queue).
+
+## What iter 12+ should consider
+
+- Write Grafana dashboard JSON to pair with prometheus-alerts cookbook.
+- Semantic caching roadmap spec (another Portkey gap).
+- Post-Auth0-fix: dogfood VK UI → 6 screenshots → PR-ready evidence.
+- Post-hono-openapi: retrofit VirtualKeysApiService etc. to typed client.
+- Post-Project.observabilityEndpoint: concrete per-project OTLP example in self-hosting config.mdx.
+- Post-terraform: update self-hosting/helm.mdx with real ingress example.
+- End-to-end CLI scenario test using scenario.run + Claude Code adapter (skills/_tests/ pattern).
+
+## Useful pointers
+
+- Contract: `specs/ai-gateway/_shared/contract.md`
+- Competitor research: `specs/ai-gateway/_shared/competitors.md`
+- Per-iter memos: `.claude/LANE-C-ITER-{1,2,3,4}.md`
+- Full commit list since iter 1 Lane C:
+  - `32bcba36a`, `9a6281a72` — iter 1
+  - `58a220a2d`, `29ccb640e` — iter 2
+  - `2ccbcdfd0`, `02e65684b` — iter 3 (+ `.claude/LANE-C-ITER-3.md`)
+  - `d5d6012a7`, `5e8d4e46b`, `60245e119` — iter 4 (+ `.claude/LANE-C-ITER-4.md`)
+  - `4d9950213` — iter 5
+  - `e8742e1ec`, `a1aad7e20` — iter 6
+  - `02233e486`, `57c6963a7` — iter 7
+  - `e61b571b5` — iter 8
+  - `232f44d78` — iter 9
+  - `f4b9c4fff` — iter 9 pt2 (streaming usage)
+  - `3dfc558e6` — iter 10 (streaming fallback docs)
+  - `a596901ae` — iter 11 (prometheus alerts)
