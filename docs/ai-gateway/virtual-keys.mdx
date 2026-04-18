@@ -18,7 +18,7 @@ VKs replace raw provider keys in your applications. The provider keys themselves
 
 The secret is shown **exactly once** at creation. After you dismiss the creation dialog it can never be retrieved again — only the first 12 characters (`lw_vk_live_01HZX9`) are visible in the list.
 
-Server-side, the secret is stored `argon2id(secret + pepper)`. A short prefix is stored alongside for grep/lookup.
+Server-side, the secret is stored as `hex(hmac_sha256(server_pepper, secret))`. Peppered HMAC-SHA256 is the right primitive for API keys (as opposed to passwords) — the VK body already carries 130 bits of entropy as a ULID, so argon2id-style stretching would just add 50–100 ms of pointless latency on every cold resolve-key call. A short prefix is stored alongside for grep/lookup.
 
 ## Creating a VK
 

@@ -1,0 +1,138 @@
+---
+title: Error Envelope
+description: OpenAI-compatible error shapes and a complete type enum.
+sidebarTitle: Errors
+---
+
+Every gateway error is returned in the OpenAI-compatible envelope:
+
+```json
+{
+  "error": {
+    "type":    "<type>",
+    "code":    "<code>",
+    "message": "<human-readable>",
+    "param":   "<optional field name>"
+  }
+}
+```
+
+This matches what the `openai` Python and TypeScript SDKs — plus the Anthropic SDK (which parses a superset) — expect. Existing client code raises its usual typed exceptions unchanged.
+
+## Response headers
+
+Errors (like successes) always carry:
+
+- `X-LangWatch-Request-Id: grq_<ULID>` — use this when filing support tickets.
+- `X-LangWatch-Provider` — present when the error originated from an upstream provider (absent for gateway-internal errors).
+
+## Type enum
+
+| `type` | HTTP | When |
+|---|---|---|
+| `invalid_api_key` | `401` | The `Authorization: Bearer …` / `x-api-key` / `api-key` header is missing, malformed, or points to a non-existent virtual key. |
+| `virtual_key_revoked` | `403` | The VK exists but has been revoked. |
+| `model_not_allowed` | `403` | The VK has a `models_allowed` allowlist and the requested model is not in it. Also used when the model/alias doesn't resolve to any configured provider. |
+| `permission_denied` | `403` | The principal lacks the RBAC permission required for the endpoint. |
+| `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope (e.g. `Budget exceeded for scope=project window=month`). |
+| `rate_limit_exceeded` | `429` | VK / project / org rate limit hit on the gateway side, or upstream returned `429` and no fallback was available. |
+| `guardrail_blocked` | `403` | A pre- or post-call guardrail returned `block`. `message` references which guardrail and why. |
+| `tool_not_allowed` | `403` | The request references a tool name matched by the VK's `blocked_patterns.tools.deny` (or absent from `allow` if set). |
+| `url_not_allowed` | `403` | Outbound URL in tool-call arguments matched `blocked_patterns.urls.deny`. |
+| `cache_override_invalid` | `400` | The `X-LangWatch-Cache` header was malformed. |
+| `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
+| `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
+| `bad_request` | `400` | Validation error on the incoming payload (e.g. missing `model`). |
+| `internal_error` | `500` | Unclassified gateway error. `X-LangWatch-Request-Id` is how we trace it. |
+
+## Budget-warning headers (not errors)
+
+These are *soft* signals on **successful** responses:
+
+- `X-LangWatch-Budget-Warning: <scope>:<pct>` — a budget scope is over its soft threshold. Multiple can be present.
+
+A `warn` breach never turns into an error envelope; it's only a header.
+
+## Examples
+
+### Invalid key
+
+```http
+HTTP/1.1 401 Unauthorized
+Content-Type: application/json
+X-LangWatch-Request-Id: grq_01HZX9K3MNM...
+
+{
+  "error": {
+    "type":    "invalid_api_key",
+    "code":    "invalid_api_key",
+    "message": "No active virtual key matches the presented credential.",
+    "param":   null
+  }
+}
+```
+
+### Budget exceeded
+
+```http
+HTTP/1.1 402 Payment Required
+Content-Type: application/json
+X-LangWatch-Request-Id: grq_01HZX9K3MNN...
+
+{
+  "error": {
+    "type":    "budget_exceeded",
+    "code":    "budget_exceeded",
+    "message": "Budget exceeded for scope=project window=month",
+    "param":   null
+  }
+}
+```
+
+### Blocked tool
+
+```http
+HTTP/1.1 403 Forbidden
+Content-Type: application/json
+X-LangWatch-Request-Id: grq_01HZX9K3MNO...
+
+{
+  "error": {
+    "type":    "tool_not_allowed",
+    "code":    "tool_not_allowed",
+    "message": "Tool 'shell.exec' is blocked by VK policy blocked_patterns.tools.",
+    "param":   "tools[0].function.name"
+  }
+}
+```
+
+### Upstream timeout after fallback exhaustion
+
+```http
+HTTP/1.1 504 Gateway Timeout
+Content-Type: application/json
+X-LangWatch-Request-Id: grq_01HZX9K3MNP...
+X-LangWatch-Provider: anthropic
+X-LangWatch-Fallback-Count: 2
+
+{
+  "error": {
+    "type":    "upstream_timeout",
+    "code":    "upstream_timeout",
+    "message": "All 3 providers in the fallback chain timed out after 30000ms.",
+    "param":   null
+  }
+}
+```
+
+## Streaming errors
+
+For SSE streaming, a terminal `event: error` frame carries the same envelope and the stream ends:
+
+```
+event: error
+data: {"error":{"type":"provider_error","code":"provider_error","message":"Upstream connection reset after 2 chunks","param":null}}
+
+```
+
+Clients that receive chunks and then an `error` frame should treat the response as incomplete (partial) and `X-LangWatch-Request-Id` still identifies the session in traces.

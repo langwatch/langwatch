@@ -31,8 +31,10 @@ Total length: **40 chars** (`lw_vk_live_01HZX9K3M...`).
 - Prefix `lw_vk_` is fixed and searchable (grep/DLP friendly).
 - Env prefix prevents accidental dev-key-in-prod / vice versa (Stripe pattern).
 - Body is ULID: monotonic, k-sortable, time-prefixed. No b62 random — ULID sorts sensibly in the dashboard.
-- Stored server-side as `argon2id(key + server_pepper)` alongside a short display prefix (`lw_vk_live_01HZX9` visible, rest hashed). Key is shown **once** at creation; not retrievable afterward.
+- Stored server-side as `hex(hmac_sha256(LW_VIRTUAL_KEY_PEPPER, key))` alongside a short display prefix (`lw_vk_live_01HZX9` visible, rest hashed). Peppered HMAC-SHA256 (not argon2id) is chosen because (a) the VK body is a 130-bit ULID — already brute-force-infeasible, (b) argon2id would add 50–100 ms to every cold resolve-key call which defeats the gateway's latency budget, (c) Stripe/GitHub use the same pattern for API keys, (d) deterministic hash enables O(1) lookup by hash (argon2id's random salt would force a table scan). Constant-time compare on verify.
+- Key is shown **once** at creation; not retrievable afterward.
 - Rotation: user can rotate a VK in place (same `vk_id`, new secret, old secret valid for 24h grace).
+- **Pepper rotation:** `LW_VIRTUAL_KEY_PEPPER` rotates via a dual-pepper lookup window — during rotation, the control-plane verifies with both the new and old pepper (returning OK on either match) and re-hashes to the new pepper on next use. Complete rotation = re-hash all live VKs in a background job, then drop the old pepper. Documented SOP in self-hosting ops guide.
 - Revocation: soft-delete sets `revoked_at`; gateway must reject within 60s (via `/changes` diff).
 
 **Header accepted by the gateway:**
@@ -94,16 +96,28 @@ X-LangWatch-Gateway-Timestamp: <unix_seconds>
 
 Control-plane verifies (a) timestamp is within ±5 min (300s) of server time (replay protection), (b) recomputed sig matches via constant-time compare, (c) body sha256 matches the one in the canonical string (defence in depth). Rotate `LW_GATEWAY_INTERNAL_SECRET` by supporting two valid values for a grace window.
 
-**Reference test vector** (agents: use this to unit-test Go signer vs Hono verifier byte-for-byte):
+**Reference test vector** — Go signer ↔ Hono verifier MUST match byte-for-byte. Source of truth for both sides' unit tests.
 
 ```
-LW_GATEWAY_INTERNAL_SECRET = "test-secret-do-not-use-in-prod"
-method    = "POST"
-path      = "/api/internal/gateway/resolve-key"
-timestamp = "1734567890"
-body      = `{"key_presented":"lw_vk_live_01HZX000000000000000000000","gateway_node_id":"gw-test-1"}`
-expected_sig = "<computed and agreed in a followup ping; unit test must match>"
+LW_GATEWAY_INTERNAL_SECRET = "shared-test-secret-32byteslong!!"
+method      = "POST"
+path        = "/api/internal/gateway/resolve-key"
+timestamp   = "1734567890"
+body        = {"key_presented":"lw_vk_live_01HZX","gateway_node_id":"gw-a"}
+body_sha256 = 59f25745b66fbb0c7b3714572d20ffef741817b84b86093e4ac6af243af66816
+canonical   = "POST\n/api/internal/gateway/resolve-key\n1734567890\n59f25745b66fbb0c7b3714572d20ffef741817b84b86093e4ac6af243af66816"
+signature   = 4e4c8634b10a7ef719cf6d56b89b7f44a5ac7544c03d98ef132b79d36a1a6a1f
 ```
+
+Headers the Go client MUST emit:
+
+```
+X-LangWatch-Gateway-Signature: <signature>
+X-LangWatch-Gateway-Timestamp: <unix_seconds>
+X-LangWatch-Gateway-Node: <hostname>          # advisory, not signed
+```
+
+Server-side verify order: (1) constant-time compare on signature first (prevents secret-length timing oracle), (2) then `|now - ts| ≤ 300s`, (3) then re-verify body sha256 in the canonical string matches the received body as a defence-in-depth check.
 
 Other shared env vars referenced across the contract:
 
