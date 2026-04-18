@@ -1,9 +1,169 @@
 ---
 title: Scaling
-description: Scaling — LangWatch AI Gateway.
+description: Horizontal scaling, capacity planning, and tuning for the LangWatch AI Gateway.
 sidebarTitle: Scaling
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+The gateway is a stateless proxy — scale it horizontally. There is no sticky-session requirement because JWTs are self-contained and every replica can serve every VK. Capacity is a function of **upstream latency** and **connection count**, not CPU.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Baseline
+
+A single gateway replica (2 vCPU, 4 GB RAM) comfortably serves:
+
+- **5,000 req/s** non-streaming Chat Completions (median upstream latency ~800 ms).
+- **1,500 concurrent streaming sessions** (Claude Messages with 2-second TTFB + 30-second body).
+- **15,000 inflight gRPC/HTTP upstream connections** across all providers.
+
+RAM is dominated by the auth L1 cache (avg ~1 KB per cached VK). With `LW_GATEWAY_AUTH_CACHE_L1_SIZE=10000`, budget 10 MB for the cache plus ~2 GB Go runtime overhead.
+
+## Horizontal Pod Autoscaler
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: langwatch-gateway
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: langwatch-gateway
+  minReplicas: 3
+  maxReplicas: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 60 }
+    - type: Pods
+      pods:
+        metric:
+          name: gateway_inflight_requests
+        target: { type: AverageValue, averageValue: "800" }
+  behavior:
+    scaleUp:
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 300
+```
+
+- **Scale metric: inflight requests per replica**. CPU alone misleads — a gateway replica handling 2,000 streaming connections uses 15% CPU but exhausts connection pools.
+- **Slow scale-down** (5-minute stabilization) to avoid flapping under bursty traffic typical of agentic CLIs.
+- **Minimum 3 replicas** for PDB headroom — `kubectl drain` during an AZ rotation must not take you below 2.
+
+## Pod Disruption Budget
+
+```yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: langwatch-gateway
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels: { app: langwatch-gateway }
+```
+
+Combined with topology spread, a single-AZ failure loses ≤33% of replicas but PDB keeps ≥2 replicas alive in surviving AZs.
+
+## Topology spread
+
+```yaml
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels: { app: langwatch-gateway }
+```
+
+Pairs naturally with 3 replicas across 3 AZs. On 6+ replicas you get 2+ per AZ, surviving an AZ loss without degradation.
+
+## Connection pooling
+
+Go's `net/http.Transport` defaults are aggressive (unbounded idle connections). The gateway clamps them:
+
+```
+MaxIdleConnsPerHost = LW_GATEWAY_UPSTREAM_MAX_CONN_PER_HOST (default 256)
+IdleConnTimeout    = LW_GATEWAY_UPSTREAM_IDLE_TIMEOUT_S      (default 90)
+```
+
+At 5K req/s sustained, each replica holds ~1.5K live connections to OpenAI. Under a full provider outage with active fallback, multiply by the fallback-chain length — budget 3× headroom.
+
+### Ephemeral-port exhaustion
+
+The gateway replica's source port pool is shared across all outbound upstreams. At 10K+ req/s from a single replica, you can exhaust ephemeral ports before CPU tops out. Two mitigations:
+
+1. Add replicas (preferred — stateless scaling is cheap).
+2. Bump `net.ipv4.ip_local_port_range` via a `sysctl` init container: `net.ipv4.ip_local_port_range=1024 65535`.
+
+## Control-plane capacity
+
+The gateway is chatty with the control plane on cold-start (`/bootstrap`) and idle (`/changes` long-poll every 25 s). Control-plane requirements scale **sub-linearly** with gateway replicas:
+
+| Gateway replicas | Control-plane QPS | Typical spend |
+|---|---|---|
+| 3 | ~0.1 req/s | zero concern |
+| 30 | ~1.5 req/s | zero concern |
+| 300 | ~15 req/s | budget 1 Postgres read replica |
+
+Debits flow through the outbox asynchronously — the gateway batches debits to 50/request or 1s delay, whichever first. Control plane sees **~1 debit/min/active-VK**, not per-request.
+
+## Redis L2 (optional)
+
+Enabling `REDIS_URL` adds a shared L2 cache for resolved VKs. Pros: replica cold-start serves traffic immediately (warm from L2 instead of calling `/resolve-key`). Cons: 1 ms per L1-miss — not much, but non-zero.
+
+**Use L2 when**:
+- Autoscaling frequently adds/removes replicas (high churn).
+- Tenants have > 50K active VKs (bootstrap payload gets unwieldy).
+
+**Skip L2 when**:
+- Small-to-medium deployments (< 10K active VKs).
+- You prefer zero external infrastructure dependencies.
+
+## Blue-green deployments
+
+The gateway supports zero-downtime blue-green via two-stage deploy:
+
+1. Deploy `langwatch-gateway-green` alongside `-blue`, same Helm chart, different `replicaCount`.
+2. Verify `/readyz` on green.
+3. Switch the LB target; old connections drain on blue (30 s window).
+4. Delete blue after 5 minutes of green being stable.
+
+Because `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` are identical across colors, JWTs minted on blue validate on green — no cache reset, no customer impact.
+
+## Regional placement
+
+For latency-sensitive deployments, run the gateway in the same region as:
+
+1. Your LangWatch control plane (reduces `/resolve-key` round-trips on cache miss).
+2. Your primary upstream provider (single-digit ms to OpenAI us-east-1, Anthropic us-west-2).
+
+Multi-region deployments: run per-region gateway fleets with independent HPAs. The gateway doesn't federate state cross-region — each replica's L1 is independent. Control plane is the single source of truth; any region can talk to it.
+
+## Benchmarks you can run
+
+The repo ships a `hack/bench/` directory with three scenarios:
+
+```bash
+# Non-streaming Chat Completions, 1000 concurrent, 30-second run
+./hack/bench/run.sh chat-nonstream --concurrency 1000 --duration 30s
+
+# Streaming Claude Messages, 500 concurrent
+./hack/bench/run.sh messages-stream --concurrency 500 --duration 60s
+
+# Cold-start cost (fresh pod, first 500 requests)
+./hack/bench/run.sh cold-start
+```
+
+Target baselines:
+
+- p50 gateway-added latency: **< 2 ms**.
+- p99 gateway-added latency: **< 15 ms**.
+- Cold-start TTFB (bootstrap disabled): **< 300 ms**.
+- Cold-start TTFB (bootstrap enabled, 10K VKs): **< 3 s to ready, then < 300 ms per request**.
+
+If you're outside these ranges, check [Health Checks](/ai-gateway/self-hosting/health-checks) and [Config](/ai-gateway/self-hosting/config) for tuning knobs before escalating.

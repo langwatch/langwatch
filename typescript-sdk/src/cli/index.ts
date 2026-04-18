@@ -666,6 +666,62 @@ modelProviderCmd
     await impl(provider, options);
   });
 
+// Add virtual-keys command group (AI Gateway)
+const virtualKeysCmd = program
+  .command("virtual-keys")
+  .alias("vk")
+  .description("Manage AI Gateway virtual keys (list, create, rotate, revoke)");
+
+virtualKeysCmd
+  .command("list")
+  .description("List all virtual keys for the current project")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
+    const { listVirtualKeysCommand: impl } = await import("./commands/virtual-keys/list.js");
+    await impl(options);
+  });
+
+virtualKeysCmd
+  .command("get <id>")
+  .description("Show details for a single virtual key")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (id: string, options: { format?: string }) => {
+    const { getVirtualKeyCommand: impl } = await import("./commands/virtual-keys/get.js");
+    await impl(id, options);
+  });
+
+virtualKeysCmd
+  .command("create")
+  .description("Create a new virtual key (secret is shown once)")
+  .requiredOption("--name <name>", "Human-readable name for the key")
+  .option("--description <desc>", "Optional description")
+  .option("--env <env>", "Environment: live or test", "live")
+  .option("--provider <id...>", "Provider credential id(s) to bind (repeatable)")
+  .option("--principal <userId>", "Bind to a specific principal user id")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (options: { name: string; description?: string; env?: "live" | "test"; provider?: string[]; principal?: string; format?: string }) => {
+    const { createVirtualKeyCommand: impl } = await import("./commands/virtual-keys/create.js");
+    await impl(options);
+  });
+
+virtualKeysCmd
+  .command("rotate <id>")
+  .description("Rotate a virtual key's secret (old secret stops working immediately)")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (id: string, options: { format?: string }) => {
+    const { rotateVirtualKeyCommand: impl } = await import("./commands/virtual-keys/rotate.js");
+    await impl(id, options);
+  });
+
+virtualKeysCmd
+  .command("revoke <id>")
+  .description("Revoke a virtual key (cannot be reactivated)")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (id: string, options: { format?: string }) => {
+    const { revokeVirtualKeyCommand: impl } = await import("./commands/virtual-keys/revoke.js");
+    await impl(id, options);
+  });
+
 // Add annotation command group
 const annotationCmd = program
   .command("annotation")
