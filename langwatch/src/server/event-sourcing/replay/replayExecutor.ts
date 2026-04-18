@@ -1,5 +1,6 @@
 import type { TenantId } from "../domain/tenantId";
 import type { FoldProjectionDefinition } from "../projections/foldProjection.types";
+import type { MapProjectionDefinition } from "../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../projections/projectionStoreContext";
 import type { ReplayEvent } from "./replayEventLoader";
 
@@ -88,6 +89,70 @@ export class FoldAccumulator {
         // Fallback: sequential single-entry writes
         for (const entry of entries) {
           await store.store(entry.state, entry.context);
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Accumulates map projection records as events are fed in one at a time.
+ *
+ * Unlike FoldAccumulator (which merges state per aggregate), MapAccumulator
+ * buffers one output record per event. Records are grouped by tenantId and
+ * flushed in bulk via `store.bulkAppend()` (or sequential `store.append()`
+ * as fallback).
+ *
+ * Memory is bounded by the number of events in a single aggregate batch
+ * that match this projection's eventTypes.
+ */
+export class MapAccumulator {
+  private byTenant = new Map<string, any[]>();
+  private _processed = 0;
+  private readonly eventTypeSet: Set<string>;
+
+  constructor(private readonly projection: MapProjectionDefinition<any, any>) {
+    this.eventTypeSet = new Set(projection.eventTypes);
+  }
+
+  get processed(): number {
+    return this._processed;
+  }
+
+  apply(event: ReplayEvent): void {
+    if (!this.eventTypeSet.has(event.type)) return;
+
+    const record = this.projection.map(event as any);
+    if (record === null) return;
+
+    let list = this.byTenant.get(event.tenantId);
+    if (!list) {
+      list = [];
+      this.byTenant.set(event.tenantId, list);
+    }
+    list.push(record);
+    this._processed++;
+  }
+
+  async flush(writeBatchSize = DEFAULT_WRITE_BATCH_SIZE): Promise<void> {
+    if (this.byTenant.size === 0) return;
+
+    const store = this.projection.store;
+
+    for (const [tenantId, records] of this.byTenant) {
+      const context: ProjectionStoreContext = {
+        aggregateId: "",
+        tenantId: tenantId as unknown as TenantId,
+      };
+
+      if (store.bulkAppend) {
+        for (let i = 0; i < records.length; i += writeBatchSize) {
+          const chunk = records.slice(i, i + writeBatchSize);
+          await store.bulkAppend(chunk, context);
+        }
+      } else {
+        for (const record of records) {
+          await store.append(record, context);
         }
       }
     }

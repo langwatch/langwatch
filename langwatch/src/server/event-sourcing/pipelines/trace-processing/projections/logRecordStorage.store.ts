@@ -12,4 +12,12 @@ export class LogRecordAppendStore implements AppendStore<NormalizedLogRecord> {
   ): Promise<void> {
     await this.repo.insertLogRecord(record);
   }
+
+  async bulkAppend(
+    records: NormalizedLogRecord[],
+    _context: ProjectionStoreContext,
+  ): Promise<void> {
+    if (records.length === 0) return;
+    await this.repo.insertLogRecords(records);
+  }
 }

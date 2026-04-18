@@ -277,6 +277,13 @@ export class ProjectionRouter<
         name,
         handler: {
           handle: async (event: EventType) => {
+            // Defer or skip if projection-replay is active for this aggregate.
+            // Mirrors the fold-side check at line 591-594.
+            if (this.replayMarkerChecker) {
+              const decision = await this.replayMarkerChecker.check(name, event);
+              if (decision === "skip") return;
+            }
+
             const context: ProjectionStoreContext = {
               aggregateId: String(event.aggregateId),
               tenantId: event.tenantId,
@@ -518,6 +525,13 @@ export class ProjectionRouter<
           }
 
           try {
+            // Defer or skip if projection-replay is active for this aggregate.
+            // Mirrors the fold-side check at line 591-594.
+            if (this.replayMarkerChecker) {
+              const decision = await this.replayMarkerChecker.check(name, event);
+              if (decision === "skip") continue;
+            }
+
             const storeContext: ProjectionStoreContext = {
               aggregateId: String(event.aggregateId),
               tenantId: event.tenantId,

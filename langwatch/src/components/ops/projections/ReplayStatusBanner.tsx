@@ -29,7 +29,9 @@ export function ReplayStatusBanner() {
             </Text>
             {status.currentProjection && (
               <Badge size="sm" variant="subtle">
-                {status.currentProjection}
+                {status.currentProjection.includes("+")
+                  ? `${status.currentProjection.split("+").length} projections`
+                  : status.currentProjection}
               </Badge>
             )}
           </HStack>

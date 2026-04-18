@@ -597,6 +597,7 @@ export interface ProjectionMetadata {
   aggregateType: string;
   source: "pipeline" | "global";
   pauseKey: string;
+  kind: "fold" | "map";
 }
 
 export interface ReactorMetadata {
@@ -620,13 +621,23 @@ function getDefinitions(): ReadonlyArray<StaticPipelineDefinition<any, any, any>
 export function getProjectionMetadata(): ProjectionMetadata[] {
   return getDefinitions().flatMap((def) => {
     const { name: pipelineName, aggregateType } = def.metadata;
-    return Array.from(def.foldProjections.values()).map(({ definition }) => ({
+    const folds = Array.from(def.foldProjections.values()).map(({ definition }) => ({
       projectionName: definition.name,
       pipelineName,
       aggregateType,
       source: "pipeline" as const,
       pauseKey: `${pipelineName}/projection/${definition.name}`,
+      kind: "fold" as const,
     }));
+    const maps = Array.from(def.mapProjections.values()).map(({ definition }) => ({
+      projectionName: definition.name,
+      pipelineName,
+      aggregateType,
+      source: "pipeline" as const,
+      pauseKey: `${pipelineName}/projection/${definition.name}`,
+      kind: "map" as const,
+    }));
+    return [...folds, ...maps];
   });
 }
 
