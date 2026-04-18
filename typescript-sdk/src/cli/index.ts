@@ -705,6 +705,29 @@ virtualKeysCmd
   });
 
 virtualKeysCmd
+  .command("update <id>")
+  .description("Update a virtual key's name/description/providers/config (requires VK edit drawer-level changes)")
+  .option("--name <name>", "New display name")
+  .option("--description <desc>", "New description")
+  .option("--clear-description", "Clear the description")
+  .option("--provider <id...>", "Replace the bound provider credential ids (repeatable; supplies the full set)")
+  .option("--config-json <json>", "Inline partial config JSON (model_aliases/cache/fallback/rate_limits/blocked_patterns). Merges with existing config")
+  .option("--config-file <path>", "Read partial config JSON from a file")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (id: string, options: {
+    name?: string;
+    description?: string;
+    clearDescription?: boolean;
+    provider?: string[];
+    configJson?: string;
+    configFile?: string;
+    format?: string;
+  }) => {
+    const { updateVirtualKeyCommand: impl } = await import("./commands/virtual-keys/update.js");
+    await impl(id, options);
+  });
+
+virtualKeysCmd
   .command("rotate <id>")
   .description("Rotate a virtual key's secret (old secret stops working immediately)")
   .option("-f, --format <format>", "Output format: text (default) or json", "text")
@@ -769,6 +792,31 @@ gatewayBudgetsCmd
   }) => {
     const { createGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/create.js");
     await impl(options);
+  });
+
+gatewayBudgetsCmd
+  .command("update <id>")
+  .description("Update a budget's name/description/limit/on-breach/timezone")
+  .option("--name <name>", "New display name")
+  .option("--description <desc>", "New description")
+  .option("--clear-description", "Clear the description")
+  .option("--limit <usd>", "New hard-cap in USD")
+  .option("--on-breach <action>", "block or warn")
+  .option("--timezone <tz>", "New IANA timezone")
+  .option("--clear-timezone", "Clear the timezone override")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (id: string, options: {
+    name?: string;
+    description?: string;
+    clearDescription?: boolean;
+    limit?: string;
+    onBreach?: "block" | "warn";
+    timezone?: string;
+    clearTimezone?: boolean;
+    format?: string;
+  }) => {
+    const { updateGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/update.js");
+    await impl(id, options);
   });
 
 gatewayBudgetsCmd
