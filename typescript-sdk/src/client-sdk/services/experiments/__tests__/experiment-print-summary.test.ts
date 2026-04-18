@@ -152,6 +152,28 @@ describe("Experiment.printSummary", () => {
     });
   });
 
+  describe("when a target is used only via log() (no withTarget wrapping)", () => {
+    it("still reports the target in the per-target summary", () => {
+      // Evaluations carry target_id but the dataset entries do NOT —
+      // simulating an explicit log() call outside a withTarget() block.
+      const exp = buildExperimentFixture({
+        evaluations: [
+          evaluation({ passed: true, target_id: "gpt-4o" }),
+          evaluation({ passed: false, target_id: "gpt-4o", index: 1 }),
+        ],
+        entries: [
+          { index: 0, entry: null, duration: 100, error: null, trace_id: "t1" },
+        ],
+      });
+
+      exp.printSummary(false);
+
+      const out = output();
+      expect(out).toContain("gpt-4o");
+      expect(out).toContain("1 passed, 1 failed");
+    });
+  });
+
   describe("when an iteration errored out (execution failure)", () => {
     it("exits even if all evaluators passed", () => {
       const exp = buildExperimentFixture({

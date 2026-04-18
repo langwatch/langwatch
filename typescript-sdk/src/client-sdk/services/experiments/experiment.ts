@@ -867,9 +867,17 @@ export class Experiment {
         stats.cost += entry.cost;
       }
     }
+    // Lazily seed target stats from evaluations too — a user can log an
+    // evaluation with an explicit target_id without ever going through
+    // withTarget(), in which case the per-target entry row may not carry
+    // target_id. Without this, such a target would be silently dropped from
+    // the per-target summary.
     for (const e of this.cumulativeEvaluations) {
       const tid = e.target_id;
-      if (!tid || !targets.has(tid)) continue;
+      if (!tid) continue;
+      if (!targets.has(tid)) {
+        targets.set(tid, { passed: 0, failed: 0, latencySum: 0, latencyCount: 0, cost: 0 });
+      }
       const stats = targets.get(tid)!;
       if (e.passed === true) stats.passed += 1;
       else if (e.passed === false) stats.failed += 1;
