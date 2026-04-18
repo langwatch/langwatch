@@ -20,8 +20,8 @@ groups:
 
       - alert: GatewayHighErrorRate
         expr: |
-          sum(rate(gateway_requests_total{status=~"5.."}[5m]))
-            / sum(rate(gateway_requests_total[5m])) > 0.05
+          sum(rate(gateway_http_requests_total{status=~"5.."}[5m]))
+            / sum(rate(gateway_http_requests_total[5m])) > 0.05
         for: 5m
         labels: { severity: page, team: ai-platform }
         annotations:
@@ -46,11 +46,11 @@ groups:
       # ─── Provider health ─────────────────────────────────────────────────
 
       - alert: CircuitOpenTooLong
-        expr: gateway_circuit_state{state="open"} == 1
+        expr: gateway_circuit_state == 2
         for: 5m
         labels: { severity: page, team: ai-platform }
         annotations:
-          summary: "Circuit open for provider {{ $labels.credential }} > 5m"
+          summary: "Circuit open for credential {{ $labels.credential_id }} > 5m"
           description: |
             Gateway has tripped the breaker and is skipping this provider.
             Verify the provider is actually having issues (check X-LangWatch-
@@ -58,8 +58,8 @@ groups:
 
       - alert: ExcessiveFallback
         expr: |
-          sum(rate(gateway_requests_total{fallback_count!="0"}[10m]))
-            / sum(rate(gateway_requests_total[10m])) > 0.1
+          sum(rate(gateway_provider_attempts_total{outcome="fallback"}[10m]))
+            / sum(rate(gateway_provider_attempts_total[10m])) > 0.1
         for: 10m
         labels: { severity: warn, team: ai-platform }
         annotations:
@@ -73,9 +73,7 @@ groups:
 
       - alert: StreamingUsageMissing
         expr: |
-          sum(rate(gateway_requests_total{
-            stream="true", usage_reported="false"
-          }[10m])) > 0
+          sum(rate(gateway_streaming_usage_missing_total[10m])) > 0
         for: 10m
         labels: { severity: page, team: ai-platform }
         annotations:
@@ -86,21 +84,22 @@ groups:
             OpenAI requires stream_options.include_usage=true on the client.
             See /ai-gateway/streaming#usage-extraction-critical-for-streaming-budgets.
 
-      - alert: BudgetDebitOutboxStale
-        expr: gateway_budget_debit_outbox_age_seconds > 600
+      - alert: BudgetDebitOutboxBacklog
+        expr: gateway_budget_debit_outbox_depth > 1000
         for: 5m
         labels: { severity: page, team: ai-platform }
         annotations:
-          summary: "Budget debit outbox not flushed in 10m"
+          summary: "Budget debit outbox depth > 1000 for 5m"
           description: |
-            Gateway can't reach the control plane /budget/debit endpoint.
-            Customer budgets are NOT being debited in real-time; near-limit
-            customers may be over-consuming. Check control-plane health.
+            Gateway can't reach the control plane /budget/debit endpoint fast
+            enough. Customer budgets are NOT being debited in real-time;
+            near-limit customers may be over-consuming. Check control-plane
+            health + gateway_budget_debit_outbox_dropped_total rate.
 
       - alert: BudgetCheckLiveFailRate
         expr: |
-          sum(rate(gateway_budget_live_check_total{outcome="fail_open"}[5m]))
-            / sum(rate(gateway_budget_live_check_total[5m])) > 0.2
+          sum(rate(gateway_budget_check_live_total{outcome="transport_error"}[5m]))
+            / sum(rate(gateway_budget_check_live_total[5m])) > 0.2
         for: 5m
         labels: { severity: warn, team: ai-platform }
         annotations:
@@ -112,23 +111,11 @@ groups:
 
       # ─── Auth cache ──────────────────────────────────────────────────────
 
-      - alert: AuthCacheBootstrapFailing
-        expr: |
-          increase(gateway_auth_cache_bootstrap_errors_total[15m]) > 0
-          and on() gateway_auth_cache_bootstrap_last_success_timestamp_seconds
-                 < (time() - 300)
-        for: 5m
-        labels: { severity: page, team: ai-platform }
-        annotations:
-          summary: "Auth cache hasn't bootstrapped in > 5m"
-          description: |
-            New pods can't pre-warm from the control plane; first-request
-            latency will spike. Check control-plane / bootstrap endpoint.
-
       - alert: AuthCacheHitRateDropped
         expr: |
-          sum(rate(gateway_auth_cache_hits_total{layer="l1"}[5m]))
-            / sum(rate(gateway_auth_cache_lookups_total[5m])) < 0.9
+          sum(rate(gateway_auth_cache_hits_total{tier="l1"}[5m]))
+            / ( sum(rate(gateway_auth_cache_hits_total{tier="l1"}[5m]))
+              + sum(rate(gateway_auth_cache_misses_total{tier="l1"}[5m])) ) < 0.9
         for: 15m
         labels: { severity: warn, team: ai-platform }
         annotations:
@@ -140,28 +127,20 @@ groups:
 
       # ─── Cost & anomaly ──────────────────────────────────────────────────
 
-      - alert: CostPerRequestAnomaly
-        expr: |
-          sum(rate(gateway_cost_usd_total[5m]))
-            / sum(rate(gateway_requests_total{status="200"}[5m]))
-          > 2 * avg_over_time((
-              sum(rate(gateway_cost_usd_total[5m]))
-              / sum(rate(gateway_requests_total{status="200"}[5m]))
-            )[1d:5m])
-        for: 15m
-        labels: { severity: warn, team: ai-platform }
-        annotations:
-          summary: "Average cost/request > 2× daily baseline for 15m"
-          description: |
-            Either a customer switched to an expensive model, a prompt
-            regressed (longer inputs), or a cache mode is off. Check
-            /gateway/usage and X-LangWatch-Cache headers.
+      # Note: per-request cost anomaly detection requires a cost metric
+      # (e.g. gateway_cost_usd_total) that isn't in the current collector set.
+      # It's easier to derive cost anomalies from the GatewayBudgetLedger
+      # table in the control-plane warehouse rather than Prometheus, since
+      # cost attribution happens on the control-plane side after debit.
+      # See /gateway/usage UI for the visual equivalent.
 
       # ─── Blocked-by-policy noise ────────────────────────────────────────
 
-      - alert: PolicyBlockSpike
+      - alert: GuardrailBlockSpike
         expr: |
-          sum by (reason) (rate(gateway_policy_blocks_total[5m])) > 10
+          sum by (direction) (
+            rate(gateway_guardrail_verdicts_total{verdict="block"}[5m])
+          ) > 10
         for: 5m
         labels: { severity: warn, team: ai-platform }
         annotations:
@@ -231,9 +210,9 @@ evaluation_interval: 1m
 tests:
   - interval: 1m
     input_series:
-      - series: 'gateway_requests_total{status="500"}'
+      - series: 'gateway_http_requests_total{status="500"}'
         values: '0 1 2 3 4 5 6 7 8 9 10'
-      - series: 'gateway_requests_total{status="200"}'
+      - series: 'gateway_http_requests_total{status="200"}'
         values: '0 0 0 0 0 0 0 0 0 0 0'
     alert_rule_test:
       - eval_time: 10m
