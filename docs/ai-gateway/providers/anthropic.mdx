@@ -1,9 +1,57 @@
 ---
 title: Anthropic
-description: Anthropic — LangWatch AI Gateway.
+description: Configure Anthropic (Claude) as a provider behind the LangWatch AI Gateway.
 sidebarTitle: Anthropic
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+Anthropic is one of the two core providers for the gateway (alongside OpenAI). The `/v1/messages` endpoint is Anthropic-native and designed to be Claude-Code-compatible.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Configure the provider credential
+
+Under **Settings → Model Providers**:
+
+1. Click **Add provider** → **Anthropic**.
+2. Paste your Anthropic API key (starts `sk-ant-...`).
+3. Save.
+
+The same credential serves the gateway, the evaluators' litellm path, and any other place in LangWatch that needs an Anthropic call.
+
+## Bind to a VK
+
+Pick Anthropic as a primary or fallback on any VK. When a VK uses Anthropic as its primary, its clients should ideally call `/v1/messages` (Anthropic-native shape). But `/v1/chat/completions` also works — the gateway uses bifrost/core to translate the request shape to Anthropic's Messages API and back.
+
+## Supported endpoints
+
+| Gateway route | Upstream | Notes |
+|---|---|---|
+| `POST /v1/messages` | `POST /v1/messages` | Native shape. Preferred for Claude Code, Anthropic SDK, any tool-using agent. |
+| `POST /v1/chat/completions` | `POST /v1/messages` (translated) | OpenAI SDKs work transparently via translation. |
+| `POST /v1/embeddings` | ❌ not supported | Anthropic has no embeddings endpoint. |
+| `POST /v1/messages` with `stream: true` | `POST /v1/messages` streaming | SSE pass-through byte-for-byte (tool-call deltas preserved). |
+
+## `cache_control` passthrough — the 90% discount
+
+Anthropic supports prompt caching via `cache_control` blocks on content. Ephemeral (5-min TTL) and persistent (1-hour TTL) caches are both honoured.
+
+The gateway's hard invariant: **`cache_control` blocks are forwarded byte-for-byte in `cache.mode = respect`** (default). If you see cache-hit costs not matching expectations, first check `X-LangWatch-Cache` response header — `miss` means no cache was hit; `hit` with non-zero `cache_read_input_tokens` means the discount applied.
+
+Usage reporting (in the response body and trace) separates three counters:
+
+- `cache_read_input_tokens` — tokens served from cache (priced at ~10%).
+- `cache_creation_input_tokens` — tokens written to cache (priced at 125%).
+- `input_tokens` — regular cold input tokens.
+
+The gateway sums these and computes per-request cost for the budget ledger.
+
+See [Caching Passthrough](/ai-gateway/caching-passthrough) for the full decision matrix and override headers.
+
+## Known quirks
+
+- **`max_tokens` required** — Anthropic requires `max_tokens` on every Messages request. The gateway does not default-insert a value; a client that omits it gets the upstream 400 back.
+- **System prompt structure** — Anthropic Messages uses a top-level `system` field (string or content blocks), not a message role. OpenAI-SDK clients that send a `system` role message get it rewritten into the top-level field by the translator.
+- **Tool-call streaming deltas** — Anthropic emits `content_block_delta` events with `input_json_delta` partial JSON. The gateway proxies these byte-for-byte post-first-chunk so Claude Code (and any other agent) can reconstruct the tool call incrementally.
+- **`thinking` (extended-reasoning) blocks** — available on Claude Opus / Sonnet extended-thinking models. Blocks appear in the response; pricing is separate. Recorded in the trace as `langwatch.reasoning_tokens`.
+
+## Using via Claude Code
+
+See [Claude Code](/ai-gateway/cli/claude-code) — set `ANTHROPIC_BASE_URL=https://gateway.langwatch.ai` and `ANTHROPIC_AUTH_TOKEN=lw_vk_live_…` and it works.

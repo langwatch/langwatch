@@ -1,9 +1,105 @@
 ---
 title: Model Aliases
-description: Model Aliases — LangWatch AI Gateway.
+description: Per-VK redirects from client-facing model names to specific provider/model/deployment combinations.
 sidebarTitle: Model Aliases
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+A model alias is a per-VK redirect. The client sends `model: "foo"`; the VK's `model_aliases` map turns it into `provider/model/deployment` at dispatch time.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+```json
+{
+  "model_aliases": {
+    "gpt-4o":       "azure/my-eastus-deployment",
+    "claude":       "anthropic/claude-haiku-4-5-20251001",
+    "big-model":    "openai/gpt-5",
+    "fast":         "gemini/gemini-2.5-flash"
+  }
+}
+```
+
+## Two main use cases
+
+### 1. Decouple client code from provider specifics
+
+An OpenAI-SDK codebase shouldn't need to know about Azure deployment names, Bedrock inference profile ARNs, or specific Anthropic model versions. Aliases move that mapping to the VK.
+
+Before:
+
+```python
+# every file needs to know the Azure deployment name
+model = "my-eastus-gpt-4o-deployment"
+```
+
+After:
+
+```python
+model = "gpt-4o"   # the VK maps this to the right Azure deployment
+```
+
+Changing the deployment — because you scaled up, moved region, or pinned a new model version — is a one-click edit on the VK. No code change, no rollout.
+
+### 2. Swap providers without client changes
+
+Operating under the alias `claude` pointing at `anthropic/claude-haiku-4-5-20251001`. Anthropic has a regional outage, or you want to test Bedrock for cost reasons. Change the alias:
+
+```json
+{"claude": "bedrock/us.anthropic.claude-haiku-4-5-20251001"}
+```
+
+Every client using `model: "claude"` now hits Bedrock. Switch back in one edit. Canary traffic by minting a second VK with the new alias while the primary stays on Anthropic.
+
+## Resolution rules
+
+Given a request with `model: "<name>"`:
+
+1. If `<name>` has a `/` in it (explicit `provider/model` form), **aliases are bypassed** and the gateway routes directly to that provider — subject to `models_allowed` and the VK's `providers[]` list.
+2. Otherwise, `<name>` is looked up in `model_aliases`. If found, the mapped `provider/model` is used.
+3. If not found in aliases, the gateway checks `models_allowed`. If the model is allowed, it's dispatched to the VK's primary provider.
+4. If none of the above, returns `403 model_not_allowed`.
+
+## Aliases always win over explicit form — if both are defined
+
+If the alias map has an entry for `gpt-4o` **and** the client sends `model: "gpt-4o"`, the alias is applied. If the client sends `model: "openai/gpt-4o"` explicitly, the alias is bypassed (step 1).
+
+This lets you have an `openai/` namespace that addresses OpenAI directly for tests or debugging while the alias `gpt-4o` redirects to Azure for production traffic.
+
+## `:fallback` suffix (advanced)
+
+Optional suffix that picks a different model when a fallback provider is used:
+
+```json
+{
+  "model_aliases": {
+    "coding-small":            "openai/gpt-5-mini",
+    "coding-small:fallback":   "anthropic/claude-haiku-4-5-20251001"
+  }
+}
+```
+
+If the primary (OpenAI) fails and fallback kicks in, the gateway uses `claude-haiku-4-5-20251001` against Anthropic. Without `:fallback`, it would try the same model name (`gpt-5-mini`) which might not exist on Anthropic.
+
+## Enforcement
+
+Aliases do not bypass `models_allowed`. If `models_allowed: ["gpt-5-mini", "claude-haiku-4-5-20251001"]` and an alias maps to `openai/o3`, a request using the alias returns `403 model_not_allowed` — the resolved model fails the allowlist.
+
+This matters for security: don't grant a model via aliases that you wouldn't grant explicitly.
+
+## Discovery via `/v1/models`
+
+`GET /v1/models` returns every alias name + every model in `models_allowed` (or every model the VK's providers support, if no allowlist). The response looks like a standard OpenAI `/v1/models` list so SDK-driven pickers work.
+
+Each entry carries a `owned_by` field indicating the resolved provider, so UIs can render "gpt-4o (Azure)" vs "gpt-4o (OpenAI)" when both are present across different VKs.
+
+## Trace attributes
+
+- `langwatch.model_requested` — what the client sent.
+- `langwatch.model_resolved` — final `provider/model` after alias resolution.
+
+Filter the LangWatch Messages view by `model_resolved` to see "how many Azure vs OpenAI calls this VK actually made today."
+
+## When NOT to use aliases
+
+- Small projects with one provider and one model — just use the provider's native model name.
+- When the alias becomes another layer of indirection nobody remembers. Keep alias names close to the provider-native names if the redirect is simple.
+
+Use aliases where the indirection pays for itself (vendor abstraction, migration primitives, canary testing).

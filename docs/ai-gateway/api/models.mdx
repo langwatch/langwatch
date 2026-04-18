@@ -1,9 +1,63 @@
 ---
-title: Models
-description: Models — LangWatch AI Gateway.
+title: GET /v1/models
+description: List the models a virtual key can access through the LangWatch AI Gateway.
 sidebarTitle: Models
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+Returns the effective model list for the virtual key presented on the request: the union of `model_aliases` keys + every model the VK's providers expose, filtered by `models_allowed` if set.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Request
+
+```
+GET /v1/models
+Authorization: Bearer lw_vk_live_<ULID>
+```
+
+## Response
+
+OpenAI-shape `list` object:
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id":       "gpt-5-mini",
+      "object":   "model",
+      "created":  1712000000,
+      "owned_by": "openai"
+    },
+    {
+      "id":       "claude-haiku",
+      "object":   "model",
+      "created":  1712000000,
+      "owned_by": "anthropic"
+    },
+    {
+      "id":       "gpt-4o",
+      "object":   "model",
+      "created":  1712000000,
+      "owned_by": "azure_openai"
+    }
+  ]
+}
+```
+
+`owned_by` reflects the **resolved** provider after the VK's `model_aliases` are applied — not the raw provider at the upstream. This lets UIs render "gpt-4o (Azure)" when the VK routes gpt-4o to Azure.
+
+## Permissions
+
+Only requires a valid VK; no extra permission. The returned list is scoped to what the VK can actually dispatch — engineers don't need `virtualKeys:view` to call this.
+
+## Use cases
+
+- **Model pickers** in UIs that speak the OpenAI API — they call `/v1/models` and render the list.
+- **Pre-flight check** in CI: assert the CI's VK has access to the models your tests depend on.
+- **Debugging aliases**: see what each VK exposes by hitting this with its token.
+
+## Errors
+
+- `401 invalid_api_key` — unknown or malformed VK.
+- `403 virtual_key_revoked` — VK revoked.
+
+See [API: Errors](/ai-gateway/api/errors) for the full table.

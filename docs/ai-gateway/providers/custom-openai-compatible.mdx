@@ -1,9 +1,63 @@
 ---
-title: Custom Openai Compatible
-description: Custom Openai Compatible — LangWatch AI Gateway.
-sidebarTitle: Custom Openai Compatible
+title: Custom OpenAI-compatible
+description: Point the gateway at any OpenAI-compatible endpoint (self-hosted vLLM, Ollama, Groq, Fireworks, Together, private fine-tunes).
+sidebarTitle: Custom OpenAI-compatible
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+The Custom OpenAI-compatible provider accepts any HTTP endpoint that implements the OpenAI Chat Completions shape — covering self-hosted servers (vLLM, SGLang, Ollama, LocalAI, TGI), hosted inference platforms (Groq, Together, Fireworks, Anyscale), and private fine-tunes exposed via an OpenAI-shape proxy.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Configure the provider credential
+
+Under **Settings → Model Providers**:
+
+1. **Add provider → Custom (OpenAI-compatible)**.
+2. Fill:
+    - **Name** — human label (e.g. `internal-vllm`, `groq`).
+    - **Base URL** — without the `/chat/completions` suffix (e.g. `https://api.groq.com/openai/v1`, `http://vllm.internal:8000/v1`).
+    - **Auth mode** — `Bearer` (default), `api-key` header, or `custom header` (for non-standard keys).
+    - **API key** — or leave blank for unauthenticated self-hosted endpoints.
+    - **Supported models** — optional allowlist to expose a curated subset via `/v1/models`.
+3. Save.
+
+## Supported endpoints (varies by upstream)
+
+The gateway forwards requests 1:1 to the upstream path (`/v1/chat/completions`, `/v1/embeddings`). If the upstream doesn't implement a path, the gateway returns the upstream's 404 or 405.
+
+Common subsets:
+
+- **Groq / Together / Fireworks** — chat + embeddings (most models).
+- **vLLM / SGLang** — chat + embeddings (depends on the model).
+- **Ollama** — chat (via the OpenAI-compat endpoint mode).
+
+## Model id format
+
+Pass the upstream-native model id directly. Aliases still work:
+
+```json
+{
+  "model_aliases": {
+    "llama-70b":   "custom-groq/llama-3.3-70b-versatile",
+    "mixtral":     "custom-together/mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "fine-tuned":  "custom-internal/my-rag-model"
+  }
+}
+```
+
+The prefix before `/` is the ModelProvider's **Name** (e.g. `custom-groq`); everything after is the upstream model id.
+
+## Caching
+
+Gateway default `cache.mode = respect` forwards any cache-control headers or body fields the upstream understands. Most OpenAI-compatible servers don't expose a standardised prompt-caching API, so `X-LangWatch-Cache: hit` will generally read as `miss` unless the upstream implements one.
+
+## Known quirks
+
+- **Streaming format drift.** Some OpenAI-compatible servers diverge on SSE chunk format (extra newlines, differing `[DONE]` casing, missing `data:` prefix on metadata frames). Test streaming early; bifrost/core normalises what it can but edge cases may require a client retry.
+- **Auth header unconventional.** Ollama historically uses no auth; vLLM uses Bearer; some self-hosted deployments use `X-Api-Key`. Pick the right mode at ModelProvider config time.
+- **`/v1/embeddings` response shape** — OpenAI-spec says each embedding is a list of floats. Some providers emit a single flat float array. Bifrost/core coerces to spec shape.
+- **Model allowlist enforcement.** If the upstream serves 100 models and you only want 3 exposed, set `models_allowed` on the VK rather than the ModelProvider — it's per-VK, so different VKs can curate different subsets.
+
+## Use cases
+
+- **Private fine-tunes.** Your ML team deploys a vLLM serving a fine-tuned model on internal infra. The gateway makes it accessible to every engineer's coding CLI with a VK, governed like any other model.
+- **Hosted inference platforms.** Groq / Together / Fireworks / DeepInfra ship OpenAI-compat APIs at competitive prices. Binding them behind the gateway lets you A/B against OpenAI without application changes.
+- **Local dev.** An engineer on the road can point the gateway at a local `ollama` server to work offline while preserving the same VK-based auth contract.

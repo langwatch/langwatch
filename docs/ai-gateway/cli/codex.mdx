@@ -20,6 +20,37 @@ That's it. Every Codex call hits the gateway, which applies your VK's policies (
 
 Codex auto-detects `/v1/responses` when available. The gateway exposes it at `POST /v1/responses` with OpenAI-equivalent shape. No config change needed.
 
+### Choosing between `wire_api: "responses"` and `"chat"`
+
+Codex's `~/.codex/config.toml` has a `wire_api` field that selects between the Responses API (`/v1/responses`) and the Chat Completions API (`/v1/chat/completions`). Which one works depends on the model + provider combination your VK resolves to:
+
+| Routed to (after VK `model_aliases`) | Recommended `wire_api` |
+|---|---|
+| OpenAI / Azure OpenAI GPT family (`gpt-5`, `gpt-5-mini`, `gpt-4.1`, `o3`, `o4-mini`) | `responses` |
+| A generic OpenAI-compatible provider that doesn't expose `/v1/responses` | `chat` |
+| Anthropic family (`claude-*`) — direct Anthropic, Bedrock, or Vertex | `chat` |
+| Google Gemini family | `chat` |
+
+If you send to `/v1/responses` for a model that can only handle the Chat Completions shape, the gateway returns `400 bad_request` with a hint:
+
+```
+Model 'gpt-4o' resolves to Anthropic. Set wire_api = "chat" in your Codex config.
+```
+
+Per-model config in `~/.codex/config.toml`:
+
+```toml
+[model.gpt-5-mini]
+wire_api = "responses"
+env_key = "OPENAI_API_KEY"
+
+[model.claude-haiku]
+wire_api = "chat"
+env_key = "OPENAI_API_KEY"
+```
+
+This means one Codex install can talk to OpenAI-family models via Responses and Anthropic-family models via Chat, all through the same LangWatch VK.
+
 ### Self-hosted gateway
 
 ```bash

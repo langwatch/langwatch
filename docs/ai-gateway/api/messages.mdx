@@ -1,9 +1,185 @@
 ---
-title: Messages
-description: Messages — LangWatch AI Gateway.
+title: POST /v1/messages
+description: Anthropic-compatible Messages endpoint through the LangWatch AI Gateway.
 sidebarTitle: Messages
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+The `/v1/messages` endpoint is Anthropic-native. Claude Code, the Anthropic Python/TypeScript SDK, and any agent built against Anthropic's Messages API works unchanged by pointing at the gateway.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+Beyond plain pass-through, the gateway preserves tool-call streaming deltas byte-for-byte (load-bearing for agentic CLIs) and forwards `cache_control` blocks identically (load-bearing for the 90% Anthropic cache discount).
+
+## Request
+
+```
+POST /v1/messages
+x-api-key: lw_vk_live_<ULID>     # or Authorization: Bearer lw_vk_live_...
+anthropic-version: 2023-06-01
+Content-Type: application/json
+```
+
+Body matches [Anthropic's Messages API](https://docs.anthropic.com/claude/reference/messages_post) verbatim. Example:
+
+```json
+{
+  "model":      "claude-haiku-4-5-20251001",
+  "max_tokens": 1024,
+  "system":     "You are concise.",
+  "messages":   [
+    { "role": "user", "content": "Hi" }
+  ],
+  "stream":     false,
+  "temperature": 0.2,
+  "tools":      [...],
+  "tool_choice": {"type": "auto"}
+}
+```
+
+Anthropic requires `max_tokens` — omitting it returns a 400 from upstream which the gateway surfaces.
+
+### Cache-aware system prompts
+
+```json
+{
+  "model":      "claude-sonnet-4-6",
+  "max_tokens": 2048,
+  "system":     [
+    {
+      "type": "text",
+      "text": "Very long system prompt here (30k tokens+)...",
+      "cache_control": {"type": "ephemeral"}
+    }
+  ],
+  "messages":   [
+    { "role": "user", "content": "What's the first paragraph?" }
+  ]
+}
+```
+
+`cache_control` blocks are forwarded byte-identically to upstream Anthropic by default (see [Caching Passthrough](/ai-gateway/caching-passthrough)).
+
+### LangWatch-specific headers
+
+Same as [POST /v1/chat/completions](/ai-gateway/api/chat-completions#langwatch-specific-headers):
+
+- `X-LangWatch-Cache: respect|force|disable|ttl=<s>`
+- `X-LangWatch-Trace-Metadata: {...}`
+- Trace-context headers (`traceparent`, `X-LangWatch-Trace-Id`, etc.) — see [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation).
+
+## Response (non-streaming)
+
+Anthropic-shaped. Response headers:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+X-LangWatch-Request-Id: grq_01HZX9K3M...
+X-LangWatch-Provider: anthropic
+X-LangWatch-Model: claude-haiku-4-5-20251001
+X-LangWatch-Cache: hit
+
+{
+  "id":            "msg_01...",
+  "type":          "message",
+  "role":          "assistant",
+  "content":       [{"type": "text", "text": "Hi!"}],
+  "model":         "claude-haiku-4-5-20251001",
+  "stop_reason":   "end_turn",
+  "usage": {
+    "input_tokens":              12,
+    "cache_creation_input_tokens": 0,
+    "cache_read_input_tokens":   1024,
+    "output_tokens":             4
+  }
+}
+```
+
+The `cache_read_input_tokens` and `cache_creation_input_tokens` are forwarded as-is; they also flow into the debit call so budget ledgers reflect the correct cache-discounted cost.
+
+## Response (streaming)
+
+Set `"stream": true`. SSE events:
+
+```
+event: message_start
+data: {"type":"message_start","message":{"id":"msg_...","type":"message","role":"assistant","content":[],"model":"claude-haiku-4-5-20251001","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":12,"output_tokens":1}}}
+
+event: content_block_start
+data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hi"}}
+
+event: content_block_delta
+data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"!"}}
+
+event: content_block_stop
+data: {"type":"content_block_stop","index":0}
+
+event: message_delta
+data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":4}}
+
+event: message_stop
+data: {"type":"message_stop"}
+```
+
+The gateway forwards these byte-for-byte after the first chunk — including `content_block_start` / `content_block_delta` / `content_block_stop` events for tool use. See [Streaming](/ai-gateway/streaming) for the full contract.
+
+## Tool use
+
+```json
+{
+  "model": "claude-sonnet-4-6",
+  "max_tokens": 1024,
+  "tools": [
+    {
+      "name": "get_weather",
+      "description": "...",
+      "input_schema": {...}
+    }
+  ],
+  "messages": [
+    {"role": "user", "content": "weather in Paris?"}
+  ]
+}
+```
+
+Subject to VK `blocked_patterns.tools` — a blocked tool name returns `403 tool_not_allowed` before the request leaves the gateway. See [Blocked Patterns](/ai-gateway/blocked-patterns).
+
+## Extended thinking (Claude Opus 4.7, Sonnet 4.6)
+
+```json
+{
+  "model":      "claude-opus-4-7",
+  "max_tokens": 8192,
+  "thinking":   { "type": "enabled", "budget_tokens": 5000 },
+  "messages":   [...]
+}
+```
+
+Thinking tokens are billed separately by Anthropic. The gateway forwards the `thinking` field unchanged; usage counts appear in `response.usage.thinking_tokens`, recorded in the trace as `langwatch.reasoning_tokens`, and debited into the budget.
+
+## Routing via `model` field
+
+`model` is resolved via the VK's `model_aliases` map (see [Model Aliases](/ai-gateway/model-aliases)):
+
+- `"claude-haiku-4-5-20251001"` → VK maps to `anthropic/claude-haiku-4-5-20251001` (or `bedrock/...`, `vertex/...` if the alias points there).
+- `"claude"` → whatever the VK defines as "default Claude".
+- `"anthropic/claude-opus-4-7"` → explicit form, bypasses aliases.
+
+If the resolved model isn't served by any provider in the VK, returns `403 model_not_allowed`.
+
+## Errors
+
+See [API: Errors](/ai-gateway/api/errors) — the full type enum applies. Errors use the OpenAI-compatible envelope (not Anthropic's native `{type: "error", error: {...}}`) for consistency across `/v1/messages` and `/v1/chat/completions`. This is a small deviation from stock Anthropic — the tradeoff is a single error-handling code path for clients that hit both endpoints.
+
+## Example: Claude Code CLI
+
+Claude Code uses `/v1/messages` natively. Setup is:
+
+```bash
+export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
+export ANTHROPIC_AUTH_TOKEN="lw_vk_live_..."
+claude
+```
+
+See [Claude Code](/ai-gateway/cli/claude-code) for governance recipes (blocking shell tools, per-engineer budgets, fallback to Bedrock).

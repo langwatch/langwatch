@@ -1,9 +1,57 @@
 ---
-title: Openai
-description: Openai — LangWatch AI Gateway.
-sidebarTitle: Openai
+title: OpenAI
+description: Configure OpenAI as a provider behind the LangWatch AI Gateway.
+sidebarTitle: OpenAI
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+OpenAI is the most straightforward provider to bind to the gateway. Any valid OpenAI API key in your LangWatch Model Providers table can be referenced by a virtual key and consumed via `/v1/chat/completions`, `/v1/embeddings`, `/v1/responses`, `/v1/images/generations`, `/v1/audio/transcriptions`, and `/v1/audio/speech`.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Configure the provider credential
+
+Under **Settings → Model Providers** in the LangWatch app:
+
+1. Click **Add provider** → **OpenAI**.
+2. Paste your OpenAI API key (starts `sk-...`).
+3. Optionally set a custom organisation ID via the Organization field.
+4. Save.
+
+This creates a `ModelProvider` row that any VK in the same project can bind to. The same credential also powers the existing litellm / playground / evaluators path — no duplication.
+
+## Bind the credential to a VK
+
+When creating or editing a VK, select the OpenAI credential from the Primary provider dropdown. Optionally add it again (or a second OpenAI key) as a fallback.
+
+Per-VK overrides available on the binding:
+
+- **Rate limits** — per-VK `rpm`, `tpm`, `rpd` enforced at the gateway before the upstream call.
+- **Extra headers** — appended to every request (e.g. `OpenAI-Beta: assistants=v2`).
+- **Rotation policy** — when a credential has multiple API keys (comma-separated), the gateway can rotate them round-robin or on rate-limit.
+
+## Supported endpoints
+
+| Gateway route | Upstream | Notes |
+|---|---|---|
+| `POST /v1/chat/completions` | `POST /v1/chat/completions` | Streaming and non-streaming both supported. |
+| `POST /v1/responses` | `POST /v1/responses` | Reasoning models (o3, o4-mini) and tool use. |
+| `POST /v1/embeddings` | `POST /v1/embeddings` | `text-embedding-3-small`, `text-embedding-3-large`, ada. |
+| `POST /v1/images/generations` | `POST /v1/images/generations` | DALL-E 3. |
+| `POST /v1/audio/transcriptions` | `POST /v1/audio/transcriptions` | Whisper. |
+| `POST /v1/audio/speech` | `POST /v1/audio/speech` | TTS. |
+| `POST /v1/moderations` | `POST /v1/moderations` | Content moderation. |
+| `GET /v1/models` | `GET /v1/models` | Filtered by the VK's `models_allowed`. |
+
+## Caching
+
+OpenAI automatically caches prompt prefixes ≥ 1024 tokens in most GPT-4 / GPT-5 / o-series models. There's no `cache_control` block to preserve — OpenAI just handles it. The gateway forwards requests untouched in `mode=respect`, so cache hits are observed naturally.
+
+The `usage.prompt_tokens_details.cached_tokens` field in the response is populated on cache hits and mirrored into the trace as `langwatch.cache_read_tokens`.
+
+## Reasoning tokens (o-series)
+
+Reasoning models return a `reasoning_tokens` count in `usage.completion_tokens_details`. The gateway forwards this verbatim; it's also recorded in the LangWatch trace for cost analysis and included in budget debit.
+
+## Known quirks
+
+- **Responses API vs Chat Completions API** — the two have slightly different payload shapes. The gateway proxies whichever endpoint the client hits; it does not translate between them. Codex users should see [Codex CLI](/ai-gateway/cli/codex) for guidance on `wire_api` config.
+- **Organization header on egress** — if the VK doesn't set a custom Organization, the upstream OpenAI request uses the ModelProvider's default.
+- **Rate-limit responses (429)** — OpenAI's 429 includes a `Retry-After` header the gateway surfaces to the client when there is no fallback, or uses as a signal to trigger fallback if `fallback.on` includes `rate_limit`.

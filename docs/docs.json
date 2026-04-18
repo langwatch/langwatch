@@ -510,11 +510,19 @@
             "group": "Coding CLI Integrations",
             "pages": [
               "ai-gateway/cli/overview",
+              "ai-gateway/cli/langwatch-cli",
               "ai-gateway/cli/claude-code",
               "ai-gateway/cli/codex",
               "ai-gateway/cli/opencode",
               "ai-gateway/cli/cursor",
               "ai-gateway/cli/aider"
+            ]
+          },
+          {
+            "group": "SDK Integration",
+            "pages": [
+              "ai-gateway/sdks/python",
+              "ai-gateway/sdks/typescript"
             ]
           },
           {

@@ -1,9 +1,69 @@
 ---
-title: Bedrock
-description: Bedrock — LangWatch AI Gateway.
-sidebarTitle: Bedrock
+title: AWS Bedrock
+description: Configure AWS Bedrock (Anthropic, Titan, Llama, Mistral, Cohere) as a provider behind the LangWatch AI Gateway.
+sidebarTitle: AWS Bedrock
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+AWS Bedrock is the enterprise-favourite path to Anthropic (and several other model families) with VPC-native security, data-residency guarantees, and AWS IAM governance. The gateway uses bifrost/core under the hood, which handles Bedrock's idiosyncratic authentication, cross-region inference profiles, and model-id quirks.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Configure the provider credential
+
+Under **Settings → Model Providers**:
+
+1. **Add provider → AWS Bedrock**.
+2. Choose authentication mode:
+    - **Access keys** — paste AWS Access Key ID + Secret Access Key + optional session token.
+    - **Instance profile / IRSA** — leave credentials empty; the gateway process uses its pod-level IAM role.
+    - **Bedrock API key** — new Bedrock-first auth mode (preview).
+3. Pick a default region (e.g. `us-east-1`). Requests can override per-call via the model id.
+4. (Optional) Provide a cross-region **inference profile ARN** for automatic regional failover on capacity issues.
+5. Save.
+
+## Model id format
+
+Bedrock model ids include the provider prefix and optionally a region tag:
+
+- `anthropic.claude-haiku-4-5-20251001` — Anthropic Claude Haiku 4.5.
+- `anthropic.claude-sonnet-4-6` — Anthropic Claude Sonnet 4.6.
+- `anthropic.claude-opus-4-7` — Anthropic Claude Opus 4.7.
+- `amazon.titan-text-express-v1` — Amazon Titan.
+- `meta.llama3-1-70b-instruct-v1:0` — Meta Llama.
+- `us.anthropic.claude-haiku-4-5-20251001` — region-prefixed (cross-region inference profile).
+
+Configure VK `model_aliases` to expose friendly names to clients:
+
+```json
+{
+  "model_aliases": {
+    "claude-haiku":  "bedrock/us.anthropic.claude-haiku-4-5-20251001",
+    "claude-sonnet": "bedrock/us.anthropic.claude-sonnet-4-6"
+  }
+}
+```
+
+## Supported endpoints
+
+- `POST /v1/messages` — Anthropic-shape dispatched to Bedrock's Converse API for Anthropic models.
+- `POST /v1/chat/completions` — translated to Bedrock Converse / InvokeModel depending on the model family.
+
+Embeddings (`/v1/embeddings`) supports Titan-Embeddings via Bedrock as well.
+
+## `cache_control` passthrough
+
+Anthropic-on-Bedrock supports prompt caching via the Converse API's `cachePoint` markers. The gateway forwards `cache_control` blocks and bifrost/core translates them into `cachePoint` objects. Cache-read and cache-write token counts flow back the same way as direct Anthropic.
+
+## Cross-region inference profiles
+
+Bedrock supports **inference profiles** that route to multiple regions automatically. Configure the ModelProvider's default region and the inference profile ARN; bifrost/core dispatches to the profile and Bedrock handles regional routing. Useful for high-availability setups without configuring an explicit fallback chain at the VK level.
+
+## Known quirks
+
+- **Region-coupled quotas** — Bedrock throughput is provisioned per-region per-model. A model that works in `us-east-1` may 429 or 403 in `eu-west-1`. Set the VK's default region to match where your quota lives.
+- **Model access enablement** — Bedrock requires manual model-access opt-in per account + region (console: *Bedrock → Model access*). A 403 with body "you don't have access to the model" means the AWS account needs to enable that model.
+- **IAM permissions** — at minimum `bedrock:InvokeModel`, `bedrock:InvokeModelWithResponseStream`, and `bedrock:Converse` + `bedrock:ConverseStream`. Inference profiles also need `bedrock:InvokeModel` on the profile ARN.
+- **Streaming format** — Bedrock's event stream is AWS-specific (`application/vnd.amazon.eventstream`); bifrost/core normalises it to SSE for the client. The gateway's byte-for-byte invariant applies to the normalised SSE, not the upstream AWS format.
+- **Cold-start latency** — Bedrock frequently has higher cold latency than direct Anthropic. Use `/readyz` startup probes generously on self-hosted deployments if Bedrock is the primary.
+
+## Using IAM roles (no access keys)
+
+Recommended for self-hosted gateway in EKS/ECS. Leave the ModelProvider's access keys empty; attach an IAM role to the gateway's service account (IRSA for EKS, task role for ECS) with the permissions above. Bifrost/core detects IAM credentials via the AWS SDK default chain.

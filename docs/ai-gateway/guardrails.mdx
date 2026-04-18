@@ -1,9 +1,94 @@
 ---
 title: Guardrails
-description: Guardrails — LangWatch AI Gateway.
+description: Run LangWatch evaluators inline on gateway traffic — pre, post, and per-stream-chunk.
 sidebarTitle: Guardrails
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+Guardrails are LangWatch evaluators attached to a virtual key. The gateway invokes them inline on every request and (optionally) every response, with three direction modes: `pre` (before dispatch), `post` (after a completed response), and `stream_chunk` (on every SSE chunk before emission).
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+Evaluators are the same ones you already use for online evaluations in LangWatch — no new authoring surface. PII detection, prompt injection, toxicity, hallucination, regex guards, custom code evaluators — every type you have attached to a project is selectable as a gateway guardrail.
+
+## Direction modes
+
+### `pre` — block/modify the outgoing request
+
+Invoked **before** the gateway dispatches to the upstream provider. Decisions:
+
+- `allow` — dispatch as-is.
+- `block` — return `403 guardrail_blocked` to the client immediately. No upstream call is made. No spend.
+- `modify` — the evaluator returns a rewritten request payload (e.g. with PII redacted). The gateway dispatches the rewritten payload.
+
+Use cases: prompt-injection detection, PII redaction before data hits a third-party provider, regex-based policy enforcement ("no customer emails in prompts").
+
+### `post` — flag/block the response
+
+Invoked on the **full completed response** for non-streaming calls, and on the **reassembled stream** for streaming calls.
+
+Decisions:
+
+- `allow` — response delivered to client.
+- `block` — for non-streaming, response is replaced with `403 guardrail_blocked`. For streaming, the response has already been delivered; the decision becomes a flag-only (`langwatch.guardrail.post_flag` trace attribute).
+- `modify` — response body is rewritten. Streaming responses: flag-only.
+
+Use cases: hallucination detection on RAG outputs, PII leakage detection in responses, response-quality spot-checks.
+
+### `stream_chunk` — redact/terminate per-chunk
+
+Invoked on **each SSE chunk** before the gateway emits it to the client. Most aggressive mode; enables real-time redaction.
+
+Decisions:
+
+- `allow` — emit chunk.
+- `block` — terminate the stream with SSE `error`. Subsequent chunks are discarded.
+- `modify` — emit the modified chunk instead.
+
+Latency budget: **≤50 ms per chunk**. If the evaluator doesn't respond in time, the gateway passes through with an OTel warning (`langwatch.guardrail.stream_chunk_timeout`). Never block the user on a slow guardrail.
+
+Use cases: real-time PII redaction (credit card numbers, emails, phone numbers), blocking specific tokens from reaching the client, enforcing length limits.
+
+## Attaching guardrails to a VK
+
+Under **AI Gateway → Virtual Keys → <key> → Guardrails**:
+
+1. Click **Add guardrail**.
+2. Pick an existing evaluator (or link to *New evaluator* to author one in the usual LangWatch evaluator UI).
+3. Choose direction: pre / post / stream_chunk.
+4. Save.
+
+A VK can have multiple guardrails in each direction; the gateway runs them in parallel and short-circuits on the first `block` decision.
+
+## Running them in parallel
+
+The gateway fans out guardrail calls in parallel (bounded by `MAX_GUARDRAIL_CONCURRENCY`, default 8 per direction). First `block` wins — other in-flight guardrails are cancelled to save cost. `modify` decisions are applied in dependency order (a guardrail's output is input to the next).
+
+## Trace attributes
+
+- `langwatch.guardrail.<direction>.<id>` — recorded per guardrail run with the decision and policies triggered.
+- `langwatch.guardrail.<direction>.blocked` — true when the overall direction resulted in a block.
+- `langwatch.guardrail.<direction>.latency_ms` — per-run latency.
+- `langwatch.guardrail.stream_chunk_timeout` — boolean, set when a stream_chunk guardrail exceeded 50ms.
+
+Click through to the evaluator's run in the LangWatch UI to see the full reasoning.
+
+## Permissions
+
+- `gatewayGuardrails:attach` — attach a guardrail to a VK.
+- `gatewayGuardrails:detach` — remove one.
+- Evaluator CRUD uses the existing `evaluations:*` permissions (unchanged).
+
+## Cost
+
+Every guardrail call is a separate LangWatch evaluator run. It's metered against your LangWatch plan the same as any other online-evaluation run — see [Pricing](/platform/pricing).
+
+## Blocking vs modifying — when to pick which
+
+- **Block** when the request/response is unfixable and the only correct behaviour is to fail fast. Example: prompt-injection detected in a user query — never forward.
+- **Modify** when there's a safe redacted version the user should still see. Example: PII in input → redact with `[REDACTED]` markers and forward the rest.
+- **Stream_chunk modify** when real-time is essential. Example: the model is emitting a credit-card number mid-stream; redact before the user sees it.
+
+Start with `allow` + `flag` (just log without blocking) while tuning a guardrail's thresholds. Promote to `block` or `modify` once the false-positive rate is low.
+
+## Further reading
+
+- [Blocked Patterns](/ai-gateway/blocked-patterns) for simpler regex-based denials (tools, MCPs, URLs) that don't need an evaluator.
+- [Streaming](/ai-gateway/streaming) for the full SSE contract.
