@@ -116,6 +116,60 @@ Same passthrough discipline.
 - Trace span per chunk is too expensive — the gateway records a single span per request with `langwatch.stream.chunk_count`, `langwatch.stream.first_chunk_ms`, `langwatch.stream.total_ms`.
 - If a mid-stream failure occurred, `langwatch.stream.terminated_at_chunk=N` records where.
 
+## Usage extraction (critical for streaming budgets)
+
+Streaming responses are just as expensive as non-streaming, but the usage block (token counts, cost inputs) arrives asynchronously — typically in the terminal chunk, but providers differ:
+
+| Provider | How usage is reported on a stream |
+|---|---|
+| Anthropic | `message_delta` event with final `usage.output_tokens` (+ `usage.cache_read_input_tokens` when applicable) |
+| OpenAI | Only when the client opts in with `stream_options: {include_usage: true}` — the final data-only chunk carries `usage`. Without the opt-in, usage is never sent over SSE |
+| Bedrock | Usage on the final `message_delta` event, same as Anthropic |
+| Vertex / Gemini | Usage on the terminal `candidates[].finishReason` event |
+
+The gateway watches every chunk for a non-zero usage block and debits the budget ledger based on the last non-empty snapshot. Key behaviour:
+
+- **Empty deltas don't zero-stomp real numbers.** OpenAI's pre-terminal "empty usage" deltas are ignored; the real numbers arrive on the last chunk.
+- **Missing usage is surfaced as a warning.** If the provider never reports usage (OpenAI without `stream_options: {include_usage: true}`), the gateway:
+  - Debits `$0` for that request.
+  - Adds `X-LangWatch-Usage-Warning: provider_did_not_report_usage_on_stream` to the response headers.
+  - Sets `span.status = success_no_usage` so you can alert on it.
+
+### How to always report streaming usage (OpenAI clients)
+
+```python
+for chunk in client.chat.completions.create(
+    model="gpt-5-mini",
+    messages=[...],
+    stream=True,
+    stream_options={"include_usage": True},
+):
+    pass
+```
+
+```ts
+const stream = await openai.chat.completions.create({
+  model: "gpt-5-mini",
+  messages: [...],
+  stream: true,
+  stream_options: { include_usage: true },
+});
+```
+
+This should be default for any client routing through the gateway, otherwise streaming calls show `$0` in your budget reports and budgets don't enforce correctly. The docs-team recommendation is: **wrap your OpenAI SDK in a helper that sets `stream_options.include_usage` by default**, so engineers can't forget.
+
+### Alerting on missing usage
+
+In Prometheus / Grafana:
+
+```promql
+rate(gateway_requests_total{usage_reported="false"}[5m]) > 0
+```
+
+If this fires, a client is streaming without `include_usage` and you're effectively not charging those requests. Sergey's warning header + span status make this observable — wire a Grafana alert on `span.status = success_no_usage` too.
+
+Shipped in langwatch-saas `56f9134` (@sergey Lane A iter 4 pt5).
+
 ## Non-streaming clients
 
 Requests without `stream: true` are dispatched synchronously, accumulated upstream, and returned as a single JSON response. Pre-call guardrails run on the request; post-call guardrails run on the full response and can block/modify the final body.
