@@ -68,6 +68,9 @@ vi.mock("~/server/api/routers/traces.schemas", () => {
 
 // Import app after mocks are defined
 const { app: v1App } = await import("../app.v1");
+const { AmbiguousTraceIdPrefixError } = await import(
+  "~/server/traces/trace.service"
+);
 
 // Build a wrapper app that injects the project variable (mimicking auth middleware)
 // and adds an error handler that mirrors the real app's JSON error responses
@@ -206,15 +209,11 @@ describe("GET /:traceId", () => {
         "abc1230000000000000000000000aaaa",
         "abc1230000000000000000000000bbbb",
       ];
-      // Use the real error class exported by the module-level mock
-      const { AmbiguousTraceIdPrefixError } = await import(
-        "~/server/traces/trace.service"
-      );
       mockGetById.mockRejectedValue(
-        new AmbiguousTraceIdPrefixError("abc123", candidates),
+        new AmbiguousTraceIdPrefixError("abc12345", candidates),
       );
 
-      const res = await makeRequest("abc123");
+      const res = await makeRequest("abc12345");
 
       expect(res.status).toBe(409);
       const body = await res.json();

@@ -27,8 +27,8 @@ Feature: Partial trace ID resolution on trace GET
     And the response body contains the trace "63dc535cea6335c506bc81ef3543a07d"
 
   Scenario: Ambiguous prefix returns 409 with the matching IDs
-    Given two traces exist with IDs "abc123def456..." and "abc123def999..."
-    When I call GET /api/traces/abc123
+    Given two traces exist with IDs "abc12345def456..." and "abc12345def999..."
+    When I call GET /api/traces/abc12345
     Then the response status is 409
     And the response body includes an error message mentioning "ambiguous"
     And the response body lists the matching full trace IDs
@@ -45,10 +45,15 @@ Feature: Partial trace ID resolution on trace GET
     When I call GET /api/traces/aaaa1111 authenticated as project B
     Then the response status is 404
 
-  Scenario: Too-short prefix is rejected
+  Scenario: Too-short prefix falls through to 404
     When I call GET /api/traces/ab
-    Then the response status is 400
-    And the response body message mentions a minimum prefix length
+    Then the response status is 404
+    And the response body message is "Trace not found."
+
+  Scenario: Non-hex input skips prefix scan and returns 404
+    When I call GET /api/traces/not-a-hex-id-zzzz
+    Then the response status is 404
+    And the response body message is "Trace not found."
 
   Scenario: CLI `trace get` with truncated ID from `trace search` succeeds
     Given I run `langwatch trace search --limit 1` and copy the displayed 20-char trace ID

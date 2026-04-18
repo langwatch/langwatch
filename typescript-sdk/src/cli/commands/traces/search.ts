@@ -97,7 +97,7 @@ export const searchTracesCommand = async (options: {
     }
     console.log(
       chalk.gray(
-        `Use ${chalk.cyan("langwatch trace get <traceId>")} to view full details (partial IDs work as long as they're unique)`,
+        `Use ${chalk.cyan("langwatch trace get <traceId>")} to view full details (partial IDs work — pass a unique prefix of at least 8 characters)`,
       ),
     );
   } catch (error) {

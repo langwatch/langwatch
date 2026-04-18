@@ -151,7 +151,7 @@ describe("TraceService", () => {
       });
     });
 
-    describe("when the input is a prefix shorter than a full ID", () => {
+    describe("when the input is a hex prefix shorter than a full ID", () => {
       it("resolves to the full trace when exactly one match exists", async () => {
         mockGetTracesWithSpansCH
           .mockResolvedValueOnce([])
@@ -162,9 +162,15 @@ describe("TraceService", () => {
 
         expect(result).toBe(sampleTrace);
         expect(mockResolveTraceIdByPrefixCH).toHaveBeenCalledWith(
-          projectId,
-          prefix20,
-          2,
+          expect.objectContaining({
+            projectId,
+            prefix: prefix20,
+            limit: 5,
+            occurredAt: expect.objectContaining({
+              from: expect.any(Number),
+              to: expect.any(Number),
+            }),
+          }),
         );
         // Second fetch uses the resolved full ID
         expect(mockGetTracesWithSpansCH).toHaveBeenNthCalledWith(
@@ -202,6 +208,21 @@ describe("TraceService", () => {
         mockGetTracesWithSpansCH.mockResolvedValue([]);
 
         const result = await service.getById(projectId, "abc", protections);
+
+        expect(result).toBeUndefined();
+        expect(mockResolveTraceIdByPrefixCH).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the input is not hex (typo, slash, etc.)", () => {
+      it("skips prefix resolution and returns undefined", async () => {
+        mockGetTracesWithSpansCH.mockResolvedValue([]);
+
+        const result = await service.getById(
+          projectId,
+          "not-a-hex-id-zzzzzzzz",
+          protections,
+        );
 
         expect(result).toBeUndefined();
         expect(mockResolveTraceIdByPrefixCH).not.toHaveBeenCalled();

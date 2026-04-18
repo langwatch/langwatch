@@ -168,18 +168,28 @@ export class ClickHouseTraceService {
    * trace search`). Returns up to `limit` distinct trace IDs so the caller can
    * detect ambiguity.
    *
-   * Returns null if the ClickHouse client is not available for the project.
+   * Callers MUST pass an `occurredAt` range to keep the scan bounded. Per
+   * repository conventions, filtering on the partition key (OccurredAt) is
+   * required — without it ClickHouse scans every partition (including cold
+   * S3 storage) for every lookup miss.
    *
-   * @param projectId - The project ID (scoped via TenantId)
-   * @param prefix - The trace ID prefix to search for
-   * @param limit - Maximum number of distinct trace IDs to return (default 2 — enough to detect ambiguity)
-   * @returns Array of matching trace IDs (deduped), or null if ClickHouse is not available
+   * Returns null if the ClickHouse client is not available for the project.
    */
-  async resolveTraceIdByPrefix(
-    projectId: string,
-    prefix: string,
+  async resolveTraceIdByPrefix({
+    projectId,
+    prefix,
+    occurredAt,
     limit = 2,
-  ): Promise<string[] | null> {
+  }: {
+    /** The project ID (scoped via TenantId) */
+    projectId: string;
+    /** The trace ID prefix to search for */
+    prefix: string;
+    /** Partition-key bound (epoch millis) — required for partition pruning */
+    occurredAt: { from: number; to: number };
+    /** Maximum distinct trace IDs to return (default 2 — enough to detect ambiguity) */
+    limit?: number;
+  }): Promise<string[] | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.resolveTraceIdByPrefix",
       { attributes: { "tenant.id": projectId, "trace.id.prefix": prefix } },
@@ -195,11 +205,15 @@ export class ClickHouseTraceService {
               SELECT DISTINCT TraceId
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
+                AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+                AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})
                 AND startsWith(TraceId, {prefix:String})
               LIMIT {limit:UInt32}
             `,
             query_params: {
               tenantId: projectId,
+              fromMs: occurredAt.from,
+              toMs: occurredAt.to,
               prefix,
               limit,
             },

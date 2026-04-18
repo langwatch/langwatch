@@ -24,6 +24,22 @@ export const MIN_TRACE_ID_PREFIX_LENGTH = 8;
 export const FULL_TRACE_ID_LENGTH = 32;
 
 /**
+ * How many candidates the resolver asks ClickHouse for when disambiguating
+ * a prefix. Matches the cap the error message previews, so API clients see
+ * every candidate the resolver considered.
+ */
+export const TRACE_ID_PREFIX_CANDIDATE_LIMIT = 5;
+
+/**
+ * Time window (in days) that prefix resolution scans. Without a partition
+ * bound, ClickHouse would scan every partition (including cold storage on
+ * S3) on a miss. 90 days covers the CLI's "copy a truncated ID from a
+ * recent search" use case while keeping the query on hot partitions.
+ * Full 32-char IDs still resolve unbounded via the normal exact-match path.
+ */
+export const TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS = 90;
+
+/**
  * Thrown when a trace ID prefix matches more than one trace in the project.
  * Callers (route handlers) map this to a 409 response listing the full
  * candidate IDs so the user can disambiguate.
@@ -33,10 +49,12 @@ export class AmbiguousTraceIdPrefixError extends Error {
     public readonly prefix: string,
     public readonly candidateTraceIds: string[],
   ) {
-    const preview = candidateTraceIds.slice(0, 5).join(", ");
+    const preview = candidateTraceIds
+      .slice(0, TRACE_ID_PREFIX_CANDIDATE_LIMIT)
+      .join(", ");
     const suffix =
-      candidateTraceIds.length > 5
-        ? `, …${candidateTraceIds.length - 5} more`
+      candidateTraceIds.length > TRACE_ID_PREFIX_CANDIDATE_LIMIT
+        ? `, …${candidateTraceIds.length - TRACE_ID_PREFIX_CANDIDATE_LIMIT} more`
         : "";
     super(
       `Trace ID prefix "${prefix}" is ambiguous — matches: ${preview}${suffix}. Use a longer prefix.`,
@@ -44,6 +62,13 @@ export class AmbiguousTraceIdPrefixError extends Error {
     this.name = "AmbiguousTraceIdPrefixError";
   }
 }
+
+/**
+ * Trace IDs per the OpenTelemetry spec are 32 hex characters. We only
+ * attempt prefix resolution for hex-only inputs — non-hex typos ("my-id ")
+ * short-circuit to 404 without scanning.
+ */
+const HEX_ONLY = /^[0-9a-f]+$/i;
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
@@ -121,17 +146,26 @@ export class TraceService {
           return traces[0];
         }
 
-        // No exact match. If the input looks like a truncated prefix (shorter
-        // than a full trace ID, but long enough to be meaningful), try
-        // git-style prefix resolution scoped to this project.
+        // No exact match. If the input looks like a truncated hex prefix
+        // (shorter than a full trace ID, but long enough to meaningfully
+        // narrow the scan), try git-style prefix resolution scoped to this
+        // project and the last TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS days.
         if (
           traceId.length < FULL_TRACE_ID_LENGTH &&
-          traceId.length >= MIN_TRACE_ID_PREFIX_LENGTH
+          traceId.length >= MIN_TRACE_ID_PREFIX_LENGTH &&
+          HEX_ONLY.test(traceId)
         ) {
+          const now = Date.now();
           const candidates = await this.clickHouseService.resolveTraceIdByPrefix(
-            projectId,
-            traceId,
-            2,
+            {
+              projectId,
+              prefix: traceId,
+              occurredAt: {
+                from: now - TRACE_ID_PREFIX_LOOKUP_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+                to: now,
+              },
+              limit: TRACE_ID_PREFIX_CANDIDATE_LIMIT,
+            },
           );
           if (candidates === null) {
             throw new Error(

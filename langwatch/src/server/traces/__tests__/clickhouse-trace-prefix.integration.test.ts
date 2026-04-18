@@ -68,6 +68,11 @@ async function insertTraceSummary(
   });
 }
 
+const occurredAtRange = {
+  from: now - 60_000,
+  to: now + 60_000,
+};
+
 let ch: ClickHouseClient;
 let service: ClickHouseTraceService;
 
@@ -118,16 +123,21 @@ describe("ClickHouseTraceService.resolveTraceIdByPrefix (integration)", () => {
     });
 
     it("returns the single full trace ID", async () => {
-      const result = await service.resolveTraceIdByPrefix(
-        tenantId,
-        fullId.slice(0, 20),
-      );
+      const result = await service.resolveTraceIdByPrefix({
+        projectId: tenantId,
+        prefix: fullId.slice(0, 20),
+        occurredAt: occurredAtRange,
+      });
 
       expect(result).toEqual([fullId]);
     });
 
     it("still resolves when the caller passes the full ID", async () => {
-      const result = await service.resolveTraceIdByPrefix(tenantId, fullId);
+      const result = await service.resolveTraceIdByPrefix({
+        projectId: tenantId,
+        prefix: fullId,
+        occurredAt: occurredAtRange,
+      });
 
       expect(result).toEqual([fullId]);
     });
@@ -143,11 +153,12 @@ describe("ClickHouseTraceService.resolveTraceIdByPrefix (integration)", () => {
     });
 
     it("returns multiple IDs up to the limit so callers can detect ambiguity", async () => {
-      const result = await service.resolveTraceIdByPrefix(
-        tenantId,
-        "abc123de",
-        2,
-      );
+      const result = await service.resolveTraceIdByPrefix({
+        projectId: tenantId,
+        prefix: "abc123de",
+        occurredAt: occurredAtRange,
+        limit: 2,
+      });
 
       expect(result).not.toBeNull();
       expect(result!).toHaveLength(2);
@@ -157,10 +168,36 @@ describe("ClickHouseTraceService.resolveTraceIdByPrefix (integration)", () => {
 
   describe("when no trace matches", () => {
     it("returns an empty array", async () => {
-      const result = await service.resolveTraceIdByPrefix(
-        tenantId,
-        "deadbeefno-match",
+      const result = await service.resolveTraceIdByPrefix({
+        projectId: tenantId,
+        prefix: "deadbeefno-match",
+        occurredAt: occurredAtRange,
+      });
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("when the trace falls outside the OccurredAt window", () => {
+    const outOfWindowTraceId = "fedcba9876543210fedcba9876543210";
+
+    beforeAll(async () => {
+      // Insert with OccurredAt far in the past — outside the test's window.
+      await insertTraceSummary(
+        ch,
+        makeTraceSummaryRow({
+          TraceId: outOfWindowTraceId,
+          OccurredAt: new Date(now - 1_000_000),
+        }),
       );
+    });
+
+    it("does not return traces outside the partition window", async () => {
+      const result = await service.resolveTraceIdByPrefix({
+        projectId: tenantId,
+        prefix: outOfWindowTraceId.slice(0, 16),
+        occurredAt: occurredAtRange,
+      });
 
       expect(result).toEqual([]);
     });
@@ -181,10 +218,11 @@ describe("ClickHouseTraceService.resolveTraceIdByPrefix (integration)", () => {
     });
 
     it("does not return it for a different project", async () => {
-      const result = await service.resolveTraceIdByPrefix(
-        tenantId,
-        otherTraceId.slice(0, 20),
-      );
+      const result = await service.resolveTraceIdByPrefix({
+        projectId: tenantId,
+        prefix: otherTraceId.slice(0, 20),
+        occurredAt: occurredAtRange,
+      });
 
       expect(result).toEqual([]);
     });
