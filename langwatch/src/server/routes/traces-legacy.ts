@@ -30,19 +30,14 @@ import type { Permission } from "~/server/api/rbac";
 import {
   enforcePatCeiling,
   extractCredentials,
-  patCeilingDenialResponse,
 } from "~/server/pat/auth-middleware";
 import { TokenResolver } from "~/server/pat/token-resolver";
-
-const tokenResolver = TokenResolver.create(prisma);
 
 export const app = new Hono().basePath("/api");
 
 /**
  * Authenticates via the unified PAT + legacy-key path and enforces the given
- * permission ceiling. Returns either `{ project, markUsed }` or
- * `{ error, status }`. `markUsed` is fire-and-forget and a no-op for legacy
- * keys — callers invoke it after a successful response.
+ * permission ceiling. Returns either `{ project }` or `{ error, status }`.
  */
 async function authenticateRequest(c: Context, permission: Permission) {
   const credentials = extractCredentials(c);
@@ -54,7 +49,7 @@ async function authenticateRequest(c: Context, permission: Permission) {
     };
   }
 
-  const resolved = await tokenResolver.resolve({
+  const resolved = await TokenResolver.create(prisma).resolve({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -62,20 +57,12 @@ async function authenticateRequest(c: Context, permission: Permission) {
     return { error: "Invalid auth token.", status: 401 as const };
   }
 
-  try {
-    await enforcePatCeiling({ prisma, resolved, permission });
-  } catch (error) {
-    const denial = patCeilingDenialResponse(error);
-    return { error: denial.message, status: denial.status };
+  const denial = await enforcePatCeiling({ resolved, permission });
+  if (denial) {
+    return { error: denial.error, status: denial.status };
   }
 
-  const markUsed = () => {
-    if (resolved.type === "pat") {
-      tokenResolver.markUsed({ patId: resolved.patId });
-    }
-  };
-
-  return { project: resolved.project, markUsed };
+  return { project: resolved.project };
 }
 
 // ---------- GET /api/trace/:id ----------
