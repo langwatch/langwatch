@@ -456,6 +456,8 @@ def _print_summary(result: ExperimentRunResult) -> None:
     print(f"  Passed:     {result.passed}")
     print(f"  Failed:     {result.failed}")
     print(f"  Pass Rate:  {result.pass_rate:.1f}%")
+    if summary.total_cost:
+        print(f"  Total Cost: ${summary.total_cost:.4f}")
 
     if summary.targets:
         print("─" * 60)

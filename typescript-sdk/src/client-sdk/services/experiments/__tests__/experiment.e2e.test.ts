@@ -155,6 +155,29 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
   });
 
   describe("printSummary()", () => {
+    // Manually intercept console.log + process.exit. vi.spyOn(process, "exit")
+    // proved unreliable in CI — swap in the capture pattern that worked end-to-end.
+    async function captureSummary(fn: () => Promise<void> | void) {
+      const captured: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => {
+        captured.push(args.map(String).join(" "));
+      };
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const origExit = process.exit;
+      let exitedWith: number | string | null | undefined = null;
+      (process as unknown as { exit: (c?: number) => void }).exit = ((c?: number) => {
+        exitedWith = c;
+      }) as never;
+      try {
+        await fn();
+      } finally {
+        console.log = origLog;
+        process.exit = origExit;
+      }
+      return { output: captured.join("\n"), exitedWith };
+    }
+
     it("prints a CI-friendly summary after run completes against real server", async () => {
       const evaluation = await langwatch.experiments.init(`test-print-summary-${Date.now()}`);
       const dataset = [
@@ -171,25 +194,16 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
         });
       });
 
-      const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
-      const exitSpy = vi
-        .spyOn(process, "exit")
-        .mockImplementation((() => undefined) as never);
+      const { output, exitedWith } = await captureSummary(() => {
+        evaluation.printSummary();
+      });
 
-      try {
-        evaluation.printSummary(); // should detect the failure and exit
-      } finally {
-        const output = logSpy.mock.calls.map((args) => args.join(" ")).join("\n");
-        logSpy.mockRestore();
-        exitSpy.mockRestore();
-
-        expect(output).toContain("EXPERIMENT RESULTS");
-        expect(output).toContain("Passed:     2");
-        expect(output).toContain("Failed:     1");
-        expect(output).toMatch(/Pass Rate:\s+66\.7%/);
-        // Should have decided to exit since there was a failure
-        expect(exitSpy).toHaveBeenCalledWith(1);
-      }
+      expect(output).toContain("EXPERIMENT RESULTS");
+      expect(output).toContain("Passed:     2");
+      expect(output).toContain("Failed:     1");
+      expect(output).toMatch(/Pass Rate:\s+66\.7%/);
+      expect(output).toContain("Status:     FAILED");
+      expect(exitedWith).toBe(1);
     });
 
     it("does not exit when every evaluation passed (real server flow)", async () => {
@@ -200,23 +214,15 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
         evaluation.log("accuracy", { index, score: 0.95, passed: true });
       });
 
-      const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
-      const exitSpy = vi
-        .spyOn(process, "exit")
-        .mockImplementation((() => undefined) as never);
-
-      try {
+      const { output, exitedWith } = await captureSummary(() => {
         evaluation.printSummary();
-      } finally {
-        const output = logSpy.mock.calls.map((args) => args.join(" ")).join("\n");
-        logSpy.mockRestore();
-        exitSpy.mockRestore();
+      });
 
-        expect(output).toContain("Passed:     2");
-        expect(output).toContain("Failed:     0");
-        expect(output).toContain("100.0%");
-        expect(exitSpy).not.toHaveBeenCalled();
-      }
+      expect(output).toContain("Passed:     2");
+      expect(output).toContain("Failed:     0");
+      expect(output).toContain("100.0%");
+      expect(output).toContain("Status:     COMPLETED");
+      expect(exitedWith).toBeNull();
     });
   });
 

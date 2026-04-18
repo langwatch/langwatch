@@ -19,6 +19,9 @@ export function printSummary(result: Omit<ExperimentRunResult, "printSummary" | 
   console.log(`  Passed:     ${passed}`);
   console.log(`  Failed:     ${failed}`);
   console.log(`  Pass Rate:  ${passRate.toFixed(1)}%`);
+  if (summary.totalCost) {
+    console.log(`  Total Cost: $${summary.totalCost.toFixed(4)}`);
+  }
 
   if (summary.targets && summary.targets.length > 0) {
     console.log("─".repeat(60));

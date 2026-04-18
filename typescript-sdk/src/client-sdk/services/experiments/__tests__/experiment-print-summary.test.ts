@@ -191,6 +191,32 @@ describe("Experiment.printSummary", () => {
     });
   });
 
+  describe("when the run has a nonzero total cost", () => {
+    it("renders Total Cost in the main summary block", () => {
+      const exp = buildExperimentFixture({
+        evaluations: [
+          evaluation({ passed: true, cost: 0.0012 }),
+          evaluation({ passed: true, cost: 0.0023, index: 1 }),
+        ],
+      });
+
+      exp.printSummary(false);
+
+      const out = output();
+      expect(out).toMatch(/Total Cost: \$0\.0035/);
+    });
+
+    it("omits Total Cost when cost is zero", () => {
+      const exp = buildExperimentFixture({
+        evaluations: [evaluation({ passed: true })],
+      });
+
+      exp.printSummary(false);
+
+      expect(output()).not.toContain("Total Cost:");
+    });
+  });
+
   describe("when an evaluator crashed (status: error)", () => {
     it("counts it as a failure and exits", () => {
       const exp = buildExperimentFixture({
