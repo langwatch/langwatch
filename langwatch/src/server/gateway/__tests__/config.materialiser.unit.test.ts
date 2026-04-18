@@ -99,6 +99,53 @@ describe("GatewayConfigMaterialiser", () => {
       expect(bundle.status).toBe("revoked");
     });
 
+    describe("observability_endpoint resolution", () => {
+      it("is null when the project has no per-project endpoint configured", async () => {
+        const prisma = mockPrisma({
+          project: {
+            findUnique: async () => ({
+              id: "project_01",
+              teamId: "team_01",
+              name: "p",
+              slug: "p",
+              team: { id: "team_01", name: "t", organizationId: "org_01" },
+            }),
+          } as any,
+          gatewayProviderCredential: { findMany: async () => [] } as any,
+          gatewayBudget: { findMany: async () => [] } as any,
+        });
+        const sut = new GatewayConfigMaterialiser(prisma);
+
+        const bundle = await sut.materialise(stubVk());
+
+        expect(bundle.observability_endpoint).toBeNull();
+      });
+
+      it("echoes the project.observabilityEndpoint when present", async () => {
+        const prisma = mockPrisma({
+          project: {
+            findUnique: async () => ({
+              id: "project_01",
+              teamId: "team_01",
+              name: "p",
+              slug: "p",
+              observabilityEndpoint: "https://otel.dedicated.acme/v1/traces",
+              team: { id: "team_01", name: "t", organizationId: "org_01" },
+            }),
+          } as any,
+          gatewayProviderCredential: { findMany: async () => [] } as any,
+          gatewayBudget: { findMany: async () => [] } as any,
+        });
+        const sut = new GatewayConfigMaterialiser(prisma);
+
+        const bundle = await sut.materialise(stubVk());
+
+        expect(bundle.observability_endpoint).toBe(
+          "https://otel.dedicated.acme/v1/traces",
+        );
+      });
+    });
+
     it("preserves provider chain ordering declared on the VK", async () => {
       const chain = [
         { providerCredentialId: "pc_primary", priority: 0 },

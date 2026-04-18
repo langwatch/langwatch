@@ -11,28 +11,73 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Gauge, Plus } from "lucide-react";
+import { Archive, Gauge, MoreVertical, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { BudgetCreateDrawer } from "~/components/gateway/BudgetCreateDrawer";
+import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { Menu } from "~/components/ui/menu";
+import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+
+type BudgetListRow = ReturnType<typeof useBudgetRows>["rows"][number];
+
+function useBudgetRows(organizationId: string | undefined) {
+  const listQuery = api.gatewayBudgets.list.useQuery(
+    { organizationId: organizationId ?? "" },
+    { enabled: !!organizationId },
+  );
+  return { rows: listQuery.data ?? [], isLoading: listQuery.isLoading, refetch: listQuery.refetch };
+}
 
 function BudgetsPage() {
   const { organization, project, hasPermission } = useOrganizationTeamProject();
   const canCreate = hasPermission("gatewayBudgets:create");
+  const canUpdate = hasPermission("gatewayBudgets:update");
+  const canDelete = hasPermission("gatewayBudgets:delete");
 
-  const listQuery = api.gatewayBudgets.list.useQuery(
-    { organizationId: organization?.id ?? "" },
-    { enabled: !!organization?.id },
-  );
+  const { rows, isLoading, refetch } = useBudgetRows(organization?.id);
+
+  const utils = api.useContext();
+  const archiveMutation = api.gatewayBudgets.archive.useMutation({
+    onSuccess: async () => {
+      if (organization?.id) {
+        await utils.gatewayBudgets.list.invalidate({
+          organizationId: organization.id,
+        });
+      }
+    },
+  });
 
   const [createOpen, setCreateOpen] = useState(false);
-  const rows = listQuery.data ?? [];
+  const [editing, setEditing] = useState<BudgetListRow | null>(null);
+
+  const handleArchive = async (row: BudgetListRow) => {
+    if (!organization) return;
+    if (
+      !confirm(
+        `Archive "${row.name}"? Debits against this budget will stop counting.`,
+      )
+    ) {
+      return;
+    }
+    try {
+      await archiveMutation.mutateAsync({
+        organizationId: organization.id,
+        id: row.id,
+      });
+    } catch (error) {
+      toaster.create({
+        title: error instanceof Error ? error.message : "Failed to archive",
+        type: "error",
+      });
+    }
+  };
 
   return (
     <GatewayLayout>
@@ -52,7 +97,7 @@ function BudgetsPage() {
         </PageLayout.Header>
 
         <Box padding={6}>
-          {listQuery.isLoading ? (
+          {isLoading ? (
             <Spinner />
           ) : rows.length === 0 ? (
             <EmptyState.Root>
@@ -87,6 +132,7 @@ function BudgetsPage() {
                   <Table.ColumnHeader>Spent / Limit</Table.ColumnHeader>
                   <Table.ColumnHeader>On breach</Table.ColumnHeader>
                   <Table.ColumnHeader>Resets</Table.ColumnHeader>
+                  <Table.ColumnHeader></Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
@@ -149,6 +195,35 @@ function BudgetsPage() {
                             : new Date(b.resetsAt).toLocaleString()}
                         </Text>
                       </Table.Cell>
+                      <Table.Cell>
+                        {(canUpdate || canDelete) && (
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <Button variant="ghost" size="xs" aria-label="Actions">
+                                <MoreVertical size={14} />
+                              </Button>
+                            </Menu.Trigger>
+                            <Menu.Content>
+                              {canUpdate && (
+                                <Menu.Item
+                                  value="edit"
+                                  onClick={() => setEditing(b)}
+                                >
+                                  <Pencil size={14} /> Edit
+                                </Menu.Item>
+                              )}
+                              {canDelete && (
+                                <Menu.Item
+                                  value="archive"
+                                  onClick={() => handleArchive(b)}
+                                >
+                                  <Archive size={14} /> Archive
+                                </Menu.Item>
+                              )}
+                            </Menu.Content>
+                          </Menu.Root>
+                        )}
+                      </Table.Cell>
                     </Table.Row>
                   );
                 })}
@@ -163,10 +238,20 @@ function BudgetsPage() {
           open={createOpen}
           onOpenChange={setCreateOpen}
           onCreated={() => {
-            void listQuery.refetch();
+            void refetch();
           }}
         />
       )}
+      <BudgetEditDrawer
+        budget={editing}
+        onOpenChange={(open) => {
+          if (!open) setEditing(null);
+        }}
+        onSaved={() => {
+          setEditing(null);
+          void refetch();
+        }}
+      />
     </GatewayLayout>
   );
 }

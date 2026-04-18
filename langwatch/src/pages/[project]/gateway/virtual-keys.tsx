@@ -11,13 +11,14 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { KeyRound, MoreVertical, Plus, RotateCw, Trash2 } from "lucide-react";
+import { KeyRound, MoreVertical, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { VirtualKeyCreateDrawer } from "~/components/gateway/VirtualKeyCreateDrawer";
+import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
 import { Menu } from "~/components/ui/menu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -32,6 +33,7 @@ function VirtualKeysPage() {
   const canCreate = hasPermission("virtualKeys:create");
   const canRotate = hasPermission("virtualKeys:rotate");
   const canRevoke = hasPermission("virtualKeys:update");
+  const canUpdate = hasPermission("virtualKeys:update");
 
   const utils = api.useContext();
   const listQuery = api.virtualKeys.list.useQuery(
@@ -47,6 +49,7 @@ function VirtualKeysPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [revealSecret, setRevealSecret] = useState<CreatedSecret | null>(null);
+  const [editing, setEditing] = useState<any | null>(null);
 
   const rows = listQuery.data ?? [];
 
@@ -184,6 +187,14 @@ function VirtualKeysPage() {
                             </Button>
                           </Menu.Trigger>
                           <Menu.Content>
+                            {canUpdate && (
+                              <Menu.Item
+                                value="edit"
+                                onClick={() => setEditing(vk)}
+                              >
+                                <Pencil size={14} /> Edit
+                              </Menu.Item>
+                            )}
                             {canRotate && (
                               <Menu.Item
                                 value="rotate"
@@ -226,6 +237,19 @@ function VirtualKeysPage() {
         keyName={revealSecret?.name ?? ""}
         secret={revealSecret?.secret ?? ""}
       />
+      {project?.id && (
+        <VirtualKeyEditDrawer
+          projectId={project.id}
+          vk={editing}
+          onOpenChange={(open) => {
+            if (!open) setEditing(null);
+          }}
+          onSaved={() => {
+            setEditing(null);
+            void listQuery.refetch();
+          }}
+        />
+      )}
     </GatewayLayout>
   );
 }

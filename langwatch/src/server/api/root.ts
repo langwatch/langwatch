@@ -52,6 +52,7 @@ import { personalAccessTokenRouter } from "./routers/personalAccessToken";
 import { groupRouter } from "./routers/group";
 import { userRouter } from "./routers/user";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
+import { gatewayUsageRouter } from "./routers/gatewayUsage";
 import { gatewayProvidersRouter } from "./routers/gatewayProviders";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { workflowRouter } from "./routers/workflows";
@@ -113,6 +114,7 @@ const coreRouters = {
   virtualKeys: virtualKeysRouter,
   gatewayProviders: gatewayProvidersRouter,
   gatewayBudgets: gatewayBudgetsRouter,
+  gatewayUsage: gatewayUsageRouter,
 };
 
 const eeRouters = {
