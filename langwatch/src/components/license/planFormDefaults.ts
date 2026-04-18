@@ -16,6 +16,11 @@ export interface PlanFormDefaults {
   maxEvaluators?: number;
   maxScenarios?: number;
   maxAgents?: number;
+  maxOnlineEvaluations?: number;
+  maxDatasets?: number;
+  maxDashboards?: number;
+  maxCustomGraphs?: number;
+  maxAutomations?: number;
   canPublish?: boolean;
   usageUnit?: "traces" | "events";
 }
@@ -36,6 +41,11 @@ export const PLAN_DEFAULTS: Record<PlanType, PlanFormDefaults> = {
     maxEvaluators: PRO_TEMPLATE.maxEvaluators,
     maxScenarios: PRO_TEMPLATE.maxScenarios,
     maxAgents: PRO_TEMPLATE.maxAgents,
+    maxOnlineEvaluations: PRO_TEMPLATE.maxOnlineEvaluations,
+    maxDatasets: PRO_TEMPLATE.maxDatasets,
+    maxDashboards: PRO_TEMPLATE.maxDashboards,
+    maxCustomGraphs: PRO_TEMPLATE.maxCustomGraphs,
+    maxAutomations: PRO_TEMPLATE.maxAutomations,
     canPublish: PRO_TEMPLATE.canPublish,
     usageUnit: PRO_TEMPLATE.usageUnit as "traces" | "events",
   },
@@ -50,6 +60,11 @@ export const PLAN_DEFAULTS: Record<PlanType, PlanFormDefaults> = {
     maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators,
     maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios,
     maxAgents: ENTERPRISE_TEMPLATE.maxAgents,
+    maxOnlineEvaluations: ENTERPRISE_TEMPLATE.maxOnlineEvaluations,
+    maxDatasets: ENTERPRISE_TEMPLATE.maxDatasets,
+    maxDashboards: ENTERPRISE_TEMPLATE.maxDashboards,
+    maxCustomGraphs: ENTERPRISE_TEMPLATE.maxCustomGraphs,
+    maxAutomations: ENTERPRISE_TEMPLATE.maxAutomations,
     canPublish: ENTERPRISE_TEMPLATE.canPublish,
     usageUnit: ENTERPRISE_TEMPLATE.usageUnit as "traces" | "events",
   },

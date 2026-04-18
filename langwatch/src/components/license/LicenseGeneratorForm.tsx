@@ -18,6 +18,7 @@ import { toaster } from "../ui/toaster";
 import { Radio, RadioGroup } from "~/components/ui/radio";
 import { Select } from "~/components/ui/select";
 import { ENTERPRISE_TEMPLATE } from "../../../ee/licensing/planTemplates";
+import { DEFAULT_LIMIT } from "../../../ee/licensing/constants";
 import { getPlanDefaults, type PlanType } from "./planFormDefaults";
 import { formatFileSize } from "./licenseStatusUtils";
 
@@ -57,18 +58,23 @@ interface FormData {
   email: string;
   expiresAt: string;
   planType: PlanType;
-  maxMembers: number;
-  maxMembersLite: number;
-  maxTeams: number;
-  maxProjects: number;
-  maxMessagesPerMonth: number;
-  evaluationsCredit: number;
-  maxWorkflows: number;
-  maxPrompts: number;
-  maxEvaluators: number;
-  maxScenarios: number;
-  maxAgents: number;
-  maxExperiments: number;
+  maxMembers: number | null;
+  maxMembersLite: number | null;
+  maxTeams: number | null;
+  maxProjects: number | null;
+  maxMessagesPerMonth: number | null;
+  evaluationsCredit: number | null;
+  maxWorkflows: number | null;
+  maxPrompts: number | null;
+  maxEvaluators: number | null;
+  maxScenarios: number | null;
+  maxAgents: number | null;
+  maxExperiments: number | null;
+  maxOnlineEvaluations: number | null;
+  maxDatasets: number | null;
+  maxDashboards: number | null;
+  maxCustomGraphs: number | null;
+  maxAutomations: number | null;
   canPublish: boolean;
   usageUnit: "traces" | "events";
 }
@@ -99,6 +105,11 @@ const defaultFormData: FormData = {
   maxScenarios: ENTERPRISE_TEMPLATE.maxScenarios ?? 1000,
   maxAgents: ENTERPRISE_TEMPLATE.maxAgents ?? 1000,
   maxExperiments: ENTERPRISE_TEMPLATE.maxExperiments ?? 1000,
+  maxOnlineEvaluations: ENTERPRISE_TEMPLATE.maxOnlineEvaluations ?? 1000,
+  maxDatasets: ENTERPRISE_TEMPLATE.maxDatasets ?? 1000,
+  maxDashboards: ENTERPRISE_TEMPLATE.maxDashboards ?? 1000,
+  maxCustomGraphs: ENTERPRISE_TEMPLATE.maxCustomGraphs ?? 1000,
+  maxAutomations: ENTERPRISE_TEMPLATE.maxAutomations ?? 1000,
   canPublish: ENTERPRISE_TEMPLATE.canPublish,
   usageUnit: (ENTERPRISE_TEMPLATE.usageUnit as "traces" | "events") ?? "events",
 };
@@ -118,21 +129,37 @@ function downloadLicenseFile(license: string, organizationName: string) {
 
 interface NumberFieldProps {
   label: string;
-  value: number;
-  onChange: (value: number) => void;
+  value: number | null;
+  onChange: (value: number | null) => void;
 }
 
+/**
+ * Number input field that treats empty/null as "Unlimited".
+ * Displays an empty input with placeholder "Unlimited" when value is null
+ * or equals DEFAULT_LIMIT (Number.MAX_SAFE_INTEGER).
+ */
 function NumberField({ label, value, onChange }: NumberFieldProps) {
+  const displayValue = value === null || value === Number.MAX_SAFE_INTEGER ? "" : value;
+
   return (
     <Field.Root flex={1}>
       <Field.Label fontSize="xs" color="fg.muted">{label}</Field.Label>
       <Input
-        value={value}
-        onChange={(e) => onChange(parseInt(e.target.value) || 0)}
+        value={displayValue}
+        onChange={(e) => {
+          const parsed = parseInt(e.target.value);
+          onChange(Number.isNaN(parsed) ? null : parsed);
+        }}
+        placeholder="Unlimited"
         type="number"
       />
     </Field.Root>
   );
+}
+
+/** Maps a nullable form value to DEFAULT_LIMIT for API submission */
+function toLimit(value: number | null): number {
+  return value ?? DEFAULT_LIMIT;
 }
 
 export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseGeneratorFormProps>(
@@ -175,7 +202,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
       }));
     };
 
-    const handleInputChange = (field: keyof FormData, value: string | number | boolean) => {
+    const handleInputChange = (field: keyof FormData, value: string | number | boolean | null) => {
       setFormData((prev) => ({ ...prev, [field]: value }));
     };
 
@@ -249,18 +276,23 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
         expiresAt: new Date(formData.expiresAt),
         planType: formData.planType,
         plan: {
-          maxMembers: formData.maxMembers,
-          maxMembersLite: formData.maxMembersLite,
-          maxTeams: formData.maxTeams,
-          maxProjects: formData.maxProjects,
-          maxMessagesPerMonth: formData.maxMessagesPerMonth,
-          evaluationsCredit: formData.evaluationsCredit,
-          maxWorkflows: formData.maxWorkflows,
-          maxPrompts: formData.maxPrompts,
-          maxEvaluators: formData.maxEvaluators,
-          maxScenarios: formData.maxScenarios,
-          maxAgents: formData.maxAgents,
-          maxExperiments: formData.maxExperiments,
+          maxMembers: toLimit(formData.maxMembers),
+          maxMembersLite: toLimit(formData.maxMembersLite),
+          maxTeams: toLimit(formData.maxTeams),
+          maxProjects: toLimit(formData.maxProjects),
+          maxMessagesPerMonth: toLimit(formData.maxMessagesPerMonth),
+          evaluationsCredit: toLimit(formData.evaluationsCredit),
+          maxWorkflows: toLimit(formData.maxWorkflows),
+          maxPrompts: toLimit(formData.maxPrompts),
+          maxEvaluators: toLimit(formData.maxEvaluators),
+          maxScenarios: toLimit(formData.maxScenarios),
+          maxAgents: toLimit(formData.maxAgents),
+          maxExperiments: toLimit(formData.maxExperiments),
+          maxOnlineEvaluations: toLimit(formData.maxOnlineEvaluations),
+          maxDatasets: toLimit(formData.maxDatasets),
+          maxDashboards: toLimit(formData.maxDashboards),
+          maxCustomGraphs: toLimit(formData.maxCustomGraphs),
+          maxAutomations: toLimit(formData.maxAutomations),
           canPublish: formData.canPublish,
           usageUnit: formData.usageUnit,
         },
@@ -549,13 +581,18 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
                 onChange={(value) => handleInputChange("maxMembersLite", value)}
               />
               <NumberField
-                label="Max Projects"
-                value={formData.maxProjects}
-                onChange={(value) => handleInputChange("maxProjects", value)}
+                label="Max Teams"
+                value={formData.maxTeams}
+                onChange={(value) => handleInputChange("maxTeams", value)}
               />
             </HStack>
 
             <HStack width="full" gap={4}>
+              <NumberField
+                label="Max Projects"
+                value={formData.maxProjects}
+                onChange={(value) => handleInputChange("maxProjects", value)}
+              />
               <NumberField
                 label="Max Messages/Month"
                 value={formData.maxMessagesPerMonth}
@@ -566,14 +603,14 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
                 value={formData.evaluationsCredit}
                 onChange={(value) => handleInputChange("evaluationsCredit", value)}
               />
+            </HStack>
+
+            <HStack width="full" gap={4}>
               <NumberField
                 label="Max Workflows"
                 value={formData.maxWorkflows}
                 onChange={(value) => handleInputChange("maxWorkflows", value)}
               />
-            </HStack>
-
-            <HStack width="full" gap={4}>
               <NumberField
                 label="Max Prompts"
                 value={formData.maxPrompts}
@@ -584,18 +621,54 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
                 value={formData.maxEvaluators}
                 onChange={(value) => handleInputChange("maxEvaluators", value)}
               />
+            </HStack>
+
+            <HStack width="full" gap={4}>
               <NumberField
                 label="Max Scenarios"
                 value={formData.maxScenarios}
                 onChange={(value) => handleInputChange("maxScenarios", value)}
               />
-            </HStack>
-
-            <HStack width="full" gap={4}>
               <NumberField
                 label="Max Agents"
                 value={formData.maxAgents}
                 onChange={(value) => handleInputChange("maxAgents", value)}
+              />
+              <NumberField
+                label="Max Experiments"
+                value={formData.maxExperiments}
+                onChange={(value) => handleInputChange("maxExperiments", value)}
+              />
+            </HStack>
+
+            <HStack width="full" gap={4}>
+              <NumberField
+                label="Max Online Evaluations"
+                value={formData.maxOnlineEvaluations}
+                onChange={(value) => handleInputChange("maxOnlineEvaluations", value)}
+              />
+              <NumberField
+                label="Max Datasets"
+                value={formData.maxDatasets}
+                onChange={(value) => handleInputChange("maxDatasets", value)}
+              />
+              <NumberField
+                label="Max Dashboards"
+                value={formData.maxDashboards}
+                onChange={(value) => handleInputChange("maxDashboards", value)}
+              />
+            </HStack>
+
+            <HStack width="full" gap={4}>
+              <NumberField
+                label="Max Custom Graphs"
+                value={formData.maxCustomGraphs}
+                onChange={(value) => handleInputChange("maxCustomGraphs", value)}
+              />
+              <NumberField
+                label="Max Automations"
+                value={formData.maxAutomations}
+                onChange={(value) => handleInputChange("maxAutomations", value)}
               />
             </HStack>
 
