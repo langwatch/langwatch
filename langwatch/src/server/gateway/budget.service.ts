@@ -84,6 +84,18 @@ export type BudgetCheckResult = {
     limitUsd: string;
     spentUsd: string;
   }>;
+  /**
+   * Raw per-scope ledger used by the gateway's `Checker.ApplyLive` to
+   * reconcile near-limit cached preview against live DB state (contract §4.4).
+   * Includes every applicable budget, not just those in warn/block.
+   */
+  scopes: Array<{
+    scope: string;
+    scopeId: string;
+    window: string;
+    spentUsd: string;
+    limitUsd: string;
+  }>;
 };
 
 export class GatewayBudgetService {
@@ -292,6 +304,7 @@ export class GatewayBudgetService {
     const now = new Date();
     const warnings: BudgetCheckResult["warnings"] = [];
     const blockedBy: BudgetCheckResult["blockedBy"] = [];
+    const scopes: BudgetCheckResult["scopes"] = [];
     let blockReason: string | null = null;
 
     for (const budget of applicable) {
@@ -302,6 +315,14 @@ export class GatewayBudgetService {
       )
         ? new Prisma.Decimal(0)
         : budget.spentUsd;
+
+      scopes.push({
+        scope: budget.scopeType.toLowerCase(),
+        scopeId: budget.scopeId,
+        window: budget.window.toLowerCase(),
+        spentUsd: effectiveSpent.toFixed(6),
+        limitUsd: budget.limitUsd.toFixed(6),
+      });
 
       const projectedTotal = effectiveSpent.plus(projected);
       if (projectedTotal.greaterThanOrEqualTo(budget.limitUsd)) {
@@ -336,7 +357,7 @@ export class GatewayBudgetService {
           ? "soft_warn"
           : "allow";
 
-    return { decision, warnings, blockReason, blockedBy };
+    return { decision, warnings, blockReason, blockedBy, scopes };
   }
 }
 

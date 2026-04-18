@@ -9,6 +9,7 @@
  */
 import type { Context } from "hono";
 import { Hono } from "hono";
+import { randomBytes } from "crypto";
 import { auth } from "~/server/better-auth";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { getServerAuthSession } from "~/server/auth";
@@ -150,6 +151,72 @@ const logoutHandler = async (c: Context) => {
 
 app.get("/auth/logout", logoutHandler);
 app.post("/auth/logout", logoutHandler);
+
+// ---------- GET /api/auth/dev-bypass ----------
+/**
+ * Development-only backdoor that mints a BetterAuth-compatible session for a
+ * deterministic dev user, skipping the configured SSO provider. Doubly-gated:
+ * the route returns 404 unless BOTH `NODE_ENV === "development"` AND
+ * `LOCAL_DEV_BYPASS_AUTH === "true"`. No behavior leaks to production even if
+ * an operator accidentally sets the flag.
+ *
+ * Inserts `dev@localhost.langwatch.ai` + a fresh `Session` row whose
+ * `sessionToken` is written to the `better-auth.session_token` cookie —
+ * `auth.api.getSession` already looks that table up by cookie value, so
+ * every downstream auth check (tRPC, Hono middleware) works unchanged.
+ *
+ * Kept under /api/auth/* because the existing origin gate and cookie-clearing
+ * logout logic already cover this path.
+ */
+app.get("/auth/dev-bypass", async (c) => {
+  if (
+    env.NODE_ENV !== "development" ||
+    env.LOCAL_DEV_BYPASS_AUTH !== "true"
+  ) {
+    return c.json({ error: "not_found" }, 404);
+  }
+
+  const DEV_EMAIL = "dev@localhost.langwatch.ai";
+  const user = await prisma.user.upsert({
+    where: { email: DEV_EMAIL },
+    update: {},
+    create: {
+      email: DEV_EMAIL,
+      name: "Local Dev User",
+      emailVerified: true,
+    },
+  });
+
+  const sessionToken = randomBytes(32).toString("hex");
+  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await prisma.session.create({
+    data: {
+      sessionToken,
+      userId: user.id,
+      expires,
+      ipAddress:
+        c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? null,
+      userAgent: c.req.header("user-agent") ?? null,
+    },
+  });
+
+  const redirectTo = c.req.query("redirect") ?? "/";
+  const cookieFlags = [
+    `better-auth.session_token=${sessionToken}`,
+    "Path=/",
+    `Max-Age=${24 * 60 * 60}`,
+    "HttpOnly",
+    "SameSite=Lax",
+  ].join("; ");
+  c.header("Set-Cookie", cookieFlags);
+
+  logger.warn(
+    { userId: user.id, email: DEV_EMAIL },
+    "LOCAL_DEV_BYPASS_AUTH issued a session — development only",
+  );
+  return c.redirect(redirectTo, 302);
+});
 
 // ---------- /api/auth/* catch-all (BetterAuth) ----------
 app.all("/auth/*", async (c) => {
