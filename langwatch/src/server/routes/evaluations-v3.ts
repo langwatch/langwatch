@@ -20,6 +20,12 @@ import { streamSSE } from "hono/streaming";
 import type { z } from "zod";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
+import type { Permission } from "~/server/api/rbac";
+import {
+  enforcePatCeiling,
+  extractCredentials,
+} from "~/server/pat/auth-middleware";
+import { TokenResolver } from "~/server/pat/token-resolver";
 import {
   createInitialUIState,
   type EvaluationsV3State,
@@ -57,26 +63,34 @@ app.use(loggerMiddleware());
 
 // ── helpers ──────────────────────────────────────────────────────────
 
-const authenticateApiKey = async (c: {
-  req: { header: (name: string) => string | undefined };
-}) => {
-  const apiKey =
-    c.req.header("X-Auth-Token") ??
-    c.req.header("Authorization")?.split(" ")[1];
-
-  if (!apiKey) {
-    return { error: "Missing API key", status: 401 as const };
+/**
+ * Authenticates a request via the unified PAT + legacy-key path and enforces
+ * the given permission ceiling. Accepts any Hono-like context shape so this
+ * helper remains testable.
+ */
+const authenticateRequest = async (
+  c: { req: { header: (name: string) => string | undefined } },
+  permission: Permission,
+) => {
+  const credentials = extractCredentials(c);
+  if (!credentials) {
+    return { error: "Missing credentials", status: 401 as const };
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey, archivedAt: null },
+  const resolved = await TokenResolver.create(prisma).resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
   });
-
-  if (!project) {
-    return { error: "Invalid API key", status: 401 as const };
+  if (!resolved) {
+    return { error: "Invalid credentials", status: 401 as const };
   }
 
-  return { project };
+  const denial = await enforcePatCeiling({ resolved, permission });
+  if (denial) {
+    return { error: denial.error, status: denial.status };
+  }
+
+  return { project: resolved.project };
 };
 
 const buildState = (
@@ -286,7 +300,7 @@ app.post("/abort", async (c) => {
 app.post("/:slug/run", async (c) => {
   const { slug } = c.req.param();
 
-  const authResult = await authenticateApiKey(c);
+  const authResult = await authenticateRequest(c, "evaluations:manage");
   if ("error" in authResult) {
     return c.json({ error: authResult.error }, { status: authResult.status });
   }
@@ -466,7 +480,7 @@ app.post("/:slug/run", async (c) => {
 app.get("/runs/:runId", async (c) => {
   const { runId } = c.req.param();
 
-  const authResult = await authenticateApiKey(c);
+  const authResult = await authenticateRequest(c, "evaluations:view");
   if ("error" in authResult) {
     return c.json({ error: authResult.error }, { status: authResult.status });
   }
@@ -533,7 +547,7 @@ app.get("/runs/:runId", async (c) => {
 app.get("/runs/:runId/results", async (c) => {
   const { runId } = c.req.param();
 
-  const authResult = await authenticateApiKey(c);
+  const authResult = await authenticateRequest(c, "evaluations:view");
   if ("error" in authResult) {
     return c.json({ error: authResult.error }, { status: authResult.status });
   }
