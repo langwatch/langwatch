@@ -6,14 +6,28 @@ import type { Evaluation, Trace } from "~/server/tracer/types";
 const mockGetById = vi.fn();
 const mockGetEvaluationsMultiple = vi.fn();
 
-vi.mock("~/server/traces/trace.service", () => ({
-  TraceService: {
-    create: () => ({
-      getById: mockGetById,
-      getEvaluationsMultiple: mockGetEvaluationsMultiple,
-    }),
-  },
-}));
+vi.mock("~/server/traces/trace.service", async () => {
+  class AmbiguousTraceIdPrefixError extends Error {
+    constructor(
+      public readonly prefix: string,
+      public readonly candidateTraceIds: string[],
+    ) {
+      super(
+        `Trace ID prefix "${prefix}" is ambiguous — matches: ${candidateTraceIds.join(", ")}`,
+      );
+      this.name = "AmbiguousTraceIdPrefixError";
+    }
+  }
+  return {
+    AmbiguousTraceIdPrefixError,
+    TraceService: {
+      create: () => ({
+        getById: mockGetById,
+        getEvaluationsMultiple: mockGetEvaluationsMultiple,
+      }),
+    },
+  };
+});
 
 vi.mock("~/server/api/utils", () => ({
   getProtectionsForProject: vi.fn().mockResolvedValue({}),
@@ -54,6 +68,9 @@ vi.mock("~/server/api/routers/traces.schemas", () => {
 
 // Import app after mocks are defined
 const { app: v1App } = await import("../app.v1");
+const { AmbiguousTraceIdPrefixError } = await import(
+  "~/server/traces/trace.service"
+);
 
 // Build a wrapper app that injects the project variable (mimicking auth middleware)
 // and adds an error handler that mirrors the real app's JSON error responses
@@ -157,6 +174,51 @@ describe("GET /:traceId", () => {
       expect(res.status).toBe(404);
       const body = await res.json();
       expect(body.message).toBe("Trace not found.");
+    });
+  });
+
+  describe("when the caller passes a unique prefix", () => {
+    it("returns the trace using the resolved full trace ID", async () => {
+      // Service resolves the prefix and hands back the full trace
+      const fullId = "63dc535cea6335c506bc81ef3543a07d";
+      mockGetById.mockResolvedValue({ ...sampleTrace, trace_id: fullId });
+      mockGetEvaluationsMultiple.mockResolvedValue({
+        [fullId]: sampleEvaluations,
+      });
+
+      const res = await makeRequest("63dc535cea6335c506bc", {
+        format: "json",
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body.trace_id).toBe(fullId);
+      expect(body.platformUrl).toContain(fullId);
+      // Evaluations lookup keys on the FULL trace ID, not the prefix
+      expect(mockGetEvaluationsMultiple).toHaveBeenCalledWith(
+        "project-123",
+        [fullId],
+        expect.any(Object),
+      );
+    });
+  });
+
+  describe("when the prefix matches multiple traces", () => {
+    it("returns 409 with the candidate trace IDs", async () => {
+      const candidates = [
+        "abc1230000000000000000000000aaaa",
+        "abc1230000000000000000000000bbbb",
+      ];
+      mockGetById.mockRejectedValue(
+        new AmbiguousTraceIdPrefixError("abc12345", candidates),
+      );
+
+      const res = await makeRequest("abc12345");
+
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.message).toMatch(/ambiguous/i);
+      expect(body.candidateTraceIds).toEqual(candidates);
     });
   });
 });
