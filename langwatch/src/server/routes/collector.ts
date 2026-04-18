@@ -94,13 +94,12 @@ app.post(
       return c.json({ message: "Invalid auth token." }, 401);
     }
 
-    // Enforce PAT ceiling (legacy tokens bypass). Uses `traces:view` as the v1
-    // primitive — every project role has it, so this confirms the PAT is
-    // actually scoped to this project. Tighten when a `traces:create`
-    // permission is introduced.
+    // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
+    // access — ADMIN and MEMBER have it; VIEWER does not, preventing
+    // read-only PATs from ingesting traces.
     const denial = await enforcePatCeiling({
       resolved,
-      permission: "traces:view",
+      permission: "traces:create",
     });
     if (denial) {
       logger.warn(
