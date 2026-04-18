@@ -165,8 +165,7 @@ app.post(
 app.get(
   "/:traceId",
   describeRoute({
-    description:
-      "Get a single trace by ID. Defaults to JSON format (pass `format=digest` for an AI-readable summary). Accepts either the full 32-character trace ID or a unique prefix of at least 8 characters (git-style shortcut). Returns 404 if no trace matches and 409 if a prefix matches more than one trace.",
+    description: "Get a single trace by ID.",
     parameters: [
       {
         name: "traceId",
