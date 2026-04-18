@@ -3,6 +3,7 @@ import ora from "ora";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { virtualKeyDetailUrl } from "./_shared";
 
 export interface CreateVirtualKeyOptions {
   name: string;
@@ -58,6 +59,10 @@ export const createVirtualKeyCommand = async (options: CreateVirtualKeyOptions):
     console.log();
     console.log(chalk.gray("Virtual key id: ") + virtual_key.id);
     console.log(chalk.gray("Prefix:         ") + `${virtual_key.prefix}...${virtual_key.last_four}`);
+    const detailUrl = virtualKeyDetailUrl(virtual_key.project_id, virtual_key.id);
+    if (detailUrl) {
+      console.log(chalk.gray("View in UI:     ") + chalk.cyan(detailUrl));
+    }
     console.log();
   } catch (error) {
     failSpinner({ spinner, error, action: "create virtual key" });

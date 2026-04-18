@@ -3,6 +3,7 @@ import ora from "ora";
 import { VirtualKeysApiService } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { virtualKeyDetailUrl } from "./_shared";
 
 export const getVirtualKeyCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -37,6 +38,10 @@ export const getVirtualKeyCommand = async (id: string, options?: { format?: stri
     }
     if (vk.revoked_at) {
       console.log(`${chalk.bold("Revoked:")}      ${chalk.red(new Date(vk.revoked_at).toLocaleString())}`);
+    }
+    const detailUrl = virtualKeyDetailUrl(vk.project_id, vk.id);
+    if (detailUrl) {
+      console.log(`${chalk.bold("View in UI:")}  ${chalk.cyan(detailUrl)}`);
     }
     console.log();
     console.log(chalk.bold("Config:"));
