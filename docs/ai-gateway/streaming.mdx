@@ -28,16 +28,26 @@ Coding CLIs like Claude Code and Codex depend on the exact `content_block_delta`
 
 If the upstream connection drops after the first chunk:
 
-1. Gateway emits a terminal SSE `error` event:
+1. Gateway emits a terminal SSE `error` event. The exact frame shape (byte-locked by the test suite so future drift breaks the build):
     ```
     event: error
-    data: {"error":{"type":"provider_error","code":"provider_error","message":"Upstream connection reset after 2 chunks","param":null}}
+    data: {"error":{"type":"provider_error","code":"upstream_mid_stream_failure","message":"Upstream connection closed at chunk N: <reason>","param":null}}
 
     ```
 2. Gateway closes the client connection.
 3. The failed provider's circuit-breaker counter increments.
 
-The client is free to retry the request; a fresh request will go through the fallback chain from scratch.
+The gateway **never** silent-switches to the fallback mid-stream. Splicing chunks from two providers would produce an inconsistent response: mismatched tool-call ids, accumulated-content replay, token-accounting drift. The choice is deliberate and enforced in code.
+
+The client is free to retry the request; a fresh request will go through the fallback chain from scratch (which IS allowed to transparently switch providers — see below).
+
+### Pre-connection fallback (transparent)
+
+When the primary returns a retryable error **before** any chunk has been sent to the client (connection failures, pre-first-chunk 5xx / 429 / timeout / network), the gateway walks the VK's `fallback.chain` the same way it does for non-streaming calls. The caller sees exactly one stream, from whichever credential accepted the request.
+
+`X-LangWatch-Fallback-Count` reports how many chain slots were skipped before the successful attempt. `0` means the primary worked; `N` means N providers were tried.
+
+Shipped in langwatch-saas `b8016b0` (@sergey Lane A iter 4 pt6).
 
 ## `stream_chunk` guardrails
 

@@ -60,14 +60,16 @@ If the client requests `gpt-5-mini` and fails over to Anthropic, the gateway app
 
 The `:fallback` suffix is optional — if absent the gateway uses the same model name against the next provider and expects it to exist.
 
-## Streaming caveat
+## Streaming
 
 Fallback behaviour differs based on when failure occurs:
 
-- **Before first chunk emits** → transparent fallback. Client sees no error; response arrives from the fallback provider.
-- **After first chunk has streamed** → **no mid-stream fallback**. The gateway closes the client connection with an SSE `error` event. The client may retry; a fresh request would then hit the fallback.
+- **Before first chunk emits** → transparent fallback. The stream-setup call (`bifrost.ChatCompletionStreamRequest`) walks the chain the same way non-streaming dispatch does; the client sees a single stream from whichever slot accepted the request. `X-LangWatch-Fallback-Count` reports the skipped slot count.
+- **After first chunk has streamed** → **no mid-stream fallback**. The gateway emits a terminal `event: error` frame (with `code: upstream_mid_stream_failure`) and closes the connection. The client may retry; a fresh request would then re-walk the chain.
 
-This is deliberate — mixing chunks from two providers would produce a Frankenstein stream that confuses both humans and parsing code.
+This split is deliberate — splicing chunks from two providers would produce an inconsistent response with mismatched tool-call ids and accumulated-content replay. It's a hard "no" per contract and enforced by a byte-exact assertion on the SSE error frame shape so future refactors can't accidentally break it.
+
+See [Streaming → pre-connection fallback / mid-stream failure](/ai-gateway/streaming#pre-connection-fallback-transparent) for the exact frame bytes and a worked example.
 
 ## Observing the chain in traces
 
