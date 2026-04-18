@@ -1,0 +1,151 @@
+---
+title: TypeScript SDK integration
+description: Use the LangWatch AI Gateway with the official OpenAI + Anthropic TypeScript SDKs, with proper trace propagation.
+sidebarTitle: TypeScript
+---
+
+Every TypeScript LLM SDK works by overriding its base URL and using a LangWatch virtual key. The gateway handles the rest.
+
+This page shows the standard setup plus how to propagate trace ids so you don't double-count cost.
+
+## OpenAI TypeScript SDK
+
+### Minimal setup
+
+```ts
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  baseURL: "https://gateway.langwatch.ai/v1",
+  apiKey: process.env.LW_VK,
+});
+
+const resp = await openai.chat.completions.create({
+  model: "gpt-5-mini",
+  messages: [{ role: "user", content: "Hi" }],
+});
+```
+
+### Trace propagation
+
+```ts
+import { getGatewayHeaders } from "langwatch";
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  baseURL: "https://gateway.langwatch.ai/v1",
+  apiKey: process.env.LW_VK,
+  defaultHeaders: getGatewayHeaders(),
+});
+```
+
+`getGatewayHeaders()` reads the active LangWatch trace (via the SDK's AsyncLocalStorage context) and returns a header object with `traceparent`, `X-LangWatch-Trace-Id`, `X-LangWatch-Parent-Span-Id`, `X-LangWatch-Thread-Id`. The gateway uses these to parent its span under your trace — no duplicate cost.
+
+<Note>`getGatewayHeaders()` ships in langwatch npm ≥ `v0.26.0` alongside the gateway GA. Check with `npm ls langwatch`.</Note>
+
+### Per-call overrides
+
+```ts
+const resp = await openai.chat.completions.create(
+  {
+    model: "gpt-5-mini",
+    messages: [{ role: "user", content: "Hi" }],
+  },
+  {
+    headers: {
+      "X-LangWatch-Cache": "disable",
+      "X-LangWatch-Trace-Metadata": JSON.stringify({ tier: "free" }),
+    },
+  }
+);
+```
+
+### Response inspection
+
+```ts
+const resp = await openai.chat.completions.withResponse().create({
+  model: "gpt-5-mini",
+  messages: [{ role: "user", content: "Hi" }],
+});
+const requestId = resp.response.headers.get("X-LangWatch-Request-Id");
+```
+
+## Anthropic TypeScript SDK
+
+```ts
+import Anthropic from "@anthropic-ai/sdk";
+import { getGatewayHeaders } from "langwatch";
+
+const anthropic = new Anthropic({
+  baseURL: "https://gateway.langwatch.ai",
+  apiKey: process.env.LW_VK,
+  defaultHeaders: getGatewayHeaders(),
+});
+
+const resp = await anthropic.messages.create({
+  model: "claude-haiku-4-5-20251001",
+  max_tokens: 64,
+  messages: [{ role: "user", content: "Hi" }],
+});
+```
+
+## Vercel AI SDK
+
+```ts
+import { createOpenAI } from "@ai-sdk/openai";
+import { getGatewayHeaders } from "langwatch";
+
+const openai = createOpenAI({
+  baseURL: "https://gateway.langwatch.ai/v1",
+  apiKey: process.env.LW_VK,
+  fetch: async (input, init) => {
+    const headers = new Headers(init?.headers);
+    for (const [k, v] of Object.entries(getGatewayHeaders())) headers.set(k, v as string);
+    return fetch(input, { ...init, headers });
+  },
+});
+
+const { text } = await generateText({
+  model: openai("gpt-5-mini"),
+  prompt: "Hi",
+});
+```
+
+Custom `fetch` lets the AI SDK pass gateway-specific headers on every request without the SDK having a `defaultHeaders` option.
+
+## LangChain.js
+
+```ts
+import { ChatOpenAI } from "@langchain/openai";
+import { getGatewayHeaders } from "langwatch";
+
+const llm = new ChatOpenAI({
+  configuration: {
+    baseURL: "https://gateway.langwatch.ai/v1",
+  },
+  apiKey: process.env.LW_VK,
+  modelKwargs: {
+    default_headers: getGatewayHeaders(),
+  },
+  model: "gpt-5-mini",
+});
+```
+
+## Self-hosted gateway
+
+Replace the hostname:
+
+```ts
+const openai = new OpenAI({
+  baseURL: "https://langwatch-gateway.your-corp.internal/v1",
+  apiKey: process.env.LW_VK,
+});
+```
+
+## Troubleshooting
+
+- **`401 invalid_api_key`** — wrong VK or revoked. Verify the first 12 chars in the LangWatch UI.
+- **Cost double-counted** — trace propagation not working. Check that `getGatewayHeaders()` returned non-empty (log the dict). If the active trace is null, no headers are set.
+- **CORS errors in browser** — the gateway does not expose CORS for the `/v1` routes by default. Use a server-side proxy; don't call the gateway from a browser with a production VK (it would expose the VK to users).
+
+See [API: Errors](/ai-gateway/api/errors).

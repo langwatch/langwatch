@@ -1,9 +1,123 @@
 ---
 title: Streaming
-description: Streaming — LangWatch AI Gateway.
+description: SSE semantics, byte-for-byte passthrough, and mid-stream behaviour.
 sidebarTitle: Streaming
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+LLM streaming over Server-Sent Events is a surprisingly load-bearing surface: coding CLIs parse tool-call deltas incrementally, UX layers render token-by-token, and any gateway that reformats the stream breaks something. The LangWatch AI Gateway is explicit about what it may and may not mutate.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## The streaming contract
+
+### Before the first chunk — mutations allowed
+
+- Gateway may inject response headers (`X-LangWatch-Request-Id`, `X-LangWatch-Provider`, `X-LangWatch-Model`).
+- Pre-call guardrails may rewrite the request payload before dispatch.
+- Fallback chain may transparently switch providers if the primary fails before any chunk arrives.
+
+At this point no client-visible byte has been emitted yet, so changes are safe.
+
+### After the first chunk — strict passthrough
+
+- SSE events are forwarded to the client **byte-for-byte**, in order, without merging, splitting, or reordering.
+- No header injection (except the ones already emitted on the first frame).
+- No mid-stream provider switch — even if the primary dies after chunk N, the gateway will NOT fall back to a secondary provider silently. Instead it terminates the stream.
+
+Coding CLIs like Claude Code and Codex depend on the exact `content_block_delta` / `input_json_delta` ordering; any reformat breaks their tool-call parser.
+
+### Mid-stream failure
+
+If the upstream connection drops after the first chunk:
+
+1. Gateway emits a terminal SSE `error` event:
+    ```
+    event: error
+    data: {"error":{"type":"provider_error","code":"provider_error","message":"Upstream connection reset after 2 chunks","param":null}}
+
+    ```
+2. Gateway closes the client connection.
+3. The failed provider's circuit-breaker counter increments.
+
+The client is free to retry the request; a fresh request will go through the fallback chain from scratch.
+
+## `stream_chunk` guardrails
+
+Guardrails with `direction: stream_chunk` run on each chunk **before emission**. See [Guardrails](/ai-gateway/guardrails).
+
+- Budget ≤50 ms per chunk. Slow guardrails fall through with an OTel warning.
+- Decision `block` terminates the stream with SSE `error`. Subsequent chunks are discarded.
+- Decision `modify` replaces the chunk content (body-level text rewrite or full-object rewrite).
+
+Stream-chunk guardrails are the only mechanism that may mutate chunks post-first-chunk — everything else must be a byte-for-byte passthrough.
+
+## Starting a streaming request
+
+### OpenAI-compatible
+
+```python
+from openai import OpenAI
+client = OpenAI(base_url="https://gateway.langwatch.ai/v1", api_key="lw_vk_live_...")
+
+for chunk in client.chat.completions.create(
+    model="gpt-5-mini",
+    messages=[{"role": "user", "content": "count to 5"}],
+    stream=True,
+):
+    print(chunk.choices[0].delta.content or "", end="")
+```
+
+### Anthropic-compatible
+
+```python
+import anthropic
+client = anthropic.Anthropic(base_url="https://gateway.langwatch.ai", api_key="lw_vk_live_...")
+
+with client.messages.stream(
+    model="claude-haiku-4-5-20251001",
+    max_tokens=64,
+    messages=[{"role": "user", "content": "count to 5"}],
+) as stream:
+    for text in stream.text_stream:
+        print(text, end="")
+```
+
+## Tool-call deltas — what to look for
+
+Anthropic emits this sequence for a tool call:
+
+```
+event: content_block_start
+data: {"index": 1, "content_block": {"type": "tool_use", "id": "tu_01H...", "name": "read_file", "input": {}}}
+
+event: content_block_delta
+data: {"index": 1, "delta": {"type": "input_json_delta", "partial_json": "{\"path\":"}}
+
+event: content_block_delta
+data: {"index": 1, "delta": {"type": "input_json_delta", "partial_json": " \"./README.md\"}"}}
+
+event: content_block_stop
+data: {"index": 1}
+```
+
+Claude Code reassembles `partial_json` chunks into a full JSON object. Any reordering or re-splitting breaks this. The gateway preserves the exact chunk boundaries.
+
+OpenAI emits tool-call deltas as:
+
+```
+data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_abc","function":{"name":"read_file","arguments":""}}]}}]}
+data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"path\":"}}]}}]}
+data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":" \"./README.md\"}"}}]}}]}
+```
+
+Same passthrough discipline.
+
+## Observability
+
+- `X-LangWatch-Request-Id` on the first frame.
+- Trace span per chunk is too expensive — the gateway records a single span per request with `langwatch.stream.chunk_count`, `langwatch.stream.first_chunk_ms`, `langwatch.stream.total_ms`.
+- If a mid-stream failure occurred, `langwatch.stream.terminated_at_chunk=N` records where.
+
+## Non-streaming clients
+
+Requests without `stream: true` are dispatched synchronously, accumulated upstream, and returned as a single JSON response. Pre-call guardrails run on the request; post-call guardrails run on the full response and can block/modify the final body.
+
+The "no mid-stream switch" rule doesn't apply — non-streaming calls can fall back freely because the client only ever sees the final successful response.

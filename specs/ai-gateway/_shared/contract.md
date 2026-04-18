@@ -239,9 +239,9 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
 }
 ```
 
-### 4.3 `GET /api/internal/gateway/changes?since=<revision>&timeout_s=25`
+### 4.3 `GET /api/internal/gateway/changes?since=<revision>&organization_id=<org_id>&timeout_s=25`
 
-Long-poll endpoint. Blocks up to `timeout_s` waiting for any VK mutation with `revision > since`.
+Long-poll endpoint. Blocks up to `timeout_s` waiting for any VK mutation in the given `organization_id` with `revision > since`. `organization_id` is **explicit** on the query string (not implicit from the HMAC signer's JWT) so the gateway doesn't have to decode a JWT on every long-poll and the control-plane can directly filter ChangeEvent rows by `organizationId` index.
 
 - **200 OK** with body if any mutation occurred before timeout.
 - **204 No Content** if timeout elapsed with no mutations (gateway re-polls immediately).
@@ -545,7 +545,82 @@ OTel trace records each block with span attribute `langwatch.policy.blocked=<kin
 
 ---
 
-## 12. Open questions (to resolve in next iterations)
+## 11c. Trace propagation headers
+
+The gateway sits in the critical path of every LLM call. Without trace propagation, every gateway span would spawn its **own** LangWatch trace — which double-counts cost (once on the caller's trace, once on the gateway's trace) and breaks the causality link from an application span to its LLM call.
+
+To avoid this, the gateway **honours incoming trace context** on every request:
+
+| Header | Meaning |
+|---|---|
+| `traceparent` (W3C Trace Context) | Standard `00-<trace_id>-<parent_span_id>-<flags>`. If valid, gateway emits its span as a child of `parent_span_id` on `trace_id`. |
+| `tracestate` (W3C) | Carried through verbatim to upstream OTel export. |
+| `X-LangWatch-Trace-Id` | LangWatch-native trace id override. Wins over `traceparent` if both set. |
+| `X-LangWatch-Parent-Span-Id` | LangWatch-native parent span id. |
+| `X-LangWatch-Thread-Id` | Optional conversation thread id; carried on the span as `langwatch.thread_id`. |
+| `X-LangWatch-Trace-Metadata` | JSON object merged into the span's custom metadata. |
+
+If **no** trace headers are present, the gateway creates a new trace and emits **`X-LangWatch-Trace-Id: <trace_id>`** and **`X-LangWatch-Request-Id: grq_…`** on the response so the caller can stitch later if desired.
+
+If the caller wants to keep traces independent (rare — e.g. a shared internal gateway that shouldn't expose its trace graph to callers), simply don't set the headers. No double-cost attribution in this case because the caller's side has no LLM span — only the gateway does.
+
+**SDK pass-through** (client-side): the OpenAI Python SDK, OpenAI TypeScript SDK, and Anthropic SDK all accept `extra_headers={}` on every method. The LangWatch Python/TS SDKs expose helpers to set these automatically when an active trace is in scope.
+
+Example (Python, OpenAI SDK):
+
+```python
+import langwatch
+from openai import OpenAI
+
+client = OpenAI(base_url="https://gateway.langwatch.ai/v1", api_key=LW_VK)
+
+with langwatch.trace(name="my-agent-turn") as trace:
+    resp = client.chat.completions.create(
+        model="gpt-5-mini",
+        messages=[...],
+        extra_headers=langwatch.get_gateway_headers(),   # injects traceparent + X-LangWatch-* automatically
+    )
+```
+
+`langwatch.get_gateway_headers()` is a new helper in the LangWatch SDK (ships in post-v1 SDK release alongside the gateway GA); it reads the active trace and formats the W3C + LangWatch-native headers.
+
+---
+
+## 12. Public REST API (for CLIs and external integrations)
+
+In addition to the internal `/api/internal/gateway/*` endpoints (gateway ↔ control-plane, §4), LangWatch exposes a **public REST API** for gateway resource CRUD at `/api/gateway/v1/*`. This is what the `langwatch` CLI and any external automation uses.
+
+Auth: existing LangWatch API tokens (personal access or service-account) presented as `Authorization: Bearer pat_...`. Permissions gated by the `virtualKeys:*`, `gatewayBudgets:*`, `gatewayProviders:*` scopes on the token.
+
+**Endpoints (canonical shapes):**
+
+| Method | Path | Purpose | Permission |
+|---|---|---|---|
+| `GET` | `/api/gateway/v1/virtual-keys` | List VKs in a project | `virtualKeys:view` |
+| `POST` | `/api/gateway/v1/virtual-keys` | Create VK (returns full secret once) | `virtualKeys:create` |
+| `GET` | `/api/gateway/v1/virtual-keys/:id` | Get VK (secret not returned) | `virtualKeys:view` |
+| `PATCH` | `/api/gateway/v1/virtual-keys/:id` | Update config (aliases, budgets, guardrails, providers) | `virtualKeys:update` |
+| `POST` | `/api/gateway/v1/virtual-keys/:id/rotate` | Rotate secret (returns new secret once) | `virtualKeys:rotate` |
+| `POST` | `/api/gateway/v1/virtual-keys/:id/revoke` | Revoke | `virtualKeys:delete` |
+| `GET` | `/api/gateway/v1/budgets` | List budgets | `gatewayBudgets:view` |
+| `POST` | `/api/gateway/v1/budgets` | Create budget | `gatewayBudgets:create` |
+| `PATCH` | `/api/gateway/v1/budgets/:id` | Update | `gatewayBudgets:update` |
+| `DELETE` | `/api/gateway/v1/budgets/:id` | Delete | `gatewayBudgets:delete` |
+| `GET` | `/api/gateway/v1/provider-credentials` | List gateway-scoped provider bindings | `gatewayProviders:view` |
+| `POST` | `/api/gateway/v1/provider-credentials` | Create binding over existing ModelProvider | `gatewayProviders:manage` |
+| `PATCH` | `/api/gateway/v1/provider-credentials/:id` | Update binding | `gatewayProviders:manage` |
+| `DELETE` | `/api/gateway/v1/provider-credentials/:id` | Delete binding | `gatewayProviders:manage` |
+| `GET` | `/api/gateway/v1/usage` | Spend / volume aggregations | `gatewayUsage:view` |
+
+**Response shape convention:** snake_case (`virtual_key_id`, `created_at`) to match the OpenAI / Anthropic API aesthetic that external integrations already expect.
+
+**Error envelope:** identical to the gateway data-plane error envelope (OpenAI-compatible). Type enum extended with `resource_not_found` (`404`) and `validation_error` (`422`).
+
+**Shared service layer:** the Hono REST routes and the internal tRPC routes **both** call the same `VirtualKeyService`, `GatewayBudgetService`, `GatewayProviderCredentialService`. No business logic is duplicated. Only the DTO-shape helpers differ (snake_case for REST, camelCase for tRPC) and they live in a shared mapper module (`src/server/gateway/mappers/`).
+
+**OpenAPI spec:** generated via `pnpm run openapi:gen` (TBD if not present) and published at `/api/gateway/v1/openapi.json` plus the docs site.
+
+## 13. Open questions (to resolve in next iterations)
 
 - [ ] **Self-host JWT secret rotation:** how do helm chart + control-plane agree on `LW_GATEWAY_JWT_SECRET` rotation without downtime? — @sergey to propose.
 - [ ] **Streaming fallback semantics:** the mid-stream policy above is conservative; verify Portkey / Helicone behaviour. — @andr competitor research.

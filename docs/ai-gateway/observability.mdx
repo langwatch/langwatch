@@ -1,9 +1,91 @@
 ---
 title: Observability
-description: Observability — LangWatch AI Gateway.
+description: Every gateway request emits a per-tenant LangWatch trace — what attributes, how routing works, how to use them.
 sidebarTitle: Observability
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+The LangWatch AI Gateway is a shared multi-tenant service, but observability is per-tenant: tenant A's traces land in tenant A's LangWatch project, tenant B's land in tenant B's, and no cross-tenant data leaks in either direction.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Per-tenant OTel routing — how it works
+
+Every request passing through the gateway emits an OTLP trace. The pattern is borrowed from Bifrost's `ObservabilityPlugin.Inject(ctx, trace)` primitive, adapted for LangWatch's attribution model:
+
+1. At auth resolution the gateway knows `vk_id → project_id → team_id → org_id → principal_id`.
+2. Every span in the request's trace is tagged with these as `langwatch.*` attributes.
+3. The OTel exporter reads `langwatch.project_id` on each span and routes the OTLP export to that project's ingestion endpoint with the project's collector token (cached from the control-plane).
+4. LangWatch's existing ingest pipeline stores the trace under the project.
+
+So the gateway never emits to a single shared collector — it emits N per-project streams, each authenticated with the owning project's token.
+
+## Self-hosted variant
+
+For single-tenant self-hosted deployments, the gateway emits to a single collector endpoint (`$LANGWATCH_OTEL_ENDPOINT`). Project attribution still happens via span attributes; LangWatch's ingest uses those to file the trace in the right project.
+
+## Attributes on every gateway span
+
+| Attribute | Meaning |
+|---|---|
+| `langwatch.vk_id` | Virtual key id that authed this request. |
+| `langwatch.project_id` | Owning project. |
+| `langwatch.team_id` | Owning team. |
+| `langwatch.org_id` | Owning organisation. |
+| `langwatch.principal_id` | User or service account that made the call. |
+| `langwatch.request_id` | The `X-LangWatch-Request-Id` emitted on the response. |
+| `langwatch.endpoint` | `/v1/chat/completions` / `/v1/messages` / etc. |
+| `langwatch.model_requested` | What the client sent. |
+| `langwatch.model_resolved` | Final provider/model after alias resolution. |
+| `langwatch.cost_usd` | Computed cost for this request. |
+| `langwatch.tokens.input` / `output` | Regular input/output tokens. |
+| `langwatch.cache_read_tokens` / `cache_write_tokens` | Provider-native cache counters. |
+| `langwatch.reasoning_tokens` | Reasoning tokens (o-series, Claude extended thinking). |
+| `langwatch.cache.outcome` | `hit` / `miss` / `bypass` / `forced`. |
+| `langwatch.status` | Final status: `success` / `provider_error` / `blocked_by_guardrail` / `budget_exceeded` / etc. |
+| `langwatch.client.name` | Heuristic client name from User-Agent (e.g. `claude-code`, `codex`, `openai-python`). |
+
+## Per-feature attributes (when applicable)
+
+- `langwatch.fallback.attempt=N` — set on each attempt span when fallback occurred. `attempt=0` is primary.
+- `langwatch.fallback.reason` — `5xx:503` / `timeout:30001ms` / `rate_limit:429` etc.
+- `langwatch.policy.blocked` — `tools:shell.exec` / `urls:evil.com` when a blocked-pattern match rejected the request.
+- `langwatch.budget.breached_scope` — `project:month` when the request was hard-blocked.
+- `langwatch.budget.warnings` — comma-separated `scope:pct_used` list on soft breaches.
+- `langwatch.guardrail.<direction>.blocked` — true when a guardrail in that direction caused a block.
+- `langwatch.stream.chunk_count` / `first_chunk_ms` / `total_ms` / `terminated_at_chunk` — stream telemetry.
+- `langwatch.cache.forced_injected` — true when `cache.mode=force` added cache_control blocks the client didn't send.
+
+## Filtering in the LangWatch UI
+
+Attribute-based filters in the Messages view compose into dashboards:
+
+- "All gateway traffic this week": `attr.langwatch.endpoint != ""`.
+- "Claude Code usage by engineer": `attr.langwatch.client.name = "claude-code"`, group by `principal_id`.
+- "Cache-economics dashboard": sum `cache_read_tokens` / `input_tokens` over 7 days.
+- "Fallback incidents": `attr.langwatch.fallback.attempt > 0`, group by `fallback.reason`.
+- "Blocked by policy": `attr.langwatch.policy.blocked != ""`.
+
+## Metrics (Prometheus)
+
+The gateway exposes `/metrics` for Prometheus:
+
+- `gateway_requests_total{provider, model, status}` — request counts.
+- `gateway_request_duration_seconds` — end-to-end latency histogram.
+- `gateway_provider_duration_seconds{provider}` — upstream latency histogram.
+- `gateway_cache_hits_total{outcome}` — cache outcome counts.
+- `gateway_budget_blocks_total{scope}` — budget rejections.
+- `gateway_guardrail_blocks_total{direction}` — guardrail rejections.
+- `gateway_circuit_state{provider}` — 0 closed / 1 half-open / 2 open.
+- `gateway_auth_cache_size{layer=l1|l2}`.
+- `gateway_auth_cache_hits_total{layer}`.
+- `gateway_internal_rtt_seconds{endpoint}` — control-plane round-trip times.
+
+Scrape with a `ServiceMonitor` (Prometheus Operator) or standard scrape config — see [Self-Hosting → Helm](/ai-gateway/self-hosting/helm#monitoring).
+
+## When OTel and metrics disagree
+
+OTel traces are sampled (configurable), metrics are exact counters. If your metrics show 1k requests but the LangWatch UI only has 100 traces for a given window, check the OTel sampling rate — it's set via `$LW_GATEWAY_OTEL_SAMPLE_RATIO` (default `1.0` = 100%).
+
+Error requests are always sampled at 100% regardless of the setting, so debugging remains reliable even when bulk sampling is lower.
+
+## Debugging a single request
+
+From a log line or an error at the client, grab the `X-LangWatch-Request-Id` (`grq_01HZX9K3M…`). Paste into the LangWatch search bar and you land on the full trace: every attempt span, upstream latency, guardrail decisions, cache outcome, budget deltas. No digging through provider-side logs.

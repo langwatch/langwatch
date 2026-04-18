@@ -1,9 +1,49 @@
 ---
-title: Overview
-description: Overview — LangWatch AI Gateway.
+title: Providers
+description: Every LLM provider the LangWatch AI Gateway can dispatch to.
 sidebarTitle: Overview
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+The gateway delegates provider-specific dispatch to [`bifrost/core`](https://github.com/maximhq/bifrost), which LangWatch embeds as a Go library. This page lists the providers the gateway can talk to today and the path to configuring each.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Configure a provider credential once, use from many VKs
+
+Every provider credential lives in the LangWatch **Model Providers** table (under **Settings → Model Providers**). It's the same surface that powers evaluators and the playground — no separate "gateway providers" store.
+
+To use a credential in the gateway, create a `GatewayProviderCredential` binding that references it + layers on gateway-only settings (rate limits, rotation, extra headers). Each VK then binds to one or more `GatewayProviderCredential`s as its primary + fallback chain.
+
+```
+ModelProvider (raw credential)
+  └── GatewayProviderCredential (gateway-specific binding)
+       └── VirtualKey.providers[] (ordered primary + fallback)
+```
+
+This layering means: rotating the raw OpenAI key rotates it everywhere; changing a rate limit or extra header only affects gateway traffic; binding a VK to a different provider is a one-click edit.
+
+## Supported providers (v1)
+
+| Provider | Routes supported | Auth methods | Caching passthrough |
+|---|---|---|---|
+| [OpenAI](/ai-gateway/providers/openai) | chat / responses / embeddings / images / audio / moderations | API key | auto-prefix |
+| [Anthropic](/ai-gateway/providers/anthropic) | messages / chat (translated) / streaming | API key | `cache_control` blocks |
+| [Azure OpenAI](/ai-gateway/providers/azure-openai) | chat / responses / embeddings / images / audio | API key / AAD | auto-prefix |
+| [AWS Bedrock](/ai-gateway/providers/bedrock) | messages / chat / embeddings (Titan) | AWS SigV4 / IRSA | `cachePoint` |
+| [Google Vertex AI](/ai-gateway/providers/vertex) | messages / chat | GCP ADC / SA JSON | implicit context cache |
+| [Google Gemini](/ai-gateway/providers/gemini) | chat | API key | implicit context cache |
+| [Custom OpenAI-compatible](/ai-gateway/providers/custom-openai-compatible) | chat / embeddings (depends on upstream) | Bearer / custom header | opaque |
+
+Behind the scenes bifrost/core also supports Groq, Cohere, Mistral, Ollama, vLLM, SGLang, Perplexity, ElevenLabs, and others. These will light up in the UI as LangWatch ships the per-provider configuration forms.
+
+## Picking a primary + fallback
+
+Most VKs end up with 1-2 fallback providers. Guidelines:
+
+- **Anthropic-first** with Bedrock-Anthropic fallback. Same models on both sides; Bedrock is a warm backup during Anthropic direct outages.
+- **OpenAI-first** with Anthropic fallback. Different model families but Claude Haiku can serve `gpt-5-mini` traffic acceptably for coding tasks.
+- **Azure-first** with OpenAI direct fallback. Pins traffic inside Azure data-residency most of the time but tolerates regional Azure outages.
+
+See [Fallback Chains](/ai-gateway/providers/fallback-chains) for trigger semantics.
+
+## Multi-region / multi-account
+
+Each provider binding pins a region (Azure endpoint, Bedrock region, Vertex project). If an organisation spans multiple regions, create one `GatewayProviderCredential` per region with a naming convention (e.g. `openai-eu`, `openai-us`) and use VK `model_aliases` to route `gpt-5-mini-eu` vs `gpt-5-mini-us` to the right credential.

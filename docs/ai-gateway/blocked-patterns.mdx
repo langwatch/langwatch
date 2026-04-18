@@ -1,9 +1,123 @@
 ---
 title: Blocked Patterns
-description: Blocked Patterns — LangWatch AI Gateway.
+description: Per-VK regex allow/deny lists for tool calls, MCP servers, and outbound URLs.
 sidebarTitle: Blocked Patterns
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+Blocked patterns are a lightweight pre-dispatch policy layer: simple regex allow/deny lists for three kinds of request content. Unlike [Guardrails](/ai-gateway/guardrails), no evaluator is involved — it's a synchronous regex match, enforced at the gateway in microseconds.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+Three kinds of patterns:
+
+- **Tools** — matched against the names of tools the client declares.
+- **MCP servers** — matched against MCP server names / URLs the client declares.
+- **URLs** — heuristically matched against outbound URLs in tool-call arguments.
+
+Each has a `deny` list and an optional `allow` list.
+
+## How it works
+
+```json
+{
+  "blocked_patterns": {
+    "tools": {
+      "deny":  ["^shell\\.", "^filesystem\\.(write|delete|chmod)$"],
+      "allow": null
+    },
+    "mcp": {
+      "deny":  ["^.*@mcp/unverified.*$"],
+      "allow": null
+    },
+    "urls": {
+      "deny":  [],
+      "allow": ["^https?://(allowed\\.example\\.com|api\\.internal\\.com)/.*"]
+    }
+  }
+}
+```
+
+**Deny semantics:** any value matching a `deny` regex is blocked → 403.
+
+**Allow semantics:** if `allow` is **non-null**, it becomes an allowlist — only values matching `allow` pass through. Anything else is blocked. `allow: null` means "no allowlist, deny-only."
+
+## What gets checked
+
+### Tools
+
+OpenAI Chat Completions: matched against `tools[].function.name`.
+Anthropic Messages: matched against `tools[].name`.
+
+Blocked → `403 tool_not_allowed` with the offending name in `error.message`. The trace records `langwatch.policy.blocked=tools:<name>`.
+
+### MCP servers
+
+If the request declares `mcp_servers` (on the Anthropic Messages API), each `.name` and `.url` is matched.
+
+Blocked → `403 tool_not_allowed` (we conflate MCP denials with tool denials for the error envelope; the policies_triggered field disambiguates).
+
+### URLs
+
+Heuristic: fields inside `tools[].function.arguments` (OpenAI) or `tools[].input` (Anthropic) whose names match `/url|endpoint|uri|href/i` are string-checked against the URL patterns.
+
+This is **advisory** in v1 — hard enforcement of outbound URLs requires an egress proxy on the node running the tool call, which is outside the gateway's responsibility.
+
+Blocked → `403 url_not_allowed`. Trace records `langwatch.policy.blocked=urls:<pattern>`.
+
+## Common policies
+
+### Block shell execution
+
+```json
+"tools": { "deny": ["^shell\\..*", "^bash$", "^exec$", "^run_command$"] }
+```
+
+### Only allow approved filesystem paths
+
+```json
+"tools": {
+  "deny": ["^filesystem\\.(write|delete|chmod|move)$"]
+}
+```
+
+### Only allow official MCPs
+
+```json
+"mcp": {
+  "allow": ["^@modelcontextprotocol/.*", "^@anthropic-ai/.*"]
+}
+```
+
+### Outbound URL allowlist
+
+```json
+"urls": {
+  "allow": [
+    "^https?://api\\.internal\\.com/.*",
+    "^https?://public-allowlist\\.example\\.com/.*"
+  ]
+}
+```
+
+## Configuring via the UI
+
+On the VK edit screen, the Blocked Patterns section has three rows (tools / mcp / urls) with an inline regex editor and a "Test this pattern" button that evaluates against sample payloads.
+
+Common presets are available in a dropdown: "No shell execution," "Read-only filesystem," "Official MCPs only," "Internal URLs only."
+
+## Performance
+
+Pattern checks are synchronous regex evaluations; total latency is sub-millisecond even for VKs with dozens of patterns. Patterns are compiled once and cached in the gateway's per-VK config cache.
+
+## Combining with guardrails
+
+Blocked patterns are the first policy check on a request, before any guardrail call. If a pattern matches, the request fails fast without incurring a guardrail evaluator run.
+
+Use patterns for deterministic rules (tool names, URL allowlists) and guardrails for anything that needs semantic analysis (is this prompt an injection attempt?).
+
+## Auditing
+
+Every block emits:
+
+- Trace attribute `langwatch.policy.blocked=<kind>:<pattern>`.
+- `GatewayAuditLog` row with actor principal, VK id, policy kind, matched pattern, offending value (truncated to 64 chars), request id.
+
+Use the audit log to identify repeat offenders and tune patterns.

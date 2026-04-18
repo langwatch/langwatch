@@ -1,9 +1,70 @@
 ---
-title: Azure Openai
-description: Azure Openai — LangWatch AI Gateway.
-sidebarTitle: Azure Openai
+title: Azure OpenAI
+description: Configure Azure OpenAI (deployment-based model ids) as a provider behind the LangWatch AI Gateway.
+sidebarTitle: Azure OpenAI
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+Azure OpenAI is enterprise OpenAI with data-residency, AAD integration, and SLA guarantees — but with a deployment-based model-id convention that breaks most OpenAI SDKs out of the box. The gateway handles Azure's quirks via bifrost/core so any OpenAI-shaped client just works.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Configure the provider credential
+
+Under **Settings → Model Providers**:
+
+1. **Add provider → Azure OpenAI**.
+2. Paste:
+    - **Endpoint** — e.g. `https://my-resource.openai.azure.com`.
+    - **API key** — Azure OpenAI key (hex string).
+    - **API version** — e.g. `2024-08-01-preview` (pin explicitly; don't rely on "latest").
+3. (Optional) **Default deployment name** — if clients send a bare model name, the gateway maps it to this deployment.
+4. Save.
+
+## Deployment-based model routing
+
+Azure OpenAI binds models to **deployments**, which have customer-chosen names. `gpt-4o` in the OpenAI SDK needs to become `my-gpt-4o-deployment` at Azure — a mapping step. The gateway handles this via VK `model_aliases`:
+
+```json
+{
+  "model_aliases": {
+    "gpt-4o":       "azure/my-gpt-4o-deployment",
+    "gpt-5-mini":   "azure/my-mini-deployment",
+    "o3":           "azure/my-o3-deployment"
+  }
+}
+```
+
+Now an OpenAI-SDK client that sends `model: "gpt-4o"` reaches the correct Azure deployment without knowing Azure exists. This is a key value-prop of aliases — the VK owner maps generic model names to their Azure infrastructure, and application code never changes.
+
+## Supported endpoints
+
+Identical to OpenAI direct:
+
+- `/v1/chat/completions`, `/v1/responses`, `/v1/embeddings`, `/v1/images/generations`, `/v1/audio/*`, `/v1/moderations`.
+
+The gateway translates the outgoing path + query string to Azure's format (`/openai/deployments/{deployment}/chat/completions?api-version=...`).
+
+## Auth headers
+
+OpenAI uses `Authorization: Bearer`, Azure uses `api-key: <hex>`. Bifrost/core swaps headers automatically based on the ModelProvider type. The client-facing VK auth is always `Authorization: Bearer lw_vk_live_…` (or one of the alternates — see [Virtual Keys](/ai-gateway/virtual-keys)).
+
+## AAD / Managed Identity
+
+For self-hosted gateway in Azure (AKS, App Service), you can omit the API key and use AAD auth:
+
+1. Assign the gateway's managed identity the "Cognitive Services OpenAI User" role on the Azure OpenAI resource.
+2. Set the ModelProvider's API key to `__use_aad__` (sentinel).
+3. The gateway uses `DefaultAzureCredential` to fetch tokens.
+
+Token caching + refresh are handled by bifrost/core.
+
+## Known quirks
+
+- **API version drift.** Azure changes API versions frequently; `2024-02-01` and `2024-08-01-preview` have different request/response shapes. Pin the version on the ModelProvider; don't rely on the newest.
+- **Content filtering.** Azure runs its own content filter before and after the model. A request blocked by Azure's filter returns 400 with a `content_filter_result` body; the gateway surfaces this as `provider_error` with the filter metadata in the OTel trace.
+- **Streaming SSE format.** Identical to OpenAI direct — `data: {...}\n\n` frames terminated by `data: [DONE]`. Byte-for-byte passthrough applies.
+- **Region naming.** Azure regions use dash-case (`eastus`, `westeurope`) vs AWS's dot-case. The gateway does not enforce a region — it's baked into the Endpoint URL.
+- **Rate limits.** Azure has per-deployment quota (PTU or TPM-based). A 429 shows `Retry-After` like OpenAI; treat it the same way (fallback trigger or client retry).
+- **Unsupported features.** Some OpenAI features (e.g. `/v1/audio/speech` TTS) are not yet available on Azure OpenAI depending on region.
+
+## Bifrost/core handles the ceremony
+
+The key-selling-point of the `bifrost/core` library: it hides the Azure idiosyncrasies (deployment URL construction, `api-key` vs `Bearer`, API-version query param, AAD vs key auth, regional endpoint detection). Users of the gateway see a plain OpenAI-shape API.

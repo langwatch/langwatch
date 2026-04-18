@@ -1,9 +1,66 @@
 ---
-title: Embeddings
-description: Embeddings — LangWatch AI Gateway.
+title: POST /v1/embeddings
+description: OpenAI-compatible embeddings endpoint through the LangWatch AI Gateway.
 sidebarTitle: Embeddings
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+OpenAI-compatible embeddings. Works against OpenAI, Azure OpenAI, Bedrock (Titan), Vertex, Gemini, and Custom OpenAI-compatible providers that implement `/v1/embeddings`.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Request
+
+```
+POST /v1/embeddings
+Authorization: Bearer lw_vk_live_<ULID>
+Content-Type: application/json
+```
+
+```json
+{
+  "model": "text-embedding-3-small",
+  "input": ["Hello", "World"]
+}
+```
+
+`input` accepts a single string or an array of strings. Token pricing is per-input-token summed across the array.
+
+## Response
+
+OpenAI-shape. Additional LangWatch headers:
+
+```http
+X-LangWatch-Request-Id: grq_01HZX9K3M...
+X-LangWatch-Provider: openai
+X-LangWatch-Model: text-embedding-3-small
+
+{
+  "object": "list",
+  "data": [
+    { "object": "embedding", "index": 0, "embedding": [0.012, -0.033, ...] },
+    { "object": "embedding", "index": 1, "embedding": [0.089, 0.041, ...] }
+  ],
+  "model": "text-embedding-3-small",
+  "usage": { "prompt_tokens": 2, "total_tokens": 2 }
+}
+```
+
+## Provider compatibility
+
+| Provider | Supported | Models |
+|---|---|---|
+| OpenAI | ✅ | `text-embedding-3-small`, `text-embedding-3-large`, `text-embedding-ada-002` |
+| Azure OpenAI | ✅ | Same as OpenAI (via deployment names) |
+| Bedrock | ✅ Titan | `amazon.titan-embed-text-v2:0` |
+| Vertex AI | ✅ Gemini embeddings | `textembedding-gecko`, `gemini-embedding-001` |
+| Gemini (AI Studio) | ✅ | `text-embedding-004`, `gemini-embedding-001` |
+| Anthropic | ❌ | No embeddings endpoint |
+| Custom OpenAI-compatible | varies | depends on upstream |
+
+## Fallback and caching
+
+Subject to the same fallback rules as chat (see [Fallback Chains](/ai-gateway/providers/fallback-chains)). Embedding models are less prone to provider outages than chat models but the chain is there if needed.
+
+Caching: deterministic — identical `(model, input)` tuples produce identical vectors, so aggressive semantic caching is feasible. V1 does not enable gateway-level caching for embeddings; use a local cache in your application layer.
+
+## Errors
+
+See [API: Errors](/ai-gateway/api/errors).

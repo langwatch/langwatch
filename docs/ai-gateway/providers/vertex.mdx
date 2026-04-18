@@ -1,9 +1,66 @@
 ---
-title: Vertex
-description: Vertex — LangWatch AI Gateway.
-sidebarTitle: Vertex
+title: Google Vertex AI
+description: Configure Google Vertex AI (Anthropic, Gemini) as a provider behind the LangWatch AI Gateway.
+sidebarTitle: Google Vertex AI
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+Vertex AI is Google Cloud's enterprise LLM surface — Anthropic's Claude family lives there alongside Gemini for customers who need GCP-native security and data-residency. The gateway uses bifrost/core which handles Vertex's OAuth / ADC flow, regional endpoints, and Anthropic-on-Vertex model-id quirks.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Configure the provider credential
+
+Under **Settings → Model Providers**:
+
+1. **Add provider → Google Vertex AI**.
+2. Choose authentication:
+    - **Service account JSON** — paste the JSON key (least-privilege role: `roles/aiplatform.user` or `roles/aiplatform.serviceAgent`).
+    - **Application Default Credentials** — leave JSON empty; gateway picks up workload identity on GKE / Cloud Run.
+3. Set **project ID** and **region** (`us-central1`, `us-east5`, `europe-west1` — Anthropic-on-Vertex has a limited region list).
+4. Save.
+
+## Model id format
+
+Vertex model ids differ by model family:
+
+- `publishers/anthropic/models/claude-haiku-4-5-20251001@20251001` — Anthropic Claude on Vertex.
+- `publishers/google/models/gemini-2.5-flash` — Gemini via Vertex.
+
+Expose friendly names via VK `model_aliases`:
+
+```json
+{
+  "model_aliases": {
+    "claude-haiku":  "vertex/publishers/anthropic/models/claude-haiku-4-5-20251001@20251001",
+    "gemini-flash":  "vertex/publishers/google/models/gemini-2.5-flash"
+  }
+}
+```
+
+## Supported endpoints
+
+- `POST /v1/messages` — Anthropic-shape dispatched to Vertex's `rawPredict` (or `streamRawPredict`) endpoint for Anthropic models.
+- `POST /v1/chat/completions` — translated shape for both Anthropic-on-Vertex and Gemini.
+
+## `cache_control` passthrough
+
+Anthropic-on-Vertex supports prompt caching via the same `cache_control` blocks. Bifrost/core translates the shape for Vertex's raw-predict endpoint. Cache-read/write token counts flow back as with direct Anthropic.
+
+Gemini's implicit context caches are exposed via a separate API (`caches.create`); the gateway does not orchestrate these in v1 but forwards any cache-reference params the client includes.
+
+## Known quirks
+
+- **Region availability.** Anthropic-on-Vertex is not in every GCP region. `us-central1`, `us-east5`, `europe-west1`, `asia-southeast1` cover most cases. A 404 with "publisher not found" means wrong region.
+- **Token refresh.** Service-account tokens expire after ~1 hour. Bifrost/core caches and auto-refreshes — no configuration needed from the VK owner.
+- **Quota headers.** Vertex returns `x-vertex-ai-quota-remaining` and throttles with 429 when exhausted. Bifrost/core surfaces the 429 to the fallback engine.
+- **Provisioned throughput vs on-demand.** Provisioned throughput ("Committed Use Discounts") has separate regional ARNs. If you're using provisioned, pass the PT-specific URL on the ModelProvider.
+- **Model IDs include `@20251001` version suffix** — omitting it may route to a different model version silently. Always pin explicit versions in aliases.
+- **Streaming.** Vertex's streaming format is JSON-lines (`\n`-delimited) not SSE. Bifrost/core normalises to SSE for the client.
+
+## Using workload identity on GKE
+
+Recommended for self-hosted gateway in GKE:
+
+1. Create a Google service account with `roles/aiplatform.user`.
+2. Bind it to the gateway pod's KSA via Workload Identity annotation.
+3. Leave the ModelProvider's JSON empty — ADC flows automatically.
+
+No JSON-key rotation chores; Google rotates tokens per-pod.

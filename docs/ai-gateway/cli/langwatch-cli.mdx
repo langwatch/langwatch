@@ -1,0 +1,191 @@
+---
+title: langwatch CLI
+description: Manage virtual keys, budgets, and provider bindings from the terminal.
+sidebarTitle: langwatch CLI
+---
+
+The `langwatch` CLI lets you provision and manage AI Gateway resources without the UI. It hits the same public REST API (`/api/gateway/v1/*`) that powers the dashboard — the CLI and UI share a service layer server-side, so behaviour is identical.
+
+Ships in the LangWatch TypeScript SDK npm package: `npm i -g langwatch`.
+
+## Authentication
+
+```bash
+langwatch login
+```
+
+Paste a personal-access token or a service-account token when prompted. The token is stored under `~/.langwatch/config.json` and used for every subsequent CLI call. To use a different token for a one-off call, set `LANGWATCH_API_KEY=...` in the environment.
+
+Permissions required on the token mirror the RBAC grants documented in [RBAC](/ai-gateway/rbac):
+
+| Command group | Permission |
+|---|---|
+| `virtual-keys list|get` | `virtualKeys:view` |
+| `virtual-keys create` | `virtualKeys:create` |
+| `virtual-keys update` | `virtualKeys:update` |
+| `virtual-keys rotate` | `virtualKeys:rotate` |
+| `virtual-keys revoke` | `virtualKeys:delete` |
+| `gateway-budgets *` | `gatewayBudgets:*` |
+| `gateway-providers *` | `gatewayProviders:*` |
+
+## Virtual keys
+
+### List
+
+```bash
+langwatch virtual-keys list
+langwatch virtual-keys list --format json
+```
+
+Output (table):
+
+```
+Name          Prefix            Env   Status   Providers           Last Used           Created
+prod-key      lw_vk_live_01HZX… live  active   openai,anthropic    2026-04-18 21:03    2026-04-10
+dev-key       lw_vk_test_01HZW… test  active   openai              2026-04-18 18:21    2026-04-12
+stale-key     lw_vk_live_01HZV… live  revoked  openai              2026-03-29 10:15    2026-03-12
+```
+
+### Create
+
+```bash
+langwatch virtual-keys create \
+  --name prod-key \
+  --env live \
+  --provider openai \
+  --provider anthropic \
+  --alias gpt-4o=azure/my-deployment \
+  --budget-usd 100 --budget-window month
+```
+
+Returns the full secret **once**:
+
+```
+✓ Created virtual key: lw_vk_live_01HZX9K3M...
+
+  Copy now — this is the only time this secret is shown:
+
+  ┌──────────────────────────────────────────────────────┐
+  │  lw_vk_live_01HZX9K3MABCDEFGH...JIKLMN0Z             │
+  └──────────────────────────────────────────────────────┘
+
+  Next steps:
+    export OPENAI_API_KEY=lw_vk_live_01HZX9K3M...
+    export OPENAI_BASE_URL=https://gateway.langwatch.ai/v1
+```
+
+Use `--format json` for scripting:
+
+```bash
+VK=$(langwatch virtual-keys create --name ci --provider openai --format json | jq -r .secret)
+```
+
+### Get details
+
+```bash
+langwatch virtual-keys get prod-key
+# Or by id:
+langwatch virtual-keys get vk_01HZX9K3MN...
+```
+
+Prints the VK's full config: providers, fallback conditions, aliases, models allowed, cache mode, guardrails, blocked patterns, budgets, last-used timestamp, owning principal.
+
+### Rotate
+
+```bash
+langwatch virtual-keys rotate prod-key
+# Or: langwatch virtual-keys rotate prod-key --yes   # skip confirmation
+```
+
+Displays the new secret exactly once. Old secret stays valid for a 24-hour grace window — update clients during that time.
+
+### Revoke
+
+```bash
+langwatch virtual-keys revoke stale-key
+# Or: langwatch virtual-keys revoke stale-key --yes
+```
+
+Hard revocation, no grace. Gateway caches invalidate within 60 seconds via `/changes` feed.
+
+## Gateway budgets
+
+```bash
+# List
+langwatch gateway-budgets list
+langwatch gateway-budgets list --scope project --scope-id proj_01HZ...
+
+# Create
+langwatch gateway-budgets create \
+  --name eng-team-monthly \
+  --scope team --scope-id team_01HZ... \
+  --window month \
+  --limit-usd 5000 \
+  --on-breach warn
+
+# Update
+langwatch gateway-budgets update bgt_01HZ... --limit-usd 7500
+
+# Delete
+langwatch gateway-budgets delete bgt_01HZ...
+```
+
+## Provider credentials (gateway bindings)
+
+```bash
+# List gateway bindings that wrap ModelProvider rows
+langwatch gateway-providers list
+
+# Bind an existing ModelProvider row to the gateway with gateway-only settings
+langwatch gateway-providers create \
+  --model-provider mp_01HZ... \
+  --name openai-fast \
+  --rpm 10000 --tpm 1000000
+
+# Disable a binding (keeps it for audit, gateway stops routing through it)
+langwatch gateway-providers disable gpc_01HZ...
+```
+
+## Dogfooding loop
+
+After you've minted a VK, test it with the LangWatch SDK's smoke-test command:
+
+```bash
+VK=$(langwatch virtual-keys create --name dogfood --provider openai --format json | jq -r .secret)
+OPENAI_API_KEY=$VK OPENAI_BASE_URL=http://localhost:7400/v1 langwatch sdk test chat
+```
+
+The `sdk test chat` command opens a minimal OpenAI client, sends a hello-world completion, and reports the `X-LangWatch-Request-Id` + measured latency.
+
+## Scripting with `--format json`
+
+Every command accepts `--format json` (or `--format table`, the default). Use JSON for piping:
+
+```bash
+# Rotate every VK tagged `cli-key` older than 90 days
+langwatch virtual-keys list --format json | \
+  jq -r '.[] | select(.metadata.tags[]? == "cli-key" and .created_at < "2026-01-18") | .id' | \
+  xargs -n1 -I{} langwatch virtual-keys rotate {} --yes
+```
+
+## Environment variables
+
+| Variable | Meaning |
+|---|---|
+| `LANGWATCH_API_KEY` | Personal-access / service-account token. Overrides `~/.langwatch/config.json`. |
+| `LANGWATCH_PROJECT` | Default project id for commands that require one. |
+| `LANGWATCH_ENDPOINT` | LangWatch API base URL (for self-hosted). Default `https://app.langwatch.ai`. |
+| `LANGWATCH_NO_COLOR` | Disable ANSI colours in output. |
+
+## Exit codes
+
+- `0` — success.
+- `1` — user error (missing token, invalid flags, permission denied, validation errors).
+- `2` — upstream error (network, control-plane outage).
+
+Use `--verbose` to see full HTTP request/response details when debugging.
+
+## See also
+
+- [Public REST API reference](/ai-gateway/api/chat-completions) — every command maps to a `/api/gateway/v1/*` endpoint you can call directly from scripts that can't install Node.
+- [RBAC](/ai-gateway/rbac) — which permissions your token needs.
