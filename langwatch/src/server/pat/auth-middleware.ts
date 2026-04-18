@@ -28,7 +28,7 @@ export type UnifiedAuthVariables = {
 /**
  * Parses the Authorization header to extract credentials for all supported
  * auth methods:
- *   1. Basic Auth: base64(projectId:token) — for SDKs, Langfuse compat
+ *   1. Basic Auth: base64(projectId:token) — for SDKs
  *   2. Bearer PAT: pat-lw-... + X-Project-Id header
  *   3. Bearer Legacy: sk-lw-... (project ID implicit in key)
  *   4. X-Auth-Token: legacy header (any token type)

@@ -107,7 +107,7 @@ export default function SettingsLayout({
         >
           <MenuLink href="/settings">General Settings</MenuLink>
           {!isLiteMember && (
-            <MenuLink href={`/${project?.slug}/setup`}>API Key</MenuLink>
+            <MenuLink href="/settings/api-keys">API Keys</MenuLink>
           )}
 
           <NavSection
@@ -134,7 +134,6 @@ export default function SettingsLayout({
               "/settings/roles",
               "/settings/access-audit",
               "/settings/authentication",
-              "/settings/personal-access-tokens",
               "/settings/scim",
               "/settings/audit-log",
             ]}
@@ -148,7 +147,6 @@ export default function SettingsLayout({
               <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
             )}
             <MenuLink href="/settings/authentication">Authentication</MenuLink>
-            <MenuLink href="/settings/personal-access-tokens">Personal Access Tokens</MenuLink>
             {isEnterprise && !isLiteMember && (
               <MenuLink href="/settings/scim">SCIM Provisioning</MenuLink>
             )}
