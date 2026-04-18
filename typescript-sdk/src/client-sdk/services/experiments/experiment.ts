@@ -42,9 +42,19 @@ import type {
   TargetExecutionContext,
   TargetContext,
 } from "./types";
+import { printSummary } from "./printSummary";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;
+
+// Slim projections retained across the lifetime of an Experiment for
+// printSummary() — deliberately excludes large fields (inputs, tracebacks,
+// outputs) so running thousands of items doesn't unbound memory.
+type SummaryEvaluation = Pick<
+  EvaluationResult,
+  "name" | "evaluator" | "status" | "passed" | "score" | "cost" | "target_id"
+>;
+type SummaryEntry = Pick<BatchEntry, "duration" | "error" | "cost" | "target_id">;
 
 /**
  * AsyncLocalStorage for iteration context isolation.
@@ -88,6 +98,13 @@ export class Experiment {
   private lastSentMs = 0;
   private pendingFlush: Promise<void> | null = null;
   private flushTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // Cumulative record for printSummary() — never cleared, mirrors batch.
+  // Store only the fields printSummary() needs, not the full payloads —
+  // inputs/tracebacks/outputs can be large and don't belong in retained summary state.
+  private cumulativeEvaluations: SummaryEvaluation[] = [];
+  private cumulativeEntries: SummaryEntry[] = [];
+  private runUrl = "";
 
   // Target registry
   private targets = new Map<string, TargetInfo>();
@@ -184,7 +201,8 @@ export class Experiment {
       (this as { experimentSlug: string }).experimentSlug = data.slug;
 
       const encodedRunId = encodeURIComponent(this.runId);
-      console.log(`Follow results at: ${this.endpoint.replace(/\/$/, "")}${data.path}?runId=${encodedRunId}`);
+      this.runUrl = `${this.endpoint.replace(/\/$/, "")}${data.path}?runId=${encodedRunId}`;
+      console.log(`Follow results at: ${this.runUrl}`);
 
       this.initialized = true;
     } catch (error) {
@@ -368,6 +386,12 @@ export class Experiment {
       };
 
       this.batch.dataset.push(entry);
+      this.cumulativeEntries.push({
+        duration: entry.duration,
+        error: entry.error,
+        cost: entry.cost,
+        target_id: entry.target_id,
+      });
     }
 
     // Clean up
@@ -448,6 +472,15 @@ export class Experiment {
     };
 
     this.batch.evaluations.push(result);
+    this.cumulativeEvaluations.push({
+      name: result.name,
+      evaluator: result.evaluator,
+      status: result.status,
+      passed: result.passed,
+      score: result.score,
+      cost: result.cost,
+      target_id: result.target_id,
+    });
     this.scheduleSend();
   }
 
@@ -736,6 +769,12 @@ export class Experiment {
     };
 
     this.batch.dataset.push(entry);
+    this.cumulativeEntries.push({
+      duration: entry.duration,
+      error: entry.error,
+      cost: entry.cost,
+      target_id: entry.target_id,
+    });
     this.scheduleSend();
 
     return {
@@ -790,6 +829,153 @@ export class Experiment {
         this.flushTimeout = null;
         this.sendBatch();
       }, DEBOUNCE_INTERVAL_MS - (now - this.lastSentMs));
+    }
+  }
+
+  /**
+   * Print a CI-friendly summary and optionally exit with code 1 on failure.
+   *
+   * Mirrors `ExperimentRunResult.printSummary` for parity — SDK-driven experiments
+   * can now fail CI builds the same way platform experiments do.
+   *
+   * @param exitOnFailure - If true (default), calls `process.exit(1)` when any evaluation failed.
+   *
+   * @example
+   * ```typescript
+   * const experiment = await langwatch.experiments.init("ci-quality-check");
+   * await experiment.run(dataset, async ({ item, index }) => {
+   *   const response = await myLLM(item.input);
+   *   await experiment.evaluate("ragas/faithfulness", { index, data: { input: item.input, output: response } });
+   * });
+   * experiment.printSummary();
+   * ```
+   */
+  printSummary(exitOnFailure = true): void {
+    const evaluators = new Map<
+      string,
+      { passed: number; failed: number; scoreSum: number; scoreCount: number }
+    >();
+    let totalPassed = 0;
+    let totalFailed = 0;
+    let totalCost = 0;
+
+    for (const e of this.cumulativeEvaluations) {
+      const name = e.name ?? e.evaluator ?? "unknown";
+      if (!evaluators.has(name)) {
+        evaluators.set(name, { passed: 0, failed: 0, scoreSum: 0, scoreCount: 0 });
+      }
+      const stats = evaluators.get(name)!;
+      // Evaluators that crashed come back as status:"error" with passed often null;
+      // treat them as failures so CI doesn't silently succeed on evaluator crashes.
+      if (e.status === "error" || e.passed === false) {
+        stats.failed += 1;
+        totalFailed += 1;
+      } else if (e.passed === true) {
+        stats.passed += 1;
+        totalPassed += 1;
+      }
+      if (typeof e.score === "number") {
+        stats.scoreSum += e.score;
+        stats.scoreCount += 1;
+      }
+      if (typeof e.cost === "number") {
+        totalCost += e.cost;
+      }
+    }
+
+    const targets = new Map<
+      string,
+      { passed: number; failed: number; latencySum: number; latencyCount: number; cost: number }
+    >();
+    for (const entry of this.cumulativeEntries) {
+      const tid = entry.target_id;
+      if (!tid) continue;
+      if (!targets.has(tid)) {
+        targets.set(tid, { passed: 0, failed: 0, latencySum: 0, latencyCount: 0, cost: 0 });
+      }
+      const stats = targets.get(tid)!;
+      if (typeof entry.duration === "number") {
+        stats.latencySum += entry.duration;
+        stats.latencyCount += 1;
+      }
+      if (typeof entry.cost === "number") {
+        stats.cost += entry.cost;
+      }
+    }
+    // Lazily seed target stats from evaluations too — a user can log an
+    // evaluation with an explicit target_id without ever going through
+    // withTarget(), in which case the per-target entry row may not carry
+    // target_id. Without this, such a target would be silently dropped from
+    // the per-target summary.
+    for (const e of this.cumulativeEvaluations) {
+      const tid = e.target_id;
+      if (!tid) continue;
+      if (!targets.has(tid)) {
+        targets.set(tid, { passed: 0, failed: 0, latencySum: 0, latencyCount: 0, cost: 0 });
+      }
+      const stats = targets.get(tid)!;
+      if (e.status === "error" || e.passed === false) stats.failed += 1;
+      else if (e.passed === true) stats.passed += 1;
+      if (typeof e.cost === "number") stats.cost += e.cost;
+    }
+
+    const total = totalPassed + totalFailed;
+    const passRate = total > 0 ? (totalPassed / total) * 100 : 0;
+
+    // Wall-clock duration from init — summing entry durations over-counts
+    // under concurrent withTarget() calls (each target produces its own entry).
+    const duration = Math.max(0, Date.now() - this.createdAtMs);
+
+    // Count entries whose target/loop execution errored out — distinct from
+    // evaluator failures but must also trigger CI exit.
+    let failedCells = 0;
+    for (const entry of this.cumulativeEntries) {
+      if (typeof entry.cost === "number") totalCost += entry.cost;
+      if (entry.error) failedCells += 1;
+    }
+
+    const hasFailures = totalFailed > 0 || failedCells > 0;
+
+    printSummary({
+      runId: this.runId,
+      status: hasFailures ? "failed" : "completed",
+      passed: totalPassed,
+      failed: totalFailed,
+      passRate,
+      duration,
+      runUrl: this.runUrl,
+      summary: {
+        runId: this.runId,
+        totalCells: this.cumulativeEntries.length || total,
+        completedCells: Math.max(0, (this.cumulativeEntries.length || total) - failedCells),
+        failedCells,
+        duration,
+        runUrl: this.runUrl,
+        totalPassed,
+        totalFailed,
+        passRate,
+        totalCost,
+        targets: Array.from(targets.entries()).map(([targetId, s]) => ({
+          targetId,
+          name: targetId,
+          passed: s.passed,
+          failed: s.failed,
+          avgLatency: s.latencyCount > 0 ? s.latencySum / s.latencyCount : 0,
+          totalCost: s.cost,
+        })),
+        evaluators: Array.from(evaluators.entries()).map(([name, s]) => ({
+          evaluatorId: name,
+          name,
+          passed: s.passed,
+          failed: s.failed,
+          passRate: s.passed + s.failed > 0 ? (s.passed / (s.passed + s.failed)) * 100 : 0,
+          avgScore: s.scoreCount > 0 ? s.scoreSum / s.scoreCount : undefined,
+        })),
+      },
+    });
+
+    if (exitOnFailure && hasFailures) {
+      process.exit(1);
     }
   }
 

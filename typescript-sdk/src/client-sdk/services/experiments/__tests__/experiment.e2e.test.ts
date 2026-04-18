@@ -154,6 +154,78 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
     });
   });
 
+  describe("printSummary()", () => {
+    // Manually intercept console.log + process.exit. vi.spyOn(process, "exit")
+    // proved unreliable in CI — swap in the capture pattern that worked end-to-end.
+    async function captureSummary(fn: () => Promise<void> | void) {
+      const captured: string[] = [];
+      const origLog = console.log;
+      console.log = (...args: unknown[]) => {
+        captured.push(args.map(String).join(" "));
+      };
+      // eslint-disable-next-line @typescript-eslint/unbound-method
+      const origExit = process.exit;
+      let exitedWith: number | string | null | undefined = null;
+      (process as unknown as { exit: (c?: number) => void }).exit = ((c?: number) => {
+        exitedWith = c;
+      }) as never;
+      try {
+        await fn();
+      } finally {
+        console.log = origLog;
+        process.exit = origExit;
+      }
+      return { output: captured.join("\n"), exitedWith };
+    }
+
+    it("prints a CI-friendly summary after run completes against real server", async () => {
+      const evaluation = await langwatch.experiments.init(`test-print-summary-${Date.now()}`);
+      const dataset = [
+        { q: "What is 2+2?" },
+        { q: "What is 3+3?" },
+        { q: "What is 4+4?" },
+      ];
+
+      await evaluation.run(dataset, async ({ index }) => {
+        evaluation.log("accuracy", {
+          index,
+          score: index === 1 ? 0.3 : 0.95,
+          passed: index !== 1, // one failure, two passes
+        });
+      });
+
+      const { output, exitedWith } = await captureSummary(() => {
+        evaluation.printSummary();
+      });
+
+      expect(output).toContain("EXPERIMENT RESULTS");
+      expect(output).toContain("Passed:     2");
+      expect(output).toContain("Failed:     1");
+      expect(output).toMatch(/Pass Rate:\s+66\.7%/);
+      expect(output).toContain("Status:     FAILED");
+      expect(exitedWith).toBe(1);
+    });
+
+    it("does not exit when every evaluation passed (real server flow)", async () => {
+      const evaluation = await langwatch.experiments.init(`test-print-summary-pass-${Date.now()}`);
+      const dataset = [{ q: "a" }, { q: "b" }];
+
+      await evaluation.run(dataset, async ({ index }) => {
+        evaluation.log("accuracy", { index, score: 0.95, passed: true });
+      });
+
+      const { output, exitedWith } = await captureSummary(() => {
+        evaluation.printSummary();
+      });
+
+      expect(output).toContain("Passed:     2");
+      expect(output).toContain("Failed:     0");
+      expect(output).toContain("100.0%");
+      expect(output).toContain("Status:     COMPLETED");
+      expect(exitedWith).toBeNull();
+    });
+  });
+
   describe("target registration", () => {
     it("throws on conflicting metadata for same target", async () => {
       const evaluation = await langwatch.experiments.init(`test-conflict-${Date.now()}`);

@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from dataclasses import dataclass
 import json
+import sys
 import threading
 import time
 import traceback
@@ -35,6 +36,14 @@ from tqdm.auto import tqdm
 import langwatch
 from langwatch.attributes import AttributeKey
 from langwatch.domain import Money, TypedValueJson
+from langwatch.experiment.platform_run import (
+    EvaluatorStats,
+    ExperimentRunResult,
+    ExperimentRunSummary,
+    TargetStats,
+    _is_notebook,
+    _print_summary,
+)
 from langwatch.telemetry.tracing import LangWatchTrace
 from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import SerializableWithStringFallback
@@ -398,6 +407,179 @@ class Experiment:
             # IPython not available — fall through to text display
             pass
         print(df.to_string())
+
+    def print_summary(self, exit_on_failure: Optional[bool] = None) -> None:
+        """
+        Print a CI-friendly summary of the experiment and optionally exit with code 1 on failure.
+
+        Mirrors ``ExperimentRunResult.print_summary`` for parity — SDK-driven
+        experiments (``langwatch.experiment.init(...)`` + ``loop`` + ``evaluate``) can
+        now fail CI builds the same way platform experiments (``langwatch.experiment.run(slug)``) do.
+
+        Args:
+            exit_on_failure: If True, calls ``sys.exit(1)`` when there are failures.
+                             If False, never exits. If None (default), auto-detects:
+                             exits in scripts/CI, doesn't in Jupyter notebooks.
+
+        Example::
+
+            experiment = langwatch.experiment.init("ci-quality-check")
+            for idx, row in experiment.loop(dataset.iterrows()):
+                response = my_llm(row["input"])
+                experiment.evaluate("ragas/faithfulness", index=idx, data={...})
+
+            experiment.print_summary()
+        """
+        result = self._build_run_result()
+        _print_summary(result)
+
+        should_exit = exit_on_failure if exit_on_failure is not None else not _is_notebook()
+        if should_exit and (result.failed > 0 or result.summary.failed_cells > 0):
+            sys.exit(1)
+
+    def _build_run_result(self) -> ExperimentRunResult:
+        """Build an ExperimentRunResult from the current results DataFrame."""
+        run_url = self._run_url or ""
+        df = self.results
+
+        if df is None or df.empty:
+            empty_summary = ExperimentRunSummary(
+                run_id=self.run_id,
+                total_cells=0,
+                completed_cells=0,
+                failed_cells=0,
+                duration=0,
+                run_url=run_url,
+            )
+            return ExperimentRunResult(
+                run_id=self.run_id,
+                status="completed",
+                passed=0,
+                failed=0,
+                pass_rate=0.0,
+                duration=0,
+                run_url=run_url,
+                summary=empty_summary,
+            )
+
+        # Flatten any MultiIndex so we can access columns uniformly.
+        flat = df.reset_index() if df.index.names and any(n is not None for n in df.index.names) else df
+
+        passed_cols = [c for c in flat.columns if isinstance(c, str) and c.endswith("_passed")]
+
+        total_passed = 0
+        total_failed = 0
+        evaluators: List[EvaluatorStats] = []
+        for pcol in passed_cols:
+            name = pcol[: -len("_passed")]
+            col = flat[pcol].dropna()
+            passed = int((col == True).sum())  # noqa: E712 — pandas comparison
+            failed = int((col == False).sum())  # noqa: E712
+            total_passed += passed
+            total_failed += failed
+
+            avg_score: Optional[float] = None
+            if name in flat.columns:
+                numeric = pd.to_numeric(flat[name], errors="coerce").dropna()
+                if not numeric.empty:
+                    avg_score = float(numeric.mean())
+
+            subtotal = passed + failed
+            eval_pass_rate = (passed / subtotal * 100.0) if subtotal > 0 else 0.0
+            evaluators.append(
+                EvaluatorStats(
+                    evaluator_id=name,
+                    name=name,
+                    passed=passed,
+                    failed=failed,
+                    pass_rate=eval_pass_rate,
+                    avg_score=avg_score,
+                )
+            )
+
+        targets: List[TargetStats] = []
+        if "target" in flat.columns:
+            for target_id, sub in flat.groupby("target"):
+                t_passed = 0
+                t_failed = 0
+                for pcol in passed_cols:
+                    if pcol not in sub.columns:
+                        continue
+                    sub_col = sub[pcol].dropna()
+                    t_passed += int((sub_col == True).sum())  # noqa: E712
+                    t_failed += int((sub_col == False).sum())  # noqa: E712
+
+                avg_latency = 0.0
+                if "duration_ms" in sub.columns:
+                    dur_numeric = pd.to_numeric(sub["duration_ms"], errors="coerce").dropna()
+                    if not dur_numeric.empty:
+                        avg_latency = float(dur_numeric.mean())
+
+                t_cost = 0.0
+                if "cost" in sub.columns:
+                    cost_numeric = pd.to_numeric(sub["cost"], errors="coerce").dropna()
+                    if not cost_numeric.empty:
+                        t_cost = float(cost_numeric.sum())
+
+                targets.append(
+                    TargetStats(
+                        target_id=str(target_id),
+                        name=str(target_id),
+                        passed=t_passed,
+                        failed=t_failed,
+                        avg_latency=avg_latency,
+                        total_cost=t_cost,
+                    )
+                )
+
+        overall_total = total_passed + total_failed
+        pass_rate = (total_passed / overall_total * 100.0) if overall_total > 0 else 0.0
+
+        duration = 0
+        if "duration_ms" in flat.columns:
+            dur_all = pd.to_numeric(flat["duration_ms"], errors="coerce").dropna()
+            if not dur_all.empty:
+                duration = int(dur_all.sum())
+
+        total_cost = 0.0
+        if "cost" in flat.columns:
+            cost_all = pd.to_numeric(flat["cost"], errors="coerce").dropna()
+            if not cost_all.empty:
+                total_cost = float(cost_all.sum())
+
+        # Count rows whose target/loop execution errored out (non-null error column).
+        # These are execution failures distinct from evaluator failures — CI must
+        # treat them as failures too, not just evaluator mismatches.
+        failed_cells = 0
+        if "error" in flat.columns:
+            failed_cells = int(flat["error"].notna().sum())
+
+        summary = ExperimentRunSummary(
+            run_id=self.run_id,
+            total_cells=len(flat),
+            completed_cells=len(flat) - failed_cells,
+            failed_cells=failed_cells,
+            duration=duration,
+            run_url=run_url,
+            targets=targets,
+            evaluators=evaluators,
+            total_passed=total_passed,
+            total_failed=total_failed,
+            pass_rate=pass_rate,
+            total_cost=total_cost,
+        )
+
+        has_failures = total_failed > 0 or failed_cells > 0
+        return ExperimentRunResult(
+            run_id=self.run_id,
+            status="failed" if has_failures else "completed",
+            passed=total_passed,
+            failed=total_failed,
+            pass_rate=pass_rate,
+            duration=duration,
+            run_url=run_url,
+            summary=summary,
+        )
 
     def __repr__(self) -> str:
         status = "finished" if self._finished else "running" if self.initialized else "not started"
