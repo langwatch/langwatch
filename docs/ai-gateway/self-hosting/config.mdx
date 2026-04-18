@@ -50,9 +50,9 @@ Provider credentials are managed from the UI (Gateway → Providers), not env va
 | `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` | `60000` | Per-upstream call timeout. Longer than reasonable for most calls; streaming requests extend via write-deadline reset on chunk |
 | `LW_GATEWAY_UPSTREAM_MAX_CONN_PER_HOST` | `256` | Connection pool size per (provider, region) |
 | `LW_GATEWAY_UPSTREAM_IDLE_TIMEOUT_S` | `90` | Keep-alive idle |
-| `LW_GATEWAY_CIRCUIT_BREAKER_ERROR_RATIO` | `0.5` | Open circuit at 50% errors over window |
-| `LW_GATEWAY_CIRCUIT_BREAKER_WINDOW_S` | `30` | Breaker rolling window |
-| `LW_GATEWAY_CIRCUIT_BREAKER_COOLDOWN_S` | `15` | Half-open probe delay |
+| `LW_GATEWAY_CIRCUIT_WINDOW_S` | `30` | Breaker sliding window |
+| `LW_GATEWAY_CIRCUIT_THRESHOLD` | `10` | Failures inside the window that open the circuit |
+| `LW_GATEWAY_CIRCUIT_COOLDOWN_S` | `60` | How long the circuit stays open before a half-open probe |
 
 Circuit breaker state is per-replica — no shared Redis dependency. This is intentional: under a large-scale outage, having N replicas rediscover independently is resilient; having them all depend on Redis for breaker state is not.
 

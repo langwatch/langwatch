@@ -543,6 +543,12 @@
               "ai-gateway/self-hosting/health-checks",
               "ai-gateway/self-hosting/scaling"
             ]
+          },
+          {
+            "group": "Cookbooks",
+            "pages": [
+              "ai-gateway/cookbooks/ci-smoke-test"
+            ]
           }
         ]
       },
