@@ -184,6 +184,30 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/[project]/automations")),
   },
   {
+    path: "/:project/gateway",
+    ...page(() => import("./pages/[project]/gateway/index")),
+  },
+  {
+    path: "/:project/gateway/virtual-keys",
+    ...page(() => import("./pages/[project]/gateway/virtual-keys")),
+  },
+  {
+    path: "/:project/gateway/budgets",
+    ...page(() => import("./pages/[project]/gateway/budgets")),
+  },
+  {
+    path: "/:project/gateway/providers",
+    ...page(() => import("./pages/[project]/gateway/providers")),
+  },
+  {
+    path: "/:project/gateway/usage",
+    ...page(() => import("./pages/[project]/gateway/usage")),
+  },
+  {
+    path: "/:project/gateway/settings",
+    ...page(() => import("./pages/[project]/gateway/settings")),
+  },
+  {
     path: "/:project/datasets",
     ...page(() => import("./pages/[project]/datasets")),
   },
