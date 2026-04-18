@@ -104,7 +104,7 @@ tier 1 pass, any scope ≥ 90%? → tier 2 (live, ~5-50ms via HMAC-signed POST)
 Gateway env knobs:
 
 - `LW_GATEWAY_BUDGET_LIVE_THRESHOLD` — default `0.9` (90%). Lower it for stricter enforcement at some latency cost.
-- `LW_GATEWAY_BUDGET_LIVE_TIMEOUT_MS` — default `200`.
+- `LW_GATEWAY_BUDGET_LIVE_TIMEOUT` — Go duration string, default `200ms`. Accepts `200ms`, `500ms`, `1s`, etc.
 
 ## What "USD cost" means
 
