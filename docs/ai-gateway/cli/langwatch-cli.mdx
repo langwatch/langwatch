@@ -52,120 +52,149 @@ stale-key     lw_vk_live_01HZV… live  revoked  openai              2026-03-29 
 langwatch virtual-keys create \
   --name prod-key \
   --env live \
-  --provider openai \
-  --provider anthropic \
-  --alias gpt-4o=azure/my-deployment \
-  --budget-usd 100 --budget-window month
+  --provider gpc_01HZX... \
+  --provider gpc_01HZY...
 ```
+
+`--provider` takes a **provider-credential id** (from `langwatch gateway-providers list`), not a plain provider name. Pass the flag multiple times to bind more than one provider.
 
 Returns the full secret **once**:
 
 ```
-✓ Created virtual key: lw_vk_live_01HZX9K3M...
+✓ Created virtual key "prod-key"
 
-  Copy now — this is the only time this secret is shown:
+⚠  Save the secret below NOW. It will not be shown again.
 
-  ┌──────────────────────────────────────────────────────┐
-  │  lw_vk_live_01HZX9K3MABCDEFGH...JIKLMN0Z             │
-  └──────────────────────────────────────────────────────┘
+  lw_vk_live_01HZX9K3MABCDEFGH...JIKLMN0Z
 
-  Next steps:
-    export OPENAI_API_KEY=lw_vk_live_01HZX9K3M...
-    export OPENAI_BASE_URL=https://gateway.langwatch.ai/v1
+Use it as the API key in OpenAI-compatible clients:
+  export OPENAI_API_KEY="lw_vk_live_01HZX..."
+  export OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"
+
+Virtual key id: vk_01HZX9K3M...
+Prefix:         lw_vk_live_01H...NZ0Z
 ```
 
-Use `--format json` for scripting:
+Use `--format json` for scripting — the JSON branch prints `{virtual_key, secret}`:
 
 ```bash
-VK=$(langwatch virtual-keys create --name ci --provider openai --format json | jq -r .secret)
+VK=$(langwatch virtual-keys create --name ci --provider gpc_01HZX... --format json | jq -r .secret)
 ```
 
 ### Get details
 
 ```bash
-langwatch virtual-keys get prod-key
-# Or by id:
 langwatch virtual-keys get vk_01HZX9K3MN...
 ```
 
-Prints the VK's full config: providers, fallback conditions, aliases, models allowed, cache mode, guardrails, blocked patterns, budgets, last-used timestamp, owning principal.
+Prints the VK's ID, name, description, environment, status, prefix, owning principal, bound provider-credential ids, timestamps, and the full `config` JSON (model_aliases, models_allowed, fallback, cache mode, guardrails, blocked_patterns).
 
 ### Rotate
 
 ```bash
-langwatch virtual-keys rotate prod-key
-# Or: langwatch virtual-keys rotate prod-key --yes   # skip confirmation
+langwatch virtual-keys rotate vk_01HZX9K3MN...
 ```
 
-Displays the new secret exactly once. Old secret stays valid for a 24-hour grace window — update clients during that time.
+Displays the new secret exactly once. The old secret stops working immediately — there is no grace window on the control plane, though gateway nodes may honour the old secret for up to ~60 seconds until their `/changes` feed catches up.
 
 ### Revoke
 
 ```bash
-langwatch virtual-keys revoke stale-key
-# Or: langwatch virtual-keys revoke stale-key --yes
+langwatch virtual-keys revoke vk_01HZX9K3MN...
 ```
 
-Hard revocation, no grace. Gateway caches invalidate within 60 seconds via `/changes` feed.
+Hard revocation, no grace. Gateway caches invalidate within 60 seconds via `/changes`.
 
 ## Gateway budgets
 
 ```bash
 # List
 langwatch gateway-budgets list
-langwatch gateway-budgets list --scope project --scope-id proj_01HZ...
 
-# Create
+# Create (scope + window + limit are all required)
 langwatch gateway-budgets create \
   --name eng-team-monthly \
-  --scope team --scope-id team_01HZ... \
-  --window month \
-  --limit-usd 5000 \
-  --on-breach warn
+  --scope team --team team_01HZ... \
+  --window month --limit 5000 --on-breach warn
 
-# Update
-langwatch gateway-budgets update bgt_01HZ... --limit-usd 7500
+# Other scope flags map by kind:
+langwatch gateway-budgets create --scope organization --organization org_... --window day --limit 1000 --name "org daily"
+langwatch gateway-budgets create --scope project      --project      proj_... --window day --limit 100  --name "project daily"
+langwatch gateway-budgets create --scope virtual-key  --virtual-key  vk_...   --window hour --limit 5   --name "vk hourly"
+langwatch gateway-budgets create --scope principal    --principal    user_... --window week --limit 50  --name "weekly personal"
 
-# Delete
-langwatch gateway-budgets delete bgt_01HZ...
+# Archive (stops enforcement; history preserved)
+langwatch gateway-budgets archive bgt_01HZ...
 ```
+
+`--window` accepts `minute|hour|day|week|month|total`. `--on-breach` is `block` (default) or `warn`. `--limit` is USD (integer or decimal). `--timezone` (optional IANA string, e.g. `Europe/Amsterdam`) sets when daily/weekly/monthly windows reset.
+
+List output shows spent vs limit as a colourised percentage — red at ≥100%, yellow at ≥80%, green otherwise.
 
 ## Provider credentials (gateway bindings)
 
 ```bash
-# List gateway bindings that wrap ModelProvider rows
+# List bindings for the current project
 langwatch gateway-providers list
 
-# Bind an existing ModelProvider row to the gateway with gateway-only settings
+# Bind an existing model-provider to the gateway
 langwatch gateway-providers create \
   --model-provider mp_01HZ... \
-  --name openai-fast \
-  --rpm 10000 --tpm 1000000
+  --slot primary \
+  --rate-limit-rpm 10000 \
+  --rate-limit-tpm 1000000 \
+  --rotation-policy manual
 
-# Disable a binding (keeps it for audit, gateway stops routing through it)
+# Disable a binding (stops routing; preserves audit trail)
 langwatch gateway-providers disable gpc_01HZ...
 ```
 
+Returns the `gpc_*` id for the binding, which you then pass to `langwatch virtual-keys create --provider <gpc_id>`.
+
+`--slot` is free-text (e.g. `primary`, `eu-region`, `canary`). `--rotation-policy` is one of `auto`, `manual`, `external_secret_store`. `--fallback-priority <n>` sets the global fallback ordering (lower = tried first).
+
+List output colourises health: green `healthy`, yellow `degraded`, red `unhealthy`.
+
 ## Dogfooding loop
 
-After you've minted a VK, test it with the LangWatch SDK's smoke-test command:
+After you've bound a provider and minted a VK, call the gateway end-to-end:
 
 ```bash
-VK=$(langwatch virtual-keys create --name dogfood --provider openai --format json | jq -r .secret)
-OPENAI_API_KEY=$VK OPENAI_BASE_URL=http://localhost:7400/v1 langwatch sdk test chat
+GPC=$(langwatch gateway-providers create --model-provider mp_01HZ... --slot primary --format json | jq -r .id)
+VK=$(langwatch virtual-keys create --name dogfood --provider "$GPC" --format json | jq -r .secret)
+
+curl -s -X POST https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $VK" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":8}' | jq
 ```
 
-The `sdk test chat` command opens a minimal OpenAI client, sends a hello-world completion, and reports the `X-LangWatch-Request-Id` + measured latency.
+Inspect response headers for correlation:
+
+```bash
+curl -sD- -o/dev/null -X POST https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $VK" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":8}' | \
+  grep -iE '^(x-langwatch-|traceparent|x-request-id)'
+```
+
+You'll see `x-langwatch-trace-id`, `x-langwatch-span-id`, `traceparent`, and `x-langwatch-request-id` — see [Observability](/ai-gateway/observability).
 
 ## Scripting with `--format json`
 
-Every command accepts `--format json` (or `--format table`, the default). Use JSON for piping:
+Every command accepts `--format json`. The default is `text` (pretty) for single-object commands and `table` for `list`.
 
 ```bash
-# Rotate every VK tagged `cli-key` older than 90 days
+# Archive every budget that's already hit its cap
+langwatch gateway-budgets list --format json | \
+  jq -r '.[] | select((.spent_usd | tonumber) >= (.limit_usd | tonumber)) | .id' | \
+  xargs -n1 -I{} langwatch gateway-budgets archive {}
+
+# Revoke every active test VK older than 90 days
 langwatch virtual-keys list --format json | \
-  jq -r '.[] | select(.metadata.tags[]? == "cli-key" and .created_at < "2026-01-18") | .id' | \
-  xargs -n1 -I{} langwatch virtual-keys rotate {} --yes
+  jq -r '.[] | select(.environment == "test" and .status == "ACTIVE" and .created_at < "2026-01-18") | .id' | \
+  xargs -n1 -I{} langwatch virtual-keys revoke {}
 ```
 
 ## Environment variables
