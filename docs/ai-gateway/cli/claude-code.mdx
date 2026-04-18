@@ -1,0 +1,107 @@
+---
+title: Claude Code
+description: Route Claude Code through the LangWatch AI Gateway for centrally-governed agentic coding.
+sidebarTitle: Claude Code
+---
+
+Claude Code is Anthropic's official agentic CLI. It speaks the Anthropic Messages API and streams tool-call deltas with specific ordering that must be preserved end-to-end.
+
+The LangWatch AI Gateway's `/v1/messages` endpoint is designed to be Claude-Code-compatible: tool-call deltas are forwarded byte-for-byte after the first chunk (see the [streaming contract](/ai-gateway/streaming)), `cache_control` blocks are passed through untouched (see [caching passthrough](/ai-gateway/caching-passthrough) — this is load-bearing because Claude Code uses prompt caching aggressively), and the `/v1/models` endpoint returns Anthropic-model shapes so Claude Code's model picker works.
+
+## Setup
+
+Assuming you've minted a VK — `lw_vk_live_01HZX…` — in the LangWatch UI:
+
+```bash
+export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
+export ANTHROPIC_AUTH_TOKEN="lw_vk_live_01HZX..."
+claude
+```
+
+That's it. `claude` boots, authenticates to the gateway, and every call is traced, budgeted, and governed.
+
+<Note>Claude Code reads `ANTHROPIC_AUTH_TOKEN` if set; otherwise it falls back to `ANTHROPIC_API_KEY`. Either works with a LangWatch VK. Using `AUTH_TOKEN` is the upstream recommendation for non-first-party tokens.</Note>
+
+## Self-hosted gateway
+
+Replace the hostname:
+
+```bash
+export ANTHROPIC_BASE_URL="https://langwatch-gateway.your-corp.internal"
+export ANTHROPIC_AUTH_TOKEN="lw_vk_live_..."
+```
+
+The gateway's `/v1/messages` path is the same whether on the LangWatch cloud or self-hosted.
+
+## Per-project or per-shell keys
+
+For engineers juggling projects with different budgets or provider allow-lists, use `direnv` (or your shell-env tool of choice) with a `.envrc` in each repo:
+
+```bash
+# .envrc
+export ANTHROPIC_AUTH_TOKEN="lw_vk_live_<project-specific-vk>"
+```
+
+Then every `claude` session inherits the project-scoped VK, its budget, and its guardrails.
+
+## Verifying the traffic flows
+
+After one `claude` session:
+
+1. Open **LangWatch → Messages** for the project the VK belongs to.
+2. You should see one trace per Claude Code turn, grouped under the agent name.
+3. Span attributes include `langwatch.vk_id`, `langwatch.cache_read_tokens`, and the full tool-call tree.
+
+If traffic doesn't appear:
+
+- Run `claude --print "say hi"` and look at the exit status + the `X-LangWatch-Request-Id` header. If the request fails, the gateway emits a diagnostic error envelope (not a provider-opaque one).
+- Check the VK's allowed providers includes `anthropic`.
+- Check that the project's Anthropic model provider credential is configured (**Settings → Model Providers**).
+
+## Governance recipes
+
+### Block shell-exec tools but allow everything else
+
+Edit the VK's `blocked_patterns.tools.deny`:
+
+```
+^shell\\..*
+```
+
+Now if a Claude Code session tries to invoke `shell.exec`, the gateway returns `403 tool_not_allowed` and the session surfaces the error instead of executing the command. Everything else keeps working.
+
+### Monthly budget per engineer
+
+- Scope: `principal`, target: the engineer's user id.
+- Window: `month`, limit: `$200`.
+- `on_breach`: `block` (hard cap) or `warn` (soft cap + Slack notification via webhook).
+
+Each engineer's Claude Code usage is metered against their personal cap; no one can outspend another.
+
+### Fallback to Bedrock on Anthropic outage
+
+- VK fallback chain: `anthropic-primary → bedrock-us-east-1`.
+- `fallback.on: [5xx, timeout, rate_limit]`.
+- `fallback.timeout_ms: 30000`.
+
+When Anthropic's API is degraded, Claude Code sessions continue through Bedrock's Anthropic models transparently — the engineer sees a tiny latency bump but no error.
+
+## Known good model aliases for Claude Code
+
+Pin the VK's `model_aliases` so Claude Code can use friendly names across providers:
+
+```json
+{
+  "claude-haiku-4-5-20251001": "anthropic/claude-haiku-4-5-20251001",
+  "claude-sonnet-4-6":   "anthropic/claude-sonnet-4-6",
+  "claude-opus-4-7":     "anthropic/claude-opus-4-7"
+}
+```
+
+If the primary is Bedrock, point those aliases at the Bedrock equivalents and Claude Code won't know the difference.
+
+## Limits and caveats
+
+- **Fallback during streaming** sticks to the original provider once the first chunk has streamed, per the [streaming contract](/ai-gateway/streaming). If the primary drops mid-stream, the session ends with an SSE error and Claude Code will retry a fresh turn — which may then land on the fallback provider.
+- **Tool-call delta shape changes across provider** — e.g. Anthropic vs Bedrock-Anthropic have subtle differences. The gateway normalises what it can via bifrost/core; complex tool flows should be smoke-tested when flipping primaries.
+- **Prompt caching is provider-specific.** Claude Code relies on Anthropic's ephemeral cache blocks. If the VK fails over to a provider without prompt caching (e.g. a generic OpenAI-compatible), expect cost to jump until the primary comes back.

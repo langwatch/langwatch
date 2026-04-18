@@ -1,0 +1,106 @@
+---
+title: Budgets
+description: Hierarchical, windowed spend limits enforced at the gateway.
+sidebarTitle: Budgets
+---
+
+A budget is a spend cap attached to a scope in your LangWatch hierarchy. Every gateway request is checked against every budget that applies to it; any hard-block breach blocks the request, any warn breach surfaces a header.
+
+## Scopes
+
+| Scope | Applies to |
+|---|---|
+| `organization` | All gateway traffic across every project in the org. |
+| `team` | All gateway traffic in projects belonging to the team. |
+| `project` | All gateway traffic in this project. |
+| `virtual_key` | This specific VK. |
+| `principal` | This user or service account across any VK they use. |
+
+A request is evaluated against **every** budget whose scope applies. For example, a request made by user Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against:
+
+- Org `acme`'s budgets (all windows).
+- Team `platform`'s budgets (all windows).
+- Project `demo`'s budgets (all windows).
+- VK `prod-key`'s budgets (all windows).
+- Alice's principal budgets (all windows).
+
+If **any** budget hard-blocks, the request is rejected. If **any** warn-threshold is breached, a warning header is added. Hard-block wins over warn.
+
+## Windows
+
+- `minute`, `hour`, `day`, `week`, `month`, `total`.
+- Calendar-aligned: `month` resets on day 1 of the next month in the org's default timezone (UTC unless the org overrides). `week` starts Monday in ISO-8601.
+- `total` never resets — useful for one-off grant-style budgets.
+
+## on_breach
+
+- `block` — hard-cap. The next request after `spent_usd >= limit_usd` returns `402 budget_exceeded` with an OpenAI-compatible error envelope.
+- `warn` — soft-cap. The request passes but the response gains `X-LangWatch-Budget-Warning: <scope>:<pct_used>`. Multiple soft caps can fire on one request.
+
+## Creating a budget
+
+**AI Gateway → Budgets → New budget.**
+
+| Field | Example |
+|---|---|
+| Name | `eng-team-monthly` |
+| Scope | `team` |
+| Target | `platform` team |
+| Window | `month` |
+| Limit (USD) | `5000` |
+| on_breach | `warn` at 80%, `block` at 100% (see "Multiple tiers" below) |
+
+Save. The budget is in force immediately; the next request counts against it.
+
+## Multiple tiers on the same scope
+
+A single scope can carry multiple budgets with different `on_breach` values. Common pattern:
+
+- Budget A: `team`, `month`, `$4000`, `warn`. Surfaces `X-LangWatch-Budget-Warning: team:80` once 80% of the real ceiling is spent.
+- Budget B: `team`, `month`, `$5000`, `block`. Hard-caps at $5k.
+
+The UI supports this as "Warning thresholds" on a single budget row; Alexis's Prisma schema stores each threshold as its own `GatewayBudget` row for simplicity.
+
+## Debit model
+
+Gateway operations are debited **after** the response completes, using the provider-reported token counts. The gateway POSTs to `/internal/gateway/budget/debit` with a `gateway_request_id` (ULID). The endpoint is **idempotent** by that id (24-hour dedup window) so gateway retries never double-bill.
+
+Debit flow:
+
+1. Gateway streams the response to the client.
+2. When the response closes, gateway computes USD cost from tokens × model price.
+3. Gateway posts the debit (fire-and-forget).
+4. LangWatch control-plane writes a `BudgetLedger` row in a transaction that also updates `spent_usd` on every affected scope.
+5. On retry from the gateway, the dedup key skips re-writing.
+
+If the control-plane is unreachable, the gateway queues debits locally and delivers them in FIFO order when the control-plane returns.
+
+## Pre-request check
+
+Before dispatching to the provider, the gateway checks the VK's cached budget snapshot. If the snapshot already shows a breach, the request is rejected without making a provider call — saving the spend entirely. The snapshot is updated by the `/changes` long-poll every time any debit lands.
+
+For tight budget windows (`minute` / `hour`) where the snapshot might be stale, the gateway can optionally call `/internal/gateway/budget/check` for a fresh pre-check. This is a latency trade-off: enable it via VK config `budget.strict_precheck: true` if you need tight enforcement.
+
+## What "USD cost" means
+
+Token × unit-price lookup, computed per provider using their published pricing. Updates land as provider pricing changes (pricing table is a separate Prisma table owned by LangWatch).
+
+Cache reads / writes are priced **separately** per provider — Anthropic cache reads are ~10% of regular input tokens, Anthropic cache writes are 125%. The gateway respects these. See [Caching Passthrough](/ai-gateway/caching-passthrough).
+
+## Permissions
+
+| Action | Permission |
+|---|---|
+| View budgets | `gatewayBudgets:view` |
+| Create | `gatewayBudgets:create` |
+| Edit | `gatewayBudgets:update` |
+| Delete | `gatewayBudgets:delete` |
+| All of the above | `gatewayBudgets:manage` |
+
+See [RBAC](/ai-gateway/rbac).
+
+## Trace attributes
+
+- `langwatch.cost_usd` — cost of this single request.
+- `langwatch.budget.breached_scope` — present when the request was blocked; format `scope:window` (e.g. `project:month`).
+- `langwatch.budget.warnings` — comma-separated list of `scope:pct_used` entries for soft breaches.

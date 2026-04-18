@@ -1,0 +1,115 @@
+---
+title: Virtual Keys
+description: Mint, rotate, revoke, and scope virtual API keys for the LangWatch AI Gateway.
+sidebarTitle: Virtual Keys
+---
+
+A **virtual key** (VK) is a LangWatch-issued credential that a downstream client (SDK, coding CLI, production app) presents to the gateway in place of a provider-native API key. The gateway resolves the VK to an owning scope, a set of provider credentials, a fallback chain, a cache policy, guardrails, blocked patterns, and budgets — everything the VK is allowed to do and how it is observed.
+
+VKs replace raw provider keys in your applications. The provider keys themselves stay inside LangWatch (configured under **Settings → Model Providers**, the same surface you already use for evaluators and playground) and are never shared with downstream clients.
+
+## Format
+
+`lw_vk_{live|test}_<26-char-ULID>` — 40 characters total.
+
+- `lw_vk_` — fixed prefix, grep-friendly, scans well in DLP / GitGuardian.
+- `live` or `test` — environment prefix. Prevents accidentally using a test key against production or vice versa.
+- 26-char Crockford-base32 ULID — time-prefixed, monotonic, renders sensibly in the dashboard and in your logs.
+
+The secret is shown **exactly once** at creation. After you dismiss the creation dialog it can never be retrieved again — only the first 12 characters (`lw_vk_live_01HZX9`) are visible in the list.
+
+Server-side, the secret is stored `argon2id(secret + pepper)`. A short prefix is stored alongside for grep/lookup.
+
+## Creating a VK
+
+Under **AI Gateway → Virtual Keys** click **New virtual key** and fill:
+
+| Field | Meaning |
+|---|---|
+| Name | Human label. Used in the UI and in `langwatch.vk.name` trace attribute. |
+| Environment | `live` (default) or `test`. Reflected in the key prefix. |
+| Primary provider credentials | The credentials the gateway uses first. Dropdown of Model Provider entries on this project. |
+| Fallback chain | Ordered list of additional provider credentials. Any failures on the primary (5xx / timeout / 429 / network) attempt the next in order. |
+| Models allowed | Optional allowlist. Blank = "any model the provider credentials support." |
+| Model aliases | Map of client-friendly names → `provider/model`. E.g. `gpt-4o: azure/my-deployment`. |
+| Cache policy | `respect` (default), `force`, or `disable`. |
+| Guardrails | Attach existing LangWatch evaluators as `pre` / `post` / `stream_chunk` hooks. |
+| Blocked patterns | Regex allow/deny for tool names, MCP servers, URLs. |
+| Initial budget | Optionally attach a budget on creation. Budgets can always be added later. |
+
+Click **Create**. The full secret is revealed inline with a **Copy** button and a **I've saved it, close** confirmation that must be checked before dismissing. After dismiss, the secret is gone for good.
+
+## Rotation
+
+Rotate a VK when you believe the secret may have leaked or as part of routine hygiene.
+
+1. Open the VK in the list.
+2. Click **Rotate secret**.
+3. LangWatch mints a new secret and displays it exactly once.
+4. The old secret remains valid for a 24-hour **grace window** to let in-flight deploys update.
+5. After the grace window ends, only the new secret works.
+
+Rotation keeps the same `vk_id`, same ownership, same configuration — only the secret changes. Observability traces remain continuous across rotation.
+
+## Revocation
+
+Revocation immediately invalidates the secret. There is **no grace period** on revoke.
+
+Gateway caches are invalidated within 60 seconds via the `/internal/gateway/changes` long-poll. If you need instant invalidation everywhere (e.g. incident response), restart the gateway pods — the next request that hits them will pull fresh state before serving.
+
+Revoked VKs remain in the database (soft-delete) for audit. Their traces still appear in analytics.
+
+## Scoping
+
+A VK belongs to exactly one project. The project's team and organisation are implicit owners.
+
+Traffic attribution on every trace:
+
+- `langwatch.vk_id`
+- `langwatch.project_id`
+- `langwatch.team_id`
+- `langwatch.org_id`
+- `langwatch.principal_id` — the user or service account that owns the VK (for principal-scoped budgets)
+
+## Personal access vs shared
+
+Two flavours:
+
+- **Personal access VK** — bound to one user principal. Best for "give the engineer a key their local tools can use." Inherits budgets scoped to that user.
+- **Shared VK** — bound to a service-account principal. Best for applications. Can be rotated independently of user offboarding.
+
+Both use the same `lw_vk_live_…` format; the difference is the principal the VK resolves to and which budgets apply.
+
+## Permissions
+
+Acting on VKs requires the following permissions (2-segment `resource:action`):
+
+| Action | Permission |
+|---|---|
+| View list | `virtualKeys:view` |
+| Create | `virtualKeys:create` |
+| Update config | `virtualKeys:update` |
+| Rotate | `virtualKeys:rotate` |
+| Delete / revoke | `virtualKeys:delete` |
+| All of the above | `virtualKeys:manage` |
+
+See [RBAC](/ai-gateway/rbac) for default role mappings.
+
+## How the gateway resolves your VK
+
+The first time the gateway sees a presented VK:
+
+1. Calls `/internal/gateway/resolve-key` on the LangWatch control-plane → receives a signed JWT (15-minute TTL) with identity claims (`vk_id`, `project_id`, `principal_id`, etc.) plus a `revision` number.
+2. Calls `/internal/gateway/config/:vk_id` (with `If-None-Match: <revision>` on subsequent fetches) → receives the fat config (providers, fallback, guardrails, budgets).
+3. Caches both in-memory (L1 LRU) and optionally in Redis (L2, shared across gateway pods).
+4. Subscribes to `/internal/gateway/changes?since=<revision>` long-poll — on any mutation to any VK, the gateway invalidates and re-fetches.
+
+Subsequent requests with the same VK are served entirely from cache. JWT verification is local (HS256 shared secret); no control-plane round-trip on the hot path.
+
+This means:
+
+- **First request** on a cold cache: 2-4 ms of control-plane overhead.
+- **Warm request** after first: tens of microseconds of overhead.
+- **Control-plane offline**: gateway continues serving from warm cache until JWT TTL expires (15 min default); with bootstrap mode on, it can serve indefinitely.
+
+See [Self-Hosting → Config](/ai-gateway/self-hosting/config) for tuning the cache.

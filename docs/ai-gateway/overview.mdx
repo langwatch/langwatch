@@ -1,0 +1,91 @@
+---
+title: LangWatch AI Gateway — Overview
+description: A governed, observable, sub-millisecond-overhead AI Gateway for enterprise LLM usage.
+sidebarTitle: Overview
+---
+
+The **LangWatch AI Gateway** is a single OpenAI- and Anthropic-compatible endpoint that every application, SDK, or coding CLI in your organization can send LLM traffic to. The gateway applies organisation-wide policy, attribution, budget enforcement, caching, guardrails, and fallback in the path of every request — and emits per-tenant OpenTelemetry traces that land in each project's LangWatch workspace.
+
+## Why an AI Gateway?
+
+Most teams start with "one app, one provider API key, one language SDK." That stops working the moment a second team, a second app, or a second model provider shows up:
+
+- Credentials proliferate (developer laptops, CI environments, Kubernetes secrets) with no revocation story.
+- Cost governance becomes guesswork — no one owns the team-level or project-level budget.
+- Observability is fragmented — each app emits traces differently (or not at all).
+- Reliability suffers — one provider outage takes down every surface that hard-coded that provider.
+
+The LangWatch AI Gateway replaces every direct provider call with a single call to `gateway.langwatch.ai` (or your self-hosted URL) carrying a LangWatch **virtual key**. From the application's perspective, nothing else changes — the OpenAI SDK still works, the Anthropic SDK still works, Claude Code and Codex still work — but every request now carries policy, budget enforcement, and observability.
+
+## What it gives you
+
+- **OpenAI-compatible endpoint** at `/v1/chat/completions`, `/v1/embeddings`, `/v1/models`, etc. Drop in `OPENAI_BASE_URL=https://gateway.langwatch.ai/v1` and `OPENAI_API_KEY=lw_vk_live_…` and every existing OpenAI-SDK codebase works unchanged.
+- **Anthropic-compatible endpoint** at `/v1/messages` so Claude Code and native Anthropic SDKs work by setting `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` to your gateway URL and a LangWatch virtual key.
+- **Virtual keys** — LangWatch-issued credentials (`lw_vk_live_<ulid>`) with project/team/org scope. Show-once secrets, argon2id-hashed, rotatable, revokable within 60 seconds.
+- **Hierarchical budgets** — enforce spend limits at organisation, team, project, virtual-key, or principal scope with windowed periods (minute → total) and soft-warn or hard-block semantics.
+- **Per-request guardrails** — invoke your LangWatch evaluators inline on the request, response, or each streaming chunk. Decisions: `allow`, `block`, `modify` (redact).
+- **Tool / MCP / URL policy** — block or allowlist tool calls, MCP server references, or outbound URLs by regex before the request ever leaves your gateway.
+- **Caching passthrough** — Anthropic `cache_control` markers are forwarded byte-for-byte by default (protecting your 90% cache discount). Override per-request with `X-LangWatch-Cache: respect|force|disable`.
+- **Automatic fallback** — per-virtual-key fallback chain (e.g. OpenAI → Anthropic → Bedrock) triggers on 5xx, timeout, 429, or circuit-breaker-open. 400/401 client errors never trigger fallback.
+- **Per-tenant observability** — every request emits a LangWatch trace to the owning project with `langwatch.vk_id`, `langwatch.project_id`, `langwatch.principal_id`, fallback attempts, cache outcome, and full cost breakdown. Shared multi-tenant gateway, per-tenant trace routing.
+- **Coding-CLI integrations** — preserves the tool-call streaming deltas that Claude Code and Codex depend on. Documented setup for the major coding assistants in [CLI Integrations](/ai-gateway/cli/overview).
+- **Self-hostable** — ships as a Helm chart alongside the LangWatch app. Horizontally scales, serves traffic during control-plane outages (with bootstrap mode).
+
+## Architecture at a glance
+
+```
+┌─────────────────────┐        Authorization: Bearer lw_vk_live_…
+│  Customer SDK /     │  ──────────────────────────────────────────▶
+│  Coding CLI         │                                              │
+└─────────────────────┘                                              │
+                                                                     ▼
+                                                ┌───────────────────────────────────┐
+                                                │   LangWatch AI Gateway (Go)       │
+                                                │   - auth / JWT cache (L1+L2)      │
+                                                │   - virtual-key resolution        │
+                                                │   - budget pre-check              │
+                                                │   - guardrail pre-call            │
+                                                │   - dispatch via bifrost/core     │
+                                                │   - guardrail post-call           │
+                                                │   - budget debit (outbox)         │
+                                                │   - per-tenant OTel emit          │
+                                                └───────┬───────────────┬───────────┘
+                                                        │               │
+                                                        ▼               ▼
+                                          ┌────────────────────┐   ┌──────────────────────┐
+                                          │  LangWatch app     │   │  Provider APIs       │
+                                          │  (control plane)   │   │  OpenAI / Anthropic  │
+                                          │  - VK CRUD         │   │  Azure / Bedrock     │
+                                          │  - budgets         │   │  Vertex / Gemini     │
+                                          │  - guardrails eng  │   │  Custom OpenAI-compat│
+                                          │  - analytics       │   └──────────────────────┘
+                                          └────────────────────┘
+```
+
+The gateway is written in Go and embeds [`github.com/maximhq/bifrost/core`](https://github.com/maximhq/bifrost) as a library for provider-specific dispatch (Azure deployment name quirks, Bedrock regional inference profiles, Vertex OAuth refresh, streaming format divergences across providers). LangWatch owns everything above the dispatch line: auth, policy, budgets, guardrails, per-tenant observability.
+
+**Why a separate Go service?** Sub-millisecond overhead on the hot path matters when the gateway sits in front of every LLM call. Go with fasthttp + sonic + in-process JWT verification gives us ~11 µs gateway-side overhead at 5k RPS sustained. A Python/FastAPI or Node/Hono gateway cannot reach those numbers.
+
+**Why embed, not fork?** Bifrost's provider dispatch is where hundreds of engineer-hours per provider have been invested (native SDKs for every provider, streaming format normalisation, tool-call delta reassembly, reasoning-token handling). That's the part we consume as a library. The policy / governance / observability layers on top are ours — the product.
+
+## When to use the gateway vs. the LangWatch SDK directly
+
+Both ship in LangWatch. They solve different problems:
+
+| Need | Use |
+|---|---|
+| "Trace my existing provider calls without changing credentials" | **LangWatch SDK** — point it at your app, it instruments. Keep your provider keys. |
+| "Give the marketing team an LLM key they can't leak, with a $500/month cap" | **AI Gateway** — mint a virtual key with a budget, share the VK. |
+| "Switch all internal apps from OpenAI to Anthropic for a week" | **AI Gateway** — flip `model_aliases` on the VKs involved. Zero code change. |
+| "Ship a coding CLI to every engineer with observability" | **AI Gateway + CLI integration** — set `OPENAI_BASE_URL` or `ANTHROPIC_BASE_URL` on every dev machine. |
+| "Guardrail the production chat surface for PII and prompt injection" | **AI Gateway** guardrail attachments — inline without touching application code. |
+| "Call 50+ providers from a single eval script" | **LangWatch SDK's existing litellm path** still works unchanged for playground/evaluators (not migrated to gateway in v1). |
+
+The gateway and the existing LangWatch SDK live in the same project: the VK you mint in the gateway can reuse the same provider credentials configured under **Settings → Model Providers**. No duplication.
+
+## Next steps
+
+1. **[Quickstart](/ai-gateway/quickstart)** — five minutes to your first gateway request.
+2. **[Concepts](/ai-gateway/concepts)** — virtual keys, budgets, fallback, guardrails, caching.
+3. **[CLI Integrations](/ai-gateway/cli/overview)** — Claude Code, Codex, opencode, Cursor, Aider.
+4. **[Self-Hosting](/ai-gateway/self-hosting/helm)** — ship the gateway with your LangWatch Helm chart.

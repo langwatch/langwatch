@@ -1,0 +1,90 @@
+---
+title: Codex CLI
+description: Route the OpenAI Codex CLI through the LangWatch AI Gateway.
+sidebarTitle: Codex CLI
+---
+
+The Codex CLI speaks the OpenAI Chat Completions and Responses APIs. Both are available from the LangWatch AI Gateway and Codex will work with either — set the two env vars and go.
+
+## Setup
+
+```bash
+export OPENAI_BASE_URL="https://gateway.langwatch.ai/v1"
+export OPENAI_API_KEY="lw_vk_live_01HZX..."
+codex exec "explain this repo"
+```
+
+That's it. Every Codex call hits the gateway, which applies your VK's policies (budget, guardrails, blocked patterns, fallback) and emits a LangWatch trace.
+
+### Using the Responses API
+
+Codex auto-detects `/v1/responses` when available. The gateway exposes it at `POST /v1/responses` with OpenAI-equivalent shape. No config change needed.
+
+### Self-hosted gateway
+
+```bash
+export OPENAI_BASE_URL="https://langwatch-gateway.your-corp.internal/v1"
+```
+
+## Model routing through aliases
+
+Codex's `--model` flag maps directly to the `model` field the gateway sees. Use the VK's `model_aliases` to decouple the CLI from provider-specific names.
+
+Example — engineers type `gpt-4o`, the VK routes to Azure:
+
+```json
+{
+  "model_aliases": {
+    "gpt-4o":   "azure/gpt-4o-eastus-deployment",
+    "gpt-5-mini": "openai/gpt-5-mini"
+  }
+}
+```
+
+Now `codex exec --model gpt-4o "ping"` lands on Azure OpenAI using the VK's pinned Azure credential, while `--model gpt-5-mini` stays on OpenAI. Switching the entire engineering team from Azure to OpenAI is a one-line edit on the VK, no rollout.
+
+## Governance recipes
+
+### Only allow safe models
+
+VK `models_allowed`: `["gpt-5-mini", "gpt-4o", "o3"]`
+
+Any Codex call with an off-list model returns `403 model_not_allowed`. The VK owner controls the list; engineers can't escape the allowlist by passing a different `--model` flag.
+
+### Disable cache to test cold-run cost
+
+Per-session:
+
+```bash
+OPENAI_BASE_URL="https://gateway.langwatch.ai/v1" \
+OPENAI_API_KEY="lw_vk_live_..." \
+OPENAI_EXTRA_HEADERS='{"X-LangWatch-Cache":"disable"}' \
+codex exec "benchmark"
+```
+
+<Note>OpenAI CLI / SDK support for custom headers varies; the header-injection method above is pseudo-code for illustration. Practical override: add `cache.mode: disable` to a dedicated "cold-benchmark" VK.</Note>
+
+### Team-scoped daily budget
+
+- Scope: `team`, target: engineering team.
+- Window: `day`, limit: `$100`.
+- `on_breach`: `warn` at 80%, `block` at 100%.
+
+Every engineer's Codex usage counts against the team budget. The team lead gets warning headers in traces when the team is at 80%, and hard-blocks for the last hour of the day.
+
+## Troubleshooting
+
+- **`401 invalid_api_key`** — wrong VK or VK revoked. Check the first 12 chars match a live VK in the UI.
+- **`403 model_not_allowed`** — VK doesn't list that model. Extend `models_allowed` or use an alias.
+- **`402 budget_exceeded`** — a scope you belong to has hit its hard cap. Check the error `message` field for which scope.
+- **Intermittent latency spikes** — open the LangWatch trace; check `X-LangWatch-Fallback-Count` > 0 (primary provider is flaky) or `X-LangWatch-Cache: miss` on calls you expected to hit.
+
+## Known good setup
+
+The combination that's been most-tested with Codex on v1:
+
+- VK `cache.mode: respect`.
+- VK `fallback.on: [5xx, timeout, 429]`, chain: `openai-primary → anthropic-fallback`.
+- VK `models_allowed: ["gpt-5-mini", "gpt-5", "gpt-4o", "claude-haiku-4-5-20251001"]`.
+- Personal-access VK bound to the engineer.
+- Monthly `principal` budget with `warn` at 80%, `block` at 100%.

@@ -91,6 +91,12 @@ model User {
     promptTagsUpdated       PromptTag[]            @relation("promptTagUpdatedBy")
     groupMemberships        GroupMembership[]
     roleBindings            RoleBinding[]
+    virtualKeysCreated      VirtualKey[]           @relation("VirtualKeyCreatedBy")
+    virtualKeysRevoked      VirtualKey[]           @relation("VirtualKeyRevokedBy")
+    gatewayBudgetsCreated   GatewayBudget[]        @relation("GatewayBudgetCreatedBy")
+    principalVirtualKeys    VirtualKey[]           @relation("VirtualKeyPrincipalUser")
+    principalGatewayBudgets GatewayBudget[]        @relation("PrincipalScopedGatewayBudgets")
+    gatewayAuditLogs        GatewayAuditLog[]      @relation("GatewayAuditLogActor")
 
 }
 
@@ -157,16 +163,17 @@ model OrganizationUser {
 }
 
 model Team {
-    id              String       @id @default(nanoid())
+    id              String          @id @default(nanoid())
     name            String
-    slug            String       @unique
+    slug            String          @unique
     members         TeamUser[]
     organizationId  String
-    organization    Organization @relation(fields: [organizationId], references: [id])
+    organization    Organization    @relation(fields: [organizationId], references: [id])
     projects        Project[]
-    createdAt       DateTime     @default(now())
-    updatedAt       DateTime     @default(now()) @updatedAt
+    createdAt       DateTime        @default(now())
+    updatedAt       DateTime        @default(now()) @updatedAt
     archivedAt      DateTime?
+    gatewayBudgets  GatewayBudget[] @relation("TeamScopedGatewayBudgets")
     @@index([organizationId])
 }
 
@@ -208,9 +215,11 @@ model Organization {
     groups        Group[]
     roleBindings  RoleBinding[]
     // License enforcement fields (COSS-0226)
-    license                String?   @db.Text
+    license                String?              @db.Text
     licenseExpiresAt       DateTime?
     licenseLastValidatedAt DateTime?
+    gatewayBudgets         GatewayBudget[]      @relation("OrgScopedGatewayBudgets")
+    gatewayChangeEvents    GatewayChangeEvent[]
 
     @@index([ssoProvider])
 }
@@ -327,6 +336,11 @@ model Project {
     scenarios                Scenario[]
     suiteConfigurations      SimulationSuite[]
     savedViews               SavedView[]
+    virtualKeys              VirtualKey[]
+    gatewayProviderCreds     GatewayProviderCredential[]
+    gatewayBudgets           GatewayBudget[]                     @relation("ProjectScopedGatewayBudgets")
+    gatewayChangeEvents      GatewayChangeEvent[]
+    gatewayAuditLogs         GatewayAuditLog[]
 
     @@index([teamId])
 }
@@ -651,9 +665,9 @@ model Annotation {
 }
 
 model ModelProvider {
-    id                     String   @id @default(nanoid())
+    id                     String                      @id @default(nanoid())
     projectId              String
-    project                Project  @relation(fields: [projectId], references: [id])
+    project                Project                     @relation(fields: [projectId], references: [id])
     provider               String
     enabled                Boolean
     customKeys             Json?
@@ -661,8 +675,9 @@ model ModelProvider {
     customModels           Json?
     customEmbeddingsModels Json?
     deploymentMapping      Json?
-    createdAt              DateTime @default(now())
-    updatedAt              DateTime @default(now()) @updatedAt
+    createdAt              DateTime                    @default(now())
+    updatedAt              DateTime                    @default(now()) @updatedAt
+    gatewayCredentials     GatewayProviderCredential[]
 
     @@index([projectId])
 }
@@ -1321,4 +1336,347 @@ model BillingMeterCheckpoint {
     updatedAt            DateTime @updatedAt
 
     @@unique([organizationId, billingMonth])
+}
+
+// ============================================================================
+// AI Gateway
+//
+// Wire-shape aligned with specs/ai-gateway/_shared/contract.md (v0.1).
+//
+// - VirtualKey: project-scoped LangWatch-issued credential consumed by the
+//   Go gateway. Secret is argon2id-hashed; only the display prefix is kept.
+// - GatewayProviderCredential: a thin binding over an existing ModelProvider
+//   row, carrying gateway-only settings (rate limits, rotation policy,
+//   gateway-only extra headers). Never duplicates the raw API key.
+// - VirtualKeyProviderCredential: the ordered fallback chain linking a VK
+//   to N provider-credential bindings.
+// - GatewayBudget: hierarchical budgets (org / team / project / vk /
+//   principal) with calendar resets and block|warn semantics.
+// - GatewayBudgetLedger: idempotent spend ledger keyed by
+//   gateway_request_id (outbox pattern — writes from the Go gateway).
+// - GatewayChangeEvent: monotonically-increasing revision feed consumed by
+//   the gateway's long-poll `/internal/gateway/changes?since=N` endpoint.
+// - GatewayAuditLog: full actor/action/before/after audit for every
+//   gateway-surface mutation.
+// ============================================================================
+
+enum VirtualKeyEnvironment {
+    LIVE
+    TEST
+}
+
+enum VirtualKeyStatus {
+    ACTIVE
+    REVOKED
+}
+
+enum GatewayProviderRotationPolicy {
+    AUTO
+    MANUAL
+    EXTERNAL_SECRET_STORE
+}
+
+enum GatewayProviderHealthStatus {
+    UNKNOWN
+    HEALTHY
+    DEGRADED
+    CIRCUIT_OPEN
+}
+
+enum GatewayBudgetScopeType {
+    ORGANIZATION
+    TEAM
+    PROJECT
+    VIRTUAL_KEY
+    PRINCIPAL
+}
+
+enum GatewayBudgetWindow {
+    MINUTE
+    HOUR
+    DAY
+    WEEK
+    MONTH
+    TOTAL
+}
+
+enum GatewayBudgetBreachAction {
+    BLOCK
+    WARN
+}
+
+enum GatewayBudgetLedgerStatus {
+    SUCCESS
+    PROVIDER_ERROR
+    BLOCKED_BY_GUARDRAIL
+    CANCELLED
+}
+
+enum GatewayChangeEventKind {
+    VK_CREATED
+    VK_CONFIG_UPDATED
+    VK_REVOKED
+    VK_ROTATED
+    BUDGET_CREATED
+    BUDGET_UPDATED
+    BUDGET_DELETED
+    PROVIDER_BINDING_UPDATED
+}
+
+enum GatewayAuditAction {
+    VIRTUAL_KEY_CREATED
+    VIRTUAL_KEY_UPDATED
+    VIRTUAL_KEY_ROTATED
+    VIRTUAL_KEY_REVOKED
+    VIRTUAL_KEY_DELETED
+    BUDGET_CREATED
+    BUDGET_UPDATED
+    BUDGET_DELETED
+    PROVIDER_BINDING_CREATED
+    PROVIDER_BINDING_UPDATED
+    PROVIDER_BINDING_DELETED
+}
+
+model VirtualKey {
+    id                       String                         @id @default(nanoid())
+    projectId                String
+    project                  Project                        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    name                     String
+    description              String?
+    environment              VirtualKeyEnvironment          @default(LIVE)
+    status                   VirtualKeyStatus               @default(ACTIVE)
+
+    // Credential material. Full secret format:
+    //   lw_vk_{live|test}_<26-char-crockford-ulid>  (40 chars total)
+    // Only the hashed form and a short display prefix (first 18 chars) are
+    // kept after creation. The full secret is shown exactly once.
+    hashedSecret             String                         // argon2id(secret + server pepper)
+    displayPrefix            String                         // e.g. "lw_vk_live_01HZX9"
+
+    // Principal to attribute traces to when this VK is used. Optional because
+    // a VK can be owned by a project without binding to a specific human.
+    principalUserId          String?
+    principalUser            User?                          @relation("VirtualKeyPrincipalUser", fields: [principalUserId], references: [id])
+
+    // Config blob. Mirrors the shape of `GET /internal/gateway/config/:vk_id`.
+    // Stored as a single JSON blob so the control-plane can version it and
+    // return it to the gateway without reassembling from many tables. Fields:
+    //   model_aliases, models_allowed, cache, guardrails, blocked_patterns,
+    //   rate_limits, fallback (non-chain scalars). The chain itself is
+    //   materialised in VirtualKeyProviderCredential for FK integrity.
+    config                   Json                           @default("{}")
+
+    // Revision — every mutation bumps this; gateway uses it to skip config
+    // fetches that would be no-ops.
+    revision                 BigInt                         @default(0)
+
+    // Rotation bookkeeping. When rotated in place, the previous secret stays
+    // valid for 24h via `previousHashedSecret` + `previousSecretValidUntil`.
+    previousHashedSecret     String?
+    previousSecretValidUntil DateTime?
+
+    revokedAt                DateTime?
+    revokedById              String?
+    revokedBy                User?                          @relation("VirtualKeyRevokedBy", fields: [revokedById], references: [id])
+
+    createdAt                DateTime                       @default(now())
+    updatedAt                DateTime                       @default(now()) @updatedAt
+    createdById              String
+    createdBy                User                           @relation("VirtualKeyCreatedBy", fields: [createdById], references: [id])
+    lastUsedAt               DateTime?
+
+    providerCredentials      VirtualKeyProviderCredential[]
+    budgets                  GatewayBudget[]                @relation("VirtualKeyScopedGatewayBudgets")
+    ledgerEntries            GatewayBudgetLedger[]
+
+    @@unique([projectId, name])
+    @@unique([hashedSecret])
+    @@index([projectId])
+    @@index([displayPrefix])
+    @@index([status])
+    @@index([principalUserId])
+    @@index([revision])
+}
+
+model GatewayProviderCredential {
+    id                     String                          @id @default(nanoid())
+    projectId              String
+    project                Project                         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    modelProviderId        String
+    modelProvider          ModelProvider                   @relation(fields: [modelProviderId], references: [id], onDelete: Cascade)
+
+    // A project can register the same ModelProvider under multiple slots
+    // (e.g. "primary", "secondary" for the same vendor with different
+    // deployments or quota tiers). Unique per (project, provider, slot).
+    slot                   String                          @default("primary")
+
+    // Gateway-only settings — do NOT leak to litellm/legacy path.
+    rateLimitRpm           Int?
+    rateLimitTpm           Int?
+    rateLimitRpd           Int?
+    rotationPolicy         GatewayProviderRotationPolicy   @default(MANUAL)
+    extraHeaders           Json?                           // appended by gateway only
+    fallbackPriorityGlobal Int?                            // used when a VK has no explicit chain
+
+    // Provider-specific routing hints (e.g. bedrock region, azure deployment
+    // override) that the gateway applies on top of ModelProvider defaults.
+    providerConfig         Json?
+
+    // Health / circuit breaker state written by the gateway.
+    healthStatus           GatewayProviderHealthStatus     @default(UNKNOWN)
+    circuitOpenedAt        DateTime?
+    lastHealthCheckAt      DateTime?
+
+    disabledAt             DateTime?
+    createdAt              DateTime                        @default(now())
+    updatedAt              DateTime                        @default(now()) @updatedAt
+
+    virtualKeyBindings     VirtualKeyProviderCredential[]
+    ledgerEntries          GatewayBudgetLedger[]
+
+    @@unique([projectId, modelProviderId, slot])
+    @@index([projectId])
+    @@index([modelProviderId])
+    @@index([healthStatus])
+}
+
+model VirtualKeyProviderCredential {
+    virtualKeyId         String
+    providerCredentialId String
+    // Position in the VK's fallback chain. Lower = higher priority.
+    priority             Int
+    // Optional per-binding overrides that apply only when this VK routes via
+    // this credential (e.g. alternate extra headers, alternate model alias set).
+    overrides            Json?
+    createdAt            DateTime                  @default(now())
+
+    virtualKey           VirtualKey                @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
+    providerCredential   GatewayProviderCredential @relation(fields: [providerCredentialId], references: [id], onDelete: Cascade)
+
+    @@id([virtualKeyId, providerCredentialId])
+    @@unique([virtualKeyId, priority])
+    @@index([providerCredentialId])
+}
+
+model GatewayBudget {
+    id                     String                    @id @default(nanoid())
+    organizationId         String
+    // Scope is identified by (scopeType, scopeId). The typed relations below
+    // exist for RI when a matching target row is deleted; scopeId is the
+    // canonical discriminator the query layer uses.
+    scopeType              GatewayBudgetScopeType
+    scopeId                String
+
+    // Typed FKs — exactly one matches scopeType. The mismatched ones are NULL.
+    organizationScopedId   String?
+    organizationScoped     Organization?             @relation("OrgScopedGatewayBudgets", fields: [organizationScopedId], references: [id], onDelete: Cascade)
+
+    teamScopedId           String?
+    teamScoped             Team?                     @relation("TeamScopedGatewayBudgets", fields: [teamScopedId], references: [id], onDelete: Cascade)
+
+    projectScopedId        String?
+    projectScoped          Project?                  @relation("ProjectScopedGatewayBudgets", fields: [projectScopedId], references: [id], onDelete: Cascade)
+
+    virtualKeyScopedId     String?
+    virtualKeyScoped       VirtualKey?               @relation("VirtualKeyScopedGatewayBudgets", fields: [virtualKeyScopedId], references: [id], onDelete: Cascade)
+
+    principalUserId        String?
+    principalUser          User?                     @relation("PrincipalScopedGatewayBudgets", fields: [principalUserId], references: [id], onDelete: Cascade)
+
+    name                   String
+    description            String?
+    window                 GatewayBudgetWindow
+    limitUsd               Decimal                   @db.Decimal(18, 6)
+    onBreach               GatewayBudgetBreachAction @default(BLOCK)
+    timezone               String?                   // org-level default if null
+
+    // Mutated by the ledger, read by the gateway as part of the config payload.
+    spentUsd               Decimal                   @default(0) @db.Decimal(18, 6)
+    currentPeriodStartedAt DateTime                  @default(now())
+    resetsAt               DateTime
+    lastResetAt            DateTime?
+
+    archivedAt             DateTime?
+
+    createdAt              DateTime                  @default(now())
+    updatedAt              DateTime                  @default(now()) @updatedAt
+    createdById            String
+    createdBy              User                      @relation("GatewayBudgetCreatedBy", fields: [createdById], references: [id])
+
+    ledgerEntries          GatewayBudgetLedger[]
+
+    @@index([organizationId])
+    @@index([scopeType, scopeId])
+    @@index([resetsAt])
+}
+
+model GatewayBudgetLedger {
+    id                   String                     @id @default(nanoid())
+    budgetId             String
+    budget               GatewayBudget              @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+    virtualKeyId         String
+    virtualKey           VirtualKey                 @relation(fields: [virtualKeyId], references: [id], onDelete: Cascade)
+    providerCredentialId String?
+    providerCredential   GatewayProviderCredential? @relation(fields: [providerCredentialId], references: [id])
+
+    // Idempotency key — ULID produced by the gateway per request. Dedup for 24h.
+    gatewayRequestId     String
+    amountUsd            Decimal                    @db.Decimal(18, 6)
+    tokensInput          Int                        @default(0)
+    tokensOutput         Int                        @default(0)
+    tokensCacheRead      Int                        @default(0)
+    tokensCacheWrite     Int                        @default(0)
+    model                String
+    providerSlot         String?
+    durationMs           Int?
+    status               GatewayBudgetLedgerStatus  @default(SUCCESS)
+    occurredAt           DateTime                   @default(now())
+
+    @@unique([budgetId, gatewayRequestId])
+    @@index([virtualKeyId])
+    @@index([gatewayRequestId])
+    @@index([occurredAt])
+}
+
+model GatewayChangeEvent {
+    // Monotonically-increasing revision the gateway long-polls on.
+    revision             BigInt                 @id @default(autoincrement())
+    organizationId       String
+    organization         Organization           @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    kind                 GatewayChangeEventKind
+    virtualKeyId         String?
+    budgetId             String?
+    providerCredentialId String?
+    projectId            String?
+    project              Project?               @relation(fields: [projectId], references: [id], onDelete: SetNull)
+    payload              Json?
+    createdAt            DateTime               @default(now())
+
+    @@index([organizationId, revision])
+    @@index([projectId, revision])
+    @@index([virtualKeyId])
+    @@index([budgetId])
+}
+
+model GatewayAuditLog {
+    id             String             @id @default(nanoid())
+    organizationId String
+    projectId      String?
+    project        Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
+    actorUserId    String?
+    actor          User?              @relation("GatewayAuditLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+    action         GatewayAuditAction
+    targetKind     String             // "virtual_key" | "budget" | "provider_binding"
+    targetId       String
+    before         Json?
+    after          Json?
+    createdAt      DateTime           @default(now())
+
+    @@index([organizationId, createdAt])
+    @@index([projectId, createdAt])
+    @@index([actorUserId])
+    @@index([targetKind, targetId])
 }

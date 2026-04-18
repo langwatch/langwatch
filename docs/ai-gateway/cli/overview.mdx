@@ -1,0 +1,61 @@
+---
+title: Coding CLI Integrations
+description: Use the LangWatch AI Gateway from Claude Code, Codex, opencode, Cursor, Aider.
+sidebarTitle: Overview
+---
+
+The fastest-growing surface for enterprise LLM usage in 2026 is coding CLIs: every engineer has at least one running locally, and the gap between personal and corporate use has become a governance crisis. The AI Gateway solves it — every engineer keeps their preferred CLI, the org controls cost, guardrails, and visibility.
+
+Setup is always the same two steps:
+
+1. Mint a LangWatch virtual key (see [Quickstart](/ai-gateway/quickstart)).
+2. Set the CLI's base URL and API key to the gateway + VK.
+
+The gateway exposes both OpenAI-compatible and Anthropic-compatible endpoints on the same port, so any CLI that speaks either dialect works unchanged.
+
+## At a glance
+
+| CLI | Endpoint used | Env vars | Notes |
+|---|---|---|---|
+| [Claude Code](/ai-gateway/cli/claude-code) | `/v1/messages` | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` | Tool-call deltas preserved byte-for-byte. |
+| [Codex CLI](/ai-gateway/cli/codex) | `/v1/chat/completions`, `/v1/responses` | `OPENAI_BASE_URL`, `OPENAI_API_KEY` | Works with both Responses and Chat APIs. |
+| [opencode](/ai-gateway/cli/opencode) | `/v1/chat/completions` | Per-provider config in `opencode.json` | Supports model routing via aliases. |
+| [Cursor](/ai-gateway/cli/cursor) | `/v1/chat/completions` | Custom "OpenAI API base URL" in settings | Agent mode benefits most from budgets. |
+| [Aider](/ai-gateway/cli/aider) | `/v1/chat/completions` | `OPENAI_API_BASE`, `OPENAI_API_KEY` | Confirmed working with model aliases. |
+
+## Why this matters for the enterprise
+
+Before the gateway, governance of coding CLIs was a choice between:
+
+- **Ban them** — kills productivity, drives shadow usage.
+- **Allow them with personal provider keys** — no visibility, no cost control, leaked credentials in dotfiles and CI logs.
+
+The gateway adds a third option: **allow every CLI, centrally governed.**
+
+- **Cost.** Each engineer's CLI spend debits the org → team → project → principal budgets you've set.
+- **Visibility.** Every CLI call shows up in LangWatch traces, scoped to the project the VK belongs to.
+- **Policy.** `blocked_patterns` can deny shell-exec tools or untrusted MCPs at the gateway level, even if the CLI would otherwise enable them.
+- **Portability.** An engineer on Claude Code and a co-worker on Codex hit the same gateway with different VKs but the same budget — you don't need to pick a winner.
+- **Revocation.** Rotate or revoke a VK and the CLI stops working globally within 60 seconds. No more "which laptops still have the old key?"
+
+## Recommended VK layout for coding CLIs
+
+A workable pattern used by several early customers:
+
+- One personal-access VK per engineer (`{engineer}-cli`) bound to the engineer's principal.
+- Attach a `principal`-scoped monthly budget (e.g. `$200/month` for engineers, `$1000/month` for staff+). `on_breach: block`.
+- `blocked_patterns.tools.deny`: `^shell\\.exec$`, `^filesystem\\.write$` (or your org's list).
+- Fallback chain: Anthropic → OpenAI → Azure OpenAI. CLI autoswitches on outage.
+- `cache.mode: respect` so Anthropic prompt caching keeps saving 90%.
+
+Then every engineer gets a one-time setup (env vars in their shell rc) and never touches provider keys again.
+
+## Real-time feedback
+
+Each CLI's trace lands in LangWatch live. You can:
+
+- Pin a filter "where `langwatch.vk.tags` contains `cli`" on the project dashboard.
+- Page on-call if any engineer crosses 80% of their monthly personal cap.
+- Run an offline eval comparing Claude Code vs Codex quality on tickets of a given type.
+
+See the per-CLI pages for exact setup commands.
