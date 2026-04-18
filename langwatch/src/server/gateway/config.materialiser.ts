@@ -11,6 +11,7 @@ import type {
   ModelProvider,
   PrismaClient,
   Project,
+  Team,
   VirtualKey,
 } from "@prisma/client";
 
@@ -90,7 +91,7 @@ export class GatewayConfigMaterialiser {
       status: vk.status === "ACTIVE" ? "active" : "revoked",
       display_prefix: vk.displayPrefix,
       environment: vk.environment === "LIVE" ? "live" : "test",
-      organization_id: project.organizationId,
+      organization_id: project.team.organizationId,
       project_id: project.id,
       team_id: project.teamId,
       principal_id: vk.principalUserId,
@@ -139,9 +140,12 @@ export class GatewayConfigMaterialiser {
     };
   }
 
-  private async requireProject(projectId: string): Promise<Project> {
+  private async requireProject(
+    projectId: string,
+  ): Promise<Project & { team: Team }> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
+      include: { team: true },
     });
     if (!project) throw new Error(`project ${projectId} not found`);
     return project;
@@ -166,14 +170,14 @@ export class GatewayConfigMaterialiser {
 
   private async applicableBudgets(
     vk: VirtualKey,
-    project: Project,
+    project: Project & { team: Team },
   ): Promise<GatewayBudget[]> {
     return this.prisma.gatewayBudget.findMany({
       where: {
-        organizationId: project.organizationId,
+        organizationId: project.team.organizationId,
         archivedAt: null,
         OR: [
-          { scopeType: "ORGANIZATION", scopeId: project.organizationId },
+          { scopeType: "ORGANIZATION", scopeId: project.team.organizationId },
           { scopeType: "TEAM", scopeId: project.teamId },
           { scopeType: "PROJECT", scopeId: project.id },
           { scopeType: "VIRTUAL_KEY", scopeId: vk.id },
