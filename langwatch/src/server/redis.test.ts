@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRedisDbIndex } from "./redis";
+import { parseRedisDbIndex } from "./redis-db-index";
 
 describe("parseRedisDbIndex", () => {
   describe("when unset", () => {
@@ -23,6 +23,15 @@ describe("parseRedisDbIndex", () => {
       expect(parseRedisDbIndex("-1")).toBe(0);
       expect(parseRedisDbIndex("16")).toBe(0);
       expect(parseRedisDbIndex("9999")).toBe(0);
+    });
+
+    it("rejects partial numeric matches that parseInt would otherwise accept", () => {
+      // `parseInt("1abc", 10) === 1`; the full-string regex prevents that silent
+      // acceptance even if callers skip the Zod layer.
+      expect(parseRedisDbIndex("1abc")).toBe(0);
+      expect(parseRedisDbIndex("15x")).toBe(0);
+      expect(parseRedisDbIndex(" 2")).toBe(0);
+      expect(parseRedisDbIndex("0x10")).toBe(0);
     });
   });
 });

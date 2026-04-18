@@ -135,6 +135,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const redis = config.skipRedis ? null : createRedisConnectionFromConfig({
     url: config.redisUrl,
     clusterEndpoints: config.redisClusterEndpoints,
+    db: config.redisDbIndex,
   });
 
   const broadcast = new BroadcastService(redis);

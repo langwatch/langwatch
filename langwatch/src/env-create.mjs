@@ -51,10 +51,13 @@ export function createEnvConfig() {
       ELASTICSEARCH_CONFIGURED: z.boolean().optional(),
       REDIS_URL: z.string().optional(),
       REDIS_CLUSTER_ENDPOINTS: z.string().optional(),
-      REDIS_DB_INDEX: z
-        .string()
-        .regex(/^(?:[0-9]|1[0-5])$/, "REDIS_DB_INDEX must be 0-15")
-        .optional(),
+      REDIS_DB_INDEX: z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z
+          .string()
+          .regex(/^(?:[0-9]|1[0-5])$/, "REDIS_DB_INDEX must be 0-15")
+          .optional(),
+      ),
       GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
       AZURE_OPENAI_ENDPOINT: z.string().optional(),
       AZURE_OPENAI_KEY: z.string().optional(),

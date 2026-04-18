@@ -3,6 +3,9 @@ import IORedis, { Cluster } from "ioredis";
 const PHASE_PRODUCTION_BUILD = "phase-production-build";
 import { env } from "../env.mjs";
 import { createLogger } from "../utils/logger/server";
+import { parseRedisDbIndex } from "./redis-db-index";
+
+export { parseRedisDbIndex } from "./redis-db-index";
 
 const logger = createLogger("langwatch:redis");
 
@@ -48,17 +51,10 @@ export let connection: IORedis | Cluster | undefined;
 // etc. Prevents multiple worktrees from contending on the same BullMQ queues
 // and GroupQueue streams. Cluster mode ignores this (cluster supports only
 // DB 0) — we warn below if it's set in that combination.
-export const parseRedisDbIndex = (raw: string | undefined): number => {
-  if (!raw) return 0;
-  const n = parseInt(raw, 10);
-  if (Number.isNaN(n) || n < 0 || n > 15) return 0;
-  return n;
-};
-
-const redisDbIndex = parseRedisDbIndex(env.REDIS_DB_INDEX);
 
 if (!isBuildOrNoRedis) {
   // Use validated env inside this block since Redis is definitely needed
+  const redisDbIndex = parseRedisDbIndex(env.REDIS_DB_INDEX);
   const useCluster = !!env.REDIS_CLUSTER_ENDPOINTS;
   if (useCluster) {
     if (redisDbIndex !== 0) {
