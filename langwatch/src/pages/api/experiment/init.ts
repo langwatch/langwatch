@@ -10,7 +10,6 @@ import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-me
 import {
   enforcePatCeiling,
   extractCredentials,
-  patCeilingDenialResponse,
 } from "~/server/pat/auth-middleware";
 import { TokenResolver } from "~/server/pat/token-resolver";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -70,8 +69,7 @@ export default async function handler(
     });
   }
 
-  const tokenResolver = TokenResolver.create(prisma);
-  const resolved = await tokenResolver.resolve({
+  const resolved = await TokenResolver.create(prisma).resolve({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -83,15 +81,12 @@ export default async function handler(
   // the RBAC catalog grows beyond workflows. Experiments are created/owned
   // by workflows today, so `workflows:manage` is the closest existing
   // ceiling — VIEWER is correctly blocked, ADMIN/MEMBER pass through.
-  try {
-    await enforcePatCeiling({
-      prisma,
-      resolved,
-      permission: "workflows:manage",
-    });
-  } catch (error) {
-    const denial = patCeilingDenialResponse(error);
-    return res.status(denial.status).json({ message: denial.message });
+  const denial = await enforcePatCeiling({
+    resolved,
+    permission: "workflows:manage",
+  });
+  if (denial) {
+    return res.status(denial.status).json({ message: denial.error });
   }
 
   const project = resolved.project;
