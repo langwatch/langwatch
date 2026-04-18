@@ -8,6 +8,42 @@ import type { Evaluation, Trace } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
 import { ClickHouseTraceService } from "./clickhouse-trace.service";
 import { ElasticsearchTraceService } from "./elasticsearch-trace.service";
+
+/**
+ * Minimum prefix length we will attempt to resolve. Shorter strings fall
+ * through to "not found" — this keeps us from scanning the entire
+ * trace_summaries table on a single-character typo and narrows the search
+ * space enough to meaningfully detect ambiguity.
+ */
+export const MIN_TRACE_ID_PREFIX_LENGTH = 8;
+
+/**
+ * Full length of a trace ID. Inputs shorter than this are treated as
+ * potential prefixes; equal-or-longer inputs are treated as literal IDs.
+ */
+export const FULL_TRACE_ID_LENGTH = 32;
+
+/**
+ * Thrown when a trace ID prefix matches more than one trace in the project.
+ * Callers (route handlers) map this to a 409 response listing the full
+ * candidate IDs so the user can disambiguate.
+ */
+export class AmbiguousTraceIdPrefixError extends Error {
+  constructor(
+    public readonly prefix: string,
+    public readonly candidateTraceIds: string[],
+  ) {
+    const preview = candidateTraceIds.slice(0, 5).join(", ");
+    const suffix =
+      candidateTraceIds.length > 5
+        ? `, …${candidateTraceIds.length - 5} more`
+        : "";
+    super(
+      `Trace ID prefix "${prefix}" is ambiguous — matches: ${preview}${suffix}. Use a longer prefix.`,
+    );
+    this.name = "AmbiguousTraceIdPrefixError";
+  }
+}
 import type {
   AggregationFiltersInput,
   CustomersAndLabelsResult,
@@ -81,7 +117,45 @@ export class TraceService {
             "ClickHouse is enabled but returned null for getById — check ClickHouse client configuration",
           );
         }
-        return traces[0];
+        if (traces[0]) {
+          return traces[0];
+        }
+
+        // No exact match. If the input looks like a truncated prefix (shorter
+        // than a full trace ID, but long enough to be meaningful), try
+        // git-style prefix resolution scoped to this project.
+        if (
+          traceId.length < FULL_TRACE_ID_LENGTH &&
+          traceId.length >= MIN_TRACE_ID_PREFIX_LENGTH
+        ) {
+          const candidates = await this.clickHouseService.resolveTraceIdByPrefix(
+            projectId,
+            traceId,
+            2,
+          );
+          if (candidates === null) {
+            throw new Error(
+              "ClickHouse is enabled but returned null for resolveTraceIdByPrefix — check ClickHouse client configuration",
+            );
+          }
+          if (candidates.length === 0) {
+            return undefined;
+          }
+          if (candidates.length > 1) {
+            span.setAttribute("trace.id.prefix.ambiguous", true);
+            throw new AmbiguousTraceIdPrefixError(traceId, candidates);
+          }
+
+          span.setAttribute("trace.id.prefix.resolved", candidates[0]!);
+          const resolved = await this.clickHouseService.getTracesWithSpans(
+            projectId,
+            [candidates[0]!],
+            protections,
+          );
+          return resolved?.[0];
+        }
+
+        return undefined;
       },
     );
   }

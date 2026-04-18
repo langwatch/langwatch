@@ -9,7 +9,10 @@ import type { Span, Trace } from "~/server/tracer/types";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { generateAsciiTree, formatTraceSummaryDigest } from "~/server/traces/trace-formatting";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
-import { TraceService } from "~/server/traces/trace.service";
+import {
+  AmbiguousTraceIdPrefixError,
+  TraceService,
+} from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
@@ -162,12 +165,14 @@ app.post(
 app.get(
   "/:traceId",
   describeRoute({
-    description: "Get a single trace by ID. Defaults to AI-readable digest format.",
+    description:
+      "Get a single trace by ID. Defaults to AI-readable digest format. Accepts either the full 32-character trace ID or a unique prefix of at least 8 characters (git-style shortcut). Returns 404 if no trace matches and 409 if a prefix matches more than one trace.",
     parameters: [
       {
         name: "traceId",
         in: "path",
-        description: "The trace ID",
+        description:
+          "The trace ID — either the full 32-char ID or a unique prefix (≥ 8 chars). Prefix lookup is scoped to the authenticated project.",
         required: true,
         schema: { type: "string" },
       },
@@ -207,6 +212,20 @@ app.get(
           },
         },
       },
+      409: {
+        description:
+          "Ambiguous trace ID prefix — the prefix matches more than one trace",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                message: z.string(),
+                candidateTraceIds: z.array(z.string()),
+              }),
+            ),
+          },
+        },
+      },
     },
   }),
   async (c) => {
@@ -227,7 +246,22 @@ app.get(
       projectId: project.id,
     });
     const traceService = TraceService.create(prisma);
-    const trace = await traceService.getById(project.id, traceId, protections);
+
+    let trace;
+    try {
+      trace = await traceService.getById(project.id, traceId, protections);
+    } catch (err) {
+      if (err instanceof AmbiguousTraceIdPrefixError) {
+        return c.json(
+          {
+            message: err.message,
+            candidateTraceIds: err.candidateTraceIds,
+          },
+          409,
+        );
+      }
+      throw err;
+    }
 
     if (!trace) {
       throw new HTTPException(404, {
@@ -235,23 +269,28 @@ app.get(
       });
     }
 
+    // If the caller passed a prefix, the resolved trace has the full ID.
+    // Use that everywhere downstream so the response, links, and evaluation
+    // lookup all key off the real trace ID.
+    const resolvedTraceId = trace.trace_id;
+
     const evaluationsMap = await traceService.getEvaluationsMultiple(
       project.id,
-      [traceId],
+      [resolvedTraceId],
       protections,
     );
-    const evaluations = evaluationsMap[traceId] ?? [];
+    const evaluations = evaluationsMap[resolvedTraceId] ?? [];
 
     if (format === "digest") {
       return c.json({
-        trace_id: traceId,
+        trace_id: resolvedTraceId,
         formatted_trace: await formatSpansDigest(trace.spans ?? []),
         timestamps: trace.timestamps,
         metadata: trace.metadata,
         evaluations,
         platformUrl: platformUrl({
           projectSlug: project.slug,
-          path: `/messages/${traceId}`,
+          path: `/messages/${resolvedTraceId}`,
         }),
       });
     }
@@ -263,7 +302,7 @@ app.get(
       ascii_tree: asciiTree,
       platformUrl: platformUrl({
         projectSlug: project.slug,
-        path: `/messages/${traceId}`,
+        path: `/messages/${resolvedTraceId}`,
       }),
     });
   },

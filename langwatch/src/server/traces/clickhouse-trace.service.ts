@@ -161,6 +161,69 @@ export class ClickHouseTraceService {
   }
 
   /**
+   * Resolve a trace ID prefix to matching full trace IDs within a project.
+   *
+   * Used for git-style shortcut lookups where a user provides a prefix of the
+   * full trace ID (for example, the 20-char truncated ID shown by `langwatch
+   * trace search`). Returns up to `limit` distinct trace IDs so the caller can
+   * detect ambiguity.
+   *
+   * Returns null if the ClickHouse client is not available for the project.
+   *
+   * @param projectId - The project ID (scoped via TenantId)
+   * @param prefix - The trace ID prefix to search for
+   * @param limit - Maximum number of distinct trace IDs to return (default 2 — enough to detect ambiguity)
+   * @returns Array of matching trace IDs (deduped), or null if ClickHouse is not available
+   */
+  async resolveTraceIdByPrefix(
+    projectId: string,
+    prefix: string,
+    limit = 2,
+  ): Promise<string[] | null> {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseTraceService.resolveTraceIdByPrefix",
+      { attributes: { "tenant.id": projectId, "trace.id.prefix": prefix } },
+      async () => {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
+          return null;
+        }
+
+        try {
+          const result = await clickHouseClient.query({
+            query: `
+              SELECT DISTINCT TraceId
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+                AND startsWith(TraceId, {prefix:String})
+              LIMIT {limit:UInt32}
+            `,
+            query_params: {
+              tenantId: projectId,
+              prefix,
+              limit,
+            },
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as Array<{ TraceId: string }>;
+          return rows.map((r) => r.TraceId);
+        } catch (error) {
+          this.logger.error(
+            {
+              projectId,
+              prefix,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to resolve trace ID by prefix from ClickHouse",
+          );
+          throw new Error("Failed to resolve trace ID by prefix");
+        }
+      },
+    );
+  }
+
+  /**
    * Get traces by thread ID.
    *
    * Queries trace_summaries using the Attributes map to find traces
