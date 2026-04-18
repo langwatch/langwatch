@@ -7,6 +7,25 @@ set -eo pipefail
 # conflict 30s later after Vite/tsx finish booting.
 "$(dirname "$0")/check-ports.sh"
 
+# Dev-only: auto-derive REDIS_DB_INDEX from the PORT slot so each worktree
+# lands on its own Redis DB. PORT=5560 → 0, 5570 → 1, 5580 → 2, …, 5710 → 15.
+# Keeps BullMQ queues, GroupQueue streams, and the fold cache isolated across
+# concurrent `pnpm dev` instances. Explicit REDIS_DB_INDEX wins.
+# Skipped in production (cluster Redis only supports DB 0 anyway).
+if [[ "$NODE_ENV" = "development" ]]; then
+  if [ -z "$REDIS_DB_INDEX" ]; then
+    _PORT_FOR_DB="${PORT:-5560}"
+    REDIS_DB_INDEX=$(( (_PORT_FOR_DB - 5560) / 10 ))
+    if [ "$REDIS_DB_INDEX" -lt 0 ] || [ "$REDIS_DB_INDEX" -gt 15 ]; then
+      REDIS_DB_INDEX=0
+    fi
+    export REDIS_DB_INDEX
+    echo "  ✓ redis db=${REDIS_DB_INDEX} (auto-derived from PORT=${_PORT_FOR_DB})"
+  else
+    echo "  ✓ redis db=${REDIS_DB_INDEX} (explicit)"
+  fi
+fi
+
 RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true"
 if [ -z "$NODE_ENV" ]; then
   RUNTIME_ENV="$RUNTIME_ENV NODE_ENV=production"

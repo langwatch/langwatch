@@ -3,6 +3,11 @@ import IORedis, { Cluster } from "ioredis";
 export interface RedisFactoryOptions {
   url?: string;
   clusterEndpoints?: string;
+  // Redis DB index (0–15). Only applied in standalone mode; cluster ignores it.
+  // Must match the main `connection` in server/redis.ts to keep BroadcastService
+  // and SpanDedupService on the same DB as the rest of the app, or the
+  // REDIS_DB_INDEX dev isolation becomes a split brain.
+  db?: number;
 }
 
 function parseClusterEndpoints(endpointsStr: string) {
@@ -32,6 +37,7 @@ export function createRedisConnectionFromConfig(
   return new IORedis(opts.url!, {
     maxRetriesPerRequest: null,
     offlineQueue: false,
+    db: opts.db ?? 0,
     tls: opts.url?.includes("tls.rejectUnauthorized=false")
       ? { rejectUnauthorized: false }
       : opts.url?.includes("rediss://")

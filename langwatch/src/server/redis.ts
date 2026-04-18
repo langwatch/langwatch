@@ -3,6 +3,9 @@ import IORedis, { Cluster } from "ioredis";
 const PHASE_PRODUCTION_BUILD = "phase-production-build";
 import { env } from "../env.mjs";
 import { createLogger } from "../utils/logger/server";
+import { parseRedisDbIndex } from "./redis-db-index";
+
+export { parseRedisDbIndex } from "./redis-db-index";
 
 const logger = createLogger("langwatch:redis");
 
@@ -44,10 +47,22 @@ function parseClusterEndpoints(endpointsStr: string) {
 
 export let connection: IORedis | Cluster | undefined;
 
+// Dev-only isolation: `pnpm dev` at PORT=5570 lands on DB 1, PORT=5580 on DB 2,
+// etc. Prevents multiple worktrees from contending on the same BullMQ queues
+// and GroupQueue streams. Cluster mode ignores this (cluster supports only
+// DB 0) — we warn below if it's set in that combination.
+
 if (!isBuildOrNoRedis) {
   // Use validated env inside this block since Redis is definitely needed
+  const redisDbIndex = parseRedisDbIndex(env.REDIS_DB_INDEX);
   const useCluster = !!env.REDIS_CLUSTER_ENDPOINTS;
   if (useCluster) {
+    if (redisDbIndex !== 0) {
+      logger.warn(
+        { redisDbIndex },
+        "REDIS_DB_INDEX is set but REDIS_CLUSTER_ENDPOINTS is active — cluster mode only supports DB 0, ignoring",
+      );
+    }
     const clusterEndpoints = parseClusterEndpoints(
       env.REDIS_CLUSTER_ENDPOINTS ?? "",
     );
@@ -71,16 +86,17 @@ if (!isBuildOrNoRedis) {
     connection = new IORedis(env.REDIS_URL ?? "", {
       maxRetriesPerRequest: null,
       offlineQueue: false,
+      db: redisDbIndex,
       tls: env.REDIS_URL?.includes("tls.rejectUnauthorized=false")
         ? { rejectUnauthorized: false }
         : (env.REDIS_URL?.includes("rediss://") as any),
     });
 
     connection.on("connect", () => {
-      logger.info("connected");
+      logger.info({ db: redisDbIndex }, "connected");
     });
     connection.on("ready", () => {
-      logger.info("ready to accept commands");
+      logger.info({ db: redisDbIndex }, "ready to accept commands");
     });
   }
 
