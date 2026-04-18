@@ -92,17 +92,37 @@ export const app = new Hono().basePath("/api");
 // POST /api/analytics
 // =============================================
 app.post("/analytics", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const credentials = extractCredentials(c);
+  if (!credentials) {
+    return c.json(
+      {
+        message:
+          "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
+      },
+      401,
+    );
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
+  const resolved = await tokenResolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
   });
-  if (!project) {
+  if (!resolved) {
     return c.json({ message: "Invalid auth token." }, 401);
   }
+
+  try {
+    await enforcePatCeiling({
+      prisma,
+      resolved,
+      permission: "analytics:view",
+    });
+  } catch (error) {
+    const denial = patCeilingDenialResponse(error);
+    return c.json({ message: denial.message }, denial.status);
+  }
+
+  const project = resolved.project;
 
   let body: Record<string, any>;
   try {
@@ -127,6 +147,9 @@ app.post("/analytics", async (c) => {
   try {
     const analyticsService = getAnalyticsService();
     const timeseriesResult = await analyticsService.getTimeseries(params);
+    if (resolved.type === "pat") {
+      tokenResolver.markUsed({ patId: resolved.patId });
+    }
     return c.json(timeseriesResult);
   } catch (e) {
     if (e instanceof TRPCError && e.code === "BAD_REQUEST") {
@@ -161,6 +184,12 @@ const HOTEL_SYSTEM_PROMPT =
 const RAG_SYSTEM_PROMPT =
   "You are a restaurant expert knowing the best around town.";
 
+// NOTE(pat): /demo/hotel_bot is intentionally NOT migrated to the unified
+// extractCredentials + TokenResolver + enforcePatCeiling pipeline. It is a
+// demo fixture that only forwards the caller's token onward to /api/collector,
+// which performs full PAT/legacy auth + ceiling enforcement itself. Adding a
+// second layer here would double-validate the same token and require a
+// scope that demo tokens may not have.
 app.post("/demo/hotel_bot", async (c) => {
   const authToken = c.req.header("x-auth-token");
   if (!authToken) {
@@ -220,17 +249,40 @@ app.post(
   "/dspy/log_steps",
   bodyLimit({ maxSize: 20 * 1024 * 1024 }),
   async (c) => {
-    const authToken = c.req.header("x-auth-token");
-    if (!authToken) {
-      return c.json({ message: "X-Auth-Token header is required." }, 401);
+    const credentials = extractCredentials(c);
+    if (!credentials) {
+      return c.json(
+        {
+          message:
+            "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
+        },
+        401,
+      );
     }
 
-    const project = await prisma.project.findUnique({
-      where: { apiKey: authToken },
+    const resolved = await tokenResolver.resolve({
+      token: credentials.token,
+      projectId: credentials.projectId,
     });
-    if (!project) {
+    if (!resolved) {
       return c.json({ message: "Invalid auth token." }, 401);
     }
+
+    try {
+      await enforcePatCeiling({
+        prisma,
+        resolved,
+        // DSPy steps are part of an experiment run; closest existing ceiling
+        // is `workflows:manage`. TODO(pat): move under a dedicated
+        // experiments permission once that exists in the RBAC catalog.
+        permission: "workflows:manage",
+      });
+    } catch (error) {
+      const denial = patCeilingDenialResponse(error);
+      return c.json({ message: denial.message }, denial.status);
+    }
+
+    const project = resolved.project;
 
     let body: unknown;
     try {
@@ -337,6 +389,10 @@ app.post(
       }
     }
 
+    if (resolved.type === "pat") {
+      tokenResolver.markUsed({ patId: resolved.patId });
+    }
+
     return c.json({ message: "ok" });
   },
 );
@@ -362,17 +418,40 @@ const dspyInitParamsSchema = z
   });
 
 app.post("/experiment/init", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const credentials = extractCredentials(c);
+  if (!credentials) {
+    return c.json(
+      {
+        message:
+          "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
+      },
+      401,
+    );
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
+  const resolved = await tokenResolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
   });
-  if (!project) {
+  if (!resolved) {
     return c.json({ message: "Invalid auth token." }, 401);
   }
+
+  // TODO(pat): introduce a dedicated `experiments:manage` permission once
+  // the RBAC catalog grows beyond workflows. `workflows:manage` is the
+  // closest existing ceiling — VIEWER blocked, ADMIN/MEMBER pass through.
+  try {
+    await enforcePatCeiling({
+      prisma,
+      resolved,
+      permission: "workflows:manage",
+    });
+  } catch (error) {
+    const denial = patCeilingDenialResponse(error);
+    return c.json({ message: denial.message }, denial.status);
+  }
+
+  const project = resolved.project;
 
   let body: Record<string, any>;
   try {
@@ -435,6 +514,10 @@ app.post("/experiment/init", async (c) => {
       );
     }
     throw error;
+  }
+
+  if (resolved.type === "pat") {
+    tokenResolver.markUsed({ patId: resolved.patId });
   }
 
   return c.json({
@@ -558,17 +641,12 @@ app.post("/optimization/:workflowId/:versionId", async (c) => {
   const workflowId = c.req.param("workflowId");
   const versionId = c.req.param("versionId");
 
-  const xAuthToken = c.req.header("x-auth-token");
-  const authHeader = c.req.header("authorization");
-  const authToken =
-    xAuthToken ??
-    (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
-
-  if (!authToken) {
+  const credentials = extractCredentials(c);
+  if (!credentials) {
     return c.json(
       {
         message:
-          "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
+          "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
       },
       401,
     );
@@ -579,13 +657,26 @@ app.post("/optimization/:workflowId/:versionId", async (c) => {
     return c.json({ message: "Invalid body, expecting json" }, 400);
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-    include: { team: true },
+  const resolved = await tokenResolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
   });
-  if (!project) {
+  if (!resolved) {
     return c.json({ message: "Invalid auth token." }, 401);
   }
+
+  try {
+    await enforcePatCeiling({
+      prisma,
+      resolved,
+      permission: "workflows:manage",
+    });
+  } catch (error) {
+    const denial = patCeilingDenialResponse(error);
+    return c.json({ message: denial.message }, denial.status);
+  }
+
+  const project = resolved.project;
 
   let body: Record<string, any>;
   try {
@@ -601,6 +692,9 @@ app.post("/optimization/:workflowId/:versionId", async (c) => {
       body,
       versionId,
     );
+    if (resolved.type === "pat") {
+      tokenResolver.markUsed({ patId: resolved.patId });
+    }
     return c.json(result);
   } catch (error) {
     return c.json(
@@ -907,17 +1001,37 @@ const filterSchema = z
   .default({});
 
 app.post("/trigger/slack", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const credentials = extractCredentials(c);
+  if (!credentials) {
+    return c.json(
+      {
+        message:
+          "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
+      },
+      401,
+    );
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
+  const resolved = await tokenResolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
   });
-  if (!project) {
+  if (!resolved) {
     return c.json({ message: "Invalid auth token." }, 401);
   }
+
+  try {
+    await enforcePatCeiling({
+      prisma,
+      resolved,
+      permission: "triggers:manage",
+    });
+  } catch (error) {
+    const denial = patCeilingDenialResponse(error);
+    return c.json({ message: denial.message }, denial.status);
+  }
+
+  const project = resolved.project;
 
   let body: Record<string, any>;
   try {
@@ -948,6 +1062,10 @@ app.post("/trigger/slack", async (c) => {
         alertType: validatedData.alert_type,
       },
     });
+
+    if (resolved.type === "pat") {
+      tokenResolver.markUsed({ patId: resolved.patId });
+    }
 
     return c.json({ message: "Slack trigger created successfully" });
   } catch (error) {
@@ -984,17 +1102,12 @@ async function handleWorkflowRun(
   workflowId: string,
   versionId: string | undefined,
 ) {
-  const xAuthToken = c.req.header("x-auth-token");
-  const authHeader = c.req.header("authorization");
-  const authToken =
-    xAuthToken ??
-    (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
-
-  if (!authToken) {
+  const credentials = extractCredentials(c);
+  if (!credentials) {
     return c.json(
       {
         message:
-          "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
+          "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
       },
       401,
     );
@@ -1005,13 +1118,26 @@ async function handleWorkflowRun(
     return c.json({ message: "Invalid body, expecting json" }, 400);
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-    include: { team: true },
+  const resolved = await tokenResolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
   });
-  if (!project) {
+  if (!resolved) {
     return c.json({ message: "Invalid auth token." }, 401);
   }
+
+  try {
+    await enforcePatCeiling({
+      prisma,
+      resolved,
+      permission: "workflows:manage",
+    });
+  } catch (error) {
+    const denial = patCeilingDenialResponse(error);
+    return c.json({ message: denial.message }, denial.status);
+  }
+
+  const project = resolved.project;
 
   let body: Record<string, any>;
   try {
@@ -1027,6 +1153,9 @@ async function handleWorkflowRun(
       body,
       versionId,
     );
+    if (resolved.type === "pat") {
+      tokenResolver.markUsed({ patId: resolved.patId });
+    }
     return c.json(result);
   } catch (error) {
     return c.json({ message: (error as Error).message }, 500);
