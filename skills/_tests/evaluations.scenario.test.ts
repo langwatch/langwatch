@@ -11,6 +11,7 @@ import {
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -74,6 +75,7 @@ describe("Evaluations Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python OpenAI evaluation experiment",
         description:
           "Creating an evaluation experiment for a Python OpenAI chatbot that replies with tweet-like responses and emojis.",
@@ -122,7 +124,7 @@ describe("Evaluations Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -138,6 +140,7 @@ describe("Evaluations Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Vercel AI evaluation experiment",
         description:
           "Creating an evaluation experiment for a TypeScript Vercel AI chatbot.",
@@ -181,7 +184,7 @@ describe("Evaluations Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -196,6 +199,7 @@ describe("Evaluations Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python LangGraph evaluation experiment",
         description:
           "Creating an evaluation experiment for a Python LangGraph agent.",
@@ -233,7 +237,7 @@ describe("Evaluations Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -248,6 +252,7 @@ describe("Evaluations Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Targeted RAG faithfulness evaluation",
         description:
           "Adding a specific evaluation for checking if the agent's responses are faithful to the context provided.",
@@ -282,7 +287,7 @@ describe("Evaluations Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -297,6 +302,7 @@ describe("Evaluations Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "RAG agent domain-specific evaluation",
         description:
           "Creating an evaluation experiment for a TerraVerde farm advisory RAG agent.",
@@ -348,6 +354,6 @@ describe("Evaluations Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 });

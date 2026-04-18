@@ -3,12 +3,15 @@ import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { formatRelativeTime } from "../../utils/formatting";
 
 export const listSimulationRunsCommand = async (options: {
   scenarioSetId?: string;
   batchRunId?: string;
   limit?: string;
   format?: string;
+  status?: string;
+  name?: string;
 }): Promise<void> => {
   checkApiKey();
 
@@ -46,6 +49,8 @@ export const listSimulationRunsCommand = async (options: {
         status: string;
         durationInMs: number;
         totalCost?: number;
+        timestamp?: number;
+        updatedAt?: number;
         results?: {
           verdict?: string | null;
         } | null;
@@ -53,11 +58,23 @@ export const listSimulationRunsCommand = async (options: {
       hasMore?: boolean;
     };
 
-    const runs = result.runs;
+    let runs = result.runs;
+
+    // Client-side filters (status / name substring) so users can drill into
+    // a specific failure without paging through everything.
+    if (options.status) {
+      const wanted = options.status.toUpperCase();
+      runs = runs.filter((r) => r.status.toUpperCase() === wanted);
+    }
+    if (options.name) {
+      const needle = options.name.toLowerCase();
+      runs = runs.filter((r) => (r.name ?? "").toLowerCase().includes(needle));
+    }
+
     spinner.succeed(`Found ${runs.length} simulation run${runs.length !== 1 ? "s" : ""}${result.hasMore ? " (more available)" : ""}`);
 
     if (options.format === "json") {
-      console.log(JSON.stringify(result, null, 2));
+      console.log(JSON.stringify({ ...result, runs }, null, 2));
       return;
     }
 
@@ -81,8 +98,9 @@ export const listSimulationRunsCommand = async (options: {
       const verdictStr = verdict ? ` (${verdict})` : "";
       const duration = run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—";
       const cost = run.totalCost ? `$${run.totalCost.toFixed(4)}` : "";
+      const when = run.timestamp ? formatRelativeTime(new Date(run.timestamp).toISOString()) : "—";
 
-      console.log(`  ${statusColor("●")} ${chalk.cyan(run.name ?? run.scenarioId)} ${statusColor(run.status)}${verdictStr}`);
+      console.log(`  ${statusColor("●")} ${chalk.cyan(run.name ?? run.scenarioId)} ${statusColor(run.status)}${verdictStr} ${chalk.gray(`· ${when}`)}`);
       console.log(`    ${chalk.gray("Run ID:")} ${run.scenarioRunId}  ${chalk.gray("Duration:")} ${duration}  ${cost ? chalk.gray("Cost:") + " " + cost : ""}`);
       console.log();
     }

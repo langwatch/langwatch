@@ -15,8 +15,12 @@ class State(TypedDict):
 llm = ChatOpenAI(model="gpt-4o")
 
 
+SYSTEM_PROMPT = "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis."
+
+
 def agent_node(state: State) -> State:
-    response = llm.invoke(state["messages"])
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}, *state["messages"]]
+    response = llm.invoke(messages)
     return {"messages": state["messages"], "response": response.content}
 
 

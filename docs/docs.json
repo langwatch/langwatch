@@ -65,6 +65,7 @@
                   "skills/pms-and-domain-experts"
                 ]
               },
+              "integration/cli",
               "integration/mcp",
               "better-agents/overview"
             ]

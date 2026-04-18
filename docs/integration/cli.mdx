@@ -1,0 +1,250 @@
+---
+title: LangWatch CLI
+sidebarTitle: LangWatch CLI
+description: The `langwatch` CLI is a single tool that gives you—and your coding assistant—full access to LangWatch from the terminal. Instrument code, version prompts, run scenarios, inspect traces, query analytics, and more.
+---
+
+Everything in the LangWatch app is available from the CLI, it's designed to be driven by a coding assistant.
+
+Every subcommand supports `--help`, and list/get commands accept `--format json`. Run `langwatch --help` to see the full command tree.
+
+## Install
+
+```bash
+npm install -g langwatch
+```
+
+Or run any command with `npx`:
+
+```bash
+npx langwatch --help
+```
+
+## Authenticate
+
+Sign in once and the CLI saves your API key to `.env` in the current directory:
+
+```bash
+langwatch login
+```
+
+This opens [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize) in your browser, where you copy a key and paste it back. For CI/CD or headless setups, pass the key non-interactively:
+
+```bash
+langwatch login --api-key sk-lw-...
+```
+
+### Self-hosted
+
+If you run a self-hosted LangWatch, point the CLI at your deployment:
+
+```bash
+export LANGWATCH_ENDPOINT=https://langwatch.mycompany.com
+langwatch login
+```
+
+The `authorize` flow, docs fetcher, and every API call will automatically use that endpoint. Add `LANGWATCH_ENDPOINT` to your `.env` so it persists.
+
+### Letting an agent do it
+
+If you're driving the CLI from a coding assistant, just ask the agent to set it up. When the API key is missing, the CLI prints a message pointing at the `/authorize` URL so the agent can walk the user through it:
+
+```
+Error: LANGWATCH_API_KEY not found.
+Get your API key from:
+  https://app.langwatch.ai/authorize
+Then either run:
+  langwatch login --api-key <your-key>
+Or add it to your .env file:
+  echo 'LANGWATCH_API_KEY=<your-key>' >> .env
+```
+
+## Fetch documentation
+
+`langwatch docs` returns any LangWatch documentation page as plain Markdown — ideal for feeding into an agent's context before it writes code.
+
+```bash
+langwatch docs                                # Documentation index
+langwatch docs integration/python/guide       # Python integration guide
+langwatch docs integration/typescript/guide   # TypeScript integration guide
+langwatch docs prompt-management/cli          # Prompts CLI reference
+langwatch docs integration/python/langgraph   # Framework-specific guides
+```
+
+Scenario framework docs live under a separate namespace:
+
+```bash
+langwatch scenario-docs                       # Scenario index
+langwatch scenario-docs advanced/red-teaming
+```
+
+Both commands accept full URLs too, and any missing `.md` extension is appended automatically.
+
+<Tip>
+If you're inside an assistant with no shell (for example, a chat-only environment), the same content is available over plain HTTP — append `.md` to any documentation path, e.g. `https://langwatch.ai/docs/integration/python/guide.md`. Indexes: [docs](https://langwatch.ai/docs/llms.txt), [scenarios](https://langwatch.ai/scenario/llms.txt).
+</Tip>
+
+## Version prompts
+
+The Prompts CLI turns your prompts into tracked files alongside your code, with lock files, tagging, and sync to the LangWatch platform.
+
+```bash
+langwatch prompt init             # scaffold prompts.json + prompts/ folder
+langwatch prompt create my-agent  # create a new local prompt
+langwatch prompt sync             # push local changes, pull remote updates
+langwatch prompt list             # see all prompts in the project
+```
+
+In your application code, fetch the latest version at runtime:
+
+<CodeGroup>
+```python Python
+import langwatch
+prompt = langwatch.prompts.get("my-agent")
+```
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+const langwatch = new LangWatch();
+const prompt = await langwatch.prompts.get("my-agent");
+```
+</CodeGroup>
+
+### Tag versions for deployment
+
+Three built-in tags are available: `latest` (auto-assigned), `production`, and `staging`. Assign a tag to the current version:
+
+```bash
+langwatch prompt tag assign my-agent production
+```
+
+Then fetch by tag at runtime:
+
+<CodeGroup>
+```python Python
+prompt = langwatch.prompts.get("my-agent", tag="production")
+```
+
+```typescript TypeScript
+const prompt = await langwatch.prompts.get("my-agent", { tag: "production" });
+```
+</CodeGroup>
+
+For canary or blue/green deployments, create custom tags with `langwatch prompt tag create`.
+
+For the full Prompts CLI reference, see the [Prompt Management CLI guide](/prompt-management/cli).
+
+## Run scenario tests
+
+Scenarios are the LangWatch equivalent of end-to-end tests for agents: a user simulator chats with your agent, an LLM judge scores the conversation against criteria you define, and everything is recorded for later inspection.
+
+```bash
+langwatch scenario list                       # see all scenarios
+langwatch scenario create "refund flow" \
+  --description "User asks for a refund on a recent order" \
+  --criteria "Agent verifies identity" \
+  --criteria "Agent processes the refund"
+langwatch scenario run <scenario-id> --target <prompt-or-agent>
+```
+
+Group related scenarios into a **suite** (a run plan) for CI or scheduled runs:
+
+```bash
+langwatch suite list
+langwatch suite run <suite-id>                # kicks off every scenario × target
+```
+
+### Inspect simulation runs
+
+Every scenario execution produces a **simulation run** you can inspect after the fact — full conversation, judge verdict, reasoning, met/unmet criteria, cost, and duration.
+
+```bash
+langwatch simulation-run list                         # recent runs, with relative timestamps
+langwatch simulation-run list --status FAILED        # only failures
+langwatch simulation-run list --name "refund flow"   # filter by name substring
+langwatch simulation-run get <run-id>                 # full details for one run
+langwatch simulation-run get <run-id> --full         # don't truncate long messages
+```
+
+The `get` command renders assistant thinking blocks and tool calls as readable plain text — no raw JSON dumps in your terminal. Use `--format json` on either command for structured output.
+
+For the full scenario testing guide, see the [Scenarios documentation](/agent-simulations/overview).
+
+## Inspect traces
+
+Traces capture every LLM call your agent makes — prompts, responses, latency, cost, errors. Search and drill into them from the terminal:
+
+```bash
+langwatch trace search --limit 10              # most recent traces
+langwatch trace search --query "error"         # full-text search
+langwatch trace get <trace-id>                 # one trace in detail
+langwatch trace export --output traces.jsonl   # stream traces for offline analysis
+```
+
+Agents use this to debug their own instrumentation: after running your code once, ask the assistant to run `langwatch trace search --limit 5` and verify traces are flowing. If nothing appears, the instrumentation is wrong — no need to read logs.
+
+## Query analytics
+
+Analytics aggregate your traces into performance and cost metrics without leaving the terminal:
+
+```bash
+langwatch analytics --help          # available metrics and dimensions
+```
+
+Use it to answer questions like "what's my P95 latency this week", "how much did each agent cost last month", or "which prompts produce the most errors". The underlying data is the same as the LangWatch dashboard.
+
+## Manage platform resources
+
+Every LangWatch resource follows the same consistent subcommand shape:
+
+```bash
+langwatch <resource> list
+langwatch <resource> get <id>
+langwatch <resource> create <name> [options]
+langwatch <resource> update <id> [options]
+langwatch <resource> delete <id>
+```
+
+Available resources include:
+
+- **`evaluator`** — create and version evaluators (answer correctness, faithfulness, custom LLM judges)
+- **`monitor`** — online evaluations that score production traces automatically
+- **`dataset`** — evaluation datasets (upload CSV, download, manage columns)
+- **`agent`** — agent definitions used by scenarios and monitors
+- **`dashboard`** and **`graph`** — custom analytics dashboards
+- **`trigger`** — automations (alerts, webhooks, dataset-append on failure)
+- **`secret`** — encrypted environment variables for scheduled agent runs
+- **`workflow`** — reusable workflows built in the UI
+- **`model-provider`** — configure OpenAI, Anthropic, Azure, or Bedrock for your project
+- **`annotation`** — attach labels to traces for supervised fine-tuning data
+
+Run `langwatch <resource> --help` on any of these for subcommand-level options, and `--format json` to get structured output for scripting.
+
+## Trigger experiments
+
+Experiments batch-run an agent or prompt against a dataset and produce an evaluation report:
+
+```bash
+langwatch evaluation --help
+```
+
+Typically you script this in CI: check out the branch, run the experiment, fail the build if the pass rate drops below your threshold. The CLI emits machine-readable results so this plumbing is straightforward.
+
+## Progressive disclosure
+
+The CLI leans heavily on `--help`. Every subcommand has its own, and the top-level `langwatch --help` is the best way to discover what's available:
+
+```bash
+langwatch --help
+langwatch prompt --help
+langwatch prompt tag --help
+langwatch prompt tag create --help
+```
+
+This keeps the CLI honest — new capabilities show up in `--help` the moment they ship, so you never have to wonder whether a flag exists.
+
+## Use the CLI as your agent's control plane
+
+The CLI was designed so that an AI coding assistant can operate LangWatch end-to-end on your behalf. Skills like [Tracing, Evaluations, Scenarios, and Prompt Versioning](/skills/directory) are built on top of it — the assistant reads docs via `langwatch docs`, runs platform operations via the subcommands, and verifies its own work by searching traces and inspecting simulation runs.
+
+If you're building your own agent workflows, the pattern works the same way: give the assistant the CLI and ask it what you want. It's a small surface area with a big reach, and everything it does is auditable in the LangWatch app afterwards.

@@ -16,26 +16,65 @@ export class FileManager {
 
   private static _projectRoot: string | undefined;
 
+  /** Reset the cached project root. Tests use this to exercise different cwds. */
+  static _resetProjectRootCache(): void {
+    this._projectRoot = undefined;
+  }
+
+  private static readonly PROJECT_MARKERS = [
+    ".git",
+    "package.json",
+    "pyproject.toml",
+  ];
+
+  private static hasProjectMarker(dir: string): boolean {
+    return this.PROJECT_MARKERS.some((m) => fs.existsSync(path.join(dir, m)));
+  }
+
   private static findProjectRoot(): string {
     if (this._projectRoot) {
       return this._projectRoot;
     }
 
-    let currentDir = process.cwd();
-    const root = path.parse(currentDir).root;
+    const cwd = process.cwd();
+    const fsRoot = path.parse(cwd).root;
 
-    while (currentDir !== root) {
+    // Find the highest ancestor that still looks like part of "this project"
+    // (has package.json / pyproject.toml / .git). If cwd itself has no marker,
+    // we don't walk up at all — prevents grabbing a stray prompts.json from
+    // /tmp or other shared scratch dirs.
+    let topProjectDir: string | null = null;
+    let scan = cwd;
+    while (scan !== fsRoot) {
+      if (this.hasProjectMarker(scan)) {
+        topProjectDir = scan;
+      }
+      scan = path.dirname(scan);
+    }
+
+    if (!topProjectDir) {
+      this._projectRoot = cwd;
+      return cwd;
+    }
+
+    // Walk up from cwd looking for prompts.json, capped at the project boundary.
+    let currentDir = cwd;
+    while (true) {
       const configPath = path.join(currentDir, this.PROMPTS_CONFIG_FILE);
       if (fs.existsSync(configPath)) {
         this._projectRoot = currentDir;
         return currentDir;
       }
+      if (currentDir === topProjectDir) break;
       currentDir = path.dirname(currentDir);
     }
 
-    // Fallback to cwd if no prompts.json found
-    this._projectRoot = process.cwd();
-    return this._projectRoot;
+    // No prompts.json anywhere within the project — default to cwd so `init`
+    // creates it where the user actually ran the command. This also keeps
+    // concurrent test workdirs isolated: each tempdir gets its own prompts.json
+    // instead of all pointing at a shared repo-root file.
+    this._projectRoot = cwd;
+    return cwd;
   }
 
   static getPromptsConfigPath(): string {

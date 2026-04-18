@@ -125,7 +125,7 @@ program
 // Top-level commands
 program
   .command("login")
-  .description("Login to LangWatch and save API key")
+  .description("Login to LangWatch and save API key. Get a key from https://app.langwatch.ai/authorize (or ${LANGWATCH_ENDPOINT}/authorize for self-hosted).")
   .option("--api-key <key>", "Set API key non-interactively (for CI/CD and agents)")
   .action(async (options: { apiKey?: string }) => {
     try {
@@ -340,6 +340,37 @@ program
   .action(async (options: { format?: string }) => {
     const { statusCommand: impl } = await import("./commands/status.js");
     await impl(options);
+  });
+
+// Docs commands - fetch markdown documentation for LangWatch and Scenario
+program
+  .command("docs [url]")
+  .description(
+    "Fetch LangWatch documentation as markdown. Pass no argument for the index (llms.txt), a path like 'integration/python/guide', or a full URL. Missing extensions default to .md.",
+  )
+  .action(async (url?: string) => {
+    try {
+      const { docsCommand: impl } = await import("./commands/docs.js");
+      await impl(url);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("scenario-docs [url]")
+  .description(
+    "Fetch LangWatch Scenario documentation as markdown. Pass no argument for the index, a path like 'advanced/red-teaming', or a full URL. Missing extensions default to .md.",
+  )
+  .action(async (url?: string) => {
+    try {
+      const { scenarioDocsCommand: impl } = await import("./commands/docs.js");
+      await impl(url);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
   });
 
 // Add evaluator command group
@@ -1131,9 +1162,11 @@ simulationRunCmd
   .description("List simulation runs (optionally filter by scenario set or batch)")
   .option("--scenario-set-id <id>", "Filter by scenario set ID")
   .option("--batch-run-id <id>", "Filter by batch run ID (requires --scenario-set-id)")
+  .option("--status <status>", "Filter by status (e.g. SUCCESS, FAILED, ERROR, IN_PROGRESS)")
+  .option("--name <substring>", "Filter by run name substring (case-insensitive)")
   .option("--limit <n>", "Max results (default: 20)")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
-  .action(async (options: { scenarioSetId?: string; batchRunId?: string; limit?: string; format?: string }) => {
+  .action(async (options: { scenarioSetId?: string; batchRunId?: string; status?: string; name?: string; limit?: string; format?: string }) => {
     const { listSimulationRunsCommand: impl } = await import("./commands/simulation-runs/list.js");
     await impl(options);
   });
@@ -1141,8 +1174,9 @@ simulationRunCmd
 simulationRunCmd
   .command("get <runId>")
   .description("Get full details of a simulation run (messages, results, costs)")
+  .option("--full", "Show full message content instead of truncating long lines")
   .option("-f, --format <format>", "Output format: table (default) or json", "table")
-  .action(async (runId: string, options: { format?: string }) => {
+  .action(async (runId: string, options: { format?: string; full?: boolean }) => {
     const { getSimulationRunCommand: impl } = await import("./commands/simulation-runs/get.js");
     await impl(runId, options);
   });

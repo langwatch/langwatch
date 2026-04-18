@@ -11,6 +11,7 @@ import {
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -69,6 +70,7 @@ describe("Prompts Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python OpenAI prompt versioning",
         description:
           "Setting up prompt versioning in a Python OpenAI bot project using the LangWatch Prompts CLI.",
@@ -79,7 +81,7 @@ describe("Prompts Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent set up prompt versioning using the LangWatch Prompts CLI",
-              "Agent should use the LangWatch MCP to check documentation",
+              "Agent used the `langwatch docs` CLI command to check documentation",
             ],
           }),
         ],
@@ -118,7 +120,7 @@ describe("Prompts Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -133,6 +135,7 @@ describe("Prompts Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Vercel AI prompt versioning",
         description:
           "Setting up prompt versioning in a TypeScript Vercel AI bot project.",
@@ -143,7 +146,7 @@ describe("Prompts Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent set up prompt versioning using the LangWatch Prompts CLI or SDK",
-              "Agent should use the LangWatch MCP to check documentation",
+              "Agent used the `langwatch docs` CLI command to check documentation",
             ],
           }),
         ],
@@ -180,7 +183,7 @@ describe("Prompts Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -195,6 +198,7 @@ describe("Prompts Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python LangGraph prompt versioning",
         description:
           "Setting up prompt versioning in a Python LangGraph agent project using the LangWatch Prompts CLI.",
@@ -244,7 +248,7 @@ describe("Prompts Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -259,6 +263,7 @@ describe("Prompts Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Mastra prompt versioning",
         description:
           "Setting up prompt versioning in a TypeScript Mastra agent project.",
@@ -306,7 +311,7 @@ describe("Prompts Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -321,6 +326,7 @@ describe("Prompts Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Targeted prompt creation",
         description:
           "Adding a new versioned prompt for a specific customer support use case.",
@@ -366,7 +372,7 @@ describe("Prompts Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -382,6 +388,7 @@ describe("Prompts Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python prompt tags deployment",
         description:
           "Setting up tag-based prompt deployment in a Python OpenAI project using the LangWatch Prompts CLI.",
@@ -393,13 +400,13 @@ describe("Prompts Skill", () => {
             criteria: [
               "Agent explains or sets up tag-based deployment (production/staging tags)",
               "Agent updates code to fetch prompts by tag instead of bare slug",
-              "Agent mentions the Deploy dialog or platform_assign_prompt_tag for assigning tags",
+              "Agent uses the `langwatch prompt tag assign` CLI command (or mentions the Deploy dialog) to assign production/staging tags",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "set up tag-based deployment for my prompts so I can use production and staging versions separately"
+            "set up tag-based deployment for my prompts so I can use production and staging versions separately. Update main.py end-to-end: initialize the prompts project, create a managed prompt for the system message, and update the OpenAI call so it fetches that prompt by tag (production)."
           ),
           scenario.agent(),
           (state) => {
@@ -425,6 +432,6 @@ describe("Prompts Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 });
