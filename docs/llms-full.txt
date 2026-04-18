@@ -18752,13 +18752,15 @@ for index, row in evaluation.loop(df.iterrows(), threads=4):
 
 ### Async-native mode
 
-If your task function awaits a resource that's bound to the event loop it was created on — Google ADK's `InMemoryRunner`, gRPC channels, Firestore clients, or any async singleton that opens an expensive connection once — use `aloop()` + `asubmit()` instead. Every submitted task stays on the caller's event loop, so shared singletons remain valid across concurrent items.
+The default `loop()` / `submit()` path above already parallelises — each submitted task runs in a worker thread, so sync and async tasks both speed up with no extra work on your side. That's the right choice for most users.
+
+Reach for `aloop()` / `asubmit()` only when your code is fully async-first and your task relies on async state whose identity is tied to one event loop. The threading path spins up a fresh event loop per worker, so those objects raise `"Future attached to a different loop"` on first use. `aloop` / `asubmit` keep every submitted task on the caller's event loop, so that state stays valid across concurrent items.
 
 ```python
 evaluation = langwatch.experiment.init("async-eval-example")
 
 async def task(index, row):
-    result = await my_async_agent(row["question"])   # singleton safe to reuse
+    result = await my_async_agent(row["question"])
     evaluation.log("response_quality", index=index, score=0.92)
 
 index = 0
@@ -18767,7 +18769,7 @@ async for row in evaluation.aloop(dataset, concurrency=4):
     index += 1
 ```
 
-Sync callables passed to `asubmit` are automatically offloaded to a worker thread so they don't block the event loop for concurrent async siblings. The `loop()` / `submit()` threading path still works unchanged — pick the one that matches your workload.
+Sync callables passed to `asubmit` are automatically offloaded to a worker thread so they don't block the event loop for concurrent async siblings.
 
   ### TypeScript
 
