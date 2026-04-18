@@ -14,11 +14,13 @@
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
 import { createHash, createHmac, timingSafeEqual } from "crypto";
+import { z } from "zod";
 
 import { env } from "~/env.mjs";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { Prisma as PrismaNs } from "@prisma/client";
+import { createLogger } from "~/utils/logger/server";
 
 import { prisma } from "~/server/db";
 import {
@@ -39,6 +41,16 @@ import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 export const app = new Hono().basePath("/api/internal/gateway");
 app.use(tracerMiddleware({ name: "gateway-internal" }));
 app.use(loggerMiddleware());
+
+const logger = createLogger("langwatch:gateway-internal");
+
+const guardrailCheckRequestSchema = z.object({
+  vk_id: z.string().min(1),
+  direction: z.enum(["pre", "post", "stream_chunk"]),
+  guardrail_ids: z.array(z.string()).default([]),
+  content: z.unknown().optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
+});
 
 // ── auth middleware ─────────────────────────────────────────────────────
 
@@ -475,7 +487,7 @@ app.post("/budget/check", async (c) => {
 
   const service = GatewayBudgetService.create(prisma);
   const result = await service.check({
-    organizationId: project.organizationId,
+    organizationId: project.team.organizationId,
     teamId: project.teamId,
     projectId: project.id,
     virtualKeyId: vk.id,
@@ -665,8 +677,59 @@ function normaliseDebitStatus(
  *
  * Request:  { vk_id, direction, guardrail_ids, content, metadata }
  * Response: { decision: allow|block|modify, reason, modified_content, policies_triggered }
+ *
+ * Current implementation is a plumbing stub: validates the request shape,
+ * returns `allow` with no policies triggered, and logs so the Go gateway can
+ * exercise the full control-plane round-trip while real evaluator wiring
+ * lands. When the langwatch/langwatch_nlp evaluator SDK is connected here,
+ * this body swaps for a parallel fan-out with first-block short-circuit
+ * (contract §4.6, and @sergey's iter 3 gateway-side fan-out mirrors this
+ * contract).
  */
-app.post("/guardrail/check", (c) => notImplemented(c));
+app.post("/guardrail/check", async (c) => {
+  let body: unknown;
+  try {
+    body = await c.req.json();
+  } catch {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "invalid_json",
+          message: "guardrail/check requires a JSON body",
+        },
+      },
+      400,
+    );
+  }
+  const parsed = guardrailCheckRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: {
+          type: "bad_request",
+          code: "validation_error",
+          message: parsed.error.message,
+        },
+      },
+      400,
+    );
+  }
+  logger.info(
+    {
+      vkId: parsed.data.vk_id,
+      direction: parsed.data.direction,
+      guardrailIds: parsed.data.guardrail_ids,
+    },
+    "guardrail/check plumbing stub — returning allow",
+  );
+  return c.json({
+    decision: "allow" as const,
+    reason: null,
+    modified_content: null,
+    policies_triggered: [],
+  });
+});
 
 /**
  * §9 — startup bootstrap. Paginated stream of all non-revoked VK JWTs so the

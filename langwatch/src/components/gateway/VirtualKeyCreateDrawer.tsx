@@ -1,6 +1,7 @@
 import {
   Badge,
   Button,
+  Field,
   HStack,
   Input,
   NativeSelect,
@@ -14,7 +15,6 @@ import { X } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
-import { Field } from "~/components/ui/field";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 
@@ -135,7 +135,8 @@ export function VirtualKeyCreateDrawer({
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={4}>
-            <Field label="Name" required>
+            <Field.Root required>
+              <Field.Label>Name</Field.Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -143,15 +144,17 @@ export function VirtualKeyCreateDrawer({
                 maxLength={128}
                 autoFocus
               />
-            </Field>
-            <Field label="Description">
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>Description</Field.Label>
               <Textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional. Shown in the list."
               />
-            </Field>
-            <Field label="Environment" helperText="Shape-of-key prefix (lw_vk_live_ vs lw_vk_test_) for accident-prevention.">
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>Environment</Field.Label>
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
                   value={environment}
@@ -165,12 +168,13 @@ export function VirtualKeyCreateDrawer({
                   <option value="test">Test</option>
                 </NativeSelect.Field>
               </NativeSelect.Root>
-            </Field>
-            <Field
-              label="Provider fallback chain"
-              required
-              helperText="Select one or more provider credentials. Order controls fallback priority; re-order with drag later."
-            >
+              <Field.HelperText>
+                Shape-of-key prefix (lw_vk_live_ vs lw_vk_test_) for
+                accident-prevention.
+              </Field.HelperText>
+            </Field.Root>
+            <Field.Root required>
+              <Field.Label>Provider fallback chain</Field.Label>
               <VStack align="stretch" gap={2}>
                 {credentialsQuery.isLoading ? (
                   <HStack>
@@ -215,7 +219,11 @@ export function VirtualKeyCreateDrawer({
                   })
                 )}
               </VStack>
-            </Field>
+              <Field.HelperText>
+                Select one or more provider credentials. Order controls
+                fallback priority; re-order with drag later.
+              </Field.HelperText>
+            </Field.Root>
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>

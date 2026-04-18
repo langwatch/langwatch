@@ -4,11 +4,7 @@
  * affects a gateway-visible artifact (VK, budget, provider binding) must
  * append an event here.
  */
-import type {
-  GatewayChangeEventKind,
-  Prisma,
-  PrismaClient,
-} from "@prisma/client";
+import { Prisma, type GatewayChangeEventKind, type PrismaClient } from "@prisma/client";
 
 export type AppendChangeEventInput = {
   organizationId: string;
@@ -36,7 +32,7 @@ export class ChangeEventRepository {
         virtualKeyId: input.virtualKeyId ?? null,
         budgetId: input.budgetId ?? null,
         providerCredentialId: input.providerCredentialId ?? null,
-        payload: input.payload ?? null,
+        payload: input.payload ?? Prisma.JsonNull,
       },
       select: { revision: true },
     });

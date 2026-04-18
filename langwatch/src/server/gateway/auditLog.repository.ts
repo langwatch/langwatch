@@ -2,11 +2,7 @@
  * GatewayAuditLog is the append-only ledger of every gateway-surface
  * mutation. Written in the same transaction as the mutation it audits.
  */
-import type {
-  GatewayAuditAction,
-  Prisma,
-  PrismaClient,
-} from "@prisma/client";
+import { Prisma, type GatewayAuditAction, type PrismaClient } from "@prisma/client";
 
 export type AppendAuditInput = {
   organizationId: string;
@@ -35,8 +31,8 @@ export class GatewayAuditLogRepository {
         action: input.action,
         targetKind: input.targetKind,
         targetId: input.targetId,
-        before: input.before ?? null,
-        after: input.after ?? null,
+        before: input.before ?? Prisma.JsonNull,
+        after: input.after ?? Prisma.JsonNull,
       },
     });
   }

@@ -11,6 +11,7 @@
  */
 import { Hono } from "hono";
 import { z } from "zod";
+import type { Prisma } from "@prisma/client";
 
 import { prisma } from "~/server/db";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
@@ -20,6 +21,7 @@ import {
   type CreateVirtualKeyInput,
 } from "~/server/gateway/virtualKey.service";
 import { virtualKeyConfigSchema } from "~/server/gateway/virtualKey.config";
+import { toVirtualKeySnakeDto } from "~/server/gateway/virtualKey.dto";
 import { createLogger } from "~/utils/logger/server";
 
 import {
@@ -243,8 +245,8 @@ export const app = new Hono<{ Variables: Variables }>()
               | "MANUAL"
               | "EXTERNAL_SECRET_STORE")
           : undefined,
-      extraHeaders: (raw.extra_headers as Record<string, string> | null) ?? null,
-      providerConfig: (raw.provider_config as Record<string, unknown> | null) ?? null,
+      extraHeaders: (raw.extra_headers as Prisma.InputJsonValue | null) ?? null,
+      providerConfig: (raw.provider_config as Prisma.InputJsonValue | null) ?? null,
       fallbackPriorityGlobal:
         (raw.fallback_priority_global as number | null) ?? null,
       actorUserId: machineActorForProject(project.id),
@@ -375,11 +377,11 @@ export const app = new Hono<{ Variables: Variables }>()
       extraHeaders:
         raw.extra_headers === undefined
           ? undefined
-          : (raw.extra_headers as Record<string, string> | null),
+          : (raw.extra_headers as Prisma.InputJsonValue | null),
       providerConfig:
         raw.provider_config === undefined
           ? undefined
-          : (raw.provider_config as Record<string, unknown> | null),
+          : (raw.provider_config as Prisma.InputJsonValue | null),
       fallbackPriorityGlobal:
         raw.fallback_priority_global === undefined
           ? undefined

@@ -50,9 +50,7 @@ export function VirtualKeySecretReveal({
 
   return (
     <Dialog.Root open={open} onOpenChange={() => {}} closeOnInteractOutside={false}>
-      <Dialog.Backdrop />
-      <Dialog.Positioner>
-        <Dialog.Content maxWidth="560px">
+      <Dialog.Content maxWidth="560px">
           <Dialog.Header>
             <Dialog.Title>Save your virtual key secret</Dialog.Title>
           </Dialog.Header>
@@ -140,8 +138,7 @@ export function VirtualKeySecretReveal({
               Close
             </Button>
           </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Positioner>
+      </Dialog.Content>
     </Dialog.Root>
   );
 }
