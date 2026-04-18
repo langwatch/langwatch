@@ -1,0 +1,152 @@
+---
+title: Concepts
+description: The mental model for the LangWatch AI Gateway — virtual keys, budgets, guardrails, fallback, caching.
+sidebarTitle: Concepts
+---
+
+A short tour of every primitive the gateway introduces, how they compose, and where the boundaries are with the rest of LangWatch.
+
+## Virtual key (VK)
+
+A LangWatch-issued credential of the form `lw_vk_{live|test}_<26-char-ULID>` (40 chars total). Used in:
+
+- `Authorization: Bearer lw_vk_live_…` (OpenAI-style clients and most CLIs).
+- `x-api-key: lw_vk_live_…` (Anthropic-style clients, including Claude Code).
+- `api-key: lw_vk_live_…` (Azure-style clients).
+
+Every gateway request **must** carry a VK. The VK resolves at the gateway to:
+
+- An **owning scope** — organisation → team → project → principal.
+- A **set of provider credentials** — the underlying OpenAI / Anthropic / Bedrock / etc. keys the VK may use. These are **reused** from LangWatch's existing Model Provider settings; the gateway does not duplicate credential storage.
+- A **fallback chain** — ordered list of providers to try if the primary fails.
+- **Model aliases** — a map like `{"gpt-4o": "azure/my-deployment"}` that lets the VK redirect a client-friendly model name to a specific provider/deployment.
+- **Cache policy**, **guardrail attachments**, **blocked patterns**, and **budgets** (see below).
+
+**Show-once secret:** the full key is displayed exactly once at creation and stored argon2id-hashed. Only a short prefix (`lw_vk_live_01HZX9`) remains visible in the UI. Rotation replaces the secret (old secret valid 24h grace); revocation propagates to gateway caches within 60 seconds.
+
+See [Virtual Keys](/ai-gateway/virtual-keys) for CRUD, rotation, and revocation details.
+
+## Budget
+
+A spending limit attached to a scope. Scopes:
+
+- `organization` (all traffic in the org)
+- `team` (all traffic in a team)
+- `project` (all traffic in a project)
+- `virtual_key` (this specific VK)
+- `principal` (one user or service account)
+
+Windows: `minute`, `hour`, `day`, `week`, `month`, `total`.
+
+`on_breach`:
+
+- `block` — 402 `budget_exceeded` returned once the limit is reached.
+- `warn` — request passes but the response carries `X-LangWatch-Budget-Warning: <scope>:<pct>`.
+
+Hierarchical: a single request is checked against every budget that applies. **Any** hard-block breach blocks; warnings compose.
+
+Spend is debited after the response completes, using the token counts the provider reported, via an idempotent outbox so gateway retries never double-bill.
+
+See [Budgets](/ai-gateway/budgets).
+
+## Principal
+
+The identity attributed to a request — the user or service account who owns the VK on this call. Matters for three things:
+
+- **Attribution in traces** (`langwatch.principal_id`).
+- **Principal-scoped budgets** (cap spend per-person).
+- **RBAC** — the principal must have permission to *use* the VK at all.
+
+Personal-access VKs bind to a user principal; shared VKs bind to a service-account principal.
+
+## Model alias
+
+A per-VK name → provider redirect. Two use cases:
+
+- **Abstraction.** Point `gpt-4o` at `azure/my-deployment` so code doesn't need to know about the Azure deployment name.
+- **Migration.** Point `claude-haiku` at `anthropic/claude-haiku-4-5-20251001` to pin a version; swap the alias to migrate every caller at once.
+
+Aliases always win over explicit `provider/model` form if both are defined for the same model name on a VK.
+
+## Fallback chain
+
+Ordered list of provider credentials (not models) to try on failure. Triggered by:
+
+- `5xx` from upstream.
+- `timeout` exceeding the VK's configured `fallback.timeout_ms`.
+- `429 rate_limit_exceeded` from upstream.
+- `network_error` (connection reset / DNS / TLS).
+- `circuit_breaker` — gateway-internal tripped after N consecutive failures.
+
+**Does not** trigger fallback:
+
+- Upstream `400 / 401 / 403 / 404` — those are client-fault errors; masking them would confuse the caller.
+- Any LangWatch-internal error (`invalid_api_key`, `permission_denied`, etc).
+
+For streaming: if the primary fails **before the first chunk**, fallback is transparent. Once chunks have started flowing, the stream stays on the original provider — otherwise the client would see a Frankenstein stream.
+
+## Caching passthrough
+
+By default the gateway forwards Anthropic `cache_control` blocks, OpenAI cached-prompt markers, and Gemini implicit caches **byte-identically**. This is load-bearing — prompt caching saves up to 90% on input tokens, and the moment the gateway starts reformatting payloads you lose it.
+
+Overrides per-request:
+
+- `X-LangWatch-Cache: respect` (default) — pass through.
+- `X-LangWatch-Cache: force` — inject `cache_control` markers on large stable prefixes even if the client didn't.
+- `X-LangWatch-Cache: disable` — strip every cache marker. Forces cold calls.
+- `X-LangWatch-Cache: ttl=3600` — same as `force` with a TTL hint.
+
+Per-VK default set via VK config `cache.mode`. Per-request header wins.
+
+Cache outcome is reported back in `X-LangWatch-Cache: hit|miss|bypass|forced` response header and recorded in the trace with separate `cache_read_tokens` / `cache_write_tokens` counters.
+
+## Guardrails
+
+LangWatch evaluators invoked inline on gateway traffic. Each VK can attach guardrails in three directions:
+
+- `pre` — run on the **request** before dispatch. Decision `block` fails with 403 `guardrail_blocked`. Decision `modify` rewrites the payload (e.g. PII redaction) before dispatch.
+- `post` — run on the **full response** after dispatch. Flag-only for streaming responses (decision recorded but response already delivered); blocking for non-streaming.
+- `stream_chunk` — run on **each SSE chunk** before emission. Decision `block` terminates the stream with an SSE error. Decision `modify` rewrites the chunk. Budget ≤50 ms per chunk or the guardrail is bypassed with an OTel warning.
+
+Guardrails reuse your existing LangWatch evaluators; nothing new to author for the gateway.
+
+## Blocked patterns
+
+Per-VK regex allow/deny lists for:
+
+- **Tool calls** — matched against `tools[].function.name` (OpenAI) and `tools[].name` (Anthropic). Denied tools → 403 `tool_not_allowed`.
+- **MCP servers** — matched against declared `mcp_servers[].name` and `.url`. Denied servers → 403 `tool_not_allowed`.
+- **Outbound URLs** — heuristically matched against tool-call arguments that look like URLs. Advisory for v1; hard enforcement requires egress proxy.
+
+Each block emits an OTel attribute `langwatch.policy.blocked=<kind>:<pattern>` for audit.
+
+## Traces (per-tenant observability)
+
+Every request emits a LangWatch trace. The clever part: the gateway is a shared multi-tenant service, but each trace is routed to the **owning tenant's project** — tenant A never sees tenant B's traffic.
+
+Attributes always present:
+
+- `langwatch.vk_id`, `langwatch.project_id`, `langwatch.team_id`, `langwatch.org_id`, `langwatch.principal_id`.
+- Nested spans per fallback attempt with `langwatch.fallback.attempt=N` and `langwatch.fallback.reason`.
+- `langwatch.cache_read_tokens` / `cache_write_tokens`.
+- `langwatch.budget.breached_scope` when a request was blocked.
+- `langwatch.policy.blocked` when a tool/MCP/URL was blocked.
+- `langwatch.guardrail.post_flag` when post-hoc guardrails flagged a completed response.
+
+## Request id
+
+Every response carries `X-LangWatch-Request-Id: grq_<ULID>`. Use it to:
+
+- Deep-link into the LangWatch trace from logs.
+- File a support ticket — the first thing we ask for.
+- Debug CLI integrations — the Codex / Claude Code logs echo these.
+
+The id also flows into the `BudgetLedger` as the idempotency key for debit retries, so a single request is billed exactly once even across gateway restarts.
+
+## What's intentionally *not* here
+
+- **SDK migration of existing litellm callsites** — the LangWatch playground and evaluators continue to use the litellm path. The gateway serves new traffic; existing internal call sites don't change. This is deliberate scope control for v1.
+- **Semantic caching across unrelated requests** — Bifrost ships a semantic-cache plugin; we're not enabling it by default because it changes latency characteristics in ways customers should opt into.
+- **Per-region provider routing for data residency** — tracked as an open question in the contract; not in v1.
+
+Once these concepts are in your head the rest of the docs — [Virtual Keys](/ai-gateway/virtual-keys), [Budgets](/ai-gateway/budgets), [Providers](/ai-gateway/providers/overview), [CLI Integrations](/ai-gateway/cli/overview) — are detail views on the same primitives.

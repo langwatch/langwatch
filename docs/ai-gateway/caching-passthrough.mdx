@@ -1,0 +1,84 @@
+---
+title: Caching Passthrough
+description: How the LangWatch AI Gateway protects your provider-native prompt caching discounts.
+sidebarTitle: Caching Passthrough
+---
+
+Modern LLM providers offer prompt caching — Anthropic (ephemeral + persistent blocks), OpenAI (automatic prefix caching), Gemini (implicit context caches). The discounts are real: **up to 90% off input tokens** on cache hits for Anthropic, comparable for others.
+
+If an AI gateway reformats or reorders a request before forwarding, it invalidates the cache keys the provider uses internally and silently kills those discounts. The LangWatch AI Gateway is engineered to preserve caching byte-for-byte by default.
+
+## The hard invariant
+
+When `cache.mode: respect` (default):
+
+> **The gateway MUST NOT strip, reorder, or rewrite any `cache_control` field or cached-prefix marker in the forwarded request.**
+
+This is asserted by integration tests that compare a request-hash roundtrip: we diff the payload the gateway forwards against the payload the client sent, and any non-trivial diff fails the test.
+
+## Override modes
+
+Per-VK default `cache.mode` and per-request header `X-LangWatch-Cache` (highest precedence):
+
+| Mode | Behaviour |
+|---|---|
+| `respect` | Forward cache markers byte-identically. Provider handles caching. **(default)** |
+| `force` | Gateway injects `cache_control: ephemeral` on large stable prefixes (system message, tool definitions, first N messages) even if the client didn't. Useful for clients that don't know about caching. Gateway never *removes* client-supplied markers in this mode. |
+| `disable` | Gateway strips every cache marker and forces a cold call. Use for benchmarks and A/B cache-impact tests. Gateway's own semantic cache is also bypassed. |
+| `ttl=3600` | Same as `force` but with an explicit TTL hint. Provider may or may not honour it depending on the caching model. |
+
+Override per-request via header: `X-LangWatch-Cache: force`, `X-LangWatch-Cache: disable`, `X-LangWatch-Cache: ttl=3600`.
+
+Malformed header → `400 cache_override_invalid` error envelope.
+
+## What's reported back
+
+Every response carries `X-LangWatch-Cache: <outcome>`:
+
+- `hit` — provider reported serving from cache (large portion of input from cache).
+- `miss` — no cache hit.
+- `bypass` — mode was `disable`.
+- `forced` — mode was `force` and the gateway injected markers that weren't in the incoming request.
+
+Usage reporting (in the response body and in the trace) separates input tokens by origin:
+
+- `cache_read_input_tokens` — served from cache, priced low (~10% of regular).
+- `cache_creation_input_tokens` — writing to cache, priced at 125% on Anthropic.
+- `input_tokens` — regular cold tokens.
+
+The `/internal/gateway/budget/debit` call forwards all three so budget ledgers reflect accurate cache economics, not just "all input tokens at full price."
+
+## When to override
+
+**Use `force` when:**
+
+- You're fronting a legacy OpenAI-SDK codebase that doesn't know about Anthropic's cache_control blocks, but you've flipped the VK's primary to Anthropic. The gateway inserts caching on the stable prefix automatically, so cost drops dramatically with no code change.
+- You have a long tool-definition section that's identical across requests.
+
+**Use `disable` when:**
+
+- You're benchmarking "cold cost" before deciding whether a caching tier is worth enabling.
+- A specific request must not hit cache for correctness reasons (rare — typically the cache is key-aware enough not to return wrong answers).
+
+**Use `ttl=NNNN` when:**
+
+- You want explicit control over cache retention (e.g. "cache this prompt for 1 hour, no more").
+
+## Provider-specific notes
+
+- **Anthropic Messages API** — `cache_control: {type: "ephemeral"}` or `{type: "persistent"}` on content blocks. Gateway forwards as-is. 5-min / 1-hour TTL respectively.
+- **OpenAI (GPT-4.1, o-series)** — no explicit cache_control field; OpenAI auto-caches prefixes ≥1024 tokens. Gateway simply forwards.
+- **Azure OpenAI** — inherits OpenAI's auto-caching. Same behaviour.
+- **Gemini (1.5 / 2.5)** — context caches are a separate API (`caches.create`). Gateway v1 does not orchestrate these on your behalf; the client calls them directly and the gateway forwards the cache reference in subsequent requests.
+- **Bedrock** — Anthropic-on-Bedrock supports prompt caching when using converse API. Gateway forwards cache_control blocks to Bedrock runtime as-is.
+- **Vertex AI** — Anthropic-on-Vertex similar to Bedrock for prompt caching.
+
+## Why this is load-bearing
+
+From a real observed pattern: a 40k-token system prompt with 100 calls a day.
+
+- Without caching: 40k × 100 = 4M input tokens/day at full price. Anthropic Opus: $60/day.
+- With Anthropic ephemeral cache (5-min TTL, 1 write + ~99 reads): 1 write @ $75/M + 99 × 40k reads @ $6/M = $3 + $23.76 ≈ $27/day. **56% cheaper.**
+- With a gateway that reformats the payload and loses the cache: back to $60/day.
+
+This is why the caching-passthrough invariant is tested at the byte level, not just "does the call succeed."

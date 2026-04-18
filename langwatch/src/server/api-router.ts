@@ -26,6 +26,7 @@ import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
 
 import { app as datasetGenerateApp } from "./routes/dataset-generate";
 import { app as evaluationsV3App } from "./routes/evaluations-v3";
+import { app as gatewayInternalApp } from "./routes/gateway-internal";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as otelApp } from "./routes/otel";
 import { app as playgroundApp } from "./routes/playground";
@@ -87,6 +88,7 @@ export function createApiRouter() {
   api.route("/", workflowsCrudApp);      // CRUD — complements workflowsApp (code-completion, post_event)
 
   api.route("/", evaluationsV3App);
+  api.route("/", gatewayInternalApp);
   api.route("/", otelApp);
   api.route("/", playgroundApp);
   api.route("/", scenarioGenerateApp);

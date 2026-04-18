@@ -24,6 +24,13 @@ export const Actions = {
   DELETE: "delete",
   MANAGE: "manage", // Full CRUD + settings
   SHARE: "share",
+  // Gateway-specific actions: `rotate` is a sub-action of `update` for virtual
+  // keys but callers may want to grant it independently. `attach`/`detach`
+  // apply to guardrails — these are also treated as sub-actions of `update`
+  // by the hierarchy helper below.
+  ROTATE: "rotate",
+  ATTACH: "attach",
+  DETACH: "detach",
 } as const;
 
 export type Action = (typeof Actions)[keyof typeof Actions];
@@ -48,6 +55,13 @@ export const Resources = {
   SECRETS: "secrets",
   PLAYGROUND: "playground",
   OPS: "ops",
+  // AI Gateway resources — see specs/ai-gateway/_shared/contract.md §10
+  VIRTUAL_KEYS: "virtualKeys",
+  GATEWAY_BUDGETS: "gatewayBudgets",
+  GATEWAY_PROVIDERS: "gatewayProviders",
+  GATEWAY_GUARDRAILS: "gatewayGuardrails",
+  GATEWAY_LOGS: "gatewayLogs",
+  GATEWAY_USAGE: "gatewayUsage",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -110,6 +124,27 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Team
     "team:view",
     "team:manage",
+    // AI Gateway (admin has full gateway CRUD + rotation)
+    "virtualKeys:view",
+    "virtualKeys:create",
+    "virtualKeys:update",
+    "virtualKeys:delete",
+    "virtualKeys:rotate",
+    "virtualKeys:manage",
+    "gatewayBudgets:view",
+    "gatewayBudgets:create",
+    "gatewayBudgets:update",
+    "gatewayBudgets:delete",
+    "gatewayBudgets:manage",
+    "gatewayProviders:view",
+    "gatewayProviders:update",
+    "gatewayProviders:manage",
+    "gatewayGuardrails:view",
+    "gatewayGuardrails:attach",
+    "gatewayGuardrails:detach",
+    "gatewayGuardrails:manage",
+    "gatewayLogs:view",
+    "gatewayUsage:view",
   ],
   [TeamUserRole.MEMBER]: [
     // Projects
@@ -150,6 +185,16 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "secrets:manage",
     // Team
     "team:view",
+    // AI Gateway (member: can manage own VKs + see budgets, cannot delete budgets)
+    "virtualKeys:view",
+    "virtualKeys:create",
+    "virtualKeys:update",
+    "virtualKeys:rotate",
+    "gatewayBudgets:view",
+    "gatewayProviders:view",
+    "gatewayGuardrails:view",
+    "gatewayLogs:view",
+    "gatewayUsage:view",
   ],
   [TeamUserRole.VIEWER]: [
     // Projects
@@ -174,6 +219,13 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "secrets:view",
     // Team
     "team:view",
+    // AI Gateway (viewer: read-only)
+    "virtualKeys:view",
+    "gatewayBudgets:view",
+    "gatewayProviders:view",
+    "gatewayGuardrails:view",
+    "gatewayLogs:view",
+    "gatewayUsage:view",
   ],
   [TeamUserRole.CUSTOM]: [
     // CUSTOM role permissions fall back to VIEWER if no assignedRoleId or custom role has no permissions
@@ -199,6 +251,13 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "secrets:view",
     // Team
     "team:view",
+    // AI Gateway (custom role default: same baseline as VIEWER, overridable via CustomRole.permissions)
+    "virtualKeys:view",
+    "gatewayBudgets:view",
+    "gatewayProviders:view",
+    "gatewayGuardrails:view",
+    "gatewayLogs:view",
+    "gatewayUsage:view",
   ],
 };
 
@@ -260,8 +319,17 @@ export function hasPermissionWithHierarchy(
     return true;
   }
 
-  // Hierarchy rule: manage permissions include view, create, update, and delete permissions
-  const actionSuffixes = [":view", ":create", ":update", ":delete"];
+  // Hierarchy rule: manage permissions include view, create, update, delete,
+  // and gateway-specific sub-actions (rotate, attach, detach).
+  const actionSuffixes = [
+    ":view",
+    ":create",
+    ":update",
+    ":delete",
+    ":rotate",
+    ":attach",
+    ":detach",
+  ];
   for (const suffix of actionSuffixes) {
     if (requestedPermission.endsWith(suffix)) {
       const managePermission = requestedPermission.replace(suffix, ":manage");
