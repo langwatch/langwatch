@@ -1,5 +1,5 @@
 import { Box, HStack, VStack } from "@chakra-ui/react";
-import { Gauge, KeyRound, LineChart, Plug } from "lucide-react";
+import { Gauge, KeyRound, LineChart, Plug, Settings } from "lucide-react";
 import { type PropsWithChildren } from "react";
 
 import { MenuLink } from "~/components/MenuLink";
@@ -62,6 +62,14 @@ export function GatewayLayout({ children }: PropsWithChildren) {
             icon={<LineChart size={16} />}
           >
             Usage
+          </MenuLink>
+        )}
+        {hasPermission("project:update") && (
+          <MenuLink
+            href={`/${slug}/gateway/settings`}
+            icon={<Settings size={16} />}
+          >
+            Settings
           </MenuLink>
         )}
       </VStack>

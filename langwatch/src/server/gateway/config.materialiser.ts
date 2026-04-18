@@ -181,19 +181,15 @@ export class GatewayConfigMaterialiser {
   }
 
   /**
-   * Per-project OTLP endpoint. For now reads an optional column on the
-   * project row; when none, the gateway will fall back to its own env
-   * default. Kept as an async boundary so future per-org or per-tenant
-   * lookups (e.g. dedicated dataplane routing) can live here without
-   * churning the signature.
+   * Per-project OTLP endpoint (contract §4.2). Null falls back to the
+   * gateway's GATEWAY_OTEL_DEFAULT_ENDPOINT env. Consumed by @sergey's
+   * RouterExporter.EndpointResolver — each customer's spans route to their
+   * own LangWatch project without touching the gateway config.
    */
   private async resolveObservabilityEndpoint(
     project: Project & { team: Team },
   ): Promise<string | null> {
-    const projectEndpoint = (project as unknown as {
-      observabilityEndpoint?: string | null;
-    }).observabilityEndpoint;
-    return projectEndpoint ?? null;
+    return project.observabilityEndpoint ?? null;
   }
 
   private async applicableBudgets(

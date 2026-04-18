@@ -488,6 +488,53 @@ export const projectRouter = createTRPCRouter({
 
       return { success: true, projectSlug: updatedProject.slug };
     }),
+  getObservabilityEndpoint: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("project:view"))
+    .query(async ({ input, ctx }) => {
+      const project = await ctx.prisma.project.findUnique({
+        where: { id: input.projectId },
+        select: { observabilityEndpoint: true },
+      });
+      if (!project) throw new TRPCError({ code: "NOT_FOUND" });
+      return { observabilityEndpoint: project.observabilityEndpoint };
+    }),
+
+  updateObservabilityEndpoint: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        /**
+         * OTLP HTTP endpoint the AI Gateway sends per-tenant spans to.
+         * Empty string clears to null (gateway falls back to its env default).
+         */
+        observabilityEndpoint: z.string().nullable(),
+      }),
+    )
+    .use(checkProjectPermission("project:update"))
+    .mutation(async ({ input, ctx }) => {
+      const trimmed =
+        typeof input.observabilityEndpoint === "string"
+          ? input.observabilityEndpoint.trim()
+          : null;
+      const value = trimmed ? trimmed : null;
+      if (value) {
+        try {
+          new URL(value);
+        } catch {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "observabilityEndpoint must be a valid URL",
+          });
+        }
+      }
+      const updated = await ctx.prisma.project.update({
+        where: { id: input.projectId },
+        data: { observabilityEndpoint: value },
+      });
+      return { success: true, observabilityEndpoint: updated.observabilityEndpoint };
+    }),
+
   updateProjectDefaultModels: protectedProcedure
     .input(
       z.object({
