@@ -504,7 +504,8 @@
               "ai-gateway/streaming",
               "ai-gateway/model-aliases",
               "ai-gateway/observability",
-              "ai-gateway/security"
+              "ai-gateway/security",
+              "ai-gateway/troubleshooting"
             ]
           },
           {
