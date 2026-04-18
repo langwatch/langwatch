@@ -2,6 +2,11 @@
 
 set -eo pipefail
 
+# Fail fast if any port we'd bind to is already taken (stale `pnpm dev`,
+# Docker exposing the same port, etc). Without this, we'd only discover the
+# conflict 30s later after Vite/tsx finish booting.
+"$(dirname "$0")/check-ports.sh"
+
 RUNTIME_ENV="DEBUG=langwatch:* DEBUG_HIDE_DATE=true DEBUG_COLORS=true"
 if [ -z "$NODE_ENV" ]; then
   RUNTIME_ENV="$RUNTIME_ENV NODE_ENV=production"
