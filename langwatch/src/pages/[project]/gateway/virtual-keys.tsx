@@ -16,6 +16,7 @@ import { useState } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { VirtualKeyCreateDrawer } from "~/components/gateway/VirtualKeyCreateDrawer";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
@@ -50,17 +51,24 @@ function VirtualKeysPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [revealSecret, setRevealSecret] = useState<CreatedSecret | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
+  const [rotating, setRotating] = useState<{ id: string; name: string } | null>(null);
+  const [revoking, setRevoking] = useState<{ id: string; name: string } | null>(null);
 
   const rows = listQuery.data ?? [];
 
-  const handleRotate = async (id: string, name: string) => {
-    if (!project?.id) return;
+  const confirmRotate = async () => {
+    if (!rotating || !project?.id) return;
     try {
       const result = await rotateMutation.mutateAsync({
         projectId: project.id,
-        id,
+        id: rotating.id,
       });
-      setRevealSecret({ id: result.virtualKey.id, name, secret: result.secret });
+      setRevealSecret({
+        id: result.virtualKey.id,
+        name: rotating.name,
+        secret: result.secret,
+      });
+      setRotating(null);
     } catch (err) {
       toaster.create({
         title: err instanceof Error ? err.message : "Failed to rotate key",
@@ -69,13 +77,14 @@ function VirtualKeysPage() {
     }
   };
 
-  const handleRevoke = async (id: string) => {
-    if (!project?.id) return;
-    if (!confirm("Revoke this virtual key? Clients using it will start receiving 401s within 60 seconds.")) {
-      return;
-    }
+  const confirmRevoke = async () => {
+    if (!revoking || !project?.id) return;
     try {
-      await revokeMutation.mutateAsync({ projectId: project.id, id });
+      await revokeMutation.mutateAsync({
+        projectId: project.id,
+        id: revoking.id,
+      });
+      setRevoking(null);
     } catch (err) {
       toaster.create({
         title: err instanceof Error ? err.message : "Failed to revoke key",
@@ -198,7 +207,9 @@ function VirtualKeysPage() {
                             {canRotate && (
                               <Menu.Item
                                 value="rotate"
-                                onClick={() => handleRotate(vk.id, vk.name)}
+                                onClick={() =>
+                                  setRotating({ id: vk.id, name: vk.name })
+                                }
                               >
                                 <RotateCw size={14} /> Rotate secret
                               </Menu.Item>
@@ -206,7 +217,9 @@ function VirtualKeysPage() {
                             {canRevoke && (
                               <Menu.Item
                                 value="revoke"
-                                onClick={() => handleRevoke(vk.id)}
+                                onClick={() =>
+                                  setRevoking({ id: vk.id, name: vk.name })
+                                }
                               >
                                 <Trash2 size={14} /> Revoke
                               </Menu.Item>
@@ -250,6 +263,30 @@ function VirtualKeysPage() {
           }}
         />
       )}
+      <ConfirmDialog
+        open={!!rotating}
+        onOpenChange={(open) => {
+          if (!open) setRotating(null);
+        }}
+        title={`Rotate ${rotating?.name ?? "virtual key"}?`}
+        message="A fresh secret will be minted and shown once. The current secret keeps working for 24h (grace window) so clients can roll over."
+        confirmLabel="Rotate secret"
+        tone="warning"
+        loading={rotateMutation.isPending}
+        onConfirm={confirmRotate}
+      />
+      <ConfirmDialog
+        open={!!revoking}
+        onOpenChange={(open) => {
+          if (!open) setRevoking(null);
+        }}
+        title={`Revoke ${revoking?.name ?? "virtual key"}?`}
+        message="Clients using this key start receiving 401s within ~60 seconds. This cannot be undone — revoked keys are never reactivated."
+        confirmLabel="Revoke key"
+        tone="danger"
+        loading={revokeMutation.isPending}
+        onConfirm={confirmRevoke}
+      />
     </GatewayLayout>
   );
 }
