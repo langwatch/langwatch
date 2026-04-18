@@ -89,3 +89,46 @@ Error requests are always sampled at 100% regardless of the setting, so debuggin
 ## Debugging a single request
 
 From a log line or an error at the client, grab the `X-LangWatch-Request-Id` (`grq_01HZX9K3M…`). Paste into the LangWatch search bar and you land on the full trace: every attempt span, upstream latency, guardrail decisions, cache outcome, budget deltas. No digging through provider-side logs.
+
+## Trace-id propagation — concrete handshake
+
+Every gateway response carries the following headers (as of Lane A iter 4 pt1 — W3C traceparent + per-tenant OTel router, langwatch-saas `e9b04e6`):
+
+| Response header | Format | Semantics |
+|---|---|---|
+| `X-LangWatch-Trace-Id` | 32 hex chars | Equals the incoming `traceparent` trace id when the caller supplied one; otherwise a freshly-minted trace id |
+| `X-LangWatch-Span-Id` | 16 hex chars | The gateway's own span id for this request |
+| `traceparent` | `00-<trace-id>-<span-id>-01` | W3C traceparent re-injected for downstream stitching — forward to any further hop you call |
+| `X-LangWatch-Request-Id` | `grq_<ULID>` | Gateway-scoped id; use this in support tickets |
+
+### Client already has a trace
+
+Set `traceparent` on the outbound request (OpenAI/Anthropic SDKs do this automatically when OTel instrumentation is active, or pass `default_headers={"traceparent": ...}`). The gateway:
+
+1. Extracts the trace id from `traceparent`.
+2. Creates its gateway span as a **child** of that trace id with a fresh span id.
+3. Returns `X-LangWatch-Trace-Id` equal to the caller's trace id (no new trace is created — no double cost attribution).
+4. Re-injects `traceparent` on the response with the gateway's span id so you can chain further hops.
+
+### Client has no trace
+
+No `traceparent` sent. The gateway mints a new trace and returns its id via `X-LangWatch-Trace-Id`. The response `traceparent` carries that id; propagate it to downstream services to stitch everything into one trace.
+
+### Verifying the handshake end-to-end
+
+```bash
+# With an existing trace context
+curl -sD- -o/dev/null \
+  -H "Authorization: Bearer $VK" \
+  -H "traceparent: 00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-1111111111111111-01" \
+  -H "Content-Type: application/json" \
+  -X POST https://gateway.langwatch.ai/v1/chat/completions \
+  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":4}' | \
+  grep -iE '^(x-langwatch-(trace|span|request)-id|traceparent)'
+```
+
+Expect `x-langwatch-trace-id: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa` (same 32-hex as input) and a new 16-hex `x-langwatch-span-id`. The `traceparent` on the response will chain under that same trace id.
+
+Without the incoming `traceparent` you'll get a fresh 32-hex trace id instead.
+
+See [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation) for language-specific recipes.
