@@ -170,6 +170,35 @@ export const projectRoutes = {
     path: "/[project]/evaluators",
     title: "Evaluators",
   },
+  gateway: {
+    path: "/[project]/gateway",
+    title: "AI Gateway",
+  },
+  gateway_virtual_keys: {
+    path: "/[project]/gateway/virtual-keys",
+    title: "Virtual Keys",
+    parent: "gateway",
+  },
+  gateway_virtual_key_detail: {
+    path: "/[project]/gateway/virtual-keys/[vkId]",
+    title: "Virtual Key",
+    parent: "gateway_virtual_keys",
+  },
+  gateway_budgets: {
+    path: "/[project]/gateway/budgets",
+    title: "Budgets",
+    parent: "gateway",
+  },
+  gateway_providers: {
+    path: "/[project]/gateway/providers",
+    title: "Providers",
+    parent: "gateway",
+  },
+  gateway_usage: {
+    path: "/[project]/gateway/usage",
+    title: "Usage",
+    parent: "gateway",
+  },
   ops: {
     path: "/ops",
     title: "Ops",
