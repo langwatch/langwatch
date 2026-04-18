@@ -154,6 +154,72 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
     });
   });
 
+  describe("printSummary()", () => {
+    it("prints a CI-friendly summary after run completes against real server", async () => {
+      const evaluation = await langwatch.experiments.init(`test-print-summary-${Date.now()}`);
+      const dataset = [
+        { q: "What is 2+2?" },
+        { q: "What is 3+3?" },
+        { q: "What is 4+4?" },
+      ];
+
+      await evaluation.run(dataset, async ({ index }) => {
+        evaluation.log("accuracy", {
+          index,
+          score: index === 1 ? 0.3 : 0.95,
+          passed: index !== 1, // one failure, two passes
+        });
+      });
+
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const exitSpy = vi
+        .spyOn(process, "exit")
+        .mockImplementation((() => undefined) as never);
+
+      try {
+        evaluation.printSummary(); // should detect the failure and exit
+      } finally {
+        const output = logSpy.mock.calls.map((args) => args.join(" ")).join("\n");
+        logSpy.mockRestore();
+        exitSpy.mockRestore();
+
+        expect(output).toContain("EXPERIMENT RESULTS");
+        expect(output).toContain("Passed:     2");
+        expect(output).toContain("Failed:     1");
+        expect(output).toMatch(/Pass Rate:\s+66\.7%/);
+        // Should have decided to exit since there was a failure
+        expect(exitSpy).toHaveBeenCalledWith(1);
+      }
+    });
+
+    it("does not exit when every evaluation passed (real server flow)", async () => {
+      const evaluation = await langwatch.experiments.init(`test-print-summary-pass-${Date.now()}`);
+      const dataset = [{ q: "a" }, { q: "b" }];
+
+      await evaluation.run(dataset, async ({ index }) => {
+        evaluation.log("accuracy", { index, score: 0.95, passed: true });
+      });
+
+      const logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+      const exitSpy = vi
+        .spyOn(process, "exit")
+        .mockImplementation((() => undefined) as never);
+
+      try {
+        evaluation.printSummary();
+      } finally {
+        const output = logSpy.mock.calls.map((args) => args.join(" ")).join("\n");
+        logSpy.mockRestore();
+        exitSpy.mockRestore();
+
+        expect(output).toContain("Passed:     2");
+        expect(output).toContain("Failed:     0");
+        expect(output).toContain("100.0%");
+        expect(exitSpy).not.toHaveBeenCalled();
+      }
+    });
+  });
+
   describe("target registration", () => {
     it("throws on conflicting metadata for same target", async () => {
       const evaluation = await langwatch.experiments.init(`test-conflict-${Date.now()}`);
