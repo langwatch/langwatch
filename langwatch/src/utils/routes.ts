@@ -180,7 +180,7 @@ export const projectRoutes = {
     parent: "gateway",
   },
   gateway_virtual_key_detail: {
-    path: "/[project]/gateway/virtual-keys/[vkId]",
+    path: "/[project]/gateway/virtual-keys/[id]",
     title: "Virtual Key",
     parent: "gateway_virtual_keys",
   },
