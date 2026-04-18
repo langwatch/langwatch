@@ -1,0 +1,143 @@
+---
+title: Security & Trust
+description: How the LangWatch AI Gateway protects secrets, isolates tenants, and audits privileged actions.
+sidebarTitle: Security & Trust
+---
+
+The gateway sits on the hot path between your applications and upstream LLM providers. Everything below is what the gateway does NOT do, what it DOES do, and how each guarantee is enforced.
+
+## Threat model
+
+In scope:
+
+- A compromised customer application attempting to exfiltrate other tenants' data.
+- A compromised virtual key leaking upstream.
+- An insider at LangWatch attempting to read VK secrets or upstream provider credentials.
+- A network-level attacker between gateway and control plane.
+
+Out of scope:
+
+- Compromise of the underlying upstream provider (Anthropic, OpenAI, etc.). Your trust in them is independent of LangWatch.
+- Compromise of the customer's OS / build pipeline supplying the VK to their app.
+
+## Secrets at rest
+
+### Virtual keys
+
+VK secrets are **hashed before persistence** and the plaintext is shown exactly once at creation. The hash scheme is peppered HMAC-SHA256 rather than argon2id — chosen deliberately:
+
+- Each VK has 130 bits of Crockford-ULID entropy. Stretching a 130-bit random with argon2 costs 50–100 ms per validation for essentially no attack surface reduction.
+- HMAC with a server-side pepper (`LW_VIRTUAL_KEY_PEPPER`, rotated via dual-pepper overlap window) makes offline cracking infeasible without the pepper.
+- HMAC is constant-time and enables an O(1) lookup-by-hash — critical for the hot-path `/resolve-key` endpoint.
+
+See [Virtual Keys → hashing](/ai-gateway/virtual-keys#how-secrets-are-stored).
+
+### Upstream provider credentials
+
+Provider credentials (OpenAI keys, Azure deployments, Bedrock IAM, Vertex service accounts) are stored encrypted at rest in the control plane. The gateway never sees the plaintext — it receives a redacted bundle and the actual upstream call is made from a short-lived subprocess with the decrypted value in memory only, zeroed after the call.
+
+- Encryption key: per-organization KMS key (AWS KMS in LangWatch Cloud; customer-supplied KMS in BYOK deployments).
+- Rotation: rotate the KMS key, re-encrypt all credentials in place. Zero-downtime — decrypt-then-re-encrypt happens in the background, old-key references resolve for 24 h during migration.
+
+### Gateway-to-control-plane auth (HMAC)
+
+Every internal call (`/api/internal/gateway/*`) is signed with HMAC-SHA256. The signature covers `METHOD\nPATH\nTIMESTAMP\nhex(sha256(body))`, with a ±300s replay window. Rotation uses a dual-secret overlap (`LW_GATEWAY_INTERNAL_SECRET` + `_PREVIOUS`) so rolling restart doesn't reject in-flight calls.
+
+Signature verification happens **before** the timestamp check to avoid a secret-length timing oracle.
+
+### JWTs on the hot path
+
+Once a VK is resolved, the gateway caches a short-lived JWT (15 min TTL) containing the minimum claims needed to authorize: `{vk_id, project_id, team_id, org_id, principal_id, revision, iat, exp, iss, aud}`. The full VK config is fetched separately with ETag revalidation so cache entries are invalidated atomically on any edit.
+
+**Never** persisted to disk. Every replica's L1 cache is in memory; the optional L2 Redis is also in-memory.
+
+## Tenant isolation
+
+### Traces
+
+Every span carries `langwatch.{vk_id, project_id, team_id, organization_id}`. The OTel exporter reads `langwatch.project_id` and routes each span to the owning project's ingestion endpoint using that project's collector token. There is no shared collector — N per-project streams, each authenticated separately.
+
+Implication: a bug or data leak in one project's span payload cannot land in another project's LangWatch UI. Cross-project queries are impossible from the gateway side.
+
+### Upstream providers
+
+Each request's upstream call uses the VK's bound `provider_credential_id`. Credentials are scoped to the VK's owning project, so a VK in project A cannot use project B's OpenAI key even if both are in the same organization.
+
+This is enforced at two layers:
+
+1. Control-plane RBAC — `POST /api/gateway/v1/virtual-keys` validates the caller has `gatewayProviders:view` on each `provider_credential_id` referenced.
+2. Gateway data-plane — the bundle returned by `/config/:vk_id` contains only the providers bound to that VK. The gateway has no way to reach a different project's provider even if a request is maliciously crafted.
+
+### Budgets & debits
+
+Debits carry the VK's `organization_id` as a filter predicate on every Postgres write. A misrouted debit cannot land on another org's ledger — the foreign-key constraint would reject it.
+
+## Privileged actions are audited
+
+Every write through the REST API or the UI emits a row in `GatewayAuditLog`:
+
+- `actorUserId` — the real user if the action was via session / personal-access token.
+- `actor` — the machine principal (e.g. `svc_<projectId>`) for service-token writes.
+- `action` — `virtualKey.created`, `virtualKey.rotated`, `budget.archived`, `provider.disabled`, etc.
+- `target` — resource id the action affected.
+- `metadata` — JSON diff on update actions.
+
+Audit logs are visible to organization admins under **Settings → Organization → Activity**. Retention: 7 years default, extendable on request.
+
+Rotations and revocations are considered security-sensitive and generate an organization-wide notification (configurable).
+
+## RBAC on gateway resources
+
+Six resources, each with standard CRUD + specialized actions:
+
+| Resource | Read | Create | Update | Delete / Rotate |
+|---|---|---|---|---|
+| `virtualKeys` | `virtualKeys:view` | `:create` | `:update` | `:delete`, `:rotate` |
+| `gatewayBudgets` | `:view` | `:create` | `:update` | `:delete` |
+| `gatewayProviders` | `:view` | `:create`, `:attach`, `:detach` | `:update` | `:delete` |
+| `gatewayGuardrails` | `:view` | `:create` | `:update` | `:delete` |
+| `gatewayLogs` | `:view` | — | — | — |
+| `gatewayUsage` | `:view` | — | — | — |
+
+Permissions bind to principals via the existing LangWatch role system — same roles/groups used elsewhere in the platform. A "VK owner" role (for engineers who create their own dev VKs but can't touch team VKs) is the common pattern; it grants `virtualKeys:{view,create,update,rotate,delete}` on their personally-owned VKs via the `principal_user_id` scope.
+
+See [RBAC](/ai-gateway/rbac) for the full resource matrix.
+
+## What the gateway can't see
+
+The gateway sits in the request path but is a passthrough for payload bytes:
+
+- It does NOT log request or response bodies by default. Body bytes are forwarded into bifrost's upstream call and returned to the client; neither the gateway process nor its structured logs retain them.
+- OTel spans record metadata (model, token counts, latencies, cost, fallback attempts) but NOT message content. Message content is written into LangWatch's trace ingestion at the SDK layer, which is a separate pipeline the customer opted into. Some gateway spans mirror the first 200 chars of user messages when customers enable the LangWatch "Message preview" setting — that toggle is off by default and project-scoped.
+- It does NOT decrypt cached `X-LangWatch-Cache: force` headers. Caching is handled entirely upstream at the provider (Anthropic `cache_control`); the gateway is transparent to which bytes are actually cached.
+
+## Data-at-rest in the LangWatch control plane
+
+Postgres:
+
+- All VK-adjacent tables live in the primary app database.
+- TLS-encrypted connections between gateway ↔ control plane (no cleartext network traffic).
+- Field-level encryption on provider credential secrets using per-org KMS keys (AWS KMS default; customer-managed KMS available for BYOK).
+
+ClickHouse:
+
+- Trace/span data is per-organization, partitioned on `TenantId`. Queries from the UI always include a `TenantId` predicate enforced at middleware. Cross-tenant reads are prevented by the ClickHouse query layer, not just by convention.
+
+## Self-hosted deployments
+
+In a self-hosted deployment, the gateway and control plane both run in your infrastructure. Data never leaves your cluster except on outbound calls to LLM providers. You own every secret, every KMS key, every audit log, and every trace.
+
+See [Self-Hosting → Helm](/ai-gateway/self-hosting/helm) for the deployment topology.
+
+## Reporting a security issue
+
+Email `security@langwatch.ai` with reproduction steps. Do not file GitHub issues for security reports. The security team replies within 1 business day; known-exploitable issues trigger a 24-hour SLA for acknowledgement.
+
+Public acknowledgements are listed in the [security.txt](https://langwatch.ai/.well-known/security.txt) endpoint.
+
+## See also
+
+- [Virtual Keys](/ai-gateway/virtual-keys) — show-once secret, rotation, revocation mechanics.
+- [RBAC](/ai-gateway/rbac) — the full permission matrix.
+- [Observability](/ai-gateway/observability) — how per-tenant trace routing works.
+- [Self-Hosting → Config](/ai-gateway/self-hosting/config) — secrets + rotation env vars.

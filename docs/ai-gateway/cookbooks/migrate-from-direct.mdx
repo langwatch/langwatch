@@ -1,0 +1,211 @@
+---
+title: Migrating from direct provider calls
+description: Move from app → OpenAI/Anthropic to app → LangWatch Gateway → providers, without rewriting your integration.
+sidebarTitle: Migrate from direct
+---
+
+You're already calling OpenAI, Anthropic, Bedrock, etc. from your application. You want to add governance — budgets, fallback, blocked-tool patterns, per-engineer attribution — without rewriting everything. This cookbook shows the minimum-effort migration.
+
+## Before
+
+```ts
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+```
+
+## After
+
+```ts
+const openai = new OpenAI({
+  baseURL: "https://gateway.langwatch.ai/v1",
+  apiKey: process.env.LANGWATCH_VK,
+});
+const anthropic = new Anthropic({
+  baseURL: "https://gateway.langwatch.ai",
+  apiKey: process.env.LANGWATCH_VK,
+});
+```
+
+Two env-var changes. That's the whole code migration if you're happy with default gateway behaviour (no budget, cache-respect, fallback disabled). Read on for the policy additions.
+
+## Pre-migration checklist
+
+- [ ] LangWatch project provisioned (you already have one for tracing — reuse it).
+- [ ] API token with `gatewayProviders:create` + `virtualKeys:create`. Use the LangWatch UI → Settings → API Tokens.
+- [ ] Access to the upstream provider accounts (you'll rebind their existing keys inside LangWatch).
+
+## Step 1 — Register the providers you already use
+
+For each provider (OpenAI / Anthropic / Bedrock / Azure / Vertex / Gemini), create a **gateway provider binding** that wraps the same upstream key you're already using:
+
+```bash
+export LANGWATCH_API_KEY="lwp_..."
+
+# Bind existing OpenAI key (the model-provider row already exists
+# because you've used LangWatch's trace-based billing UI before).
+langwatch gateway-providers create \
+  --model-provider mp_openai \
+  --slot primary \
+  --rotation-policy manual \
+  --format json | jq -r '.id'
+# → gpc_01HZX...
+
+langwatch gateway-providers create \
+  --model-provider mp_anthropic \
+  --slot primary \
+  --format json | jq -r '.id'
+# → gpc_01HZY...
+```
+
+Keep the returned `gpc_*` ids — you need them in the next step.
+
+<Note>If you've never configured providers in LangWatch before, do it first in the UI (Settings → Model Providers). The CLI above needs the `mp_*` id of an already-configured provider row.</Note>
+
+## Step 2 — Mint your first virtual key
+
+```bash
+langwatch virtual-keys create \
+  --name "dev-migration" \
+  --env live \
+  --provider gpc_01HZX... \
+  --provider gpc_01HZY... \
+  --format json | tee /tmp/vk.json
+
+export LANGWATCH_VK=$(jq -r '.secret' /tmp/vk.json)
+```
+
+Save the secret. It's shown exactly once.
+
+## Step 3 — Flip the env vars in your app
+
+Dev/staging first:
+
+```bash
+# Before
+OPENAI_API_KEY=sk-proj-...
+ANTHROPIC_API_KEY=sk-ant-...
+
+# After
+OPENAI_API_KEY=$LANGWATCH_VK
+OPENAI_BASE_URL=https://gateway.langwatch.ai/v1
+ANTHROPIC_API_KEY=$LANGWATCH_VK
+ANTHROPIC_BASE_URL=https://gateway.langwatch.ai
+```
+
+Redeploy. Every request now flows through the gateway.
+
+### Verify the migration is live
+
+```bash
+curl -sD- -o/dev/null \
+  -H "Authorization: Bearer $LANGWATCH_VK" \
+  -H "Content-Type: application/json" \
+  -X POST https://gateway.langwatch.ai/v1/chat/completions \
+  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":4}' | \
+  grep -i x-langwatch-
+```
+
+You should see `X-LangWatch-Request-Id`, `X-LangWatch-Trace-Id`, `X-LangWatch-Span-Id`. Paste the request id into the LangWatch search bar — the full trace is already there.
+
+## Step 4 — Add your first policy
+
+The whole point of the migration. Pick the policy that maps to a real pain you have today:
+
+### Hard cap on engineering spend
+
+```bash
+langwatch gateway-budgets create \
+  --name "engineering-monthly-cap" \
+  --scope team --team team_eng... \
+  --window month --limit 5000 --on-breach block
+```
+
+Every VK attached to engineering principals now shares the $5K/month envelope.
+
+### Automatic failover when OpenAI is flaky
+
+Edit the VK via the UI (Gateway → Virtual Keys → edit — once the VK edit drawer is live; until then use the `model_aliases` JSON on create):
+
+```json
+{
+  "fallback": {
+    "chain": ["gpc_openai_primary", "gpc_anthropic_backup"],
+    "on": ["5xx", "timeout", "rate_limit", "network_error"],
+    "timeout_ms": 30000,
+    "max_attempts": 2
+  },
+  "model_aliases": {
+    "gpt-5-mini": "openai/gpt-5-mini",
+    "gpt-5-mini:fallback": "anthropic/claude-haiku-4-5-20251001"
+  }
+}
+```
+
+When OpenAI throws a 503, the gateway re-dispatches the same prompt to Claude Haiku transparently. Your application sees a normal 200 response from `gpt-5-mini`.
+
+### Block destructive tools on engineer VKs
+
+```json
+{
+  "blocked_patterns": {
+    "tools": { "deny": ["^shell\\.exec$", "^filesystem\\.write$"], "allow": null }
+  }
+}
+```
+
+Agent calls like `shell.exec("rm -rf ~")` get `403 tool_not_allowed` before they reach the model — the model never generates the destructive call path in the first place.
+
+## Step 5 — Wire trace propagation
+
+If you were already using LangWatch SDKs for tracing, propagate the trace id into the gateway so requests nest under your existing trace (no double-cost-attribution):
+
+```python
+import langwatch
+
+client = OpenAI(
+    base_url="https://gateway.langwatch.ai/v1",
+    api_key=os.environ["LANGWATCH_VK"],
+    default_headers=langwatch.get_gateway_headers(),
+)
+```
+
+See [Python SDK → trace propagation](/ai-gateway/sdks/python#trace-propagation) and [TypeScript SDK](/ai-gateway/sdks/typescript#trace-propagation).
+
+## Step 6 — Rotate the original upstream keys
+
+After a week of running through the gateway, the original upstream keys (`sk-proj-...`, `sk-ant-...`) should no longer be used by any application. Rotate them in the provider console — this is the only time you need to touch upstream again. The gateway still has access via its own encrypted copies of the old keys (fetched from the LangWatch control plane), and will continue to serve traffic uninterrupted.
+
+## Troubleshooting
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `401 invalid_api_key` on every request | VK env var not loaded; or VK revoked | `echo $LANGWATCH_VK` to verify; check LangWatch UI for VK status |
+| `403 model_not_allowed` on a model you used before | VK's `models_allowed` is set restrictively | Edit VK to add the model, or remove the allowlist |
+| Calls succeed but no trace in LangWatch UI | Project-id mismatch between VK and where you're looking | `langwatch virtual-keys get <id>` → check `project_id` matches the project you're viewing |
+| Anthropic-side calls return `400 must provide max_tokens` | You removed `max_tokens` because OpenAI doesn't require it | Anthropic requires it; keep it set |
+| Response latency jumped by ~50 ms | Fallback is running every call (primary is down) | Check `X-LangWatch-Fallback-Count` — if > 0, fix the primary |
+
+## What NOT to change
+
+- Request bodies: the gateway's whole point is byte-for-byte passthrough. Don't rewrite your payloads.
+- SDKs: the official OpenAI / Anthropic SDKs work unchanged. You don't need the LangWatch SDK for gateway integration (only for *trace propagation*).
+- Streaming handlers: SSE passthrough is byte-identical post-first-chunk. Your streaming code should keep working.
+
+## Rollback plan
+
+If the gateway misbehaves, flip the env vars back:
+
+```bash
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_API_KEY=sk-proj-...    # original key
+```
+
+Redeploy. You're back to direct provider calls. Traces in LangWatch stop populating (the trace propagation + gateway spans go away), but your app works.
+
+Plan the first rollout behind a feature flag for this exact reason — 10% traffic through the gateway for a day before going 100%.
+
+## See also
+
+- [Quickstart](/ai-gateway/quickstart) — green-field setup without migration.
+- [CI smoke test cookbook](/ai-gateway/cookbooks/ci-smoke-test) — automate gateway health verification.
+- [SDK integration](/ai-gateway/sdks/python) — trace propagation recipes.
