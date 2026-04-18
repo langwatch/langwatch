@@ -238,21 +238,70 @@ export const app = new Hono<{ Variables: Variables }>()
     );
   })
 
-  .get("/virtual-keys/:id", async (c) => {
-    const project = c.get("project");
-    const id = c.req.param("id");
-    const service = VirtualKeyService.create(prisma);
-    const vk = await service.getById(id, project.id);
-    if (!vk) {
-      return c.json(
-        { error: { type: "not_found", code: "virtual_key_not_found", message: "virtual key not found" } },
-        404,
-      );
-    }
-    return c.json({ virtual_key: toVkDto(vk) });
-  })
+  .get(
+    "/virtual-keys/:id",
+    describeRoute({
+      summary: "Get virtual key",
+      tags: ["Virtual Keys"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Virtual key detail",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
+            },
+          },
+        },
+        404: {
+          description: "Not found",
+          content: {
+            "application/json": { schema: resolver(errorSchema) },
+          },
+        },
+      },
+    }),
+    async (c) => {
+      const project = c.get("project");
+      const id = c.req.param("id");
+      const service = VirtualKeyService.create(prisma);
+      const vk = await service.getById(id, project.id);
+      if (!vk) {
+        return c.json(
+          { error: { type: "not_found", code: "virtual_key_not_found", message: "virtual key not found" } },
+          404,
+        );
+      }
+      return c.json({ virtual_key: toVkDto(vk) });
+    },
+  )
 
-  .patch("/virtual-keys/:id", async (c) => {
+  .patch(
+    "/virtual-keys/:id",
+    describeRoute({
+      summary: "Update virtual key",
+      description:
+        "Partial update — send only the fields you want to change. `provider_credential_ids` replaces the entire fallback chain. `config` is deep-merged.",
+      tags: ["Virtual Keys"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Updated",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
+            },
+          },
+        },
+        400: {
+          description: "Validation error",
+          content: {
+            "application/json": { schema: resolver(errorSchema) },
+          },
+        },
+      },
+    }),
+    async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
     const body = updateVirtualKeySchema.safeParse(await c.req.json());
@@ -315,7 +364,26 @@ export const app = new Hono<{ Variables: Variables }>()
     return c.json({ virtual_key: toVkDto(virtualKey), secret });
   })
 
-  .post("/virtual-keys/:id/revoke", async (c) => {
+  .post(
+    "/virtual-keys/:id/revoke",
+    describeRoute({
+      summary: "Revoke virtual key",
+      description:
+        "Marks the virtual key as revoked. Clients using it start receiving 401 within ~60s (the gateway's change-event long-poll period).",
+      tags: ["Virtual Keys"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Revoked",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ virtual_key: virtualKeyDtoSchema })),
+            },
+          },
+        },
+      },
+    }),
+    async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
@@ -391,7 +459,30 @@ export const app = new Hono<{ Variables: Variables }>()
     });
   })
 
-  .post("/providers", async (c) => {
+  .post(
+    "/providers",
+    describeRoute({
+      summary: "Bind a model provider to the gateway",
+      description:
+        "Creates a GatewayProviderCredential binding. Reuses the ModelProvider API key already configured in project settings; this only adds gateway-specific settings (rate limits, rotation, fallback priority).",
+      tags: ["Providers"],
+      responses: {
+        ...baseResponses,
+        201: {
+          description: "Binding created",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  provider_credential: z.object({ id: z.string() }),
+                }),
+              ),
+            },
+          },
+        },
+      },
+    }),
+    async (c) => {
     const project = c.get("project");
     const raw = (await c.req.json()) as Record<string, unknown>;
     const organizationId = await orgIdForProject(project.id);
@@ -463,7 +554,32 @@ export const app = new Hono<{ Variables: Variables }>()
     });
   })
 
-  .post("/budgets", async (c) => {
+  .post(
+    "/budgets",
+    describeRoute({
+      summary: "Create budget",
+      description:
+        "Creates an organization-owned budget. The scope discriminates which resource the budget covers (organization / team / project / virtual_key / principal).",
+      tags: ["Budgets"],
+      responses: {
+        ...baseResponses,
+        201: {
+          description: "Budget created",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ budget: budgetDtoSchema })),
+            },
+          },
+        },
+        400: {
+          description: "Validation error",
+          content: {
+            "application/json": { schema: resolver(errorSchema) },
+          },
+        },
+      },
+    }),
+    async (c) => {
     const project = c.get("project");
     const body = createBudgetSchema.safeParse(await c.req.json());
     if (!body.success) {
@@ -488,7 +604,26 @@ export const app = new Hono<{ Variables: Variables }>()
     return c.json({ budget: toBudgetDto(row) }, 201);
   })
 
-  .patch("/budgets/:id", async (c) => {
+  .patch(
+    "/budgets/:id",
+    describeRoute({
+      summary: "Update budget",
+      description:
+        "Partial update — scope and window are immutable after create. Use explicit null to clear timezone / description.",
+      tags: ["Budgets"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Updated",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ budget: budgetDtoSchema })),
+            },
+          },
+        },
+      },
+    }),
+    async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
     const raw = (await c.req.json()) as Record<string, unknown>;
@@ -513,7 +648,26 @@ export const app = new Hono<{ Variables: Variables }>()
     return c.json({ budget: toBudgetDto(row) });
   })
 
-  .delete("/budgets/:id", async (c) => {
+  .delete(
+    "/budgets/:id",
+    describeRoute({
+      summary: "Archive budget",
+      description:
+        "Soft-delete — the row is marked archived and no longer counted by the budget engine. Historical ledger entries are retained.",
+      tags: ["Budgets"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Archived",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ budget: budgetDtoSchema })),
+            },
+          },
+        },
+      },
+    }),
+    async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
@@ -528,7 +682,30 @@ export const app = new Hono<{ Variables: Variables }>()
 
   // ── Provider credentials — update + disable ────────────────────────────
 
-  .patch("/providers/:id", async (c) => {
+  .patch(
+    "/providers/:id",
+    describeRoute({
+      summary: "Update provider binding",
+      description:
+        "Partial update of gateway-specific settings (rate limits, rotation, slot, extra headers). The underlying ModelProvider credentials are managed in project settings, not here.",
+      tags: ["Providers"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Updated",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  provider_credential: z.object({ id: z.string() }),
+                }),
+              ),
+            },
+          },
+        },
+      },
+    }),
+    async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
     const raw = (await c.req.json()) as Record<string, unknown>;
@@ -575,7 +752,33 @@ export const app = new Hono<{ Variables: Variables }>()
     return c.json({ provider_credential: { id: row.id } });
   })
 
-  .delete("/providers/:id", async (c) => {
+  .delete(
+    "/providers/:id",
+    describeRoute({
+      summary: "Disable provider binding",
+      description:
+        "Marks the binding disabled. Requests routing to this slot are skipped (fallback chain continues). Historical ledger rows are retained.",
+      tags: ["Providers"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Disabled",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  provider_credential: z.object({
+                    id: z.string(),
+                    disabled_at: z.string().nullable(),
+                  }),
+                }),
+              ),
+            },
+          },
+        },
+      },
+    }),
+    async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);

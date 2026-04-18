@@ -9,7 +9,7 @@
  */
 import type { Context } from "hono";
 import { Hono } from "hono";
-import { randomBytes } from "crypto";
+import { makeSignature } from "better-auth/crypto";
 import { auth } from "~/server/better-auth";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { getServerAuthSession } from "~/server/auth";
@@ -187,34 +187,46 @@ app.get("/auth/dev-bypass", async (c) => {
     },
   });
 
-  const sessionToken = randomBytes(32).toString("hex");
-  const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  // Create the session through BetterAuth's internal adapter so the row it
+  // writes matches what `auth.api.getSession` expects (hashed token in DB,
+  // plaintext token inside the signed cookie). Signing the cookie manually
+  // below with makeSignature produces the exact `<token>.<signature>` shape
+  // BetterAuth validates on every request.
+  const ctx = await auth.$context;
+  const session = await ctx.internalAdapter.createSession(user.id);
+  if (!session) {
+    return c.json(
+      {
+        error: {
+          type: "internal_error",
+          code: "session_create_failed",
+          message: "failed to create dev session",
+        },
+      },
+      500,
+    );
+  }
 
-  await prisma.session.create({
-    data: {
-      sessionToken,
-      userId: user.id,
-      expires,
-      ipAddress:
-        c.req.header("x-forwarded-for") ?? c.req.header("x-real-ip") ?? null,
-      userAgent: c.req.header("user-agent") ?? null,
-    },
-  });
-
-  const redirectTo = c.req.query("redirect") ?? "/";
+  const signed = `${session.token}.${await makeSignature(session.token, ctx.secret)}`;
+  const cookieConfig = ctx.authCookies.sessionToken;
   const cookieFlags = [
-    `better-auth.session_token=${sessionToken}`,
-    "Path=/",
-    `Max-Age=${24 * 60 * 60}`,
-    "HttpOnly",
-    "SameSite=Lax",
-  ].join("; ");
-  c.header("Set-Cookie", cookieFlags);
+    `${cookieConfig.name}=${encodeURIComponent(signed)}`,
+    `Path=${cookieConfig.attributes.path ?? "/"}`,
+    `Max-Age=${cookieConfig.attributes.maxAge ?? 24 * 60 * 60}`,
+  ];
+  if (cookieConfig.attributes.httpOnly ?? true) cookieFlags.push("HttpOnly");
+  const sameSite = cookieConfig.attributes.sameSite ?? "Lax";
+  cookieFlags.push(
+    `SameSite=${sameSite.charAt(0).toUpperCase()}${sameSite.slice(1)}`,
+  );
+  if (cookieConfig.attributes.secure) cookieFlags.push("Secure");
+  c.header("Set-Cookie", cookieFlags.join("; "));
 
   logger.warn(
-    { userId: user.id, email: DEV_EMAIL },
+    { userId: user.id, email: DEV_EMAIL, sessionId: session.id },
     "LOCAL_DEV_BYPASS_AUTH issued a session — development only",
   );
+  const redirectTo = c.req.query("redirect") ?? "/";
   return c.redirect(redirectTo, 302);
 });
 
