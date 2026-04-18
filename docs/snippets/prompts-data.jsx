@@ -15,7 +15,7 @@ Use the \`langwatch\` CLI for everything: documentation (\`langwatch docs ...\`,
 
 If the user's request is **general** ("instrument my code", "add tracing", "set up observability"):
 - Read the full codebase to understand the agent's architecture
-- Study git history for context on prior changes
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Add comprehensive tracing across all LLM call sites
 
 If the user's request is **specific** ("add tracing to the payment function", "trace this endpoint"):
@@ -126,6 +126,7 @@ Use evaluations when you have many examples with clear correct answers, or for C
 
 If the user's request is **general** ("set up evaluations"):
 - Read the codebase to understand the agent
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Set up an experiment + evaluator + dataset
 - After the experiment is working, summarize results and suggest improvements (consultant mode — see end of skill).
 
@@ -346,6 +347,7 @@ NEVER invent your own agent testing framework. Use \`@langwatch/scenario\` (Pyth
 
 If the user's request is **general** ("add scenarios", "test my agent"):
 - Read the codebase to understand the agent's architecture
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
 - For conversational agents, include multi-turn scenarios — that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
 - ALWAYS run the tests after writing them. If they fail, debug and fix the test or the agent code.
@@ -656,7 +658,7 @@ Use the \`langwatch\` CLI for everything: documentation (\`langwatch docs ...\`,
 
 If the user's request is **general** ("set up prompt versioning", "version my prompts"):
 - Read the full codebase to find all hardcoded prompt strings
-- Study git history for context on prompt tweaks and behavior changes
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Set up the Prompts CLI and create managed prompts for each hardcoded prompt
 - Update all application code to use \`langwatch.prompts.get()\`
 
@@ -1302,7 +1304,7 @@ Use the \`langwatch\` CLI for everything: documentation (\`langwatch docs ...\`,
 
 If the user's request is **general** ("instrument my code", "add tracing", "set up observability"):
 - Read the full codebase to understand the agent's architecture
-- Study git history for context on prior changes
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Add comprehensive tracing across all LLM call sites
 
 If the user's request is **specific** ("add tracing to the payment function", "trace this endpoint"):
@@ -1392,7 +1394,7 @@ Do NOT consider the work complete without verifying. In order:
 
 If the user's request is **general** ("set up prompt versioning", "version my prompts"):
 - Read the full codebase to find all hardcoded prompt strings
-- Study git history for context on prompt tweaks and behavior changes
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Set up the Prompts CLI and create managed prompts for each hardcoded prompt
 - Update all application code to use \`langwatch.prompts.get()\`
 
@@ -1529,6 +1531,7 @@ Use evaluations when you have many examples with clear correct answers, or for C
 
 If the user's request is **general** ("set up evaluations"):
 - Read the codebase to understand the agent
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Set up an experiment + evaluator + dataset
 - After the experiment is working, summarize results and suggest improvements (consultant mode — see end of skill).
 
@@ -1723,6 +1726,7 @@ NEVER invent your own agent testing framework. Use \`@langwatch/scenario\` (Pyth
 
 If the user's request is **general** ("add scenarios", "test my agent"):
 - Read the codebase to understand the agent's architecture
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
 - For conversational agents, include multi-turn scenarios — that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
 - ALWAYS run the tests after writing them. If they fail, debug and fix the test or the agent code.
@@ -2604,6 +2608,8 @@ Write scenarios where the agent makes a mistake and must recover:
   platform_analytics: `How is my agent performing?
 
 You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
 Use the \`langwatch\` CLI for everything: documentation (\`langwatch docs ...\`, \`langwatch scenario-docs ...\`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with \`npm install -g langwatch\` (or run any command via \`npx langwatch\`).
 
 # Analyze Agent Performance with LangWatch
@@ -2698,6 +2704,8 @@ Summarize the data clearly for the user:
   platform_scenarios: `Add scenario tests for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
 Use the \`langwatch\` CLI for everything: documentation (\`langwatch docs ...\`, \`langwatch scenario-docs ...\`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with \`npm install -g langwatch\` (or run any command via \`npx langwatch\`).
 
 # Test Your Agent with Scenarios
@@ -2708,6 +2716,7 @@ NEVER invent your own agent testing framework. Use \`@langwatch/scenario\` (Pyth
 
 If the user's request is **general** ("add scenarios", "test my agent"):
 - Read the codebase to understand the agent's architecture
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Generate comprehensive coverage (happy path, edge cases, error handling)
 - For conversational agents, include multi-turn scenarios — that's where the interesting edge cases live (context retention, topic switching, recovery from misunderstandings)
 - ALWAYS run the tests after writing them. If they fail, debug and fix the test or the agent code.
@@ -3008,6 +3017,8 @@ Do NOT ask permission before Phase 1 and 2 — deliver value first. Do NOT ask g
   platform_evaluators: `Set up evaluations for my agent
 
 You are using LangWatch for your AI agent project. Follow these instructions.
+
+IMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.
 Use the \`langwatch\` CLI for everything: documentation (\`langwatch docs ...\`, \`langwatch scenario-docs ...\`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it with \`npm install -g langwatch\` (or run any command via \`npx langwatch\`).
 
 # Set Up Evaluations for Your Agent
@@ -3032,6 +3043,7 @@ Use evaluations when you have many examples with clear correct answers, or for C
 
 If the user's request is **general** ("set up evaluations"):
 - Read the codebase to understand the agent
+- Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
 - Set up an experiment + evaluator + dataset
 - After the experiment is working, summarize results and suggest improvements (consultant mode — see end of skill).
 
