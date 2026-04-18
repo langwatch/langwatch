@@ -18,6 +18,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { BudgetCreateDrawer } from "~/components/gateway/BudgetCreateDrawer";
 import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
@@ -56,21 +57,16 @@ function BudgetsPage() {
 
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<BudgetListRow | null>(null);
+  const [archiving, setArchiving] = useState<BudgetListRow | null>(null);
 
-  const handleArchive = async (row: BudgetListRow) => {
-    if (!organization) return;
-    if (
-      !confirm(
-        `Archive "${row.name}"? Debits against this budget will stop counting.`,
-      )
-    ) {
-      return;
-    }
+  const confirmArchive = async () => {
+    if (!archiving || !organization) return;
     try {
       await archiveMutation.mutateAsync({
         organizationId: organization.id,
-        id: row.id,
+        id: archiving.id,
       });
+      setArchiving(null);
     } catch (error) {
       toaster.create({
         title: error instanceof Error ? error.message : "Failed to archive",
@@ -215,7 +211,7 @@ function BudgetsPage() {
                               {canDelete && (
                                 <Menu.Item
                                   value="archive"
-                                  onClick={() => handleArchive(b)}
+                                  onClick={() => setArchiving(b)}
                                 >
                                   <Archive size={14} /> Archive
                                 </Menu.Item>
@@ -251,6 +247,18 @@ function BudgetsPage() {
           setEditing(null);
           void refetch();
         }}
+      />
+      <ConfirmDialog
+        open={!!archiving}
+        onOpenChange={(open) => {
+          if (!open) setArchiving(null);
+        }}
+        title={`Archive ${archiving?.name ?? "budget"}?`}
+        message="Debits against this budget stop counting. The historical ledger is preserved but new requests route as if the budget didn't exist."
+        confirmLabel="Archive"
+        tone="warning"
+        loading={archiveMutation.isPending}
+        onConfirm={confirmArchive}
       />
     </GatewayLayout>
   );
