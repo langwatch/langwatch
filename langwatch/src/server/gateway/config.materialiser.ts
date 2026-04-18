@@ -60,6 +60,17 @@ export type GatewayConfigPayload = {
     tpm: number | null;
     rpd: number | null;
   };
+  /**
+   * Per-project OTLP endpoint the gateway should emit spans to. Null means
+   * the gateway should use its own default (GATEWAY_OTEL_DEFAULT_ENDPOINT
+   * env). Consumed by @sergey's RouterExporter.EndpointResolver — see
+   * langwatch-saas/internal/otel/router.go.
+   *
+   * Source, in order: (1) Project.observabilityEndpoint column once the
+   * schema migration lands, (2) env default. For now the field is always
+   * null in the bundle; the gateway falls back to its env default.
+   */
+  observability_endpoint: string | null;
   budgets: Array<{
     id: string;
     scope: "organization" | "team" | "project" | "virtual_key" | "principal";
@@ -125,6 +136,7 @@ export class GatewayConfigMaterialiser {
         tpm: config.rateLimits.tpm,
         rpd: config.rateLimits.rpd,
       },
+      observability_endpoint: await this.resolveObservabilityEndpoint(project),
       budgets: budgets.map((b) => ({
         id: b.id,
         scope: scopeToWire(b.scopeType),
@@ -166,6 +178,22 @@ export class GatewayConfigMaterialiser {
     return vk.providerCredentials
       .map((p) => byId.get(p.providerCredentialId))
       .filter((r): r is ProviderRow => Boolean(r));
+  }
+
+  /**
+   * Per-project OTLP endpoint. For now reads an optional column on the
+   * project row; when none, the gateway will fall back to its own env
+   * default. Kept as an async boundary so future per-org or per-tenant
+   * lookups (e.g. dedicated dataplane routing) can live here without
+   * churning the signature.
+   */
+  private async resolveObservabilityEndpoint(
+    project: Project & { team: Team },
+  ): Promise<string | null> {
+    const projectEndpoint = (project as unknown as {
+      observabilityEndpoint?: string | null;
+    }).observabilityEndpoint;
+    return projectEndpoint ?? null;
   }
 
   private async applicableBudgets(
