@@ -9,6 +9,7 @@ import type { Span, Trace } from "~/server/tracer/types";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { generateAsciiTree, formatTraceSummaryDigest } from "~/server/traces/trace-formatting";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
+import { getApp } from "~/server/app-layer/app";
 import { TraceService } from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
@@ -155,6 +156,114 @@ app.post(
         scrollId: results.scrollId,
       },
     });
+  },
+);
+
+// POST /archive - Archive multiple traces
+app.post(
+  "/archive",
+  describeRoute({
+    description:
+      "Archive one or more traces by ID. Dispatches an archiveTrace command per trace through the event-sourcing pipeline; the trace_summaries fold projection stamps ArchivedAt. Archived traces are excluded from query results but the underlying data is not deleted.",
+    responses: {
+      ...baseResponses,
+      202: {
+        description: "Archive commands dispatched",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                dispatched: z.number(),
+              }),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  zValidator(
+    "json",
+    z.object({
+      traceIds: z
+        .array(z.string())
+        .min(1)
+        .max(1000)
+        .describe("Trace IDs to archive"),
+    }),
+  ),
+  async (c) => {
+    const project = c.get("project");
+    const { traceIds } = c.req.valid("json");
+
+    logger.info(
+      { projectId: project.id, traceCount: traceIds.length },
+      "Dispatching archiveTrace commands",
+    );
+
+    const app = getApp();
+    const occurredAt = Date.now();
+    await Promise.all(
+      traceIds.map((traceId) =>
+        app.traces.archiveTrace({
+          tenantId: project.id,
+          traceId,
+          occurredAt,
+        }),
+      ),
+    );
+
+    return c.json({ dispatched: traceIds.length }, 202);
+  },
+);
+
+// POST /:traceId/archive - Archive a single trace
+app.post(
+  "/:traceId/archive",
+  describeRoute({
+    description:
+      "Archive a single trace by ID. Dispatches an archiveTrace command through the event-sourcing pipeline.",
+    parameters: [
+      {
+        name: "traceId",
+        in: "path",
+        description: "The trace ID to archive",
+        required: true,
+        schema: { type: "string" },
+      },
+    ],
+    responses: {
+      ...baseResponses,
+      202: {
+        description: "Archive command dispatched",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                dispatched: z.number(),
+              }),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const project = c.get("project");
+    const { traceId } = c.req.param();
+
+    logger.info(
+      { projectId: project.id, traceId },
+      "Dispatching archiveTrace command",
+    );
+
+    const app = getApp();
+    await app.traces.archiveTrace({
+      tenantId: project.id,
+      traceId,
+      occurredAt: Date.now(),
+    });
+
+    return c.json({ dispatched: 1 }, 202);
   },
 );
 

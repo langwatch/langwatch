@@ -7,6 +7,7 @@ import {
   createDatasetSchema,
   datasetColumnDefinitionSchema,
 } from "./schemas/create-dataset.js";
+import { handleArchiveTraces } from "./tools/archive-traces.js";
 
 const modelSchema = z
   .string()
@@ -235,6 +236,24 @@ function registerTools(server: McpServer): void {
       const { handleGetTrace } = await import("./tools/get-trace.js");
       return {
         content: [{ type: "text", text: await handleGetTrace(params) }],
+      };
+    })
+  );
+
+  server.tool(
+    "archive_traces",
+    "Archive one or more traces by ID. Archived traces are excluded from all query results (search, get, analytics) but the underlying data is not deleted. This is a soft-delete operation.",
+    {
+      traceIds: z
+        .array(z.string())
+        .min(1)
+        .max(1000)
+        .describe("One or more trace IDs to archive"),
+    },
+    withToolLogging("archive_traces", async (params) => {
+      requireApiKey();
+      return {
+        content: [{ type: "text", text: await handleArchiveTraces(params) }],
       };
     })
   );

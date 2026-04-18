@@ -569,7 +569,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       metricsCollector: null,
     },
     commands: {
-      traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop, resolveOrigin: noop, addAnnotation: noop, removeAnnotation: noop, bulkSyncAnnotations: noop } satisfies AppCommands["traces"],
+      traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop, resolveOrigin: noop, addAnnotation: noop, removeAnnotation: noop, bulkSyncAnnotations: noop, archiveTrace: noop } satisfies AppCommands["traces"],
       evaluations: {
         executeEvaluation: noop,
         startEvaluation: noop,

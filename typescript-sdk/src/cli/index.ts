@@ -742,6 +742,18 @@ traceCmd
     await impl(traceId, options);
   });
 
+traceCmd
+  .command("archive <traceIds...>")
+  .description(
+    "Archive one or more traces by ID. Archived traces are excluded from queries but data is retained.",
+  )
+  .action(async (traceIds: string[]) => {
+    const { archiveTracesCommand: impl } = await import(
+      "./commands/traces/archive.js"
+    );
+    await impl(traceIds);
+  });
+
 // Add scenario command group
 const scenarioCmd = program
   .command("scenario")

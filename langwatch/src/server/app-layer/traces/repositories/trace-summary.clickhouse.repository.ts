@@ -55,6 +55,7 @@ interface ClickHouseSummaryRecord {
   ScenarioRoleSpans: Record<string, string>;
   SpanCosts: Record<string, number>;
   LastEventOccurredAt: number;
+  ArchivedAt: Date | null;
 }
 
 export class TraceSummaryClickHouseRepository implements TraceSummaryRepository {
@@ -200,7 +201,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             ScenarioRoleCosts,
             ScenarioRoleLatencies,
             ScenarioRoleSpans,
-            SpanCosts
+            SpanCosts,
+            toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND TraceId = {traceId:String}
@@ -263,6 +265,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
       lastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
+      archivedAt: record.ArchivedAt ? Number(record.ArchivedAt) : null,
     };
   }
 
@@ -309,6 +312,7 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       ScenarioRoleLatencies: data.scenarioRoleLatencies ?? {},
       ScenarioRoleSpans: data.scenarioRoleSpans ?? {},
       SpanCosts: data.spanCosts ?? {},
+      ArchivedAt: data.archivedAt ? new Date(data.archivedAt) : null,
     };
   }
 }

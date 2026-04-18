@@ -204,6 +204,7 @@ async function fetchCountsFromClickHouse(
         toString(countIf(TopicId IS NOT NULL AND TopicId != '')) AS assigned
       FROM trace_summaries t
       WHERE TenantId = {tenantId:String}
+        AND ArchivedAt IS NULL
         AND OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})
         AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
           SELECT TenantId, TraceId, max(UpdatedAt)
@@ -305,6 +306,7 @@ async function fetchTracesFromClickHouse(
 
   const baseConditions = [
     "TenantId = {tenantId:String}",
+    "ArchivedAt IS NULL",
     "OccurredAt >= fromUnixTimestamp64Milli({twelveMonthsAgo:UInt64})",
     "OccurredAt < now64(3)",
     "ComputedInput IS NOT NULL",
@@ -337,7 +339,13 @@ async function fetchTracesFromClickHouse(
     )`);
   }
 
-  const baseWhereClause = baseConditions.join(" AND ");
+  // Inner dedup subquery must NOT filter ArchivedAt — otherwise max(UpdatedAt)
+  // is computed over unarchived rows and archived traces leak back when the
+  // latest row is archived. ArchivedAt IS NULL stays in the outer whereClause.
+  const dedupBaseConditions = baseConditions.filter(
+    (c) => c !== "ArchivedAt IS NULL",
+  );
+  const baseWhereClause = dedupBaseConditions.join(" AND ");
   const whereClause = conditions.join(" AND ");
 
   const result = await clickhouse.query({

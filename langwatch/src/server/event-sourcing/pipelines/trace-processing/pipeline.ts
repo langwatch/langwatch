@@ -8,6 +8,7 @@ import { AssignTopicCommand } from "./commands/assignTopicCommand";
 import { RecordLogCommand } from "./commands/recordLogCommand";
 import { RecordMetricCommand } from "./commands/recordMetricCommand";
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
+import { ArchiveTraceCommand } from "./commands/archiveTraceCommand";
 import { ResolveOriginCommand } from "./commands/resolveOriginCommand";
 import { LogRecordStorageMapProjection } from "./projections/logRecordStorage.mapProjection";
 import { MetricRecordStorageMapProjection } from "./projections/metricRecordStorage.mapProjection";
@@ -83,5 +84,6 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withCommand("addAnnotation", AddAnnotationCommand)
     .withCommand("removeAnnotation", RemoveAnnotationCommand)
     .withCommand("bulkSyncAnnotations", BulkSyncAnnotationsCommand)
+    .withCommand("archiveTrace", ArchiveTraceCommand)
     .build();
 }

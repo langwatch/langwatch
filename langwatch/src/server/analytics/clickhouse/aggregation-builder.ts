@@ -98,6 +98,7 @@ function dedupedTraceSummaries(
   return `(
     SELECT ${columnList} FROM trace_summaries
     WHERE TenantId = {tenantId:String}
+      AND ArchivedAt IS NULL
       ${dateClause}
       AND (TenantId, TraceId, UpdatedAt) IN (
         SELECT TenantId, TraceId, max(UpdatedAt)

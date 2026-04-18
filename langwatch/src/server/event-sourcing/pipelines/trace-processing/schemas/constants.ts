@@ -60,6 +60,14 @@ export const ANNOTATIONS_BULK_SYNCED_EVENT_VERSIONS = [
   ANNOTATIONS_BULK_SYNCED_EVENT_VERSION_LATEST,
 ] as const;
 
+export const TRACE_ARCHIVED_EVENT_TYPE =
+  "lw.obs.trace.trace_archived" as const;
+export const TRACE_ARCHIVED_EVENT_VERSION_LATEST = "2026-04-16" as const;
+
+export const TRACE_ARCHIVED_EVENT_VERSIONS = [
+  TRACE_ARCHIVED_EVENT_VERSION_LATEST,
+] as const;
+
 export const TRACE_PROCESSING_EVENT_TYPES = [
   SPAN_RECEIVED_EVENT_TYPE,
   TOPIC_ASSIGNED_EVENT_TYPE,
@@ -69,6 +77,7 @@ export const TRACE_PROCESSING_EVENT_TYPES = [
   ANNOTATION_ADDED_EVENT_TYPE,
   ANNOTATION_REMOVED_EVENT_TYPE,
   ANNOTATIONS_BULK_SYNCED_EVENT_TYPE,
+  TRACE_ARCHIVED_EVENT_TYPE,
 ] as const;
 
 export type TraceProcessingEventType =
@@ -83,6 +92,8 @@ export const ADD_ANNOTATION_COMMAND_TYPE = "lw.obs.trace.add_annotation" as cons
 export const REMOVE_ANNOTATION_COMMAND_TYPE = "lw.obs.trace.remove_annotation" as const;
 export const BULK_SYNC_ANNOTATIONS_COMMAND_TYPE = "lw.obs.trace.bulk_sync_annotations" as const;
 
+export const ARCHIVE_TRACE_COMMAND_TYPE = "lw.obs.trace.archive_trace" as const;
+
 export const TRACE_PROCESSING_COMMAND_TYPES = [
   RECORD_SPAN_COMMAND_TYPE,
   ASSIGN_TOPIC_COMMAND_TYPE,
@@ -92,6 +103,7 @@ export const TRACE_PROCESSING_COMMAND_TYPES = [
   ADD_ANNOTATION_COMMAND_TYPE,
   REMOVE_ANNOTATION_COMMAND_TYPE,
   BULK_SYNC_ANNOTATIONS_COMMAND_TYPE,
+  ARCHIVE_TRACE_COMMAND_TYPE,
 ] as const;
 
 export type TraceProcessingCommandType =

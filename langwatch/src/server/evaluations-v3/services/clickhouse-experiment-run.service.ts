@@ -556,6 +556,11 @@ export class ClickHouseExperimentRunService {
     if (traceIds.length === 0) return items;
 
     try {
+      // Outer ArchivedAt IS NULL excludes traces whose latest version is
+      // archived — archived traces must not leak into experiment cost
+      // enrichment. Inner dedup subquery intentionally omits ArchivedAt so
+      // max(UpdatedAt) resolves the true latest version before the outer
+      // archival check.
       const traceCostResult = await clickHouseClient.query({
         query: `
           SELECT
@@ -564,6 +569,7 @@ export class ClickHouseExperimentRunService {
           FROM trace_summaries
           WHERE TenantId = {tenantId:String}
             AND TraceId IN ({traceIds:Array(String)})
+            AND ArchivedAt IS NULL
             AND (TenantId, TraceId, UpdatedAt) IN (
               SELECT TenantId, TraceId, max(UpdatedAt)
               FROM trace_summaries

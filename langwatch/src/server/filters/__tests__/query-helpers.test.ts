@@ -50,9 +50,30 @@ describe("buildTraceSummariesConditions", () => {
     expect(result).not.toContain("CreatedAt");
   });
 
+  it("filters archived traces via ArchivedAt IS NULL", () => {
+    const result = buildTraceSummariesConditions(baseParams);
+    expect(result).toContain("ArchivedAt IS NULL");
+  });
+
+  it("includes IN-tuple dedup subquery so pre-merge archived rows do not leak", () => {
+    const result = buildTraceSummariesConditions(baseParams);
+    // Outer keeps ArchivedAt IS NULL; inner dedup must NOT filter ArchivedAt
+    // (otherwise max(UpdatedAt) picks a stale version and archived traces
+    // reappear).
+    expect(result).toContain("(TenantId, TraceId, UpdatedAt) IN (");
+    expect(result).toContain("max(UpdatedAt)");
+    expect(result).toContain("GROUP BY TenantId, TraceId");
+    const innerSubquery = result.substring(
+      result.indexOf("(TenantId, TraceId, UpdatedAt) IN ("),
+    );
+    expect(innerSubquery).not.toContain("ArchivedAt");
+  });
+
   it("joins conditions with AND", () => {
     const result = buildTraceSummariesConditions(baseParams);
-    expect(result.split(" AND ").length).toBe(3);
+    // 5 outer conditions (tenant, archived, 2x occurred-at range, IN-tuple)
+    // plus 2 ANDs inside the dedup subquery's WHERE clause → 7 segments.
+    expect(result.split(" AND ").length).toBe(7);
   });
 });
 

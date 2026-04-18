@@ -143,13 +143,22 @@ export async function queryTraceSummariesTotalUniq({
 
   const [startDate, endDate] = billingMonthDateRange(billingMonth);
 
+  // Dedup via HAVING argMax so traces whose latest version is archived are
+  // excluded from billing counts, even if older unarchived rows still exist
+  // pre-merge. CreatedAt range stays in the inner WHERE — it's immutable per
+  // trace so any version shares the same CreatedAt.
   const result = await client.query({
     query: `
-      SELECT uniq(TraceId) as total
-      FROM trace_summaries
-      WHERE TenantId IN {tenantIds:Array(String)}
-        AND CreatedAt >= {startDate:DateTime64(3)}
-        AND CreatedAt < {endDate:DateTime64(3)}
+      SELECT count() as total
+      FROM (
+        SELECT TenantId, TraceId
+        FROM trace_summaries
+        WHERE TenantId IN {tenantIds:Array(String)}
+          AND CreatedAt >= {startDate:DateTime64(3)}
+          AND CreatedAt < {endDate:DateTime64(3)}
+        GROUP BY TenantId, TraceId
+        HAVING argMax(ArchivedAt, UpdatedAt) IS NULL
+      )
     `,
     query_params: { tenantIds: projectIds, startDate, endDate },
     format: "JSONEachRow",

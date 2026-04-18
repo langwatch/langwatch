@@ -197,14 +197,24 @@ export class ClickHouseTraceService {
         );
 
         try {
-          // Query trace_summaries for traces with matching thread_id
-          // Thread ID can be stored under different attribute keys
+          // Query trace_summaries for traces with matching thread_id.
+          // Dedup via IN-tuple so the latest row (by UpdatedAt) is the one whose
+          // ArchivedAt we check — otherwise an older unarchived row leaks in
+          // before CH merges land.
           const result = await clickHouseClient.query({
             query: `
               SELECT DISTINCT TraceId
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
+                AND ArchivedAt IS NULL
                 AND Attributes['gen_ai.conversation.id'] = {threadId:String}
+                AND (TenantId, TraceId, UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE TenantId = {tenantId:String}
+                    AND Attributes['gen_ai.conversation.id'] = {threadId:String}
+                  GROUP BY TenantId, TraceId
+                )
               ORDER BY CreatedAt ASC
               LIMIT 1000
             `,
@@ -296,14 +306,24 @@ export class ClickHouseTraceService {
         );
 
         try {
-          // Query trace_summaries for traces with matching thread_ids
-          // Thread ID can be stored under different attribute keys
+          // Query trace_summaries for traces with matching thread_ids.
+          // Dedup via IN-tuple so the latest row (by UpdatedAt) is the one whose
+          // ArchivedAt we check — otherwise an older unarchived row leaks in
+          // before CH merges land.
           const result = await clickHouseClient.query({
             query: `
               SELECT DISTINCT TraceId
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
+                AND ArchivedAt IS NULL
                 AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
+                AND (TenantId, TraceId, UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE TenantId = {tenantId:String}
+                    AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
+                  GROUP BY TenantId, TraceId
+                )
               ORDER BY CreatedAt ASC
               LIMIT 1000
             `,
@@ -615,7 +635,7 @@ export class ClickHouseTraceService {
 
         try {
           // Build date filter conditions
-          const conditions: string[] = ["TenantId = {tenantId:String}"];
+          const conditions: string[] = ["TenantId = {tenantId:String}", "ArchivedAt IS NULL"];
           if (input.startDate) {
             conditions.push(
               "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
@@ -628,6 +648,12 @@ export class ClickHouseTraceService {
           }
 
           const whereClause = conditions.join(" AND ");
+          // Inner dedup subquery must NOT filter ArchivedAt — otherwise
+          // max(UpdatedAt) picks an older unarchived row and the archived
+          // trace leaks back. CreatedAt range stays (it's version-invariant).
+          const dedupWhereClause = conditions
+            .filter((c) => c !== "ArchivedAt IS NULL")
+            .join(" AND ");
 
           const result = await clickHouseClient.query({
             query: `
@@ -638,6 +664,12 @@ export class ClickHouseTraceService {
               FROM trace_summaries
               WHERE ${whereClause}
                 AND (TopicId IS NOT NULL OR SubTopicId IS NOT NULL)
+                AND (TenantId, TraceId, UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE ${dedupWhereClause}
+                  GROUP BY TenantId, TraceId
+                )
               GROUP BY TopicId, SubTopicId
               LIMIT 10000
             `,
@@ -720,7 +752,7 @@ export class ClickHouseTraceService {
 
         try {
           // Build date filter conditions
-          const conditions: string[] = ["TenantId = {tenantId:String}"];
+          const conditions: string[] = ["TenantId = {tenantId:String}", "ArchivedAt IS NULL"];
           if (input.startDate) {
             conditions.push(
               "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
@@ -733,6 +765,12 @@ export class ClickHouseTraceService {
           }
 
           const whereClause = conditions.join(" AND ");
+          // Inner dedup subquery omits ArchivedAt so max(UpdatedAt) resolves
+          // to the true latest row; the outer ArchivedAt IS NULL then excludes
+          // traces whose latest version is archived even in pre-merge state.
+          const dedupWhereClause = conditions
+            .filter((c) => c !== "ArchivedAt IS NULL")
+            .join(" AND ");
 
           // Query for unique customer IDs
           const customerResult = await clickHouseClient.query({
@@ -741,6 +779,12 @@ export class ClickHouseTraceService {
               FROM trace_summaries
               WHERE ${whereClause}
                 AND Attributes['langwatch.customer_id'] != ''
+                AND (TenantId, TraceId, UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE ${dedupWhereClause}
+                  GROUP BY TenantId, TraceId
+                )
               LIMIT 10000
             `,
             query_params: {
@@ -763,6 +807,12 @@ export class ClickHouseTraceService {
               FROM trace_summaries
               WHERE ${whereClause}
                 AND Attributes['langwatch.labels'] != ''
+                AND (TenantId, TraceId, UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE ${dedupWhereClause}
+                  GROUP BY TenantId, TraceId
+                )
               LIMIT 10000
             `,
             query_params: {
@@ -863,6 +913,16 @@ export class ClickHouseTraceService {
                   WHERE TenantId = {tenantId:String}
                     AND SpanId = {spanId:String}
                   LIMIT 1
+                )
+                -- Exclude archived traces. ArchivedAt lives only on
+                -- trace_summaries (spans inherit archival from their trace);
+                -- argMax over unfiltered rows resolves the latest version.
+                AND TraceId IN (
+                  SELECT TraceId
+                  FROM trace_summaries
+                  WHERE TenantId = {tenantId:String}
+                  GROUP BY TraceId
+                  HAVING argMax(ArchivedAt, UpdatedAt) IS NULL
                 )
               LIMIT 1000
             `,
@@ -1144,6 +1204,18 @@ export class ClickHouseTraceService {
                 AND StartTime >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
                 AND SpanName != ''
+                -- Exclude span names belonging only to archived traces.
+                -- ArchivedAt lives on trace_summaries; argMax over unfiltered
+                -- rows resolves the latest version per trace.
+                AND TraceId IN (
+                  SELECT TraceId
+                  FROM trace_summaries
+                  WHERE TenantId = {tenantId:String}
+                    AND CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                    AND CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                  GROUP BY TraceId
+                  HAVING argMax(ArchivedAt, UpdatedAt) IS NULL
+                )
               ORDER BY SpanName ASC
               LIMIT 1000
             `,
@@ -1170,6 +1242,7 @@ export class ClickHouseTraceService {
               SELECT DISTINCT arrayJoin(mapKeys(Attributes)) AS key
               FROM trace_summaries
               WHERE TenantId = {tenantId:String}
+                AND ArchivedAt IS NULL
                 AND CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})
               ORDER BY key ASC
@@ -1316,14 +1389,19 @@ export class ClickHouseTraceService {
         const [countResult, summaryResult] = await Promise.all([
           clickHouseClient.query({
             query: `
-              SELECT uniq(ts.TraceId) as total
-              FROM trace_summaries ts
-              WHERE ts.TenantId = {tenantId:String}
-                AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
-                AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
-                ${extraFilters}
-                ${traceIdFilter}
-                ${searchFilter}
+              SELECT count() AS total
+              FROM (
+                SELECT ts.TraceId
+                FROM trace_summaries ts
+                WHERE ts.TenantId = {tenantId:String}
+                  AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                  AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                  ${extraFilters}
+                  ${traceIdFilter}
+                  ${searchFilter}
+                GROUP BY ts.TraceId
+                HAVING argMax(ts.ArchivedAt, ts.UpdatedAt) IS NULL
+              )
             `,
             query_params: sharedParams,
             format: "JSONEachRow",
@@ -1358,11 +1436,13 @@ export class ClickHouseTraceService {
                 toUnixTimestamp64Milli(ts.UpdatedAt) AS ts_UpdatedAt
               FROM trace_summaries ts
               WHERE ts.TenantId = {tenantId:String}
+                AND ts.ArchivedAt IS NULL
                 AND ts.TraceId IN (
                   SELECT s.TraceId
                   FROM (
                     SELECT ts.TraceId AS TraceId,
-                           argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa
+                           argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa,
+                           argMax(ts.ArchivedAt, ts.UpdatedAt) AS _archived
                     FROM trace_summaries ts
                     WHERE ts.TenantId = {tenantId:String}
                       AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
@@ -1373,6 +1453,7 @@ export class ClickHouseTraceService {
                       ${cursorCondition}
                     GROUP BY ts.TraceId
                   ) s
+                  WHERE s._archived IS NULL
                   ORDER BY s._oa ${orderDirection}, s.TraceId ${orderDirection}
                   LIMIT {pageSize:UInt32}
                 )
@@ -1580,6 +1661,7 @@ export class ClickHouseTraceService {
           toUnixTimestamp64Milli(UpdatedAt) AS ts_UpdatedAt
         FROM trace_summaries AS t
         WHERE t.TenantId = {tenantId:String}
+          AND t.ArchivedAt IS NULL
           AND t.TraceId IN ({traceIds:Array(String)})
           AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
             SELECT TenantId, TraceId, max(UpdatedAt)
@@ -1623,6 +1705,9 @@ export class ClickHouseTraceService {
         FROM stored_spans AS t
         WHERE t.TenantId = {tenantId:String}
           AND t.TraceId IN ({traceIds:Array(String)})
+          -- Archival is a trace-level fact held on trace_summaries; the caller
+          -- filters archived traces upstream so the TraceId list here is
+          -- already archive-clean.
           AND (t.TenantId, t.TraceId, t.SpanId, t.StartTime) IN (
             SELECT TenantId, TraceId, SpanId, max(StartTime)
             FROM stored_spans

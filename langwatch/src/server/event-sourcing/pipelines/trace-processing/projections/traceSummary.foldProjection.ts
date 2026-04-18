@@ -21,6 +21,7 @@ import type {
   AnnotationAddedEvent,
   AnnotationRemovedEvent,
   AnnotationsBulkSyncedEvent,
+  TraceArchivedEvent,
 } from "../schemas/events";
 import {
   spanReceivedEventSchema,
@@ -31,6 +32,7 @@ import {
   annotationAddedEventSchema,
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
+  traceArchivedEventSchema,
 } from "../schemas/events";
 import type { NormalizedSpan } from "../schemas/spans";
 import {
@@ -138,6 +140,7 @@ const traceSummaryEvents = [
   annotationAddedEventSchema,
   annotationRemovedEventSchema,
   annotationsBulkSyncedEventSchema,
+  traceArchivedEventSchema,
 ] as const;
 
 /**
@@ -359,5 +362,15 @@ export class TraceSummaryFoldProjection
   ): TraceSummaryData {
     const merged = [...new Set([...(state.annotationIds ?? []), ...event.data.annotationIds])];
     return { ...state, annotationIds: merged };
+  }
+
+  handleTraceTraceArchived(
+    event: TraceArchivedEvent,
+    state: TraceSummaryData,
+  ): TraceSummaryData {
+    return {
+      ...state,
+      archivedAt: event.data.archivedAtMs,
+    };
   }
 }

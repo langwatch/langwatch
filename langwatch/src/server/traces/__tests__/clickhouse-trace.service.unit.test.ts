@@ -12,7 +12,9 @@ const { mockClickHouseQuery, mockPrismaFindUnique } = vi.hoisted(() => ({
 
 vi.mock("~/server/clickhouse/clickhouseClient", () => ({
   getClickHouseClientForProject: () =>
-    Promise.resolve({ query: mockClickHouseQuery }),
+    Promise.resolve({
+      query: mockClickHouseQuery,
+    }),
 }));
 
 vi.mock("~/server/db", () => ({
@@ -752,4 +754,5 @@ describe("ClickHouseTraceService", () => {
       });
     });
   });
+
 });

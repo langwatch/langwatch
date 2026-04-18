@@ -103,11 +103,18 @@ async function getChTraceCount(
   clickhouse: ClickHouseClient,
   projectIds: string[],
 ): Promise<number> {
+  // Dedup by (TenantId, TraceId) and filter ArchivedAt via HAVING argMax so a
+  // trace with an older unarchived row doesn't leak in pre-merge state.
   const result = await clickhouse.query({
     query: `
-      SELECT toString(count(DISTINCT TraceId)) AS Total
-      FROM trace_summaries
-      WHERE TenantId IN ({projectIds:Array(String)})
+      SELECT toString(count()) AS Total
+      FROM (
+        SELECT TenantId, TraceId
+        FROM trace_summaries
+        WHERE TenantId IN ({projectIds:Array(String)})
+        GROUP BY TenantId, TraceId
+        HAVING argMax(ArchivedAt, UpdatedAt) IS NULL
+      )
     `,
     query_params: { projectIds },
     format: "JSONEachRow",

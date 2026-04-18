@@ -175,6 +175,22 @@ export async function getTraceById(
   ) as Promise<TraceDetailResponse>;
 }
 
+/**
+ * Archives one or more traces by ID.
+ *
+ * The API dispatches archive commands asynchronously through the event-sourcing
+ * pipeline and returns the number of commands dispatched. Archival becomes
+ * visible to readers once the trace-summaries fold projection processes the
+ * emitted TraceArchivedEvent.
+ */
+export async function archiveTraces(
+  traceIds: string[],
+): Promise<{ dispatched: number }> {
+  return makeRequest("POST", "/api/traces/archive", {
+    traceIds,
+  }) as Promise<{ dispatched: number }>;
+}
+
 /** Fetches analytics timeseries data for the given metrics and date range. */
 export async function getAnalyticsTimeseries(params: {
   series: Array<{
