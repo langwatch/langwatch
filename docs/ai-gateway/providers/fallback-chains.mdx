@@ -1,0 +1,91 @@
+---
+title: Fallback Chains
+description: Survive provider outages, rate limits, and timeouts transparently.
+sidebarTitle: Fallback Chains
+---
+
+A fallback chain is an ordered list of provider credentials the gateway tries in sequence when the primary fails. It's per-virtual-key configuration; each VK owns its own chain.
+
+## Configuring a chain
+
+On the VK edit screen:
+
+1. Select a **primary** provider credential.
+2. Add one or more **fallback** credentials in the order they should be tried.
+3. Pick which conditions trigger fallback (by default: `5xx`, `timeout`, `rate_limit`).
+4. Set `timeout_ms` (default `30000`) and `max_attempts` (default `3`).
+
+```json
+{
+  "fallback": {
+    "chain":        ["pc_primary_openai", "pc_anthropic", "pc_bedrock_us_east"],
+    "on":           ["5xx", "timeout", "rate_limit", "network_error"],
+    "timeout_ms":   30000,
+    "max_attempts": 3
+  }
+}
+```
+
+## When fallback triggers
+
+| Condition | Fires? | Why |
+|---|---|---|
+| Upstream `5xx` | ✅ | Provider's fault; next provider may work. |
+| `timeout` (> `timeout_ms`) | ✅ | Provider degraded. |
+| `429 rate_limit_exceeded` | ✅ | Primary is throttled; secondary may have headroom. |
+| `network_error` (DNS/TCP/TLS) | ✅ | Connectivity issue to primary. |
+| `circuit_breaker` open | ✅ | Preemptive — gateway knows primary has been failing recently. |
+| Upstream `400 Bad Request` | ❌ | Client-fault. Surfacing the error is correct. |
+| Upstream `401 Unauthorized` | ❌ | Provider credential bad. Needs human fix, not masking. |
+| Upstream `403 Forbidden` | ❌ | Authorization issue. Silent switch would hide a real problem. |
+| Upstream `404 Not Found` | ❌ | Requested model doesn't exist. |
+| LangWatch-internal `invalid_api_key` etc | ❌ | Never reaches the fallback layer. |
+
+## Model translation across providers
+
+A single VK may have mixed providers (OpenAI + Anthropic + Bedrock). The gateway uses [Bifrost's provider-dispatch library](https://github.com/maximhq/bifrost) to translate payloads: same `messages` schema, different wire formats.
+
+If the client requests `gpt-5-mini` and fails over to Anthropic, the gateway applies the VK's `model_aliases` to pick the Anthropic equivalent (e.g. `claude-haiku-4-5-20251001`). Configure this per VK:
+
+```json
+{
+  "model_aliases": {
+    "gpt-5-mini":              "openai/gpt-5-mini",
+    "gpt-5-mini:fallback":     "anthropic/claude-haiku-4-5-20251001",
+    "claude-haiku-4-5-20251001":        "anthropic/claude-haiku-4-5-20251001",
+    "claude-haiku-4-5-20251001:fallback": "bedrock/anthropic.claude-haiku-4-5-20251001"
+  }
+}
+```
+
+The `:fallback` suffix is optional — if absent the gateway uses the same model name against the next provider and expects it to exist.
+
+## Streaming caveat
+
+Fallback behaviour differs based on when failure occurs:
+
+- **Before first chunk emits** → transparent fallback. Client sees no error; response arrives from the fallback provider.
+- **After first chunk has streamed** → **no mid-stream fallback**. The gateway closes the client connection with an SSE `error` event. The client may retry; a fresh request would then hit the fallback.
+
+This is deliberate — mixing chunks from two providers would produce a Frankenstein stream that confuses both humans and parsing code.
+
+## Observing the chain in traces
+
+Every attempt is a nested span:
+
+- `langwatch.fallback.attempt=0` — primary.
+- `langwatch.fallback.attempt=1` — first fallback.
+- `langwatch.fallback.reason` — the condition that triggered the next attempt (e.g. `5xx:503`, `timeout:30001ms`).
+- Response header `X-LangWatch-Fallback-Count: N` — how many fallbacks were attempted before success.
+
+If **all** attempts in the chain fail, the gateway returns the last provider's error envelope mapped to the OpenAI-compatible shape (`provider_error` or `upstream_timeout` as the `type`).
+
+## Circuit breaker
+
+After N consecutive failures against a specific provider within M seconds, the gateway marks that provider as "open" and skips it for subsequent requests until a probe succeeds. Configured at the service level (`$LW_GATEWAY_CIRCUIT_THRESHOLD`, `$LW_GATEWAY_CIRCUIT_WINDOW_SEC`).
+
+Per-provider circuit state is emitted as a metric (`gateway_circuit_state{provider="openai"}`) so you can alert on "primary circuit has been open for N minutes."
+
+## Sizing the chain
+
+Diminishing returns after 3 entries — by the time you've burnt ~60s trying three providers, the latency budget of the original call is gone and the client has probably given up. Use chains of 2-3 for latency-sensitive traffic; longer chains are fine for batch/offline.

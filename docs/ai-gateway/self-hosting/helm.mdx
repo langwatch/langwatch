@@ -1,0 +1,148 @@
+---
+title: Helm chart
+description: Deploy the LangWatch AI Gateway alongside your self-hosted LangWatch.
+sidebarTitle: Helm
+---
+
+The AI Gateway ships as a sub-chart of the LangWatch Helm chart. It runs as a separate Kubernetes Deployment (own pod, own container, own service) and reuses the LangWatch control-plane for VK CRUD, budget accounting, and guardrail execution.
+
+## Enabling the gateway
+
+In your `values.yaml`:
+
+```yaml
+gateway:
+  enabled: true
+  replicas: 2
+  image:
+    repository: langwatch/ai-gateway
+    tag: v1.0.0
+  service:
+    type: ClusterIP
+    port: 7400
+  ingress:
+    enabled: true
+    host: gateway.your-corp.com
+    tls:
+      secretName: gateway-tls
+  resources:
+    requests: { cpu: 200m, memory: 256Mi }
+    limits:   { cpu: 1,    memory: 1Gi }
+  env:
+    LW_GATEWAY_CONTROL_PLANE_URL: "http://langwatch-app:3000"
+    LW_GATEWAY_JWT_SECRET: { secretKeyRef: { name: gateway-secrets, key: jwt } }
+    LW_GATEWAY_INTERNAL_SECRET: { secretKeyRef: { name: gateway-secrets, key: internal } }
+    LW_GATEWAY_REDIS_URL: redis://langwatch-redis:6379/2
+    LW_GATEWAY_BOOTSTRAP_PULL: "false"
+    LW_GATEWAY_CIRCUIT_THRESHOLD: "5"
+    LW_GATEWAY_CIRCUIT_WINDOW_SEC: "60"
+  healthcheck:
+    livenessProbe:
+      httpGet: { path: /healthz, port: 7400 }
+      initialDelaySeconds: 5
+    readinessProbe:
+      httpGet: { path: /readyz, port: 7400 }
+      initialDelaySeconds: 5
+      failureThreshold: 3
+    startupProbe:
+      httpGet: { path: /startupz, port: 7400 }
+      periodSeconds: 10
+      failureThreshold: 30
+```
+
+Apply:
+
+```bash
+helm upgrade --install langwatch langwatch/langwatch \
+  -f values.yaml \
+  --namespace langwatch --create-namespace
+```
+
+## Secrets
+
+Provision these via your secrets manager (e.g. `kubectl create secret`):
+
+```bash
+kubectl create secret generic gateway-secrets \
+  --from-literal=internal="$(openssl rand -hex 32)" \
+  --from-literal=jwt="$(openssl rand -hex 32)" \
+  -n langwatch
+```
+
+Then mirror the same values into the LangWatch app's secret (`LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET`) so signing/verification align.
+
+`LW_VIRTUAL_KEY_PEPPER` is control-plane-only and should never appear in gateway secrets.
+
+## Networking
+
+The gateway needs to reach:
+
+- The LangWatch control-plane (`LW_GATEWAY_CONTROL_PLANE_URL`) for `/api/internal/gateway/*` calls.
+- Redis (`LW_GATEWAY_REDIS_URL`) for L2 auth cache — optional, can run without.
+- Outbound to each provider API (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, Gemini). Network policy must allow egress.
+
+Clients reach the gateway via the Ingress (`gateway.your-corp.com`) on port 443.
+
+## Scaling
+
+The gateway is stateless and horizontally scalable. Enable HPA on CPU and request-rate:
+
+```yaml
+gateway:
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+```
+
+In-flight streaming requests pin a connection to a single replica; HPA should scale slowly (target CPU) rather than chasing spikes that would drop live streams.
+
+## High availability
+
+- Run ≥2 replicas with a PodDisruptionBudget so rolling updates don't remove every pod simultaneously.
+- Enable `LW_GATEWAY_BOOTSTRAP_PULL=true` to have every replica load all active VKs into its L1 cache on startup — allows serving traffic if the control-plane is briefly offline.
+- Use Redis (`LW_GATEWAY_REDIS_URL`) as L2 cache so a replica joining a running cluster warms up from shared cache rather than hammering the control-plane.
+
+## Monitoring
+
+The gateway exposes Prometheus metrics at `/metrics`:
+
+- `gateway_requests_total{provider, model, status}` — count of requests by provider and final status.
+- `gateway_request_duration_seconds_bucket` — histogram of end-to-end latency.
+- `gateway_provider_duration_seconds_bucket{provider}` — upstream provider latency.
+- `gateway_cache_hits_total{outcome=hit|miss|bypass|forced}`.
+- `gateway_budget_blocks_total{scope}` — budget hard-cap rejections.
+- `gateway_guardrail_blocks_total{direction}` — guardrail rejections.
+- `gateway_circuit_state{provider}` — 0 closed / 1 half-open / 2 open.
+- `gateway_auth_cache_size{layer=l1|l2}` / `gateway_auth_cache_hits_total`.
+
+Scrape with the standard Prometheus Operator `ServiceMonitor`:
+
+```yaml
+gateway:
+  metrics:
+    serviceMonitor:
+      enabled: true
+      namespace: monitoring
+      interval: 30s
+```
+
+## Probes
+
+Three Kubernetes probes are provided; all hit the gateway's own `/healthz`, `/readyz`, `/startupz`:
+
+- **Liveness (`/healthz`)** — returns `200 {"status":"ok"}` as long as the process is alive. Never calls the control-plane.
+- **Readiness (`/readyz`)** — only `200` when: bifrost/core is initialised, at least one provider credential resolves successfully, the control-plane's `/api/internal/gateway/resolve-key` is reachable (or bootstrap cache is populated), and the `/changes` long-poll goroutine is running. Returns `503` with a JSON body listing failed checks otherwise.
+- **Startup (`/startupz`)** — similar to readiness but lenient on bootstrap duration for large VK populations.
+
+The readiness definition is strict on purpose — a pod should not be hit by the Service until every dependency is usable, otherwise the first requests after a rollout fail.
+
+## Upgrade procedure
+
+The gateway is versioned independently of the LangWatch app, but they share a contract. A gateway version is compatible with control-plane versions within the same major (see the compatibility matrix in the release notes).
+
+1. Deploy the new control-plane first (it must understand both old and new signature formats during the rollout).
+2. Deploy the new gateway.
+3. Monitor `gateway_provider_duration_seconds` and `gateway_requests_total{status!="2xx"}` for ~30 min.
+4. Roll back via `helm rollback` if anomalies appear — the gateway's cache survives restarts and requests resume immediately.

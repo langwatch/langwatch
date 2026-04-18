@@ -1,0 +1,150 @@
+---
+title: POST /v1/chat/completions
+description: OpenAI-compatible chat completions through the LangWatch AI Gateway.
+sidebarTitle: Chat Completions
+---
+
+OpenAI-compatible chat completions endpoint. Any client that speaks the OpenAI Chat Completions API — official SDKs, Codex CLI, opencode, Cursor, Aider, a thousand internal scripts — works with zero code change by pointing its `OPENAI_BASE_URL` at the LangWatch AI Gateway and its `OPENAI_API_KEY` at a LangWatch virtual key.
+
+## Request
+
+```
+POST /v1/chat/completions
+Authorization: Bearer lw_vk_live_<ULID>
+Content-Type: application/json
+```
+
+Body matches OpenAI's [Chat Completions schema](https://platform.openai.com/docs/api-reference/chat/create) verbatim. Example:
+
+```json
+{
+  "model":       "gpt-5-mini",
+  "messages":    [
+    {"role": "system", "content": "You are concise."},
+    {"role": "user",   "content": "Hi"}
+  ],
+  "temperature": 0.2,
+  "max_tokens":  256,
+  "stream":      false,
+  "tools":       [],
+  "tool_choice": "auto"
+}
+```
+
+### LangWatch-specific headers
+
+| Header | Purpose |
+|---|---|
+| `X-LangWatch-Cache: respect\|force\|disable\|ttl=<s>` | Override the VK's cache mode for this request. See [Caching Passthrough](/ai-gateway/caching-passthrough). |
+| `X-LangWatch-Trace-Metadata: {...}` | Attach arbitrary key/value metadata to the trace (e.g. deployment id, experiment tag). |
+
+### Model resolution
+
+The `model` field can be:
+
+- A VK-defined alias (e.g. `gpt-4o`, `claude`) → routed via the VK's `model_aliases` map.
+- An explicit `<provider>/<model>` form (e.g. `openai/gpt-5-mini`, `azure/my-deployment`) — bypasses aliases.
+
+If the alias/explicit form doesn't resolve to a provider in the VK's `providers` list, returns `403 model_not_allowed`.
+
+## Response (non-streaming)
+
+OpenAI-shaped. Additional LangWatch headers:
+
+```http
+HTTP/1.1 200 OK
+Content-Type: application/json
+X-LangWatch-Request-Id: grq_01HZX9K3M...
+X-LangWatch-Provider: openai
+X-LangWatch-Model: gpt-5-mini
+X-LangWatch-Cache: miss
+X-LangWatch-Fallback-Count: 0
+
+{
+  "id":       "chatcmpl-...",
+  "object":   "chat.completion",
+  "created":  1734567890,
+  "model":    "gpt-5-mini",
+  "choices":  [...],
+  "usage":    { ... }
+}
+```
+
+`usage.prompt_tokens_details.cached_tokens` is populated when cache hits occur (used by the internal debit logic).
+
+## Response (streaming)
+
+Set `"stream": true` in the body. The gateway proxies upstream SSE events byte-for-byte after the first chunk, preserving tool-call delta ordering — this is important for coding CLIs like Codex that parse tool-call streams incrementally.
+
+```
+data: {"id":"chatcmpl-…","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"Hi"}}]}
+
+data: {"id":"chatcmpl-…","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"content":"!"}}]}
+
+data: [DONE]
+```
+
+A response header `X-LangWatch-Request-Id` is emitted on the first frame. Mid-stream failures close the connection with a terminal `event: error` frame (see [Errors](/ai-gateway/api/errors#streaming-errors)).
+
+## Error handling
+
+All errors use the OpenAI-compatible envelope documented at [Errors](/ai-gateway/api/errors):
+
+- `401 invalid_api_key` — missing/malformed/unknown VK.
+- `402 budget_exceeded` — hard-cap budget breach.
+- `403 guardrail_blocked | tool_not_allowed | model_not_allowed | permission_denied | virtual_key_revoked` — policy.
+- `429 rate_limit_exceeded` — VK / project / org rate limit.
+- `502 provider_error` / `504 upstream_timeout` — upstream provider exhausted (possibly after fallback).
+
+Every error carries `X-LangWatch-Request-Id` — use it for support tickets and to jump straight to the trace in the LangWatch UI.
+
+## Example (Python)
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://gateway.langwatch.ai/v1",
+    api_key="lw_vk_live_...",
+)
+
+resp = client.chat.completions.create(
+    model="gpt-5-mini",
+    messages=[{"role": "user", "content": "Hi"}],
+    extra_headers={"X-LangWatch-Cache": "respect"},
+)
+
+print(resp.choices[0].message.content)
+print("Request id:", resp.response.headers["X-LangWatch-Request-Id"])
+```
+
+## Example (curl)
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer $LW_VK" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "model": "gpt-5-mini",
+        "messages": [{"role":"user","content":"Hi"}]
+      }' \
+  -i
+```
+
+## Rate limits
+
+Per-VK rate limits are configurable (`rate_limits.rpm|tpm|rpd`) and enforced at the gateway before the request leaves for the provider. Breaches return `429 rate_limit_exceeded` with a `Retry-After` header in seconds.
+
+Upstream provider rate limits are opaque to the VK owner but can trigger fallback (if `rate_limit` is in the VK's `fallback.on`). A `Retry-After` from upstream is surfaced to the client when no fallback remains.
+
+## Observability
+
+Every request emits a LangWatch trace with attributes:
+
+- `langwatch.vk_id`, `langwatch.project_id`, `langwatch.team_id`, `langwatch.org_id`, `langwatch.principal_id`.
+- `langwatch.model_requested` (what the client sent) vs `langwatch.model_resolved` (provider + model after alias).
+- `langwatch.cache_read_tokens` / `cache_write_tokens` (cache economics).
+- `langwatch.cost_usd` (computed from tokens × price).
+- `langwatch.fallback.attempt` spans (one per attempt; `attempt=0` is primary).
+
+Filter in the LangWatch UI via `attr.langwatch.model_resolved` to see how many requests actually hit Azure vs OpenAI, for example.
