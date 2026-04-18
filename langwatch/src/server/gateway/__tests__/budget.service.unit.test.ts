@@ -151,6 +151,53 @@ describe("GatewayBudgetService.check", () => {
     });
   });
 
+  describe("scopes payload (contract §4.4 for Checker.ApplyLive)", () => {
+    it("echoes every applicable budget, not just warn/block ones", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithBudgets([
+          stubBudget({
+            id: "b_org",
+            scopeType: "ORGANIZATION",
+            scopeId: "org_01",
+            spentUsd: new Prisma.Decimal("10.00"),
+          }),
+          stubBudget({
+            id: "b_team",
+            scopeType: "TEAM",
+            scopeId: "team_01",
+            spentUsd: new Prisma.Decimal("50.00"),
+          }),
+        ]),
+      );
+
+      const result = await sut.check({ ...baseCheck, projectedCostUsd: 1 });
+
+      expect(result.decision).toBe("allow");
+      expect(result.scopes).toHaveLength(2);
+      expect(result.scopes.map((s) => s.scope).sort()).toEqual([
+        "organization",
+        "team",
+      ]);
+      expect(result.scopes[0]).toHaveProperty("spentUsd");
+      expect(result.scopes[0]).toHaveProperty("limitUsd");
+    });
+
+    it("reports spent_usd as 0 for budgets whose window has rolled over", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithBudgets([
+          stubBudget({
+            spentUsd: new Prisma.Decimal("99.00"),
+            resetsAt: new Date("2020-01-01T00:00:00Z"),
+          }),
+        ]),
+      );
+
+      const result = await sut.check({ ...baseCheck, projectedCostUsd: 1 });
+
+      expect(result.scopes[0]?.spentUsd).toBe("0.000000");
+    });
+  });
+
   describe("when the stale spent_usd indicates the window has reset", () => {
     it("treats effective spent as 0 and allows the request", async () => {
       const sut = GatewayBudgetService.create(

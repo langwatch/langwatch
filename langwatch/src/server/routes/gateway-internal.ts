@@ -512,6 +512,16 @@ app.post("/budget/check", async (c) => {
         limit_usd: b.limitUsd,
         spent_usd: b.spentUsd,
       })),
+      // Contract §4.4 — raw per-scope ledger consumed by the gateway's
+      // Checker.ApplyLive reconciliation path. Includes every applicable
+      // budget, not just the ones in warn/block.
+      scopes: result.scopes.map((s) => ({
+        scope: s.scope,
+        scope_id: s.scopeId,
+        window: s.window,
+        spent_usd: s.spentUsd,
+        limit_usd: s.limitUsd,
+      })),
     },
     200,
   );

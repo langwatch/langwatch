@@ -55,6 +55,12 @@ export function createEnvConfig() {
       // Argon2id pepper mixed into virtual-key hashing. Rotating this
       // invalidates all existing VKs — treat as append-only / key-management.
       LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
+      // Development-only: when set to "true" AND NODE_ENV === "development",
+      // exposes GET /api/auth/dev-bypass which mints a session for a
+      // deterministic dev user (dev@localhost.langwatch.ai) without going
+      // through the configured SSO provider. Doubly-gated so a stray env
+      // setting in production still refuses to bypass auth.
+      LOCAL_DEV_BYPASS_AUTH: z.enum(["true", "false"]).optional(),
       ELASTICSEARCH_NODE_URL: z.string().optional(),
       ELASTICSEARCH_API_KEY: z.string().optional(),
       ELASTICSEARCH_CONFIGURED: z.boolean().optional(),
@@ -167,6 +173,10 @@ export function createEnvConfig() {
       NEXTAUTH_PROVIDER: process.env.NEXTAUTH_PROVIDER ?? "email",
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
       NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+      LW_GATEWAY_INTERNAL_SECRET: process.env.LW_GATEWAY_INTERNAL_SECRET,
+      LW_GATEWAY_JWT_SECRET: process.env.LW_GATEWAY_JWT_SECRET,
+      LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
+      LOCAL_DEV_BYPASS_AUTH: process.env.LOCAL_DEV_BYPASS_AUTH,
       AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
       AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
       AUTH0_ISSUER: process.env.AUTH0_ISSUER,

@@ -10,9 +10,13 @@
  * this case.
  */
 import { Hono } from "hono";
+import { describeRoute } from "hono-openapi";
+import { resolver } from "hono-openapi/zod";
 import { z } from "zod";
 import type { Prisma } from "@prisma/client";
 
+import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { baseResponses } from "../../shared/base-responses";
 import { prisma } from "~/server/db";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { GatewayProviderCredentialService } from "~/server/gateway/providerCredential.service";
@@ -33,6 +37,54 @@ import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 
 const logger = createLogger("langwatch:api:gateway-platform");
+
+patchZodOpenapi();
+
+// ── Response DTO schemas (used by describeRoute for OpenAPI gen) ────────
+// These mirror the shapes returned by toVirtualKeySnakeDto / budget DTO /
+// provider DTO. Kept in-file to stay a single source of truth per app.
+
+const virtualKeyDtoSchema = z.object({
+  id: z.string(),
+  display_prefix: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  environment: z.enum(["live", "test"]),
+  status: z.enum(["active", "revoked"]),
+  principal_user_id: z.string().nullable(),
+  provider_credential_ids: z.array(z.string()),
+  revision: z.string(),
+  last_used_at: z.string().nullable(),
+  created_at: z.string(),
+});
+
+const budgetDtoSchema = z.object({
+  id: z.string(),
+  organization_id: z.string(),
+  scope_type: z.string(),
+  scope_id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  window: z.string(),
+  on_breach: z.enum(["BLOCK", "WARN"]),
+  limit_usd: z.string(),
+  spent_usd: z.string(),
+  resets_at: z.string(),
+  archived_at: z.string().nullable(),
+});
+
+const providerDtoSchema = z.object({
+  id: z.string(),
+  disabled_at: z.string().nullable().optional(),
+});
+
+const errorSchema = z.object({
+  error: z.object({
+    type: z.string(),
+    code: z.string(),
+    message: z.string(),
+  }),
+});
 
 type Variables = AuthMiddlewareVariables;
 
@@ -92,14 +144,66 @@ export const app = new Hono<{ Variables: Variables }>()
 
   // ── Virtual keys ────────────────────────────────────────────────────────
 
-  .get("/virtual-keys", async (c) => {
-    const project = c.get("project");
-    const service = VirtualKeyService.create(prisma);
-    const rows = await service.getAll(project.id);
-    return c.json({ data: rows.map(toVkDto) });
-  })
+  .get(
+    "/virtual-keys",
+    describeRoute({
+      summary: "List virtual keys",
+      description:
+        "Returns every non-archived virtual key in the caller's project, ordered by creation time.",
+      tags: ["Virtual Keys"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Virtual keys for the project",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({ data: z.array(virtualKeyDtoSchema) }),
+              ),
+            },
+          },
+        },
+      },
+    }),
+    async (c) => {
+      const project = c.get("project");
+      const service = VirtualKeyService.create(prisma);
+      const rows = await service.getAll(project.id);
+      return c.json({ data: rows.map(toVkDto) });
+    },
+  )
 
-  .post("/virtual-keys", async (c) => {
+  .post(
+    "/virtual-keys",
+    describeRoute({
+      summary: "Create virtual key",
+      description:
+        "Mints a new virtual key and returns the secret exactly once. The caller MUST persist the `secret` value — LangWatch stores only a hash.",
+      tags: ["Virtual Keys"],
+      responses: {
+        ...baseResponses,
+        201: {
+          description: "Virtual key created",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  virtual_key: virtualKeyDtoSchema,
+                  secret: z.string(),
+                }),
+              ),
+            },
+          },
+        },
+        400: {
+          description: "Validation error",
+          content: {
+            "application/json": { schema: resolver(errorSchema) },
+          },
+        },
+      },
+    }),
+    async (c) => {
     const project = c.get("project");
     const body = createVirtualKeySchema.safeParse(await c.req.json());
     if (!body.success) {
@@ -173,7 +277,31 @@ export const app = new Hono<{ Variables: Variables }>()
     return c.json({ virtual_key: toVkDto(updated) });
   })
 
-  .post("/virtual-keys/:id/rotate", async (c) => {
+  .post(
+    "/virtual-keys/:id/rotate",
+    describeRoute({
+      summary: "Rotate virtual key secret",
+      description:
+        "Mints a fresh secret for an existing VK. The old secret remains valid for 24h (grace window) so in-flight clients can roll over.",
+      tags: ["Virtual Keys"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Rotated",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  virtual_key: virtualKeyDtoSchema,
+                  secret: z.string(),
+                }),
+              ),
+            },
+          },
+        },
+      },
+    }),
+    async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
     const organizationId = await orgIdForProject(project.id);
@@ -203,7 +331,45 @@ export const app = new Hono<{ Variables: Variables }>()
 
   // ── Gateway provider bindings ───────────────────────────────────────────
 
-  .get("/providers", async (c) => {
+  .get(
+    "/providers",
+    describeRoute({
+      summary: "List provider bindings",
+      description:
+        "Lists every gateway-bound model-provider credential for the caller's project, including health and rate-limit settings.",
+      tags: ["Providers"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Provider bindings",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({
+                  data: z.array(
+                    z.object({
+                      id: z.string(),
+                      model_provider_id: z.string(),
+                      model_provider_name: z.string(),
+                      slot: z.string(),
+                      rate_limit_rpm: z.number().nullable(),
+                      rate_limit_tpm: z.number().nullable(),
+                      rate_limit_rpd: z.number().nullable(),
+                      rotation_policy: z.string(),
+                      fallback_priority_global: z.number().nullable(),
+                      health_status: z.string(),
+                      disabled_at: z.string().nullable(),
+                      created_at: z.string(),
+                    }),
+                  ),
+                }),
+              ),
+            },
+          },
+        },
+      },
+    }),
+    async (c) => {
     const project = c.get("project");
     const service = GatewayProviderCredentialService.create(prisma);
     const rows = await service.getAll(project.id);
@@ -256,7 +422,26 @@ export const app = new Hono<{ Variables: Variables }>()
 
   // ── Budgets ─────────────────────────────────────────────────────────────
 
-  .get("/budgets", async (c) => {
+  .get(
+    "/budgets",
+    describeRoute({
+      summary: "List budgets applicable to the project",
+      description:
+        "Returns every budget that could apply to requests routed through this project — org, team, and project scope. VK and principal-scoped budgets are returned via their detail pages.",
+      tags: ["Budgets"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Applicable budgets",
+          content: {
+            "application/json": {
+              schema: resolver(z.object({ data: z.array(budgetDtoSchema) })),
+            },
+          },
+        },
+      },
+    }),
+    async (c) => {
     const project = c.get("project");
     const service = GatewayBudgetService.create(prisma);
     const rows = await service.listForProject(project.id);
