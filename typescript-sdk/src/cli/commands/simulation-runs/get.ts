@@ -32,18 +32,23 @@ function renderContent(raw: unknown): string {
       case "thinking":
         return ""; // drop reasoning blobs
       case "text":
-        return String(obj.text ?? "");
-      case "tool_use":
-        return chalk.yellow(`[tool ${String(obj.name ?? "?")}]`);
+        return typeof obj.text === "string" ? obj.text : "";
+      case "tool_use": {
+        const name = typeof obj.name === "string" ? obj.name : "?";
+        return chalk.yellow(`[tool ${name}]`);
+      }
       case "tool_result": {
         const inner = renderContent(obj.content);
         return inner ? chalk.gray(`[result] `) + inner : "";
       }
       default:
-        try { return JSON.stringify(obj); } catch { return String(obj); }
+        try { return JSON.stringify(obj); } catch { return ""; }
     }
   }
-  return String(raw ?? "");
+  if (raw === null || raw === undefined) return "";
+  if (typeof raw === "string") return raw;
+  if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
+  return "";
 }
 
 export const getSimulationRunCommand = async (
