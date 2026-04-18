@@ -25,12 +25,14 @@ export class PatService {
    */
   async create({
     name,
+    description,
     userId,
     organizationId,
     expiresAt,
     bindings,
   }: {
     name: string;
+    description?: string | null;
     userId: string;
     organizationId: string;
     expiresAt?: Date | null;
@@ -48,6 +50,7 @@ export class PatService {
 
       const created = await txRepo.create({
         name,
+        description,
         lookupId,
         hashedSecret,
         userId,

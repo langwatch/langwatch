@@ -5,6 +5,7 @@ ALTER TABLE "RoleBinding" ADD COLUMN     "patId" TEXT;
 CREATE TABLE "PersonalAccessToken" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
+    "description" TEXT,
     "lookupId" TEXT NOT NULL,
     "hashedSecret" TEXT NOT NULL,
     "userId" TEXT NOT NULL,

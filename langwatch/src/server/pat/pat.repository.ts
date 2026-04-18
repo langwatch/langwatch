@@ -13,6 +13,7 @@ export class PatRepository {
 
   async create({
     name,
+    description,
     lookupId,
     hashedSecret,
     userId,
@@ -20,6 +21,7 @@ export class PatRepository {
     expiresAt,
   }: {
     name: string;
+    description?: string | null;
     lookupId: string;
     hashedSecret: string;
     userId: string;
@@ -27,7 +29,15 @@ export class PatRepository {
     expiresAt?: Date | null;
   }): Promise<PersonalAccessToken> {
     return this.prisma.personalAccessToken.create({
-      data: { name, lookupId, hashedSecret, userId, organizationId, expiresAt: expiresAt ?? null },
+      data: {
+        name,
+        description: description ?? null,
+        lookupId,
+        hashedSecret,
+        userId,
+        organizationId,
+        expiresAt: expiresAt ?? null,
+      },
     });
   }
 

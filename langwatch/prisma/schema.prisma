@@ -1319,6 +1319,7 @@ model RoleBinding {
 model PersonalAccessToken {
     id             String        @id @default(nanoid())
     name           String
+    description    String?
     lookupId       String        @unique
     hashedSecret   String
     userId         String
