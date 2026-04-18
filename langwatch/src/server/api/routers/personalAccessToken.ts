@@ -1,9 +1,32 @@
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { DomainError } from "~/server/app-layer/domain-error";
 import { PatService } from "~/server/pat/pat.service";
 import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
 import { skipPermissionCheck, type Permission } from "../rbac";
+
+/**
+ * Maps a PAT domain error (identified by `kind` — not `instanceof`, which
+ * breaks across bundler module boundaries) to a tRPCError. Re-throws anything
+ * that isn't a handled DomainError.
+ */
+function mapPatDomainError(error: unknown): never {
+  if (DomainError.isHandled(error)) {
+    switch (error.kind) {
+      case "pat_not_found":
+        throw new TRPCError({ code: "NOT_FOUND", message: error.message, cause: error });
+      case "pat_not_owned":
+      case "pat_permission_denied":
+      case "pat_scope_violation":
+        throw new TRPCError({ code: "FORBIDDEN", message: error.message, cause: error });
+      case "pat_already_revoked":
+        throw new TRPCError({ code: "CONFLICT", message: error.message, cause: error });
+    }
+  }
+  throw error;
+}
 
 const roleBindingSchema = z.object({
   role: z.nativeEnum(TeamUserRole),
@@ -290,10 +313,14 @@ export const personalAccessTokenRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const patService = PatService.create(ctx.prisma);
-      await patService.revoke({
-        id: input.patId,
-        userId: ctx.session.user.id,
-      });
+      try {
+        await patService.revoke({
+          id: input.patId,
+          userId: ctx.session.user.id,
+        });
+      } catch (error) {
+        mapPatDomainError(error);
+      }
       return { success: true };
     }),
 });
