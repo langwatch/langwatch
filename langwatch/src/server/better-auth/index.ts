@@ -11,6 +11,8 @@ import { createLogger } from "../../utils/logger/server";
 import { fireActivityTrackingNurturing } from "../../../ee/billing/nurturing/hooks/activityTracking";
 import { ensureUserSyncedToCio } from "../../../ee/billing/nurturing/hooks/userSync";
 import {
+  afterAccountCreate,
+  afterAccountUpdate,
   afterSessionCreate,
   afterUserCreate,
   beforeAccountCreate,
@@ -412,6 +414,33 @@ export const auth = betterAuth({
               userId: account.userId,
               providerId: account.providerId,
               accountId: account.accountId,
+            },
+          });
+        },
+        after: async (account) => {
+          if (!account.userId || !account.providerId || !account.accountId) return;
+          await afterAccountCreate({
+            prisma,
+            account: {
+              userId: account.userId as string,
+              providerId: account.providerId as string,
+              accountId: account.accountId as string,
+            },
+          });
+        },
+      },
+      update: {
+        after: async (account) => {
+          // BetterAuth refreshes tokens on the linked Account row on every
+          // OAuth sign-in. Use that as the trigger to reconcile pendingSsoSetup
+          // for users whose correct-provider account is already linked.
+          if (!account.userId || !account.providerId || !account.accountId) return;
+          await afterAccountUpdate({
+            prisma,
+            account: {
+              userId: account.userId as string,
+              providerId: account.providerId as string,
+              accountId: account.accountId as string,
             },
           });
         },

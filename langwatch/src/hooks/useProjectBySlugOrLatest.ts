@@ -25,6 +25,8 @@ export interface MinimalOrganization {
  */
 export function useProjectBySlugOrLatest(organization?: MinimalOrganization) {
   const router = useRouter();
+  const query = router.query.projectSlug;
+  const rawSlug = Array.isArray(query) ? query[0] : query;
 
   const project = useMemo(() => {
     if (!organization) return undefined;
@@ -35,9 +37,6 @@ export function useProjectBySlugOrLatest(organization?: MinimalOrganization) {
 
     if (!allProjects.length) return undefined;
 
-    const query = router.query.projectSlug;
-    const slug = Array.isArray(query) ? query[0] : query;
-
     const normalizeDate = (value?: Date | string | null): number => {
       if (!value) return 0;
       if (value instanceof Date) return value.getTime();
@@ -45,9 +44,9 @@ export function useProjectBySlugOrLatest(organization?: MinimalOrganization) {
       return Number.isNaN(time) ? 0 : time;
     };
 
-    if (slug) {
+    if (rawSlug) {
       const matching = allProjects
-        .filter((p) => p.slug === slug)
+        .filter((p) => p.slug === rawSlug)
         .sort(
           (a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt),
         );
@@ -57,7 +56,9 @@ export function useProjectBySlugOrLatest(organization?: MinimalOrganization) {
     return allProjects.sort(
       (a, b) => normalizeDate(b.createdAt) - normalizeDate(a.createdAt),
     )[0];
-  }, [organization, router.query.projectSlug]);
+  }, [organization, rawSlug]);
 
-  return { project };
+  const slug = project?.slug ?? rawSlug ?? undefined;
+
+  return { project, slug };
 }

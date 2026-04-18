@@ -327,18 +327,6 @@ describe("RoleService Tests", () => {
       );
 
       expect(result).toEqual({ success: true });
-      expect(mockPrisma.teamUser.update).toHaveBeenCalledWith({
-        where: {
-          userId_teamId: {
-            userId: "user-123",
-            teamId: "team-123",
-          },
-        },
-        data: {
-          role: TeamUserRole.CUSTOM,
-          assignedRoleId: "role-123",
-        },
-      });
       expect(mockPrisma.roleBinding.deleteMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ userId: "user-123", scopeType: "TEAM", scopeId: "team-123" }),
@@ -431,18 +419,6 @@ describe("RoleService Tests", () => {
       );
 
       expect(result).toEqual({ success: true });
-      expect(mockPrisma.teamUser.update).toHaveBeenCalledWith({
-        where: {
-          userId_teamId: {
-            userId: "user-123",
-            teamId: "team-123",
-          },
-        },
-        data: {
-          role: TeamUserRole.VIEWER,
-          assignedRoleId: null,
-        },
-      });
       expect(mockPrisma.roleBinding.deleteMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: expect.objectContaining({ userId: "user-123", scopeType: "TEAM", scopeId: "team-123" }),

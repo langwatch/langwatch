@@ -11,6 +11,7 @@ import {
   useBreakpointValue,
   VStack,
 } from "@chakra-ui/react";
+import { OrganizationUserRole } from "@prisma/client";
 import type { Organization, Project, Team } from "@prisma/client";
 import { Activity, ChevronDown, ChevronRight, Info, KeyRound, Plus } from "lucide-react";
 import ErrorPage from "~/utils/compat/next-error";
@@ -138,11 +139,22 @@ export const ProjectSelector = React.memo(function ProjectSelector({
             <Menu.Content>
               <>
                 {projectGroups
-                  .filter((projectGroup) =>
-                    projectGroup.team.members.some(
-                      (member) => member.userId === session?.user.id,
-                    ),
-                  )
+                  .filter((projectGroup) => {
+                    // Org admins created via RoleBinding-only flow have no TeamUser row
+                    // but still have full access. Resolve the current user's
+                    // organization role explicitly rather than relying on
+                    // members[0] being pre-filtered.
+                    const currentUserOrgRole =
+                      projectGroup.organization.members.find(
+                        (m) => m.userId === session?.user.id,
+                      )?.role;
+                    return (
+                      currentUserOrgRole === OrganizationUserRole.ADMIN ||
+                      (projectGroup.team.members?.some(
+                        (member) => member.userId === session?.user.id,
+                      ) ?? false)
+                    );
+                  })
                   .map((projectGroup) => (
                     <Menu.ItemGroup
                       key={projectGroup.team.id}
@@ -289,7 +301,7 @@ export const DashboardLayout = ({
 
   const { data: session } = useRequiredSession({ required: !publicPage });
 
-  const { isLoading, organization, organizations, team, project } =
+  const { isLoading, organization, organizations, team, project, organizationRole } =
     useOrganizationTeamProject();
   const { isLiteMember } = useLiteMemberGuard();
   const usage = api.limits.getUsage.useQuery(
@@ -336,7 +348,10 @@ export const DashboardLayout = ({
   const userIsPartOfTeam =
     publicPage ||
     isDemoProject ||
-    team?.members.some((member) => member.userId === user?.id);
+    (team?.members?.some((member) => member.userId === user?.id) ?? false) ||
+    // Org admins created via RoleBinding-only flow have no TeamUser row but still
+    // have full team access — mirrors server-side org-scoped ADMIN RoleBinding logic.
+    organizationRole === OrganizationUserRole.ADMIN;
 
   const menuWidth = compactMenu ? MENU_WIDTH_COMPACT : MENU_WIDTH_EXPANDED;
   const isTracesOrAnalyticsPage =

@@ -191,10 +191,11 @@ function AccessAuditPage() {
   const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("ALL");
 
-  const { data: bindings, isLoading } = api.roleBinding.listForOrg.useQuery(
-    { organizationId: organization?.id ?? "" },
-    { enabled: !!organization?.id && isEnterprise },
-  );
+  const { data: bindings, isLoading } =
+    api.roleBinding.listForOrg.useQuery(
+      { organizationId: organization?.id ?? "" },
+      { enabled: !!organization?.id && isEnterprise },
+    );
 
   if (isPlanLoading || !organization) {
     return <SettingsLayout><Spinner /></SettingsLayout>;
@@ -269,11 +270,13 @@ function AccessAuditPage() {
             )}
           </Card.Body>
         </Card.Root>
+
       </VStack>
     </SettingsLayout>
   );
 }
 
-export default withPermissionGuard("organization:view", {
+
+export default withPermissionGuard("organization:manage", {
   layoutComponent: SettingsLayout,
 })(AccessAuditPage);

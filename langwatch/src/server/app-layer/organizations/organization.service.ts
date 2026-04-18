@@ -1,4 +1,4 @@
-import { PricingModel, type OrganizationUserRole, type TeamUserRole } from "@prisma/client";
+import { PricingModel, RoleBindingScopeType, type OrganizationUserRole, type TeamUserRole } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { generate } from "@langwatch/ksuid";
 import { slugify } from "~/utils/slugify";
@@ -22,6 +22,78 @@ import type {
 } from "./repositories/organization.repository";
 import type { User } from "@prisma/client";
 import { PromptTagRepository } from "~/server/prompt-config/repositories/prompt-tag.repository";
+import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/repositories/role-binding.repository";
+
+/**
+ * Pure function that returns a team enriched with a synthesized member entry
+ * for the given user if they have a RoleBinding for this team or one of its
+ * projects but no TeamUser row yet.
+ *
+ * This is intentionally a standalone function — NOT a method on
+ * `OrganizationService` — because the service instance is wrapped with the
+ * `traced()` proxy (see `app-layer/tracing.ts`) which turns every method call
+ * into an async call that returns a Promise. Callers expecting a synchronous
+ * return value would silently get a Promise with `members === undefined`,
+ * causing team membership enrichment to fail invisibly.
+ */
+type TeamMembershipLike = {
+  userId: string;
+  teamId: string;
+  role: TeamUserRole;
+  assignedRoleId: string | null;
+  assignedRole?: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+export function enrichTeamWithRoleBindings<
+  T extends {
+    members: TeamMembershipLike[];
+    id: string;
+    projects: { id: string }[];
+  },
+>(
+  team: T,
+  userId: string,
+  userRoleBindings: RoleBindingForSynthesis[],
+  organizationId: string,
+): T {
+  const teamProjectIds = new Set(team.projects.map((p) => p.id));
+  // TEAM scope takes precedence over PROJECT scope so the synthesized role is
+  // deterministic when a user has both kinds of binding for the same team.
+  const teamBinding = userRoleBindings.find(
+    (b) =>
+      b.organizationId === organizationId &&
+      b.scopeType === RoleBindingScopeType.TEAM &&
+      b.scopeId === team.id,
+  );
+  const projectBinding = teamBinding
+    ? undefined
+    : userRoleBindings.find(
+        (b) =>
+          b.organizationId === organizationId &&
+          b.scopeType === RoleBindingScopeType.PROJECT &&
+          teamProjectIds.has(b.scopeId),
+      );
+  const binding = teamBinding ?? projectBinding;
+  if (!binding) return team;
+
+  const bindingMember = {
+    userId,
+    teamId: team.id,
+    role: binding.role,
+    assignedRoleId: binding.customRoleId ?? null,
+    assignedRole: binding.customRole ?? null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+  const existingIndex = team.members.findIndex((m) => m.userId === userId);
+  const newMembers =
+    existingIndex >= 0
+      ? team.members.map((m, i) => (i === existingIndex ? bindingMember : m))
+      : [...team.members, bindingMember];
+  return { ...team, members: newMembers };
+}
 
 export type OrganizationFeatureName = "billable_events_usage";
 
@@ -305,4 +377,5 @@ export class OrganizationService {
   ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }> {
     return this.repo.getAuditLogs(filters);
   }
+
 }

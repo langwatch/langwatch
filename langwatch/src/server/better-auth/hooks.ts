@@ -4,8 +4,46 @@ import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "../../utils/logger/server";
 import { isSsoProviderMatch, extractEmailDomain } from "./sso";
+import { InviteService } from "~/server/invites/invite.service";
 
 const logger = createLogger("langwatch:better-auth:hooks");
+
+/**
+ * Atomically deletes every OAuth account row for the user EXCEPT the one being
+ * linked/refreshed, and clears `pendingSsoSetup`. Used by both
+ * `beforeAccountCreate` (first time the correct SSO provider is linked) and
+ * `afterAccountUpdate` (subsequent sign-ins via the correct provider when the
+ * Account row already exists). Credential accounts are preserved for on-prem /
+ * email-mode deployments.
+ */
+const reconcileSsoAccounts = async ({
+  prisma,
+  userId,
+  providerId,
+  accountId,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  providerId: string;
+  accountId: string;
+}): Promise<void> => {
+  await prisma.$transaction([
+    prisma.account.deleteMany({
+      where: {
+        userId,
+        provider: { not: "credential" },
+        OR: [
+          { provider: { not: providerId } },
+          { providerAccountId: { not: accountId } },
+        ],
+      },
+    }),
+    prisma.user.update({
+      where: { id: userId },
+      data: { pendingSsoSetup: false },
+    }),
+  ]);
+};
 
 /**
  * Called before a new user is created (via OAuth signup or email+password signup).
@@ -35,16 +73,29 @@ export const beforeUserCreate = async ({
 
 /**
  * Called after a new user is created. If the user's email domain matches an
- * organization with ssoDomain, add them as a MEMBER automatically.
- * Ported from createUserAndAddToOrganization in the old NextAuth auth.ts.
+ * organization with ssoDomain, auto-onboard the user:
  *
- * The org auto-add is best-effort: if it fails (concurrent signup, race
- * with another tab, transient DB issue), we LOG and SWALLOW the error so
- * the signup itself still succeeds. Failing the signup over a missing org
- * membership would orphan the user (the User row was just committed by the
- * preceding Prisma adapter call) and produce a confusing
- * "unable to create user" error in the OAuth callback. The user can always
- * be added to the org later via invite or admin action.
+ *   - If a PENDING invite exists for (org, email), apply it — the invite's
+ *     role and team assignments take precedence, and the invite is marked
+ *     ACCEPTED so it stops appearing as an outstanding link. This fixes the
+ *     bug where an SSO signup bypassed an existing invite and landed the user
+ *     in the org with only the default MEMBER role while the invite kept
+ *     looking unused.
+ *   - Otherwise, fall back to the default behavior and add them as MEMBER.
+ *
+ * OrganizationUser + RoleBinding writes are wrapped in a single transaction
+ * so a partial failure can't leave the user "in the org" with no RoleBinding
+ * (which would look like org membership to legacy code but give zero access
+ * under RBAC).
+ *
+ * Outer catch: the whole auto-add is best-effort. If the transaction fails
+ * outright (transient DB issue, concurrent signup we didn't catch via P2002),
+ * we LOG and SWALLOW so the signup itself still succeeds — failing would
+ * orphan the user (the User row was just committed by the preceding Prisma
+ * adapter call) and surface as a confusing "unable to create user" error in
+ * the OAuth callback. The user can always be added later via invite or admin
+ * action, and the pendingSsoSetup + afterAccountUpdate self-heal path covers
+ * re-attempts on subsequent sign-ins.
  */
 export const afterUserCreate = async ({
   prisma,
@@ -62,36 +113,55 @@ export const afterUserCreate = async ({
     });
     if (!org) return;
 
-    try {
-      await prisma.organizationUser.create({
-        data: {
-          userId: user.id,
-          organizationId: org.id,
-          role: "MEMBER",
-        },
+    const pendingInvite = await InviteService.create(prisma)
+      .findPendingByOrgAndEmail({
+        organizationId: org.id,
+        email: user.email,
       });
 
-      // Create the RoleBinding that the RBAC system uses as the
-      // authoritative access record (added by PR #2867 SCIM groups).
-      await prisma.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: org.id,
-          userId: user.id,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: org.id,
-        },
+    try {
+      await prisma.$transaction(async (tx) => {
+        if (pendingInvite) {
+          const txInviteService = InviteService.create(tx);
+          await txInviteService.applyInvite({
+            userId: user.id,
+            invite: pendingInvite,
+          });
+          return;
+        }
+
+        await tx.organizationUser.create({
+          data: {
+            userId: user.id,
+            organizationId: org.id,
+            role: "MEMBER",
+          },
+        });
+        await tx.roleBinding.create({
+          data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            organizationId: org.id,
+            userId: user.id,
+            role: TeamUserRole.MEMBER,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: org.id,
+          },
+        });
       });
 
       logger.info(
-        { userId: user.id, organizationId: org.id },
-        "Auto-added new user to SSO organization (with RoleBinding)",
+        {
+          userId: user.id,
+          organizationId: org.id,
+          inviteId: pendingInvite?.id ?? null,
+        },
+        pendingInvite
+          ? "Applied pending invite on SSO signup"
+          : "Auto-added new user to SSO organization (default MEMBER)",
       );
     } catch (err) {
       // P2002 (unique constraint) means another concurrent OAuth callback
-      // or a retry already created this membership. Idempotent success —
-      // don't log as an error. Caught by CodeRabbit in PR review.
+      // or a retry already created this membership. Idempotent success.
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
@@ -172,21 +242,10 @@ export const beforeAccountCreate = async ({
   });
 
   if (matchesSso) {
-    await prisma.$transaction([
-      // Clear any stale account rows for this provider with a different
-      // providerAccountId (user's SSO subject changed, e.g. Auth0 connection rotation)
-      prisma.account.deleteMany({
-        where: {
-          userId: user.id,
-          provider: account.providerId,
-          providerAccountId: { not: account.accountId },
-        },
-      }),
-      prisma.user.update({
-        where: { id: user.id },
-        data: { pendingSsoSetup: false },
-      }),
-    ]);
+    // Correct SSO provider — let BetterAuth create the Account row. Stale-row
+    // reconciliation is deferred to `afterAccountCreate` so it only runs after
+    // the new Account row has committed, avoiding a window where the user has
+    // `pendingSsoSetup=false` and zero OAuth rows if account creation fails.
     return;
   }
 
@@ -229,6 +288,129 @@ export const beforeAccountCreate = async ({
     },
     "Flagged existing user with pendingSsoSetup (wrong SSO provider)",
   );
+};
+
+/**
+ * Called after a new Account row is created. Runs the SSO reconciliation that
+ * `beforeAccountCreate` used to perform inline, but deferred to this hook so
+ * the cleanup only commits once the new Account row exists.
+ *
+ * Handles the two stale-row cases from the beforeAccountCreate comment:
+ *   1) Same provider with a different providerAccountId (SSO subject rotated).
+ *   2) A different OAuth provider (user had Google linked while the org's
+ *      configured SSO is Auth0).
+ *
+ * Credential accounts (providerId = "credential") skip this entirely — on-prem
+ * email-mode deployments don't configure SSO.
+ */
+export const afterAccountCreate = async ({
+  prisma,
+  account,
+}: {
+  prisma: PrismaClient;
+  account: { userId: string; providerId: string; accountId: string };
+}): Promise<void> => {
+  try {
+    if (account.providerId === "credential") return;
+
+    const user = await prisma.user.findUnique({
+      where: { id: account.userId },
+      select: { id: true, email: true },
+    });
+    if (!user?.email) return;
+
+    const domain = extractEmailDomain(user.email);
+    if (!domain) return;
+
+    const org = await prisma.organization.findUnique({
+      where: { ssoDomain: domain },
+    });
+    if (!org) return;
+
+    const matchesSso = isSsoProviderMatch(org, {
+      providerId: account.providerId,
+      accountId: account.accountId,
+    });
+    if (!matchesSso) return;
+
+    await reconcileSsoAccounts({
+      prisma,
+      userId: user.id,
+      providerId: account.providerId,
+      accountId: account.accountId,
+    });
+  } catch (err) {
+    logger.error(
+      { err, userId: account.userId },
+      "Failed to reconcile SSO accounts after account create",
+    );
+  }
+};
+
+/**
+ * Called after an existing Account row is updated. On an OAuth sign-in via
+ * `handleOAuthUserInfo`, BetterAuth refreshes tokens on the linked Account row
+ * (`internalAdapter.updateAccount`), which fires this hook.
+ *
+ * Closes the dual-account edge case for pendingSsoSetup:
+ * - User previously signed in with WRONG provider → pendingSsoSetup=true,
+ *   wrong Account row exists.
+ * - User later signs in with the CORRECT provider for the first time →
+ *   `beforeAccountCreate` fires and clears the flag / deletes the stale row.
+ * - BUT if the correct-provider Account already exists (e.g. user bounced
+ *   between the two methods), no new Account is created on subsequent correct
+ *   sign-ins, so `beforeAccountCreate` never fires and pendingSsoSetup stays
+ *   stuck.
+ *
+ * This hook runs on every account token refresh, so when the user signs in via
+ * the correct SSO provider — even without a new Account — we detect the
+ * reconciliation opportunity and clean up.
+ */
+export const afterAccountUpdate = async ({
+  prisma,
+  account,
+}: {
+  prisma: PrismaClient;
+  account: { userId: string; providerId: string; accountId: string };
+}): Promise<void> => {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: account.userId },
+      select: { id: true, email: true, pendingSsoSetup: true },
+    });
+    if (!user?.email || !user.pendingSsoSetup) return;
+
+    const domain = extractEmailDomain(user.email);
+    if (!domain) return;
+
+    const org = await prisma.organization.findUnique({
+      where: { ssoDomain: domain },
+    });
+    if (!org) return;
+
+    const matchesSso = isSsoProviderMatch(org, {
+      providerId: account.providerId,
+      accountId: account.accountId,
+    });
+    if (!matchesSso) return;
+
+    await reconcileSsoAccounts({
+      prisma,
+      userId: user.id,
+      providerId: account.providerId,
+      accountId: account.accountId,
+    });
+
+    logger.info(
+      { userId: user.id, providerId: account.providerId },
+      "Cleared pendingSsoSetup and removed stale accounts after sign-in via correct SSO provider",
+    );
+  } catch (err) {
+    logger.error(
+      { err, userId: account.userId },
+      "Failed to reconcile pendingSsoSetup after account update",
+    );
+  }
 };
 
 /**

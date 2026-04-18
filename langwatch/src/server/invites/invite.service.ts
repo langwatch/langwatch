@@ -4,7 +4,10 @@ import {
   OrganizationUserRole,
   type Prisma,
   type PrismaClient,
+  RoleBindingScopeType,
 } from "@prisma/client";
+import { generate } from "@langwatch/ksuid";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   DuplicateInviteError,
   InviteNotFoundError,
@@ -152,13 +155,21 @@ export class InviteService {
    * Factory method for creating InviteService with default dependencies.
    * Use this in production code for convenience.
    * Pass options.planProvider to override the default app singleton (useful in tests).
+   *
+   * planProvider is resolved lazily — callers that only use
+   * invite-application methods (findPendingByOrgAndEmail, applyInvite,
+   * findLandingProjectSlug, etc.) don't require the global App to be
+   * initialized, so this factory is safe to call from unit-tested hooks
+   * and from early-boot code paths.
    */
   static create(
     prisma: PrismaClient | Prisma.TransactionClient,
     options?: { planProvider?: PlanProvider }
   ): InviteService {
     const licenseRepo = new LicenseEnforcementRepository(prisma);
-    const provider = options?.planProvider ?? getApp().planProvider;
+    const provider: PlanProvider = options?.planProvider ?? {
+      getActivePlan: (params) => getApp().planProvider.getActivePlan(params),
+    };
     return new InviteService(prisma, licenseRepo, provider);
   }
 
@@ -475,6 +486,143 @@ export class InviteService {
         : null);
 
     return project?.slug ?? null;
+  }
+
+  /**
+   * Finds a PENDING, non-expired invite matching the given organization and
+   * email (case-insensitive). Returns null when no such invite exists.
+   *
+   * Used by the SSO auto-onboarding hook so a new signup whose domain matches
+   * an SSO-enforced org adopts the invite's role + team assignments rather
+   * than the default MEMBER, and the invite gets marked ACCEPTED instead of
+   * lingering as an outstanding link.
+   */
+  async findPendingByOrgAndEmail({
+    organizationId,
+    email,
+  }: {
+    organizationId: string;
+    email: string;
+  }): Promise<OrganizationInvite | null> {
+    return this.prisma.organizationInvite.findFirst({
+      where: {
+        organizationId,
+        email: { equals: email, mode: "insensitive" },
+        status: "PENDING",
+        OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+      },
+    });
+  }
+
+  /**
+   * Applies a PENDING invite to a user: writes OrganizationUser, the
+   * ORGANIZATION-scoped RoleBinding (skipped for EXTERNAL — they get access
+   * via team/project bindings), each team's RoleBinding, and marks the invite
+   * ACCEPTED. All writes are idempotent — OrganizationUser uses
+   * createMany+skipDuplicates, RoleBindings use delete-then-create to tolerate
+   * prior partial state — so callers can safely retry on transient failure.
+   *
+   * Must be called with a TransactionClient: the four write groups must
+   * commit or roll back together to avoid the "in-org-but-no-RoleBinding"
+   * stuck state that originally motivated this helper.
+   */
+  async applyInvite({
+    userId,
+    invite,
+  }: {
+    userId: string;
+    invite: OrganizationInvite;
+  }): Promise<void> {
+    await this.prisma.organizationUser.createMany({
+      data: [
+        {
+          userId,
+          organizationId: invite.organizationId,
+          role: invite.role,
+        },
+      ],
+      skipDuplicates: true,
+    });
+
+    if (invite.role !== OrganizationUserRole.EXTERNAL) {
+      await this.prisma.roleBinding.deleteMany({
+        where: {
+          organizationId: invite.organizationId,
+          userId,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: invite.organizationId,
+        },
+      });
+      await this.prisma.roleBinding.create({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: invite.organizationId,
+          userId,
+          role: invite.role as unknown as TeamUserRole,
+          scopeType: RoleBindingScopeType.ORGANIZATION,
+          scopeId: invite.organizationId,
+        },
+      });
+    }
+
+    let teamMembershipData: Array<{
+      teamId: string;
+      role: TeamUserRole;
+      customRoleId?: string;
+    }> = [];
+
+    if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
+      const assignments = invite.teamAssignments as unknown as Array<{
+        teamId: string;
+        role: TeamUserRole;
+        customRoleId?: string;
+      }>;
+      teamMembershipData = assignments.map((a) => ({
+        teamId: a.teamId,
+        role: a.role,
+        customRoleId: a.customRoleId,
+      }));
+    } else {
+      const dedupedTeamIds = Array.from(
+        new Set(
+          invite.teamIds
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean),
+        ),
+      );
+      teamMembershipData = dedupedTeamIds.map((teamId) => ({
+        teamId,
+        role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
+      }));
+    }
+
+    for (const member of teamMembershipData) {
+      await this.prisma.roleBinding.deleteMany({
+        where: {
+          organizationId: invite.organizationId,
+          userId,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: member.teamId,
+        },
+      });
+      await this.prisma.roleBinding.create({
+        data: {
+          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+          organizationId: invite.organizationId,
+          userId,
+          role: member.role,
+          customRoleId: member.customRoleId ?? null,
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: member.teamId,
+        },
+      });
+    }
+
+    await this.prisma.organizationInvite.update({
+      where: { id: invite.id, organizationId: invite.organizationId },
+      data: { status: "ACCEPTED" },
+    });
   }
 
   /**
