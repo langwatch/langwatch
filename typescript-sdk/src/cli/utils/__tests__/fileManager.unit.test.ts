@@ -71,14 +71,14 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
   });
 
   describe("when project has no prompts.json yet", () => {
-    it("returns the project-root path so init creates it there", () => {
+    it("returns the cwd path so init creates it where the user ran the command", () => {
       fs.writeFileSync(path.join(scratchRoot, "package.json"), "{}");
       const sub = path.join(scratchRoot, "nested");
       fs.mkdirSync(sub);
       process.chdir(sub);
 
       expect(FileManager.getPromptsConfigPath()).toBe(
-        path.join(scratchRoot, "prompts.json"),
+        path.join(sub, "prompts.json"),
       );
     });
   });

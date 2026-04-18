@@ -69,10 +69,12 @@ export class FileManager {
       currentDir = path.dirname(currentDir);
     }
 
-    // No prompts.json anywhere within the project — default to the project root
-    // so `init` creates it next to package.json / .git rather than in a random subdir.
-    this._projectRoot = topProjectDir;
-    return topProjectDir;
+    // No prompts.json anywhere within the project — default to cwd so `init`
+    // creates it where the user actually ran the command. This also keeps
+    // concurrent test workdirs isolated: each tempdir gets its own prompts.json
+    // instead of all pointing at a shared repo-root file.
+    this._projectRoot = cwd;
+    return cwd;
   }
 
   static getPromptsConfigPath(): string {
