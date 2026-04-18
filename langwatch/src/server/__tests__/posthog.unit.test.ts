@@ -10,14 +10,19 @@
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
-const { mockCapture } = vi.hoisted(() => ({
+const { mockCapture, mockCaptureException } = vi.hoisted(() => ({
   mockCapture: vi.fn(),
+  mockCaptureException: vi.fn(),
 }));
 
 vi.mock("posthog-node", () => ({
   PostHog: function () {
     return { capture: mockCapture, shutdown: vi.fn() };
   },
+}));
+
+vi.mock("~/utils/posthogErrorCapture", () => ({
+  captureException: mockCaptureException,
 }));
 
 vi.mock("~/utils/logger/server", () => ({
@@ -112,6 +117,49 @@ describe("trackServerEvent", () => {
         event: "team_member_invited",
         properties: { inviteCount: 3 },
       });
+    });
+  });
+
+  describe("when posthog.capture throws", () => {
+    it("swallows the error and reports it to captureException", () => {
+      const captureError = new Error("posthog internal failure");
+      mockCapture.mockImplementationOnce(() => {
+        throw captureError;
+      });
+
+      expect(() =>
+        trackServerEvent({ userId: "user-123", event: "limit_blocked" })
+      ).not.toThrow();
+
+      expect(mockCaptureException).toHaveBeenCalledWith(captureError);
+    });
+  });
+
+  describe("when POSTHOG_KEY is not set (self-hosted without PostHog)", () => {
+    // The singleton `_posthogInstance` is decided at module load based on
+    // env.POSTHOG_KEY, so we reset modules and re-mock env to exercise the
+    // null branch. This is the hot path for self-hosted deployments and must
+    // never call capture or throw.
+    it("no-ops without calling capture or throwing", async () => {
+      vi.resetModules();
+      vi.doMock("~/env.mjs", () => ({
+        env: { POSTHOG_KEY: undefined, POSTHOG_HOST: undefined },
+      }));
+
+      const { trackServerEvent: trackWithoutKey } = await import("../posthog");
+
+      expect(() =>
+        trackWithoutKey({
+          userId: "user-123",
+          event: "limit_blocked",
+          properties: { limitType: "workflows" },
+        })
+      ).not.toThrow();
+
+      expect(mockCapture).not.toHaveBeenCalled();
+      expect(mockCaptureException).not.toHaveBeenCalled();
+
+      vi.doUnmock("~/env.mjs");
     });
   });
 });
