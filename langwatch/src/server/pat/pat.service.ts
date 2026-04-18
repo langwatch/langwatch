@@ -83,7 +83,7 @@ export class PatService {
     const { token, lookupId, hashedSecret } = generatePatToken();
 
     const pat = await this.prisma.$transaction(async (tx) => {
-      const txRepo = PatRepository.create(tx as PrismaClient);
+      const txRepo = PatRepository.create(tx);
 
       const created = await txRepo.create({
         name,
