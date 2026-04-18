@@ -42,6 +42,7 @@ import type {
   TargetExecutionContext,
   TargetContext,
 } from "./types";
+import { printSummary } from "./printSummary";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;
@@ -88,6 +89,11 @@ export class Experiment {
   private lastSentMs = 0;
   private pendingFlush: Promise<void> | null = null;
   private flushTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  // Cumulative record for printSummary() — never cleared, mirrors batch.
+  private cumulativeEvaluations: EvaluationResult[] = [];
+  private cumulativeEntries: BatchEntry[] = [];
+  private runUrl = "";
 
   // Target registry
   private targets = new Map<string, TargetInfo>();
@@ -184,7 +190,8 @@ export class Experiment {
       (this as { experimentSlug: string }).experimentSlug = data.slug;
 
       const encodedRunId = encodeURIComponent(this.runId);
-      console.log(`Follow results at: ${this.endpoint.replace(/\/$/, "")}${data.path}?runId=${encodedRunId}`);
+      this.runUrl = `${this.endpoint.replace(/\/$/, "")}${data.path}?runId=${encodedRunId}`;
+      console.log(`Follow results at: ${this.runUrl}`);
 
       this.initialized = true;
     } catch (error) {
@@ -368,6 +375,7 @@ export class Experiment {
       };
 
       this.batch.dataset.push(entry);
+      this.cumulativeEntries.push(entry);
     }
 
     // Clean up
@@ -448,6 +456,7 @@ export class Experiment {
     };
 
     this.batch.evaluations.push(result);
+    this.cumulativeEvaluations.push(result);
     this.scheduleSend();
   }
 
@@ -736,6 +745,7 @@ export class Experiment {
     };
 
     this.batch.dataset.push(entry);
+    this.cumulativeEntries.push(entry);
     this.scheduleSend();
 
     return {
@@ -790,6 +800,131 @@ export class Experiment {
         this.flushTimeout = null;
         this.sendBatch();
       }, DEBOUNCE_INTERVAL_MS - (now - this.lastSentMs));
+    }
+  }
+
+  /**
+   * Print a CI-friendly summary and optionally exit with code 1 on failure.
+   *
+   * Mirrors `ExperimentRunResult.printSummary` for parity — SDK-driven experiments
+   * can now fail CI builds the same way platform experiments do.
+   *
+   * @param exitOnFailure - If true (default), calls `process.exit(1)` when any evaluation failed.
+   *
+   * @example
+   * ```typescript
+   * const experiment = await langwatch.experiments.init("ci-quality-check");
+   * await experiment.run(dataset, async ({ item, index }) => {
+   *   const response = await myLLM(item.input);
+   *   await experiment.evaluate("ragas/faithfulness", { index, data: { input: item.input, output: response } });
+   * });
+   * experiment.printSummary();
+   * ```
+   */
+  printSummary(exitOnFailure = true): void {
+    const evaluators = new Map<
+      string,
+      { passed: number; failed: number; scoreSum: number; scoreCount: number }
+    >();
+    let totalPassed = 0;
+    let totalFailed = 0;
+
+    for (const e of this.cumulativeEvaluations) {
+      const name = e.name ?? e.evaluator ?? "unknown";
+      if (!evaluators.has(name)) {
+        evaluators.set(name, { passed: 0, failed: 0, scoreSum: 0, scoreCount: 0 });
+      }
+      const stats = evaluators.get(name)!;
+      if (e.passed === true) {
+        stats.passed += 1;
+        totalPassed += 1;
+      } else if (e.passed === false) {
+        stats.failed += 1;
+        totalFailed += 1;
+      }
+      if (typeof e.score === "number") {
+        stats.scoreSum += e.score;
+        stats.scoreCount += 1;
+      }
+    }
+
+    const targets = new Map<
+      string,
+      { passed: number; failed: number; latencySum: number; latencyCount: number; cost: number }
+    >();
+    for (const entry of this.cumulativeEntries) {
+      const tid = entry.target_id;
+      if (!tid) continue;
+      if (!targets.has(tid)) {
+        targets.set(tid, { passed: 0, failed: 0, latencySum: 0, latencyCount: 0, cost: 0 });
+      }
+      const stats = targets.get(tid)!;
+      if (typeof entry.duration === "number") {
+        stats.latencySum += entry.duration;
+        stats.latencyCount += 1;
+      }
+      if (typeof entry.cost === "number") {
+        stats.cost += entry.cost;
+      }
+    }
+    for (const e of this.cumulativeEvaluations) {
+      const tid = e.target_id;
+      if (!tid || !targets.has(tid)) continue;
+      const stats = targets.get(tid)!;
+      if (e.passed === true) stats.passed += 1;
+      else if (e.passed === false) stats.failed += 1;
+    }
+
+    const total = totalPassed + totalFailed;
+    const passRate = total > 0 ? (totalPassed / total) * 100 : 0;
+
+    let duration = 0;
+    let totalCost = 0;
+    for (const entry of this.cumulativeEntries) {
+      if (typeof entry.duration === "number") duration += entry.duration;
+      if (typeof entry.cost === "number") totalCost += entry.cost;
+    }
+
+    printSummary({
+      runId: this.runId,
+      status: "completed",
+      passed: totalPassed,
+      failed: totalFailed,
+      passRate,
+      duration,
+      runUrl: this.runUrl,
+      summary: {
+        runId: this.runId,
+        totalCells: this.cumulativeEntries.length || total,
+        completedCells: this.cumulativeEntries.length || total,
+        failedCells: 0,
+        duration,
+        runUrl: this.runUrl,
+        totalPassed,
+        totalFailed,
+        passRate,
+        totalCost,
+        targets: Array.from(targets.entries()).map(([targetId, s]) => ({
+          targetId,
+          name: targetId,
+          passed: s.passed,
+          failed: s.failed,
+          avgLatency: s.latencyCount > 0 ? s.latencySum / s.latencyCount : 0,
+          totalCost: s.cost,
+        })),
+        evaluators: Array.from(evaluators.entries()).map(([name, s]) => ({
+          evaluatorId: name,
+          name,
+          passed: s.passed,
+          failed: s.failed,
+          passRate: s.passed + s.failed > 0 ? (s.passed / (s.passed + s.failed)) * 100 : 0,
+          avgScore: s.scoreCount > 0 ? s.scoreSum / s.scoreCount : undefined,
+        })),
+      },
+    });
+
+    if (exitOnFailure && totalFailed > 0) {
+      process.exit(1);
     }
   }
 
