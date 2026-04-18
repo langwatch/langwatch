@@ -75,7 +75,10 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: captureExceptionSpy,
 }));
 
-import { useAcceptInviteOnce } from "../useAcceptInviteOnce";
+import {
+  _resetSubmittedInviteCodesForTests,
+  useAcceptInviteOnce,
+} from "../useAcceptInviteOnce";
 
 function resetMutationState() {
   mockState.mutation = {
@@ -94,6 +97,7 @@ describe("useAcceptInviteOnce()", () => {
     hardRedirectSpy.mockReset();
     captureExceptionSpy.mockReset();
     resetMutationState();
+    _resetSubmittedInviteCodesForTests();
   });
 
   afterEach(() => {
@@ -114,6 +118,30 @@ describe("useAcceptInviteOnce()", () => {
 
         expect(mutateSpy).toHaveBeenCalledTimes(1);
         expect(mutateSpy).toHaveBeenCalledWith({ inviteCode: "invite-abc" });
+      });
+
+      it("does not re-submit after a real unmount/remount with the same code", () => {
+        const { unmount } = renderHook(
+          () =>
+            useAcceptInviteOnce({
+              inviteCode: "invite-abc",
+              enabled: true,
+            }),
+          { wrapper: StrictMode },
+        );
+
+        unmount();
+
+        renderHook(
+          () =>
+            useAcceptInviteOnce({
+              inviteCode: "invite-abc",
+              enabled: true,
+            }),
+          { wrapper: StrictMode },
+        );
+
+        expect(mutateSpy).toHaveBeenCalledTimes(1);
       });
 
       it("does not re-submit when the hook re-renders with the same code", () => {

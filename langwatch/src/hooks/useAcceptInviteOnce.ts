@@ -1,10 +1,25 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 
 import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "~/server/invites/errors";
 import { api } from "~/utils/api";
 import { hardRedirect } from "~/utils/hardRedirect";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { toaster } from "~/components/ui/toaster";
+
+/**
+ * Module-scoped set of invite codes that have already had a `mutate` call
+ * dispatched during this page session. Living at module scope (not `useRef`)
+ * means the guard survives real unmount/remount — parent re-keying, HMR,
+ * back-nav with `?inviteCode=` still in the URL — and not just same-instance
+ * double-invokes from StrictMode. A hard redirect (success or already-accepted)
+ * reloads the page and wipes this set, which is the correct semantics.
+ */
+const submittedInviteCodes = new Set<string>();
+
+/** Test-only: reset the module-scoped guard between test cases. */
+export function _resetSubmittedInviteCodesForTests(): void {
+  submittedInviteCodes.clear();
+}
 
 type AcceptInviteMutation = ReturnType<
   typeof api.organization.acceptInvite.useMutation
@@ -35,17 +50,20 @@ export interface UseAcceptInviteOnceOptions {
  * Fire `organization.acceptInvite` at most once per invite code and drive the
  * page through a small state machine.
  *
- * ## Why a `useRef` one-shot guard instead of `mutation.isIdle`?
+ * ## Why a module-scoped `Set` one-shot guard instead of `mutation.isIdle` or `useRef`?
  *
  * React StrictMode (dev) intentionally double-invokes effects **synchronously**
  * within the same render tick. During the second invocation the mutation's
  * `isIdle` flag is still `true` because react-query has not yet transitioned
- * state — a check against `isIdle` would still fire `mutate` twice. A ref set
- * immediately before `mutate()` is the only way to block the second call
+ * state — a check against `isIdle` would still fire `mutate` twice. A guard
+ * set immediately before `mutate()` is the only way to block the second call
  * without coupling to react-query's internal timing.
  *
- * The same ref also protects against remounts from HMR, parent re-keying, and
- * back-nav with `?inviteCode=` still in the URL.
+ * The guard lives at **module scope** (not in a `useRef`) because a ref resets
+ * whenever the component actually unmounts and remounts — HMR, parent re-keying,
+ * or back-nav with `?inviteCode=` still in the URL would all resubmit. A
+ * module-scoped `Set` survives those remounts; a successful `hardRedirect`
+ * reloads the page and wipes the set, which is the correct semantics.
  *
  * ## Why navigate via `window.location.href` on success/already-accepted?
  *
@@ -58,7 +76,6 @@ export function useAcceptInviteOnce({
   inviteCode,
   enabled,
 }: UseAcceptInviteOnceOptions): UseAcceptInviteOnceResult {
-  const submittedInviteCodeRef = useRef<string | null>(null);
   const mutation = api.organization.acceptInvite.useMutation({
     onSuccess: (data) => {
       toaster.create({
@@ -87,8 +104,9 @@ export function useAcceptInviteOnce({
 
   useEffect(() => {
     if (!shouldTrigger) return;
-    if (submittedInviteCodeRef.current === inviteCode) return;
-    submittedInviteCodeRef.current = inviteCode;
+    if (typeof inviteCode !== "string") return;
+    if (submittedInviteCodes.has(inviteCode)) return;
+    submittedInviteCodes.add(inviteCode);
     mutate({ inviteCode });
   }, [shouldTrigger, inviteCode, mutate]);
 
