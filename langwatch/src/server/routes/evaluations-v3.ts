@@ -63,10 +63,17 @@ app.use(loggerMiddleware());
 
 // ── helpers ──────────────────────────────────────────────────────────
 
+const tokenResolver = TokenResolver.create(prisma);
+
 /**
  * Authenticates a request via the unified PAT + legacy-key path and enforces
  * the given permission ceiling. Accepts any Hono-like context shape so this
  * helper remains testable.
+ *
+ * Returns `markUsed` in the success case — a no-op for legacy keys, a
+ * fire-and-forget lastUsedAt bump for PATs. Callers invoke it only after the
+ * response has been built so `lastUsedAt` tracks fully-successful outcomes
+ * (matches the route-owned pattern in `collector.ts`).
  */
 const authenticateRequest = async (
   c: { req: { header: (name: string) => string | undefined } },
@@ -77,7 +84,7 @@ const authenticateRequest = async (
     return { error: "Missing credentials", status: 401 as const };
   }
 
-  const resolved = await TokenResolver.create(prisma).resolve({
+  const resolved = await tokenResolver.resolve({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -85,12 +92,18 @@ const authenticateRequest = async (
     return { error: "Invalid credentials", status: 401 as const };
   }
 
-  const denial = await enforcePatCeiling({ resolved, permission });
+  const denial = await enforcePatCeiling({ prisma, resolved, permission });
   if (denial) {
     return { error: denial.error, status: denial.status };
   }
 
-  return { project: resolved.project };
+  const markUsed = () => {
+    if (resolved.type === "pat") {
+      tokenResolver.markUsed({ patId: resolved.patId });
+    }
+  };
+
+  return { project: resolved.project, resolved, markUsed };
 };
 
 const buildState = (

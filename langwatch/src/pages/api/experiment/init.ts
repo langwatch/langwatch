@@ -69,7 +69,8 @@ export default async function handler(
     });
   }
 
-  const resolved = await TokenResolver.create(prisma).resolve({
+  const tokenResolver = TokenResolver.create(prisma);
+  const resolved = await tokenResolver.resolve({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -82,6 +83,7 @@ export default async function handler(
   // by workflows today, so `workflows:manage` is the closest existing
   // ceiling — VIEWER is correctly blocked, ADMIN/MEMBER pass through.
   const denial = await enforcePatCeiling({
+    prisma,
     resolved,
     permission: "workflows:manage",
   });
@@ -143,6 +145,13 @@ export default async function handler(
       });
     }
     throw error;
+  }
+
+  // Late markUsed: response has been fully built, the PAT was genuinely used
+  // for a successful request. Fire-and-forget; a DB hiccup must not mask the
+  // experiment creation.
+  if (resolved.type === "pat") {
+    tokenResolver.markUsed({ patId: resolved.patId });
   }
 
   return res.status(200).json({

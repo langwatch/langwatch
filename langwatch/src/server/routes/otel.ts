@@ -101,6 +101,7 @@ async function authenticateAndCheckLimit(c: {
   // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
   // access on OTLP ingestion — same semantics as the collector path.
   const denial = await enforcePatCeiling({
+    prisma,
     resolved,
     permission: "traces:create",
   });

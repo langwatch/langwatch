@@ -77,17 +77,24 @@ import {
 import { TokenResolver } from "~/server/pat/token-resolver";
 
 const logger = createLogger("langwatch:evaluations-legacy");
+const tokenResolver = TokenResolver.create(prisma);
 
 /**
  * Authenticates via the unified PAT + legacy-key path and enforces the given
- * permission ceiling. Returns either a `{ project }` context on success or
- * `{ error, status }` for the caller to short-circuit with c.json(...).
+ * permission ceiling. Returns either a `{ project, markUsed }` context on
+ * success or `{ error, status }` for the caller to short-circuit with
+ * c.json(...). `markUsed` is a no-op for legacy keys and a fire-and-forget
+ * lastUsedAt bump for PATs — callers invoke it after building a success
+ * response.
  */
 async function authenticateRequest(
   c: Context,
   permission: Permission,
 ): Promise<
-  | { project: Project & { team?: { id: string; organizationId: string } } }
+  | {
+      project: Project & { team?: { id: string; organizationId: string } };
+      markUsed: () => void;
+    }
   | { error: string; status: 401 | 403 }
 > {
   const credentials = extractCredentials(c);
@@ -99,7 +106,7 @@ async function authenticateRequest(
     };
   }
 
-  const resolved = await TokenResolver.create(prisma).resolve({
+  const resolved = await tokenResolver.resolve({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -107,12 +114,18 @@ async function authenticateRequest(
     return { error: "Invalid auth token.", status: 401 };
   }
 
-  const denial = await enforcePatCeiling({ resolved, permission });
+  const denial = await enforcePatCeiling({ prisma, resolved, permission });
   if (denial) {
     return { error: denial.error, status: denial.status };
   }
 
-  return { project: resolved.project };
+  const markUsed = () => {
+    if (resolved.type === "pat") {
+      tokenResolver.markUsed({ patId: resolved.patId });
+    }
+  };
+
+  return { project: resolved.project, markUsed };
 }
 
 export const app = new Hono().basePath("/api");

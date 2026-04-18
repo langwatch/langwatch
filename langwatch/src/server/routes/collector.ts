@@ -98,6 +98,7 @@ app.post(
     // access — ADMIN and MEMBER have it; VIEWER does not, preventing
     // read-only PATs from ingesting traces.
     const denial = await enforcePatCeiling({
+      prisma,
       resolved,
       permission: "traces:create",
     });
