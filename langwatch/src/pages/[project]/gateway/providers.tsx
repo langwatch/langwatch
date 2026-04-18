@@ -10,11 +10,13 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Plug, RefreshCw } from "lucide-react";
+import { Plug, Plus, RefreshCw } from "lucide-react";
+import { useState } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
+import { ProviderBindingCreateDrawer } from "~/components/gateway/ProviderBindingCreateDrawer";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -26,6 +28,7 @@ function ProvidersPage() {
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
+  const [bindOpen, setBindOpen] = useState(false);
 
   return (
     <GatewayLayout>
@@ -41,6 +44,15 @@ function ProvidersPage() {
           >
             <RefreshCw size={14} /> Refresh
           </Button>
+          {canManage && (
+            <Button
+              colorPalette="orange"
+              size="sm"
+              onClick={() => setBindOpen(true)}
+            >
+              <Plus size={14} /> Bind provider
+            </Button>
+          )}
         </PageLayout.Header>
         <Box padding={6}>
           {listQuery.isLoading ? (
@@ -59,9 +71,15 @@ function ProvidersPage() {
                   existing ModelProvider credentials; binding only adds
                   gateway-specific settings like rate limits and rotation.
                 </EmptyState.Description>
-                <Text fontSize="sm" color="fg.muted" mt={2}>
-                  Binding UI lands next iteration.
-                </Text>
+                {canManage && (
+                  <Button
+                    colorPalette="orange"
+                    onClick={() => setBindOpen(true)}
+                    mt={2}
+                  >
+                    <Plug size={14} /> Bind your first provider
+                  </Button>
+                )}
               </EmptyState.Content>
             </EmptyState.Root>
           ) : (
@@ -105,6 +123,16 @@ function ProvidersPage() {
           )}
         </Box>
       </PageLayout.Container>
+      {project?.id && (
+        <ProviderBindingCreateDrawer
+          projectId={project.id}
+          open={bindOpen}
+          onOpenChange={setBindOpen}
+          onCreated={() => {
+            void listQuery.refetch();
+          }}
+        />
+      )}
     </GatewayLayout>
   );
 }

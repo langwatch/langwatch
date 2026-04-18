@@ -11,7 +11,7 @@ import { z } from "zod";
 
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 
-import { checkOrganizationPermission } from "../rbac";
+import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 const scopeSchema = z.discriminatedUnion("kind", [
@@ -53,6 +53,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
 
   listForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("gatewayBudgets:view"))
     .query(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(ctx.prisma);
       const rows = await service.listForProject(input.projectId);

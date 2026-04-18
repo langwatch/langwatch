@@ -4,11 +4,11 @@
  * extra headers) on top of an existing project-scoped ModelProvider row —
  * the raw API key never leaves ModelProvider.
  */
-import type {
-  GatewayProviderCredential,
-  ModelProvider,
+import {
   Prisma,
-  PrismaClient,
+  type GatewayProviderCredential,
+  type ModelProvider,
+  type PrismaClient,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
@@ -142,7 +142,7 @@ export class GatewayProviderCredentialService {
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.gatewayProviderCredential.update({
-        where: { id: input.id, projectId: input.projectId },
+        where: { id: input.id },
         data: {
           slot: input.slot ?? existing.slot,
           rateLimitRpm:
@@ -160,12 +160,14 @@ export class GatewayProviderCredentialService {
           rotationPolicy: input.rotationPolicy ?? existing.rotationPolicy,
           extraHeaders:
             input.extraHeaders !== undefined
-              ? input.extraHeaders
-              : existing.extraHeaders ?? undefined,
+              ? (input.extraHeaders ?? Prisma.JsonNull)
+              : (existing.extraHeaders as Prisma.InputJsonValue | undefined) ??
+                Prisma.JsonNull,
           providerConfig:
             input.providerConfig !== undefined
-              ? input.providerConfig
-              : existing.providerConfig ?? undefined,
+              ? (input.providerConfig ?? Prisma.JsonNull)
+              : (existing.providerConfig as Prisma.InputJsonValue | undefined) ??
+                Prisma.JsonNull,
           fallbackPriorityGlobal:
             input.fallbackPriorityGlobal !== undefined
               ? input.fallbackPriorityGlobal
