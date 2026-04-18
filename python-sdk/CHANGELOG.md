@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.20.0...python-sdk@v0.21.0) (2026-04-18)
+
+
+### Features
+
+* **sdk:** add Experiment.print_summary for CI parity with platform runs ([#3318](https://github.com/langwatch/langwatch/issues/3318)) ([942c6ec](https://github.com/langwatch/langwatch/commit/942c6ec70747cbed9ac9828034474a939a7433ab))
+
 ## [0.20.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.19.0...python-sdk@v0.20.0) (2026-04-17)
 
 
