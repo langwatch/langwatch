@@ -114,11 +114,9 @@ async function authenticateRequest(
     return { error: "Invalid auth token.", status: 401 };
   }
 
-  try {
-    await enforcePatCeiling({ prisma, resolved, permission });
-  } catch (error) {
-    const denial = patCeilingDenialResponse(error);
-    return { error: denial.message, status: denial.status };
+  const denial = await enforcePatCeiling({ prisma, resolved, permission });
+  if (denial) {
+    return { error: denial.error, status: denial.status };
   }
 
   const markUsed = () => {
@@ -128,43 +126,6 @@ async function authenticateRequest(
   };
 
   return { project: resolved.project, markUsed };
-}
-
-/**
- * Authenticates via the unified PAT + legacy-key path and enforces the given
- * permission ceiling. Returns either a `{ project }` context on success or
- * `{ error, status }` for the caller to short-circuit with c.json(...).
- */
-async function authenticateRequest(
-  c: Context,
-  permission: Permission,
-): Promise<
-  | { project: Project & { team?: { id: string; organizationId: string } } }
-  | { error: string; status: 401 | 403 }
-> {
-  const credentials = extractCredentials(c);
-  if (!credentials) {
-    return {
-      error:
-        "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
-      status: 401,
-    };
-  }
-
-  const resolved = await TokenResolver.create(prisma).resolve({
-    token: credentials.token,
-    projectId: credentials.projectId,
-  });
-  if (!resolved) {
-    return { error: "Invalid auth token.", status: 401 };
-  }
-
-  const denial = await enforcePatCeiling({ resolved, permission });
-  if (denial) {
-    return { error: denial.error, status: denial.status };
-  }
-
-  return { project: resolved.project };
 }
 
 export const app = new Hono().basePath("/api");

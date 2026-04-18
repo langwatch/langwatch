@@ -69,7 +69,8 @@ export default async function handler(
     });
   }
 
-  const resolved = await TokenResolver.create(prisma).resolve({
+  const tokenResolver = TokenResolver.create(prisma);
+  const resolved = await tokenResolver.resolve({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -82,6 +83,7 @@ export default async function handler(
   // by workflows today, so `workflows:manage` is the closest existing
   // ceiling — VIEWER is correctly blocked, ADMIN/MEMBER pass through.
   const denial = await enforcePatCeiling({
+    prisma,
     resolved,
     permission: "workflows:manage",
   });

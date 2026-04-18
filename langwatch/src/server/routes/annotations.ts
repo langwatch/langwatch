@@ -25,8 +25,9 @@ export const app = new Hono().basePath("/api");
 
 /**
  * Authenticates via the unified PAT + legacy-key path and enforces the given
- * permission ceiling. Returns either a `{ project }` context or an error
- * descriptor the caller surfaces via c.json(...).
+ * permission ceiling. Returns either a `{ project, markUsed }` context or an
+ * error descriptor the caller surfaces via c.json(...). `markUsed` is
+ * fire-and-forget and a no-op for legacy keys.
  */
 async function authenticateRequest(
   c: Context,
@@ -41,7 +42,7 @@ async function authenticateRequest(
     };
   }
 
-  const resolved = await TokenResolver.create(prisma).resolve({
+  const resolved = await tokenResolver.resolve({
     token: credentials.token,
     projectId: credentials.projectId,
   });
@@ -49,12 +50,18 @@ async function authenticateRequest(
     return { error: "Invalid auth token.", status: 401 as const };
   }
 
-  const denial = await enforcePatCeiling({ resolved, permission });
+  const denial = await enforcePatCeiling({ prisma, resolved, permission });
   if (denial) {
     return { error: denial.error, status: denial.status };
   }
 
-  return { project: resolved.project };
+  const markUsed = () => {
+    if (resolved.type === "pat") {
+      tokenResolver.markUsed({ patId: resolved.patId });
+    }
+  };
+
+  return { project: resolved.project, markUsed };
 }
 
 // ---------- GET /api/annotations ----------
