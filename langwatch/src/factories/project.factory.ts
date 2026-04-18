@@ -26,6 +26,7 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   defaultModel: null,
   topicClusteringModel: null,
   embeddingsModel: null,
+  observabilityEndpoint: null,
   s3Endpoint: null,
   s3AccessKeyId: null,
   s3SecretAccessKey: null,
