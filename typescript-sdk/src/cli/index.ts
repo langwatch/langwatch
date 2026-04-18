@@ -722,6 +722,112 @@ virtualKeysCmd
     await impl(id, options);
   });
 
+// Add gateway-budgets command group (AI Gateway)
+const gatewayBudgetsCmd = program
+  .command("gateway-budgets")
+  .description("Manage AI Gateway spend budgets (hierarchical scopes)");
+
+gatewayBudgetsCmd
+  .command("list")
+  .description("List all budgets across scopes")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
+    const { listGatewayBudgetsCommand: impl } = await import("./commands/gateway-budgets/list.js");
+    await impl(options);
+  });
+
+gatewayBudgetsCmd
+  .command("create")
+  .description("Create a new budget (scope + window + limit)")
+  .requiredOption("--name <name>", "Human-readable budget name")
+  .option("--description <desc>", "Optional description")
+  .requiredOption("--scope <kind>", "Budget scope: organization|team|project|virtual-key|principal")
+  .option("--organization <id>", "Organization id (for scope=organization)")
+  .option("--team <id>", "Team id (for scope=team)")
+  .option("--project <id>", "Project id (for scope=project)")
+  .option("--virtual-key <id>", "Virtual key id (for scope=virtual-key)")
+  .option("--principal <id>", "Principal user id (for scope=principal)")
+  .requiredOption("--window <w>", "Budget window: minute|hour|day|week|month|total")
+  .requiredOption("--limit <usd>", "Hard cap in USD (e.g. 100 or 49.99)")
+  .option("--on-breach <action>", "block (default) or warn", "block")
+  .option("--timezone <tz>", "IANA timezone for window boundaries (e.g. Europe/Amsterdam)")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (options: {
+    name: string;
+    description?: string;
+    scope: "organization" | "team" | "project" | "virtual-key" | "principal";
+    organization?: string;
+    team?: string;
+    project?: string;
+    virtualKey?: string;
+    principal?: string;
+    window: string;
+    limit: string;
+    onBreach?: "block" | "warn";
+    timezone?: string;
+    format?: string;
+  }) => {
+    const { createGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/create.js");
+    await impl(options);
+  });
+
+gatewayBudgetsCmd
+  .command("archive <id>")
+  .description("Archive a budget (stops enforcement; does not delete history)")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (id: string, options: { format?: string }) => {
+    const { archiveGatewayBudgetCommand: impl } = await import("./commands/gateway-budgets/archive.js");
+    await impl(id, options);
+  });
+
+// Add gateway-providers command group (AI Gateway)
+const gatewayProvidersCmd = program
+  .command("gateway-providers")
+  .description("Manage AI Gateway provider credential bindings");
+
+gatewayProvidersCmd
+  .command("list")
+  .description("List provider bindings attached to the current project's gateway")
+  .option("-f, --format <format>", "Output format: table (default) or json", "table")
+  .action(async (options: { format?: string }) => {
+    const { listGatewayProvidersCommand: impl } = await import("./commands/gateway-providers/list.js");
+    await impl(options);
+  });
+
+gatewayProvidersCmd
+  .command("create")
+  .description("Bind an existing model-provider to the gateway with optional rate limits")
+  .requiredOption("--model-provider <id>", "Existing model-provider id to bind")
+  .option("--slot <slot>", "Optional free-text slot tag (e.g. 'primary', 'eu-region')")
+  .option("--rate-limit-rpm <rpm>", "Requests per minute")
+  .option("--rate-limit-tpm <tpm>", "Tokens per minute")
+  .option("--rate-limit-rpd <rpd>", "Requests per day")
+  .option("--rotation-policy <p>", "auto|manual|external_secret_store")
+  .option("--fallback-priority <n>", "Global fallback priority (lower = earlier)")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (options: {
+    modelProvider: string;
+    slot?: string;
+    rateLimitRpm?: string;
+    rateLimitTpm?: string;
+    rateLimitRpd?: string;
+    rotationPolicy?: "auto" | "manual" | "external_secret_store";
+    fallbackPriority?: string;
+    format?: string;
+  }) => {
+    const { createGatewayProviderCommand: impl } = await import("./commands/gateway-providers/create.js");
+    await impl(options);
+  });
+
+gatewayProvidersCmd
+  .command("disable <id>")
+  .description("Disable a provider binding (stops routing traffic to it)")
+  .option("-f, --format <format>", "Output format: text (default) or json", "text")
+  .action(async (id: string, options: { format?: string }) => {
+    const { disableGatewayProviderCommand: impl } = await import("./commands/gateway-providers/disable.js");
+    await impl(id, options);
+  });
+
 // Add annotation command group
 const annotationCmd = program
   .command("annotation")
