@@ -77,7 +77,11 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import { createLogger } from "~/utils/logger/server";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import { TokenResolver } from "~/server/pat/token-resolver";
-import { extractCredentials } from "~/server/pat/auth-middleware";
+import {
+  enforcePatCeiling,
+  extractCredentials,
+  patCeilingDenialResponse,
+} from "~/server/pat/auth-middleware";
 
 const logger = createLogger("langwatch:misc");
 const tokenResolver = TokenResolver.create(prisma);
@@ -700,6 +704,20 @@ app.post("/track_event", async (c) => {
   });
   if (!resolved) {
     return c.json({ message: "Invalid auth token." }, 401);
+  }
+
+  // `traces:create` gates event tracking — tracked events are written into
+  // the same traces pipeline as spans, so a read-only PAT should not be
+  // able to create them.
+  try {
+    await enforcePatCeiling({
+      prisma,
+      resolved,
+      permission: "traces:create",
+    });
+  } catch (error) {
+    const denial = patCeilingDenialResponse(error);
+    return c.json({ message: denial.message }, denial.status);
   }
 
   const project = resolved.project;

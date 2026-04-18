@@ -29,7 +29,11 @@ import {
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
 import { createLogger } from "../../utils/logger/server";
 import { TokenResolver } from "../pat/token-resolver";
-import { enforcePatCeiling, extractCredentials } from "../pat/auth-middleware";
+import {
+  enforcePatCeiling,
+  extractCredentials,
+  patCeilingDenialResponse,
+} from "../pat/auth-middleware";
 
 const logger = createLogger("langwatch.collector");
 const tokenResolver = TokenResolver.create(prisma);
@@ -97,17 +101,19 @@ app.post(
     // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
     // access — ADMIN and MEMBER have it; VIEWER does not, preventing
     // read-only PATs from ingesting traces.
-    const denial = await enforcePatCeiling({
-      prisma,
-      resolved,
-      permission: "traces:create",
-    });
-    if (denial) {
+    try {
+      await enforcePatCeiling({
+        prisma,
+        resolved,
+        permission: "traces:create",
+      });
+    } catch (error) {
+      const denial = patCeilingDenialResponse(error);
       logger.warn(
         { projectId: resolved.project.id, patId: resolved.type === "pat" ? resolved.patId : undefined },
         "collector request denied by PAT ceiling",
       );
-      return c.json({ message: denial.error }, denial.status);
+      return c.json({ message: denial.message }, denial.status);
     }
 
     const project = resolved.project;

@@ -73,6 +73,7 @@ import type { Permission } from "~/server/api/rbac";
 import {
   enforcePatCeiling,
   extractCredentials,
+  patCeilingDenialResponse,
 } from "~/server/pat/auth-middleware";
 import { TokenResolver } from "~/server/pat/token-resolver";
 
@@ -114,9 +115,11 @@ async function authenticateRequest(
     return { error: "Invalid auth token.", status: 401 };
   }
 
-  const denial = await enforcePatCeiling({ prisma, resolved, permission });
-  if (denial) {
-    return { error: denial.error, status: denial.status };
+  try {
+    await enforcePatCeiling({ prisma, resolved, permission });
+  } catch (error) {
+    const denial = patCeilingDenialResponse(error);
+    return { error: denial.message, status: denial.status };
   }
 
   const markUsed = () => {
