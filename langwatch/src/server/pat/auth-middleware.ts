@@ -1,7 +1,6 @@
-import type { Project } from "@prisma/client";
+import type { PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import { TokenResolver, type ResolvedToken } from "./token-resolver";
-import { prisma } from "~/server/db";
 import type { Permission } from "~/server/api/rbac";
 import { resolvePatPermission } from "~/server/rbac/role-binding-resolver";
 import { createLogger } from "~/utils/logger/server";
@@ -82,8 +81,21 @@ function extractCredentials(c: {
  *   - Legacy (X-Auth-Token: sk-lw-... unchanged)
  *
  * Sets `project`, `patId`, `patUserId`, `patOrganizationId` on the context.
+ *
+ * Takes a PrismaClient via injection so the middleware isn't coupled to the
+ * module-scope `~/server/db` global and can be exercised with a test client
+ * or a per-request Prisma instance.
+ *
+ * markUsed is late — called only after `next()` returns a 2xx response. This
+ * keeps `lastUsedAt` aligned with *successful* request outcomes rather than
+ * merely successful authentication, mirroring the route-owned pattern in
+ * `collector.ts`.
  */
-export function createUnifiedAuthMiddleware(): MiddlewareHandler {
+export function createUnifiedAuthMiddleware({
+  prisma,
+}: {
+  prisma: PrismaClient;
+}): MiddlewareHandler {
   const resolver = TokenResolver.create(prisma);
 
   return async (c, next) => {
@@ -100,44 +112,12 @@ export function createUnifiedAuthMiddleware(): MiddlewareHandler {
       );
     }
 
+    let resolved: ResolvedToken | null;
     try {
-      const resolved = await resolver.resolve({
+      resolved = await resolver.resolve({
         token: credentials.token,
         projectId: credentials.projectId,
       });
-
-      if (!resolved) {
-        logger.warn(
-          {
-            hasToken: true,
-            tokenType: credentials.token.startsWith("pat-lw-")
-              ? "pat"
-              : credentials.token.startsWith("sk-lw-")
-                ? "legacy"
-                : "unknown",
-            hasProjectId: !!credentials.projectId,
-          },
-          "Authentication failed: invalid credentials",
-        );
-        return c.json(
-          { error: "Unauthorized", message: "Invalid credentials" },
-          401,
-        );
-      }
-
-      c.set("project", resolved.project);
-
-      if (resolved.type === "pat") {
-        c.set("patId", resolved.patId);
-        c.set("patUserId", resolved.userId);
-        c.set("patOrganizationId", resolved.organizationId);
-        // Middleware path: mark used after successful authentication.
-        // Downstream routes run their own validation; the audit trail
-        // here reflects "last successful authentication" per-route.
-        resolver.markUsed({ patId: resolved.patId });
-      }
-
-      c.set("resolvedToken", resolved);
     } catch (error) {
       logger.error(
         {
@@ -157,11 +137,48 @@ export function createUnifiedAuthMiddleware(): MiddlewareHandler {
       );
     }
 
+    if (!resolved) {
+      logger.warn(
+        {
+          hasToken: true,
+          tokenType: credentials.token.startsWith("pat-lw-")
+            ? "pat"
+            : credentials.token.startsWith("sk-lw-")
+              ? "legacy"
+              : "unknown",
+          hasProjectId: !!credentials.projectId,
+        },
+        "Authentication failed: invalid credentials",
+      );
+      return c.json(
+        { error: "Unauthorized", message: "Invalid credentials" },
+        401,
+      );
+    }
+
+    c.set("project", resolved.project);
+    c.set("resolvedToken", resolved);
+
+    if (resolved.type === "pat") {
+      c.set("patId", resolved.patId);
+      c.set("patUserId", resolved.userId);
+      c.set("patOrganizationId", resolved.organizationId);
+    }
+
     await next();
+
+    // Late markUsed: only when the handler produced a success response. Keeps
+    // lastUsedAt tied to successful request outcomes, not mere authentication.
+    if (
+      resolved.type === "pat" &&
+      c.res.status >= 200 &&
+      c.res.status < 300
+    ) {
+      resolver.markUsed({ patId: resolved.patId });
+    }
   };
 }
 
-// Re-export for backwards compatibility with existing auth middleware consumers
 export { extractCredentials };
 
 /**
@@ -174,11 +191,17 @@ export { extractCredentials };
  * Returns `null` when access is granted, or an error descriptor the caller
  * can surface as a 403. This helper exists so both Hono middleware and
  * inline route handlers (collector, otel) share one enforcement path.
+ *
+ * `prisma` is injected rather than imported from module scope so the helper
+ * doesn't leak infrastructure; callers already hold a client to construct
+ * TokenResolver and can pass the same instance.
  */
 export async function enforcePatCeiling({
+  prisma,
   resolved,
   permission,
 }: {
+  prisma: PrismaClient;
   resolved: ResolvedToken;
   permission: Permission;
 }): Promise<{ error: string; status: 403 } | null> {
@@ -219,11 +242,16 @@ export async function enforcePatCeiling({
 /**
  * Hono middleware that applies the PAT ceiling for a specific permission.
  * Must be chained AFTER createUnifiedAuthMiddleware — reads `resolvedToken`
- * from context.
+ * from context. Accepts a PrismaClient via injection so enforcement never
+ * reaches for a module-scope client.
  */
-export function requirePatPermission(
-  permission: Permission,
-): MiddlewareHandler {
+export function requirePatPermission({
+  prisma,
+  permission,
+}: {
+  prisma: PrismaClient;
+  permission: Permission;
+}): MiddlewareHandler {
   return async (c, next) => {
     const resolved = c.get("resolvedToken") as ResolvedToken | undefined;
     if (!resolved) {
@@ -234,7 +262,7 @@ export function requirePatPermission(
       );
     }
 
-    const denial = await enforcePatCeiling({ resolved, permission });
+    const denial = await enforcePatCeiling({ prisma, resolved, permission });
     if (denial) {
       return c.json({ error: "Forbidden", message: denial.error }, denial.status);
     }
