@@ -1,0 +1,254 @@
+---
+title: Prometheus alert rules
+description: Production-ready PromQL alert rules for the LangWatch AI Gateway.
+sidebarTitle: Prometheus alerts
+---
+
+The gateway exposes a `/metrics` endpoint scrapable by any standard Prometheus setup. This cookbook is a drop-in set of alert rules that cover what you actually need to page on: provider outages, budget bypass, auth cache degradation, streaming bugs, and cost anomalies.
+
+Copy this into `alerts/langwatch-gateway.yml` and `prometheus reload` or `kubectl rollout restart` your Prometheus Operator-managed `PrometheusRule` CR.
+
+## The ruleset
+
+```yaml
+groups:
+  - name: langwatch-gateway
+    interval: 30s
+    rules:
+
+      # ─── Reliability ─────────────────────────────────────────────────────
+
+      - alert: GatewayHighErrorRate
+        expr: |
+          sum(rate(gateway_requests_total{status=~"5.."}[5m]))
+            / sum(rate(gateway_requests_total[5m])) > 0.05
+        for: 5m
+        labels: { severity: page, team: ai-platform }
+        annotations:
+          summary: "Gateway 5xx rate > 5% over 5m"
+          description: |
+            End-user requests to the gateway are returning 5xx at {{ printf "%.1f" (mulScalar $value 100) }}%.
+            Check /readyz on pods, then upstream provider status.
+
+      - alert: GatewayReadinessFlapping
+        expr: |
+          changes(kube_pod_status_ready{
+              condition="true",
+              namespace="langwatch",
+              pod=~"langwatch-gateway-.*"
+            }[10m]) > 4
+        for: 5m
+        labels: { severity: warn, team: ai-platform }
+        annotations:
+          summary: "Gateway pod {{ $labels.pod }} readiness flapped > 4 times in 10m"
+          description: "Pod is flipping ready/not-ready. Investigate /readyz output."
+
+      # ─── Provider health ─────────────────────────────────────────────────
+
+      - alert: CircuitOpenTooLong
+        expr: gateway_circuit_state{state="open"} == 1
+        for: 5m
+        labels: { severity: page, team: ai-platform }
+        annotations:
+          summary: "Circuit open for provider {{ $labels.credential }} > 5m"
+          description: |
+            Gateway has tripped the breaker and is skipping this provider.
+            Verify the provider is actually having issues (check X-LangWatch-
+            Provider headers on recent failures + provider status page).
+
+      - alert: ExcessiveFallback
+        expr: |
+          sum(rate(gateway_requests_total{fallback_count!="0"}[10m]))
+            / sum(rate(gateway_requests_total[10m])) > 0.1
+        for: 10m
+        labels: { severity: warn, team: ai-platform }
+        annotations:
+          summary: "> 10% of requests falling back over 10m"
+          description: |
+            Primary provider is degraded enough that > 10% of requests are
+            walking the fallback chain. Not paging because fallback is
+            working as designed, but the primary needs investigation.
+
+      # ─── Budget governance ───────────────────────────────────────────────
+
+      - alert: StreamingUsageMissing
+        expr: |
+          sum(rate(gateway_requests_total{
+            stream="true", usage_reported="false"
+          }[10m])) > 0
+        for: 10m
+        labels: { severity: page, team: ai-platform }
+        annotations:
+          summary: "Streaming requests without usage reported"
+          description: |
+            Streaming request completing without token counts means $0 is
+            being debited to the budget — budgets are silently bypassed.
+            OpenAI requires stream_options.include_usage=true on the client.
+            See /ai-gateway/streaming#usage-extraction-critical-for-streaming-budgets.
+
+      - alert: BudgetDebitOutboxStale
+        expr: gateway_budget_debit_outbox_age_seconds > 600
+        for: 5m
+        labels: { severity: page, team: ai-platform }
+        annotations:
+          summary: "Budget debit outbox not flushed in 10m"
+          description: |
+            Gateway can't reach the control plane /budget/debit endpoint.
+            Customer budgets are NOT being debited in real-time; near-limit
+            customers may be over-consuming. Check control-plane health.
+
+      - alert: BudgetCheckLiveFailRate
+        expr: |
+          sum(rate(gateway_budget_live_check_total{outcome="fail_open"}[5m]))
+            / sum(rate(gateway_budget_live_check_total[5m])) > 0.2
+        for: 5m
+        labels: { severity: warn, team: ai-platform }
+        annotations:
+          summary: "Live /budget/check failing open > 20%"
+          description: |
+            Live reconciliation for near-limit scopes is timing out or erroring
+            and falling back to the cached snapshot. Near-limit customers may
+            briefly over-consume. Check control-plane /budget/check latency.
+
+      # ─── Auth cache ──────────────────────────────────────────────────────
+
+      - alert: AuthCacheBootstrapFailing
+        expr: |
+          increase(gateway_auth_cache_bootstrap_errors_total[15m]) > 0
+          and on() gateway_auth_cache_bootstrap_last_success_timestamp_seconds
+                 < (time() - 300)
+        for: 5m
+        labels: { severity: page, team: ai-platform }
+        annotations:
+          summary: "Auth cache hasn't bootstrapped in > 5m"
+          description: |
+            New pods can't pre-warm from the control plane; first-request
+            latency will spike. Check control-plane / bootstrap endpoint.
+
+      - alert: AuthCacheHitRateDropped
+        expr: |
+          sum(rate(gateway_auth_cache_hits_total{layer="l1"}[5m]))
+            / sum(rate(gateway_auth_cache_lookups_total[5m])) < 0.9
+        for: 15m
+        labels: { severity: warn, team: ai-platform }
+        annotations:
+          summary: "L1 auth cache hit rate < 90% for 15m"
+          description: |
+            Sustained cache-miss rate means every miss costs a /resolve-key
+            round-trip to the control plane. Investigate: recent deploy churn,
+            /changes feed reliability, or LRU eviction under load.
+
+      # ─── Cost & anomaly ──────────────────────────────────────────────────
+
+      - alert: CostPerRequestAnomaly
+        expr: |
+          sum(rate(gateway_cost_usd_total[5m]))
+            / sum(rate(gateway_requests_total{status="200"}[5m]))
+          > 2 * avg_over_time((
+              sum(rate(gateway_cost_usd_total[5m]))
+              / sum(rate(gateway_requests_total{status="200"}[5m]))
+            )[1d:5m])
+        for: 15m
+        labels: { severity: warn, team: ai-platform }
+        annotations:
+          summary: "Average cost/request > 2× daily baseline for 15m"
+          description: |
+            Either a customer switched to an expensive model, a prompt
+            regressed (longer inputs), or a cache mode is off. Check
+            /gateway/usage and X-LangWatch-Cache headers.
+
+      # ─── Blocked-by-policy noise ────────────────────────────────────────
+
+      - alert: PolicyBlockSpike
+        expr: |
+          sum by (reason) (rate(gateway_policy_blocks_total[5m])) > 10
+        for: 5m
+        labels: { severity: warn, team: ai-platform }
+        annotations:
+          summary: "> 10 req/s blocked by policy reason={{ $labels.reason }}"
+          description: |
+            Legit block storm (a customer's runtime is trying a banned tool
+            repeatedly) or a regression in the blocked_patterns config.
+            Check LangWatch traces filtered on
+            attr.langwatch.policy.blocked != "".
+```
+
+## Why these and not others
+
+The temptation with Prometheus rules is to alert on everything. Don't. Each rule above either:
+
+- **Represents real impact** (5xx rate, circuit open, usage missing) — customers or budgets are actively affected.
+- **Is a leading indicator of incoming impact** (excessive fallback, L1 cache drop, outbox stale) — things get worse soon if ignored.
+- **Is a cost guardrail** (streaming usage missing, cost anomaly) — silent over-spend is a real failure mode for AI infra.
+
+Rules we explicitly **do NOT** have:
+
+- **Individual provider 429s** — these are normal operating state; fallback + circuit handle them without a human.
+- **High latency** — the gateway's added latency is bounded; if a provider is slow, alerting on it is alerting on the provider.
+- **Cache miss rate on upstream** — cache is passthrough; if Anthropic doesn't hit cache that's not the gateway's problem.
+
+## Slack / PagerDuty routing
+
+Route `severity: page` to PagerDuty, `severity: warn` to Slack. Example Alertmanager config:
+
+```yaml
+route:
+  receiver: slack-gateway
+  group_by: [alertname, team]
+  routes:
+    - matchers: [severity="page", team="ai-platform"]
+      receiver: pagerduty-ai-platform
+      continue: true
+    - matchers: [severity="warn", team="ai-platform"]
+      receiver: slack-gateway
+
+receivers:
+  - name: pagerduty-ai-platform
+    pagerduty_configs:
+      - routing_key: "<pager-duty-service-key>"
+  - name: slack-gateway
+    slack_configs:
+      - channel: "#ai-gateway-alerts"
+        title: "{{ .GroupLabels.alertname }}"
+        text: "{{ range .Alerts }}{{ .Annotations.description }}{{ end }}"
+```
+
+## Verifying rules before deploy
+
+```bash
+promtool check rules alerts/langwatch-gateway.yml
+promtool test rules alerts/langwatch-gateway.test.yml
+```
+
+Example unit test:
+
+```yaml
+rule_files:
+  - alerts/langwatch-gateway.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'gateway_requests_total{status="500"}'
+        values: '0 1 2 3 4 5 6 7 8 9 10'
+      - series: 'gateway_requests_total{status="200"}'
+        values: '0 0 0 0 0 0 0 0 0 0 0'
+    alert_rule_test:
+      - eval_time: 10m
+        alertname: GatewayHighErrorRate
+        exp_alerts:
+          - exp_labels: { severity: page, team: ai-platform }
+```
+
+## Grafana dashboard
+
+A matching Grafana dashboard JSON is at [/ai-gateway/self-hosting/helm#monitoring](/ai-gateway/self-hosting/helm#monitoring). Panels mirror the alert rules so you can visually see what's about to fire.
+
+## See also
+
+- [Troubleshooting](/ai-gateway/troubleshooting) — paged-at-3am runbook for each symptom.
+- [Observability](/ai-gateway/observability) — span attributes + metric names surface.
+- [Streaming](/ai-gateway/streaming) — the include_usage gotcha these alerts catch.
+- [Budgets](/ai-gateway/budgets) — why budget_debit_outbox_age matters.
