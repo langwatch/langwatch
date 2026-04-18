@@ -14,6 +14,7 @@ function createMockPrisma() {
     },
     roleBinding: {
       create: vi.fn(),
+      createMany: vi.fn(),
     },
     $transaction: vi.fn((cb: (tx: any) => Promise<any>) => cb(mock)),
   } as any;
@@ -44,12 +45,7 @@ describe("PatService", () => {
         revokedAt: null,
       });
 
-      prisma.roleBinding.create.mockResolvedValue({
-        id: "rb-1",
-        role: "MEMBER",
-        scopeType: "ORGANIZATION",
-        scopeId: "org-1",
-      });
+      prisma.roleBinding.createMany.mockResolvedValue({ count: 1 });
 
       const result = await service.create({
         name: "CI Pipeline",
@@ -64,7 +60,7 @@ describe("PatService", () => {
       expect(result.pat.id).toBe("pat-1");
       expect(result.pat.name).toBe("CI Pipeline");
       expect(prisma.personalAccessToken.create).toHaveBeenCalledOnce();
-      expect(prisma.roleBinding.create).toHaveBeenCalledOnce();
+      expect(prisma.roleBinding.createMany).toHaveBeenCalledOnce();
     });
   });
 
