@@ -1,9 +1,155 @@
 ---
 title: Health Checks
-description: Health Checks — LangWatch AI Gateway.
+description: Liveness, readiness, and startup probes for the LangWatch AI Gateway.
 sidebarTitle: Health Checks
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+The gateway exposes three HTTP endpoints for Kubernetes probes. Each is deliberately scoped — a passing `/readyz` must mean "this replica can safely serve customer traffic", and nothing less.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Endpoint summary
+
+| Endpoint | Used by | Validates |
+|---|---|---|
+| `/livez` | Kubernetes `livenessProbe` | Go runtime is responsive (goroutine count under threshold, no deadlock on the main mutex) |
+| `/readyz` | Kubernetes `readinessProbe` + loadbalancer | L1 auth cache populated, control-plane reachable, at least one provider credential cache entry, outbox-writer heartbeat fresh |
+| `/healthz` | Kubernetes `startupProbe` | Bootstrap bundle fetched successfully at least once (or bootstrap disabled) |
+| `/metrics` | Prometheus | Counter + histogram surface (see [Observability](/ai-gateway/observability)) |
+
+## `/livez`
+
+```
+GET /livez
+→ 200 OK
+{ "status": "alive", "pid": 1, "goroutines": 187, "heap_mb": 124 }
+```
+
+Cheap by design. Never does network I/O. If this returns non-200 the kubelet kills the pod. Kubernetes defaults are fine:
+
+```yaml
+livenessProbe:
+  httpGet: { path: /livez, port: 8080 }
+  periodSeconds: 10
+  failureThreshold: 3
+```
+
+## `/readyz`
+
+```
+GET /readyz
+→ 200 OK
+{
+  "status": "ready",
+  "node_id": "gw_01HZX...",
+  "checks": {
+    "control_plane":        "ok",
+    "auth_cache_l1":        "ok (entries=1243)",
+    "auth_cache_bootstrap": "ok (last=13s)",
+    "outbox_writer":        "ok (pending=4, last_flush=250ms)",
+    "providers":            "ok (healthy=5, degraded=0, circuit_open=0)"
+  }
+}
+```
+
+On failure:
+
+```
+→ 503 Service Unavailable
+{
+  "status": "not_ready",
+  "checks": {
+    "control_plane": "error: timeout calling /api/internal/gateway/changes after 2s"
+  }
+}
+```
+
+This is the load-bearing probe. **Do not weaken it.** A replica flipping to not-ready because its cache bootstrap failed is correct behaviour — the loadbalancer should route around it, not drain the pod and spin up an identical replica with the same dependency issue.
+
+Example probe config:
+
+```yaml
+readinessProbe:
+  httpGet: { path: /readyz, port: 8080 }
+  periodSeconds: 5
+  failureThreshold: 2
+  timeoutSeconds: 3
+```
+
+### What `/readyz` does NOT check
+
+- **Every provider's live health**: if OpenAI is down, the gateway is still ready — it fails over to Anthropic per VK fallback chains. Reporting ready=false when a single upstream is down would multiply downstream incidents.
+- **Redis L2**: optional infrastructure. L1 is authoritative; Redis is a warm cache shared across replicas.
+- **PostgreSQL**: the gateway never talks to Postgres directly. The control plane handles that.
+
+The blast radius of readiness is specifically: "can this replica authenticate a request and forward it somewhere sensible?"
+
+## `/healthz` (startup)
+
+```
+GET /healthz
+→ 200 OK
+{
+  "status": "healthy",
+  "uptime_seconds": 12,
+  "bootstrap_complete": true,
+  "bootstrap_key_count": 1243
+}
+```
+
+Returns 503 until the startup bootstrap is complete OR `LW_GATEWAY_AUTH_CACHE_BOOTSTRAP=false`. Use this for startup probes with a generous `failureThreshold` (30×5s = 150s) — tenants with 50K+ VKs take 2–3 seconds to bootstrap, and restarting a pod for that is expensive.
+
+```yaml
+startupProbe:
+  httpGet: { path: /healthz, port: 8080 }
+  periodSeconds: 5
+  failureThreshold: 30
+  timeoutSeconds: 3
+```
+
+## End-to-end synthetic check
+
+`/readyz` validates internal state but not the actual request path. For that, run a synthetic check:
+
+```bash
+# Blackbox exporter probe — test VK configured in advance
+curl --fail --max-time 5 \
+  -H "Authorization: Bearer $LW_SYNTHETIC_VK" \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}],"max_tokens":1}' \
+  https://gateway.langwatch.ai/v1/chat/completions
+```
+
+Run this from outside the cluster every 30 s. On alert:
+
+1. Check `X-LangWatch-Request-Id` in the error response.
+2. Check the LangWatch trace for that request.
+3. If the gateway returned 5xx, pull the gateway logs filtered by `node_id`.
+4. If the gateway returned upstream's error verbatim, the gateway is healthy — the provider is degraded.
+
+## Graceful shutdown
+
+`SIGTERM` triggers:
+
+1. Immediately: `/readyz` starts returning 503. LB removes the pod from rotation (~5 s depending on LB config).
+2. 0–30 s: existing in-flight requests complete; streams continue until their source closes or the upstream finishes.
+3. 30 s: remaining connections closed; outbox writer flushes pending debits.
+4. 32 s: process exits with code 0.
+
+Match your Kubernetes spec:
+
+```yaml
+terminationGracePeriodSeconds: 35
+lifecycle:
+  preStop:
+    exec: { command: ["sleep", "3"] }   # gives LB time to notice /readyz=503
+```
+
+Without the `preStop`, a small fraction of in-flight requests during rolling deploys hit a replica that has already closed its listener — 502 from the LB. The 3-second sleep fixes it.
+
+## Common failures
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| Pod restarts every 2 min, `/livez` passes, `/readyz` flaps | Control-plane timeout on `/changes` | Investigate control-plane latency; temporarily bump `LW_GATEWAY_AUTH_CACHE_CHANGES_POLL_SECONDS` |
+| Startup probe fails 30× in a row | Control-plane unreachable or `LW_VIRTUAL_KEY_PEPPER` mismatch | Check firewall, verify secret match between control plane and gateway |
+| `/readyz` shows `outbox_writer: stale (last_flush=12m)` | Control-plane `/budget/debit` returning persistent 5xx | Control plane incident — gateway still serves but stops debiting. Budgets go stale |
+| Ready pod returns 502 during rolling deploy | Missing `preStop` sleep | Add the 3-second sleep above |

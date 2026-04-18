@@ -1,9 +1,113 @@
 ---
-title: Opencode
-description: Opencode — LangWatch AI Gateway.
-sidebarTitle: Opencode
+title: opencode
+description: Route the opencode terminal agent through the LangWatch AI Gateway.
+sidebarTitle: opencode
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+[opencode](https://opencode.ai) is an OSS terminal coding agent with pluggable providers. Because it supports any OpenAI-compatible or Anthropic-compatible endpoint, you can point it at the LangWatch AI Gateway and pick up budgets, guardrails, blocked-pattern filters, and trace propagation without changing the agent itself.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Setup
+
+opencode reads `~/.config/opencode/opencode.json` (or the project-local `opencode.json`). Configure the gateway as a custom provider:
+
+```json
+{
+  "provider": {
+    "langwatch-gateway": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "LangWatch Gateway",
+      "options": {
+        "baseURL": "https://gateway.langwatch.ai/v1",
+        "apiKey": "{env:LANGWATCH_VK}"
+      },
+      "models": {
+        "gpt-5-mini": { "name": "GPT-5 mini (via gateway)" },
+        "claude-haiku-4-5-20251001": { "name": "Claude Haiku 4.5 (via gateway)" },
+        "claude-sonnet-4-6": { "name": "Claude Sonnet 4.6 (via gateway)" }
+      }
+    }
+  }
+}
+```
+
+Then set your virtual key and run opencode:
+
+```bash
+export LANGWATCH_VK="lw_vk_live_01HZX..."
+opencode
+```
+
+Pick the gateway provider in the model picker (`Ctrl-X M`).
+
+## Using Anthropic-shape models via `/v1/messages`
+
+If you want opencode to hit the Anthropic-native endpoint (preserves `cache_control` blocks byte-for-byte), use the `@ai-sdk/anthropic` provider instead:
+
+```json
+{
+  "provider": {
+    "langwatch-gateway-anthropic": {
+      "npm": "@ai-sdk/anthropic",
+      "name": "LangWatch Gateway (Anthropic)",
+      "options": {
+        "baseURL": "https://gateway.langwatch.ai",
+        "apiKey": "{env:LANGWATCH_VK}"
+      },
+      "models": {
+        "claude-sonnet-4-6": { "name": "Claude Sonnet 4.6 (cache-aware)" }
+      }
+    }
+  }
+}
+```
+
+The gateway serves both `/v1/chat/completions` and `/v1/messages` on the same VK. Pick the shape opencode knows how to emit for your model family.
+
+## Trace propagation
+
+opencode passes request-level headers through its provider config. To make gateway spans nest under the opencode trace:
+
+```json
+{
+  "provider": {
+    "langwatch-gateway": {
+      "options": {
+        "headers": {
+          "traceparent": "{env:OPENCODE_TRACEPARENT}",
+          "X-LangWatch-Thread-Id": "{env:OPENCODE_SESSION_ID}"
+        }
+      }
+    }
+  }
+}
+```
+
+If `OPENCODE_TRACEPARENT` is set by the shell wrapper, the gateway parents its span under that trace and the cost is attributed to the opencode session — no double counting. See [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation) for the header shape.
+
+## Governance recipes
+
+### Hackday mode — disable cache, warn on spend
+
+```json
+{
+  "provider": {
+    "langwatch-gateway": {
+      "options": {
+        "headers": { "X-LangWatch-Cache": "disable" }
+      }
+    }
+  }
+}
+```
+
+Pair with a `principal` budget on the hackday VK: window `day`, limit `$20`, `on_breach: warn`. Engineers see a warning but aren't blocked mid-experiment.
+
+### Block dangerous shell tools
+
+VK `blocked_patterns.tools: ["bash", "shell", "exec"]`. opencode requests a tool with that name → `403 tool_not_allowed` before it ever leaves the gateway. See [Blocked Patterns](/ai-gateway/blocked-patterns).
+
+## Troubleshooting
+
+- **Model picker shows only stock providers** — ensure `opencode.json` is in `~/.config/opencode/` or `$PWD`. opencode logs the loaded config path on startup.
+- **`401 invalid_api_key`** — `{env:LANGWATCH_VK}` didn't expand. Export the env var before launching opencode.
+- **Streaming hangs mid-response** — check `X-LangWatch-Request-Id` against the LangWatch trace; gateway emits a terminal `event: error` on mid-stream failures (it won't silently switch providers). See [Streaming](/ai-gateway/streaming).

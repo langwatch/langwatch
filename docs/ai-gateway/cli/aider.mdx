@@ -1,9 +1,80 @@
 ---
 title: Aider
-description: Aider — LangWatch AI Gateway.
+description: Route Aider through the LangWatch AI Gateway for team governance and tracing.
 sidebarTitle: Aider
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+[Aider](https://aider.chat) is a CLI pair-programmer that edits files in your repo via LLM round-trips. It supports any OpenAI-compatible endpoint via `--openai-api-base`, which is exactly what the LangWatch AI Gateway exposes.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Setup
+
+```bash
+export OPENAI_API_KEY="lw_vk_live_01HZX..."
+export OPENAI_API_BASE="https://gateway.langwatch.ai/v1"
+
+aider --model gpt-5-mini
+```
+
+For Anthropic Claude models, Aider uses `litellm` under the hood — it will route `anthropic/claude-*` model names through its Anthropic handler, which uses `ANTHROPIC_BASE_URL`:
+
+```bash
+export ANTHROPIC_API_KEY="lw_vk_live_01HZX..."
+export ANTHROPIC_BASE_URL="https://gateway.langwatch.ai"
+
+aider --model anthropic/claude-sonnet-4-6
+```
+
+This hits the gateway's `/v1/messages` endpoint, which is Anthropic-native and preserves `cache_control` blocks byte-for-byte (load-bearing for Aider's repo-map caching — see below).
+
+## Cache-aware repo maps
+
+Aider sends your repo map as a long system prompt (often 20–50k tokens). Anthropic caches the repo map with `cache_control: {type: "ephemeral"}`, giving a 90% discount on cache hits. The gateway preserves these cache markers on `/v1/messages`, so your Aider session pays full price once and discounted price on every follow-up in the 5-minute cache window.
+
+For this to work:
+
+1. Use `/v1/messages` (Anthropic shape), not `/v1/chat/completions`.
+2. Set VK `cache.mode: respect` (the default). Do NOT use `cache.mode: disable` with Aider — it 10×s your Claude bill.
+
+See [Caching Passthrough](/ai-gateway/caching-passthrough) for the complete contract.
+
+## Trace propagation
+
+Aider doesn't natively emit a trace, but you can thread one manually:
+
+```bash
+python -c "import uuid; print('00-{:032x}-{:016x}-01'.format(uuid.uuid4().int, uuid.uuid4().int >> 64))" > /tmp/aider-trace
+export OPENAI_EXTRA_HEADERS="{\"traceparent\": \"$(cat /tmp/aider-trace)\", \"X-LangWatch-Thread-Id\": \"aider-$(date +%s)\"}"
+```
+
+<Note>`OPENAI_EXTRA_HEADERS` passthrough works with `openai` Python SDK ≥ v1.30. Aider versions pinned to older SDKs ignore it.</Note>
+
+Every request from that Aider session shares a trace id; the gateway nests its span under it and no cost is double-attributed. See [SDKs → trace propagation](/ai-gateway/sdks/python#trace-propagation) for the generator helper.
+
+## Governance recipes
+
+### Per-engineer Aider budget
+
+- Scope: `principal`, target: the engineer.
+- Window: `day`, limit: `$25`.
+- `on_breach`: `block` (Aider errors out cleanly — better than a $400 mistake).
+
+### Block destructive tools
+
+Aider uses a tool-based interface for applying diffs. If you want to route Aider through a read-only VK (for demo purposes):
+
+- VK `blocked_patterns.tools`: `["shell", "run"]`.
+
+Aider's `/run` command returns `403 tool_not_allowed` and the agent surfaces the error.
+
+### Fallback to a cheaper model on 429
+
+Chain: `openai-primary → openai-cheap-backup` (same provider, different-region key with a lower quota).
+
+When OpenAI rate-limits your primary, Aider keeps working at slightly degraded quality instead of erroring. See [Fallback Chains](/ai-gateway/providers/fallback-chains).
+
+## Troubleshooting
+
+- **Aider complains "invalid_api_key"** — verify you exported `OPENAI_API_KEY` with the VK value, not your real OpenAI key.
+- **`ANTHROPIC_BASE_URL` ignored** — Aider's litellm handler needs litellm ≥ v1.40; earlier versions hardcode `api.anthropic.com`.
+- **Cache misses on repo maps** — confirm your model is `anthropic/*` (uses `/v1/messages`) and VK `cache.mode` is `respect`. `disable` defeats the Anthropic discount.
+- **Gateway returns `413 payload_too_large`** — Aider can send 100k+ token prompts on large repos. Check the gateway's `LW_GATEWAY_MAX_BODY_BYTES` setting (default 10MB).

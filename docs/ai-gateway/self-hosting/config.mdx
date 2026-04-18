@@ -1,9 +1,82 @@
 ---
 title: Config
-description: Config — LangWatch AI Gateway.
+description: Environment variables and configuration for self-hosted LangWatch AI Gateway deployments.
 sidebarTitle: Config
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+The gateway is configured entirely through environment variables — no YAML or config files. Defaults are safe for production; every value below is overridable via Helm values or plain env vars.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+## Secrets
+
+These MUST be provided via a Kubernetes Secret (or the equivalent on non-Kubernetes deployments) — never baked into an image.
+
+| Var | Purpose | Shared with control plane? |
+|---|---|---|
+| `LW_GATEWAY_INTERNAL_SECRET` | HMAC secret used for `/api/internal/gateway/*` calls between gateway and LangWatch control plane | Yes — same value in both |
+| `LW_GATEWAY_JWT_SECRET` | HS256 secret for signing the short-lived JWT returned by `/resolve-key` | Yes |
+| `LW_VIRTUAL_KEY_PEPPER` | Peppered HMAC secret used to hash virtual-key secrets at rest | Control plane only; gateway never sees it |
+| `REDIS_URL` | Optional L2 cache for resolved VKs (shared across gateway replicas) | Gateway only |
+
+Rotate `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` together — the gateway supports a 10-minute overlap window (`LW_GATEWAY_JWT_SECRET_PREVIOUS`) so rolling restart doesn't evict every cached JWT at once.
+
+## Routing
+
+| Var | Default | Purpose |
+|---|---|---|
+| `LW_GATEWAY_LISTEN_ADDR` | `:8080` | Listen addr. Binds `0.0.0.0:8080` in-cluster |
+| `LW_GATEWAY_CONTROL_PLANE_URL` | `https://app.langwatch.ai` | Base URL for `/api/internal/gateway/*` calls |
+| `LW_GATEWAY_NODE_ID` | auto-generated ULID | Unique id for this replica, surfaced in HMAC `X-LangWatch-Gateway-Node` and in traces |
+| `LW_GATEWAY_READ_TIMEOUT_MS` | `30000` | HTTP server read timeout |
+| `LW_GATEWAY_WRITE_TIMEOUT_MS` | `120000` | HTTP server write timeout (streaming-safe) |
+| `LW_GATEWAY_MAX_BODY_BYTES` | `10485760` (10 MB) | Max request body size — Aider and large-prompt agents need headroom |
+
+## Auth cache
+
+| Var | Default | Purpose |
+|---|---|---|
+| `LW_GATEWAY_AUTH_CACHE_L1_SIZE` | `10000` | In-process LRU capacity (per replica) |
+| `LW_GATEWAY_AUTH_CACHE_TTL_SECONDS` | `900` | JWT TTL / L1 expiry. Matches `/resolve-key` JWT `exp` |
+| `LW_GATEWAY_AUTH_CACHE_CHANGES_POLL_SECONDS` | `25` | Long-poll interval against `/api/internal/gateway/changes` |
+| `LW_GATEWAY_AUTH_CACHE_BOOTSTRAP` | `true` | On startup, pre-warm L1 via `/bootstrap` call |
+
+See [Auth Cache Architecture](/ai-gateway/observability#auth-cache-architecture) for the two-tier L1/L2 design.
+
+## Providers
+
+Provider credentials are managed from the UI (Gateway → Providers), not env vars. The gateway fetches them via `/config/:vk_id` per-request and caches them in the L1 JWT alongside the VK config. Upstream-specific tuning:
+
+| Var | Default | Purpose |
+|---|---|---|
+| `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` | `60000` | Per-upstream call timeout. Longer than reasonable for most calls; streaming requests extend via write-deadline reset on chunk |
+| `LW_GATEWAY_UPSTREAM_MAX_CONN_PER_HOST` | `256` | Connection pool size per (provider, region) |
+| `LW_GATEWAY_UPSTREAM_IDLE_TIMEOUT_S` | `90` | Keep-alive idle |
+| `LW_GATEWAY_CIRCUIT_BREAKER_ERROR_RATIO` | `0.5` | Open circuit at 50% errors over window |
+| `LW_GATEWAY_CIRCUIT_BREAKER_WINDOW_S` | `30` | Breaker rolling window |
+| `LW_GATEWAY_CIRCUIT_BREAKER_COOLDOWN_S` | `15` | Half-open probe delay |
+
+Circuit breaker state is per-replica — no shared Redis dependency. This is intentional: under a large-scale outage, having N replicas rediscover independently is resilient; having them all depend on Redis for breaker state is not.
+
+## Tracing
+
+| Var | Default | Purpose |
+|---|---|---|
+| `LW_GATEWAY_OTEL_EXPORTER` | `otlp-http` | One of `otlp-http`, `otlp-grpc`, `none` |
+| `LW_GATEWAY_OTEL_SAMPLING_RATIO` | `1.0` | Head sampler. Gateway-internal spans only — customer traces are passed through untouched |
+| `LW_GATEWAY_OTEL_TENANT_ROUTER` | `enabled` | Per-tenant trace routing: reads `X-LangWatch-Trace-Metadata` to route spans to the right project's OTel pipeline. See [Observability](/ai-gateway/observability) |
+
+## Guardrails + budgets
+
+| Var | Default | Purpose |
+|---|---|---|
+| `LW_GATEWAY_GUARDRAIL_TIMEOUT_MS` | `1500` | Request-level guardrail timeout. Fails closed (blocks request) |
+| `LW_GATEWAY_GUARDRAIL_STREAM_CHUNK_TIMEOUT_MS` | `50` | Per-chunk guardrail timeout during streaming. Fails OPEN (lets chunk through) |
+| `LW_GATEWAY_BUDGET_DEBIT_RETRY_MAX` | `8` | Outbox retries before shelving. Exponential backoff |
+| `LW_GATEWAY_BUDGET_DEBIT_SHELF_BYTES` | `134217728` (128 MB) | On-disk shelf size for unprocessable debits (4xx from control plane) |
+
+## Operational defaults worth knowing
+
+- The gateway preloads every VK's config on startup (via `/bootstrap`) if `LW_GATEWAY_AUTH_CACHE_BOOTSTRAP=true`. This adds ~1–3 s to startup for a 50K-key tenant. Disable it for horizontally-sharded deployments where each replica only serves a subset.
+- `SIGTERM` handling: 30 s drain, refuse new requests with 503, finish in-flight streams. Matches Kubernetes `preStop` + `terminationGracePeriodSeconds: 35`.
+- `PROTECTED_ENDPOINTS` (internal): the `/healthz` / `/readyz` / `/metrics` endpoints never require auth and are not rate-limited — give your scraper direct access.
+
+See [Health Checks](/ai-gateway/self-hosting/health-checks) for what each probe validates and [Scaling](/ai-gateway/self-hosting/scaling) for HPA and capacity planning.
