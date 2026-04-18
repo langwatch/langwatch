@@ -144,25 +144,46 @@ For latency-sensitive deployments, run the gateway in the same region as:
 
 Multi-region deployments: run per-region gateway fleets with independent HPAs. The gateway doesn't federate state cross-region — each replica's L1 is independent. Control plane is the single source of truth; any region can talk to it.
 
-## Benchmarks you can run
+## Benchmarks — hot-path microbenchmarks
 
-The repo ships a `hack/bench/` directory with three scenarios:
+Each hot-path primitive is benchmarked with Go's `testing.B`. Baselines measured on Apple M1 Max, Go 1.26.1 (see `BENCHMARKS.md` in the gateway repo):
+
+| Operation | Time | Allocs | When it fires |
+|---|---|---|---|
+| `auth.SignRequest` (HMAC + body hash) | ~2,900 ns | — | Internal calls to control plane only (not hot path) |
+| `auth.KeyHash` (VK → L1 lookup key) | 380 ns | — | Every incoming request |
+| `circuit.Allow` (closed state) | 64 ns | **0** | Every request against a healthy provider |
+| `circuit.Allow` with 500 credentials in pool | 112 ns | — | Large fleet scale |
+| `budget.Precheck` (3-scope cached) | 9 ns | **0** | Every request |
+| `budget.NewULID` | 116 ns | — | Every request (generates `gateway_request_id`) |
+| `fallback.Walk` (primary succeeds) | 119 ns | — | Every request |
+| `fallback.Walk` (falls over one slot) | 243 ns | — | When primary is degraded |
+
+Happy-path pre-bifrost overhead sums to **~700 ns per request** — effectively sub-microsecond. Bifrost + upstream RTT dominate wall time; the gateway's own tax is negligible.
+
+Regressions > 2× any baseline block PR merges per `BENCHMARKS.md` policy. Re-run cadence: monthly, or on any hot-path refactor.
+
+Shipped in langwatch-saas `f43cc20` (@sergey Lane A iter 6).
+
+## End-to-end benchmarks — k6 / vegeta
+
+Microbenchmarks validate correctness, not throughput. For full-request testing, point k6 or vegeta at a running gateway:
 
 ```bash
-# Non-streaming Chat Completions, 1000 concurrent, 30-second run
-./hack/bench/run.sh chat-nonstream --concurrency 1000 --duration 30s
+# k6 — non-streaming, 30s, ramping to 500 VUs
+k6 run --vus 500 --duration 30s ./hack/bench/chat.js
 
-# Streaming Claude Messages, 500 concurrent
-./hack/bench/run.sh messages-stream --concurrency 500 --duration 60s
-
-# Cold-start cost (fresh pod, first 500 requests)
-./hack/bench/run.sh cold-start
+# vegeta — sustained 1000 req/s on /v1/chat/completions
+echo 'POST https://gateway.langwatch.ai/v1/chat/completions
+Authorization: Bearer '"$LW_BENCH_VK"'
+Content-Type: application/json
+@body.json' | vegeta attack -duration=30s -rate=1000/s | vegeta report
 ```
 
-Target baselines:
+Targets end-to-end:
 
-- p50 gateway-added latency: **< 2 ms**.
-- p99 gateway-added latency: **< 15 ms**.
+- p50 gateway-added latency: **< 2 ms** (measured: primary + hot-path ≈ 700 ns + OTel batch + HTTP serialisation).
+- p99 gateway-added latency: **< 15 ms** (tail captures L1 cache miss → /resolve-key round-trip).
 - Cold-start TTFB (bootstrap disabled): **< 300 ms**.
 - Cold-start TTFB (bootstrap enabled, 10K VKs): **< 3 s to ready, then < 300 ms per request**.
 

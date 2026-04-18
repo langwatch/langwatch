@@ -84,9 +84,9 @@ Source commits (single repo, chronological):
 
 ## Outstanding for polish / v1.1
 
-**Polish (Lane B iter 10):**
-- Replace `confirm()` on rotate/revoke with proper Dialog (UX-affecting).
-- VK edit drawer deep-link via `/gateway/virtual-keys/[id]` detail page (browser history).
+**Polish (Lane B):**
+- ~~Replace `confirm()` on rotate/revoke with proper Dialog~~ — shipped iter 10 (`6021c1816`), incl. rotate-confirm that was missing entirely before.
+- VK detail page at `/gateway/virtual-keys/[id]` for deep-linking — in flight Lane B iter 11. Once live, CLI can print a shareable URL after `vk create` output.
 - /gateway/usage `byDay` sparkline (nicer visualisation).
 
 **Quality gates (recommended before GA):**
@@ -137,6 +137,16 @@ cd ~/Projects/langwatch-saas/services/gateway
 make run  # reads env from .env.local
 ```
 
+## Benchmarked hot-path overhead
+
+@sergey Lane A iter 6 (`f43cc20`) locks the GA "sub-millisecond gateway overhead" pitch with reproducible Go microbenchmarks on M1 Max, Go 1.26.1:
+
+- `auth.KeyHash` 380 ns, `circuit.Allow` 64 ns (0 allocs), `budget.Precheck` 9 ns (0 allocs), `fallback.Walk` 119 ns success / 243 ns fallover
+- Happy-path pre-bifrost overhead totals **~700 ns per request**
+- CI gate: > 2× regression on any baseline blocks PR merge
+
+See `docs/ai-gateway/self-hosting/scaling.mdx#benchmarks` for the full table + k6/vegeta recipes for end-to-end load validation.
+
 ## One-line summary
 
-"Three parallel agents shipped: a Go data-plane with bifrost + fallback + circuit + per-project OTel + streaming + terraform ingress; a Hono control plane with full VK/budget/provider CRUD + dev-auth-bypass + observability_endpoint; 45+ docs pages including an SRE runbook and Prometheus alert rules; 13 CLI subcommands; 6 dogfood screenshots; and 16 BDD spec files. v1 GA foundation is solid; polish queue is short."
+"Three parallel agents shipped: a Go data-plane (bifrost + fallback + circuit + per-project OTel + streaming + terraform ingress + Prometheus metrics + benchmarks); a Hono control plane (full VK/budget/provider CRUD + dev-auth-bypass + observability_endpoint + themable ConfirmDialog); 45+ docs pages (SRE runbook + Prometheus alerts + 4 cookbooks); 13 CLI subcommands; 6 dogfood screenshots; 16 BDD spec files. v1 GA foundation is solid, 700ns hot-path overhead, polish queue is three items."
