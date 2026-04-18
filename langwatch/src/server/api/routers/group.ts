@@ -8,6 +8,7 @@ import {
 } from "../enterprise";
 import { checkOrganizationPermission } from "../rbac";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
+import { RoleBindingService } from "~/server/role-bindings/role-binding.service";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { slugify } from "~/utils/slugify";
 import { KSUID_RESOURCES } from "~/utils/constants";
@@ -480,5 +481,64 @@ export const groupRouter = createTRPCRouter({
         where: { userId_groupId: { userId: input.userId, groupId: input.groupId } },
       });
       return { success: true };
+    }),
+
+  /**
+   * Atomically apply a batch of edits to a group: rename, binding
+   * additions/removals, and member additions/removals. The GroupDetailDialog
+   * uses this so a partial failure cannot leave the group half-edited.
+   */
+  applyEdits: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        groupId: z.string(),
+        rename: z
+          .object({
+            name: z.string().trim().min(1).max(100),
+          })
+          .nullable()
+          .optional(),
+        bindingIdsToDelete: z.array(z.string()),
+        bindingsToCreate: z.array(
+          z.object({
+            role: z.nativeEnum(TeamUserRole),
+            customRoleId: z.string().optional(),
+            scopeType: z.nativeEnum(RoleBindingScopeType),
+            scopeId: z.string(),
+          }),
+        ),
+        memberUserIdsToAdd: z.array(z.string()),
+        memberUserIdsToRemove: z.array(z.string()),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ ctx, input }) => {
+      let resolvedRename: { name: string; slug: string } | null = null;
+      if (input.rename) {
+        const baseSlug = slugify(input.rename.name, {
+          lower: true,
+          strict: true,
+        });
+        const slug = await findUniqueGroupSlug(
+          ctx.prisma,
+          input.organizationId,
+          baseSlug,
+          input.groupId,
+        );
+        resolvedRename = { name: input.rename.name, slug };
+      }
+
+      const repo = new PrismaRoleBindingRepository(ctx.prisma);
+      const service = new RoleBindingService(ctx.prisma, repo);
+      return service.applyGroupEdits({
+        organizationId: input.organizationId,
+        groupId: input.groupId,
+        rename: resolvedRename,
+        bindingIdsToDelete: input.bindingIdsToDelete,
+        bindingsToCreate: input.bindingsToCreate,
+        memberUserIdsToAdd: input.memberUserIdsToAdd,
+        memberUserIdsToRemove: input.memberUserIdsToRemove,
+      });
     }),
 });

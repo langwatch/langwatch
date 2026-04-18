@@ -10,23 +10,13 @@ const roleSchema = z.nativeEnum(TeamUserRole);
 
 export const roleBindingRouter = createTRPCRouter({
   /**
-   * List all role bindings in an org — used by the Members page to render each
-   * member's effective access in the table.
+   * List all role bindings in an org. Returns audit-grade RBAC data
+   * (every binding's userIds, group memberships, scope ids/names, role
+   * assignments) so it must stay gated at organization:manage. The members
+   * page renders an Access column from this payload, so the column itself
+   * must also be hidden from non-managers.
    */
   listForOrg: protectedProcedure
-    .input(z.object({ organizationId: z.string() }))
-    .use(checkOrganizationPermission("organization:view"))
-    .query(async ({ ctx, input }) => {
-      const repo = new PrismaRoleBindingRepository(ctx.prisma);
-      const service = new RoleBindingService(ctx.prisma, repo);
-      return service.listForOrg({ organizationId: input.organizationId });
-    }),
-
-  /**
-   * Same payload as listForOrg but gated at organization:manage so audit data
-   * cannot be read via the tRPC API by org members who don't have the audit page.
-   */
-  listForOrgAudit: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:manage"))
     .query(async ({ ctx, input }) => {
@@ -140,6 +130,39 @@ export const roleBindingRouter = createTRPCRouter({
       return service.delete({
         organizationId: input.organizationId,
         bindingId: input.bindingId,
+      });
+    }),
+
+  /**
+   * Atomically apply a batch of binding deletes + creates for a single user.
+   * The MemberDetailDialog uses this so a partial failure cannot leave a user
+   * with some bindings deleted but others not added.
+   */
+  applyMemberBindings: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        userId: z.string(),
+        bindingIdsToDelete: z.array(z.string()),
+        bindingsToCreate: z.array(
+          z.object({
+            role: roleSchema,
+            customRoleId: z.string().optional(),
+            scopeType: scopeTypeSchema,
+            scopeId: z.string(),
+          }),
+        ),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:manage"))
+    .mutation(async ({ ctx, input }) => {
+      const repo = new PrismaRoleBindingRepository(ctx.prisma);
+      const service = new RoleBindingService(ctx.prisma, repo);
+      return service.applyMemberBindings({
+        organizationId: input.organizationId,
+        userId: input.userId,
+        bindingIdsToDelete: input.bindingIdsToDelete,
+        bindingsToCreate: input.bindingsToCreate,
       });
     }),
 });

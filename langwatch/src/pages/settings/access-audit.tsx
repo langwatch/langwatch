@@ -192,7 +192,7 @@ function AccessAuditPage() {
   const [scopeFilter, setScopeFilter] = useState<ScopeFilter>("ALL");
 
   const { data: bindings, isLoading } =
-    api.roleBinding.listForOrgAudit.useQuery(
+    api.roleBinding.listForOrg.useQuery(
       { organizationId: organization?.id ?? "" },
       { enabled: !!organization?.id && isEnterprise },
     );

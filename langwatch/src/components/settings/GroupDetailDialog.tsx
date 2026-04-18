@@ -20,6 +20,7 @@ import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 import type { RouterOutputs } from "~/utils/api";
+import { TeamUserRole } from "@prisma/client";
 import {
   BindingInputRow,
   roleBadgeColor,
@@ -98,12 +99,8 @@ export function GroupDetailDialog({
     { enabled: open && canManage },
   );
 
-  // ── mutations (used only inside handleSave) ──────────────────────────────────
-  const renameGroup = api.group.rename.useMutation();
-  const addBinding = api.group.addBinding.useMutation();
-  const removeBinding = api.group.removeBinding.useMutation();
-  const addMemberMutation = api.group.addMember.useMutation();
-  const removeMemberMutation = api.group.removeMember.useMutation();
+  // ── mutations ────────────────────────────────────────────────────────────────
+  const applyEdits = api.group.applyEdits.useMutation();
 
   // ── save ────────────────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -115,42 +112,28 @@ export function GroupDetailDialog({
 
     setIsSaving(true);
     try {
-      if (nameChanged) {
-        await renameGroup.mutateAsync({
-          organizationId,
-          groupId: group.id,
-          name: pendingName.trim(),
-        });
-      }
-
-      await Promise.all([
-        ...[...pendingBindingRemovals].map((bindingId) =>
-          removeBinding.mutateAsync({ organizationId, bindingId }),
-        ),
-        ...allBindingAdditions.map((b) =>
-          addBinding.mutateAsync({
-            organizationId,
-            groupId: group.id,
-            role: b.role as any,
-            customRoleId: b.customRoleId,
-            scopeType: b.scopeType,
-            scopeId: b.scopeId,
-          }),
-        ),
-        ...[...pendingRemovals].map((userId) =>
-          removeMemberMutation.mutateAsync({ organizationId, groupId: group.id, userId }),
-        ),
-        ...pendingAdditions.map((a) =>
-          addMemberMutation.mutateAsync({ organizationId, groupId: group.id, userId: a.userId }),
-        ),
-      ]);
+      await applyEdits.mutateAsync({
+        organizationId,
+        groupId: group.id,
+        rename: nameChanged ? { name: pendingName.trim() } : null,
+        bindingIdsToDelete: [...pendingBindingRemovals],
+        bindingsToCreate: allBindingAdditions.map((b) => ({
+          role: b.role as TeamUserRole,
+          customRoleId: b.customRoleId,
+          scopeType: b.scopeType,
+          scopeId: b.scopeId,
+        })),
+        memberUserIdsToAdd: pendingAdditions.map((a) => a.userId),
+        memberUserIdsToRemove: [...pendingRemovals],
+      });
 
       void queryClient.group.getById.invalidate();
       void queryClient.group.listAll.invalidate();
       toaster.create({ title: "Group updated", type: "success" });
       onClose();
-    } catch (e: any) {
-      toaster.create({ title: e?.message ?? "Failed to save", type: "error" });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to save";
+      toaster.create({ title: message, type: "error" });
     } finally {
       setIsSaving(false);
     }

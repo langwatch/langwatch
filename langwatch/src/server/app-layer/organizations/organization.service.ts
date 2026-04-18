@@ -36,8 +36,22 @@ import type { RoleBindingForSynthesis } from "~/server/app-layer/role-bindings/r
  * return value would silently get a Promise with `members === undefined`,
  * causing team membership enrichment to fail invisibly.
  */
+type TeamMembershipLike = {
+  userId: string;
+  teamId: string;
+  role: TeamUserRole;
+  assignedRoleId: string | null;
+  assignedRole?: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
 export function enrichTeamWithRoleBindings<
-  T extends { members: any[]; id: string; projects: { id: string }[] },
+  T extends {
+    members: TeamMembershipLike[];
+    id: string;
+    projects: { id: string }[];
+  },
 >(
   team: T,
   userId: string,
@@ -73,14 +87,10 @@ export function enrichTeamWithRoleBindings<
     createdAt: new Date(),
     updatedAt: new Date(),
   };
-  const existingIndex = team.members.findIndex(
-    (m: { userId: string }) => m.userId === userId,
-  );
+  const existingIndex = team.members.findIndex((m) => m.userId === userId);
   const newMembers =
     existingIndex >= 0
-      ? team.members.map((m: unknown, i: number) =>
-          i === existingIndex ? bindingMember : m,
-        )
+      ? team.members.map((m, i) => (i === existingIndex ? bindingMember : m))
       : [...team.members, bindingMember];
   return { ...team, members: newMembers };
 }

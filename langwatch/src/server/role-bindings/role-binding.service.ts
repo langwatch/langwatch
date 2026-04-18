@@ -383,4 +383,209 @@ export class RoleBindingService {
     await this.prisma.roleBinding.delete({ where: { id: bindingId } });
     return { success: true };
   }
+
+  /**
+   * Atomically apply a batch of binding deletes + creates for a single user.
+   * Used by MemberDetailDialog so a partial failure can never leave the user
+   * with some bindings deleted but others not added (or vice versa).
+   */
+  async applyMemberBindings({
+    organizationId,
+    userId,
+    bindingIdsToDelete,
+    bindingsToCreate,
+  }: {
+    organizationId: string;
+    userId: string;
+    bindingIdsToDelete: string[];
+    bindingsToCreate: Array<{
+      role: TeamUserRole;
+      customRoleId?: string | null;
+      scopeType: RoleBindingScopeType;
+      scopeId: string;
+    }>;
+  }) {
+    // Validate scopes up front so a bad input fails the whole batch before
+    // we open the transaction.
+    for (const b of bindingsToCreate) {
+      await this.repo.validateScopeInOrg({
+        organizationId,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      if (bindingIdsToDelete.length > 0) {
+        const existing = await tx.roleBinding.findMany({
+          where: { id: { in: bindingIdsToDelete }, organizationId },
+          select: { id: true },
+        });
+        if (existing.length !== bindingIdsToDelete.length) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "One or more bindings not found",
+          });
+        }
+        await tx.roleBinding.deleteMany({
+          where: { id: { in: bindingIdsToDelete }, organizationId },
+        });
+      }
+
+      if (bindingsToCreate.length > 0) {
+        await tx.roleBinding.createMany({
+          data: bindingsToCreate.map((b) => ({
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            organizationId,
+            userId,
+            groupId: null,
+            role: b.role,
+            customRoleId:
+              b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
+            scopeType: b.scopeType,
+            scopeId: b.scopeId,
+          })),
+        });
+      }
+
+      return { success: true };
+    });
+  }
+
+  /**
+   * Atomically apply a batch of edits to a group: rename, binding
+   * additions/removals, and member additions/removals. Wraps everything in a
+   * single transaction so the UI never observes a partial save.
+   */
+  async applyGroupEdits({
+    organizationId,
+    groupId,
+    rename,
+    bindingIdsToDelete,
+    bindingsToCreate,
+    memberUserIdsToAdd,
+    memberUserIdsToRemove,
+  }: {
+    organizationId: string;
+    groupId: string;
+    rename?: { name: string; slug: string } | null;
+    bindingIdsToDelete: string[];
+    bindingsToCreate: Array<{
+      role: TeamUserRole;
+      customRoleId?: string | null;
+      scopeType: RoleBindingScopeType;
+      scopeId: string;
+    }>;
+    memberUserIdsToAdd: string[];
+    memberUserIdsToRemove: string[];
+  }) {
+    for (const b of bindingsToCreate) {
+      await this.repo.validateScopeInOrg({
+        organizationId,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const group = await tx.group.findFirst({
+        where: { id: groupId, organizationId },
+        select: { id: true, scimSource: true },
+      });
+      if (!group) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
+      }
+
+      if (rename) {
+        if (group.scimSource) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "SCIM-managed groups cannot be renamed",
+          });
+        }
+        await tx.group.update({
+          where: { id: groupId },
+          data: { name: rename.name, slug: rename.slug },
+        });
+      }
+
+      if (bindingIdsToDelete.length > 0) {
+        const existing = await tx.roleBinding.findMany({
+          where: {
+            id: { in: bindingIdsToDelete },
+            organizationId,
+            groupId,
+          },
+          select: { id: true },
+        });
+        if (existing.length !== bindingIdsToDelete.length) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "One or more bindings not found",
+          });
+        }
+        await tx.roleBinding.deleteMany({
+          where: { id: { in: bindingIdsToDelete }, organizationId, groupId },
+        });
+      }
+
+      if (bindingsToCreate.length > 0) {
+        await tx.roleBinding.createMany({
+          data: bindingsToCreate.map((b) => ({
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            organizationId,
+            userId: null,
+            groupId,
+            role: b.role,
+            customRoleId:
+              b.role === TeamUserRole.CUSTOM ? (b.customRoleId ?? null) : null,
+            scopeType: b.scopeType,
+            scopeId: b.scopeId,
+          })),
+        });
+      }
+
+      if (memberUserIdsToRemove.length > 0) {
+        if (group.scimSource) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "Cannot manually remove members from a SCIM-managed group",
+          });
+        }
+        await tx.groupMembership.deleteMany({
+          where: { groupId, userId: { in: memberUserIdsToRemove } },
+        });
+      }
+
+      if (memberUserIdsToAdd.length > 0) {
+        if (group.scimSource) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Cannot manually add members to a SCIM-managed group",
+          });
+        }
+        const orgMembers = await tx.organizationUser.findMany({
+          where: {
+            organizationId,
+            userId: { in: memberUserIdsToAdd },
+          },
+          select: { userId: true },
+        });
+        if (orgMembers.length !== memberUserIdsToAdd.length) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message:
+              "All users must belong to the organization before joining a group",
+          });
+        }
+        await tx.groupMembership.createMany({
+          data: memberUserIdsToAdd.map((userId) => ({ groupId, userId })),
+          skipDuplicates: true,
+        });
+      }
+
+      return { success: true };
+    });
+  }
 }

@@ -8,7 +8,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { RoleBindingScopeType } from "@prisma/client";
+import {
+  OrganizationUserRole,
+  RoleBindingScopeType,
+  TeamUserRole,
+} from "@prisma/client";
 import { X } from "lucide-react";
 import { Link } from "~/components/ui/link";
 import { useEffect, useRef, useState } from "react";
@@ -22,9 +26,11 @@ import {
   type BindingInputRowHandle,
   type PendingBinding,
 } from "./GroupBindingInputRow";
+import { OrganizationUserRoleField } from "./OrganizationUserRoleField";
 
 type MemberSummary = {
   userId: string;
+  role: OrganizationUserRole;
   user: { name: string | null; email: string | null };
 };
 
@@ -32,17 +38,20 @@ export function MemberDetailDialog({
   member,
   organizationId,
   canManage,
+  isCurrentUser,
   open,
   onClose,
 }: {
   member: MemberSummary;
   organizationId: string;
   canManage: boolean;
+  isCurrentUser: boolean;
   open: boolean;
   onClose: () => void;
 }) {
   const queryClient = api.useContext();
 
+  const [pendingRole, setPendingRole] = useState<OrganizationUserRole>(member.role);
   const [pendingBindingRemovals, setPendingBindingRemovals] = useState<Set<string>>(new Set());
   const [pendingBindingAdditions, setPendingBindingAdditions] = useState<PendingBinding[]>([]);
   const [isSaving, setIsSaving] = useState(false);
@@ -50,6 +59,7 @@ export function MemberDetailDialog({
   const bindingInputRef = useRef<BindingInputRowHandle>(null);
 
   const reset = () => {
+    setPendingRole(member.role);
     setPendingBindingRemovals(new Set());
     setPendingBindingAdditions([]);
   };
@@ -68,12 +78,14 @@ export function MemberDetailDialog({
     { enabled: open },
   );
 
-  const createBinding = api.roleBinding.create.useMutation();
-  const deleteBinding = api.roleBinding.delete.useMutation();
+  const updateOrgRole = api.organization.updateMemberRole.useMutation();
+  const applyMemberBindings = api.roleBinding.applyMemberBindings.useMutation();
 
-  const hasChanges =
+  const hasBindingChanges =
     pendingBindingRemovals.size > 0 ||
     pendingBindingAdditions.length > 0;
+  const roleChanged = pendingRole !== member.role;
+  const hasChanges = hasBindingChanges || roleChanged;
 
   const handleSave = async () => {
     // Auto-stage any uncommitted binding row (user selected fields but didn't click Add)
@@ -81,24 +93,35 @@ export function MemberDetailDialog({
     const allBindingAdditions = uncommitted
       ? [...pendingBindingAdditions, uncommitted]
       : pendingBindingAdditions;
+    const hasBindingChangesNow =
+      pendingBindingRemovals.size > 0 || allBindingAdditions.length > 0;
 
     setIsSaving(true);
     try {
-      await Promise.all([
-        ...[...pendingBindingRemovals].map((bindingId) =>
-          deleteBinding.mutateAsync({ organizationId, bindingId }),
-        ),
-        ...allBindingAdditions.map((b) =>
-          createBinding.mutateAsync({
-            organizationId,
-            userId: member.userId,
-            role: b.role as any,
+      // Apply org role first — it has license/plan checks that should block the
+      // whole save if they fail. Bindings then run as a single transactional
+      // batch so they cannot leave a partial state behind.
+      if (roleChanged) {
+        await updateOrgRole.mutateAsync({
+          organizationId,
+          userId: member.userId,
+          role: pendingRole,
+        });
+      }
+
+      if (hasBindingChangesNow) {
+        await applyMemberBindings.mutateAsync({
+          organizationId,
+          userId: member.userId,
+          bindingIdsToDelete: [...pendingBindingRemovals],
+          bindingsToCreate: allBindingAdditions.map((b) => ({
+            role: b.role as TeamUserRole,
             customRoleId: b.customRoleId,
             scopeType: b.scopeType,
             scopeId: b.scopeId,
-          }),
-        ),
-      ]);
+          })),
+        });
+      }
 
       await Promise.all([
         queryClient.roleBinding.listForUser.invalidate(),
@@ -107,8 +130,9 @@ export function MemberDetailDialog({
       ]);
       toaster.create({ title: "Member updated", type: "success" });
       onClose();
-    } catch (e: any) {
-      toaster.create({ title: e?.message ?? "Failed to save", type: "error" });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Failed to save";
+      toaster.create({ title: message, type: "error" });
     } finally {
       setIsSaving(false);
     }
@@ -134,6 +158,25 @@ export function MemberDetailDialog({
         <Dialog.CloseTrigger />
         <Dialog.Body pb={6}>
           <VStack gap={5} align="stretch">
+            {/* Organization role */}
+            {canManage && (
+              <Box>
+                <Text fontSize="sm" fontWeight="semibold" mb={3}>
+                  Organization role
+                </Text>
+                {isCurrentUser ? (
+                  <Text fontSize="sm" color="fg.muted" fontStyle="italic">
+                    You cannot change your own organization role.
+                  </Text>
+                ) : (
+                  <OrganizationUserRoleField
+                    value={pendingRole}
+                    onChange={setPendingRole}
+                  />
+                )}
+              </Box>
+            )}
+
             {/* Direct access bindings */}
             {canManage && (
               <Box>

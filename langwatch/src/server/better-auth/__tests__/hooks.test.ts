@@ -10,8 +10,11 @@ import {
   beforeUserCreate,
 } from "../hooks";
 
-const makePrismaMock = (overrides: Record<string, any> = {}): PrismaClient => {
-  const base: Record<string, any> = {
+type PrismaMockTable = Record<string, ReturnType<typeof vi.fn>>;
+type PrismaMockOverrides = Record<string, PrismaMockTable | unknown>;
+
+const makePrismaMock = (overrides: PrismaMockOverrides = {}): PrismaClient => {
+  const base: PrismaMockOverrides = {
     organization: { findUnique: vi.fn().mockResolvedValue(null) },
     organizationInvite: { findFirst: vi.fn().mockResolvedValue(null) },
     organizationUser: {
@@ -32,7 +35,7 @@ const makePrismaMock = (overrides: Record<string, any> = {}): PrismaClient => {
       count: vi.fn().mockResolvedValue(0),
     },
   };
-  const merged: any = { ...base, ...overrides };
+  const merged: PrismaMockOverrides = { ...base, ...overrides };
   // Support both $transaction forms: array form (returns the ops) and
   // callback form (invokes the callback with this same mock as `tx`, so
   // tests continue to assert against `prisma.xxx` spies).

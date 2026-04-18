@@ -38,7 +38,7 @@ import type {
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { api } from "../../utils/api";
 import type { RouterOutputs } from "../../utils/api";
-import { RoleBindingScopeType } from "@prisma/client";
+import { OrganizationUserRole, RoleBindingScopeType } from "@prisma/client";
 
 type Binding = RouterOutputs["roleBinding"]["listForOrg"][number];
 
@@ -100,6 +100,7 @@ function MembersList({
 
   const [selectedMember, setSelectedMember] = useState<{
     userId: string;
+    role: OrganizationUserRole;
     user: { name: string | null; email: string | null };
   } | null>(null);
 
@@ -217,7 +218,7 @@ function MembersList({
     isError: isBindingsError,
   } = api.roleBinding.listForOrg.useQuery(
     { organizationId: organization.id },
-    { enabled: !!organization.id },
+    { enabled: !!organization.id && hasOrganizationManagePermission },
   );
 
   const bindingsByUser = useMemo(() => {
@@ -287,7 +288,9 @@ function MembersList({
                   <Table.ColumnHeader width="56px" />
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Email</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
+                  {hasOrganizationManagePermission && (
+                    <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
+                  )}
                   <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
@@ -314,6 +317,7 @@ function MembersList({
                             onClick={() => {
                               setSelectedMember({
                                 userId: member.userId,
+                                role: member.role,
                                 user: { name: member.user.name ?? null, email: member.user.email ?? null },
                               });
                             }}
@@ -333,12 +337,14 @@ function MembersList({
                         </HStack>
                       </Table.Cell>
                       <Table.Cell>{member.user.email}</Table.Cell>
-                      <Table.Cell>
-                        <MemberAccessDisplay
-                          bindings={bindingsByUser.get(member.userId) ?? []}
-                          isLoading={isBindingsLoading || isBindingsError}
-                        />
-                      </Table.Cell>
+                      {hasOrganizationManagePermission && (
+                        <Table.Cell>
+                          <MemberAccessDisplay
+                            bindings={bindingsByUser.get(member.userId) ?? []}
+                            isLoading={isBindingsLoading || isBindingsError}
+                          />
+                        </Table.Cell>
+                      )}
                       <Table.Cell>
                         <Box
                           width="full"
@@ -356,6 +362,7 @@ function MembersList({
                                 onClick={() => {
                                   setSelectedMember({
                                     userId: member.userId,
+                                    role: member.role,
                                     user: { name: member.user.name ?? null, email: member.user.email ?? null },
                                   });
                                 }}
@@ -403,6 +410,7 @@ function MembersList({
           member={selectedMember}
           organizationId={organization.id}
           canManage={hasOrganizationManagePermission}
+          isCurrentUser={selectedMember.userId === user?.id}
           open={!!selectedMember}
           onClose={() => setSelectedMember(null)}
         />
