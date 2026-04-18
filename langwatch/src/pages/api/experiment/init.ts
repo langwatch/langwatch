@@ -7,9 +7,30 @@ import { prisma } from "~/server/db";
 import { createLicenseEnforcementService } from "~/server/license-enforcement";
 import { LimitExceededError } from "~/server/license-enforcement/errors";
 import { buildResourceLimitMessage } from "~/server/license-enforcement/limit-message";
+import {
+  enforcePatCeiling,
+  extractCredentials,
+} from "~/server/pat/auth-middleware";
+import { TokenResolver } from "~/server/pat/token-resolver";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { slugify } from "~/utils/slugify";
 import { createLogger } from "../../../utils/logger/server";
+
+/**
+ * Adapts a Next.js pages-router request to the minimal Hono-shaped surface
+ * consumed by `extractCredentials` (`{ req: { header: (name) => string | undefined } }`).
+ * Header names are normalised to lowercase because Node gives us a mixed-case
+ * record and `extractCredentials` looks up by the canonical lowercase name.
+ */
+const toHonoHeaderAdapter = (req: NextApiRequest) => ({
+  req: {
+    header: (name: string): string | undefined => {
+      const value = req.headers[name.toLowerCase()];
+      if (Array.isArray(value)) return value[0];
+      return value ?? undefined;
+    },
+  },
+});
 
 const logger = createLogger("langwatch:dspy:init");
 
@@ -40,21 +61,35 @@ export default async function handler(
     return res.status(405).end(); // Only accept POST requests
   }
 
-  const authToken = req.headers["x-auth-token"];
-
-  if (!authToken) {
-    return res
-      .status(401)
-      .json({ message: "X-Auth-Token header is required." });
+  const credentials = extractCredentials(toHonoHeaderAdapter(req));
+  if (!credentials) {
+    return res.status(401).json({
+      message:
+        "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
+    });
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken as string },
+  const resolved = await TokenResolver.create(prisma).resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
   });
-
-  if (!project) {
+  if (!resolved) {
     return res.status(401).json({ message: "Invalid auth token." });
   }
+
+  // TODO(pat): introduce a dedicated `experiments:manage` permission once
+  // the RBAC catalog grows beyond workflows. Experiments are created/owned
+  // by workflows today, so `workflows:manage` is the closest existing
+  // ceiling — VIEWER is correctly blocked, ADMIN/MEMBER pass through.
+  const denial = await enforcePatCeiling({
+    resolved,
+    permission: "workflows:manage",
+  });
+  if (denial) {
+    return res.status(denial.status).json({ message: denial.error });
+  }
+
+  const project = resolved.project;
 
   let params: z.infer<typeof dspyInitParamsSchema>;
   try {
