@@ -1,8 +1,10 @@
 import type { PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import { TokenResolver, type ResolvedToken } from "./token-resolver";
+import { PatPermissionDeniedError } from "./errors";
 import type { Permission } from "~/server/api/rbac";
 import { resolvePatPermission } from "~/server/rbac/role-binding-resolver";
+import { DomainError } from "~/server/app-layer/domain-error";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:api:unified-auth");
@@ -188,9 +190,11 @@ export { extractCredentials };
  * bypass RBAC). PAT tokens must satisfy `effective = PAT ∩ user` at the
  * project scope for the requested permission.
  *
- * Returns `null` when access is granted, or an error descriptor the caller
- * can surface as a 403. This helper exists so both Hono middleware and
- * inline route handlers (collector, otel) share one enforcement path.
+ * Throws `PatPermissionDeniedError` when a PAT is denied so route handlers
+ * can catch a typed domain error (kind `pat_permission_denied`, httpStatus
+ * 403) instead of inspecting an ad-hoc descriptor. Returns normally when
+ * access is granted. This helper exists so both Hono middleware and inline
+ * route handlers (collector, otel, track_event) share one enforcement path.
  *
  * `prisma` is injected rather than imported from module scope so the helper
  * doesn't leak infrastructure; callers already hold a client to construct
@@ -204,8 +208,8 @@ export async function enforcePatCeiling({
   prisma: PrismaClient;
   resolved: ResolvedToken;
   permission: Permission;
-}): Promise<{ error: string; status: 403 } | null> {
-  if (resolved.type !== "pat") return null;
+}): Promise<void> {
+  if (resolved.type !== "pat") return;
 
   const allowed = await resolvePatPermission({
     prisma,
@@ -230,13 +234,32 @@ export async function enforcePatCeiling({
       },
       "PAT ceiling check failed",
     );
-    return {
-      error: `PAT lacks required permission: ${permission}`,
-      status: 403,
-    };
+    throw new PatPermissionDeniedError(permission, {
+      meta: {
+        patId: resolved.patId,
+        userId: resolved.userId,
+        projectId: resolved.project.id,
+      },
+    });
   }
+}
 
-  return null;
+/**
+ * Converts a PAT permission denial thrown by `enforcePatCeiling` into a
+ * Hono-style JSON + status tuple. Re-throws anything that isn't a
+ * `PatPermissionDeniedError` so genuine infrastructure errors surface.
+ *
+ * Route handlers use this in their auth try/catch to preserve the existing
+ * descriptor-style early-return ergonomics while the underlying enforcement
+ * path is now a typed domain error.
+ */
+export function patCeilingDenialResponse(
+  error: unknown,
+): { error: string; message: string; status: 403 } {
+  if (DomainError.isHandled(error) && error.kind === "pat_permission_denied") {
+    return { error: "Forbidden", message: error.message, status: 403 };
+  }
+  throw error;
 }
 
 /**
@@ -262,9 +285,14 @@ export function requirePatPermission({
       );
     }
 
-    const denial = await enforcePatCeiling({ prisma, resolved, permission });
-    if (denial) {
-      return c.json({ error: "Forbidden", message: denial.error }, denial.status);
+    try {
+      await enforcePatCeiling({ prisma, resolved, permission });
+    } catch (error) {
+      const denial = patCeilingDenialResponse(error);
+      return c.json(
+        { error: denial.error, message: denial.message },
+        denial.status,
+      );
     }
 
     await next();
