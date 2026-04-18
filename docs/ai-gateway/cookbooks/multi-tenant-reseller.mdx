@@ -1,0 +1,234 @@
+---
+title: Multi-tenant SaaS reseller pattern
+description: Provision per-customer virtual keys and budgets from your application backend, audit everything, and bill accurately.
+sidebarTitle: Multi-tenant SaaS
+---
+
+If you're building a SaaS product on top of LLMs, and you want to let your customers bring their own budget without giving them direct provider credentials, this pattern is for you. You become the upstream provider; the LangWatch AI Gateway becomes your provisioning + enforcement + audit layer.
+
+## The shape
+
+```
+End user's app
+      │
+      ▼
+YOUR SaaS backend ──provisions VKs via──▶ LangWatch Management API (/api/gateway/v1/*)
+      │
+      │  issues VK to end-user's runtime
+      ▼
+End user's runtime ──/v1/chat/completions──▶ LangWatch Gateway ──▶ Upstream provider (your account)
+```
+
+Key properties:
+
+- **Each end-user has their own VK.** One per customer, or per seat — your call.
+- **You set per-customer budgets.** Enforced at the gateway. When a customer hits their cap, the gateway returns `402 budget_exceeded`. Your code doesn't need to track spend.
+- **All audit + trace data lands in your LangWatch project.** End-users never see LangWatch.
+- **End-users can't escape your policy.** Blocked patterns, model allowlists, cache rules all attach to the VK.
+
+## Step 1 — Model the tenancy
+
+Decide your scope granularity:
+
+| Model | VK per | Budget scope | Use case |
+|---|---|---|---|
+| **Per customer** | one VK per tenant | `principal` or `virtual_key` | Most SaaS apps, one account = one VK |
+| **Per seat** | one VK per user within tenant | `principal` | Per-seat billing, per-user rate limits |
+| **Per team** | one VK per sub-org | `team`-scope budgets | Customers have their own teams/projects |
+
+For this walkthrough, assume **per-customer** model.
+
+## Step 2 — Provision the provider binding once
+
+Your LangWatch project owns a single provider binding per upstream (OpenAI, Anthropic). End-users don't see these:
+
+```bash
+export LANGWATCH_API_KEY="$YOUR_BACKEND_TOKEN"  # service-account token with gatewayProviders:create
+
+GPC_ID=$(langwatch gateway-providers create \
+  --model-provider mp_openai \
+  --slot primary \
+  --rate-limit-rpm 100000 \
+  --format json | jq -r .id)
+echo "gpc_id: $GPC_ID"
+# gpc_id: gpc_01HZX...
+```
+
+Store `$GPC_ID` in your backend config.
+
+## Step 3 — Provision a VK when a customer signs up
+
+Server-side code (Node.js example):
+
+```ts
+import { VirtualKeysApiService } from "langwatch";
+
+const langwatch = new VirtualKeysApiService({
+  apiKey: process.env.LANGWATCH_BACKEND_TOKEN,
+});
+
+export async function provisionCustomer(customerId: string) {
+  const { virtual_key, secret } = await langwatch.create({
+    name: `customer-${customerId}`,
+    environment: "live",
+    principal_user_id: customerId,          // audit attribution
+    provider_credential_ids: [process.env.LANGWATCH_GPC_ID!],
+    config: {
+      models_allowed: ["gpt-5-mini", "gpt-5", "claude-haiku-4-5-20251001"],
+      cache: { mode: "respect" },
+      blocked_patterns: {
+        tools: { deny: ["^shell\\.", "^filesystem\\.write"], allow: null },
+      },
+    },
+  });
+
+  // Persist vk.id; hand the secret to the customer exactly once.
+  return { vkId: virtual_key.id, secret };
+}
+```
+
+In a signup webhook:
+
+```ts
+const { vkId, secret } = await provisionCustomer(newCustomer.id);
+await db.customers.update({
+  where: { id: newCustomer.id },
+  data: { langwatchVkId: vkId },
+});
+// Send `secret` to the customer via email / dashboard UI / API response
+// exactly once. Your system never stores it in plaintext.
+```
+
+## Step 4 — Attach a per-customer budget
+
+Tie the budget to the VK:
+
+```ts
+import { GatewayBudgetsApiService } from "langwatch";
+
+const budgets = new GatewayBudgetsApiService({
+  apiKey: process.env.LANGWATCH_BACKEND_TOKEN,
+});
+
+export async function attachCustomerBudget(vkId: string, planLimit: number) {
+  await budgets.create({
+    name: `customer-${vkId}-monthly`,
+    scope: { kind: "VIRTUAL_KEY", virtual_key_id: vkId },
+    window: "MONTH",
+    limit_usd: planLimit,             // from your plans table
+    on_breach: "BLOCK",               // or WARN for grace periods
+  });
+}
+```
+
+When you upgrade / downgrade a customer:
+
+```ts
+await budgets.update(budgetId, { limit_usd: newPlanLimit });
+```
+
+Changes propagate to the gateway within 30 s via the `/changes` feed — no restart, no customer impact.
+
+## Step 5 — End-user makes a call
+
+Your customer's app calls the gateway directly with the VK you gave them:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(
+    base_url="https://gateway.langwatch.ai/v1",
+    api_key=os.environ["MY_SAAS_API_KEY"],  # the VK secret you sent them
+)
+```
+
+The gateway:
+
+- Authenticates the VK.
+- Checks the customer's budget.
+- Applies your `models_allowed` and `blocked_patterns`.
+- Dispatches to OpenAI using **your** provider credential.
+- Meters the cost against the customer's budget.
+- Emits a LangWatch trace into your project, tagged with `principal_user_id = customerId`.
+
+## Step 6 — Bill the customer
+
+You have two options, matching two mental models:
+
+### (a) Bill from your pricing table
+
+You define a markup over what the gateway shows you spent. Use `/api/gateway/v1/budgets` or the `gateway_budget_ledger` ClickHouse view to read per-VK spend:
+
+```bash
+langwatch gateway-budgets list --format json | \
+  jq '[.[] | select(.scope_type == "VIRTUAL_KEY") | {vk: .scope_id, spent: .spent_usd, limit: .limit_usd}]'
+```
+
+Your Stripe / billing layer reads this and invoices.
+
+### (b) Passthrough billing
+
+For passthrough, your UI shows the same numbers you see in LangWatch + a per-customer markup or flat management fee. The BudgetLedger row is per-request and includes cost — you can stream it into your reporting.
+
+## Handling over-limit customers
+
+When `on_breach: BLOCK`, the gateway returns `402 budget_exceeded`. Your customer sees:
+
+```json
+{
+  "error": {
+    "type": "budget_exceeded",
+    "message": "Budget exceeded for scope=virtual_key window=month",
+    "code": "budget_exceeded"
+  }
+}
+```
+
+Your customer's app should catch this and either:
+
+- Show an upgrade CTA in the end-user's UI.
+- Fall back to a free-tier response ("you've hit your monthly cap; upgrade for unlimited").
+
+Because the response is standard OpenAI-compatible, your error handler only needs to switch on `error.type`.
+
+## Rotation & revocation
+
+**Customer resets their API key in your UI** → you call `langwatch.rotate(vkId)`, get a new secret, send it to the customer. The old secret stops working within the gateway's cache TTL (~60 s).
+
+**Customer cancels their subscription** → `langwatch.revoke(vkId)`. The next request returns `403 virtual_key_revoked`. If you want a grace period, schedule the revoke job for 24–48 h after cancellation instead.
+
+## Audit — who did what
+
+Every write through your backend token is audited with `actor = "svc_<your_project_id>"`, action, target, and metadata. Filter the audit log on `resource_type = "VirtualKey"` to get a per-customer provisioning history. Under **Settings → Organization → Activity** in the LangWatch UI.
+
+If you need SIEM export: ClickHouse `GatewayAuditLog` table is queryable. Set up a daily export to your SIEM's ingestion pipeline.
+
+## Gotchas
+
+- **Never let the customer see your backend API token.** It has `virtualKeys:create`; they'd provision more VKs charged to you.
+- **Rotate VKs when an end-user leaves your customer's org.** Otherwise the ex-user keeps spend access until the budget resets.
+- **Set `principal_user_id` at VK creation time**, not later. Audit attribution is based on this; filling it in after-the-fact doesn't retroactively re-tag old traces.
+- **Test the `402` path in your app** before go-live. Many apps have unhandled exceptions on budget breach and crash the user's flow.
+- **Budgets scoped to `virtual_key`** are the right level for per-customer enforcement. Scoping to `principal` works too but traces get messier because `principal_user_id` values from different customers can collide if you're not careful with namespacing.
+
+## Rate limits at your gateway level
+
+If you want to throttle a specific customer without moving them to a different plan:
+
+```ts
+await langwatch.update(vkId, {
+  config: {
+    rate_limits: { rpm: 60, tpm: 100000 },
+  },
+});
+```
+
+Gateway enforces at the VK level; customer sees `429 rate_limit_exceeded`. Combine with a short-window budget (`hour`, `minute`) for finer control.
+
+## See also
+
+- [Management REST API](/ai-gateway/api/management) — every endpoint used above.
+- [Virtual Keys](/ai-gateway/virtual-keys) — VK lifecycle semantics.
+- [Budgets](/ai-gateway/budgets) — hierarchical scope logic.
+- [Security](/ai-gateway/security) — how backend tokens are isolated from VK secrets.
+- [CI smoke-test cookbook](/ai-gateway/cookbooks/ci-smoke-test) — validate the full flow in CI.

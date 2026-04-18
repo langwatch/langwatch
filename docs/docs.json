@@ -551,7 +551,8 @@
             "group": "Cookbooks",
             "pages": [
               "ai-gateway/cookbooks/ci-smoke-test",
-              "ai-gateway/cookbooks/migrate-from-direct"
+              "ai-gateway/cookbooks/migrate-from-direct",
+              "ai-gateway/cookbooks/multi-tenant-reseller"
             ]
           }
         ]

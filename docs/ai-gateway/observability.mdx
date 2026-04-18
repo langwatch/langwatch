@@ -12,8 +12,10 @@ Every request passing through the gateway emits an OTLP trace. The pattern is bo
 
 1. At auth resolution the gateway knows `vk_id → project_id → team_id → org_id → principal_id`.
 2. Every span in the request's trace is tagged with these as `langwatch.*` attributes.
-3. The OTel exporter reads `langwatch.project_id` on each span and routes the OTLP export to that project's ingestion endpoint with the project's collector token (cached from the control-plane).
-4. LangWatch's existing ingest pipeline stores the trace under the project.
+3. The bundle returned by `/api/internal/gateway/config/:vk_id` carries the project's `observability_endpoint` (null for projects using LangWatch's default, populated for projects with a custom OTel endpoint).
+4. The auth cache's `OnBundleResolved` hook writes `project_id → endpoint` into the gateway's in-memory `ProjectEndpointRegistry` on every resolve / config-refresh.
+5. `RouterExporter.Resolver` looks up the project id on each span export and routes OTLP to that endpoint; null falls back to `GATEWAY_OTEL_DEFAULT_ENDPOINT`.
+6. LangWatch's ingest pipeline stores the trace under the project.
 
 So the gateway never emits to a single shared collector — it emits N per-project streams, each authenticated with the owning project's token.
 
