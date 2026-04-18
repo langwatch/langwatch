@@ -98,11 +98,11 @@ async function authenticateAndCheckLimit(c: {
     return { error: "Invalid auth token.", status: 401 as const };
   }
 
-  // Enforce PAT ceiling (legacy tokens bypass). See collector.ts for the
-  // rationale behind `traces:view` as the v1 primitive.
+  // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
+  // access on OTLP ingestion — same semantics as the collector path.
   const denial = await enforcePatCeiling({
     resolved,
-    permission: "traces:view",
+    permission: "traces:create",
   });
   if (denial) {
     return { error: denial.error, status: denial.status };
