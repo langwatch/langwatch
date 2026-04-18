@@ -240,6 +240,17 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
+            {hasPermission("virtualKeys:view") && (
+              <PageMenuLink
+                path={projectRoutes.gateway.path}
+                icon={featureIcons.gateway.icon}
+                label={projectRoutes.gateway.title}
+                project={project}
+                isActive={router.pathname.includes("/gateway")}
+                showLabel={showExpanded}
+              />
+            )}
+
             <OpsSection showExpanded={showExpanded} />
           </VStack>
 

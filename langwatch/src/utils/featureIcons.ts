@@ -10,6 +10,7 @@ import {
   FileText,
   FolderOpen,
   Home,
+  KeyRound,
   ListTree,
   type LucideIcon,
   Pencil,
@@ -37,7 +38,8 @@ export type FeatureKey =
   | "annotations"
   | "settings"
   | "agents"
-  | "evaluators";
+  | "evaluators"
+  | "gateway";
 
 export type FeatureConfig = {
   icon: LucideIcon;
@@ -124,6 +126,11 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     icon: Percent,
     color: "green.500",
     label: "Evaluators",
+  },
+  gateway: {
+    icon: KeyRound,
+    color: "orange.500",
+    label: "AI Gateway",
   },
 };
 

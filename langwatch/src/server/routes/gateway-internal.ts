@@ -13,7 +13,7 @@
  */
 import { Hono } from "hono";
 import type { Context, Next } from "hono";
-import { timingSafeEqual, createHmac } from "crypto";
+import { createHash, createHmac, timingSafeEqual } from "crypto";
 
 import { env } from "~/env.mjs";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
@@ -41,7 +41,29 @@ app.use(loggerMiddleware());
 
 // ── auth middleware ─────────────────────────────────────────────────────
 
-const GATEWAY_SIGNATURE_WINDOW_SECONDS = 300;
+export const GATEWAY_SIGNATURE_WINDOW_SECONDS = 300;
+
+/**
+ * Build the canonical string the Go gateway signs:
+ *   METHOD + "\n" + PATH + "\n" + TIMESTAMP + "\n" + hex(sha256(body))
+ */
+export function buildGatewayCanonicalString(input: {
+  method: string;
+  path: string;
+  timestamp: string;
+  body: string;
+}): string {
+  const bodyHash = createHash("sha256").update(input.body).digest("hex");
+  return `${input.method}\n${input.path}\n${input.timestamp}\n${bodyHash}`;
+}
+
+/** hex(hmac_sha256(secret, canonical)) */
+export function computeGatewaySignature(
+  secret: string,
+  canonical: string,
+): string {
+  return createHmac("sha256", secret).update(canonical).digest("hex");
+}
 
 /**
  * Verify the gateway's HMAC signature with a replay-protection timestamp.
@@ -52,12 +74,15 @@ const GATEWAY_SIGNATURE_WINDOW_SECONDS = 300;
  * Headers:
  *   X-LangWatch-Gateway-Signature: hex(hmac_sha256(LW_GATEWAY_INTERNAL_SECRET, canonical))
  *   X-LangWatch-Gateway-Timestamp: unix seconds (±300s window)
+ *   X-LangWatch-Gateway-Node: advisory, unsigned
  *
- * Rejects when:
- *   - either header is missing
- *   - timestamp is outside the window (captured-and-replayed calls)
- *   - signature does not match
+ * Verification order (by design — matches `services/gateway/internal/auth`):
+ *   1. Missing headers → 401 (cheap check)
+ *   2. Signature compare (constant-time) → 401 if bad
+ *   3. Timestamp window → 401 if drifted
  *
+ * Doing the HMAC compare before the timestamp check prevents timing-side
+ * channels from leaking which failed (invalid sig vs. replayed request).
  * Machine-to-machine only; never touches the user session.
  */
 async function verifyGatewaySignature(c: Context, next: Next) {
@@ -91,6 +116,31 @@ async function verifyGatewaySignature(c: Context, next: Next) {
     );
   }
 
+  const body = await c.req.raw.clone().text();
+  const url = new URL(c.req.url);
+  const canonical = buildGatewayCanonicalString({
+    method: c.req.method,
+    path: url.pathname,
+    timestamp: presentedTs,
+    body,
+  });
+  const expected = computeGatewaySignature(secret, canonical);
+
+  const a = Buffer.from(expected);
+  const b = Buffer.from(presentedSig);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) {
+    return c.json(
+      {
+        error: {
+          type: "permission_denied",
+          code: "invalid_signature",
+          message: "signature mismatch",
+        },
+      },
+      401,
+    );
+  }
+
   const ts = Number.parseInt(presentedTs, 10);
   if (!Number.isFinite(ts)) {
     return c.json(
@@ -112,27 +162,6 @@ async function verifyGatewaySignature(c: Context, next: Next) {
           type: "permission_denied",
           code: "timestamp_out_of_window",
           message: `timestamp drift > ${GATEWAY_SIGNATURE_WINDOW_SECONDS}s`,
-        },
-      },
-      401,
-    );
-  }
-
-  const body = await c.req.raw.clone().text();
-  const bodyHash = createHmac("sha256", "").update(body).digest("hex");
-  const url = new URL(c.req.url);
-  const canonical = `${c.req.method}\n${url.pathname}\n${presentedTs}\n${bodyHash}`;
-  const expected = createHmac("sha256", secret).update(canonical).digest("hex");
-
-  const a = Buffer.from(expected);
-  const b = Buffer.from(presentedSig);
-  if (a.length !== b.length || !timingSafeEqual(a, b)) {
-    return c.json(
-      {
-        error: {
-          type: "permission_denied",
-          code: "invalid_signature",
-          message: "signature mismatch",
         },
       },
       401,
