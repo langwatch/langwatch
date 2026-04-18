@@ -174,6 +174,39 @@ describe("Experiment.printSummary", () => {
     });
   });
 
+  describe("when an evaluator crashed (status: error)", () => {
+    it("counts it as a failure and exits", () => {
+      const exp = buildExperimentFixture({
+        evaluations: [
+          evaluation({ passed: true }),
+          evaluation({ passed: null, status: "error", index: 1 }),
+        ],
+      });
+
+      exp.printSummary();
+
+      expect(output()).toContain("Failed:     1");
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe("when evaluators carry a cost field", () => {
+    it("sums evaluator costs into totalCost and per-target cost", () => {
+      const exp = buildExperimentFixture({
+        evaluations: [
+          evaluation({ passed: true, cost: 0.0012, target_id: "gpt-4o" }),
+          evaluation({ passed: true, cost: 0.0023, target_id: "gpt-4o", index: 1 }),
+        ],
+      });
+
+      exp.printSummary(false);
+
+      const out = output();
+      // Per-target cost is rendered as $X.XXXX — 0.0035 total
+      expect(out).toContain("Total cost: $0.0035");
+    });
+  });
+
   describe("when an iteration errored out (execution failure)", () => {
     it("exits even if all evaluators passed", () => {
       const exp = buildExperimentFixture({

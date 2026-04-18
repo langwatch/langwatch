@@ -47,6 +47,15 @@ import { printSummary } from "./printSummary";
 const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;
 
+// Slim projections retained across the lifetime of an Experiment for
+// printSummary() — deliberately excludes large fields (inputs, tracebacks,
+// outputs) so running thousands of items doesn't unbound memory.
+type SummaryEvaluation = Pick<
+  EvaluationResult,
+  "name" | "evaluator" | "status" | "passed" | "score" | "cost" | "target_id"
+>;
+type SummaryEntry = Pick<BatchEntry, "duration" | "error" | "cost" | "target_id">;
+
 /**
  * AsyncLocalStorage for iteration context isolation.
  * This stores the current item and index for each iteration,
@@ -91,8 +100,10 @@ export class Experiment {
   private flushTimeout: ReturnType<typeof setTimeout> | null = null;
 
   // Cumulative record for printSummary() — never cleared, mirrors batch.
-  private cumulativeEvaluations: EvaluationResult[] = [];
-  private cumulativeEntries: BatchEntry[] = [];
+  // Store only the fields printSummary() needs, not the full payloads —
+  // inputs/tracebacks/outputs can be large and don't belong in retained summary state.
+  private cumulativeEvaluations: SummaryEvaluation[] = [];
+  private cumulativeEntries: SummaryEntry[] = [];
   private runUrl = "";
 
   // Target registry
@@ -375,7 +386,12 @@ export class Experiment {
       };
 
       this.batch.dataset.push(entry);
-      this.cumulativeEntries.push(entry);
+      this.cumulativeEntries.push({
+        duration: entry.duration,
+        error: entry.error,
+        cost: entry.cost,
+        target_id: entry.target_id,
+      });
     }
 
     // Clean up
@@ -456,7 +472,15 @@ export class Experiment {
     };
 
     this.batch.evaluations.push(result);
-    this.cumulativeEvaluations.push(result);
+    this.cumulativeEvaluations.push({
+      name: result.name,
+      evaluator: result.evaluator,
+      status: result.status,
+      passed: result.passed,
+      score: result.score,
+      cost: result.cost,
+      target_id: result.target_id,
+    });
     this.scheduleSend();
   }
 
@@ -745,7 +769,12 @@ export class Experiment {
     };
 
     this.batch.dataset.push(entry);
-    this.cumulativeEntries.push(entry);
+    this.cumulativeEntries.push({
+      duration: entry.duration,
+      error: entry.error,
+      cost: entry.cost,
+      target_id: entry.target_id,
+    });
     this.scheduleSend();
 
     return {
@@ -828,6 +857,7 @@ export class Experiment {
     >();
     let totalPassed = 0;
     let totalFailed = 0;
+    let totalCost = 0;
 
     for (const e of this.cumulativeEvaluations) {
       const name = e.name ?? e.evaluator ?? "unknown";
@@ -835,16 +865,21 @@ export class Experiment {
         evaluators.set(name, { passed: 0, failed: 0, scoreSum: 0, scoreCount: 0 });
       }
       const stats = evaluators.get(name)!;
-      if (e.passed === true) {
-        stats.passed += 1;
-        totalPassed += 1;
-      } else if (e.passed === false) {
+      // Evaluators that crashed come back as status:"error" with passed often null;
+      // treat them as failures so CI doesn't silently succeed on evaluator crashes.
+      if (e.status === "error" || e.passed === false) {
         stats.failed += 1;
         totalFailed += 1;
+      } else if (e.passed === true) {
+        stats.passed += 1;
+        totalPassed += 1;
       }
       if (typeof e.score === "number") {
         stats.scoreSum += e.score;
         stats.scoreCount += 1;
+      }
+      if (typeof e.cost === "number") {
+        totalCost += e.cost;
       }
     }
 
@@ -879,8 +914,9 @@ export class Experiment {
         targets.set(tid, { passed: 0, failed: 0, latencySum: 0, latencyCount: 0, cost: 0 });
       }
       const stats = targets.get(tid)!;
-      if (e.passed === true) stats.passed += 1;
-      else if (e.passed === false) stats.failed += 1;
+      if (e.status === "error" || e.passed === false) stats.failed += 1;
+      else if (e.passed === true) stats.passed += 1;
+      if (typeof e.cost === "number") stats.cost += e.cost;
     }
 
     const total = totalPassed + totalFailed;
@@ -890,9 +926,8 @@ export class Experiment {
     // under concurrent withTarget() calls (each target produces its own entry).
     const duration = Math.max(0, Date.now() - this.createdAtMs);
 
-    // Count entries whose target/loop execution errored out — these are distinct
-    // from evaluator failures but must also trigger CI exit.
-    let totalCost = 0;
+    // Count entries whose target/loop execution errored out — distinct from
+    // evaluator failures but must also trigger CI exit.
     let failedCells = 0;
     for (const entry of this.cumulativeEntries) {
       if (typeof entry.cost === "number") totalCost += entry.cost;
