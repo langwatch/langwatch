@@ -51,6 +51,10 @@ export function createEnvConfig() {
       ELASTICSEARCH_CONFIGURED: z.boolean().optional(),
       REDIS_URL: z.string().optional(),
       REDIS_CLUSTER_ENDPOINTS: z.string().optional(),
+      REDIS_DB_INDEX: z
+        .string()
+        .regex(/^(?:[0-9]|1[0-5])$/, "REDIS_DB_INDEX must be 0-15")
+        .optional(),
       GOOGLE_APPLICATION_CREDENTIALS: z.string().optional(),
       AZURE_OPENAI_ENDPOINT: z.string().optional(),
       AZURE_OPENAI_KEY: z.string().optional(),
@@ -160,6 +164,7 @@ export function createEnvConfig() {
       ELASTICSEARCH_CONFIGURED: !!(process.env.ELASTICSEARCH_NODE_URL),
       REDIS_URL: process.env.REDIS_URL,
       REDIS_CLUSTER_ENDPOINTS: process.env.REDIS_CLUSTER_ENDPOINTS,
+      REDIS_DB_INDEX: process.env.REDIS_DB_INDEX,
       GOOGLE_APPLICATION_CREDENTIALS: process.env.GOOGLE_APPLICATION_CREDENTIALS,
       AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
       AZURE_OPENAI_KEY: process.env.AZURE_OPENAI_KEY,
