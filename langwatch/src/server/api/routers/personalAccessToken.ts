@@ -165,7 +165,12 @@ export const personalAccessTokenRouter = createTRPCRouter({
         name: z.string().min(1).max(100),
         description: z.string().max(500).optional(),
         expiresAt: z.coerce.date().optional(),
-        bindings: z.array(roleBindingSchema).min(1),
+        // 20 is well above any realistic grant (an owner mirroring every
+        // scope they hold rarely exceeds a handful) while bounding the
+        // per-request validation cost — each binding walks scope lookups
+        // and permission checks, so an unbounded list is a cheap DoS
+        // surface for an authenticated user.
+        bindings: z.array(roleBindingSchema).min(1).max(20),
       }),
     )
     .use(
