@@ -1,0 +1,305 @@
+---
+title: Management REST API
+description: Manage virtual keys, budgets, and provider bindings programmatically via /api/gateway/v1/*.
+sidebarTitle: Management REST
+---
+
+The management REST API is the same surface the `langwatch` CLI and LangWatch dashboard use, exposed for scripts, CI pipelines, SDKs, and terraform providers. It runs on the LangWatch control plane (`https://app.langwatch.ai`), separately from the data-plane gateway (`https://gateway.langwatch.ai`).
+
+Authentication uses existing LangWatch API tokens (`Authorization: Bearer lwp_...` or `X-Auth-Token: lwp_...`). No new token format.
+
+<Info>The CLI (`langwatch virtual-keys ...`) is built on this API. If you're scripting from Node or Python, consider using the CLI rather than calling the REST directly — it handles pagination, JSON formatting, and error messages for you.</Info>
+
+## Base
+
+```
+Base URL: https://app.langwatch.ai/api/gateway/v1
+Auth:     Authorization: Bearer <project_api_token>
+Content:  application/json
+```
+
+Self-hosted: replace the base with your control plane's DNS.
+
+## Virtual keys
+
+### List
+
+```
+GET /virtual-keys
+```
+
+Response:
+
+```json
+{
+  "data": [
+    {
+      "id": "vk_01HZX...",
+      "name": "prod-key",
+      "description": null,
+      "environment": "live",
+      "prefix": "lw_vk_live_01H",
+      "last_four": "NZ0Z",
+      "status": "ACTIVE",
+      "principal_user_id": null,
+      "project_id": "proj_01HZ...",
+      "organization_id": "org_01HZ...",
+      "provider_credential_ids": ["gpc_01HZ...", "gpc_01HZW..."],
+      "config": { /* model_aliases, cache, fallback, ... */ },
+      "created_at": "2026-04-10T12:00:00Z",
+      "updated_at": "2026-04-18T18:21:00Z",
+      "revoked_at": null,
+      "last_used_at": "2026-04-18T21:03:12Z"
+    }
+  ]
+}
+```
+
+### Create
+
+```
+POST /virtual-keys
+```
+
+Body:
+
+```json
+{
+  "name": "ci-key",
+  "description": "CI smoke tests",
+  "environment": "live",                         // or "test"
+  "principal_user_id": null,                     // optional
+  "provider_credential_ids": ["gpc_01HZ..."],    // required, min 1
+  "config": { /* optional partial config */ }
+}
+```
+
+Response `201`:
+
+```json
+{
+  "virtual_key": { /* full VK shape per List */ },
+  "secret": "lw_vk_live_01HZX9K3MABCDEFGH...JIKLMN0Z"
+}
+```
+
+<Warning>The `secret` field is returned **only this once**. Persist it immediately.</Warning>
+
+### Get
+
+```
+GET /virtual-keys/:id
+```
+
+Response: `{ "virtual_key": {...} }`. No secret.
+
+### Update
+
+```
+PATCH /virtual-keys/:id
+```
+
+Body (all fields optional):
+
+```json
+{
+  "name": "new-name",
+  "description": null,                         // null clears
+  "provider_credential_ids": ["gpc_...", "..."],
+  "config": { /* partial, merges with existing */ }
+}
+```
+
+### Rotate
+
+```
+POST /virtual-keys/:id/rotate
+```
+
+Response `200`:
+
+```json
+{
+  "virtual_key": { /* ... */ },
+  "secret": "lw_vk_live_NEW..."
+}
+```
+
+The previous secret stops authenticating immediately (modulo ~60 s of gateway L1 cache TTL).
+
+### Revoke
+
+```
+POST /virtual-keys/:id/revoke
+```
+
+Idempotent: revoking an already-revoked VK returns `200` with the same status.
+
+## Budgets
+
+### List
+
+```
+GET /budgets
+```
+
+Response: `{ "data": [{...}, ...] }`. Each entry has `limit_usd` and `spent_usd` as strings (decimal precision preserved).
+
+### Create
+
+```
+POST /budgets
+```
+
+Body:
+
+```json
+{
+  "scope": {
+    "kind": "PROJECT",         // or ORGANIZATION, TEAM, VIRTUAL_KEY, PRINCIPAL
+    "project_id": "proj_..."   // the id field depends on scope.kind
+  },
+  "name": "project-monthly-cap",
+  "description": "Standard monthly envelope",
+  "window": "MONTH",           // MINUTE | HOUR | DAY | WEEK | MONTH | TOTAL
+  "limit_usd": 5000,           // or "5000.00"
+  "on_breach": "BLOCK",        // or WARN
+  "timezone": "Europe/Amsterdam"
+}
+```
+
+### Update
+
+```
+PATCH /budgets/:id
+```
+
+Updatable fields: `name`, `description`, `limit_usd`, `on_breach`, `timezone`.
+
+### Archive
+
+```
+DELETE /budgets/:id
+```
+
+Soft archive: preserves ledger history, stops enforcement on new requests.
+
+## Provider bindings
+
+### List
+
+```
+GET /providers
+```
+
+Response:
+
+```json
+{
+  "data": [
+    {
+      "id": "gpc_01HZ...",
+      "model_provider_id": "mp_openai",
+      "model_provider_name": "openai",
+      "slot": "primary",
+      "rate_limit_rpm": 10000,
+      "rate_limit_tpm": 1000000,
+      "rate_limit_rpd": null,
+      "rotation_policy": "manual",
+      "fallback_priority_global": 10,
+      "health_status": "healthy",
+      "disabled_at": null,
+      "created_at": "2026-04-10T12:00:00Z"
+    }
+  ]
+}
+```
+
+### Create
+
+```
+POST /providers
+```
+
+Body:
+
+```json
+{
+  "model_provider_id": "mp_openai",   // the existing provider row id
+  "slot": "primary",                  // free-text
+  "rate_limit_rpm": 10000,
+  "rate_limit_tpm": 1000000,
+  "rate_limit_rpd": null,
+  "rotation_policy": "manual",        // auto | manual | external_secret_store
+  "extra_headers": null,
+  "provider_config": null,
+  "fallback_priority_global": 10
+}
+```
+
+Response `201`: `{ "provider_credential": { "id": "gpc_01HZ..." } }`.
+
+### Update
+
+```
+PATCH /providers/:id
+```
+
+### Disable
+
+```
+DELETE /providers/:id
+```
+
+Soft disable: existing VKs bound to this credential continue to resolve; new VK creation rejects this credential.
+
+## Errors
+
+All responses follow the OpenAI-compatible envelope:
+
+```json
+{
+  "error": {
+    "type": "bad_request",
+    "code": "validation_error",
+    "message": "provider_credential_ids must contain at least 1 element"
+  }
+}
+```
+
+See [API: Errors](/ai-gateway/api/errors) for the full type enum.
+
+Common management-side types:
+
+| HTTP | `type` | Meaning |
+|---|---|---|
+| 400 | `bad_request` | Validation / missing required field |
+| 401 | `unauthenticated` | Missing or invalid API token |
+| 403 | `permission_denied` | Token lacks the required RBAC scope |
+| 404 | `not_found` | Resource doesn't exist or isn't visible in this project |
+| 409 | `conflict` | Name collision on create, stale update (optimistic concurrency) |
+| 422 | `validation_error` | Semantic error (e.g. `window=MINUTE` but `limit_usd=100000`, impossibly large per-minute cap) |
+
+## Audit
+
+Every write emits a row in `GatewayAuditLog` — visible under **Settings → Organization → Activity**. Writes via API tokens without an associated user (service tokens) are attributed to `actor = "svc_<projectId>"`.
+
+## Rate limits
+
+Management endpoints are rate-limited to 100 req/min/token. For bulk operations, use the `--format json` CLI with `xargs -P4` (the CLI sleeps 250 ms between retries on 429).
+
+## Shared service layer
+
+Both the REST API and the tRPC routers (`virtualKeys.*`, `gatewayBudgets.*`, `gatewayProviders.*`) call the same service classes on the server — `VirtualKeyService`, `GatewayBudgetService`, `GatewayProviderCredentialService`. The only difference between REST and tRPC is the DTO shape (snake_case vs camelCase). Behaviour is identical.
+
+This matters for testing: the BDD scenarios in `specs/ai-gateway/public-rest-api.feature` include a parity check that asserts the two surfaces return equivalent data for the same resource after case normalization. If you rely on a field in one, it's guaranteed to exist in the other.
+
+## Future
+
+The REST routes will gain an OpenAPI 3.1 schema via `hono-openapi`'s `describeRoute` annotations (tracked in Lane B iter 7). Once published, the CLI's `VirtualKeysApiService`, `GatewayBudgetsApiService`, `GatewayProvidersApiService` will be regenerated from the schema so any drift between the server and the client is caught at build time.
+
+## See also
+
+- [langwatch CLI](/ai-gateway/cli/langwatch-cli) — higher-level access.
+- [RBAC](/ai-gateway/rbac) — which scopes your token needs.
+- [Security](/ai-gateway/security) — how your API tokens and resulting writes are protected.

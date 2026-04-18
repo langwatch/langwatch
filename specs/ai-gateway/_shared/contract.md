@@ -263,7 +263,7 @@ Gateway re-fetches affected `config/:vk_id`. This replaces the 60s full-refresh 
 
 ### 4.4 `POST /api/internal/gateway/budget/check`
 
-Pre-request check (optional if cached config has sufficient budget). Returns whether a prospective cost would breach any scope.
+Live reconciliation for near-limit scopes. Called by the gateway only when the cached snapshot shows any scope ≥ 90% of its hard limit (see `budgets.mdx` "Tier 2 — live reconciliation"). For cold scopes the cached snapshot is authoritative and this endpoint is never hit.
 
 Request:
 ```json
@@ -271,18 +271,32 @@ Request:
   "vk_id": "vk_01HZ...",
   "gateway_request_id": "grq_01HZ...",
   "projected_cost_usd": 0.012,
-  "model": "gpt-5-mini"
+  "model": "gpt-5-mini",
+  "hot_scopes": [                            // optional: which scopes to check live
+    { "scope": "project", "scope_id": "proj_..." },
+    { "scope": "principal", "scope_id": "user_..." }
+  ]
 }
 ```
 
-Response:
+Response (dual-shape; both tiers populate both for now):
 ```json
 {
-  "decision": "allow | soft_warn | hard_block",
-  "warnings": [ { "scope": "team", "pct_used": 89.2 } ],
-  "block_reason": null | "Budget exceeded for scope=project window=month"
+  "decision":     "allow | soft_warn | hard_block",
+  "warnings":    [ { "scope": "team", "pct_used": 89.2 } ],
+  "block_reason": null,
+  "blocked_by":   null,                      // or { "scope": "project", "window": "month" }
+
+  "scopes": [                                // raw per-scope ledger snapshot
+    { "scope": "project",   "scope_id": "proj_...",  "window": "month",  "spent_usd": "4824.12", "limit_usd": "5000.00" },
+    { "scope": "principal", "scope_id": "user_...",  "window": "day",    "spent_usd": "19.40",   "limit_usd": "25.00"   }
+  ]
 }
 ```
+
+Consumers can read EITHER the `decision`/`warnings`/`block_reason`/`blocked_by` top-level fields (dispatcher-style; used by older call sites) OR the `scopes` array (raw per-scope data; used by the gateway `Checker.ApplyLive` path landed in Lane A iter 4 pt3). Both are derived from the same authoritative ledger query, so they agree by construction.
+
+Timeout and fail-open: gateway uses a 200 ms deadline on this call. On timeout or 5xx, the gateway falls back to its tier-1 cached decision (allow-through if cache said allow). Configurable via `LW_GATEWAY_BUDGET_LIVE_TIMEOUT_MS`.
 
 ### 4.5 `POST /api/internal/gateway/budget/debit`
 

@@ -534,7 +534,8 @@
               "ai-gateway/api/messages",
               "ai-gateway/api/embeddings",
               "ai-gateway/api/models",
-              "ai-gateway/api/errors"
+              "ai-gateway/api/errors",
+              "ai-gateway/api/management"
             ]
           },
           {

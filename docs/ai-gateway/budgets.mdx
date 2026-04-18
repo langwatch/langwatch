@@ -77,9 +77,34 @@ If the control-plane is unreachable, the gateway queues debits locally and deliv
 
 ## Pre-request check
 
-Before dispatching to the provider, the gateway checks the VK's cached budget snapshot. If the snapshot already shows a breach, the request is rejected without making a provider call — saving the spend entirely. The snapshot is updated by the `/changes` long-poll every time any debit lands.
+Before dispatching to the provider, the gateway runs a **two-tier precheck** designed to keep the hot path free while avoiding stale-snapshot races as budgets approach their caps:
 
-For tight budget windows (`minute` / `hour`) where the snapshot might be stale, the gateway can optionally call `/internal/gateway/budget/check` for a fresh pre-check. This is a latency trade-off: enable it via VK config `budget.strict_precheck: true` if you need tight enforcement.
+### Tier 1 — cached snapshot (always)
+
+The gateway checks the VK's in-memory budget snapshot (refreshed via the `/changes` long-poll on every debit). If the snapshot already shows a hard-breach, the request is rejected immediately with `402 budget_exceeded` — saving the provider spend and the wall-clock round-trip entirely. This costs ~0 μs: it's an in-process map lookup.
+
+### Tier 2 — live reconciliation (near-limit only)
+
+If any scope applicable to the request has `spent_usd / limit_usd >= 0.90`, the gateway makes a signed `POST /api/internal/gateway/budget/check` call to the control plane with ONLY those hot scopes. The control plane returns the real-time `spent_usd` from the authoritative ledger, and the gateway re-evaluates. Timeout is 200 ms; if the call fails, tier 1's decision is used (fail-open).
+
+This closes the **stale-snapshot race** where two gateway nodes each see a cached `spent=$24.90 / limit=$25.00` and both admit a $0.50 request — producing $25.80 in actual spend against a $25 cap. With tier 2 active on the near-limit 10% band, the control plane sees both requests and rejects the second based on the live ledger.
+
+Cold scopes (under 90%) skip the live call entirely — no latency tax on the common case.
+
+```
+request → tier 1 (always, ~0μs) → pass?
+                                → breach? → 402 (saved provider spend)
+
+tier 1 pass, any scope ≥ 90%? → tier 2 (live, ~5-50ms via HMAC-signed POST)
+                              → live spent says breach? → 402
+                              → live says OK? → dispatch
+                              → timeout / 5xx? → dispatch (fail-open)
+```
+
+Gateway env knobs:
+
+- `LW_GATEWAY_BUDGET_LIVE_THRESHOLD` — default `0.9` (90%). Lower it for stricter enforcement at some latency cost.
+- `LW_GATEWAY_BUDGET_LIVE_TIMEOUT_MS` — default `200`.
 
 ## What "USD cost" means
 
