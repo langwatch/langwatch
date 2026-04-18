@@ -1,86 +1,50 @@
 import { Alert, Button, VStack } from "@chakra-ui/react";
-import { useRouter } from "~/utils/compat/next-router";
-import { signOut } from "~/utils/auth-client";
-import { useEffect } from "react";
+
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { SetupLayout } from "../../components/SetupLayout";
-import { toaster } from "../../components/ui/toaster";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
-import { api } from "../../utils/api";
+import { useAcceptInviteOnce } from "../../hooks/useAcceptInviteOnce";
+import { useRouter } from "~/utils/compat/next-router";
+import { signOut } from "~/utils/auth-client";
 
 export default function Accept() {
   const router = useRouter();
   const { inviteCode } = router.query;
-  const acceptInviteMutation = api.organization.acceptInvite.useMutation();
-
   const { data: session } = useRequiredSession();
-  const triggerInvite = typeof inviteCode === "string" && !!session;
+  const { status, errorMessage } = useAcceptInviteOnce({
+    inviteCode: typeof inviteCode === "string" ? inviteCode : undefined,
+    enabled: !!session,
+  });
 
-  useEffect(() => {
-    if (!triggerInvite) return;
+  // "already-accepted" and "success" both trigger a hard redirect in the hook;
+  // show the loading screen while navigation is in flight so the error UI
+  // never flashes for the benign already-accepted case.
+  const isAwaitingOrRedirecting =
+    status === "idle" ||
+    status === "loading" ||
+    status === "success" ||
+    status === "already-accepted";
 
-    acceptInviteMutation.mutate(
-      { inviteCode },
-      {
-        onSuccess: (data) => {
-          toaster.create({
-            title: "Invite Accepted",
-            description: `You have successfully accepted the invite for ${data.invite.organization.name}.`,
-            type: "success",
-            meta: {
-              closable: true,
-            },
-            duration: 5000,
-          });
-
-          // Hard redirect so the page reloads with a clean cache — avoids
-          // useOrganizationTeamProject reading stale (no-org) data and
-          // bouncing the user to /onboarding/welcome
-          window.location.href = data.project?.slug
-            ? `/${data.project.slug}`
-            : "/";
-        },
-      },
-    );
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerInvite]);
-
-  if (
-    !triggerInvite ||
-    acceptInviteMutation.isLoading ||
-    acceptInviteMutation.isSuccess
-  ) {
+  if (isAwaitingOrRedirecting) {
     return <LoadingScreen />;
   }
 
-  if (acceptInviteMutation.isError) {
-    if (acceptInviteMutation.error.message === "Invite was already accepted") {
-      void router.push("/");
-      return <LoadingScreen />;
-    }
-
-    return (
-      <SetupLayout>
-        <VStack gap={4}>
-          <Alert.Root status="error">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title>
-                An error occurred while accepting the invite.
-              </Alert.Title>
-              <Alert.Description>
-                {acceptInviteMutation.error.message}
-              </Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
-          <Button colorPalette="orange" onClick={() => void signOut()}>
-            Log Out and Try Again
-          </Button>
-        </VStack>
-      </SetupLayout>
-    );
-  }
-
-  return <SetupLayout />;
+  return (
+    <SetupLayout>
+      <VStack gap={4}>
+        <Alert.Root status="error">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>
+              An error occurred while accepting the invite.
+            </Alert.Title>
+            <Alert.Description>{errorMessage}</Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+        <Button colorPalette="orange" onClick={() => void signOut()}>
+          Log Out and Try Again
+        </Button>
+      </VStack>
+    </SetupLayout>
+  );
 }
