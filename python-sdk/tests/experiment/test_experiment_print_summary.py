@@ -9,6 +9,8 @@ import pytest
 
 from langwatch.experiment.experiment import Experiment
 
+pytestmark = pytest.mark.unit
+
 
 def _experiment_with_df(df: pd.DataFrame, run_url: str = "https://app.langwatch.ai/runs/xyz") -> Experiment:
     exp = Experiment(name="ci-quality-check", run_id="run_abc")
@@ -92,6 +94,22 @@ class TestBuildRunResult:
         assert claude.passed == 1 and claude.failed == 1
         assert gpt.avg_latency == pytest.approx(150.0)
         assert claude.total_cost == pytest.approx(0.007)
+
+    def test_counts_rows_with_errors_as_failed_cells(self):
+        df = pd.DataFrame(
+            {
+                "index": [0, 1, 2],
+                "faithfulness_passed": [True, True, True],
+                "error": [None, "timeout after 30s", None],
+            }
+        ).set_index("index")
+        exp = _experiment_with_df(df)
+
+        result = exp._build_run_result()
+
+        assert result.summary.failed_cells == 1
+        assert result.summary.completed_cells == 2
+        assert result.summary.total_cells == 3
 
     def test_ignores_non_passed_columns(self):
         df = pd.DataFrame(
@@ -185,7 +203,7 @@ class TestPrintSummary:
         ).set_index("index")
         exp = _experiment_with_df(df)
 
-        with patch("langwatch.experiment.platform_run._is_notebook", return_value=False):
+        with patch("langwatch.experiment.experiment._is_notebook", return_value=False):
             buf = io.StringIO()
             with redirect_stdout(buf), pytest.raises(SystemExit) as exc:
                 exp.print_summary()
@@ -200,12 +218,28 @@ class TestPrintSummary:
         ).set_index("index")
         exp = _experiment_with_df(df)
 
-        with patch("langwatch.experiment.platform_run._is_notebook", return_value=True):
+        with patch("langwatch.experiment.experiment._is_notebook", return_value=True):
             buf = io.StringIO()
             with redirect_stdout(buf):
                 exp.print_summary()
             # No SystemExit — test passes if we reach here
             assert "Failed:     1" in buf.getvalue()
+
+    def test_exits_on_execution_errors_even_when_all_evaluators_passed(self):
+        df = pd.DataFrame(
+            {
+                "index": [0, 1],
+                "faithfulness_passed": [True, True],
+                "error": [None, "LLM call timed out"],
+            }
+        ).set_index("index")
+        exp = _experiment_with_df(df)
+
+        buf = io.StringIO()
+        with redirect_stdout(buf), pytest.raises(SystemExit) as exc:
+            exp.print_summary(exit_on_failure=True)
+
+        assert exc.value.code == 1
 
     def test_handles_empty_results_gracefully(self):
         exp = _experiment_with_df(pd.DataFrame())

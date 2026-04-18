@@ -13,7 +13,7 @@ Feature: Python SDK Experiment.print_summary for CI/CD parity
   Scenario: print_summary prints a CI-friendly summary after loop completes
     Given the experiment has looped over a dataset and recorded evaluations
     When I call experiment.print_summary(exit_on_failure=False)
-    Then stdout contains the experiment name
+    Then stdout contains the run ID
     And stdout contains the total passed and failed counts
     And stdout contains the pass rate
     And stdout contains the run URL

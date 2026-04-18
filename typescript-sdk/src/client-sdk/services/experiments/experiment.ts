@@ -878,11 +878,17 @@ export class Experiment {
     const total = totalPassed + totalFailed;
     const passRate = total > 0 ? (totalPassed / total) * 100 : 0;
 
-    let duration = 0;
+    // Wall-clock duration from init — summing entry durations over-counts
+    // under concurrent withTarget() calls (each target produces its own entry).
+    const duration = Math.max(0, Date.now() - this.createdAtMs);
+
+    // Count entries whose target/loop execution errored out — these are distinct
+    // from evaluator failures but must also trigger CI exit.
     let totalCost = 0;
+    let failedCells = 0;
     for (const entry of this.cumulativeEntries) {
-      if (typeof entry.duration === "number") duration += entry.duration;
       if (typeof entry.cost === "number") totalCost += entry.cost;
+      if (entry.error) failedCells += 1;
     }
 
     printSummary({
@@ -896,8 +902,8 @@ export class Experiment {
       summary: {
         runId: this.runId,
         totalCells: this.cumulativeEntries.length || total,
-        completedCells: this.cumulativeEntries.length || total,
-        failedCells: 0,
+        completedCells: Math.max(0, (this.cumulativeEntries.length || total) - failedCells),
+        failedCells,
         duration,
         runUrl: this.runUrl,
         totalPassed,
@@ -923,7 +929,7 @@ export class Experiment {
       },
     });
 
-    if (exitOnFailure && totalFailed > 0) {
+    if (exitOnFailure && (totalFailed > 0 || failedCells > 0)) {
       process.exit(1);
     }
   }

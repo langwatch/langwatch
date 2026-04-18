@@ -36,6 +36,14 @@ from tqdm.auto import tqdm
 import langwatch
 from langwatch.attributes import AttributeKey
 from langwatch.domain import Money, TypedValueJson
+from langwatch.experiment.platform_run import (
+    EvaluatorStats,
+    ExperimentRunResult,
+    ExperimentRunSummary,
+    TargetStats,
+    _is_notebook,
+    _print_summary,
+)
 from langwatch.telemetry.tracing import LangWatchTrace
 from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import SerializableWithStringFallback
@@ -422,30 +430,17 @@ class Experiment:
 
             experiment.print_summary()
         """
-        from langwatch.experiment.platform_run import _is_notebook, _print_summary
-
         result = self._build_run_result()
         _print_summary(result)
 
         should_exit = exit_on_failure if exit_on_failure is not None else not _is_notebook()
-        if should_exit and result.failed > 0:
+        if should_exit and (result.failed > 0 or result.summary.failed_cells > 0):
             sys.exit(1)
 
-    def _build_run_result(self) -> "ExperimentRunResult":
+    def _build_run_result(self) -> ExperimentRunResult:
         """Build an ExperimentRunResult from the current results DataFrame."""
-        from langwatch.experiment.platform_run import (
-            EvaluatorStats,
-            ExperimentRunResult,
-            ExperimentRunSummary,
-            TargetStats,
-        )
-
         run_url = self._run_url or ""
-
-        try:
-            df = self.results
-        except Exception:
-            df = pd.DataFrame()
+        df = self.results
 
         if df is None or df.empty:
             empty_summary = ExperimentRunSummary(
@@ -552,11 +547,18 @@ class Experiment:
             if not cost_all.empty:
                 total_cost = float(cost_all.sum())
 
+        # Count rows whose target/loop execution errored out (non-null error column).
+        # These are execution failures distinct from evaluator failures — CI must
+        # treat them as failures too, not just evaluator mismatches.
+        failed_cells = 0
+        if "error" in flat.columns:
+            failed_cells = int(flat["error"].notna().sum())
+
         summary = ExperimentRunSummary(
             run_id=self.run_id,
             total_cells=len(flat),
-            completed_cells=len(flat),
-            failed_cells=0,
+            completed_cells=len(flat) - failed_cells,
+            failed_cells=failed_cells,
             duration=duration,
             run_url=run_url,
             targets=targets,

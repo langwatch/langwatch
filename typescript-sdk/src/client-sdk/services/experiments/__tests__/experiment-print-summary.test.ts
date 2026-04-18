@@ -151,4 +151,20 @@ describe("Experiment.printSummary", () => {
       expect(exitSpy).not.toHaveBeenCalled();
     });
   });
+
+  describe("when an iteration errored out (execution failure)", () => {
+    it("exits even if all evaluators passed", () => {
+      const exp = buildExperimentFixture({
+        evaluations: [evaluation({ passed: true })],
+        entries: [
+          { index: 0, entry: null, duration: 100, error: null, trace_id: "t1" },
+          { index: 1, entry: null, duration: 0, error: "LLM timed out", trace_id: "t2" },
+        ],
+      });
+
+      exp.printSummary();
+
+      expect(exitSpy).toHaveBeenCalledWith(1);
+    });
+  });
 });
