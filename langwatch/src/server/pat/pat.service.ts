@@ -10,6 +10,9 @@ import {
   PatNotFoundError,
   PatNotOwnedError,
 } from "./errors";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:pat:service");
 
 export class PatService {
   private readonly repo: PatRepository;
@@ -109,9 +112,18 @@ export class PatService {
 
   /**
    * Fire-and-forget lastUsedAt update. Call after full authorization succeeds.
+   *
+   * Errors are logged rather than swallowed silently so lastUsedAt drift
+   * between the DB and the token's true usage is visible in operational
+   * logs (disk pressure, connection churn, migrations in flight, etc.).
    */
   markUsed({ id }: { id: string }): void {
-    void this.repo.updateLastUsedAt({ id });
+    this.repo.updateLastUsedAt({ id }).catch((err: unknown) => {
+      logger.warn(
+        { err, patId: id },
+        "failed to update PAT lastUsedAt (fire-and-forget)",
+      );
+    });
   }
 
   /**
