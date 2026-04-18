@@ -934,9 +934,11 @@ export class Experiment {
       if (entry.error) failedCells += 1;
     }
 
+    const hasFailures = totalFailed > 0 || failedCells > 0;
+
     printSummary({
       runId: this.runId,
-      status: "completed",
+      status: hasFailures ? "failed" : "completed",
       passed: totalPassed,
       failed: totalFailed,
       passRate,
@@ -972,7 +974,7 @@ export class Experiment {
       },
     });
 
-    if (exitOnFailure && (totalFailed > 0 || failedCells > 0)) {
+    if (exitOnFailure && hasFailures) {
       process.exit(1);
     }
   }

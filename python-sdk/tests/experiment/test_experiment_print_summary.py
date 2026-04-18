@@ -241,6 +241,32 @@ class TestPrintSummary:
 
         assert exc.value.code == 1
 
+    def test_status_reflects_failures_not_completed(self):
+        df = pd.DataFrame(
+            {
+                "index": [0, 1],
+                "faithfulness_passed": [True, False],
+            }
+        ).set_index("index")
+        exp = _experiment_with_df(df)
+
+        result = exp._build_run_result()
+
+        assert result.status == "failed"
+
+    def test_status_is_completed_when_all_pass(self):
+        df = pd.DataFrame(
+            {
+                "index": [0, 1],
+                "faithfulness_passed": [True, True],
+            }
+        ).set_index("index")
+        exp = _experiment_with_df(df)
+
+        result = exp._build_run_result()
+
+        assert result.status == "completed"
+
     def test_handles_empty_results_gracefully(self):
         exp = _experiment_with_df(pd.DataFrame())
 

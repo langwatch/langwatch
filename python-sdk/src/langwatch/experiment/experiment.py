@@ -569,9 +569,10 @@ class Experiment:
             total_cost=total_cost,
         )
 
+        has_failures = total_failed > 0 or failed_cells > 0
         return ExperimentRunResult(
             run_id=self.run_id,
-            status="completed",
+            status="failed" if has_failures else "completed",
             passed=total_passed,
             failed=total_failed,
             pass_rate=pass_rate,

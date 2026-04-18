@@ -174,6 +174,23 @@ describe("Experiment.printSummary", () => {
     });
   });
 
+  describe("when the run has failures", () => {
+    it("reports Status: FAILED (not COMPLETED)", () => {
+      const exp = buildExperimentFixture({
+        evaluations: [
+          evaluation({ passed: true }),
+          evaluation({ passed: false, index: 1 }),
+        ],
+      });
+
+      exp.printSummary(false);
+
+      const out = output();
+      expect(out).toContain("Status:     FAILED");
+      expect(out).not.toContain("Status:     COMPLETED");
+    });
+  });
+
   describe("when an evaluator crashed (status: error)", () => {
     it("counts it as a failure and exits", () => {
       const exp = buildExperimentFixture({
