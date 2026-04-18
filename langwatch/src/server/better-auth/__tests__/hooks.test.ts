@@ -11,11 +11,17 @@ import {
 } from "../hooks";
 
 const makePrismaMock = (overrides: Record<string, any> = {}): PrismaClient => {
-  const base = {
+  const base: Record<string, any> = {
     organization: { findUnique: vi.fn().mockResolvedValue(null) },
+    organizationInvite: { findFirst: vi.fn().mockResolvedValue(null) },
     organizationUser: {
       create: vi.fn().mockResolvedValue(undefined),
+      createMany: vi.fn().mockResolvedValue({ count: 0 }),
       count: vi.fn().mockResolvedValue(0),
+    },
+    roleBinding: {
+      create: vi.fn().mockResolvedValue(undefined),
+      deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
     },
     user: {
       findUnique: vi.fn().mockResolvedValue(null),
@@ -25,9 +31,20 @@ const makePrismaMock = (overrides: Record<string, any> = {}): PrismaClient => {
       deleteMany: vi.fn().mockResolvedValue(undefined),
       count: vi.fn().mockResolvedValue(0),
     },
-    $transaction: vi.fn().mockImplementation(async (ops: unknown[]) => ops),
   };
-  return { ...base, ...overrides } as unknown as PrismaClient;
+  const merged: any = { ...base, ...overrides };
+  // Support both $transaction forms: array form (returns the ops) and
+  // callback form (invokes the callback with this same mock as `tx`, so
+  // tests continue to assert against `prisma.xxx` spies).
+  if (!merged.$transaction) {
+    merged.$transaction = vi.fn().mockImplementation(async (arg: unknown) => {
+      if (typeof arg === "function") {
+        return (arg as (tx: unknown) => unknown)(merged);
+      }
+      return arg;
+    });
+  }
+  return merged as unknown as PrismaClient;
 };
 
 describe("beforeUserCreate", () => {
@@ -80,6 +97,79 @@ describe("afterUserCreate", () => {
       });
       expect(prisma.organizationUser.create).toHaveBeenCalledWith({
         data: { userId: "user_1", organizationId: "org_1", role: "MEMBER" },
+      });
+    });
+  });
+
+  describe("when a PENDING invite exists for the signing-up user", () => {
+    it("applies the invite's role + team assignments and marks it ACCEPTED", async () => {
+      const pendingInvite = {
+        id: "inv_1",
+        email: "Alice@Acme.com",
+        organizationId: "org_1",
+        role: "ADMIN",
+        teamIds: "",
+        teamAssignments: [
+          { teamId: "team_1", role: "ADMIN" },
+          { teamId: "team_2", role: "MEMBER", customRoleId: "cr_1" },
+        ],
+        status: "PENDING",
+      };
+
+      const inviteUpdate = vi.fn().mockResolvedValue(undefined);
+      const orgUserCreateMany = vi.fn().mockResolvedValue({ count: 1 });
+      const roleBindingCreate = vi.fn().mockResolvedValue(undefined);
+      const roleBindingDeleteMany = vi.fn().mockResolvedValue({ count: 0 });
+
+      const prisma = makePrismaMock({
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+          }),
+        },
+        organizationInvite: {
+          findFirst: vi.fn().mockResolvedValue(pendingInvite),
+          update: inviteUpdate,
+        },
+        organizationUser: {
+          create: vi.fn(),
+          createMany: orgUserCreateMany,
+          count: vi.fn().mockResolvedValue(0),
+        },
+        roleBinding: {
+          create: roleBindingCreate,
+          deleteMany: roleBindingDeleteMany,
+        },
+      });
+
+      await afterUserCreate({
+        prisma,
+        user: { id: "user_1", email: "alice@acme.com" },
+      });
+
+      // Default-branch create must NOT run when invite is applied.
+      expect(prisma.organizationUser.create).not.toHaveBeenCalled();
+
+      // OrganizationUser written via invite application (ADMIN role from invite).
+      expect(orgUserCreateMany).toHaveBeenCalledWith({
+        data: [
+          {
+            userId: "user_1",
+            organizationId: "org_1",
+            role: "ADMIN",
+          },
+        ],
+        skipDuplicates: true,
+      });
+
+      // 3 RoleBinding creates: 1 ORG-scope (ADMIN) + 2 TEAM-scope.
+      expect(roleBindingCreate).toHaveBeenCalledTimes(3);
+
+      // Invite flipped to ACCEPTED so the link stops looking outstanding.
+      expect(inviteUpdate).toHaveBeenCalledWith({
+        where: { id: "inv_1", organizationId: "org_1" },
+        data: { status: "ACCEPTED" },
       });
     });
   });

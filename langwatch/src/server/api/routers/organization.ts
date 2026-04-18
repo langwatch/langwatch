@@ -6,8 +6,6 @@ import {
 import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { generate } from "@langwatch/ksuid";
-import { KSUID_RESOURCES } from "~/utils/constants";
 
 import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
@@ -1021,107 +1019,11 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      await prisma.$transaction(async (prisma) => {
-        // Create org membership; skip if it already exists
-        await prisma.organizationUser.createMany({
-          data: [
-            {
-              userId: session.user.id,
-              organizationId: invite.organizationId,
-              role: invite.role,
-            },
-          ],
-          skipDuplicates: true,
-        });
-
-        // Create ORGANIZATION-scoped RoleBinding (skip EXTERNAL — they get access via team/project bindings)
-        if (invite.role !== OrganizationUserRole.EXTERNAL) {
-          await prisma.roleBinding.deleteMany({
-            where: {
-              organizationId: invite.organizationId,
-              userId: session.user.id,
-              scopeType: RoleBindingScopeType.ORGANIZATION,
-              scopeId: invite.organizationId,
-            },
-          });
-          await prisma.roleBinding.create({
-            data: {
-              id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-              organizationId: invite.organizationId,
-              userId: session.user.id,
-              role: invite.role as unknown as TeamUserRole,
-              scopeType: RoleBindingScopeType.ORGANIZATION,
-              scopeId: invite.organizationId,
-            },
-          });
-        }
-
-        // Use teamAssignments if available (new format), otherwise fall back to legacy teamIds
-        let teamMembershipData: Array<{
-          userId: string;
-          teamId: string;
-          role: TeamUserRole;
-          customRoleId?: string;
-        }> = [];
-
-        if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
-          // New format: use per-team roles from teamAssignments
-          const assignments = invite.teamAssignments as Array<{
-            teamId: string;
-            role: TeamUserRole;
-            customRoleId?: string;
-          }>;
-          teamMembershipData = assignments.map((assignment) => ({
-            userId: session.user.id,
-            teamId: assignment.teamId,
-            role: assignment.role,
-            customRoleId: assignment.customRoleId,
-          }));
-        } else {
-          // Legacy format: use organization role mapping
-          const dedupedTeamIds = Array.from(
-            new Set(
-              invite.teamIds
-                .split(",")
-                .map((s) => s.trim())
-                .filter(Boolean),
-            ),
-          );
-
-          teamMembershipData = dedupedTeamIds.map((teamId) => ({
-            userId: session.user.id,
-            teamId,
-            role: ORGANIZATION_TO_TEAM_ROLE_MAP[invite.role],
-          }));
-        }
-
-        if (teamMembershipData.length > 0) {
-          for (const member of teamMembershipData) {
-            await prisma.roleBinding.deleteMany({
-              where: {
-                organizationId: invite.organizationId,
-                userId: member.userId,
-                scopeType: RoleBindingScopeType.TEAM,
-                scopeId: member.teamId,
-              },
-            });
-            await prisma.roleBinding.create({
-              data: {
-                id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-                organizationId: invite.organizationId,
-                userId: member.userId,
-                role: member.role,
-                customRoleId: member.customRoleId ?? null,
-                scopeType: RoleBindingScopeType.TEAM,
-                scopeId: member.teamId,
-              },
-            });
-          }
-        }
-
-        await prisma.organizationInvite.update({
-          where: { id: invite.id, organizationId: invite.organizationId },
-          data: { status: "ACCEPTED" },
+      await prisma.$transaction(async (tx) => {
+        const txInviteService = InviteService.create(tx);
+        await txInviteService.applyInvite({
+          userId: session.user.id,
+          invite,
         });
       });
 

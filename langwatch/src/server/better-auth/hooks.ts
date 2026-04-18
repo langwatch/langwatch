@@ -4,6 +4,7 @@ import { generate } from "@langwatch/ksuid";
 import { KSUID_RESOURCES } from "~/utils/constants";
 import { createLogger } from "../../utils/logger/server";
 import { isSsoProviderMatch, extractEmailDomain } from "./sso";
+import { InviteService } from "~/server/invites/invite.service";
 
 const logger = createLogger("langwatch:better-auth:hooks");
 
@@ -72,16 +73,29 @@ export const beforeUserCreate = async ({
 
 /**
  * Called after a new user is created. If the user's email domain matches an
- * organization with ssoDomain, add them as a MEMBER automatically.
- * Ported from createUserAndAddToOrganization in the old NextAuth auth.ts.
+ * organization with ssoDomain, auto-onboard the user:
  *
- * The org auto-add is best-effort: if it fails (concurrent signup, race
- * with another tab, transient DB issue), we LOG and SWALLOW the error so
- * the signup itself still succeeds. Failing the signup over a missing org
- * membership would orphan the user (the User row was just committed by the
- * preceding Prisma adapter call) and produce a confusing
- * "unable to create user" error in the OAuth callback. The user can always
- * be added to the org later via invite or admin action.
+ *   - If a PENDING invite exists for (org, email), apply it — the invite's
+ *     role and team assignments take precedence, and the invite is marked
+ *     ACCEPTED so it stops appearing as an outstanding link. This fixes the
+ *     bug where an SSO signup bypassed an existing invite and landed the user
+ *     in the org with only the default MEMBER role while the invite kept
+ *     looking unused.
+ *   - Otherwise, fall back to the default behavior and add them as MEMBER.
+ *
+ * OrganizationUser + RoleBinding writes are wrapped in a single transaction
+ * so a partial failure can't leave the user "in the org" with no RoleBinding
+ * (which would look like org membership to legacy code but give zero access
+ * under RBAC).
+ *
+ * Outer catch: the whole auto-add is best-effort. If the transaction fails
+ * outright (transient DB issue, concurrent signup we didn't catch via P2002),
+ * we LOG and SWALLOW so the signup itself still succeeds — failing would
+ * orphan the user (the User row was just committed by the preceding Prisma
+ * adapter call) and surface as a confusing "unable to create user" error in
+ * the OAuth callback. The user can always be added later via invite or admin
+ * action, and the pendingSsoSetup + afterAccountUpdate self-heal path covers
+ * re-attempts on subsequent sign-ins.
  */
 export const afterUserCreate = async ({
   prisma,
@@ -99,36 +113,55 @@ export const afterUserCreate = async ({
     });
     if (!org) return;
 
-    try {
-      await prisma.organizationUser.create({
-        data: {
-          userId: user.id,
-          organizationId: org.id,
-          role: "MEMBER",
-        },
+    const pendingInvite = await InviteService.create(prisma)
+      .findPendingByOrgAndEmail({
+        organizationId: org.id,
+        email: user.email,
       });
 
-      // Create the RoleBinding that the RBAC system uses as the
-      // authoritative access record (added by PR #2867 SCIM groups).
-      await prisma.roleBinding.create({
-        data: {
-          id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
-          organizationId: org.id,
-          userId: user.id,
-          role: TeamUserRole.MEMBER,
-          scopeType: RoleBindingScopeType.ORGANIZATION,
-          scopeId: org.id,
-        },
+    try {
+      await prisma.$transaction(async (tx) => {
+        if (pendingInvite) {
+          const txInviteService = InviteService.create(tx);
+          await txInviteService.applyInvite({
+            userId: user.id,
+            invite: pendingInvite,
+          });
+          return;
+        }
+
+        await tx.organizationUser.create({
+          data: {
+            userId: user.id,
+            organizationId: org.id,
+            role: "MEMBER",
+          },
+        });
+        await tx.roleBinding.create({
+          data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            organizationId: org.id,
+            userId: user.id,
+            role: TeamUserRole.MEMBER,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: org.id,
+          },
+        });
       });
 
       logger.info(
-        { userId: user.id, organizationId: org.id },
-        "Auto-added new user to SSO organization (with RoleBinding)",
+        {
+          userId: user.id,
+          organizationId: org.id,
+          inviteId: pendingInvite?.id ?? null,
+        },
+        pendingInvite
+          ? "Applied pending invite on SSO signup"
+          : "Auto-added new user to SSO organization (default MEMBER)",
       );
     } catch (err) {
       // P2002 (unique constraint) means another concurrent OAuth callback
-      // or a retry already created this membership. Idempotent success —
-      // don't log as an error. Caught by CodeRabbit in PR review.
+      // or a retry already created this membership. Idempotent success.
       if (
         err instanceof Prisma.PrismaClientKnownRequestError &&
         err.code === "P2002"
