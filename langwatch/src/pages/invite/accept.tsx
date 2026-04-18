@@ -1,7 +1,7 @@
 import { Alert, Button, VStack } from "@chakra-ui/react";
 import { useRouter } from "~/utils/compat/next-router";
 import { signOut } from "~/utils/auth-client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { SetupLayout } from "../../components/SetupLayout";
 import { toaster } from "../../components/ui/toaster";
@@ -15,9 +15,14 @@ export default function Accept() {
 
   const { data: session } = useRequiredSession();
   const triggerInvite = typeof inviteCode === "string" && !!session;
+  // One-shot guard: ensure `mutate` fires at most once per invite code, even
+  // under StrictMode double-invoke, HMR, or parent re-keying.
+  const submittedInviteCodeRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!triggerInvite) return;
+    if (submittedInviteCodeRef.current === inviteCode) return;
+    submittedInviteCodeRef.current = inviteCode;
 
     acceptInviteMutation.mutate(
       { inviteCode },
@@ -40,26 +45,30 @@ export default function Accept() {
             ? `/${data.project.slug}`
             : "/";
         },
+        onError: (error) => {
+          // Already-accepted is not an error from the user's perspective —
+          // hard-redirect home, consistent with the success path.
+          if (error.message === "Invite was already accepted") {
+            window.location.href = "/";
+          }
+        },
       },
     );
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [triggerInvite]);
+  }, [triggerInvite, inviteCode]);
 
   if (
     !triggerInvite ||
     acceptInviteMutation.isLoading ||
-    acceptInviteMutation.isSuccess
+    acceptInviteMutation.isSuccess ||
+    (acceptInviteMutation.isError &&
+      acceptInviteMutation.error.message === "Invite was already accepted")
   ) {
     return <LoadingScreen />;
   }
 
   if (acceptInviteMutation.isError) {
-    if (acceptInviteMutation.error.message === "Invite was already accepted") {
-      void router.push("/");
-      return <LoadingScreen />;
-    }
-
     return (
       <SetupLayout>
         <VStack gap={4}>
