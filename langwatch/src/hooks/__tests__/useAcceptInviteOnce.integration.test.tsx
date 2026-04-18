@@ -20,27 +20,32 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "~/server/invites/errors";
 
-const { mutateSpy, toasterCreate, hardRedirectSpy, mockState } = vi.hoisted(
-  () => {
-    return {
-      mutateSpy: vi.fn(),
-      toasterCreate: vi.fn(),
-      hardRedirectSpy: vi.fn(),
-      mockState: {
-        handlers: {} as {
-          onSuccess?: (data: unknown) => void;
-          onError?: (error: { message: string }) => void;
-        },
-        mutation: {
-          isLoading: false,
-          isSuccess: false,
-          isError: false,
-          error: null as { message: string } | null,
-        },
+const {
+  mutateSpy,
+  toasterCreate,
+  hardRedirectSpy,
+  captureExceptionSpy,
+  mockState,
+} = vi.hoisted(() => {
+  return {
+    mutateSpy: vi.fn(),
+    toasterCreate: vi.fn(),
+    hardRedirectSpy: vi.fn(),
+    captureExceptionSpy: vi.fn(),
+    mockState: {
+      handlers: {} as {
+        onSuccess?: (data: unknown) => void;
+        onError?: (error: { message: string }) => void;
       },
-    };
-  },
-);
+      mutation: {
+        isLoading: false,
+        isSuccess: false,
+        isError: false,
+        error: null as { message: string } | null,
+      },
+    },
+  };
+});
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -66,6 +71,10 @@ vi.mock("~/utils/hardRedirect", () => ({
   hardRedirect: hardRedirectSpy,
 }));
 
+vi.mock("~/utils/posthogErrorCapture", () => ({
+  captureException: captureExceptionSpy,
+}));
+
 import { useAcceptInviteOnce } from "../useAcceptInviteOnce";
 
 function resetMutationState() {
@@ -83,6 +92,7 @@ describe("useAcceptInviteOnce()", () => {
     mutateSpy.mockReset();
     toasterCreate.mockReset();
     hardRedirectSpy.mockReset();
+    captureExceptionSpy.mockReset();
     resetMutationState();
   });
 
@@ -145,11 +155,8 @@ describe("useAcceptInviteOnce()", () => {
 
   describe("given the server returns 'already accepted'", () => {
     describe("when onError fires", () => {
-      it("hard-redirects to / and reports 'already-accepted' status", async () => {
-        mockState.mutation.isError = true;
-        mockState.mutation.error = { message: INVITE_ALREADY_ACCEPTED_MESSAGE };
-
-        const { result } = renderHook(() =>
+      it("hard-redirects to /, reports 'already-accepted' status, and does NOT capture to PostHog", () => {
+        const { result, rerender } = renderHook(() =>
           useAcceptInviteOnce({
             inviteCode: "invite-abc",
             enabled: true,
@@ -157,12 +164,18 @@ describe("useAcceptInviteOnce()", () => {
         );
 
         act(() => {
+          mockState.mutation.isError = true;
+          mockState.mutation.error = {
+            message: INVITE_ALREADY_ACCEPTED_MESSAGE,
+          };
           mockState.handlers.onError?.({
             message: INVITE_ALREADY_ACCEPTED_MESSAGE,
           });
         });
+        rerender();
 
         expect(hardRedirectSpy).toHaveBeenCalledWith("/");
+        expect(captureExceptionSpy).not.toHaveBeenCalled();
         expect(result.current.status).toBe("already-accepted");
       });
     });
@@ -170,11 +183,8 @@ describe("useAcceptInviteOnce()", () => {
 
   describe("given the server returns a generic error", () => {
     describe("when onError fires", () => {
-      it("surfaces status='error' with the message and does NOT navigate", () => {
-        mockState.mutation.isError = true;
-        mockState.mutation.error = { message: "The invite has expired" };
-
-        const { result } = renderHook(() =>
+      it("surfaces status='error' with the message, captures to PostHog, and does NOT navigate", () => {
+        const { result, rerender } = renderHook(() =>
           useAcceptInviteOnce({
             inviteCode: "invite-abc",
             enabled: true,
@@ -182,10 +192,19 @@ describe("useAcceptInviteOnce()", () => {
         );
 
         act(() => {
+          mockState.mutation.isError = true;
+          mockState.mutation.error = { message: "The invite has expired" };
           mockState.handlers.onError?.({ message: "The invite has expired" });
         });
+        rerender();
 
         expect(hardRedirectSpy).not.toHaveBeenCalled();
+        expect(captureExceptionSpy).toHaveBeenCalledWith(
+          expect.objectContaining({ message: "The invite has expired" }),
+          expect.objectContaining({
+            tags: expect.objectContaining({ source: "useAcceptInviteOnce" }),
+          }),
+        );
         expect(result.current.status).toBe("error");
         expect(result.current.errorMessage).toBe("The invite has expired");
       });
@@ -194,8 +213,8 @@ describe("useAcceptInviteOnce()", () => {
 
   describe("given the mutation succeeds", () => {
     describe("when the invite has a landing project", () => {
-      it("hard-redirects to the project slug and toasts success", () => {
-        renderHook(() =>
+      it("hard-redirects to the project slug, toasts success, and reports 'success' status", () => {
+        const { result, rerender } = renderHook(() =>
           useAcceptInviteOnce({
             inviteCode: "invite-abc",
             enabled: true,
@@ -203,22 +222,25 @@ describe("useAcceptInviteOnce()", () => {
         );
 
         act(() => {
+          mockState.mutation.isSuccess = true;
           mockState.handlers.onSuccess?.({
             invite: { organization: { name: "Acme" } },
             project: { slug: "acme-prod" },
           });
         });
+        rerender();
 
         expect(hardRedirectSpy).toHaveBeenCalledWith("/acme-prod");
         expect(toasterCreate).toHaveBeenCalledWith(
           expect.objectContaining({ type: "success" }),
         );
+        expect(result.current.status).toBe("success");
       });
     });
 
     describe("when the invite has no landing project", () => {
-      it("hard-redirects to /", () => {
-        renderHook(() =>
+      it("hard-redirects to / and reports 'success' status", () => {
+        const { result, rerender } = renderHook(() =>
           useAcceptInviteOnce({
             inviteCode: "invite-abc",
             enabled: true,
@@ -226,11 +248,15 @@ describe("useAcceptInviteOnce()", () => {
         );
 
         act(() => {
+          mockState.mutation.isSuccess = true;
           mockState.handlers.onSuccess?.({
             invite: { organization: { name: "Acme" } },
             project: null,
           });
         });
+        rerender();
+
+        expect(result.current.status).toBe("success");
 
         expect(hardRedirectSpy).toHaveBeenCalledWith("/");
       });

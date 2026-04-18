@@ -3,7 +3,16 @@ import { useEffect, useRef } from "react";
 import { INVITE_ALREADY_ACCEPTED_MESSAGE } from "~/server/invites/errors";
 import { api } from "~/utils/api";
 import { hardRedirect } from "~/utils/hardRedirect";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { toaster } from "~/components/ui/toaster";
+
+type AcceptInviteMutation = ReturnType<
+  typeof api.organization.acceptInvite.useMutation
+>;
+type AcceptInviteMutationResult = Pick<
+  AcceptInviteMutation,
+  "isLoading" | "isSuccess" | "isError" | "error"
+>;
 
 export type AcceptInviteStatus =
   | "idle"
@@ -65,7 +74,11 @@ export function useAcceptInviteOnce({
     onError: (error) => {
       if (error.message === INVITE_ALREADY_ACCEPTED_MESSAGE) {
         hardRedirect("/");
+        return;
       }
+      // Real failure (expired invite, email mismatch, …). The page renders
+      // `errorMessage` inline; also capture for observability.
+      captureException(error, { tags: { source: "useAcceptInviteOnce" } });
     },
   });
 
@@ -86,12 +99,7 @@ export function useAcceptInviteOnce({
 }
 
 function deriveStatus(
-  mutation: {
-    isLoading: boolean;
-    isSuccess: boolean;
-    isError: boolean;
-    error: { message: string } | null;
-  },
+  mutation: AcceptInviteMutationResult,
   shouldTrigger: boolean,
 ): AcceptInviteStatus {
   if (!shouldTrigger) return "idle";

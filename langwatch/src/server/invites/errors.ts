@@ -8,7 +8,8 @@
  * been consumed. Shared between server (where it's thrown) and client (where
  * it's matched to trigger a redirect) so the two cannot drift.
  */
-export const INVITE_ALREADY_ACCEPTED_MESSAGE = "Invite was already accepted";
+export const INVITE_ALREADY_ACCEPTED_MESSAGE =
+  "Invite was already accepted" as const;
 
 export class DuplicateInviteError extends Error {
   constructor(email: string) {
