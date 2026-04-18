@@ -82,9 +82,28 @@ If **all** attempts in the chain fail, the gateway returns the last provider's e
 
 ## Circuit breaker
 
-After N consecutive failures against a specific provider within M seconds, the gateway marks that provider as "open" and skips it for subsequent requests until a probe succeeds. Configured at the service level (`$LW_GATEWAY_CIRCUIT_THRESHOLD`, `$LW_GATEWAY_CIRCUIT_WINDOW_SEC`).
+Each provider has an independent circuit breaker with a sliding window:
 
-Per-provider circuit state is emitted as a metric (`gateway_circuit_state{provider="openai"}`) so you can alert on "primary circuit has been open for N minutes."
+| Default | Meaning |
+|---|---|
+| **Window:** 30 s | Failure events within the last 30 s count toward the open threshold |
+| **Threshold:** 10 failures | 10 failures in the window open the circuit |
+| **Open cooldown:** 60 s | Circuit stays open for 60 s; skipped on new requests regardless of fallback order |
+| **Half-open probe:** 1 request | After cooldown, a single probe is let through; if it succeeds, circuit closes; if it fails, another 60 s of open |
+
+Override at the service level:
+
+| Env var | Default |
+|---|---|
+| `LW_GATEWAY_CIRCUIT_WINDOW_S` | `30` |
+| `LW_GATEWAY_CIRCUIT_THRESHOLD` | `10` |
+| `LW_GATEWAY_CIRCUIT_COOLDOWN_S` | `60` |
+
+**Per-replica, not shared**: each gateway replica maintains its own breaker state. This is deliberate — under a large-scale outage, N replicas rediscovering the recovered provider independently is resilient; depending on Redis for breaker consensus is not.
+
+Per-provider circuit state is emitted as a Prometheus metric `gateway_circuit_state{provider,state}` where `state ∈ {closed, half_open, open}`. Alert on "primary circuit has been `open` for > 5 minutes" to catch real provider outages (as distinct from transient blips).
+
+When a request hits a circuit that's currently `open`, the gateway skips to the next entry in the fallback chain immediately — no wasted round-trip to a provider we already know is down.
 
 ## Sizing the chain
 
