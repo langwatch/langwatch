@@ -6,7 +6,7 @@
  * reflection via `Object.assign` on an Object.create'd Experiment prototype to populate
  * the cumulative arrays without going through the network.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach, type MockInstance } from "vitest";
 import { Experiment } from "../experiment";
 import type { BatchEntry, EvaluationResult } from "../types";
 
@@ -50,12 +50,12 @@ function evaluation(overrides: Partial<EvaluationResult>): EvaluationResult {
 }
 
 describe("Experiment.printSummary", () => {
-  let logSpy: ReturnType<typeof vi.spyOn>;
-  let exitSpy: ReturnType<typeof vi.spyOn>;
+  let logSpy: MockInstance<typeof console.log>;
+  let exitSpy: MockInstance<typeof process.exit>;
 
   beforeEach(() => {
-    logSpy = vi.spyOn(console, "log").mockImplementation(() => {});
-    exitSpy = vi.spyOn(process, "exit").mockImplementation(((_code?: number | string | null | undefined) => undefined) as never);
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
+    exitSpy = vi.spyOn(process, "exit").mockImplementation((() => undefined) as never);
   });
 
   afterEach(() => {
