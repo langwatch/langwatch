@@ -1,6 +1,68 @@
 import { Prisma, RoleBindingScopeType, TeamUserRole, type PrismaClient } from "@prisma/client";
 import { NotFoundError, ValidationError } from "~/server/app-layer/domain-error";
 
+type TxClient = Prisma.TransactionClient;
+
+async function computeEffectiveAdminUserIds(
+  tx: TxClient,
+  organizationId: string,
+  teamId: string,
+): Promise<Set<string>> {
+  const adminBindings = await tx.roleBinding.findMany({
+    where: {
+      organizationId,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
+      role: TeamUserRole.ADMIN,
+    },
+    select: { userId: true, groupId: true },
+  });
+
+  const userIds = new Set<string>();
+  const groupIds: string[] = [];
+  for (const b of adminBindings) {
+    if (b.userId) userIds.add(b.userId);
+    if (b.groupId) groupIds.push(b.groupId);
+  }
+
+  if (groupIds.length > 0) {
+    const memberships = await tx.groupMembership.findMany({
+      where: { groupId: { in: groupIds } },
+      select: { userId: true },
+    });
+    for (const m of memberships) userIds.add(m.userId);
+  }
+
+  return userIds;
+}
+
+async function isUserAdminViaGroup(
+  tx: TxClient,
+  organizationId: string,
+  teamId: string,
+  userId: string,
+): Promise<boolean> {
+  const adminGroupBindings = await tx.roleBinding.findMany({
+    where: {
+      organizationId,
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: teamId,
+      role: TeamUserRole.ADMIN,
+      groupId: { not: null },
+    },
+    select: { groupId: true },
+  });
+  if (adminGroupBindings.length === 0) return false;
+
+  const count = await tx.groupMembership.count({
+    where: {
+      userId,
+      groupId: { in: adminGroupBindings.map((b) => b.groupId!) },
+    },
+  });
+  return count > 0;
+}
+
 export class TeamService {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -47,12 +109,22 @@ export class TeamService {
             : [],
         ]);
 
-        // ── Expand group memberships for group-based team bindings ──
+        // ── Expand group memberships for every group referenced by any
+        // binding touching this team. We fetch memberships for project-level
+        // group bindings too because they're needed to decide which inherited
+        // (team-level group-expanded) entries to filter out as overridden on
+        // each project. ──
         const groupBindings = teamBindings.filter((b) => b.groupId);
-        const groupIds = groupBindings.map((b) => b.groupId!);
-        const groupMemberships = groupIds.length > 0
+        const projectGroupBindings = projectBindings.filter((b) => b.groupId);
+        const allGroupIds = Array.from(
+          new Set([
+            ...groupBindings.map((b) => b.groupId!),
+            ...projectGroupBindings.map((b) => b.groupId!),
+          ]),
+        );
+        const groupMemberships = allGroupIds.length > 0
           ? await this.prisma.groupMembership.findMany({
-              where: { groupId: { in: groupIds } },
+              where: { groupId: { in: allGroupIds } },
               include: { user: { select: { id: true, name: true, email: true } } },
             })
           : [];
@@ -111,7 +183,13 @@ export class TeamService {
             customRoleName: b.customRole?.name ?? null,
           })),
           ...expandedGroupMembers,
-        ];
+        ].sort((a, b) => {
+          const nameCmp = (a.name ?? "").localeCompare(b.name ?? "");
+          if (nameCmp !== 0) return nameCmp;
+          const emailCmp = (a.email ?? "").localeCompare(b.email ?? "");
+          if (emailCmp !== 0) return emailCmp;
+          return (a.userId ?? "").localeCompare(b.userId ?? "");
+        });
 
         // ── Collect userIds that have a team-level binding (direct or via group) ──
         const teamBoundUserIds = new Set(
@@ -126,6 +204,7 @@ export class TeamService {
           email: string | null;
           role: TeamUserRole;
           customRoleId: string | null;
+          customRoleName: string | null;
           projectId: string;
           projectName: string;
         }>();
@@ -144,6 +223,7 @@ export class TeamService {
               email: b.user?.email ?? null,
               role: b.role,
               customRoleId: b.customRoleId,
+              customRoleName: b.customRole?.name ?? null,
               projectId: project.id,
               projectName: project.name,
             });
@@ -183,20 +263,31 @@ export class TeamService {
             (b) => b.scopeId === proj.id,
           );
 
+          // Group IDs bound at the team level — used to detect whether a
+          // project-level group binding is overriding a team-level one.
+          const teamBoundGroupIds = new Set(
+            groupBindings.map((b) => b.groupId!),
+          );
+
           const projectLevel = projBindings.map((b) => {
-            // A user "overrides" team access if they have team-level membership
-            // via any path — direct or group-expanded. `teamBinding` only finds
-            // direct team bindings; `teamBoundUserIds` covers both.
+            // A binding "overrides" team access if the same principal
+            // (user or group) already has team-level access — direct or
+            // group-expanded for users; same group bound at team level for
+            // groups.
             const directTeamBinding = teamBindings.find(
               (tb) => tb.userId && tb.userId === b.userId,
             );
-            const inheritsFromTeam =
+            const userInheritsFromTeam =
               !!b.userId && teamBoundUserIds.has(b.userId);
+            const groupInheritsFromTeam =
+              !!b.groupId && teamBoundGroupIds.has(b.groupId);
+            const inheritsFromTeam =
+              userInheritsFromTeam || groupInheritsFromTeam;
             return {
               bindingId: b.id,
               userId: b.userId,
               groupId: b.groupId,
-              viaGroupName: null as string | null,
+              viaGroupName: b.groupId ? b.group?.name ?? null : null,
               name: b.user?.name ?? b.group?.name ?? "Unknown",
               email: b.user?.email ?? null,
               role: b.role,
@@ -209,10 +300,20 @@ export class TeamService {
             };
           });
 
-          // Remove "inherited" entries that have a project-level override
-          const overriddenUserIds = new Set(
+          // Remove "inherited" entries that have a project-level override.
+          // Project-level group bindings also override the inherited
+          // (team-level) group-expanded entries for their members.
+          const overriddenUserIds = new Set<string>(
             projBindings.filter((b) => b.userId).map((b) => b.userId!),
           );
+          const projGroupIdsOnThisProject = projBindings
+            .filter((b) => b.groupId)
+            .map((b) => b.groupId!);
+          for (const gid of projGroupIdsOnThisProject) {
+            for (const gm of groupMemberships) {
+              if (gm.groupId === gid) overriddenUserIds.add(gm.userId);
+            }
+          }
           const filteredInherited = inherited.filter(
             (m) => !m.userId || !overriddenUserIds.has(m.userId),
           );
@@ -255,25 +356,22 @@ export class TeamService {
         throw new NotFoundError("team_not_found", "Team", teamId);
       }
 
-      // Lock and validate admin count within transaction
-      const adminBindings = await tx.roleBinding.findMany({
-        where: {
-          organizationId: team.organizationId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-          role: TeamUserRole.ADMIN,
-          userId: { not: null },
-        },
-        select: { userId: true },
-      });
+      // Compute the effective set of admin userIds — direct user ADMIN
+      // bindings plus members of any group with an ADMIN binding on this
+      // team. Counting only direct user bindings (as we used to) ignores
+      // SCIM/group admins and would incorrectly treat a team with a single
+      // direct admin + group-expanded admins as having only one admin.
+      const effectiveAdminUserIds = await computeEffectiveAdminUserIds(
+        tx,
+        team.organizationId,
+        teamId,
+      );
 
-      const adminCount = adminBindings.length;
-
-      if (adminCount === 0) {
+      if (effectiveAdminUserIds.size === 0) {
         throw new ValidationError("No admin found for this team");
       }
 
-      // Check if the target user is currently a member
+      // Check if the target user is currently a direct member of the team
       const targetBinding = await tx.roleBinding.findFirst({
         where: {
           organizationId: team.organizationId,
@@ -288,9 +386,21 @@ export class TeamService {
         throw new NotFoundError("team_membership_not_found", "TeamMember", userId);
       }
 
-      const isTargetUserAdmin = targetBinding.role === TeamUserRole.ADMIN;
+      // Project the post-removal admin set. Removing the target's direct
+      // binding only changes things if they aren't also an admin via a
+      // group membership on this team.
+      const targetStillAdminViaGroup = await isUserAdminViaGroup(
+        tx,
+        team.organizationId,
+        teamId,
+        userId,
+      );
+      const projectedAdminUserIds = new Set(effectiveAdminUserIds);
+      if (!targetStillAdminViaGroup) {
+        projectedAdminUserIds.delete(userId);
+      }
 
-      if (adminCount === 1 && isTargetUserAdmin) {
+      if (projectedAdminUserIds.size === 0) {
         if (userId === currentUserId) {
           throw new ValidationError("You cannot remove yourself from the last admin position in this team");
         }
@@ -313,18 +423,15 @@ export class TeamService {
         }),
       ]);
 
-      // Post-removal validation: ensure we still have at least one admin
-      const finalAdminCount = await tx.roleBinding.count({
-        where: {
-          organizationId: team.organizationId,
-          scopeType: RoleBindingScopeType.TEAM,
-          scopeId: teamId,
-          role: TeamUserRole.ADMIN,
-          userId: { not: null },
-        },
-      });
+      // Post-removal validation: ensure we still have at least one
+      // effective admin (direct or group-expanded).
+      const finalAdminUserIds = await computeEffectiveAdminUserIds(
+        tx,
+        team.organizationId,
+        teamId,
+      );
 
-      if (finalAdminCount === 0) {
+      if (finalAdminUserIds.size === 0) {
         throw new ValidationError("Operation would result in no admins for this team");
       }
 
