@@ -13,6 +13,18 @@
 # the port is free, which is the *good* path for us — it should not abort
 # the whole script.
 
+# This pre-flight check is a dev-host-only quality-of-life affordance: it
+# catches the common case where two `pnpm dev` invocations on the same laptop
+# fight for the same ports. In any other context it's pointless noise:
+#   - Production: if the port is taken the node server will fail to bind and
+#     surface its own clean error — we must not fail-fast the container start.
+#   - Docker: each container has its own network namespace, so collisions are
+#     impossible by definition, and `lsof` inside a distroless-ish image can
+#     misreport PID 1 (the node entrypoint itself) as holding the port.
+if [ "${NODE_ENV:-production}" != "development" ] || [ -f /.dockerenv ]; then
+  exit 0
+fi
+
 PORT="${PORT:-5560}"
 API_PORT=$((PORT + 1000))
 WORKER_METRICS_PORT="${WORKER_METRICS_PORT:-$((PORT - 2561))}"
