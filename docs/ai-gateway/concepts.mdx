@@ -118,20 +118,22 @@ Per-VK regex allow/deny lists for:
 - **MCP servers** — matched against declared `mcp_servers[].name` and `.url`. Denied servers → 403 `tool_not_allowed`.
 - **Outbound URLs** — heuristically matched against tool-call arguments that look like URLs. Advisory for v1; hard enforcement requires egress proxy.
 
-Each block emits an OTel attribute `langwatch.policy.blocked=<kind>:<pattern>` for audit.
+Each block emits a `GatewayAuditLog` row + the `X-LangWatch-Request-Id` response header → trace correlation. (A dedicated `langwatch.policy.blocked` span attribute is tracked as a v1.1 observability follow-up; see [Observability → Per-feature attributes](/ai-gateway/observability#per-feature-attributes-when-applicable) for the full v1 vs v1.1 matrix.)
 
 ## Traces (per-tenant observability)
 
 Every request emits a LangWatch trace. The clever part: the gateway is a shared multi-tenant service, but each trace is routed to the **owning tenant's project** — tenant A never sees tenant B's traffic.
 
-Attributes always present:
+Attributes always present (source of truth: `services/gateway/internal/otel/attrs.go`):
 
-- `langwatch.vk_id`, `langwatch.project_id`, `langwatch.team_id`, `langwatch.org_id`, `langwatch.principal_id`.
-- Nested spans per fallback attempt with `langwatch.fallback.attempt=N` and `langwatch.fallback.reason`.
-- `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.cache_creation.input_tokens` (OTel GenAI semconv).
-- `langwatch.budget.breached_scope` when a request was blocked.
-- `langwatch.policy.blocked` when a tool/MCP/URL was blocked.
-- `langwatch.guardrail.post_flag` when post-hoc guardrails flagged a completed response.
+- `langwatch.virtual_key_id`, `langwatch.project_id`, `langwatch.team_id`, `langwatch.organization_id`, `langwatch.principal_id`.
+- `langwatch.model`, `langwatch.provider`, `langwatch.model_source`, `langwatch.streaming`.
+- `langwatch.usage.input_tokens` / `langwatch.usage.output_tokens` + OTel GenAI semconv `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.cache_creation.input_tokens`.
+- `langwatch.cost_usd`, `langwatch.duration_ms`, `langwatch.status`, `langwatch.budget.decision`.
+
+When a bundle-baked cache rule matches: `langwatch.cache.rule_id` / `.rule_priority` / `.mode_applied`.
+
+<Info>Previously-documented per-feature attrs (`langwatch.fallback.attempt` / `.reason`, `langwatch.policy.blocked`, `langwatch.budget.breached_scope`, `langwatch.guardrail.post_flag` / `.verdict`) are **not emitted in v1**. For per-feature signals today, use the Prometheus counters + correlate via `X-LangWatch-Request-Id`. See [Observability → Per-feature attributes](/ai-gateway/observability#per-feature-attributes-when-applicable) for the v1 ↔ v1.1 breakdown.</Info>
 
 ## Request id
 
