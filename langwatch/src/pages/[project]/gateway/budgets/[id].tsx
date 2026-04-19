@@ -84,7 +84,7 @@ function BudgetDetailPage() {
 
   return (
     <GatewayLayout>
-      <PageLayout.Container>
+      <>
         <PageLayout.Header>
           <HStack>
             <Link
@@ -285,7 +285,7 @@ function BudgetDetailPage() {
             </VStack>
           )}
         </Box>
-      </PageLayout.Container>
+      </>
 
       <BudgetEditDrawer
         budget={editing && budget ? budget : null}

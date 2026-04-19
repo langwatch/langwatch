@@ -92,7 +92,7 @@ function VirtualKeyDetailPage() {
 
   return (
     <GatewayLayout>
-      <PageLayout.Container>
+      <>
         <PageLayout.Header>
           <HStack>
             <Link
@@ -227,7 +227,7 @@ function VirtualKeyDetailPage() {
             </VStack>
           )}
         </Box>
-      </PageLayout.Container>
+      </>
 
       {project?.id && vk && (
         <VirtualKeyEditDrawer

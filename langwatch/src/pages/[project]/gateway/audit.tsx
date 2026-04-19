@@ -83,7 +83,7 @@ function AuditLogPage() {
 
   return (
     <GatewayLayout>
-      <PageLayout.Container>
+      <>
         <PageLayout.Header>
           <PageLayout.Heading>Audit log</PageLayout.Heading>
           <Spacer />
@@ -187,7 +187,7 @@ function AuditLogPage() {
             </VStack>
           )}
         </Box>
-      </PageLayout.Container>
+      </>
     </GatewayLayout>
   );
 }
