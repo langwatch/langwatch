@@ -154,7 +154,7 @@ function VirtualKeysPage() {
                 {rows.map((vk) => (
                   <Table.Row key={vk.id}>
                     <Table.Cell>
-                      <VStack align="start" gap={0}>
+                      <VStack align="start" gap={1}>
                         <Link
                           href={`/${project?.slug}/gateway/virtual-keys/${vk.id}`}
                           fontWeight="medium"
@@ -167,6 +167,26 @@ function VirtualKeysPage() {
                             {vk.description}
                           </Text>
                         )}
+                        {(() => {
+                          const tags =
+                            (vk.config as { metadata?: { tags?: string[] } })
+                              ?.metadata?.tags ?? [];
+                          if (tags.length === 0) return null;
+                          return (
+                            <HStack gap={1} flexWrap="wrap">
+                              {tags.map((t) => (
+                                <Badge
+                                  key={t}
+                                  variant="subtle"
+                                  colorPalette="gray"
+                                  fontSize="2xs"
+                                >
+                                  {t}
+                                </Badge>
+                              ))}
+                            </HStack>
+                          );
+                        })()}
                       </VStack>
                     </Table.Cell>
                     <Table.Cell>
