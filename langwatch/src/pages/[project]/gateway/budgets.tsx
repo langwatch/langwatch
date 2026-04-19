@@ -20,6 +20,7 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { BudgetCreateDrawer } from "~/components/gateway/BudgetCreateDrawer";
 import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -37,7 +38,13 @@ function useBudgetRows(organizationId: string | undefined) {
     { organizationId: organizationId ?? "" },
     { enabled: !!organizationId },
   );
-  return { rows: listQuery.data ?? [], isLoading: listQuery.isLoading, refetch: listQuery.refetch };
+  return {
+    rows: listQuery.data ?? [],
+    isLoading: listQuery.isLoading,
+    isError: listQuery.isError,
+    error: listQuery.error,
+    refetch: listQuery.refetch,
+  };
 }
 
 function BudgetsPage() {
@@ -46,7 +53,9 @@ function BudgetsPage() {
   const canUpdate = hasPermission("gatewayBudgets:update");
   const canDelete = hasPermission("gatewayBudgets:delete");
 
-  const { rows, isLoading, refetch } = useBudgetRows(organization?.id);
+  const { rows, isLoading, isError, error, refetch } = useBudgetRows(
+    organization?.id,
+  );
 
   const utils = api.useContext();
   const archiveMutation = api.gatewayBudgets.archive.useMutation({
@@ -99,6 +108,12 @@ function BudgetsPage() {
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           {isLoading ? (
             <Spinner />
+          ) : isError ? (
+            <GatewayErrorPanel
+              title="Failed to load budgets"
+              error={error}
+              onRetry={() => refetch()}
+            />
           ) : rows.length === 0 ? (
             <EmptyState.Root>
               <EmptyState.Content>

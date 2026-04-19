@@ -17,6 +17,7 @@ import { useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { ProviderBindingCreateDrawer } from "~/components/gateway/ProviderBindingCreateDrawer";
 import { ProviderBindingEditDrawer } from "~/components/gateway/ProviderBindingEditDrawer";
@@ -93,6 +94,12 @@ function ProvidersPage() {
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           {listQuery.isLoading ? (
             <Spinner />
+          ) : listQuery.isError ? (
+            <GatewayErrorPanel
+              title="Failed to load providers"
+              error={listQuery.error}
+              onRetry={() => listQuery.refetch()}
+            />
           ) : (listQuery.data ?? []).length === 0 ? (
             <EmptyState.Root>
               <EmptyState.Content>

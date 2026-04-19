@@ -19,6 +19,7 @@ import { useState } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
@@ -200,6 +201,12 @@ function AuditLogPage() {
 
           {listQuery.isLoading ? (
             <Spinner />
+          ) : listQuery.isError ? (
+            <GatewayErrorPanel
+              title="Failed to load audit log"
+              error={listQuery.error}
+              onRetry={() => listQuery.refetch()}
+            />
           ) : entries.length === 0 ? (
             <EmptyState.Root>
               <EmptyState.Content>

@@ -26,6 +26,7 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { CacheRuleCreateDrawer } from "~/components/gateway/CacheRuleCreateDrawer";
 import { CacheRuleEditDrawer } from "~/components/gateway/CacheRuleEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
@@ -145,6 +146,12 @@ function CacheRulesPage() {
           </Text>
           {listQuery.isLoading ? (
             <Spinner />
+          ) : listQuery.isError ? (
+            <GatewayErrorPanel
+              title="Failed to load cache rules"
+              error={listQuery.error}
+              onRetry={() => listQuery.refetch()}
+            />
           ) : rows.length === 0 ? (
             <EmptyState.Root>
               <EmptyState.Content>
