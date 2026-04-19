@@ -99,6 +99,42 @@ func TestMaxBodyBytesZeroLimitIsPassthrough(t *testing.T) {
 	}
 }
 
+// TestMaxBodyBytesRunsBeforeDownstream pins the middleware-ordering
+// invariant dogfooded live (Lane A iter 38): an oversized body MUST be
+// rejected with 413 before any downstream handler — notably auth — runs.
+// If this test fails, a client hammering with multi-GB payloads could
+// trip auth-cache work, resolve-key allocations, or dispatcher code
+// paths before being rejected.
+func TestMaxBodyBytesRunsBeforeDownstream(t *testing.T) {
+	var downstreamCalled bool
+	downstream := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		downstreamCalled = true
+		// Simulate auth emitting 401 — if we ever see this code on the
+		// wire with an oversized body, the ordering has regressed.
+		gwerrors.Write(w, "", gwerrors.TypeInvalidAPIKey,
+			"missing_api_key", "downstream should never run", "")
+	})
+
+	h := MaxBodyBytes(1024)(downstream)
+	rec := httptest.NewRecorder()
+	body := bytes.Repeat([]byte("a"), 4096)
+	req := httptest.NewRequest("POST", "/v1/chat/completions", bytes.NewReader(body))
+	req.ContentLength = int64(len(body))
+	h.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("code=%d want 413", rec.Code)
+	}
+	if downstreamCalled {
+		t.Fatal("downstream handler ran despite oversized body — middleware ordering regression")
+	}
+	var env gwerrors.Envelope
+	_ = json.NewDecoder(rec.Body).Decode(&env)
+	if env.Error.Type != gwerrors.TypePayloadTooLarge {
+		t.Errorf("error.type=%q want payload_too_large", env.Error.Type)
+	}
+}
+
 func TestIsMaxBytesErrorClassifier(t *testing.T) {
 	var mbe = &http.MaxBytesError{Limit: 10}
 	if !IsMaxBytesError(mbe) {
