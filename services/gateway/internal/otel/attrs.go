@@ -48,6 +48,16 @@ const (
 	AttrStatus        = "langwatch.status"
 	AttrDecision      = "langwatch.budget.decision"
 	AttrGuardrailVerdict = "langwatch.guardrail.verdict"
+	// Cache-control rule match attribution. Emitted when the bundle-
+	// baked rule engine (internal/cacherules) picks a matching rule
+	// ahead of the per-request X-LangWatch-Cache header. rule_id is
+	// the configured rule identifier; rule_priority mirrors the
+	// control-plane-assigned priority (DESC-sorted on the wire);
+	// mode_applied is the final mode after header-vs-rule-vs-default
+	// precedence resolution (contract §Precedence).
+	AttrCacheRuleID       = "langwatch.cache.rule_id"
+	AttrCacheRulePriority = "langwatch.cache.rule_priority"
+	AttrCacheModeApplied  = "langwatch.cache.mode_applied"
 )
 
 // Standard response header names the gateway emits so client SDKs /

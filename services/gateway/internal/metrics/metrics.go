@@ -54,6 +54,7 @@ type Metrics struct {
 	GuardrailVerdicts  *prometheus.CounterVec
 	InFlightRequests   prometheus.Gauge
 	Draining           prometheus.Gauge
+	CacheRuleHits      *prometheus.CounterVec
 }
 
 // New builds a fresh Metrics bundle. Callers own the returned struct
@@ -173,6 +174,13 @@ func New() *Metrics {
 			Help: "1 while the pod is draining (post-SIGTERM, pre-server-shutdown). Paired with in_flight_requests to let operators distinguish 'LB has stopped sending traffic' (draining=1, in_flight decreasing) from 'stuck drain' (draining=1, in_flight flat).",
 		},
 	)
+	m.CacheRuleHits = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "gateway_cache_rule_hits_total",
+			Help: "Cache-control rule matches applied to a request. `rule_id` is the configured rule identifier; `mode_applied` is the final mode after precedence resolution (header > rule > VK default) in RESPECT|FORCE|DISABLE (upper-case to match control-plane mode_enum).",
+		},
+		[]string{"rule_id", "mode_applied"},
+	)
 	reg.MustRegister(
 		m.HTTPRequests, m.HTTPDuration,
 		m.ProviderAttempts, m.CircuitState,
@@ -182,6 +190,7 @@ func New() *Metrics {
 		m.AuthCacheHits, m.AuthCacheMisses,
 		m.StreamingNoUsage, m.GuardrailVerdicts,
 		m.InFlightRequests, m.Draining,
+		m.CacheRuleHits,
 	)
 	return m
 }
@@ -253,4 +262,15 @@ func (m *Metrics) RecordGuardrailVerdict(direction, verdict string) {
 		return
 	}
 	m.GuardrailVerdicts.WithLabelValues(direction, verdict).Inc()
+}
+
+// RecordCacheRuleHit fires when a bundle-baked cache-control rule
+// matches a request. `mode` is the effective mode AFTER precedence
+// resolution (header > rule > VK default) in RESPECT|FORCE|DISABLE
+// upper-case, matching the control-plane mode_enum Prom label.
+func (m *Metrics) RecordCacheRuleHit(ruleID, mode string) {
+	if m == nil {
+		return
+	}
+	m.CacheRuleHits.WithLabelValues(ruleID, mode).Inc()
 }
