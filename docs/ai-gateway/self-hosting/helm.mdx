@@ -46,6 +46,14 @@ gateway:
     # existingAuthSecretName: gateway-admin-token  # optional bearer gate
     # authSecretKey: token                         # default "token"
 
+  # Graceful drain on SIGTERM (Lane A iter 24)
+  # preDrainWait + timeout + slack MUST be ≤ terminationGracePeriodSeconds.
+  # Default 5 + 15 + 10 = 30 matches the chart's terminationGracePeriodSeconds.
+  shutdown:
+    preDrainWait: 5s    # time /readyz=503 + sleep for LB endpoint propagation
+    timeout: 15s        # max wait for in-flight handlers to finish
+  terminationGracePeriodSeconds: 30
+
   # Edge protection (Lane A iter 23) — request body size cap
   # Enforced before auth; a 1 GB drive-by scan cannot pressure the pod memory
   # limit or the auth cache. Raise for orgs shipping large base64 image arrays.
@@ -347,6 +355,53 @@ kubectl exec -n langwatch deploy/langwatch-gateway -- \
 ```
 
 If egress fails with DNS resolution errors, verify the kube-system selector in the chart matches your cluster's DNS namespace (some clusters use `kube-dns` in `kube-system`, others use a custom namespace).
+
+## Graceful drain (iter 24, `ea167ca`)
+
+Rolling deploys, HPA scale-downs, and voluntary pod evictions all invoke SIGTERM. The gateway's four-phase drain makes sure in-flight requests finish and new requests route to surviving replicas:
+
+1. **SIGTERM received.** `ctx.Done()` fires.
+2. **Flip readiness + gauge.** `/readyz` starts returning `503 {"status":"draining"}`; `gateway_draining{pod=...}` goes to 1.
+3. **Pre-drain wait** (`shutdown.preDrainWait`, default 5 s). Gives the LB endpoint controller (nginx-ingress + kube-proxy) time to remove the pod from service endpoints. EKS-observed propagation is 3-4 s; 5 s has margin. During this window the pod is refusing new work via `/readyz` but `/livez` + `/startupz` stay green so kubelet doesn't short-circuit the drain.
+4. **Graceful close.** `server.Shutdown(Timeout=15s)` blocks until every in-flight handler exits, then force-closes. Streaming handlers that honour request context cancellation finish cleanly within the grace.
+
+```yaml
+gateway:
+  shutdown:
+    preDrainWait: 5s
+    timeout: 15s
+  terminationGracePeriodSeconds: 30   # MUST be ≥ preDrainWait + timeout + slack
+```
+
+### Invariant
+
+`terminationGracePeriodSeconds ≥ preDrainWait + timeout + slack`. Violate this and k8s SIGKILLs the pod mid-drain. The chart defaults 5 + 15 + 10-slack = 30 which matches the template.
+
+If your LB propagation is slower than EKS (e.g. cloud LB with 10+ second endpoint propagation), bump `preDrainWait` **and** `terminationGracePeriodSeconds` together:
+
+```yaml
+gateway:
+  shutdown:
+    preDrainWait: 15s
+    timeout: 20s
+  terminationGracePeriodSeconds: 45   # 15 + 20 + 10 slack
+```
+
+### Observability
+
+Two gauges, always exported:
+
+- `gateway_draining{pod}` — 0 normally, 1 during shutdown. A stuck pod (draining but never dying) shows as this being 1 for > grace.
+- `gateway_in_flight_requests{pod}` — monotonic counter minus completions, so concretely the count of currently-executing handlers. During drain this should curve down to 0.
+
+Pairing the two during drain gives two operationally distinct patterns:
+
+| Pattern | Meaning |
+|---|---|
+| `draining=1` + `in_flight` monotonically decreasing to 0 | **healthy drain** — nothing to do |
+| `draining=1` + `in_flight` flat for > grace | **stuck handler** — upstream hang or a breaker without a deadline. Pod is about to SIGKILL |
+
+See [Production runbook → Recipe 7](/ai-gateway/cookbooks/production-runbook#recipe-7--stuck-drain) for the diagnostic ladder when handlers don't exit within the grace.
 
 ## Security (iter 23, `79b46bf`)
 

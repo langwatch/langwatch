@@ -15,11 +15,12 @@ Eight rows, top to bottom:
 | Request health | rate, p50/p95/p99, error % | primary SLI row; everything else is causal |
 | Provider health | circuit state, upstream latency, fallback count | which provider is degrading and how often we're saved by fallback |
 | Auth cache | L1 hit rate, L2 hit rate, resolve-key RPS | cache degradation = spike in control-plane load |
-| Budgets & debits | outbox size, debit retries, shelf bytes | outbox pressure before it OOMs |
+| Budgets & debits | outbox fill-pct, flush failures, 4xx drops | outbox pressure before silent data loss |
 | Guardrails | verdicts by direction, blocks by reason | catches both legit policy enforcement and regressions |
 | Streaming | active streams, usage-warning rate | streams that never reported usage = cost blind spot |
 | Cache (passthrough) | hits / bypass / forced — Anthropic discount proxy | cache outcome vs expectation |
 | Infrastructure | pod replicas, CPU, memory, goroutines | k8s-side correlates for everything above |
+| Lifecycle | draining pods, in-flight requests | iter 24: detect hung drains before SIGKILL |
 
 ## Prerequisites
 
@@ -353,6 +354,34 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
       "gridPos": { "x": 16, "y": 63, "w": 8, "h": 7 },
       "targets": [{
         "expr": "go_goroutines{namespace=\"$namespace\", pod=~\"langwatch-gateway-.*\"}",
+        "legendFormat": "{{pod}}"
+      }]
+    },
+
+    {
+      "type": "row",
+      "title": "Lifecycle (iter 24 drain)",
+      "gridPos": { "x": 0, "y": 70, "w": 24, "h": 1 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Draining pods",
+      "description": "Iter 24: gateway_draining flips to 1 on SIGTERM; a pod stuck at 1 for > terminationGracePeriodSeconds is a hung handler (see Production runbook Recipe 7).",
+      "datasource": "$datasource",
+      "gridPos": { "x": 0, "y": 71, "w": 12, "h": 7 },
+      "targets": [{
+        "expr": "sum by (pod) (gateway_draining{namespace=\"$namespace\"})",
+        "legendFormat": "{{pod}}"
+      }]
+    },
+    {
+      "type": "timeseries",
+      "title": "In-flight requests",
+      "description": "Iter 24: paired with Draining — healthy drain curves to 0; flat while draining=1 means a handler is hung.",
+      "datasource": "$datasource",
+      "gridPos": { "x": 12, "y": 71, "w": 12, "h": 7 },
+      "targets": [{
+        "expr": "sum by (pod) (gateway_in_flight_requests{namespace=\"$namespace\"})",
         "legendFormat": "{{pod}}"
       }]
     }

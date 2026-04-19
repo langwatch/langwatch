@@ -60,6 +60,32 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       return rows.map(toDto);
     }),
 
+  get: protectedProcedure
+    .input(z.object({ organizationId: z.string(), id: z.string() }))
+    .use(checkOrganizationPermission("gatewayBudgets:view"))
+    .query(async ({ ctx, input }) => {
+      await requireOrgAccess(ctx, input.organizationId);
+      const service = GatewayBudgetService.create(ctx.prisma);
+      const detail = await service.getDetail(input.id, input.organizationId);
+      if (!detail) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "budget not found" });
+      }
+      return {
+        ...toDto(detail.budget),
+        scopeTarget: detail.scopeTarget,
+        recentLedger: detail.recentLedger.map((l) => ({
+          id: l.id,
+          virtualKeyId: l.virtualKeyId,
+          virtualKeyName: l.virtualKey?.name ?? l.virtualKeyId,
+          virtualKeyPrefix: l.virtualKey?.displayPrefix ?? "",
+          amountUsd: l.amountUsd.toString(),
+          model: l.model,
+          status: l.status,
+          occurredAt: l.occurredAt.toISOString(),
+        })),
+      };
+    }),
+
   create: protectedProcedure
     .input(
       z.object({
