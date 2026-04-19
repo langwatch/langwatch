@@ -31,7 +31,14 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { api } from "~/utils/api";
 
-type CreatedSecret = { id: string; name: string; secret: string };
+type CreatedSecret = {
+  id: string;
+  name: string;
+  secret: string;
+  // Differentiates mint flow (initial creation) from rotate — the
+  // reveal dialog adds a 24h-grace banner on rotations.
+  kind: "create" | "rotate";
+};
 
 function VirtualKeysPage() {
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -71,6 +78,7 @@ function VirtualKeysPage() {
         id: result.virtualKey.id,
         name: rotating.name,
         secret: result.secret,
+        kind: "rotate",
       });
       setRotating(null);
     } catch (err) {
@@ -285,7 +293,9 @@ function VirtualKeysPage() {
           projectId={project.id}
           open={createOpen}
           onOpenChange={setCreateOpen}
-          onCreated={(created) => setRevealSecret(created)}
+          onCreated={(created) =>
+            setRevealSecret({ ...created, kind: "create" })
+          }
         />
       )}
       <VirtualKeySecretReveal
@@ -293,6 +303,7 @@ function VirtualKeysPage() {
         onClose={() => setRevealSecret(null)}
         keyName={revealSecret?.name ?? ""}
         secret={revealSecret?.secret ?? ""}
+        kind={revealSecret?.kind ?? "create"}
       />
       {project?.id && (
         <VirtualKeyEditDrawer

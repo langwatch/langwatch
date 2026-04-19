@@ -18,6 +18,10 @@ type VirtualKeySecretRevealProps = {
   onClose: () => void;
   keyName: string;
   secret: string;
+  // Distinguishes the initial-mint flow from a rotation. Rotations
+  // also carry a grace-window banner (previous secret stays valid
+  // for 24h so clients can roll over without a cliff).
+  kind?: "create" | "rotate";
 };
 
 /**
@@ -30,6 +34,7 @@ export function VirtualKeySecretReveal({
   onClose,
   keyName,
   secret,
+  kind = "create",
 }: VirtualKeySecretRevealProps) {
   const [revealed, setRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -52,7 +57,11 @@ export function VirtualKeySecretReveal({
     <Dialog.Root open={open} onOpenChange={() => {}} closeOnInteractOutside={false}>
       <Dialog.Content maxWidth="560px">
           <Dialog.Header>
-            <Dialog.Title>Save your virtual key secret</Dialog.Title>
+            <Dialog.Title>
+              {kind === "rotate"
+                ? "Save your rotated secret"
+                : "Save your virtual key secret"}
+            </Dialog.Title>
           </Dialog.Header>
           <Dialog.Body>
             <VStack align="stretch" gap={4}>
@@ -66,6 +75,19 @@ export function VirtualKeySecretReveal({
                   </Alert.Description>
                 </Alert.Content>
               </Alert.Root>
+              {kind === "rotate" && (
+                <Alert.Root status="info">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Title>24-hour grace window active.</Alert.Title>
+                    <Alert.Description>
+                      The previous secret keeps working for 24 hours so
+                      clients can roll over gradually. After that it hard-
+                      fails with a 401 even though this key stays active.
+                    </Alert.Description>
+                  </Alert.Content>
+                </Alert.Root>
+              )}
 
               <VStack align="start" gap={1}>
                 <Text fontSize="sm" color="fg.muted">
