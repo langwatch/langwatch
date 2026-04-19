@@ -29,13 +29,14 @@ gateway:
     requests: { cpu: 200m, memory: 256Mi }
     limits:   { cpu: 1,    memory: 1Gi }
   env:
-    LW_GATEWAY_CONTROL_PLANE_URL: "http://langwatch-app:5560"
-    LW_GATEWAY_JWT_SECRET: { secretKeyRef: { name: gateway-secrets, key: jwt } }
+    # Secrets — only these three var names use the LW_ prefix.
     LW_GATEWAY_INTERNAL_SECRET: { secretKeyRef: { name: gateway-secrets, key: internal } }
-    LW_GATEWAY_REDIS_URL: redis://langwatch-redis:6379/2
-    LW_GATEWAY_BOOTSTRAP_PULL: "false"
-    LW_GATEWAY_CIRCUIT_THRESHOLD: "5"
-    LW_GATEWAY_CIRCUIT_WINDOW_SEC: "60"
+    LW_GATEWAY_JWT_SECRET: { secretKeyRef: { name: gateway-secrets, key: jwt } }
+    LW_GATEWAY_JWT_SECRET_PREVIOUS: { secretKeyRef: { name: gateway-secrets, key: jwt-previous, optional: true } }
+    # Non-secret tuning — GATEWAY_* prefix.
+    GATEWAY_CONTROL_PLANE_URL: "http://langwatch-app:5560"
+    GATEWAY_REDIS_URL: redis://langwatch-redis:6379/2
+    GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS: "false"
 
   # Admin / pprof listener (Lane A iter 14) — loopback-bound by default.
   # kubectl port-forward is the supported access path in the default posture.
@@ -158,8 +159,8 @@ See [Config → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation
 
 The gateway needs to reach:
 
-- The LangWatch control-plane (`LW_GATEWAY_CONTROL_PLANE_URL`) for `/api/internal/gateway/*` calls.
-- Redis (`LW_GATEWAY_REDIS_URL`) for L2 auth cache — optional, can run without.
+- The LangWatch control-plane (`GATEWAY_CONTROL_PLANE_URL`) for `/api/internal/gateway/*` calls.
+- Redis (`GATEWAY_REDIS_URL`) for L2 auth cache — optional, can run without.
 - Outbound to each provider API (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, Gemini). Network policy must allow egress.
 
 Clients reach the gateway via the Ingress (`gateway.your-corp.com`) on port 443.
@@ -182,8 +183,8 @@ In-flight streaming requests pin a connection to a single replica; HPA should sc
 ## High availability
 
 - Run ≥2 replicas with a PodDisruptionBudget so rolling updates don't remove every pod simultaneously.
-- Enable `LW_GATEWAY_BOOTSTRAP_PULL=true` to have every replica load all active VKs into its L1 cache on startup — allows serving traffic if the control-plane is briefly offline.
-- Use Redis (`LW_GATEWAY_REDIS_URL`) as L2 cache so a replica joining a running cluster warms up from shared cache rather than hammering the control-plane.
+- Enable `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` to have every replica load all active VKs into its L1 cache on startup — allows serving traffic if the control-plane is briefly offline.
+- Use Redis (`GATEWAY_REDIS_URL`) as L2 cache so a replica joining a running cluster warms up from shared cache rather than hammering the control-plane.
 
 ## Monitoring
 
