@@ -291,7 +291,7 @@ When you don't know where to start:
 
 1. Take the `X-LangWatch-Request-Id` from the failing request → LangWatch search.
 2. Compare `X-LangWatch-Provider` to the VK's configured primary — if different, fallback fired.
-3. Check `X-LangWatch-Cache` response header: `hit` / `miss` / `bypass` / `forced`.
+3. Check `X-LangWatch-Cache` response header: `hit` / `miss` / `bypass` / `force` (the last is v1.1 — deferred in v1).
 4. Gateway pod logs filtered on `request_id=grq_...` for structured entries.
 5. Control-plane logs filtered on `vk_id` for authorization decisions.
 

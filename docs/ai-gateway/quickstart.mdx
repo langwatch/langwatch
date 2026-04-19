@@ -109,7 +109,7 @@ Every gateway trace carries these attributes:
 | `langwatch.team_id` | Owning team. |
 | `langwatch.org_id` | Owning organisation. |
 | `langwatch.principal_id` | User or service account that made the call. |
-| `langwatch.cache_read_tokens` / `cache_write_tokens` | Cache economics (zero when cache bypassed). |
+| `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.cache_creation.input_tokens` | Cache economics (OTel GenAI semconv; zero when cache bypassed). |
 | `langwatch.fallback.attempt` | 0 on primary success, N for fallback attempts. |
 
 ## 4. Add a budget

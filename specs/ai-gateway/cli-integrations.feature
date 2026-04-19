@@ -47,7 +47,7 @@ Feature: AI Gateway — Coding CLI integrations
     When the session runs 5 consecutive prompts
     Then the first response has cache_creation_input_tokens > 0 and cache_read_input_tokens = 0
     And responses 2-5 have cache_read_input_tokens > 30000 and cache_creation_input_tokens = 0
-    And the trace records per-request "langwatch.cache_read_tokens" and "cache_write_tokens"
+    And the trace records per-request "gen_ai.usage.cache_read.input_tokens" and "gen_ai.usage.cache_creation.input_tokens" (semconv-only post iter 42)
 
   # ============================================================================
   # Codex CLI

@@ -143,7 +143,7 @@ Every request emits a LangWatch trace with attributes:
 
 - `langwatch.vk_id`, `langwatch.project_id`, `langwatch.team_id`, `langwatch.org_id`, `langwatch.principal_id`.
 - `langwatch.model_requested` (what the client sent) vs `langwatch.model_resolved` (provider + model after alias).
-- `langwatch.cache_read_tokens` / `cache_write_tokens` (cache economics).
+- `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.cache_creation.input_tokens` (OTel GenAI semconv; cache economics).
 - `langwatch.cost_usd` (computed from tokens × price).
 - `langwatch.fallback.attempt` spans (one per attempt; `attempt=0` is primary).
 

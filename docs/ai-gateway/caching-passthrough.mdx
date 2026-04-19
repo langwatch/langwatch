@@ -42,7 +42,7 @@ Two response headers surface cache behaviour:
   - `hit` — provider reported serving from cache (large portion of input from cache).
   - `miss` — no cache hit.
   - `bypass` — mode was `disable`.
-  - `forced` — mode was `force` (v1.1).
+  - `force` — mode was `force` (v1.1 — deferred with 400 cache_override_not_implemented in v1).
 
 Usage reporting (in the response body and in the trace) separates input tokens by origin:
 
