@@ -61,6 +61,18 @@ const EXEMPT_MODELS = [
    * PATs are organization-level, scoped by organizationId + userId.
    */
   "PersonalAccessToken",
+  /**
+   * AI Gateway models. Budgets are organization-level (scopeType +
+   * scopeId identifies which target); ledger rows descend from VirtualKey
+   * via virtualKeyId rather than a direct projectId column; change-events
+   * and audit logs both allow null projectId for org-level mutations.
+   * VirtualKey and GatewayProviderCredential are project-scoped and stay
+   * under the middleware's normal guard.
+   */
+  "GatewayBudget",
+  "GatewayBudgetLedger",
+  "GatewayChangeEvent",
+  "GatewayAuditLog",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
