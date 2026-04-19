@@ -72,7 +72,7 @@ func TestApplyCacheOverride_HeaderWinsOverRule(t *testing.T) {
 	req := postBody(bodyWithCache())
 	req.Header.Set("X-LangWatch-Cache", "respect")
 
-	out, ok := d.applyCacheOverride(rec, req, []byte(bodyWithCache()), "req_x", b, "")
+	out, ok := d.applyCacheOverride(rec, req, []byte(bodyWithCache()), "req_x", b)
 	if !ok {
 		t.Fatal("expected continue")
 	}
@@ -101,7 +101,7 @@ func TestApplyCacheOverride_RuleDisableStripsCacheControl(t *testing.T) {
 	req := postBody(bodyWithCache())
 	// No X-LangWatch-Cache → rule should apply
 
-	out, ok := d.applyCacheOverride(rec, req, []byte(bodyWithCache()), "req_x", b, "")
+	out, ok := d.applyCacheOverride(rec, req, []byte(bodyWithCache()), "req_x", b)
 	if !ok {
 		t.Fatal("expected continue")
 	}
@@ -128,7 +128,7 @@ func TestApplyCacheOverride_RuleForceDowngradesToRespect(t *testing.T) {
 	rec := httptest.NewRecorder()
 	body := bodyWithCache()
 
-	out, ok := d.applyCacheOverride(rec, httptest.NewRequest("POST", "/v1/messages", strings.NewReader(body)), []byte(body), "req_x", b, "")
+	out, ok := d.applyCacheOverride(rec, httptest.NewRequest("POST", "/v1/messages", strings.NewReader(body)), []byte(body), "req_x", b)
 	if !ok {
 		t.Fatal("expected continue")
 	}
@@ -151,7 +151,7 @@ func TestApplyCacheOverride_NoRulesNoHeaderPassthrough(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	body := bodyWithCache()
-	out, ok := d.applyCacheOverride(rec, postBody(body), []byte(body), "req_x", b, "")
+	out, ok := d.applyCacheOverride(rec, postBody(body), []byte(body), "req_x", b)
 	if !ok {
 		t.Fatal("expected continue")
 	}
@@ -174,12 +174,59 @@ func TestApplyCacheOverride_RuleMatchWithPrincipalID(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	body := bodyWithCache()
-	_, ok := d.applyCacheOverride(rec, postBody(body), []byte(body), "req_x", b, "")
+	_, ok := d.applyCacheOverride(rec, postBody(body), []byte(body), "req_x", b)
 	if !ok {
 		t.Fatal("expected continue")
 	}
 	if v := counterValue(t, m, "r_principal", "DISABLE"); v != 1 {
 		t.Errorf("principal matcher should fire; got %f", v)
+	}
+}
+
+// TestApplyCacheOverride_ModelMatcherFires covers iter 49: extractModelField
+// lets rule.matchers.model fire from inside applyCacheOverride without
+// waiting for parseOpenAIChatBody downstream. Closes the scope note
+// in iter 47's docs that said "model-field matchers don't fire on
+// /v1/messages because model parse happens below cache-override".
+func TestApplyCacheOverride_ModelMatcherFires(t *testing.T) {
+	d, m := testDispatcher(t)
+	rules := []auth.CacheRuleSpec{
+		{ID: "r_haiku", Priority: 700, Matchers: auth.CacheRuleMatchers{Model: "claude-haiku-*"}, Action: auth.CacheRuleAction{Mode: "disable"}},
+	}
+	b := testBundle(rules)
+
+	rec := httptest.NewRecorder()
+	body := `{"model":"claude-haiku-4-5-20251001","system":[{"type":"text","text":"hi","cache_control":{"type":"ephemeral"}}],"messages":[{"role":"user","content":"ping"}]}`
+	_, ok := d.applyCacheOverride(rec, postBody(body), []byte(body), "req_x", b)
+	if !ok {
+		t.Fatal("expected continue")
+	}
+	if v := counterValue(t, m, "r_haiku", "DISABLE"); v != 1 {
+		t.Errorf("model glob matcher should fire on claude-haiku-4-5; got %f", v)
+	}
+}
+
+// TestExtractModelField covers the cheap JSON peek helper iter 49
+// added so cache-rule model matchers can fire without waiting for
+// parseOpenAIChatBody.
+func TestExtractModelField(t *testing.T) {
+	cases := []struct {
+		name string
+		body string
+		want string
+	}{
+		{"happy path", `{"model":"gpt-5-mini","messages":[]}`, "gpt-5-mini"},
+		{"missing model", `{"messages":[]}`, ""},
+		{"malformed json", `{"model":"gpt-5-mini"`, ""},
+		{"empty body", ``, ""},
+		{"extra fields ignored", `{"stream":true,"model":"claude-haiku-4-5","messages":[]}`, "claude-haiku-4-5"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := extractModelField([]byte(tc.body)); got != tc.want {
+				t.Errorf("got %q want %q", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -193,7 +240,7 @@ func TestApplyCacheOverride_RuleRespectIsPurePassthrough(t *testing.T) {
 
 	rec := httptest.NewRecorder()
 	body := bodyWithCache()
-	out, ok := d.applyCacheOverride(rec, postBody(body), []byte(body), "req_x", b, "")
+	out, ok := d.applyCacheOverride(rec, postBody(body), []byte(body), "req_x", b)
 	if !ok {
 		t.Fatal("expected continue")
 	}
