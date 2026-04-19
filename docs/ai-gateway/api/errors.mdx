@@ -39,7 +39,8 @@ Errors (like successes) always carry:
 | `guardrail_blocked` | `403` | A pre- or post-call guardrail returned `block`. `message` references which guardrail and why. |
 | `tool_not_allowed` | `403` | The request references a tool name matched by the VK's `blocked_patterns.tools.deny` (or absent from `allow` if set). |
 | `url_not_allowed` | `403` | Any `http://` / `https://` URL extracted from the request body (user messages, tool-call args, system prompts — anywhere) matched `blocked_patterns.urls.deny` or fell outside a non-null `allow` list. |
-| `cache_override_invalid` | `400` | The `X-LangWatch-Cache` header was malformed. |
+| `cache_override_invalid` | `400` | The `X-LangWatch-Cache` header was malformed or used an unknown mode. |
+| `cache_override_not_implemented` | `400` | The `X-LangWatch-Cache` header was well-formed but named a mode deferred to v1.1 (`force` or `ttl=NNN`). `respect` and `disable` are the v1 modes. |
 | `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
 | `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
 | `bad_request` | `400` | Validation error on the incoming payload (e.g. missing `model`). |
