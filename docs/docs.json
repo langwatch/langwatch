@@ -576,6 +576,7 @@
                   "ai-gateway/audit"
                 ]
               },
+              "ai-gateway/model-naming",
               "ai-gateway/model-aliases",
               {
                 "group": "Operations",

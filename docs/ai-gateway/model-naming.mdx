@@ -1,0 +1,131 @@
+---
+title: Model Naming
+description: How to name models in requests — bare, prefixed, or aliased — and how the gateway resolves each.
+sidebarTitle: Model Naming
+---
+
+The gateway accepts three ways to reference a model in the `model` field of a request. Which to use depends on what your virtual key is bound to, and whether you want a redirect layer in the middle.
+
+<CardGroup cols={3}>
+  <Card title="Bare" icon="circle-check">
+    `"model": "gpt-5-mini"` — preferred for OpenAI-SDK drop-in and single-provider VKs.
+  </Card>
+  <Card title="Prefixed" icon="slash">
+    `"model": "openai/gpt-5-mini"` — disambiguator for multi-provider VKs.
+  </Card>
+  <Card title="Alias" icon="arrow-right-arrow-left">
+    `"model": "coding-small"` — per-VK redirect to any `provider/model`. See [Model Aliases](/ai-gateway/model-aliases).
+  </Card>
+</CardGroup>
+
+## Bare model (preferred)
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer lw_vk_live_..." \
+  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"hi"}]}'
+```
+
+Matches what every OpenAI-SDK codebase already writes. Works on any VK where the model name is unambiguous — i.e. a single-provider VK, or a multi-provider VK where only one bound provider offers that model.
+
+**Use bare when:**
+- Your VK is bound to one provider.
+- You're migrating an existing OpenAI/Anthropic SDK codebase and want zero code changes.
+- You're writing documentation or examples for broad audiences.
+
+## Prefixed model (`provider/model`)
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer lw_vk_live_..." \
+  -d '{"model":"openai/gpt-5-mini","messages":[{"role":"user","content":"hi"}]}'
+```
+
+Explicit disambiguator. Matches the litellm / OpenRouter / Portkey convention and preserves compatibility with codebases that already use that pattern.
+
+**Use prefixed when:**
+- Your VK is bound to multiple providers AND more than one offers the same model name (e.g. both OpenAI and Azure OpenAI expose `gpt-5-mini`).
+- You want readers of your code to see at a glance which provider a call is targeting.
+- You're porting from a gateway (litellm, OpenRouter) that required this form.
+
+The supported prefixes are: `openai`, `anthropic`, `azure`, `bedrock`, `vertex`, `gemini`, `groq`, `grok`, `ollama`, `openrouter`, plus any custom-OpenAI-compatible provider name you configured.
+
+## Alias
+
+```bash
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer lw_vk_live_..." \
+  -d '{"model":"coding-small","messages":[{"role":"user","content":"hi"}]}'
+```
+
+A per-VK redirect from a client-facing name to a concrete `provider/model`. Aliases decouple client code from provider specifics — you can repoint `coding-small` from OpenAI to Bedrock in a single VK edit without touching any caller.
+
+See [Model Aliases](/ai-gateway/model-aliases) for the full story, including the `:fallback` suffix for cross-provider remap and the `GET /v1/models` discovery endpoint.
+
+## How resolution works
+
+The gateway resolves the `model` field in **a single map lookup on the hot path**. There is no try-the-bare-form-then-fall-back-to-the-prefixed-form behaviour — that would cost multiple hash lookups and an error branch per request, and the hot path has a sub-millisecond budget.
+
+Instead, when a VK's config is loaded (via the long-poll `/changes` feed from the control plane), the gateway pre-builds a `map[string] → providerRoute` per VK that contains **both the bare and the prefixed key** for every routable model:
+
+| Map key | Resolves to |
+|---|---|
+| `gpt-5-mini` | openai route + `gpt-5-mini` |
+| `openai/gpt-5-mini` | openai route + `gpt-5-mini` |
+| `claude-haiku-4-5-20251001` | anthropic route + `claude-haiku-4-5-20251001` |
+| `anthropic/claude-haiku-4-5-20251001` | anthropic route + `claude-haiku-4-5-20251001` |
+| `coding-small` | *(alias → openai route + `gpt-5-mini`)* |
+
+At request time, the raw `model` string is looked up once. If there's a hit, the route is used. If there's a miss, the request returns `400 bad_request` with an enriched error (below).
+
+## Ambiguity — rejected at save time
+
+If a VK is bound to multiple providers that expose the same model name (e.g. both OpenAI and Azure OpenAI offer `gpt-5-mini`), the VK **cannot be saved** without a disambiguating alias. The create/update dialog surfaces an inline error:
+
+> `gpt-5-mini` is provided by multiple bound providers on this VK (`openai`, `azure`). Define a model alias that pins the bare name to one provider, or remove one of the duplicate providers.
+
+Rejecting at save time — not at request time — preserves the runtime contract: **every bare name on an active VK resolves unambiguously in a single O(1) lookup**. The hot path never has to branch on collision.
+
+Prefixed forms on the same VK always resolve unambiguously, so `"model": "openai/gpt-5-mini"` and `"model": "azure/gpt-5-mini"` always work alongside whatever alias you defined for the bare form.
+
+## Model not found
+
+If the `model` string matches no map key:
+
+```json
+{
+  "error": {
+    "type": "bad_request",
+    "code": "model_not_bound",
+    "message": "Model 'turbo' is not bound to this VK. Bound models: gpt-5-mini, gpt-4o, claude-haiku-4-5-20251001. Or define an alias on the VK."
+  }
+}
+```
+
+The error surfaces the accepted names so an integrator can fix the request without reading docs.
+
+## Decision tree
+
+<Steps>
+  <Step title="Single-provider VK">
+    Use bare. `gpt-5-mini`. Drop-in for OpenAI SDK.
+  </Step>
+  <Step title="Multi-provider VK, unique model names">
+    Use bare. The map resolves each unique name to the right provider — no ambiguity.
+  </Step>
+  <Step title="Multi-provider VK, overlapping model names">
+    Use prefixed. `openai/gpt-5-mini` vs `azure/gpt-5-mini` disambiguates. Or define aliases that pin each name to a specific provider.
+  </Step>
+  <Step title="You want a stable client-facing name that can be repointed">
+    Use an alias. Edit the VK once, zero caller changes. See [Model Aliases](/ai-gateway/model-aliases).
+  </Step>
+  <Step title="Cross-provider fallback (primary dies, secondary takes over)">
+    Alias with `:fallback` suffix. `"coding-small": "openai/gpt-5-mini"` + `"coding-small:fallback": "anthropic/claude-haiku-4-5-20251001"`. See [Model Aliases → :fallback suffix](/ai-gateway/model-aliases#fallback-suffix-advanced).
+  </Step>
+</Steps>
+
+## Why not just pick one convention?
+
+Most gateways in the ecosystem (litellm, OpenRouter, Portkey) use `provider/model`. Most SDK codebases use the bare name. Requiring either one would create friction for the other population.
+
+Accepting both — with a single O(1) resolution step, not a retry loop — lets you write whichever is natural for your code and the gateway figures it out at zero hot-path cost.
