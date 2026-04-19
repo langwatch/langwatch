@@ -69,8 +69,67 @@ import { getPayloadSizeHistogram } from "~/server/metrics";
 import { rAGChunkSchema } from "~/server/tracer/types.generated";
 import { createLogger } from "~/utils/logger/server";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
+import type { Permission } from "~/server/api/rbac";
+import {
+  enforcePatCeiling,
+  extractCredentials,
+  patCeilingDenialResponse,
+} from "~/server/pat/auth-middleware";
+import { TokenResolver } from "~/server/pat/token-resolver";
 
 const logger = createLogger("langwatch:evaluations-legacy");
+const tokenResolver = TokenResolver.create(prisma);
+
+/**
+ * Authenticates via the unified PAT + legacy-key path and enforces the given
+ * permission ceiling. Returns either a `{ project, markUsed }` context on
+ * success or `{ error, status }` for the caller to short-circuit with
+ * c.json(...). `markUsed` is a no-op for legacy keys and a fire-and-forget
+ * lastUsedAt bump for PATs — callers invoke it after building a success
+ * response.
+ */
+async function authenticateRequest(
+  c: Context,
+  permission: Permission,
+): Promise<
+  | {
+      project: Project & { team?: { id: string; organizationId: string } };
+      markUsed: () => void;
+    }
+  | { error: string; status: 401 | 403 }
+> {
+  const credentials = extractCredentials(c);
+  if (!credentials) {
+    return {
+      error:
+        "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
+      status: 401,
+    };
+  }
+
+  const resolved = await tokenResolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
+  });
+  if (!resolved) {
+    return { error: "Invalid auth token.", status: 401 };
+  }
+
+  try {
+    await enforcePatCeiling({ prisma, resolved, permission });
+  } catch (error) {
+    const denial = patCeilingDenialResponse(error);
+    return { error: denial.message, status: denial.status };
+  }
+
+  const markUsed = () => {
+    if (resolved.type === "pat") {
+      tokenResolver.markUsed({ patId: resolved.patId });
+    }
+  };
+
+  return { project: resolved.project, markUsed };
+}
 
 export const app = new Hono().basePath("/api");
 
@@ -105,22 +164,11 @@ app.post(
   "/evaluations/batch/log_results",
   bodyLimit({ maxSize: 20 * 1024 * 1024 }),
   async (c) => {
-    const xAuthToken = c.req.header("x-auth-token");
-    const authHeader = c.req.header("authorization");
-
-    const authToken =
-      xAuthToken ??
-      (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
-
-    if (!authToken) {
-      return c.json(
-        {
-          message:
-            "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
-        },
-        401,
-      );
+    const auth = await authenticateRequest(c, "evaluations:manage");
+    if ("error" in auth) {
+      return c.json({ message: auth.error }, auth.status);
     }
+    const { project } = auth;
 
     const contentType = c.req.header("content-type");
     if (!contentType || !contentType.includes("application/json")) {
@@ -131,14 +179,6 @@ app.post(
         "log_results request body is not json",
       );
       return c.json({ message: "Invalid body, expecting json" }, 400);
-    }
-
-    const project = await prisma.project.findUnique({
-      where: { apiKey: authToken },
-    });
-
-    if (!project) {
-      return c.json({ message: "Invalid auth token." }, 401);
     }
 
     let body: Record<string, any>;
@@ -265,13 +305,13 @@ app.post(
 
 // ---------- POST /api/dataset/evaluate ----------
 app.post("/dataset/evaluate", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const auth = await authenticateRequest(c, "evaluations:manage");
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, auth.status);
   }
-
+  // dataset/evaluate needs the full team relation for downstream queries.
   const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
+    where: { id: auth.project.id },
     include: { team: true },
   });
   if (!project) {
@@ -553,17 +593,11 @@ async function handleEvaluatorCall(
   evaluatorSlug: string,
   as_guardrail: boolean,
 ) {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const auth = await authenticateRequest(c, "evaluations:manage");
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, auth.status);
   }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+  const { project } = auth;
 
   let body: Record<string, any>;
   try {

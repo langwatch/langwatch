@@ -162,9 +162,10 @@ func TestResolveConfig_OptionsOverrideEnv(t *testing.T) {
 }
 
 func TestBuildHeaders(t *testing.T) {
-	headers := buildHeaders("test-api-key")
+	headers := buildHeaders("test-api-key", "")
 
 	assert.Equal(t, "Bearer test-api-key", headers["Authorization"])
+	assert.Equal(t, "test-api-key", headers["X-Auth-Token"])
 	assert.Equal(t, "langwatch-sdk-go", headers["x-langwatch-sdk-name"])
 	assert.Equal(t, "go", headers["x-langwatch-sdk-language"])
 	assert.Equal(t, Version, headers["x-langwatch-sdk-version"])

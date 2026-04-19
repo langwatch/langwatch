@@ -8,6 +8,7 @@
  * - src/pages/api/trace/search.ts
  * - src/pages/api/thread/[id].ts
  */
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { z } from "zod";
 import { fromZodError, type ZodError } from "zod-validation-error";
@@ -25,24 +26,67 @@ import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { TraceService } from "~/server/traces/trace.service";
 import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
 import type { Span, Trace } from "~/server/tracer/types";
+import type { Permission } from "~/server/api/rbac";
+import {
+  enforcePatCeiling,
+  extractCredentials,
+  patCeilingDenialResponse,
+} from "~/server/pat/auth-middleware";
+import { TokenResolver } from "~/server/pat/token-resolver";
+
+const tokenResolver = TokenResolver.create(prisma);
 
 export const app = new Hono().basePath("/api");
 
-// ---------- GET /api/trace/:id ----------
-app.get("/trace/:id", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+/**
+ * Authenticates via the unified PAT + legacy-key path and enforces the given
+ * permission ceiling. Returns either `{ project, markUsed }` or
+ * `{ error, status }`. `markUsed` is fire-and-forget and a no-op for legacy
+ * keys — callers invoke it after a successful response.
+ */
+async function authenticateRequest(c: Context, permission: Permission) {
+  const credentials = extractCredentials(c);
+  if (!credentials) {
+    return {
+      error:
+        "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
+      status: 401 as const,
+    };
+  }
+
+  const resolved = await tokenResolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
+  });
+  if (!resolved) {
+    return { error: "Invalid auth token.", status: 401 as const };
   }
 
   try {
-    const project = await prisma.project.findUnique({
-      where: { apiKey: authToken },
-    });
-    if (!project) {
-      return c.json({ message: "Invalid auth token." }, 401);
-    }
+    await enforcePatCeiling({ prisma, resolved, permission });
+  } catch (error) {
+    const denial = patCeilingDenialResponse(error);
+    return { error: denial.message, status: denial.status };
+  }
 
+  const markUsed = () => {
+    if (resolved.type === "pat") {
+      tokenResolver.markUsed({ patId: resolved.patId });
+    }
+  };
+
+  return { project: resolved.project, markUsed };
+}
+
+// ---------- GET /api/trace/:id ----------
+app.get("/trace/:id", async (c) => {
+  const auth = await authenticateRequest(c, "traces:view");
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, auth.status);
+  }
+  const { project } = auth;
+
+  try {
     const traceId = c.req.param("id");
     const formatParam = c.req.query("format");
     const llmMode =
@@ -108,17 +152,11 @@ app.get("/trace/:id", async (c) => {
 
 // ---------- POST /api/trace/:id/share ----------
 app.post("/trace/:id/share", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const auth = await authenticateRequest(c, "traces:share");
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, auth.status);
   }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+  const { project } = auth;
 
   const traceId = c.req.param("id");
 
@@ -133,17 +171,11 @@ app.post("/trace/:id/share", async (c) => {
 
 // ---------- POST /api/trace/:id/unshare ----------
 app.post("/trace/:id/unshare", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const auth = await authenticateRequest(c, "traces:share");
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, auth.status);
   }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+  const { project } = auth;
 
   const traceId = c.req.param("id");
 
@@ -182,17 +214,11 @@ const paramsSchema = getAllForProjectInput
   });
 
 app.post("/trace/search", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const auth = await authenticateRequest(c, "traces:view");
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, auth.status);
   }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+  const { project } = auth;
 
   let body: Record<string, any>;
   try {
@@ -279,17 +305,11 @@ app.post("/trace/search", async (c) => {
 
 // ---------- GET /api/thread/:id ----------
 app.get("/thread/:id", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const auth = await authenticateRequest(c, "traces:view");
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, auth.status);
   }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+  const { project } = auth;
 
   const threadId = c.req.param("id");
   const protections = await getProtectionsForProject(prisma, {

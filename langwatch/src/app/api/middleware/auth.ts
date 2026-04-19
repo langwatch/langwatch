@@ -1,62 +1,25 @@
 import type { Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
-
 import { prisma } from "~/server/db";
-
-import { createLogger } from "~/utils/logger/server";
-
-const logger = createLogger("langwatch:api:auth");
+import { createUnifiedAuthMiddleware } from "~/server/pat/auth-middleware";
 
 /**
- * Variables set by the auth middleware
+ * Variables set by the auth middleware.
+ * Extended to include optional PAT fields from the unified middleware.
  */
 export type AuthMiddlewareVariables = {
   project: Project;
+  patId?: string;
+  patUserId?: string;
+  patOrganizationId?: string;
 };
 
-export const authMiddleware: MiddlewareHandler = async (c, next) => {
-  const apiKey =
-    c.req.header("X-Auth-Token") ??
-    c.req.header("Authorization")?.split(" ")[1];
-
-  if (!apiKey) {
-    return c.json({ error: "Unauthorized", message: "Missing API key" }, 401);
-  }
-
-  try {
-    const project = await prisma.project.findUnique({
-      where: { apiKey, archivedAt: null },
-    });
-
-    if (!project) {
-      return c.json({ error: "Unauthorized", message: "Invalid API key" }, 401);
-    }
-
-    // Store project and repository for use in route handlers
-    c.set("project", project);
-  } catch (error) {
-    // Log with structured context for debugging
-    logger.error(
-      {
-        error,
-        path: c.req.path,
-        method: c.req.method,
-        hasApiKey: !!apiKey,
-        apiKeyPrefix: apiKey?.substring(0, 8) + "...", // Safe logging of key prefix
-      },
-      "Database error during authentication",
-    );
-
-    // Return 500 since auth failure due to database issues is a server error,
-    // not a service unavailability issue
-    return c.json(
-      {
-        error: "Internal Server Error",
-        message: "Authentication service error",
-      },
-      500,
-    );
-  }
-
-  await next();
-};
+/**
+ * Unified auth middleware that handles all auth methods:
+ *   - Basic Auth: base64(projectId:token)
+ *   - Bearer PAT: pat-lw-... + X-Project-Id
+ *   - Bearer Legacy: sk-lw-...
+ *   - X-Auth-Token: legacy header
+ */
+export const authMiddleware: MiddlewareHandler =
+  createUnifiedAuthMiddleware({ prisma });

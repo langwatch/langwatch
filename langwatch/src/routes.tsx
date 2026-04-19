@@ -144,6 +144,10 @@ const routes: RouteObject[] = [
     path: "/settings/roles",
     ...page(() => import("./pages/settings/roles")),
   },
+  {
+    path: "/settings/api-keys",
+    ...page(() => import("./pages/settings/api-keys")),
+  },
   { path: "/settings/scim", ...page(() => import("./pages/settings/scim")) },
   {
     path: "/settings/secrets",

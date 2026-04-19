@@ -76,26 +76,47 @@ import { slugify } from "~/utils/slugify";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { createLogger } from "~/utils/logger/server";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
+import {
+  createUnifiedAuthMiddleware,
+  requirePatPermission,
+  type UnifiedAuthVariables,
+} from "~/server/pat/auth-middleware";
 
 const logger = createLogger("langwatch:misc");
+// Shared auth middlewares for every PAT-aware handler in this file.
+// `createUnifiedAuthMiddleware` runs the extractCredentials → TokenResolver
+// → setContext → late markUsed pipeline once; `requirePatPermission`
+// enforces the per-route ceiling and returns 403 on denial.
+const authMiddleware = createUnifiedAuthMiddleware({ prisma });
+const requireAnalyticsView = requirePatPermission({
+  prisma,
+  permission: "analytics:view",
+});
+// TODO(pat): move DSPy steps under a dedicated experiments permission once
+// the RBAC catalog has one. `workflows:manage` is the closest existing
+// ceiling — VIEWER blocked, ADMIN/MEMBER allowed.
+const requireWorkflowsManage = requirePatPermission({
+  prisma,
+  permission: "workflows:manage",
+});
+const requireTracesCreate = requirePatPermission({
+  prisma,
+  permission: "traces:create",
+});
+const requireTriggersManage = requirePatPermission({
+  prisma,
+  permission: "triggers:manage",
+});
 
-export const app = new Hono().basePath("/api");
+export const app = new Hono<{ Variables: UnifiedAuthVariables }>().basePath(
+  "/api",
+);
 
 // =============================================
 // POST /api/analytics
 // =============================================
-app.post("/analytics", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
-  }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+app.post("/analytics", authMiddleware, requireAnalyticsView, async (c) => {
+  const project = c.get("project");
 
   let body: Record<string, any>;
   try {
@@ -154,6 +175,12 @@ const HOTEL_SYSTEM_PROMPT =
 const RAG_SYSTEM_PROMPT =
   "You are a restaurant expert knowing the best around town.";
 
+// NOTE(pat): /demo/hotel_bot is intentionally NOT migrated to the unified
+// extractCredentials + TokenResolver + enforcePatCeiling pipeline. It is a
+// demo fixture that only forwards the caller's token onward to /api/collector,
+// which performs full PAT/legacy auth + ceiling enforcement itself. Adding a
+// second layer here would double-validate the same token and require a
+// scope that demo tokens may not have.
 app.post("/demo/hotel_bot", async (c) => {
   const authToken = c.req.header("x-auth-token");
   if (!authToken) {
@@ -212,18 +239,10 @@ app.post("/demo/hotel_bot", async (c) => {
 app.post(
   "/dspy/log_steps",
   bodyLimit({ maxSize: 20 * 1024 * 1024 }),
+  authMiddleware,
+  requireWorkflowsManage,
   async (c) => {
-    const authToken = c.req.header("x-auth-token");
-    if (!authToken) {
-      return c.json({ message: "X-Auth-Token header is required." }, 401);
-    }
-
-    const project = await prisma.project.findUnique({
-      where: { apiKey: authToken },
-    });
-    if (!project) {
-      return c.json({ message: "Invalid auth token." }, 401);
-    }
+    const project = c.get("project");
 
     let body: unknown;
     try {
@@ -354,18 +373,15 @@ const dspyInitParamsSchema = z
     return true;
   });
 
-app.post("/experiment/init", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
-  }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+// TODO(pat): introduce a dedicated `experiments:manage` permission once
+// the RBAC catalog grows beyond workflows. `workflows:manage` is the
+// closest existing ceiling — VIEWER blocked, ADMIN/MEMBER pass through.
+app.post(
+  "/experiment/init",
+  authMiddleware,
+  requireWorkflowsManage,
+  async (c) => {
+  const project = c.get("project");
 
   let body: Record<string, any>;
   try {
@@ -434,7 +450,8 @@ app.post("/experiment/init", async (c) => {
     path: `/${project.slug}/experiments/${experiment.slug}`,
     slug: experiment.slug,
   });
-});
+  },
+);
 
 // =============================================
 // POST /api/mcp/authorize
@@ -547,61 +564,41 @@ app.post("/mcp/authorize", async (c) => {
 // =============================================
 // POST /api/optimization/:workflowId/:versionId  (deprecated)
 // =============================================
-app.post("/optimization/:workflowId/:versionId", async (c) => {
-  const workflowId = c.req.param("workflowId");
-  const versionId = c.req.param("versionId");
+app.post(
+  "/optimization/:workflowId/:versionId",
+  authMiddleware,
+  requireWorkflowsManage,
+  async (c) => {
+    const workflowId = c.req.param("workflowId");
+    const versionId = c.req.param("versionId");
 
-  const xAuthToken = c.req.header("x-auth-token");
-  const authHeader = c.req.header("authorization");
-  const authToken =
-    xAuthToken ??
-    (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
+    const contentType = c.req.header("content-type");
+    if (!contentType || !contentType.includes("application/json")) {
+      return c.json({ message: "Invalid body, expecting json" }, 400);
+    }
 
-  if (!authToken) {
-    return c.json(
-      {
-        message:
-          "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
-      },
-      401,
-    );
-  }
+    const project = c.get("project");
 
-  const contentType = c.req.header("content-type");
-  if (!contentType || !contentType.includes("application/json")) {
-    return c.json({ message: "Invalid body, expecting json" }, 400);
-  }
+    let body: Record<string, any>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ message: "Invalid body" }, 400);
+    }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-    include: { team: true },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
-
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Invalid body" }, 400);
-  }
-
-  try {
-    const result = await runWorkflowFn(
-      workflowId,
-      project.id,
-      body,
-      versionId,
-    );
-    return c.json(result);
-  } catch (error) {
-    return c.json(
-      { message: (error as Error).message },
-      500,
-    );
-  }
-});
+    try {
+      const result = await runWorkflowFn(
+        workflowId,
+        project.id,
+        body,
+        versionId,
+      );
+      return c.json(result);
+    } catch (error) {
+      return c.json({ message: (error as Error).message }, 500);
+    }
+  },
+);
 
 // =============================================
 // GET /api/rerun_checks
@@ -685,18 +682,8 @@ const predefinedEventTypes = predefinedEventsSchemas.options.map(
   (schema) => schema.shape.event_type.value,
 );
 
-app.post("/track_event", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
-  }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+app.post("/track_event", authMiddleware, requireTracesCreate, async (c) => {
+  const project = c.get("project");
 
   let rawBody: Record<string, any>;
   try {
@@ -877,112 +864,95 @@ const filterSchema = z
   )
   .default({});
 
-app.post("/trigger/slack", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
-  }
+app.post(
+  "/trigger/slack",
+  authMiddleware,
+  requireTriggersManage,
+  async (c) => {
+    const project = c.get("project");
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
-
-  let body: Record<string, any>;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ message: "Bad request" }, 400);
-  }
-
-  const schema = z.object({
-    slack_webhook: z.string().url("The Slack webhook must be a valid URL"),
-    name: z.string(),
-    message: z.string().optional(),
-    filters: filterSchema,
-    alert_type: z.nativeEnum(AlertType),
-  });
-
-  try {
-    const validatedData = schema.parse(body);
-
-    await prisma.trigger.create({
-      data: {
-        projectId: project.id,
-        action: TriggerAction.SEND_SLACK_MESSAGE,
-        name: validatedData.name,
-        message: validatedData.message,
-        filters: JSON.stringify(validatedData.filters),
-        actionParams: { slackWebhook: validatedData.slack_webhook },
-        alertType: validatedData.alert_type,
-      },
-    });
-
-    return c.json({ message: "Slack trigger created successfully" });
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return c.json(
-        { message: "Invalid request data", errors: error.errors },
-        400,
-      );
+    let body: Record<string, any>;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ message: "Bad request" }, 400);
     }
 
-    logger.error({ error }, "Error creating trigger");
-    return c.json({ message: "Error creating trigger" }, 500);
-  }
-});
+    const schema = z.object({
+      slack_webhook: z.string().url("The Slack webhook must be a valid URL"),
+      name: z.string(),
+      message: z.string().optional(),
+      filters: filterSchema,
+      alert_type: z.nativeEnum(AlertType),
+    });
+
+    try {
+      const validatedData = schema.parse(body);
+
+      await prisma.trigger.create({
+        data: {
+          projectId: project.id,
+          action: TriggerAction.SEND_SLACK_MESSAGE,
+          name: validatedData.name,
+          message: validatedData.message,
+          filters: JSON.stringify(validatedData.filters),
+          actionParams: { slackWebhook: validatedData.slack_webhook },
+          alertType: validatedData.alert_type,
+        },
+      });
+
+      return c.json({ message: "Slack trigger created successfully" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return c.json(
+          { message: "Invalid request data", errors: error.errors },
+          400,
+        );
+      }
+
+      logger.error({ error }, "Error creating trigger");
+      return c.json({ message: "Error creating trigger" }, 500);
+    }
+  },
+);
 
 // =============================================
 // POST /api/workflows/:workflowId/run
 // POST /api/workflows/:workflowId/:versionId/run
 // =============================================
-app.post("/workflows/:workflowId/run", async (c) => {
-  return handleWorkflowRun(c, c.req.param("workflowId"), undefined);
-});
+app.post(
+  "/workflows/:workflowId/run",
+  authMiddleware,
+  requireWorkflowsManage,
+  async (c) => {
+    return handleWorkflowRun(c, c.req.param("workflowId"), undefined);
+  },
+);
 
-app.post("/workflows/:workflowId/:versionId/run", async (c) => {
-  return handleWorkflowRun(
-    c,
-    c.req.param("workflowId"),
-    c.req.param("versionId"),
-  );
-});
+app.post(
+  "/workflows/:workflowId/:versionId/run",
+  authMiddleware,
+  requireWorkflowsManage,
+  async (c) => {
+    return handleWorkflowRun(
+      c,
+      c.req.param("workflowId"),
+      c.req.param("versionId"),
+    );
+  },
+);
 
 async function handleWorkflowRun(
   c: any,
   workflowId: string,
   versionId: string | undefined,
 ) {
-  const xAuthToken = c.req.header("x-auth-token");
-  const authHeader = c.req.header("authorization");
-  const authToken =
-    xAuthToken ??
-    (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
-
-  if (!authToken) {
-    return c.json(
-      {
-        message:
-          "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
-      },
-      401,
-    );
-  }
-
   const contentType = c.req.header("content-type");
   if (!contentType || !contentType.includes("application/json")) {
     return c.json({ message: "Invalid body, expecting json" }, 400);
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-    include: { team: true },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+  const project = c.get("project");
 
   let body: Record<string, any>;
   try {

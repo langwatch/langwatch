@@ -21,6 +21,12 @@ import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
 import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
+import { TokenResolver } from "~/server/pat/token-resolver";
+import {
+  enforcePatCeiling,
+  extractCredentials,
+  patCeilingDenialResponse,
+} from "~/server/pat/auth-middleware";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 
@@ -76,30 +82,40 @@ app.use(loggerMiddleware());
 
 // ── shared auth + limit check ────────────────────────────────────────
 
+const tokenResolver = TokenResolver.create(prisma);
+
 async function authenticateAndCheckLimit(c: {
   req: { raw: Request; header: (name: string) => string | undefined };
 }) {
-  const xAuthToken = c.req.header("x-auth-token");
-  const authHeader = c.req.header("authorization");
+  const credentials = extractCredentials(c);
 
-  const authToken =
-    xAuthToken ??
-    (authHeader?.toLowerCase().startsWith("bearer ")
-      ? authHeader.slice(7)
-      : null);
-
-  if (!authToken) {
+  if (!credentials) {
     return { error: "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.", status: 401 as const };
   }
 
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-    include: { team: true },
+  const resolved = await tokenResolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
   });
 
-  if (!project) {
+  if (!resolved) {
     return { error: "Invalid auth token.", status: 401 as const };
   }
+
+  // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
+  // access on OTLP ingestion — same semantics as the collector path.
+  try {
+    await enforcePatCeiling({
+      prisma,
+      resolved,
+      permission: "traces:create",
+    });
+  } catch (error) {
+    const denial = patCeilingDenialResponse(error);
+    return { error: denial.message, status: denial.status };
+  }
+
+  const project = resolved.project;
 
   // Check usage limits
   try {
@@ -145,7 +161,7 @@ async function authenticateAndCheckLimit(c: {
     });
   }
 
-  return { project };
+  return { project, resolved };
 }
 
 // ── POST /traces ─────────────────────────────────────────────────────
@@ -164,7 +180,7 @@ app.post("/traces", async (c) => {
         return c.json({ message: authResult.error }, { status: authResult.status });
       }
 
-      const { project } = authResult;
+      const { project, resolved } = authResult;
       span.setAttribute("langwatch.project.id", project.id);
 
       const contentType = c.req.header("content-type");
@@ -220,6 +236,11 @@ app.post("/traces", async (c) => {
         }
       }
 
+      // Body successfully parsed — mark PAT as used
+      if (resolved.type === "pat") {
+        tokenResolver.markUsed({ patId: resolved.patId });
+      }
+
       const collectionResult =
         await getApp().traces.collection.handleOtlpTraceRequest(
           project.id,
@@ -254,7 +275,7 @@ app.post("/logs", async (c) => {
         return c.json({ message: authResult.error }, { status: authResult.status });
       }
 
-      const { project } = authResult;
+      const { project, resolved } = authResult;
       span.setAttribute("langwatch.project.id", project.id);
 
       const contentType = c.req.header("content-type");
@@ -298,6 +319,11 @@ app.post("/logs", async (c) => {
         }
       }
 
+      // Body successfully parsed — mark PAT as used
+      if (resolved.type === "pat") {
+        tokenResolver.markUsed({ patId: resolved.patId });
+      }
+
       await getApp().traces.logCollection.handleOtlpLogRequest({
         tenantId: project.id,
         logRequest,
@@ -325,7 +351,7 @@ app.post("/metrics", async (c) => {
         return c.json({ message: authResult.error }, { status: authResult.status });
       }
 
-      const { project } = authResult;
+      const { project, resolved } = authResult;
       span.setAttribute("langwatch.project.id", project.id);
 
       const contentType = c.req.header("content-type");
@@ -367,6 +393,11 @@ app.post("/metrics", async (c) => {
 
           return c.json({ error: "Failed to parse metrics" }, { status: 400 });
         }
+      }
+
+      // Body successfully parsed — mark PAT as used
+      if (resolved.type === "pat") {
+        tokenResolver.markUsed({ patId: resolved.patId });
       }
 
       await getApp().traces.metricCollection.handleOtlpMetricRequest({
