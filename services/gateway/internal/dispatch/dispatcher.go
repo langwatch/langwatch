@@ -1237,6 +1237,16 @@ func (d *Dispatcher) ServeEmbeddings(w http.ResponseWriter, r *http.Request, b *
 		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "body_read_failed", err.Error(), "")
 		return
 	}
+	// Cache override on /v1/embeddings — all 5 providers' embedding
+	// APIs cache input tokens transparently (OpenAI 50% discount,
+	// Azure inherits, others similar), so mode=disable/force are
+	// body-level no-ops here. Rule matches still emit span attrs +
+	// bump the metric for per-rule attribution on the embedding path.
+	if out, ok := d.applyCacheOverride(w, r, body, reqID, b); ok {
+		body = out
+	} else {
+		return
+	}
 	parsed, err := parseOpenAIChatBody(body)
 	if err != nil {
 		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "bad_json", err.Error(), "")

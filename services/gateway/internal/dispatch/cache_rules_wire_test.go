@@ -148,6 +148,33 @@ func TestApplyCacheOverride_RuleForceInjectsOnAnthropic(t *testing.T) {
 	}
 }
 
+// TestApplyCacheOverride_EmbeddingsPath covers iter 51 — cache-rules
+// on /v1/embeddings. Embedding endpoints use the same applyCacheOverride
+// as chat/messages; body-level mutations are no-ops on the current
+// OpenAI-shape embeddings schema (no cache_control field), so the
+// value is observability: rule fires + metric bumps + span attrs.
+func TestApplyCacheOverride_EmbeddingsPath(t *testing.T) {
+	d, m := testDispatcher(t)
+	rules := []auth.CacheRuleSpec{
+		{ID: "r_emb", Priority: 500, Matchers: auth.CacheRuleMatchers{VKPrefix: "lw_vk_live_"}, Action: auth.CacheRuleAction{Mode: "disable"}},
+	}
+	b := testBundle(rules)
+
+	rec := httptest.NewRecorder()
+	// Embeddings body is OpenAI-shape: model + input string/array
+	body := `{"model":"text-embedding-3-small","input":"the quick brown fox"}`
+	_, ok := d.applyCacheOverride(rec, httptest.NewRequest("POST", "/v1/embeddings", strings.NewReader(body)), []byte(body), "req_x", b)
+	if !ok {
+		t.Fatal("expected continue")
+	}
+	if v := counterValue(t, m, "r_emb", "DISABLE"); v != 1 {
+		t.Errorf("rule metric should fire on /v1/embeddings; got %f", v)
+	}
+	if got := rec.Header().Get("X-LangWatch-Cache-Mode"); got != "disable" {
+		t.Errorf("X-LangWatch-Cache-Mode=%q want disable", got)
+	}
+}
+
 func TestApplyCacheOverride_RuleForceOpenAIShapePassthrough(t *testing.T) {
 	// Force on OpenAI-shape body (string content) is a body-level
 	// no-op — their caching is automatic. Rule still fires so
