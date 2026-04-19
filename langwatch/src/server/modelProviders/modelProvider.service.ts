@@ -290,6 +290,11 @@ export class ModelProviderService {
             extraHeaders: mp.extraHeaders as
               | { key: string; value: string }[]
               | null,
+            scopeType: mp.scopeType as
+              | "ORGANIZATION"
+              | "TEAM"
+              | "PROJECT",
+            scopeId: mp.scopeId,
           };
 
           return { ...acc, [mp.provider]: provider_ };
