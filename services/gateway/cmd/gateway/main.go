@@ -69,6 +69,12 @@ func main() {
 		JWTSecretPrevious: cfg.ControlPlane.JWTSecretPrevious,
 		GatewayNodeID:     nodeID,
 		Timeout:           cfg.ControlPlane.RequestTimeout,
+		// LongPollTimeout is the http.Client ceiling for WaitForChanges
+		// specifically — short-RPC (resolve-key, fetch-config) still
+		// use the 2s Timeout. Without this the client fires at 2s
+		// while Hono's /changes holds the socket 25s, so revision
+		// bumps never propagate (finding #32).
+		LongPollTimeout: cfg.ControlPlane.LongPollTimeout + 5*time.Second,
 	})
 	if cfg.ControlPlane.JWTSecretPrevious != "" {
 		logger.Warn("jwt_secret_rotation_active",

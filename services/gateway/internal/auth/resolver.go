@@ -63,8 +63,13 @@ type httpResolver struct {
 	jwtSecret      []byte
 	jwtSecretPrev  []byte // optional; set during a key rotation window
 	gatewayNodeID  string
-	http           *http.Client
-	jwtKeyFn       jwt.Keyfunc
+	// http is the short-RPC client used for resolve-key + fetch-config.
+	// Timeout is opts.Timeout (typically 2s). The long-poll path uses
+	// longPollHTTP with a much larger deadline so the changes endpoint
+	// (up to 25s server-held) can actually complete.
+	http         *http.Client
+	longPollHTTP *http.Client
+	jwtKeyFn     jwt.Keyfunc
 }
 
 // HTTPResolverOptions carries everything NewHTTPResolver needs. Named
@@ -87,6 +92,15 @@ type HTTPResolverOptions struct {
 	JWTSecretPrevious string
 	GatewayNodeID     string        // identifier for this gateway node (hostname is a fine default)
 	Timeout           time.Duration // per-request timeout for non-long-poll calls
+	// LongPollTimeout is the ceiling for WaitForChanges' http.Client.
+	// Must be strictly greater than the timeout we send on the wire as
+	// the `timeout_s` query param or the client races the server-held
+	// long-poll and fires "context deadline exceeded (Client.Timeout
+	// exceeded while awaiting headers)" just before Hono's 204 lands.
+	// Zero disables the override and falls back to Timeout (unsafe for
+	// long-poll — expect immediate timeouts). Default 30s is 5s over
+	// the 25s we send on the wire.
+	LongPollTimeout time.Duration
 }
 
 // NewHTTPResolver returns a Resolver that talks to the LangWatch control
@@ -96,6 +110,10 @@ type HTTPResolverOptions struct {
 func NewHTTPResolver(opts HTTPResolverOptions) Resolver {
 	jwtSecret := []byte(opts.JWTSecret)
 	jwtPrev := []byte(opts.JWTSecretPrevious)
+	longPollTimeout := opts.LongPollTimeout
+	if longPollTimeout <= 0 {
+		longPollTimeout = opts.Timeout
+	}
 	r := &httpResolver{
 		baseURL:        strings.TrimRight(opts.BaseURL, "/"),
 		internalSecret: []byte(opts.InternalSecret),
@@ -103,6 +121,7 @@ func NewHTTPResolver(opts HTTPResolverOptions) Resolver {
 		jwtSecretPrev:  jwtPrev,
 		gatewayNodeID:  opts.GatewayNodeID,
 		http:           &http.Client{Timeout: opts.Timeout},
+		longPollHTTP:   &http.Client{Timeout: longPollTimeout},
 	}
 	r.jwtKeyFn = func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
@@ -233,7 +252,7 @@ func (r *httpResolver) WaitForChanges(ctx context.Context, orgID string, sinceRe
 		return nil, err
 	}
 	r.signRequest(req, nil)
-	resp, err := r.http.Do(req)
+	resp, err := r.longPollHTTP.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("changes transport: %w", err)
 	}
