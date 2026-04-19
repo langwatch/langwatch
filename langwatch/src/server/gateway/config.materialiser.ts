@@ -54,6 +54,7 @@ export type GatewayConfigPayload = {
     tools: { deny: string[]; allow: string[] | null };
     mcp: { deny: string[]; allow: string[] | null };
     urls: { deny: string[]; allow: string[] | null };
+    models: { deny: string[]; allow: string[] | null };
   };
   rate_limits: {
     rpm: number | null;
@@ -130,6 +131,7 @@ export class GatewayConfigMaterialiser {
         tools: config.blockedPatterns.tools,
         mcp: config.blockedPatterns.mcp,
         urls: config.blockedPatterns.urls,
+        models: config.blockedPatterns.models,
       },
       rate_limits: {
         rpm: config.rateLimits.rpm,
