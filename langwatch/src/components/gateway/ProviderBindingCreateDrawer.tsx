@@ -19,8 +19,17 @@ import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { ProviderScopeChips } from "~/components/settings/ProviderScopeChips";
 
 import { FieldInfoTooltip } from "./FieldInfoTooltip";
+
+type MpScope = { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string };
+type BindableProvider = {
+  id: string;
+  provider: string;
+  scopes?: MpScope[];
+  scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+};
 
 type ProviderBindingCreateDrawerProps = {
   projectId: string;
@@ -108,22 +117,29 @@ export function ProviderBindingCreateDrawer({
   const providersRecord = providersQuery.data ?? {};
   const enabledProviders = Object.values(providersRecord).filter(
     (p: any) => p?.enabled && p?.id,
-  );
+  ) as BindableProvider[];
   const boundIds = new Set(
     (existingBindingsQuery.data ?? []).map((b) => b.modelProviderId),
   );
-  const available = enabledProviders.filter((p: any) => !boundIds.has(p.id));
+  const available: BindableProvider[] = enabledProviders.filter(
+    (p) => !boundIds.has(p.id),
+  );
 
   const providerCollection = useMemo(
     () =>
       createListCollection({
-        items: available.map((p: any) => ({
-          value: p.id as string,
-          label: p.provider as string,
+        items: available.map((p) => ({
+          value: p.id,
+          label: p.provider,
         })),
       }),
     [available],
   );
+
+  const selected = available.find((p) => p.id === modelProviderId);
+  const selectedIsShared = selected?.scopes?.some(
+    (s) => s.scopeType === "ORGANIZATION" || s.scopeType === "TEAM",
+  ) || selected?.scopeType === "ORGANIZATION" || selected?.scopeType === "TEAM";
 
   return (
     <Drawer.Root
@@ -183,24 +199,36 @@ export function ProviderBindingCreateDrawer({
                           typeof item === "object" && "label" in item
                             ? (item as { label: string }).label
                             : "";
+                        const match = available.find((p) => p.id === modelProviderId);
                         return (
                           <HStack gap={2}>
                             <ProviderIconBox provider={provider} />
                             <Text>{provider}</Text>
+                            {match && (
+                              <ProviderScopeChips
+                                scopes={match.scopes}
+                                fallbackScopeType={match.scopeType}
+                              />
+                            )}
                           </HStack>
                         );
                       }}
                     </Select.ValueText>
                   </Select.Trigger>
                   <Select.Content>
-                    {available.map((p: any) => (
+                    {available.map((p) => (
                       <Select.Item
                         item={{ value: p.id, label: p.provider }}
                         key={p.id}
                       >
-                        <HStack gap={2}>
+                        <HStack gap={2} width="full">
                           <ProviderIconBox provider={p.provider} />
                           <Text>{p.provider}</Text>
+                          <Spacer />
+                          <ProviderScopeChips
+                            scopes={p.scopes}
+                            fallbackScopeType={p.scopeType}
+                          />
                         </HStack>
                       </Select.Item>
                     ))}
@@ -208,12 +236,33 @@ export function ProviderBindingCreateDrawer({
                 </Select.Root>
               )}
               <Field.HelperText>
-                Gateway reuses the ModelProvider API key from{" "}
-                <Link href={settingsHref} color="orange.600">
-                  Settings → Model Providers
-                </Link>
-                . Binding only adds gateway-specific settings (rate limits,
-                fallback priority).
+                {selectedIsShared ? (
+                  <>
+                    This credential is scoped to the{" "}
+                    {selected?.scopes?.some(
+                      (s) => s.scopeType === "ORGANIZATION",
+                    ) || selected?.scopeType === "ORGANIZATION"
+                      ? "organization"
+                      : "team"}
+                    , so any project with access can bind it to the gateway.
+                    Binding here only stores this project's gateway-specific
+                    settings (rate limits, fallback priority); the API key
+                    stays managed in{" "}
+                    <Link href={settingsHref} color="orange.600">
+                      Settings → Model Providers
+                    </Link>
+                    .
+                  </>
+                ) : (
+                  <>
+                    Gateway reuses the ModelProvider API key from{" "}
+                    <Link href={settingsHref} color="orange.600">
+                      Settings → Model Providers
+                    </Link>
+                    . Binding only adds gateway-specific settings (rate limits,
+                    fallback priority).
+                  </>
+                )}
               </Field.HelperText>
             </Field.Root>
             <Field.Root>
