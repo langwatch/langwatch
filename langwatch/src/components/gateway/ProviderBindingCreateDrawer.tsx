@@ -1,6 +1,7 @@
 import {
   Box,
   Button,
+  createListCollection,
   Field,
   HStack,
   Input,
@@ -9,10 +10,11 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
+import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
@@ -112,6 +114,17 @@ export function ProviderBindingCreateDrawer({
   );
   const available = enabledProviders.filter((p: any) => !boundIds.has(p.id));
 
+  const providerCollection = useMemo(
+    () =>
+      createListCollection({
+        items: available.map((p: any) => ({
+          value: p.id as string,
+          label: p.provider as string,
+        })),
+      }),
+    [available],
+  );
+
   return (
     <Drawer.Root
       open={open}
@@ -152,36 +165,47 @@ export function ProviderBindingCreateDrawer({
                   </Link>
                 </VStack>
               ) : (
-                <VStack align="stretch" gap={2}>
-                  {available.map((p: any) => {
-                    const selected = modelProviderId === p.id;
-                    const icon =
-                      modelProviderIcons[
-                        p.provider as keyof typeof modelProviderIcons
-                      ];
-                    return (
-                      <HStack
+                <Select.Root
+                  collection={providerCollection}
+                  value={modelProviderId ? [modelProviderId] : []}
+                  onValueChange={(change) =>
+                    setModelProviderId(change.value[0] ?? "")
+                  }
+                  width="full"
+                  size="sm"
+                >
+                  <Select.Trigger>
+                    <Select.ValueText placeholder="Select a provider">
+                      {(items) => {
+                        const item = items[0];
+                        if (!item) return "Select a provider";
+                        const provider =
+                          typeof item === "object" && "label" in item
+                            ? (item as { label: string }).label
+                            : "";
+                        return (
+                          <HStack gap={2}>
+                            <ProviderIconBox provider={provider} />
+                            <Text>{provider}</Text>
+                          </HStack>
+                        );
+                      }}
+                    </Select.ValueText>
+                  </Select.Trigger>
+                  <Select.Content>
+                    {available.map((p: any) => (
+                      <Select.Item
+                        item={{ value: p.id, label: p.provider }}
                         key={p.id}
-                        borderWidth="1px"
-                        borderColor={selected ? "orange.400" : "border.subtle"}
-                        borderRadius="md"
-                        paddingX={3}
-                        paddingY={2}
-                        cursor="pointer"
-                        onClick={() => setModelProviderId(p.id)}
-                        background={selected ? "orange.50" : undefined}
-                        _hover={{ borderColor: "orange.300" }}
                       >
-                        <Box width="20px" height="20px" flexShrink={0}>
-                          {icon}
-                        </Box>
-                        <Text fontSize="sm" fontWeight="medium">
-                          {p.provider}
-                        </Text>
-                      </HStack>
-                    );
-                  })}
-                </VStack>
+                        <HStack gap={2}>
+                          <ProviderIconBox provider={p.provider} />
+                          <Text>{p.provider}</Text>
+                        </HStack>
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
               )}
               <Field.HelperText>
                 Gateway reuses the ModelProvider API key from{" "}
@@ -269,5 +293,27 @@ export function ProviderBindingCreateDrawer({
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+function ProviderIconBox({ provider }: { provider: string }) {
+  const icon =
+    provider in modelProviderIcons
+      ? modelProviderIcons[provider as keyof typeof modelProviderIcons]
+      : null;
+  return (
+    <Box
+      width="18px"
+      height="18px"
+      flexShrink={0}
+      display="flex"
+      alignItems="center"
+      justifyContent="center"
+      css={{
+        "& > svg": { width: "100%", height: "100%" },
+      }}
+    >
+      {icon}
+    </Box>
   );
 }
