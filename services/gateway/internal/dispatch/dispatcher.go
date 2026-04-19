@@ -358,8 +358,17 @@ func (d *Dispatcher) callChatStream(r *http.Request, b *auth.Bundle, resolved Re
 			Provider:       resolved.Provider,
 			Model:          resolved.Model,
 			RawRequestBody: body,
+			// Bifrost's ChatCompletionRequest rejects req.Input == nil
+			// even when we've set BifrostContextKeyUseRawRequestBody.
+			// Stub a non-nil empty slice so the check passes; provider
+			// implementations honour the raw-body context key and
+			// ignore Input entirely. See bifrost.go:679.
+			Input: []bfschemas.ChatMessage{},
 		}
-		dispatchCtx := withBundle(withCredentialPin(ctx, credID), b)
+		dispatchCtx := context.WithValue(
+			withBundle(withCredentialPin(ctx, credID), b),
+			bfschemas.BifrostContextKeyUseRawRequestBody, true,
+		)
 		bfCtx := bfschemas.NewBifrostContext(dispatchCtx, time.Now().Add(timeout))
 		ch, berr := d.bifrost.ChatCompletionStreamRequest(bfCtx, bfReq)
 		if berr == nil {
@@ -387,8 +396,20 @@ func (d *Dispatcher) callChat(r *http.Request, b *auth.Bundle, resolved Resolved
 			Provider:       resolved.Provider,
 			Model:          resolved.Model,
 			RawRequestBody: body,
+			// Bifrost's ChatCompletionRequest rejects req.Input == nil
+			// even when we've set BifrostContextKeyUseRawRequestBody.
+			// Stub a non-nil empty slice so the check passes; provider
+			// implementations honour the raw-body context key and
+			// ignore Input entirely. See bifrost.go:679.
+			Input: []bfschemas.ChatMessage{},
 		}
-		dispatchCtx := withBundle(withCredentialPin(ctx, credID), b)
+		// We send RawRequestBody (client's exact JSON) and never
+		// materialize Input{} — Bifrost refuses to dispatch unless
+		// this context key tells it to use the raw body instead.
+		dispatchCtx := context.WithValue(
+			withBundle(withCredentialPin(ctx, credID), b),
+			bfschemas.BifrostContextKeyUseRawRequestBody, true,
+		)
 		bfCtx := bfschemas.NewBifrostContext(dispatchCtx, time.Now().Add(timeout))
 		resp, berr := d.bifrost.ChatCompletionRequest(bfCtx, bfReq)
 		if berr == nil {
@@ -1265,7 +1286,10 @@ func (d *Dispatcher) ServeEmbeddings(w http.ResponseWriter, r *http.Request, b *
 		Model:          resolved.Model,
 		RawRequestBody: body,
 	}
-	ctx := withBundle(r.Context(), b)
+	ctx := context.WithValue(
+		withBundle(r.Context(), b),
+		bfschemas.BifrostContextKeyUseRawRequestBody, true,
+	)
 	bfCtx := bfschemas.NewBifrostContext(ctx, time.Now().Add(30*time.Second))
 	t0 := time.Now()
 	resp, berr := d.bifrost.EmbeddingRequest(bfCtx, bfReq)

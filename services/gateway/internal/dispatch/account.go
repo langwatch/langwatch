@@ -89,13 +89,16 @@ func (a *vkAccount) GetKeysForProvider(ctx context.Context, providerKey bfschema
 	return keys, nil
 }
 
-// GetConfigForProvider returns provider-specific network/auth settings.
-// Returning nil signals bifrost to use defaults for the provider — that
-// covers the 80% case (OpenAI, Anthropic, Gemini with standard base
-// URLs). Per-VK base URL overrides live on the ProviderCred.BaseURL
-// field and get threaded through in pcToBifrostKey.
+// GetConfigForProvider returns provider-specific network/concurrency
+// settings. Bifrost v1.4.22+ rejects nil config (see bifrost.go:3842
+// "config is nil for provider %s"), so we return an empty
+// ProviderConfig and let CheckAndSetDefaults() fill in timeouts /
+// buffer sizes / concurrency. Per-VK base URL overrides still live
+// on ProviderCred.BaseURL and get threaded through in pcToBifrostKey.
 func (a *vkAccount) GetConfigForProvider(providerKey bfschemas.ModelProvider) (*bfschemas.ProviderConfig, error) {
-	return nil, nil
+	cfg := &bfschemas.ProviderConfig{}
+	cfg.CheckAndSetDefaults()
+	return cfg, nil
 }
 
 // aliasProvider maps LangWatch-side provider type names to bifrost's
