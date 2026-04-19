@@ -33,6 +33,7 @@ func (c *Config) LogFields() []any {
 		"guardrail_post_timeout", c.Guardrails.PostTimeout.String(),
 		"guardrail_stream_chunk_window", c.Guardrails.StreamChunkWindow.String(),
 		"otel_default_endpoint", c.OTel.DefaultExportEndpoint,
+		"otel_default_auth_token", redact(c.OTel.DefaultAuthToken),
 		"otel_batch_timeout", c.OTel.BatchTimeout.String(),
 		"otel_max_queue_size", c.OTel.MaxQueueSize,
 		"bifrost_pool_size", c.Bifrost.PoolSize,
