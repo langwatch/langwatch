@@ -162,7 +162,7 @@ describe("GatewayConfigMaterialiser", () => {
         stubVk({ providerCredentials: chain as any }),
       );
 
-      expect(bundle.providers.map((p) => p.credentials_ref)).toEqual([
+      expect(bundle.providers.map((p) => p.id)).toEqual([
         "pc_primary",
         "pc_fallback",
       ]);

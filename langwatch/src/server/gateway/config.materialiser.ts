@@ -16,14 +16,37 @@ import type {
   VirtualKey,
 } from "@prisma/client";
 
+import { decrypt } from "../../utils/encryption";
 import { GatewayCacheRuleService } from "./cacheRule.service";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithChain } from "./virtualKey.repository";
 
 export type ProviderSlot = {
+  // `id` is the per-org-unique provider credential identifier the Go
+  // gateway keys on (auth.ProviderCred.ID, json:"id"). Was historically
+  // emitted as `credentials_ref` for the resolve-later opaque-ref model
+  // that never shipped; renamed in contract §4.2 to match wire reality.
+  id: string;
   slot: string;
   type: string;
-  credentials_ref: string;
+  /**
+   * Opaque per-provider credentials blob. Shape matches what the Go
+   * gateway's pcToBifrostKey expects for each provider type:
+   * - OpenAI / Anthropic / Gemini / default: `{api_key}`
+   * - Azure: `{api_key, endpoint, api_version?}`
+   * - Bedrock: `{access_key, secret_key, session_token?, region?}`
+   * - Vertex: `{project_id, project_number, region, auth_credentials}`
+   * Decrypted from ModelProvider.customKeys (AES-256-GCM at rest).
+   * Finding #26 fix: without this field the gateway surfaces
+   * "no keys found for provider: <name>" on every /v1/* request.
+   */
+  credentials: Record<string, unknown>;
+  // Promoted out of `config` per contract §4.2 so Go-side ProviderCred
+  // can unmarshal directly into its top-level fields. Omitted when
+  // unset so the JSON remains terse.
+  base_url?: string;
+  region?: string;
+  deployment_map?: Record<string, string>;
   config: Record<string, unknown>;
 };
 
@@ -124,12 +147,7 @@ export class GatewayConfigMaterialiser {
       project_id: project.id,
       team_id: project.teamId,
       principal_id: vk.principalUserId,
-      providers: chain.map((row, index) => ({
-        slot: row.slot ?? (index === 0 ? "primary" : `fallback_${index}`),
-        type: row.modelProvider.provider,
-        credentials_ref: row.id,
-        config: buildProviderConfig(row),
-      })),
+      providers: chain.map((row, index) => buildProviderSlot(row, index)),
       fallback: {
         on: config.fallback.on,
         chain: chain.map((row) => row.id),
@@ -234,15 +252,121 @@ export class GatewayConfigMaterialiser {
   }
 }
 
-function buildProviderConfig(row: ProviderRow): Record<string, unknown> {
+// decryptCustomKeys turns ModelProvider.customKeys (AES-256-GCM
+// encrypted string, legacy plaintext objects accepted for back-compat)
+// into a plain key/value map. Mirrors
+// modelProvider.repository.ts#decryptCustomKeys.
+function decryptCustomKeys(raw: unknown): Record<string, unknown> {
+  if (raw === null || raw === undefined) return {};
+  if (typeof raw === "object") return raw as Record<string, unknown>;
+  if (typeof raw === "string") {
+    try {
+      return JSON.parse(decrypt(raw)) as Record<string, unknown>;
+    } catch {
+      return {};
+    }
+  }
+  return {};
+}
+
+// buildCredentials maps ModelProvider.customKeys (historical env-var-
+// style UPPER_SNAKE_CASE keys inherited from LiteLLM integration) to
+// the Go gateway's per-provider credential shape. See
+// services/gateway/internal/dispatch/account.go#pcToBifrostKey for the
+// consuming side.
+function buildCredentials(row: ProviderRow): Record<string, unknown> {
+  const provider = row.modelProvider.provider;
+  const customKeys = decryptCustomKeys(row.modelProvider.customKeys);
+  const pick = (k: string): string =>
+    typeof customKeys[k] === "string" ? (customKeys[k] as string) : "";
+
+  switch (provider) {
+    case "azure": {
+      return {
+        api_key: pick("AZURE_OPENAI_API_KEY") || pick("api-key"),
+        endpoint: pick("AZURE_OPENAI_ENDPOINT") || pick("AZURE_API_GATEWAY_BASE_URL"),
+        api_version: pick("AZURE_OPENAI_API_VERSION") || pick("AZURE_API_GATEWAY_VERSION"),
+      };
+    }
+    case "bedrock": {
+      return {
+        access_key: pick("AWS_ACCESS_KEY_ID"),
+        secret_key: pick("AWS_SECRET_ACCESS_KEY"),
+        session_token: pick("AWS_SESSION_TOKEN"),
+        region: pick("AWS_REGION_NAME") || pick("AWS_REGION"),
+      };
+    }
+    case "vertex_ai":
+    case "vertex": {
+      return {
+        project_id: pick("VERTEXAI_PROJECT") || pick("GOOGLE_PROJECT_ID"),
+        project_number: pick("VERTEXAI_PROJECT_NUMBER"),
+        region: pick("VERTEXAI_LOCATION") || pick("GOOGLE_REGION"),
+        auth_credentials:
+          pick("GOOGLE_APPLICATION_CREDENTIALS") ||
+          pick("VERTEXAI_SERVICE_ACCOUNT_JSON"),
+      };
+    }
+    case "anthropic":
+      return { api_key: pick("ANTHROPIC_API_KEY") };
+    case "gemini":
+    case "google_gemini":
+      return { api_key: pick("GEMINI_API_KEY") || pick("GOOGLE_API_KEY") };
+    case "openai":
+      return { api_key: pick("OPENAI_API_KEY") };
+    case "deepseek":
+      return { api_key: pick("DEEPSEEK_API_KEY") };
+    case "xai":
+      return { api_key: pick("XAI_API_KEY") };
+    case "cerebras":
+      return { api_key: pick("CEREBRAS_API_KEY") };
+    case "groq":
+      return { api_key: pick("GROQ_API_KEY") };
+    case "cloudflare":
+      return { api_key: pick("CLOUDFLARE_API_KEY") };
+    default: {
+      // Fallback: first UPPER_CASE_KEY ending in _API_KEY.
+      const apiKey = Object.entries(customKeys).find(([k]) =>
+        /_API_KEY$/.test(k),
+      )?.[1];
+      return { api_key: typeof apiKey === "string" ? apiKey : "" };
+    }
+  }
+}
+
+function buildProviderSlot(row: ProviderRow, index: number): ProviderSlot {
+  const credentials = buildCredentials(row);
   const mp = row.modelProvider;
+  const customKeys = decryptCustomKeys(mp.customKeys);
+  const baseURL = pickString(customKeys, "base_url") ?? pickString(customKeys, "BASE_URL");
+  // Region lives on credentials for Bedrock/Vertex; mirror to the
+  // top-level `region` field so the Go gateway's non-provider-specific
+  // code (logging, fallback, health probes) can read it without
+  // re-parsing the opaque credentials blob.
+  const region = pickString(credentials, "region");
+  const deploymentMap = mp.deploymentMapping
+    ? (mp.deploymentMapping as Record<string, string>)
+    : undefined;
+  return {
+    id: row.id,
+    slot: row.slot ?? (index === 0 ? "primary" : `fallback_${index}`),
+    type: mp.provider,
+    credentials,
+    ...(baseURL ? { base_url: baseURL } : {}),
+    ...(region ? { region } : {}),
+    ...(deploymentMap ? { deployment_map: deploymentMap } : {}),
+    config: buildProviderConfig(row),
+  };
+}
+
+function pickString(obj: Record<string, unknown>, key: string): string | undefined {
+  const v = obj[key];
+  return typeof v === "string" && v.length > 0 ? v : undefined;
+}
+
+function buildProviderConfig(row: ProviderRow): Record<string, unknown> {
   const gatewayExtras = (row.providerConfig ?? {}) as Record<string, unknown>;
   return {
-    base_url:
-      typeof mp.customKeys === "object" && mp.customKeys && "base_url" in mp.customKeys
-        ? (mp.customKeys as Record<string, unknown>)["base_url"]
-        : undefined,
-    deployment_mapping: mp.deploymentMapping ?? undefined,
     rate_limit: {
       rpm: row.rateLimitRpm,
       tpm: row.rateLimitTpm,
