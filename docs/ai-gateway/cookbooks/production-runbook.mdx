@@ -238,6 +238,19 @@ curl -s http://localhost:6060/debug/pprof/goroutine?debug=1 | \
 
 **Temporary workaround:** bump `shutdown.timeout` + `terminationGracePeriodSeconds` to give the hanging request time to complete. Only appropriate while you diagnose the root cause — long grace periods slow down rolling deploys and make HPA scale-downs feel sluggish.
 
+## Graceful degradation — what survives what
+
+The gateway is a cache of the control plane, so a surprising amount continues to work when pieces go down. Quick reference:
+
+| Component down | Customer impact | How long gateway stays up | Notes |
+|---|---|---|---|
+| LangWatch control plane | None for cached VKs | ≥ 15 min (JWT TTL) + bootstrap cache; Redis L2 extends indefinitely | Outbox re-enqueues debits safely; they flush on recovery. New VK creation is blocked until control plane returns |
+| One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite — circuit breaker (iter 4) + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
+| Redis L2 cache | +~30 ms on cold-for-pod VKs | Indefinite — L1 + `/resolve-key` cover the miss | Fail-open by design (poison entries `DEL`, network errors log and miss) |
+| Gateway pod (crash / eviction) | None — HPA replaces, PDB holds ≥ 2 replicas | N/A | Stateless; new pod warms from Redis L2 + `/bootstrap` |
+
+For multi-region deployments with shared control plane: a gateway region down is handled by Route53 latency-based failover. See [Scaling → Regional placement](/ai-gateway/self-hosting/scaling#regional-placement).
+
 ## Writing findings back
 
 When you find something worth filing:
