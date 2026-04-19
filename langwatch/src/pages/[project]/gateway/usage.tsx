@@ -111,7 +111,7 @@ function GatewayUsagePage() {
                 />
                 <StatTile
                   label="Avg $/request"
-                  value={`$${Number(data.avgUsdPerRequest).toFixed(6)}`}
+                  value={formatAvgCost(data.avgUsdPerRequest)}
                 />
                 <StatTile
                   label="Blocked by guardrail"
@@ -265,6 +265,17 @@ function formatDayTick(day: string): string {
   const [, mm, dd] = day.split("-");
   if (!mm || !dd) return day;
   return `${mm}/${dd}`;
+}
+
+// Avg-cost often sits in $0.001–$0.1; 2 decimals rounds to $0.00 and
+// 6 decimals is noisy. Match the same logic as the ledger-line
+// formatter on budget detail.
+function formatAvgCost(raw: string | number): string {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return "—";
+  if (n >= 1) return `$${n.toFixed(4)}`;
+  if (n >= 0.01) return `$${n.toFixed(5)}`;
+  return `$${n.toFixed(6)}`;
 }
 
 function StatTile({

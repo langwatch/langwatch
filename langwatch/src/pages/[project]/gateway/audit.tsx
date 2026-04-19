@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  Card,
   Code,
   EmptyState,
   HStack,
@@ -161,7 +162,9 @@ function AuditLogPage() {
             </EmptyState.Root>
           ) : (
             <VStack align="stretch" gap={3}>
-              <Table.Root size="sm">
+              <Card.Root width="full" overflow="hidden">
+                <Card.Body paddingY={0} paddingX={0}>
+              <Table.Root variant="line" size="md" width="full">
                 <Table.Header>
                   <Table.Row>
                     <Table.ColumnHeader width="32px"></Table.ColumnHeader>
@@ -181,6 +184,8 @@ function AuditLogPage() {
                   ))}
                 </Table.Body>
               </Table.Root>
+                </Card.Body>
+              </Card.Root>
               {listQuery.hasNextPage && (
                 <HStack justify="center">
                   <Button
