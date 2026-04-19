@@ -449,13 +449,13 @@ export function VirtualKeyEditDrawer({
                     }
                   >
                     <option value="respect">
-                      Respect — honour provider caching headers
-                    </option>
-                    <option value="force">
-                      Force — cache even when provider says no
+                      Respect — byte-for-byte pass-through of cache_control
                     </option>
                     <option value="disable">
-                      Disable — skip cache entirely
+                      Disable — strip cache_control at every nesting depth
+                    </option>
+                    <option value="force" disabled>
+                      Force — v1.1 (returns 400 cache_override_not_implemented)
                     </option>
                   </NativeSelect.Field>
                 </NativeSelect.Root>
