@@ -173,16 +173,19 @@ Feature: Cache control rules — operator-defined overrides without client code 
     And there are zero allocations on the hot path (0 B/op, 0 allocs/op)
     And the ~700 ns hot-path target is preserved with 28× headroom
 
-  Scenario: Rule evaluation is wired on both /v1/messages AND /v1/chat/completions (iter 49)
+  Scenario: Rule evaluation is wired on all 3 data-plane endpoints (iter 49 + iter 51)
     Given a cache rule "rule_any" matches any request
     When the client calls POST /v1/messages
     Then the rule fires and span attribute "langwatch.cache.rule_id" is set
     When the client calls POST /v1/chat/completions
     Then the rule ALSO fires and attribution emits on the span + metric
-    # Note: on /v1/chat/completions the action.mode=disable is a body-level
-    # no-op because OpenAI's prompt caching is automatic, but observability
-    # (rule_id + mode_applied + gateway_cache_rule_hits_total) is identical.
-    # Embeddings endpoint (/v1/embeddings) still deferred to v1.1.
+    When the client calls POST /v1/embeddings
+    Then the rule ALSO fires and attribution emits on the span + metric
+    # Body-level mutations for mode=disable are a no-op on embeddings
+    # (neither OpenAI nor Gemini expose cache_control on the embeddings
+    # schema; their caching is transparent). Observability parity is
+    # the value: same span attrs + same metric labels across all 3
+    # endpoints, so operators can slice per-endpoint cache-rule hit rate.
 
   Scenario: Model-field matchers fire on both endpoints (iter 49)
     Given a cache rule matching model "claude-haiku-*"
