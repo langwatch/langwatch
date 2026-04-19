@@ -669,8 +669,20 @@ model Annotation {
 
 model ModelProvider {
     id                     String                      @id @default(nanoid())
+    // Legacy pointer. Always the project the row was originally
+    // created under (or the project itself for scopeType=PROJECT
+    // rows). New callers read scopeType + scopeId for access; the
+    // column stays for backward compatibility.
     projectId              String
     project                Project                     @relation(fields: [projectId], references: [id])
+    // Principal-style scope (iter 107 #2): lets an org/team
+    // administrator configure a provider credential once and have
+    // every project under that scope inherit it. Mirrors the
+    // RoleBinding principal pattern. scopeType is one of
+    // "ORGANIZATION" / "TEAM" / "PROJECT"; scopeId is the matching
+    // id of the scoping entity.
+    scopeType              String
+    scopeId                String
     provider               String
     enabled                Boolean
     customKeys             Json?
@@ -683,6 +695,7 @@ model ModelProvider {
     gatewayCredentials     GatewayProviderCredential[]
 
     @@index([projectId])
+    @@index([scopeType, scopeId])
 }
 
 model ProjectSecret {

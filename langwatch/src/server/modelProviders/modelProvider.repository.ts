@@ -58,6 +58,12 @@ export class ModelProviderRepository {
       customModels?: CustomModelsInput;
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders?: { key: string; value: string }[];
+      // Principal-style scope (iter 107 #2). Omitted callers get the
+      // legacy project-scoped default so existing create paths keep
+      // working unchanged; newer callers (Settings org/team picker)
+      // pass the resolved scope.
+      scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+      scopeId?: string;
     },
     tx?: Prisma.TransactionClient,
   ): Promise<ModelProvider> {
@@ -67,6 +73,8 @@ export class ModelProviderRepository {
       data: {
         id: generate(KSUID_RESOURCES.MODEL_PROVIDER).toString(),
         projectId: data.projectId,
+        scopeType: data.scopeType ?? "PROJECT",
+        scopeId: data.scopeId ?? data.projectId,
         provider: data.provider,
         enabled: data.enabled,
         customKeys: encryptedKeys as Prisma.InputJsonValue | undefined,

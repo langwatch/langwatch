@@ -76,6 +76,8 @@ describe("OnboardingChecksService Integration", () => {
         data: {
           id: `test-provider-${Date.now()}`,
           projectId,
+          scopeType: "PROJECT",
+          scopeId: projectId,
           provider: "openai",
           enabled: true,
         },
@@ -94,6 +96,8 @@ describe("OnboardingChecksService Integration", () => {
         data: {
           id: `test-disabled-provider-${Date.now()}`,
           projectId,
+          scopeType: "PROJECT",
+          scopeId: projectId,
           provider: "anthropic",
           enabled: false,
         },
