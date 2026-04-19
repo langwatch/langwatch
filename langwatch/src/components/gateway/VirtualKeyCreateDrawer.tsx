@@ -192,10 +192,44 @@ export function VirtualKeyCreateDrawer({
                     <Text fontSize="sm">Loading providers…</Text>
                   </HStack>
                 ) : availableProviders.length === 0 ? (
-                  <Text fontSize="sm" color="fg.muted">
-                    No providers enabled for the gateway yet. Configure one in{" "}
-                    <strong>AI Gateway → Providers</strong> first.
-                  </Text>
+                  <VStack
+                    align="stretch"
+                    gap={2}
+                    borderWidth="1px"
+                    borderColor="orange.200"
+                    borderRadius="md"
+                    background="orange.50"
+                    padding={3}
+                  >
+                    <Text fontSize="sm" fontWeight="medium">
+                      No provider bindings yet
+                    </Text>
+                    <Text fontSize="xs" color="fg.muted">
+                      A virtual key routes requests through{" "}
+                      <strong>provider bindings</strong> — wrappers around
+                      your configured LLM credentials that carry gateway
+                      settings (rate limits, fallback priority). Create at
+                      least one before minting a VK.
+                    </Text>
+                    <HStack>
+                      <Button
+                        size="xs"
+                        colorPalette="orange"
+                        onClick={() => {
+                          onOpenChange(false);
+                          if (typeof window !== "undefined") {
+                            window.location.href =
+                              window.location.pathname.replace(
+                                /\/gateway.*$/,
+                                "/gateway/providers",
+                              );
+                          }
+                        }}
+                      >
+                        Go to Providers →
+                      </Button>
+                    </HStack>
+                  </VStack>
                 ) : (
                   availableProviders.map((p: any, index: number) => {
                     const selected = selectedProviderIds.includes(p.id);
