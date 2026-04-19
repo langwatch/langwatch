@@ -748,8 +748,13 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	if len(parsed.Messages) > 0 {
 		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIInputMessages, string(parsed.Messages))
 	}
-	if len(parsed.System) > 0 {
-		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAISystemInstructions, string(parsed.System))
+	// Hoist system prompts into gen_ai.system_instructions so the
+	// trace renderer finds them regardless of transport:
+	//   - Anthropic /v1/messages: top-level `system` field (parsed.System)
+	//   - OpenAI /v1/chat/completions: role=system entry inside messages
+	// Rendering convention is the same on both paths — ariana's #75/#76.
+	if sysInstr := resolveSystemInstructions(parsed); sysInstr != "" {
+		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAISystemInstructions, sysInstr)
 	}
 
 	// Budget precheck against cached snapshot. This is intentionally
@@ -911,6 +916,15 @@ func (d *Dispatcher) serveChatStream(w http.ResponseWriter, r *http.Request, b *
 		lastIn, lastOut, lastCR, lastCW int
 		lastCost                         float64
 		sawUsage                         bool
+		// Streaming output accumulation for gen_ai.output.messages
+		// + gen_ai.response.* attrs. We mirror the non-streaming
+		// path's span shape so gateway spans stay interchangeable
+		// regardless of transport (rchaves "EVERYTHING follows
+		// gen_ai specs").
+		streamContent      strings.Builder
+		streamFinishReason string
+		streamResponseID   string
+		streamResponseModel string
 	)
 	enc := json.NewEncoder(w)
 	midStreamErr := false
@@ -981,6 +995,22 @@ func (d *Dispatcher) serveChatStream(w http.ResponseWriter, r *http.Request, b *
 			lastIn, lastOut, lastCR, lastCW, lastCost = in, out, cr, cw, cost
 			sawUsage = true
 		}
+		if delta := extractChunkDeltaText(chunk); delta != "" {
+			streamContent.WriteString(delta)
+		}
+		if chunk.BifrostChatResponse != nil {
+			if chunk.BifrostChatResponse.ID != "" && streamResponseID == "" {
+				streamResponseID = chunk.BifrostChatResponse.ID
+			}
+			if chunk.BifrostChatResponse.Model != "" {
+				streamResponseModel = chunk.BifrostChatResponse.Model
+			}
+			if len(chunk.BifrostChatResponse.Choices) > 0 {
+				if fr := chunk.BifrostChatResponse.Choices[0].FinishReason; fr != nil && *fr != "" {
+					streamFinishReason = *fr
+				}
+			}
+		}
 		// Bifrost chunk → SSE data line. No re-chunking; one chunk = one
 		// data: event.
 		if _, err := w.Write([]byte("data: ")); err != nil {
@@ -1006,10 +1036,37 @@ func (d *Dispatcher) serveChatStream(w http.ResponseWriter, r *http.Request, b *
 	d.enqueueDebit(b, grq, resolved, lastIn, lastOut, lastCR, lastCW, lastCost, duration, "success")
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrUsageIn, int64(lastIn))
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrUsageOut, int64(lastOut))
+	if total := lastIn + lastOut; total > 0 {
+		gwotel.AddInt64Attr(r.Context(), gwotel.AttrGenAIUsageTotalTokens, int64(total))
+	}
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrUsageCacheReadInputTokens, int64(lastCR))
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrUsageCacheCreationInputTokens, int64(lastCW))
 	gwotel.AddFloatAttr(r.Context(), gwotel.AttrCostUSD, lastCost)
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrDurationMS, duration)
+	// Stamp streaming-reassembled response metadata + output content
+	// on the span at close. Matches the non-streaming path so gateway
+	// traces are transport-agnostic.
+	if streamResponseID != "" {
+		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIResponseID, streamResponseID)
+	}
+	if streamResponseModel != "" {
+		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIResponseModel, streamResponseModel)
+	}
+	if streamFinishReason != "" {
+		if js, err := json.Marshal([]string{streamFinishReason}); err == nil {
+			gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIResponseFinishReasons, string(js))
+		}
+	}
+	if streamContent.Len() > 0 {
+		outMsg := []map[string]any{{
+			"role":          "assistant",
+			"content":       streamContent.String(),
+			"finish_reason": streamFinishReason,
+		}}
+		if js, err := json.Marshal(outMsg); err == nil {
+			gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOutputMessages, string(js))
+		}
+	}
 	if sawUsage {
 		gwotel.AddStringAttr(r.Context(), gwotel.AttrStatus, "success")
 	} else {
@@ -1166,6 +1223,61 @@ func collectFinishReasons(resp *bfschemas.BifrostChatResponse) string {
 		return ""
 	}
 	b, err := json.Marshal(reasons)
+	if err != nil {
+		return ""
+	}
+	return string(b)
+}
+
+// resolveSystemInstructions picks the system prompts for the span
+// attribute, preferring Anthropic's top-level `system` field when set
+// and otherwise hoisting role=system entries from the messages array.
+// Returns "" when neither source carries a system message.
+func resolveSystemInstructions(parsed openaiChatRequest) string {
+	if len(parsed.System) > 0 && string(parsed.System) != "null" {
+		return string(parsed.System)
+	}
+	return extractSystemInstructionsFromMessages(parsed.Messages)
+}
+
+// extractSystemInstructionsFromMessages scans an OpenAI-style messages
+// array for entries with role=system and returns the JSON-encoded list
+// of their content strings. Lets the gateway hoist system prompts into
+// `gen_ai.system_instructions` uniformly, independent of whether the
+// caller used Anthropic's top-level `system` field or OpenAI's
+// role=system message entries. Empty string when no system entries
+// are present.
+//
+// Matches the canonicaliser's treatment: system_instructions is a
+// separate renderer column, so the trace UI shows it inline with the
+// INPUT section instead of leaving it invisible in the messages list.
+func extractSystemInstructionsFromMessages(messages json.RawMessage) string {
+	if len(messages) == 0 {
+		return ""
+	}
+	var raw []map[string]json.RawMessage
+	if err := json.Unmarshal(messages, &raw); err != nil {
+		return ""
+	}
+	out := make([]map[string]any, 0, 1)
+	for _, m := range raw {
+		var role string
+		if err := json.Unmarshal(m["role"], &role); err != nil || role != "system" {
+			continue
+		}
+		if content, ok := m["content"]; ok && len(content) > 0 {
+			var s string
+			if err := json.Unmarshal(content, &s); err == nil && s != "" {
+				out = append(out, map[string]any{"role": "system", "content": s})
+				continue
+			}
+			out = append(out, map[string]any{"role": "system", "content": json.RawMessage(content)})
+		}
+	}
+	if len(out) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(out)
 	if err != nil {
 		return ""
 	}
@@ -1345,8 +1457,18 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrModel, resolved.Model)
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOperationName, "messages")
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIRequestModel, resolved.Model)
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAISystem, string(resolved.Provider))
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrProvider, string(resolved.Provider))
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrModelSource, string(resolved.Source))
+	stampGenAIRequestParams(r.Context(), parsed)
+	if len(parsed.Messages) > 0 {
+		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIInputMessages, string(parsed.Messages))
+	}
+	if sysInstr := resolveSystemInstructions(parsed); sysInstr != "" {
+		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAISystemInstructions, sysInstr)
+	}
 	pre := d.budgetPrecheck(r.Context(), b, estimateCostUSD(len(body), resolved.Model))
 	if pre.Decision == budget.DecisionHardStop {
 		gwerrors.Write(w, reqID, gwerrors.TypeBudgetExceeded, "budget_hard_cap_hit", pre.Reason, "")
@@ -1386,11 +1508,18 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 	d.enqueueDebit(b, grq, resolved, in, out, cr, cw, cost, time.Since(t0).Milliseconds(), "success")
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrUsageIn, int64(in))
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrUsageOut, int64(out))
+	if total := in + out; total > 0 {
+		gwotel.AddInt64Attr(r.Context(), gwotel.AttrGenAIUsageTotalTokens, int64(total))
+	}
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrUsageCacheReadInputTokens, int64(cr))
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrUsageCacheCreationInputTokens, int64(cw))
 	gwotel.AddFloatAttr(r.Context(), gwotel.AttrCostUSD, cost)
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrDurationMS, time.Since(t0).Milliseconds())
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrStatus, "success")
+	if outMsgs := extractOutputMessages(resp); outMsgs != "" {
+		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOutputMessages, outMsgs)
+	}
+	stampGenAIResponseMeta(r.Context(), resp)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-LangWatch-Request-Id", reqID)
 	w.Header().Set("X-LangWatch-Provider", string(resolved.Provider))
