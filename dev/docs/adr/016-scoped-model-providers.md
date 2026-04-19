@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-19
 
-**Status:** Proposed
+**Status:** Accepted (v1 scope — shipped iter 107-108 across 9 commits: schema `83f687b1f`, repository walker `a56939520`, service `d51120a78`, DTO `e3e7d60f1`, tRPC `4f833fabc`, list badge `d3599c611`, form picker `15671dabd`, save-time alias validation `b7c880650`, ladder tests `e40600e15`)
 
 ## Context
 
@@ -32,6 +32,7 @@ Concretely:
 6. **Gateway integration.** `GatewayProviderCredential.modelProviderId` already references a `ModelProvider` by id — no schema change is required on the gateway side. The binding picker (control-plane React) swaps its data source from `findMany({ projectId })` to `getAllAccessible`, and each row shows its scope badge.
 7. **Data plane unchanged.** The Go gateway resolves `GatewayProviderCredential` by id in its bundle resolver. It does not care about the scope of the underlying `ModelProvider` — the join is identical. Zero hot-path changes. No sub-millisecond budget regression.
 8. **Litellm / langevals untouched.** The existing `findLitellmProviderForModel` path and the langevals integration continue to work against project-scoped providers. The refactor is additive — existing callsites see exactly the same data they see today.
+9. **Multitenancy middleware exemption.** `ModelProvider` joins the `EXEMPT_MODELS` list in `src/utils/dbMultiTenancyProtection.ts` alongside the gateway-family tables (`GatewayBudget`, `GatewayBudgetLedger`, `GatewayChangeEvent`, `GatewayAuditLog`, `VirtualKeyProviderCredential`, `GatewayCacheRule`). Rationale: the `OR` branches in `findAllAccessibleForProject` match on `scopeType` + `scopeId` rather than on `projectId` / `organizationId`, so the default `_guardProjectId` middleware rejects the query before it reaches Prisma. The new `(scopeType, scopeId)` pair is the tenancy boundary for this model; the exemption is how we express that to the middleware. Discovered as a runtime blocker during iter 108 bugbash (finding #29).
 
 ## Rationale / Trade-offs
 
