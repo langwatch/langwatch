@@ -18,7 +18,7 @@ All three scenarios share the same feedback loop:
 
 You've tagged enterprise-tier VKs with `tier=enterprise`. You want every Anthropic request from those VKs to carry `cache_control: {type: "ephemeral"}` on the last system/user block, so large system prompts cost $1/1M input tokens instead of $3/1M on cache hits.
 
-<Warning>v1 note — `force` mode currently attributes + metrics the match but **does not** inject `cache_control` into the body. The gateway WARN-logs the rule id and downgrades to `respect`. Body-mutation force arrives in v1.1 with a Bifrost-provider matrix for every supported cache wire shape.</Warning>
+<Info>v1 scope — `force` mode injects `cache_control: {type: "ephemeral"}` on Anthropic-shape bodies (`/v1/messages`) into `system[-1]` and `messages[-1].content[-1]`, preserves any client-set `cache_control` (no double-inject), and is a wire no-op on OpenAI-shape (`/v1/chat/completions` — OpenAI's caching is automatic, but the rule still attributes + counts). Gemini `force` still surfaces as WARN + passthrough because the `/cachedContents` pre-POST path breaks zero-hop routing — tracked as v1.1 follow-up.</Info>
 
 ### Author the rule
 
@@ -86,23 +86,25 @@ curl https://gateway.langwatch.ai/v1/messages \
 The response headers:
 
 ```
-X-LangWatch-Cache-Mode: respect      # downgraded per v1 force-deferral
+X-LangWatch-Cache-Mode: force
 ```
+
+The forwarded request body now has `cache_control: {type: "ephemeral"}` on `system[-1]` (or `messages[-1].content[-1]` if the last user message has array content). Anthropic serves the cached prefix on the next matching request at 10% input-token cost.
 
 The trace span on LangWatch:
 
 ```
-langwatch.cache.rule_id: cm4fKsjhX…          # the rule matched
-langwatch.cache.mode_applied: RESPECT        # APPLIED mode (not the intent)
+langwatch.cache.rule_id: V1StGXR8_…          # the rule matched
+langwatch.cache.mode_applied: FORCE          # rule intent applied to the wire
 ```
 
 Prometheus:
 
 ```
-gateway_cache_rule_hits_total{rule_id="cm4fKsjhX…", mode_applied="RESPECT"} 1
+gateway_cache_rule_hits_total{rule_id="V1StGXR8_…", mode_applied="FORCE"} 1
 ```
 
-Operator dashboard query: join `gateway_cache_rule_hits_total by (rule_id, mode_applied)` against `/cache-rules/:id` lookups to surface intent-vs-applied drift. In v1 this drift is the `force`-downgrade window — a useful metric on its own for planning the v1.1 body-mutation rollout.
+On `/v1/chat/completions` (OpenAI), the rule still fires + attributes + bumps the counter, but the forwarded body is byte-identical — OpenAI's caching is automatic. Operator dashboard query: `gateway_cache_rule_hits_total by (rule_id, mode_applied)` gives per-rule firing rates; pair with provider-reported `cache_read_input_tokens` in the trace span to verify cache hits on the response side.
 
 ## Scenario 2 — Disable cache for evaluation traffic
 
