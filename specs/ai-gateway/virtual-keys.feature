@@ -55,6 +55,65 @@ Feature: AI Gateway — Virtual Keys
       fallback chain summary, budget status summary
 
   # ============================================================================
+  # Create-drawer capability preview (Lane B iter 23) — minimum-viable
+  # creation surface with a read-only preview of advanced settings.
+  #
+  # The create drawer only exposes name/description/environment/provider
+  # chain; every other capability (cache control, guardrails, blocked
+  # patterns, rate limits) is editable post-create via the edit drawer.
+  # Showing defaults in the create drawer avoids doubling the surface
+  # while still advertising what the gateway offers.
+  # ============================================================================
+
+  @integration
+  Scenario: Create drawer shows capability preview with post-create defaults
+    When I open the "New virtual key" drawer
+    Then a "What else you get (configurable after create)" section is visible
+    And it lists the following defaults:
+      | capability        | default     |
+      | Cache control     | respect     |
+      | Guardrails        | none        |
+      | Blocked patterns  | none        |
+      | Rate limits       | unlimited   |
+    And each row has a short description of the capability
+    And no inputs are shown for these capabilities in the create drawer
+    And the preview is labelled as a "preview" badge to signal read-only
+
+  @integration
+  Scenario: Capability preview cache-control default is provider-agnostic
+    When I open the "New virtual key" drawer
+    Then the "Cache control" preview row reads "respect" as the default
+    And its description mentions provider-agnostic passthrough across
+      Anthropic cache_control, OpenAI/Azure automatic caching, and Gemini
+      cachedContent
+    And the description does NOT frame caching as Anthropic-specific
+
+  # ============================================================================
+  # Cache control (Lane B iter 35) — provider-agnostic framing in the edit
+  # drawer. Modes: respect (passthrough, default), force (always cache on
+  # providers that support it, no-op where unsupported), disable (strip
+  # cache hints so provider responses are never cached).
+  # ============================================================================
+
+  @integration
+  Scenario: Edit drawer shows three cache-control modes with provider-agnostic helper
+    Given I am editing virtual key "prod-key"
+    When I expand the "Cache control" section
+    Then three options are available: respect, force, disable
+    And respect is selected by default
+    And the helper copy describes behaviour for Anthropic (cache_control),
+      OpenAI/Azure (automatic), and Gemini (cachedContent) without
+      anchoring the feature to any single provider
+
+  @integration
+  Scenario: Force cache mode is documented as no-op on providers that do not honour it
+    Given I am editing virtual key "prod-key"
+    When I select cache mode "force"
+    Then the save is accepted for all selected providers
+    And the helper copy warns that providers without explicit cache
+      controls (e.g. Gemini's side-effect model) treat force as a best-effort hint
+
+  # ============================================================================
   # Provider credential wiring — reuses existing ModelProvider rows
   # ============================================================================
 
