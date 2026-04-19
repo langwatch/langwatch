@@ -58,7 +58,7 @@ The slot is **cosmetic** — the gateway dispatches based on the VK fallback cha
 
 Tracks how the underlying credential rotates. **v1 supports `MANUAL` only** — the operator rotates the credential in Settings → Model Providers and the gateway picks up the new value on the next `/changes` long-poll (≤ 30 s).
 
-<Info>Automatic rotation (on schedule) and external-secret-store integration (HashiCorp Vault, AWS Secrets Manager, etc.) are tracked as v1.1 features. Until they land, the dropdown offers `MANUAL` only.</Info>
+<Info>The Bind-provider drawer does not surface this field in v1 because a single-option dropdown is worse UX than no field. Every binding is therefore implicitly `MANUAL`. The Edit drawer still exposes it for forward compat; only `MANUAL` is accepted. Automatic rotation (on schedule) + external-secret-store integration (HashiCorp Vault, AWS Secrets Manager, etc.) are tracked as v1.1 features and will restore the dropdown when implemented.</Info>
 
 ### Rate limit — RPM <a id="rate-limit-rpm"></a>
 
