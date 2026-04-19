@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-19
 
-**Status:** Proposed (v1.1 scope)
+**Status:** Accepted (v1 scope — escalated from v1.1 by rchaves iter 107 dogfood)
 
 ## Context
 
@@ -90,5 +90,5 @@ Specifically:
 - ADR-001: RBAC (permission model this extends)
 - ADR-005: Feature flags (rollout behind `release_gateway_payload_capture_enabled`)
 - LangWatch PII redaction pipeline: `langwatch/src/server/traces/redaction/` and [Presidio docs](https://microsoft.github.io/presidio/)
-- Feature spec to follow: `specs/ai-gateway/payload-capture.feature` (v1.1)
-- Related v1.1 items: finding #24 (ClickHouse ledger), #72 (principal_id propagation) — both touch the same span-attribute surface
+- Feature spec to follow: `specs/ai-gateway/payload-capture.feature` (v1)
+- Related items: finding #72 (principal_id propagation) — @sergey 7c48fc7ea shipped headers path; finding #24 (ClickHouse ledger) — Lane A v1.1 scope still
