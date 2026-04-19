@@ -130,7 +130,7 @@ func New(ctx context.Context, opts Options) (*Dispatcher, error) {
 // when we've already written a 400 envelope and the caller must return.
 // Respect (default) + disable are implemented; force and ttl=N remain
 // valid-but-deferred → 400.
-func (d *Dispatcher) applyCacheOverride(w http.ResponseWriter, r *http.Request, body []byte, reqID string, b *auth.Bundle, model string) ([]byte, bool) {
+func (d *Dispatcher) applyCacheOverride(w http.ResponseWriter, r *http.Request, body []byte, reqID string, b *auth.Bundle) ([]byte, bool) {
 	hdr := r.Header.Get("X-LangWatch-Cache")
 
 	// Header wins — no rule evaluation when the caller is explicit.
@@ -143,7 +143,7 @@ func (d *Dispatcher) applyCacheOverride(w http.ResponseWriter, r *http.Request, 
 		match, ok := cacherules.Evaluate(b.Config.CacheRules, cacherules.Request{
 			VKID:        b.DisplayPrefix,
 			PrincipalID: b.JWTClaims.PrincipalID,
-			Model:       model,
+			Model:       extractModelField(body),
 			// vk_tags + request_metadata aren't yet plumbed through the
 			// hot path; they'll land when the bundle/request pipeline
 			// carries them. Evaluate tolerates zero-value fields.
@@ -156,6 +156,26 @@ func (d *Dispatcher) applyCacheOverride(w http.ResponseWriter, r *http.Request, 
 	// Fall through: no header, no rule match → respect VK default (no-op
 	// body transform since cacheoverride.Apply on Kind=respect is pass-through).
 	return body, true
+}
+
+// extractModelField cheaply pulls the top-level `model` field from a
+// JSON body so cache-rule model matchers can fire without requiring
+// callers to parse the full body first. Returns "" on any decode
+// error — Evaluate treats empty as wildcard, so the rule-eval path
+// degrades gracefully to VK/principal/tag-only matching.
+//
+// Tradeoff: this is a cheap shape-peek (unmarshal into a single-field
+// struct), not a reuse of parseOpenAIChatBody, because we want zero
+// allocations on the non-matching path. ~150 ns for a typical body.
+func extractModelField(body []byte) string {
+	if len(body) == 0 {
+		return ""
+	}
+	var peek struct {
+		Model string `json:"model"`
+	}
+	_ = json.Unmarshal(body, &peek)
+	return peek.Model
 }
 
 // applyHeaderMode handles the X-LangWatch-Cache request header path.
@@ -661,6 +681,17 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "body_read_failed", err.Error(), "")
 		return
 	}
+	// Cache override is evaluated on /v1/chat/completions too — OpenAI
+	// doesn't carry cache_control in the wire body (their prompt caching
+	// is automatic), so mode=disable is a no-op on this path. Rule
+	// matches still fire span attrs + metric so operators get rule-
+	// attribution on both endpoints. mode=force downgrades to respect
+	// with a WARN (v1 scope). Model matchers work via extractModelField.
+	if out, ok := d.applyCacheOverride(w, r, body, reqID, b); ok {
+		body = out
+	} else {
+		return
+	}
 	if !d.enforceBlockedPatterns(w, b, body, reqID) {
 		return
 	}
@@ -1106,11 +1137,10 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 	// Cache override is evaluated on /v1/messages because Anthropic
 	// is the canonical cache_control shape today. Still runs before
 	// blocked-pattern checks so a disabled-cache request uses the
-	// same regex evaluation as any other. Model-field matchers in
-	// cache rules can't fire here because model parse happens below;
-	// that's a scoping choice — VK-scoped / prefix / principal / tag
-	// / metadata rules all still work on this path.
-	if out, ok := d.applyCacheOverride(w, r, body, reqID, b, ""); ok {
+	// same regex evaluation as any other. applyCacheOverride uses
+	// extractModelField() on the body so rule.matchers.model fires
+	// without waiting on the downstream parseOpenAIChatBody.
+	if out, ok := d.applyCacheOverride(w, r, body, reqID, b); ok {
 		body = out
 	} else {
 		return
