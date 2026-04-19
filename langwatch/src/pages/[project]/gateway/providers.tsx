@@ -25,6 +25,7 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 
 type ProviderRow = {
   id: string;
@@ -107,7 +108,7 @@ function ProvidersPage() {
                 </EmptyState.Indicator>
                 <EmptyState.Title>No providers bound to the gateway yet</EmptyState.Title>
                 <EmptyState.Description>
-                  Configure an OpenAI / Anthropic / Azure / Bedrock / Vertex
+                  Configure an LLM
                   provider in{" "}
                   <Link href="/settings/model-providers" color="orange.600">
                     Settings → Model Providers
@@ -135,65 +136,102 @@ function ProvidersPage() {
                   <Table.ColumnHeader>Slot</Table.ColumnHeader>
                   <Table.ColumnHeader>Health</Table.ColumnHeader>
                   <Table.ColumnHeader>Rate limits</Table.ColumnHeader>
-                  <Table.ColumnHeader>Rotation</Table.ColumnHeader>
                   <Table.ColumnHeader>Priority</Table.ColumnHeader>
                   <Table.ColumnHeader></Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {(listQuery.data ?? []).map((row) => (
-                  <Table.Row key={row.id}>
-                    <Table.Cell>
-                      <Text fontWeight="medium">{row.modelProviderName}</Text>
-                    </Table.Cell>
-                    <Table.Cell>{row.slot}</Table.Cell>
-                    <Table.Cell>
-                      <HealthBadge status={row.healthStatus} />
-                    </Table.Cell>
-                    <Table.Cell>
-                      <VStack align="start" gap={0}>
-                        <Text fontSize="xs">rpm: {row.rateLimitRpm ?? "∞"}</Text>
-                        <Text fontSize="xs">rpd: {row.rateLimitRpd ?? "∞"}</Text>
-                      </VStack>
-                    </Table.Cell>
-                    <Table.Cell>
-                      <Badge variant="outline">
-                        {row.rotationPolicy.toLowerCase()}
-                      </Badge>
-                    </Table.Cell>
-                    <Table.Cell>
-                      {row.fallbackPriorityGlobal ?? "—"}
-                    </Table.Cell>
-                    <Table.Cell>
-                      {canManage && !row.disabledAt && (
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <Button variant="ghost" size="xs" aria-label="Actions">
-                              <MoreVertical size={14} />
-                            </Button>
-                          </Menu.Trigger>
-                          <Menu.Content>
-                            <Menu.Item
-                              value="edit"
-                              onClick={() => setEditing(row)}
-                            >
-                              <Pencil size={14} /> Edit
-                            </Menu.Item>
-                            <Menu.Item
-                              value="disable"
-                              onClick={() => setDisabling(row)}
-                            >
-                              <PowerOff size={14} /> Disable
-                            </Menu.Item>
-                          </Menu.Content>
-                        </Menu.Root>
-                      )}
-                      {row.disabledAt && (
-                        <Badge colorPalette="gray">disabled</Badge>
-                      )}
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
+                {(listQuery.data ?? []).map((row) => {
+                  const providerKey =
+                    row.modelProviderName as keyof typeof modelProviderIcons;
+                  const icon = modelProviderIcons[providerKey];
+                  return (
+                    <Table.Row key={row.id}>
+                      <Table.Cell>
+                        <HStack gap={2}>
+                          <Box
+                            width="20px"
+                            height="20px"
+                            flexShrink={0}
+                            display="flex"
+                            alignItems="center"
+                            justifyContent="center"
+                          >
+                            {icon}
+                          </Box>
+                          <VStack align="start" gap={0}>
+                            <Text fontWeight="medium">
+                              {row.modelProviderName}
+                            </Text>
+                            {row.disabledAt && (
+                              <Text fontSize="2xs" color="fg.muted">
+                                disabled{" "}
+                                {new Date(row.disabledAt).toLocaleDateString()}
+                              </Text>
+                            )}
+                          </VStack>
+                        </HStack>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Badge variant="subtle" colorPalette="gray">
+                          {row.slot}
+                        </Badge>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <HealthBadge status={row.healthStatus} />
+                      </Table.Cell>
+                      <Table.Cell>
+                        <HStack gap={1} flexWrap="wrap">
+                          <Badge variant="outline" fontSize="2xs">
+                            rpm {row.rateLimitRpm ?? "∞"}
+                          </Badge>
+                          <Badge variant="outline" fontSize="2xs">
+                            rpd {row.rateLimitRpd ?? "∞"}
+                          </Badge>
+                        </HStack>
+                      </Table.Cell>
+                      <Table.Cell>
+                        <Text fontSize="sm" color="fg.muted">
+                          {row.fallbackPriorityGlobal ?? "—"}
+                        </Text>
+                      </Table.Cell>
+                      <Table.Cell>
+                        {canManage && !row.disabledAt && (
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="xs"
+                                aria-label="Actions"
+                              >
+                                <MoreVertical size={14} />
+                              </Button>
+                            </Menu.Trigger>
+                            <Menu.Content>
+                              <Menu.Item
+                                value="edit"
+                                onClick={() => setEditing(row)}
+                              >
+                                <Pencil size={14} /> Edit
+                              </Menu.Item>
+                              <Menu.Item
+                                value="disable"
+                                onClick={() => setDisabling(row)}
+                              >
+                                <PowerOff size={14} /> Disable
+                              </Menu.Item>
+                            </Menu.Content>
+                          </Menu.Root>
+                        )}
+                        {row.disabledAt && (
+                          <Badge colorPalette="gray" variant="subtle">
+                            disabled
+                          </Badge>
+                        )}
+                      </Table.Cell>
+                    </Table.Row>
+                  );
+                })}
               </Table.Body>
             </Table.Root>
           )}
