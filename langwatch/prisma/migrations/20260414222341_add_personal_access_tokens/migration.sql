@@ -34,3 +34,18 @@ CREATE INDEX "PersonalAccessToken_lookupId_idx" ON "PersonalAccessToken"("lookup
 -- CreateIndex
 CREATE INDEX "RoleBinding_patId_idx" ON "RoleBinding"("patId");
 
+-- Partial unique indexes for PAT-principal bindings. Mirrors the four existing
+-- indexes for user/group principals from 20260410120000_fix_role_binding_unique_custom_role.
+-- Without these, the same PAT could be granted the same (role, scope) twice,
+-- or the same (customRole, scope) twice — silently duplicating permissions.
+
+-- PAT bindings — built-in roles (customRoleId IS NULL)
+CREATE UNIQUE INDEX "RoleBinding_pat_builtin_role_scope_key"
+  ON "RoleBinding"("patId", "role", "scopeType", "scopeId")
+  WHERE "patId" IS NOT NULL AND "customRoleId" IS NULL;
+
+-- PAT bindings — custom roles (different customRoleIds are distinct at the same scope)
+CREATE UNIQUE INDEX "RoleBinding_pat_custom_role_scope_key"
+  ON "RoleBinding"("patId", "customRoleId", "scopeType", "scopeId")
+  WHERE "patId" IS NOT NULL AND "customRoleId" IS NOT NULL;
+
