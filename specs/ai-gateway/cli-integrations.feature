@@ -242,3 +242,35 @@ Feature: AI Gateway — Coding CLI integrations
     Then exit status is non-zero
     And stderr contains "permission_denied"
     And stderr names "gatewayCacheRules:create" as the missing permission
+
+  @integration @cli @cache-rules
+  Scenario: `export --file` closes the round-trip for git-backed rule ops (alexis iter 50)
+    Given three cache rules in the org
+    When I run `langwatch cache-rules export --file rules.json`
+    Then exit status is 0
+    And `rules.json` contains an array of 3 rule objects
+    And each object has the same shape as POST /cache-rules would accept (name + priority + enabled + matchers + action)
+    And archived rules are NOT included (exports the live set only)
+    When I run `langwatch cache-rules apply --file rules.json`
+    Then the response summary reports `created=0, updated=3, archived=0`
+    # Round-trip: export → commit to infra monorepo → CI apply on deploy.
+    # Enables the enterprise rule-ops workflow where rules live alongside
+    # service code and drift is caught by git diff after a UI edit.
+
+  @integration @cli @cache-rules @security
+  Scenario: `export` requires gatewayCacheRules:view permission
+    Given a CLI token with no gatewayCacheRules permissions
+    When I run `langwatch cache-rules export --file rules.json`
+    Then exit status is non-zero
+    And stderr names "gatewayCacheRules:view" as the missing permission
+    And `rules.json` is NOT created
+
+  @integration @cli @cache-rules
+  Scenario: `apply --file` is a composite create/update/archive permission requirement
+    Given a CLI token with "gatewayCacheRules:view" + ":create" but NOT ":update" + ":delete"
+    And a rules.json file that would require both an update and an archive
+    When I run `langwatch cache-rules apply --file rules.json`
+    Then exit status is non-zero
+    And stderr lists BOTH "gatewayCacheRules:update" AND "gatewayCacheRules:delete" as missing
+    # Per alexis iter 50 permission table: apply = :create + :update + :delete composite
+    # because diff-apply touches all three verbs depending on what's in the file.
