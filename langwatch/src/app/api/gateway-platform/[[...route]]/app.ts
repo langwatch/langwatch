@@ -19,6 +19,7 @@ import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { baseResponses } from "../../shared/base-responses";
 import { prisma } from "~/server/db";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { GatewayCacheRuleService } from "~/server/gateway/cacheRule.service";
 import { GatewayProviderCredentialService } from "~/server/gateway/providerCredential.service";
 import {
   VirtualKeyService,
@@ -89,6 +90,22 @@ const requireGatewayBudgetsDelete = requirePatPermission({
   prisma,
   permission: "gatewayBudgets:delete",
 });
+const requireGatewayCacheRulesView = requirePatPermission({
+  prisma,
+  permission: "gatewayCacheRules:view",
+});
+const requireGatewayCacheRulesCreate = requirePatPermission({
+  prisma,
+  permission: "gatewayCacheRules:create",
+});
+const requireGatewayCacheRulesUpdate = requirePatPermission({
+  prisma,
+  permission: "gatewayCacheRules:update",
+});
+const requireGatewayCacheRulesDelete = requirePatPermission({
+  prisma,
+  permission: "gatewayCacheRules:delete",
+});
 
 const logger = createLogger("langwatch:api:gateway-platform");
 
@@ -132,6 +149,44 @@ const providerDtoSchema = z.object({
   disabled_at: z.string().nullable().optional(),
 });
 
+const cacheRuleMatchersSchema = z
+  .object({
+    vk_id: z.string().optional(),
+    vk_tags: z.array(z.string()).optional(),
+    vk_prefix: z.string().optional(),
+    principal_id: z.string().optional(),
+    model: z.string().optional(),
+    request_metadata: z.record(z.string(), z.string()).optional(),
+  })
+  .strict();
+
+const cacheRuleActionSchema = z
+  .object({
+    mode: z.enum(["respect", "force", "disable"]),
+    ttl: z.number().int().min(0).max(86_400).optional(),
+    salt: z.string().max(64).optional(),
+  })
+  .strict();
+
+const cacheRuleDtoSchema = z.object({
+  id: z.string(),
+  organization_id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  priority: z.number().int(),
+  enabled: z.boolean(),
+  matchers: z.record(z.string(), z.unknown()),
+  action: z.object({
+    mode: z.enum(["respect", "force", "disable"]),
+    ttl: z.number().int().optional(),
+    salt: z.string().optional(),
+  }),
+  mode_enum: z.enum(["RESPECT", "FORCE", "DISABLE"]),
+  archived_at: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+
 const errorSchema = z.object({
   error: z.object({
     type: z.string(),
@@ -169,6 +224,24 @@ const updateVirtualKeySchema = z.object({
   description: z.string().nullable().optional(),
   provider_credential_ids: z.array(z.string()).min(1).optional(),
   config: virtualKeyConfigSchema.partial().optional(),
+});
+
+const createCacheRuleSchema = z.object({
+  name: z.string().min(1).max(128),
+  description: z.string().max(512).nullable().optional(),
+  priority: z.number().int().min(0).max(1_000).optional(),
+  enabled: z.boolean().optional(),
+  matchers: cacheRuleMatchersSchema,
+  action: cacheRuleActionSchema,
+});
+
+const updateCacheRuleSchema = z.object({
+  name: z.string().min(1).max(128).optional(),
+  description: z.string().max(512).nullable().optional(),
+  priority: z.number().int().min(0).max(1_000).optional(),
+  enabled: z.boolean().optional(),
+  matchers: cacheRuleMatchersSchema.optional(),
+  action: cacheRuleActionSchema.optional(),
 });
 
 const createBudgetSchema = z.object({
@@ -858,7 +931,254 @@ export const app = new Hono<{ Variables: Variables }>()
       actorUserId: machineActorForProject(project.id),
     });
     return c.json({ provider_credential: { id: row.id, disabled_at: row.disabledAt?.toISOString() ?? null } });
-  });
+  })
+
+  // ── Cache-control rules ────────────────────────────────────────────────
+
+  .get(
+    "/cache-rules",
+    describeRoute({
+      summary: "List cache-control rules",
+      description:
+        "Organization-scoped operator-authored rules. Returned sorted priority DESC; archived rules excluded. Matchers and action are returned verbatim as JSON.",
+      tags: ["Cache Rules"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Cache rules for the organisation",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({ data: z.array(cacheRuleDtoSchema) }),
+              ),
+            },
+          },
+        },
+      },
+    }),
+    requireGatewayCacheRulesView,
+    async (c) => {
+      const project = c.get("project");
+      const organizationId = await orgIdForProject(project.id);
+      const service = GatewayCacheRuleService.create(prisma);
+      const rows = await service.list(organizationId);
+      return c.json({ data: rows.map(toCacheRuleDto) });
+    },
+  )
+
+  .get(
+    "/cache-rules/:id",
+    describeRoute({
+      summary: "Get a cache rule",
+      description: "Returns the rule if it belongs to the caller's organisation; 404 otherwise. Archived rules are NOT returned (use the audit log to inspect removed rules).",
+      tags: ["Cache Rules"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "The rule",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({ cache_rule: cacheRuleDtoSchema }),
+              ),
+            },
+          },
+        },
+      },
+    }),
+    requireGatewayCacheRulesView,
+    async (c) => {
+      const project = c.get("project");
+      const id = c.req.param("id");
+      const organizationId = await orgIdForProject(project.id);
+      const service = GatewayCacheRuleService.create(prisma);
+      const row = await service.get(id, organizationId);
+      if (!row) {
+        return c.json(
+          {
+            error: {
+              type: "not_found",
+              code: "cache_rule_not_found",
+              message: `cache rule ${id} not found`,
+            },
+          },
+          404,
+        );
+      }
+      return c.json({ cache_rule: toCacheRuleDto(row) });
+    },
+  )
+
+  .post(
+    "/cache-rules",
+    describeRoute({
+      summary: "Create a cache rule",
+      description:
+        "Matchers are ANDed across non-null fields; at least one matcher is required. Mode is one of respect/force/disable. TTL is clamped to [0, 86400]. Salt is an optional cache-bust tag (max 64 chars). All writes emit a ChangeEvent so the gateway picks up the new rule within 30 s via its /changes long-poll.",
+      tags: ["Cache Rules"],
+      responses: {
+        ...baseResponses,
+        201: {
+          description: "Created",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({ cache_rule: cacheRuleDtoSchema }),
+              ),
+            },
+          },
+        },
+        400: {
+          description: "Validation error",
+          content: {
+            "application/json": { schema: resolver(errorSchema) },
+          },
+        },
+      },
+    }),
+    requireGatewayCacheRulesCreate,
+    async (c) => {
+      const project = c.get("project");
+      const body = createCacheRuleSchema.safeParse(await c.req.json());
+      if (!body.success) {
+        return c.json(
+          {
+            error: {
+              type: "bad_request",
+              code: "validation_error",
+              message: body.error.message,
+            },
+          },
+          400,
+        );
+      }
+      const organizationId = await orgIdForProject(project.id);
+      const service = GatewayCacheRuleService.create(prisma);
+      const row = await service.create({
+        organizationId,
+        name: body.data.name,
+        description: body.data.description ?? null,
+        priority: body.data.priority,
+        enabled: body.data.enabled,
+        matchers: body.data.matchers,
+        action: body.data.action,
+        actorUserId: machineActorForProject(project.id),
+      });
+      return c.json({ cache_rule: toCacheRuleDto(row) }, 201);
+    },
+  )
+
+  .patch(
+    "/cache-rules/:id",
+    describeRoute({
+      summary: "Update a cache rule",
+      description:
+        "Partial update. `matchers` and `action` REPLACE the stored value when provided (not merged field-by-field). Omitting them leaves the stored value untouched. The rule id + organisation are immutable.",
+      tags: ["Cache Rules"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Updated",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({ cache_rule: cacheRuleDtoSchema }),
+              ),
+            },
+          },
+        },
+      },
+    }),
+    requireGatewayCacheRulesUpdate,
+    async (c) => {
+      const project = c.get("project");
+      const id = c.req.param("id");
+      const body = updateCacheRuleSchema.safeParse(await c.req.json());
+      if (!body.success) {
+        return c.json(
+          {
+            error: {
+              type: "bad_request",
+              code: "validation_error",
+              message: body.error.message,
+            },
+          },
+          400,
+        );
+      }
+      const organizationId = await orgIdForProject(project.id);
+      const service = GatewayCacheRuleService.create(prisma);
+      const row = await service.update({
+        id,
+        organizationId,
+        name: body.data.name,
+        description: body.data.description,
+        priority: body.data.priority,
+        enabled: body.data.enabled,
+        matchers: body.data.matchers,
+        action: body.data.action,
+        actorUserId: machineActorForProject(project.id),
+      });
+      return c.json({ cache_rule: toCacheRuleDto(row) });
+    },
+  )
+
+  .delete(
+    "/cache-rules/:id",
+    describeRoute({
+      summary: "Archive a cache rule",
+      description:
+        "Soft-delete — sets archivedAt. The rule stops matching new requests. Audit log retains before/after snapshots. Returns the archived row.",
+      tags: ["Cache Rules"],
+      responses: {
+        ...baseResponses,
+        200: {
+          description: "Archived",
+          content: {
+            "application/json": {
+              schema: resolver(
+                z.object({ cache_rule: cacheRuleDtoSchema }),
+              ),
+            },
+          },
+        },
+      },
+    }),
+    requireGatewayCacheRulesDelete,
+    async (c) => {
+      const project = c.get("project");
+      const id = c.req.param("id");
+      const organizationId = await orgIdForProject(project.id);
+      const service = GatewayCacheRuleService.create(prisma);
+      const row = await service.archive({
+        id,
+        organizationId,
+        actorUserId: machineActorForProject(project.id),
+      });
+      return c.json({ cache_rule: toCacheRuleDto(row) });
+    },
+  );
+
+function toCacheRuleDto(r: import("@prisma/client").GatewayCacheRule) {
+  return {
+    id: r.id,
+    organization_id: r.organizationId,
+    name: r.name,
+    description: r.description,
+    priority: r.priority,
+    enabled: r.enabled,
+    matchers: r.matchers as Record<string, unknown>,
+    action: r.action as {
+      mode: "respect" | "force" | "disable";
+      ttl?: number;
+      salt?: string;
+    },
+    mode_enum: r.modeEnum,
+    archived_at: r.archivedAt?.toISOString() ?? null,
+    created_at: r.createdAt.toISOString(),
+    updated_at: r.updatedAt.toISOString(),
+  };
+}
 
 function toBudgetDto(b: import("@prisma/client").GatewayBudget) {
   return {
