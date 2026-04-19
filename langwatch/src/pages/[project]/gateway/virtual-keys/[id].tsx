@@ -13,7 +13,16 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ArrowLeft, Pencil, RotateCw, Trash2 } from "lucide-react";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip as RechartsTooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -38,6 +47,20 @@ function VirtualKeyDetailPage() {
 
   const detailQuery = api.virtualKeys.get.useQuery(
     { projectId: project?.id ?? "", id: vkId },
+    { enabled: !!project?.id && !!vkId },
+  );
+  const usageWindow = useMemo(() => {
+    const to = new Date();
+    const from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+    return { fromDate: from.toISOString(), toDate: to.toISOString() };
+  }, []);
+  const usageQuery = api.gatewayUsage.summaryForVirtualKey.useQuery(
+    {
+      projectId: project?.id ?? "",
+      virtualKeyId: vkId,
+      fromDate: usageWindow.fromDate,
+      toDate: usageWindow.toDate,
+    },
     { enabled: !!project?.id && !!vkId },
   );
   const utils = api.useContext();
@@ -215,6 +238,9 @@ function VirtualKeyDetailPage() {
               </Section>
 
               <ConfigurationSection config={vk.config as VkConfig | null} />
+
+              <UsageSection data={usageQuery.data ?? null} />
+
             </VStack>
           )}
         </Box>
@@ -324,6 +350,222 @@ type ChainEntry = {
   slot: string;
   providerType: string;
 };
+
+type VkUsageData = {
+  totalUsd: string;
+  totalRequests: number;
+  blockedRequests: number;
+  avgUsdPerRequest: string;
+  byModel: Array<{ model: string; totalUsd: string; requests: number }>;
+  byDay: Array<{ day: string; totalUsd: string; requests: number }>;
+  recentDebits: Array<{
+    id: string;
+    occurredAt: string;
+    model: string;
+    providerSlot: string | null;
+    amountUsd: string;
+    tokensInput: number;
+    tokensOutput: number;
+    durationMs: number | null;
+    status: string;
+  }>;
+};
+
+function UsageSection({ data }: { data: VkUsageData | null }) {
+  if (!data) {
+    return (
+      <Section title="Usage (last 30 days)">
+        <Spinner size="sm" />
+      </Section>
+    );
+  }
+  if (data.totalRequests === 0) {
+    return (
+      <Section title="Usage (last 30 days)">
+        <Text fontSize="sm" color="fg.muted">
+          No debits in the last 30 days. The gateway writes the ledger
+          after a completed request against this virtual key.
+        </Text>
+      </Section>
+    );
+  }
+  const points = data.byDay.map((p) => ({
+    day: p.day,
+    spendUsd: Number(p.totalUsd),
+    requests: p.requests,
+  }));
+  return (
+    <Section title="Usage (last 30 days)">
+      <VStack align="stretch" gap={4}>
+        <HStack gap={6} wrap="wrap">
+          <VkStat label="Total spend" value={`$${Number(data.totalUsd).toFixed(2)}`} />
+          <VkStat label="Requests" value={data.totalRequests.toLocaleString()} />
+          <VkStat
+            label="Avg $/request"
+            value={formatVkAvgCost(data.avgUsdPerRequest)}
+          />
+          {data.blockedRequests > 0 && (
+            <VkStat
+              label="Blocked"
+              value={data.blockedRequests.toLocaleString()}
+              tone="red"
+            />
+          )}
+        </HStack>
+        {points.length >= 2 && (
+          <Box
+            borderWidth="1px"
+            borderColor="border.subtle"
+            borderRadius="lg"
+            padding={3}
+            height="180px"
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart
+                data={points}
+                margin={{ top: 8, right: 8, bottom: 0, left: 0 }}
+              >
+                <defs>
+                  <linearGradient id="vkSpendFill" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
+                    <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <XAxis
+                  dataKey="day"
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  tickFormatter={(d: string) => d.slice(5)}
+                  minTickGap={24}
+                />
+                <YAxis
+                  tick={{ fontSize: 11, fill: "#64748b" }}
+                  tickFormatter={(v: number) => `$${v.toFixed(2)}`}
+                  width={56}
+                />
+                <RechartsTooltip
+                  formatter={(value, name) =>
+                    name === "spendUsd"
+                      ? [`$${Number(value).toFixed(4)}`, "Spend"]
+                      : [value, name]
+                  }
+                  labelFormatter={(label) => String(label ?? "")}
+                  contentStyle={{ fontSize: 12 }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="spendUsd"
+                  stroke="#f97316"
+                  strokeWidth={2}
+                  fill="url(#vkSpendFill)"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </Box>
+        )}
+        {data.byModel.length > 0 && (
+          <VStack align="stretch" gap={1}>
+            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+              Spend by model
+            </Text>
+            <HStack gap={2} flexWrap="wrap">
+              {data.byModel.map((m) => (
+                <Badge key={m.model} variant="outline" fontSize="2xs">
+                  {m.model} · ${Number(m.totalUsd).toFixed(2)} · {m.requests}
+                </Badge>
+              ))}
+            </HStack>
+          </VStack>
+        )}
+        {data.recentDebits.length > 0 && (
+          <VStack align="stretch" gap={1}>
+            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+              Recent debits
+            </Text>
+            <Table.Root size="sm" variant="line">
+              <Table.Header>
+                <Table.Row>
+                  <Table.ColumnHeader>When</Table.ColumnHeader>
+                  <Table.ColumnHeader>Model</Table.ColumnHeader>
+                  <Table.ColumnHeader>Tokens</Table.ColumnHeader>
+                  <Table.ColumnHeader>Amount</Table.ColumnHeader>
+                  <Table.ColumnHeader>Latency</Table.ColumnHeader>
+                </Table.Row>
+              </Table.Header>
+              <Table.Body>
+                {data.recentDebits.slice(0, 10).map((d) => (
+                  <Table.Row key={d.id}>
+                    <Table.Cell>
+                      <Tooltip content={new Date(d.occurredAt).toLocaleString()}>
+                        <Text fontSize="xs" color="fg.muted">
+                          {formatTimeAgo(new Date(d.occurredAt).getTime())}
+                        </Text>
+                      </Tooltip>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Code fontSize="xs">{d.model}</Code>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text fontSize="xs" color="fg.muted">
+                        {d.tokensInput.toLocaleString()} →{" "}
+                        {d.tokensOutput.toLocaleString()}
+                      </Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text fontSize="xs">{formatVkAmount(d.amountUsd)}</Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text fontSize="xs" color="fg.muted">
+                        {d.durationMs !== null ? `${d.durationMs}ms` : "—"}
+                      </Text>
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Root>
+          </VStack>
+        )}
+      </VStack>
+    </Section>
+  );
+}
+
+function VkStat({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "red";
+}) {
+  return (
+    <VStack align="start" gap={0}>
+      <Text fontSize="2xs" color="fg.muted" textTransform="uppercase">
+        {label}
+      </Text>
+      <Text fontSize="xl" fontWeight="semibold" color={tone === "red" ? "red.600" : undefined}>
+        {value}
+      </Text>
+    </VStack>
+  );
+}
+
+function formatVkAvgCost(raw: string | number): string {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return "—";
+  if (n >= 1) return `$${n.toFixed(4)}`;
+  if (n >= 0.01) return `$${n.toFixed(5)}`;
+  return `$${n.toFixed(6)}`;
+}
+
+function formatVkAmount(raw: string | number): string {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return "—";
+  if (n >= 1) return `$${n.toFixed(4)}`;
+  if (n >= 0.01) return `$${n.toFixed(5)}`;
+  return `$${n.toFixed(6)}`;
+}
 
 type ProviderKey = keyof typeof modelProviderIcons;
 

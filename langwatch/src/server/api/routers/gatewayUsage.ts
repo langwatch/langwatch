@@ -26,4 +26,26 @@ export const gatewayUsageRouter = createTRPCRouter({
         toDate: new Date(input.toDate),
       });
     }),
+
+  summaryForVirtualKey: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        virtualKeyId: z.string(),
+        fromDate: z.string().datetime(),
+        toDate: z.string().datetime(),
+      }),
+    )
+    .use(checkProjectPermission("virtualKeys:view"))
+    .query(async ({ ctx, input }) => {
+      const service = GatewayUsageService.create(ctx.prisma);
+      return service.summaryForVirtualKey(
+        input.projectId,
+        input.virtualKeyId,
+        {
+          fromDate: new Date(input.fromDate),
+          toDate: new Date(input.toDate),
+        },
+      );
+    }),
 });
