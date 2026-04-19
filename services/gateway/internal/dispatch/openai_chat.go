@@ -25,12 +25,21 @@ var errNoMatchingProvider = errors.New("no provider credential for this model")
 // to the incoming `model` field:
 //
 //  1. If `model` is in model_aliases, use the alias target (wins always).
-//  2. Else if `model` is "<provider>/<model>" form, split.
-//  3. Else — try to pick the only provider slot (rare single-provider case).
-//     If multiple provider slots exist and no alias/prefix, error out.
+//  2. Else if `model` is "<provider>/<model>" form, split eagerly — no
+//     fallback retry. If the provider prefix doesn't match any of the
+//     VK's bound providers, return an enriched error listing the
+//     available providers and model form options.
+//  3. Else pick the only provider slot (single-provider VK). Multi-
+//     provider VKs without alias/prefix are ambiguous by design —
+//     return the same enriched error so the user knows to disambiguate
+//     with either `provider/model` or a VK-level alias.
 //
 // Then it checks models_allowed if the list is non-empty. Returns
 // errModelNotAllowed when the effective model is outside the allowlist.
+//
+// Hot-path constraint: single pass over the request string, no branch
+// retries, no exception-driven fallback. Everything is pre-baked on the
+// VK config when the bundle materialises.
 func resolveModel(b *auth.Bundle, requested string) (ResolvedModel, error) {
 	if b == nil || b.Config == nil {
 		return ResolvedModel{}, errors.New("no VK config loaded")
@@ -52,16 +61,23 @@ func resolveModel(b *auth.Bundle, requested string) (ResolvedModel, error) {
 		parts := strings.SplitN(target, "/", 2)
 		providerKey = aliasProvider(parts[0])
 		modelName = parts[1]
-	} else {
-		// No provider prefix — pick the single provider on the VK.
-		if len(cfg.ProviderCreds) == 1 {
-			providerKey = aliasProvider(cfg.ProviderCreds[0].Type)
-			modelName = target
-		} else if len(cfg.ProviderCreds) == 0 {
-			return ResolvedModel{}, errNoMatchingProvider
-		} else {
-			return ResolvedModel{}, fmt.Errorf("model %q is ambiguous: VK has %d provider slots and no alias matched", requested, len(cfg.ProviderCreds))
+		if !providerBoundOnVK(cfg, providerKey) {
+			return ResolvedModel{}, errProviderNotBound{
+				providerGiven: parts[0],
+				bound:         boundProviderTypes(cfg),
+				modelName:     modelName,
+			}
 		}
+	} else {
+		// No provider prefix — for single-provider VKs pick that provider;
+		// for multi-provider VKs default to the primary (first) credential.
+		// Runtime stays permissive per rchaves: ambiguity is rejected at
+		// config/save time (control plane), not on the hot path.
+		if len(cfg.ProviderCreds) == 0 {
+			return ResolvedModel{}, errNoMatchingProvider
+		}
+		providerKey = aliasProvider(cfg.ProviderCreds[0].Type)
+		modelName = target
 	}
 
 	if !modelAllowed(cfg, modelName) {
@@ -69,6 +85,52 @@ func resolveModel(b *auth.Bundle, requested string) (ResolvedModel, error) {
 	}
 	return ResolvedModel{Provider: providerKey, Model: modelName, Source: source}, nil
 }
+
+// providerBoundOnVK returns true when the VK config has a provider credential
+// whose slot type matches the given Bifrost provider key.
+func providerBoundOnVK(cfg *auth.Config, providerKey bfschemas.ModelProvider) bool {
+	for _, pc := range cfg.ProviderCreds {
+		if aliasProvider(pc.Type) == providerKey {
+			return true
+		}
+	}
+	return false
+}
+
+// boundProviderTypes returns the sorted, de-duplicated list of provider
+// slot types bound on the VK. Used only to enrich error messages.
+func boundProviderTypes(cfg *auth.Config) []string {
+	seen := make(map[string]struct{}, len(cfg.ProviderCreds))
+	out := make([]string, 0, len(cfg.ProviderCreds))
+	for _, pc := range cfg.ProviderCreds {
+		if _, ok := seen[pc.Type]; ok {
+			continue
+		}
+		seen[pc.Type] = struct{}{}
+		out = append(out, pc.Type)
+	}
+	return out
+}
+
+// errProviderNotBound — user sent `<prefix>/<model>` but the prefix isn't
+// one of the providers this VK is bound to. The error string names the
+// providers the VK actually has, so the fix is obvious.
+type errProviderNotBound struct {
+	providerGiven string
+	bound         []string
+	modelName     string
+}
+
+func (e errProviderNotBound) Error() string {
+	if len(e.bound) == 0 {
+		return fmt.Sprintf("provider %q is not bound on this virtual key (no providers bound yet)", e.providerGiven)
+	}
+	return fmt.Sprintf(
+		"provider %q is not bound on this virtual key (bound: %s) — try %q, define an alias on the VK, or re-prefix with one of the bound providers",
+		e.providerGiven, strings.Join(e.bound, ", "), e.modelName,
+	)
+}
+
 
 type errModelNotAllowed struct{ model string }
 
@@ -128,4 +190,33 @@ func parseOpenAIChatBody(body []byte) (openaiChatRequest, error) {
 		return req, errors.New("request is missing 'model' field")
 	}
 	return req, nil
+}
+
+// rewriteRequestModel rewrites the top-level "model" field of an OpenAI-
+// compatible JSON body to the provider-native model name the dispatcher
+// resolved. This covers the "openai/gpt-5-mini" → "gpt-5-mini" case
+// where the user used litellm-style prefix notation: resolveModel strips
+// the prefix for routing, but Bifrost forwards RawRequestBody verbatim,
+// so the upstream would otherwise receive the prefix and 400.
+//
+// No-ops when current == target. Returns body unchanged on decode errors
+// (callers already validated with parseOpenAIChatBody upstream).
+func rewriteRequestModel(body []byte, current, target string) []byte {
+	if current == target || target == "" {
+		return body
+	}
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(body, &obj); err != nil {
+		return body
+	}
+	patched, err := json.Marshal(target)
+	if err != nil {
+		return body
+	}
+	obj["model"] = patched
+	out, err := json.Marshal(obj)
+	if err != nil {
+		return body
+	}
+	return out
 }

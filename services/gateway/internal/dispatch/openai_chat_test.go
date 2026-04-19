@@ -57,11 +57,21 @@ func TestResolveModelImplicitSingleProvider(t *testing.T) {
 	}
 }
 
-func TestResolveModelAmbiguousErrors(t *testing.T) {
+func TestResolveModelMultiProviderBarePrefersPrimary(t *testing.T) {
+	// Multi-provider VK with a bare model name routes to the primary
+	// (first) provider at runtime. Config-time save path is expected to
+	// block configurations that would make this routing surprising —
+	// runtime stays permissive per rchaves's sub-µs resolver constraint.
 	b := &auth.Bundle{Config: cfg(nil, nil, pcOpenAI(), pcAnthropic())}
-	_, err := resolveModel(b, "gpt-5-mini") // no alias, no slash, multiple providers
-	if err == nil {
-		t.Fatal("expected ambiguity error")
+	rm, err := resolveModel(b, "gpt-5-mini")
+	if err != nil {
+		t.Fatalf("runtime should not reject bare on multi-provider VK; got %v", err)
+	}
+	if rm.Provider != bfschemas.OpenAI {
+		t.Errorf("want openai (primary), got %+v", rm)
+	}
+	if rm.Model != "gpt-5-mini" {
+		t.Errorf("want model=gpt-5-mini, got %+v", rm)
 	}
 }
 
