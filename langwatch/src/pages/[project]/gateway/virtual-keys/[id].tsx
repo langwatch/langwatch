@@ -224,6 +224,8 @@ function VirtualKeyDetailPage() {
                   </Table.Root>
                 )}
               </Section>
+
+              <ConfigurationSection config={vk.config as VkConfig | null} />
             </VStack>
           )}
         </Box>
@@ -306,6 +308,112 @@ function DetailRow({
       </Text>
       {children}
     </HStack>
+  );
+}
+
+type VkConfig = {
+  modelAliases?: Record<string, string>;
+  modelsAllowed?: string[] | null;
+  cache?: { mode?: "respect" | "force" | "disable"; ttlS?: number };
+  rateLimits?: { rpm?: number | null; tpm?: number | null; rpd?: number | null };
+  blockedPatterns?: {
+    tools?: { deny?: string[]; allow?: string[] | null };
+    mcp?: { deny?: string[]; allow?: string[] | null };
+    urls?: { deny?: string[]; allow?: string[] | null };
+    models?: { deny?: string[]; allow?: string[] | null };
+  };
+  guardrails?: {
+    pre?: unknown[];
+    post?: unknown[];
+    streamChunk?: unknown[];
+  };
+  metadata?: { tags?: string[] };
+};
+
+function ConfigurationSection({ config }: { config: VkConfig | null }) {
+  if (!config) return null;
+
+  const tags = config.metadata?.tags ?? [];
+  const cacheMode = config.cache?.mode ?? "respect";
+  const rpm = config.rateLimits?.rpm ?? null;
+  const rpd = config.rateLimits?.rpd ?? null;
+  const aliasCount = Object.keys(config.modelAliases ?? {}).length;
+
+  const blockedCount = (["tools", "mcp", "urls", "models"] as const).reduce(
+    (sum, dim) => {
+      const bp = config.blockedPatterns?.[dim];
+      return sum + (bp?.deny?.length ?? 0);
+    },
+    0,
+  );
+
+  const guardrailCount =
+    (config.guardrails?.pre?.length ?? 0) +
+    (config.guardrails?.post?.length ?? 0) +
+    (config.guardrails?.streamChunk?.length ?? 0);
+
+  const cacheTone =
+    cacheMode === "force" ? "orange" : cacheMode === "disable" ? "red" : "green";
+
+  return (
+    <Section title="Configuration">
+      {tags.length > 0 && (
+        <DetailRow label="Tags">
+          <HStack gap={1} flexWrap="wrap">
+            {tags.map((t) => (
+              <Badge key={t} variant="subtle" colorPalette="gray" fontSize="2xs">
+                {t}
+              </Badge>
+            ))}
+          </HStack>
+        </DetailRow>
+      )}
+      <DetailRow label="Cache mode">
+        <HStack gap={1}>
+          <Badge colorPalette={cacheTone}>{cacheMode}</Badge>
+          {cacheMode === "force" && (
+            <Text fontSize="xs" color="fg.muted">
+              ttl {config.cache?.ttlS ?? 3600}s
+            </Text>
+          )}
+        </HStack>
+      </DetailRow>
+      <DetailRow label="Rate limits">
+        <HStack gap={1} flexWrap="wrap">
+          <Badge variant="outline" fontSize="2xs">
+            rpm {rpm ?? "∞"}
+          </Badge>
+          <Badge variant="outline" fontSize="2xs">
+            rpd {rpd ?? "∞"}
+          </Badge>
+        </HStack>
+      </DetailRow>
+      <DetailRow label="Model aliases">
+        <Text fontSize="sm" color={aliasCount > 0 ? undefined : "fg.muted"}>
+          {aliasCount > 0 ? `${aliasCount} rewrite${aliasCount > 1 ? "s" : ""}` : "—"}
+        </Text>
+      </DetailRow>
+      <DetailRow label="Blocked patterns">
+        <Text
+          fontSize="sm"
+          color={blockedCount > 0 ? undefined : "fg.muted"}
+        >
+          {blockedCount > 0
+            ? `${blockedCount} deny rule${blockedCount > 1 ? "s" : ""} across tools / mcp / urls / models`
+            : "—"}
+        </Text>
+      </DetailRow>
+      <DetailRow label="Guardrails">
+        <Text
+          fontSize="sm"
+          color={guardrailCount > 0 ? undefined : "fg.muted"}
+        >
+          {guardrailCount > 0
+            ? `${guardrailCount} monitor${guardrailCount > 1 ? "s" : ""} attached (pre/post/stream_chunk)`
+            : "—"}
+        </Text>
+      </DetailRow>
+    </Section>
   );
 }
 
