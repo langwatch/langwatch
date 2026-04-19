@@ -62,20 +62,20 @@ Circuit breaker state is per-replica — no shared Redis dependency. This is int
 |---|---|---|
 | `LW_GATEWAY_OTEL_EXPORTER` | `otlp-http` | One of `otlp-http`, `otlp-grpc`, `none` |
 | `LW_GATEWAY_OTEL_SAMPLING_RATIO` | `1.0` | Head sampler. Gateway-internal spans only — customer traces are passed through untouched |
-| `LW_GATEWAY_OTEL_TENANT_ROUTER` | `enabled` | Per-tenant trace routing — reads the VK bundle's `observability_endpoint` (populated from the control-plane `Project.observabilityEndpoint`) and routes each span to the owning project's OTel pipeline. See [Observability](/ai-gateway/observability) |
-| `GATEWAY_OTEL_DEFAULT_ENDPOINT` | `https://app.langwatch.ai/otel/v1/traces` | Fallback endpoint when `observability_endpoint` is null for a given project. Self-hosted: point this at your in-cluster OTel collector |
+| `LW_GATEWAY_OTEL_TENANT_ROUTER` | `enabled` | Per-tenant trace routing — reads `project_id` from the VK bundle on every resolve and routes each span to the owning project's OTel pipeline. See [Observability](/ai-gateway/observability) |
+| `GATEWAY_OTEL_DEFAULT_ENDPOINT` | `https://app.langwatch.ai/otel/v1/traces` | Endpoint the gateway ships all traces to. LangWatch ingest files each trace under the right project via the `langwatch.project_id` span attribute. Self-hosted: point this at your in-cluster OTel collector |
 
 ### Per-project routing (no customer config)
 
 When `LW_GATEWAY_OTEL_TENANT_ROUTER=enabled` (default), the gateway:
 
-1. Reads each VK bundle's `observability_endpoint` on bundle-resolve and on every config-refresh.
-2. Writes `project_id → endpoint` into an in-memory `ProjectEndpointRegistry`.
-3. On every span export, the `RouterExporter.Resolver` looks up the project id and routes to that endpoint; null/empty values fall back to `GATEWAY_OTEL_DEFAULT_ENDPOINT`.
+1. Reads `project_id` from each resolved VK bundle.
+2. Tags every span on the request's trace with `langwatch.project_id` (plus team, org, principal).
+3. Ships traces to `GATEWAY_OTEL_DEFAULT_ENDPOINT`; LangWatch ingest uses the span attribute to file each trace under the owning project.
 
-Result: customer spans land in the customer's own LangWatch project without any env-var or client-side config. When an operator changes `Project.observabilityEndpoint` in the control plane, the next `/changes` long-poll propagates it ≤ 30 s.
+Result: customer spans land in the customer's own LangWatch project without any env-var or client-side config. There is no operator override — we sell observability, so we route everything to the LangWatch pipeline by design.
 
-Shipped in `5fe8486` (@sergey Lane A iter 4 pt4) wired to `observability_endpoint` on the GatewayConfig bundle (@alexis Lane B iter 6 `6cda472ec`).
+Shipped in `5fe8486` (@sergey Lane A iter 4 pt4) wired to the GatewayConfig bundle (@alexis Lane B iter 6 `6cda472ec`); customer-override surface removed in @alexis Lane B iter 25 / @sergey Lane A iter 34 (`0ed2910fc`).
 
 ## Guardrails + budgets
 

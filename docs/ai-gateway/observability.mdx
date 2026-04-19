@@ -12,16 +12,15 @@ Every request passing through the gateway emits an OTLP trace. The pattern is bo
 
 1. At auth resolution the gateway knows `vk_id → project_id → team_id → org_id → principal_id`.
 2. Every span in the request's trace is tagged with these as `langwatch.*` attributes.
-3. The bundle returned by `/api/internal/gateway/config/:vk_id` carries the project's `observability_endpoint` (null for projects using LangWatch's default, populated for projects with a custom OTel endpoint).
-4. The auth cache's `OnBundleResolved` hook writes `project_id → endpoint` into the gateway's in-memory `ProjectEndpointRegistry` on every resolve / config-refresh.
-5. `RouterExporter.Resolver` looks up the project id on each span export and routes OTLP to that endpoint; null falls back to `GATEWAY_OTEL_DEFAULT_ENDPOINT`.
-6. LangWatch's ingest pipeline stores the trace under the project.
+3. The bundle returned by `/api/internal/gateway/config/:vk_id` carries `project_id` — the gateway uses it to tag every span on the trace.
+4. The gateway ships all traces to a single endpoint (`GATEWAY_OTEL_DEFAULT_ENDPOINT`, default `https://app.langwatch.ai/otel/v1/traces`).
+5. LangWatch's ingest pipeline reads `langwatch.project_id` off each span and stores the trace under the owning project — the attribution happens at ingest, not at export.
 
-So the gateway never emits to a single shared collector — it emits N per-project streams, each authenticated with the owning project's token.
+So the gateway has a single egress path, but attribution is still per-tenant: tenant A's traces file under tenant A's project, tenant B's under tenant B's. There is no customer-facing override — we sell observability, so everything routes to the LangWatch pipeline by design.
 
-## Self-hosted variant
+## Self-hosted
 
-For single-tenant self-hosted deployments, the gateway emits to a single collector endpoint (`$LANGWATCH_OTEL_ENDPOINT`). Project attribution still happens via span attributes; LangWatch's ingest uses those to file the trace in the right project.
+On self-hosted deployments, set `GATEWAY_OTEL_DEFAULT_ENDPOINT` to your in-cluster OTel collector (or LangWatch ingestion endpoint for hybrid setups). Attribution works the same way: per-project span attributes are filed at ingest.
 
 ## Attributes on every gateway span
 

@@ -21,7 +21,7 @@ Compiled across 3 parallel ralph lanes (@ai_gateway_sergey / @ai_gateway_alexis 
 - Anthropic `cache_control` byte-for-byte passthrough (default `respect`) + `X-LangWatch-Cache: disable` override with recursive deep-strip at any nesting depth. `force` / `ttl=NNN` deferred to v1.1 (returns 400 `cache_override_not_implemented`).
 - Per-VK `blocked_patterns` across 4 dimensions (tools / mcp / urls / models), RE2 deny/allow with deny-wins + fail-closed-on-invalid-regex. Enforced pre-body-parse so blocked requests incur zero provider cost.
 - Three guardrail directions — `pre` (block/modify before dispatch), `post` (block/modify/skip-on-content-blocks after upstream), `stream_chunk` (terminate-on-block on visible-text frames, 50 ms per-chunk budget, fail-open by contract). Fail-closed default on pre+post with per-direction VK opt-in (`guardrails.{request,response}_fail_open`). Zero-cost `blocked_by_guardrail` debit on post-block.
-- Per-project OTLP export via `ProjectEndpointRegistry` — customer spans land in the customer's LangWatch project with zero client config.
+- Per-project trace attribution via `langwatch.project_id` span attribute — single egress endpoint (`GATEWAY_OTEL_DEFAULT_ENDPOINT`); LangWatch ingest files each trace under the owning project. No customer override (we sell observability).
 - Redis L2 auth cache with JSON round-trip, 30 s TTL floor, poison-pill `DEL`-on-decode-error (iter 15).
 - Per-org `/changes` long-poll scoping — one goroutine per organization observed, `revByOrg` cursor, lazy `ensureOrgPoller` (iter 17).
 - Streaming usage extraction across all providers; emits `X-LangWatch-Usage-Warning` + span `success_no_usage` when upstream doesn't report.
@@ -65,7 +65,7 @@ Compiled across 3 parallel ralph lanes (@ai_gateway_sergey / @ai_gateway_alexis 
 - VK drawer surfaces every bundle primitive — rate-limits (iter 12), blocked_patterns with 4 rows (iter 14), cache mode with `force` v1.1 badge (iter 14.1), guardrail refs picker with pre/post/stream_chunk direction sections (iter 17) + `requestFailOpen` / `responseFailOpen` toggles.
 - Themable ConfirmDialog on revoke (danger) / rotate (warning) / archive (warning).
 - /gateway/usage stat tiles (24 h / 7 d / 30 d / 90 d windows) reading real `GatewayBudgetLedger` data.
-- /gateway/settings for per-project `observability_endpoint`.
+- (Removed — /gateway/settings customer-override page was deleted in alexis iter 25 / sergey iter 34. Per-tenant trace routing now unconditional via `langwatch.project_id` span attribute + single `GATEWAY_OTEL_DEFAULT_ENDPOINT`.)
 
 ### CLI (`langwatch` npm package)
 
@@ -103,7 +103,7 @@ Compiled across 3 parallel ralph lanes (@ai_gateway_sergey / @ai_gateway_alexis 
 |---|---|---|
 | Data plane auth / HMAC / JWT | **high** — tests green, byte-locked test vector shared between Go + Hono |
 | Fallback + circuit breaker | **high** — tests green, contract-locked behaviour |
-| Per-project OTLP routing | **high** — tests green, observability_endpoint wired through |
+| Per-project trace attribution | **high** — tests green, `langwatch.project_id` span attribute wired at auth-resolve |
 | Streaming usage extraction | **high** — closes a real silent-bypass path, covered by alerts |
 | Streaming fallback | **high** — byte-locked SSE error frame shape test |
 | Live `/budget/check` | **high** — closes the stale-snapshot race, 200 ms fail-open |
