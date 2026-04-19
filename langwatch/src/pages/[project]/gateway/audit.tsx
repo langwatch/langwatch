@@ -354,6 +354,8 @@ function resolveTargetHref(
       return `/${projectSlug}/gateway/budgets/${id}`;
     case "provider_binding":
       return `/${projectSlug}/gateway/providers`;
+    case "cache_rule":
+      return `/${projectSlug}/gateway/cache-rules`;
     default:
       return null;
   }
