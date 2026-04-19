@@ -172,7 +172,70 @@ Feature: Cross-scope ModelProvider reuse
     And callers on that project see the same resolved model as before
 
   # ─────────────────────────────────────────────────────────────────────────
-  # §8. Out of scope for this refactor
+  # §8. Write-path UI — matches @alexis iter 108 Lane B slice
+  # ─────────────────────────────────────────────────────────────────────────
+
+  Scenario: Scope picker on the create drawer gates each radio by permission
+    Given alice has MEMBER on "acme" org, ADMIN on team "acme-platform", ADMIN on project "acme-api"
+    When alice opens Settings → Model Providers → New provider
+    Then the Scope radio group shows three options: Project / Team / Organization
+    And "Organization" is disabled with tooltip "Requires organization admin"
+    And "Team" is enabled and reveals a team dropdown that lists only "acme-platform"
+    And "Project" is enabled and reveals a project dropdown listing projects she can manage
+    And the default selection is "Project" (least-privilege default)
+
+  Scenario: Scope picker on the edit drawer lets an admin widen or narrow scope
+    Given a PROJECT-scoped provider "OpenAI-prod-only" on "acme-api"
+    And alice is an org admin
+    When alice opens the edit drawer and switches Scope from "Project" to "Organization"
+    Then the form surfaces a warning banner explaining widening: "This provider will become available to every project in the org"
+    When alice saves
+    Then the provider row persists with scopeType="ORGANIZATION", scopeId=acme
+    And the projectId column is cleared
+    And all existing bindings still resolve because they reference the provider by id
+
+  Scenario: Narrowing scope surfaces the archive confirmation
+    Given an ORG-scoped provider "OpenAI-wide" with 5 bindings across 5 projects
+    And alice is an org admin
+    When she edits the scope down to "Project" on "acme-api"
+    Then a confirmation modal lists the 4 bindings outside "acme-api" that will be archived
+    And each row shows: project name, binding created-at, last used
+    When alice confirms
+    Then the narrow persists AND 4 GatewayChangeEvents are emitted (kind=PROVIDER_BINDING_ARCHIVED)
+    # UX aligns with §5 semantics — never silent-revoke; always explicit.
+
+  Scenario: Inherited rows render with the "override" affordance
+    Given a TEAM-scoped provider "OpenAI-platform" on team "acme-platform"
+    And no PROJECT-scoped provider override on "acme-api"
+    When alice opens Settings → Model Providers scoped to project "acme-api"
+    Then "OpenAI-platform" is listed with a gray background and a "Team: acme-platform" badge
+    And an "Override at project scope" action is available in the row's kebab menu
+    When she clicks "Override at project scope"
+    Then the create drawer opens with Scope pre-selected to "Project" + scopeId="acme-api"
+    And the form fields are pre-filled from the inherited row so the operator edits, not retypes
+
+  Scenario: Scope badges on the list render transport-agnostic
+    Given providers at ORG "OpenAI-ent", TEAM "OpenAI-plat", PROJECT "OpenAI-prod-only"
+    When alice opens the Settings page filtered to "All providers"
+    Then each row shows a Scope badge:
+      | name             | badge                   |
+      | OpenAI-ent       | "Org: acme"             |
+      | OpenAI-plat      | "Team: acme-platform"   |
+      | OpenAI-prod-only | "Project: acme-api"     |
+    And the badge colour reflects the scope tier (org=blue, team=purple, project=gray)
+
+  Scenario: Gateway binding drawer groups Select options by scope origin
+    Given the setup from "Scope badges on the list render transport-agnostic"
+    When alice opens Gateway → Providers → Bind provider on project "acme-api"
+    Then the provider Select groups options by Scope heading:
+      | group                     | options          |
+      | Organisation (acme)       | OpenAI-ent       |
+      | Team (acme-platform)      | OpenAI-plat      |
+      | This project (acme-api)   | OpenAI-prod-only |
+    And hovering any option shows the scope-ladder rationale (why this row is visible here)
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # §9. Out of scope for this refactor
   # ─────────────────────────────────────────────────────────────────────────
 
   # - Per-provider ACL ("only these teams can bind against OpenAI-ent")

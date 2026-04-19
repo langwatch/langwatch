@@ -212,7 +212,7 @@
                   "platform/rbac",
                   "platform/audit-log",
                   "platform/scim",
-                  "platform/scim-groups"
+                  "platform/model-providers"
                 ]
               }
             ]
