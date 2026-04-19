@@ -41,9 +41,17 @@ export default function SignIn() {
   useEffect(() => {
     if (!publicEnv.data) return;
 
+    // Already-signed-in users hitting /auth/signin should bounce to their
+    // callback (or dashboard) instead of staring at a 'Redirecting to Sign
+    // in...' splash forever (ariana dogfood finding #2).
+    if (session) {
+      const dest = callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : "/";
+      window.location.replace(dest);
+      return;
+    }
+
     if (
       error !== "OAuthAccountNotLinked" &&
-      !session &&
       isSocialProvider
     ) {
       setTimeout(
@@ -61,6 +69,14 @@ export default function SignIn() {
 
   if (!publicEnv.data) {
     return null;
+  }
+
+  // Show a friendlier message if the user is already signed in (the
+  // useEffect above triggers the redirect — this is the transient splash
+  // for ~1 paint frame). Distinguishes the two very different states that
+  // used to render the same "Redirecting to Sign in..." string.
+  if (session) {
+    return <Box padding="12px">Already signed in — redirecting…</Box>;
   }
 
   if (isSocialProvider) {
