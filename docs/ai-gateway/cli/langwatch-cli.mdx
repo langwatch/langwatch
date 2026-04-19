@@ -151,7 +151,7 @@ langwatch gateway-providers disable gpc_01HZ...
 
 Returns the `gpc_*` id for the binding, which you then pass to `langwatch virtual-keys create --provider <gpc_id>`.
 
-`--slot` is free-text (e.g. `primary`, `eu-region`, `canary`). `--rotation-policy` is one of `auto`, `manual`, `external_secret_store`. `--fallback-priority <n>` sets the global fallback ordering (lower = tried first).
+`--slot` is free-text (e.g. `primary`, `eu-region`, `canary`). `--rotation-policy` currently accepts `manual` only in v1; `auto` (scheduled rotation) and `external_secret_store` (HashiCorp Vault / AWS Secrets Manager / GCP Secret Manager) are v1.1 scope. `--fallback-priority <n>` sets the global fallback ordering (lower = tried first).
 
 List output colourises health: green `healthy`, yellow `degraded`, red `unhealthy`.
 
