@@ -58,7 +58,7 @@ export function FieldInfoTooltip({
               >
                 <HStack gap={1} display="inline-flex">
                   <Text as="span">{docLabel}</Text>
-                  <ExternalLink size={10} />
+                  {docHref.startsWith("http") && <ExternalLink size={10} />}
                 </HStack>
               </Link>
             )}
