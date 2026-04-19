@@ -184,6 +184,17 @@ function SettingsForm({
                   <Text>{organization.slug}</Text>
                 )}
               </HorizontalFormControl>
+              <HorizontalFormControl
+                label="Project ID"
+                helper="Use this ID when authenticating with Personal Access Tokens"
+              >
+                <Input
+                  width="full"
+                  disabled
+                  type="text"
+                  value={project.id}
+                />
+              </HorizontalFormControl>
 
               {organization.useCustomS3 && (
                 <HorizontalFormControl
