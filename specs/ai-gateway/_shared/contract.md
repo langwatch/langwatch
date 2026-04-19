@@ -211,6 +211,11 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
   "models_allowed": ["gpt-5-mini", "claude-haiku-*", "gemini-2.5-flash"],
   "cache": { "mode": "respect|force|disable", "ttl_s": 3600 },
   "guardrails": {
+    /* Both fail-open flags default false (fail-closed). Flip to true per
+       direction to pass through on guardrail outages with a warn log
+       + OTel attribute `langwatch.guardrail.fail_open=true`. */
+    "request_fail_open": false,
+    "response_fail_open": false,
     "pre":  [{"id": "guard_01HZ...", "evaluator": "evaluators/pii-check-abc12"}],
     "post": [{"id": "guard_01HZ...", "evaluator": "evaluators/hallucination-check-def34"}],
     "stream_chunk": []
@@ -405,7 +410,8 @@ All errors OpenAI-compatible:
 | `permission_denied` | 403 | Principal lacks RBAC permission for endpoint |
 | `budget_exceeded` | 402 | Any hard-cap budget scope is over limit |
 | `rate_limit_exceeded` | 429 | VK / project / org rate limit hit |
-| `guardrail_blocked` | 403 | Pre- or post-call guardrail returned `block` |
+| `guardrail_blocked` | 403 | Pre- or post-call guardrail returned `block` (post-block also records a zero-cost `blocked_by_guardrail` debit) |
+| `guardrail_upstream_unavailable` | 503 | Guardrail evaluator service unreachable/errored; VK is fail-closed by default. Opt into fail-open per direction via `guardrails.{request,response}_fail_open: true` |
 | `tool_not_allowed` | 403 | Requested tool/MCP matches VK `blocked_patterns.tools` or `blocked_patterns.mcp` (deny-wins, RE2) |
 | `url_not_allowed` | 403 | Any `http(s)://` URL extracted from the request body matches VK `blocked_patterns.urls` deny (or falls outside a non-null `allow`) — extraction is permissive: user messages / tool args / system prompts / anywhere |
 | `cache_override_invalid` | 400 | `X-LangWatch-Cache` header malformed or unknown mode |

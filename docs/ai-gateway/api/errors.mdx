@@ -36,7 +36,8 @@ Errors (like successes) always carry:
 | `permission_denied` | `403` | The principal lacks the RBAC permission required for the endpoint. |
 | `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope (e.g. `Budget exceeded for scope=project window=month`). |
 | `rate_limit_exceeded` | `429` | Gateway-level (per-VK RPM/RPD) or upstream. Gateway-level adds `code = vk_rate_limit_exceeded`, `Retry-After: <seconds>` (RFC 7231), and `X-LangWatch-RateLimit-Dimension: rpm\|rpd` telling you which ceiling fired. TPM is deferred to v1.1. |
-| `guardrail_blocked` | `403` | A pre- or post-call guardrail returned `block`. `message` references which guardrail and why. |
+| `guardrail_blocked` | `403` | A pre- or post-call guardrail returned `block`. `message` references which guardrail and why. Post-block also records a zero-cost `blocked_by_guardrail` debit on the budget ledger. |
+| `guardrail_upstream_unavailable` | `503` | A pre- or post-call guardrail's evaluator service was unreachable or errored, and the VK's `guardrails.{request,response}_fail_open` is `false` (the fail-closed default). Flip to fail-open on the VK to pass through on guardrail outages. |
 | `tool_not_allowed` | `403` | The request references a tool name matched by the VK's `blocked_patterns.tools.deny` (or absent from `allow` if set). |
 | `url_not_allowed` | `403` | Any `http://` / `https://` URL extracted from the request body (user messages, tool-call args, system prompts — anywhere) matched `blocked_patterns.urls.deny` or fell outside a non-null `allow` list. |
 | `cache_override_invalid` | `400` | The `X-LangWatch-Cache` header was malformed or used an unknown mode. |
