@@ -28,7 +28,7 @@ Rotate `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` together — the
 | `LW_GATEWAY_NODE_ID` | auto-generated ULID | Unique id for this replica, surfaced in HMAC `X-LangWatch-Gateway-Node` and in traces |
 | `LW_GATEWAY_READ_TIMEOUT_MS` | `30000` | HTTP server read timeout |
 | `LW_GATEWAY_WRITE_TIMEOUT_MS` | `120000` | HTTP server write timeout (streaming-safe) |
-| `LW_GATEWAY_MAX_BODY_BYTES` | `10485760` (10 MB) | Max request body size — Aider and large-prompt agents need headroom |
+| `LW_GATEWAY_MAX_BODY_BYTES` | `10485760` (10 MB) | Legacy alias retained for backward compat. New deploys should use `GATEWAY_MAX_REQUEST_BODY_BYTES` (see [Edge protection](#edge-protection-iter-23-79b46bf) below) |
 
 ## Auth cache
 
@@ -85,6 +85,14 @@ Shipped in langwatch-saas `5fe8486` (@sergey Lane A iter 4 pt4) wired to `observ
 | `LW_GATEWAY_GUARDRAIL_STREAM_CHUNK_TIMEOUT_MS` | `50` | Per-chunk guardrail timeout during streaming. Fails OPEN (lets chunk through) |
 | `LW_GATEWAY_BUDGET_DEBIT_RETRY_MAX` | `8` | Outbox retries before shelving. Exponential backoff |
 | `LW_GATEWAY_BUDGET_DEBIT_SHELF_BYTES` | `134217728` (128 MB) | On-disk shelf size for unprocessable debits (4xx from control plane) |
+
+## Edge protection (iter 23, `79b46bf`)
+
+| Var | Default | Purpose |
+|---|---|---|
+| `GATEWAY_MAX_REQUEST_BODY_BYTES` | `10485760` (10 MiB) | Maximum request body size. Enforced by `httpx.MaxBodyBytes` middleware wired **before** auth: a 1 GB drive-by scan never pressures the pod memory limit (512 Mi default) or the auth cache. Declared `Content-Length` above the cap gets 413 immediately (socket is not drained). Unknown-length bodies (chunked) hit `*http.MaxBytesError` at the cap. 10 MiB was chosen to fit ~3 MB of prompt text + base64 images + headroom, comfortably under a 512 Mi pod cap. Raise for orgs shipping large base64 image arrays; lower for edge deployments with known small payload ceilings |
+
+The `Security` config struct is intentionally separate from `Upstream` (per-provider budgets) and `Budget` (spend outbox). Edge protection is a distinct concern and its values belong in their own Helm stanza — see [Helm → Security](/ai-gateway/self-hosting/helm#security-iter-23-79b46bf).
 
 ## Startup gate
 
