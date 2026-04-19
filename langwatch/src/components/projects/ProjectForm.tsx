@@ -65,7 +65,13 @@ export function ProjectForm(props: ProjectFormProps): React.ReactElement {
   } = useForm<ProjectFormData>({
     defaultValues: {
       name: "",
-      teamId: "",
+      // Seed from defaultTeamId so the form always submits a valid teamId
+      // even when teams.data is slow to arrive OR the RBAC-filtered teams
+      // response is empty (finding #82: Settings→+ New Project on an org
+      // with a default team but no projects yet was throwing
+      // "Either teamId or newTeamName must be provided" because the
+      // teams.useQuery-driven useEffect below never fired a reset).
+      teamId: defaultTeamId ?? "",
     },
   });
 
