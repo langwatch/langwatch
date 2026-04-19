@@ -6,6 +6,51 @@ sidebarTitle: Overview
 
 The **LangWatch AI Gateway** is a single OpenAI- and Anthropic-compatible endpoint that every application, SDK, or coding CLI in your organization can send LLM traffic to. The gateway applies organisation-wide policy, attribution, budget enforcement, caching, guardrails, and fallback in the path of every request — and emits per-tenant OpenTelemetry traces that land in each project's LangWatch workspace.
 
+<Info>**~11 µs of gateway-side overhead at 5k RPS sustained.** Written in Go with fasthttp + sonic + in-process JWT verification. The hot path sits in front of every LLM call — it has to be close to free.</Info>
+
+## Try it in 30 seconds
+
+Swap your OpenAI `base_url` + `api_key` and you're done:
+
+<CodeGroup>
+
+```bash curl
+curl https://gateway.langwatch.ai/v1/chat/completions \
+  -H "Authorization: Bearer lw_vk_live_..." \
+  -H "Content-Type: application/json" \
+  -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}]}'
+```
+
+```python Python
+from openai import OpenAI
+client = OpenAI(
+    base_url="https://gateway.langwatch.ai/v1",
+    api_key="lw_vk_live_...",
+)
+client.chat.completions.create(
+    model="gpt-5-mini",
+    messages=[{"role": "user", "content": "ping"}],
+)
+```
+
+```typescript TypeScript
+import OpenAI from "openai";
+const client = new OpenAI({
+  baseURL: "https://gateway.langwatch.ai/v1",
+  apiKey: "lw_vk_live_...",
+});
+await client.chat.completions.create({
+  model: "gpt-5-mini",
+  messages: [{ role: "user", content: "ping" }],
+});
+```
+
+</CodeGroup>
+
+See [Quickstart](/ai-gateway/quickstart) for the full five-minute walkthrough — minting a VK, wiring a provider, calling the gateway, inspecting the trace.
+
+Prefer to self-host? See [Self-Hosting → Helm](/ai-gateway/self-hosting/helm). The same image and config shape run in both modes.
+
 ## Why an AI Gateway?
 
 Most teams start with "one app, one provider API key, one language SDK." That stops working the moment a second team, a second app, or a second model provider shows up:
