@@ -135,7 +135,7 @@ function CacheRulesPage() {
           )}
         </PageLayout.Header>
 
-        <Box padding={6}>
+        <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           <Text fontSize="sm" color="fg.muted" mb={4}>
             Rules are evaluated first-match-wins by priority (highest first).
             A per-request <code>X-LangWatch-Cache</code> header always wins
