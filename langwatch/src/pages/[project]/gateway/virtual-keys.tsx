@@ -12,8 +12,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { KeyRound, MoreVertical, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
+import { Eye, KeyRound, MoreVertical, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -44,6 +45,7 @@ type CreatedSecret = {
 
 function VirtualKeysPage() {
   const { project, hasPermission } = useOrganizationTeamProject();
+  const router = useRouter();
   const canCreate = hasPermission("virtualKeys:create");
   const canRotate = hasPermission("virtualKeys:rotate");
   const canRevoke = hasPermission("virtualKeys:update");
@@ -173,7 +175,16 @@ function VirtualKeysPage() {
               </Table.Header>
               <Table.Body>
                 {rows.map((vk) => (
-                  <Table.Row key={vk.id}>
+                  <Table.Row
+                    key={vk.id}
+                    cursor="pointer"
+                    _hover={{ bg: "bg.subtle" }}
+                    onClick={() =>
+                      void router.push(
+                        `/${project?.slug}/gateway/virtual-keys/${vk.id}`,
+                      )
+                    }
+                  >
                     <Table.Cell>
                       <VStack align="start" gap={1}>
                         <Link
@@ -249,7 +260,10 @@ function VirtualKeysPage() {
                         </Text>
                       )}
                     </Table.Cell>
-                    <Table.Cell>
+                    <Table.Cell
+                      onClick={(e) => e.stopPropagation()}
+                      cursor="default"
+                    >
                       {vk.status === "active" && (
                         <Menu.Root>
                           <Menu.Trigger asChild>
@@ -258,6 +272,16 @@ function VirtualKeysPage() {
                             </Button>
                           </Menu.Trigger>
                           <Menu.Content>
+                            <Menu.Item
+                              value="details"
+                              onClick={() =>
+                                void router.push(
+                                  `/${project?.slug}/gateway/virtual-keys/${vk.id}`,
+                                )
+                              }
+                            >
+                              <Eye size={14} /> Details
+                            </Menu.Item>
                             {canUpdate && (
                               <Menu.Item
                                 value="edit"
