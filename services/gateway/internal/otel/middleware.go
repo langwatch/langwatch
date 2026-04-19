@@ -37,6 +37,7 @@ func (p *Provider) StartFromRequest(w http.ResponseWriter, r *http.Request, span
 	ctx, span := p.tracer.Start(parentCtx, spanName,
 		trace.WithSpanKind(trace.SpanKindServer),
 		trace.WithAttributes(
+			attribute.String(AttrOrigin, OriginGateway),
 			attribute.String("http.request.method", r.Method),
 			attribute.String("url.path", r.URL.Path),
 			attribute.String("network.protocol.name", "http"),

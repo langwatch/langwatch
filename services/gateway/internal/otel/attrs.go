@@ -21,6 +21,13 @@ package otel
 // span purely on trace_id (W3C handles that) and filtered per project
 // without touching OTel resource attrs.
 const (
+	// AttrOrigin tags every gateway-emitted span so LangWatch trace
+	// pipeline can sort them into the "Gateway" origin bucket alongside
+	// application / evaluation / simulation / playground. Value is the
+	// constant OriginGateway below; see trace-origin.service.ts on the
+	// control plane for the canonical list.
+	AttrOrigin        = "langwatch.origin"
+	OriginGateway     = "gateway"
 	AttrVirtualKeyID  = "langwatch.virtual_key_id"
 	AttrProjectID     = "langwatch.project_id"
 	AttrTeamID        = "langwatch.team_id"
