@@ -474,6 +474,66 @@
             ]
           },
           {
+            "group": "SDK Integration",
+            "pages": [
+              {
+                "group": "Python",
+                "icon": "python",
+                "pages": [
+                  "ai-gateway/sdks/python"
+                ]
+              },
+              {
+                "group": "TypeScript",
+                "icon": "square-js",
+                "pages": [
+                  "ai-gateway/sdks/typescript"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Coding CLI Integrations",
+            "pages": [
+              "ai-gateway/cli/overview",
+              {
+                "group": "Claude Code",
+                "icon": "/images/logos/anthropic.svg",
+                "pages": [
+                  "ai-gateway/cli/claude-code"
+                ]
+              },
+              {
+                "group": "Codex",
+                "icon": "/images/logos/openai.svg",
+                "pages": [
+                  "ai-gateway/cli/codex"
+                ]
+              },
+              {
+                "group": "OpenCode",
+                "icon": "code",
+                "pages": [
+                  "ai-gateway/cli/opencode"
+                ]
+              },
+              {
+                "group": "Cursor",
+                "icon": "arrow-pointer",
+                "pages": [
+                  "ai-gateway/cli/cursor"
+                ]
+              },
+              {
+                "group": "Aider",
+                "icon": "wand-magic-sparkles",
+                "pages": [
+                  "ai-gateway/cli/aider"
+                ]
+              }
+            ]
+          },
+          {
             "group": "Virtual Keys & Budgets",
             "pages": [
               "ai-gateway/virtual-keys",
@@ -509,25 +569,6 @@
               "ai-gateway/security",
               "ai-gateway/audit",
               "ai-gateway/troubleshooting"
-            ]
-          },
-          {
-            "group": "Coding CLI Integrations",
-            "pages": [
-              "ai-gateway/cli/overview",
-              "ai-gateway/cli/langwatch-cli",
-              "ai-gateway/cli/claude-code",
-              "ai-gateway/cli/codex",
-              "ai-gateway/cli/opencode",
-              "ai-gateway/cli/cursor",
-              "ai-gateway/cli/aider"
-            ]
-          },
-          {
-            "group": "SDK Integration",
-            "pages": [
-              "ai-gateway/sdks/python",
-              "ai-gateway/sdks/typescript"
             ]
           },
           {
@@ -980,6 +1021,10 @@
     {
       "source": "/self-hosting/kubernetes-helm",
       "destination": "/self-hosting/deployment/kubernetes-helm"
+    },
+    {
+      "source": "/ai-gateway/cli/langwatch-cli",
+      "destination": "/integration/cli"
     }
   ]
 }

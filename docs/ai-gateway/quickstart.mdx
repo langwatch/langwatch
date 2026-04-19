@@ -8,6 +8,21 @@ This walkthrough takes you from zero to a traced, budget-gated LLM response.
 
 <Note>You'll need a LangWatch account, an **organisation admin** or **project admin** role, and at least one model provider (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, or Gemini) configured at **Settings → Model Providers**. If you haven't set one up yet, start there — the AI Gateway reuses those credentials.</Note>
 
+<CardGroup cols={2}>
+  <Card title="Python / TypeScript SDK" icon="code" href="/ai-gateway/sdks/python">
+    Drop-in for the OpenAI / Anthropic SDKs — swap `base_url` and `api_key`.
+  </Card>
+  <Card title="Use it from your coding assistant" icon="terminal" href="/ai-gateway/cli/overview">
+    Wire Claude Code, Codex, OpenCode, Cursor, or Aider through the gateway.
+  </Card>
+  <Card title="Core concepts" icon="compass" href="/ai-gateway/concepts">
+    Virtual keys, budgets, provider bindings, cache rules, fallback chains.
+  </Card>
+  <Card title="API reference" icon="book" href="/ai-gateway/api/chat-completions">
+    OpenAI-compatible `/v1/chat/completions` + Anthropic-shape `/v1/messages`.
+  </Card>
+</CardGroup>
+
 ## 1. Create a virtual key
 
 1. Open **AI Gateway → Virtual Keys** in the LangWatch app.

@@ -8,6 +8,21 @@ A **virtual key** (VK) is a LangWatch-issued credential that a downstream client
 
 VKs replace raw provider keys in your applications. The provider keys themselves stay inside LangWatch (configured under **Settings → Model Providers**, the same surface you already use for evaluators and playground) and are never shared with downstream clients.
 
+<CardGroup cols={2}>
+  <Card title="Quickstart — first request in 5 min" icon="rocket" href="/ai-gateway/quickstart">
+    Create a VK, call `/v1/chat/completions`, read correlation headers.
+  </Card>
+  <Card title="Use your VK from Python / TypeScript" icon="code" href="/ai-gateway/sdks/python">
+    OpenAI / Anthropic SDK drop-in — just swap `base_url` and `api_key`.
+  </Card>
+  <Card title="Plug your VK into Claude Code / Codex / Cursor" icon="terminal" href="/ai-gateway/cli/overview">
+    Route coding-assistant traffic through the gateway for budget + audit.
+  </Card>
+  <Card title="Manage VKs from the terminal" icon="keyboard" href="/integration/cli#virtual-keys">
+    `langwatch virtual-keys create | list | rotate | revoke` — scriptable.
+  </Card>
+</CardGroup>
+
 ## Format
 
 `lw_vk_{live|test}_<26-char-ULID>` — 40 characters total.
