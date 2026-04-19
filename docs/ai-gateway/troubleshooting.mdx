@@ -79,7 +79,7 @@ The response payload's `error.message` names the scope that breached — `projec
 
 Check whether the 429 came from your VK's rate-limit config OR from the upstream provider. The response headers tell you:
 
-- `error.code = vk_rate_limit_exceeded` + `X-LangWatch-RateLimit-Dimension: rpm|rpd` + `Retry-After: <seconds>` — gateway-level VK cap. The dimension header names which ceiling fired so dashboards can filter.
+- `error.type = rate_limit_exceeded` + `X-LangWatch-RateLimit-Dimension: rpm|rpd` + `Retry-After: <seconds>` — gateway-level VK cap. The dimension header names which ceiling fired so dashboards can filter.
 - `type: rate_limit_exceeded` WITH `X-LangWatch-Provider: openai` and no `X-LangWatch-RateLimit-Dimension` — upstream quota hit.
 
 Gateway-level enforcement runs **before** guardrails / budget / bifrost so rejected requests don't count upstream tokens. Cross-dimension accounting: if RPM denies, RPD isn't burned (and vice versa) — raising one ceiling doesn't blow through the other.
@@ -282,7 +282,7 @@ kubectl logs -n langwatch "$POD" | grep -E 'dns resolution failed|tcp dial faile
 
 **Fix:**
 - Enable Redis L2 (`REDIS_URL`) — new replicas warm from Redis instead of control plane.
-- Make sure `LW_GATEWAY_AUTH_CACHE_BOOTSTRAP=true` (default) is on.
+- Set `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` on the gateway Deployment to pre-warm the L1 LRU with every active VK on startup (off by default — large orgs opt in; small orgs pay the first-resolve cost per key as traffic naturally warms the cache).
 - Ensure pod readiness probe waits for bootstrap to complete (`/readyz` handles this correctly by default).
 
 ## Debug checklist — common patterns
@@ -297,12 +297,12 @@ When you don't know where to start:
 
 If none of the above narrows it: post in `#ai-gateway-support` with the request id and the full response headers. LangWatch oncall will trace it within an hour.
 
-## `503 guardrail_upstream_unavailable`
+## `503 service_unavailable` — guardrail upstream
 
 **Symptoms:**
-- Requests that previously worked return 503 with `type=guardrail_upstream_unavailable` and `code=guardrail_upstream_unavailable`.
+- Requests that previously worked return 503 with `type=service_unavailable` when a guardrail evaluator fails and the VK is fail-closed (the default).
 - The LangWatch evaluator dashboard shows errors or timeouts on evaluators attached to the VK.
-- Metric `gateway_guardrail_verdicts_total{verdict="upstream_unavailable"}` is climbing.
+- Metric `gateway_guardrail_verdicts_total{verdict="block"}` climbs on the affected direction (request / response) — or `{verdict="fail_open"}` if the VK opts in.
 
 **Root cause:** a `pre` or `post` guardrail's evaluator service (LangEvals, custom webhook evaluator, etc.) is unreachable or erroring, and the VK's fail-open toggle is `false`. The gateway's default is **fail closed** — if policy can't be evaluated, the request is refused rather than passed through ungoverned.
 
@@ -329,11 +329,12 @@ langwatch virtual-keys get <vk_id> --format json | \
 
 See [Guardrails → fail-open vs fail-closed](/ai-gateway/guardrails#fail-open-vs-fail-closed).
 
-## `503 blocked_patterns_invalid_regex`
+## `503 service_unavailable` — blocked_patterns compile failure
 
 **Symptoms:**
-- All requests through one VK return 503 with `code=blocked_patterns_invalid_regex`.
-- Fail-closed error message names the dimension (`tools`, `mcp`, `urls`, `models`) and the list (`deny` / `allow`).
+- All requests through one VK return 503 with `type=service_unavailable`.
+- Gateway WARN log line `blocked_patterns_compile_failed` (dispatcher.go:253) — names the dimension (`tools`, `mcp`, `urls`, `models`) and the broken pattern.
+- Follow-up WARN line `blocked_patterns_broken` on every subsequent request until the policy is fixed.
 
 **Root cause:** one of the RE2 patterns on the VK's `blocked_patterns` failed to compile. The gateway fails **closed** on invalid regex (iter 14) — silent bypass is not an option, because an invalid-regex rule would effectively disable an intended block.
 
