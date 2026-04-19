@@ -110,6 +110,16 @@ otel:
   # Empty disables trace export — spans are still created + finalised
   # in-pod but never flushed.
   endpoint: ""
+  # X-Auth-Token attached to every OTLP export. Required when endpoint
+  # points at /api/otel — the ingest rejects unauthenticated spans with
+  # 401 and the span disappears silently. In multi-tenant production,
+  # prefer the per-project resolver hook over a shared token; this value
+  # is the fallback for single-tenant / dev / air-gapped deploys.
+  # Provide via existingSecretName in production; inline authToken is
+  # accepted for dev only.
+  authExistingSecretName: ""
+  authSecretKey: token
+  authToken: ""
   batchTimeout: 5s
   maxQueueSize: 8192
 
