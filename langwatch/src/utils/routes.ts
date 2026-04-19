@@ -211,7 +211,7 @@ export const projectRoutes = {
   },
   gateway_cache_rules: {
     path: "/[project]/gateway/cache-rules",
-    title: "Cache control",
+    title: "Cache Rules",
     parent: "gateway",
   },
   ops: {
