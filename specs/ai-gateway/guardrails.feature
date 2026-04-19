@@ -11,7 +11,7 @@ Feature: Guardrails wrap every gateway dispatch
       | direction     | guardrail       | on_block    |
       | request       | pii-detector    | block       |
       | response      | hallucination   | flag (warn) |
-      | stream_chunk  | profanity       | modify      |
+      | stream_chunk  | profanity       | block       |
 
   Rule: Request-direction guardrails run pre-dispatch
 
@@ -136,3 +136,61 @@ Feature: Guardrails wrap every gateway dispatch
       Then the gateway dispatches anyway
       And a warning span attribute `langwatch.guardrail.fail_open=true` is set
       And the trace clearly shows the guardrail was skipped
+
+  Rule: stream_chunk guardrails terminate (not modify) on block in v1
+
+    @integration
+    Scenario: only chunks with visible delta text invoke the guardrail
+      Given a VK with a stream_chunk guardrail attached
+      When the upstream emits a role-only frame, a tool-call delta, and a terminal usage frame
+      Then none of these frames invoke the guardrail service
+      And the OTel trace records `langwatch.guardrail.stream_chunk.skipped=no_text`
+      # ~95% of stream frames carry no visible delta; skipping them keeps stream
+      # latency at near-zero overhead.
+
+    @integration
+    Scenario: visible delta text triggers the stream_chunk guardrail with a 50ms budget
+      Given a VK with a stream_chunk guardrail attached
+      When the upstream emits a visible assistant text delta
+      Then the guardrail is called with that chunk's text
+      And the call is bounded to 50ms per chunk
+
+    @integration
+    Scenario: stream_chunk block emits the byte-locked guardrail terminator
+      Given the stream_chunk guardrail returns verdict=block with reason "pii_detected"
+      When a visible delta chunk is being emitted
+      Then the gateway writes exactly:
+        """
+        event: error
+        data: {"error":{"type":"guardrail_blocked","code":"stream_chunk_blocked","message":"pii_detected","param":null}}
+
+        """
+      And the stream channel is closed
+      And subsequent upstream chunks are discarded
+      And `gateway_guardrail_verdicts_total{direction=stream_chunk,verdict=block}` increments
+
+    @integration
+    Scenario: stream_chunk timeout falls open (does NOT block the user's stream)
+      Given the stream_chunk guardrail exceeds the 50ms budget
+      When a visible delta chunk is being emitted
+      Then the chunk is emitted to the client unchanged
+      And the trace records `langwatch.guardrail.stream_chunk_fail_open=timeout`
+      And `gateway_guardrail_verdicts_total{direction=stream_chunk,verdict=fail_open}` increments
+      # Failing the user's stream on a slow policy service is worse than
+      # occasional pass-through — but the metric surfaces degraded services.
+
+    @integration
+    Scenario: stream_chunk upstream error falls open (same policy as timeout)
+      Given POST /internal/gateway/guardrail/check returns 500 during a chunk check
+      When a visible delta chunk is being emitted
+      Then the chunk is emitted to the client unchanged
+      And the trace records `langwatch.guardrail.stream_chunk_fail_open=upstream_error`
+
+    @integration
+    Scenario: stream_chunk modify verdict is treated as block in v1
+      Given the stream_chunk guardrail returns verdict=modify with edited_text
+      When a visible delta chunk is being emitted
+      Then the gateway emits the terminal guardrail_blocked error frame
+      And the edited_text is NOT written to the stream
+      # Provider-shape-specific chunk rewriting is deferred to a future iter.
+      # "redact on stream" in v1 = block + client-retry.

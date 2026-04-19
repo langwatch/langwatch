@@ -42,19 +42,25 @@ For VKs where an unavailable guardrail should *not* block (e.g. best-effort reda
 
 `pre` guardrails use the same fail-closed default and the same VK opt-out (`guardrails.request_fail_open`).
 
-### `stream_chunk` — redact/terminate per-chunk
+### `stream_chunk` — terminate per-chunk on visible deltas
 
-Invoked on **each SSE chunk** before the gateway emits it to the client. Most aggressive mode; enables real-time redaction.
+Invoked on **each SSE chunk with visible delta text** before the gateway emits it to the client. Chunks without text — role-only frames (`{"delta":{"role":"assistant"}}`), tool-call frames, terminal usage frames — **skip the guardrail call entirely**. In practice this keeps ~95% of stream frames at pass-through cost.
 
 Decisions:
 
 - `allow` — emit chunk.
-- `block` — terminate the stream with SSE `error`. Subsequent chunks are discarded.
-- `modify` — emit the modified chunk instead.
+- `block` — terminate the stream with a terminal `event: error`:
+  ```
+  event: error
+  data: {"error":{"type":"guardrail_blocked","code":"stream_chunk_blocked","message":"<reason>"}}
 
-Latency budget: **≤50 ms per chunk**. If the evaluator doesn't respond in time, the gateway passes through with an OTel warning (`langwatch.guardrail.stream_chunk_timeout`). Never block the user on a slow guardrail.
+  ```
+  The channel is closed immediately after; subsequent upstream chunks are discarded. Same wire shape as a provider-failure terminator, distinguishable by `error.code` (`stream_chunk_blocked` vs `provider_error`). See [Streaming → Mid-stream error shapes](/ai-gateway/streaming#terminal-error-shapes).
+- `modify` — **not implemented in v1.** Chunk-level content rewriting is provider-shape-specific (OpenAI delta JSON vs Anthropic SSE events have different shapes). For v1, "redact on stream" = block and let the client retry without the offending input. A future iter may add provider-aware chunk rewriting once a real customer asks.
 
-Use cases: real-time PII redaction (credit card numbers, emails, phone numbers), blocking specific tokens from reaching the client, enforcing length limits.
+Latency budget: **≤50 ms per chunk**. If the evaluator doesn't respond in time, or the upstream guardrail errors, the gateway **fails open** — the chunk passes through with an OTel warning (`langwatch.guardrail.stream_chunk_fail_open=<reason>`) and a bump to `gateway_guardrail_verdicts_total{direction=stream_chunk,verdict=fail_open}`. This is an explicit contract decision: blocking the user's stream on a slow policy service is worse than occasional pass-through — but the metric makes slow/flaky services visible before they become reliability problems.
+
+Use cases: real-time PII termination (credit card numbers, emails, phone numbers) where the correct behaviour on detection is "stop sending and the user retries." For best-effort redaction that doesn't interrupt the stream, use `post` on the reassembled response instead.
 
 ## Attaching guardrails to a VK
 
