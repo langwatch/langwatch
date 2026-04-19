@@ -1,0 +1,104 @@
+---
+title: Provider bindings
+description: Bind the model providers you already have in Settings to the gateway so virtual keys can dispatch traffic through them.
+sidebarTitle: Provider bindings
+---
+
+A **provider binding** is a gateway-specific wrapper around a model provider you've already configured in **Settings → Model Providers**. The LangWatch dashboard already knows how to talk to OpenAI / Anthropic / Gemini / Azure / Bedrock / Vertex — the gateway binding layers gateway-only settings on top of that existing credential:
+
+- Which **slot** the binding fills in VK fallback chains
+- Per-binding **rate limits** (RPM / RPD) applied before provider dispatch
+- **Fallback priority** for selecting this binding when a VK has multiple bindings eligible
+- (Future) **Rotation policy** for credential lifecycle
+
+No new API keys here — the provider's real credential stays in **Settings → Model Providers**, encrypted at rest with per-organization KMS.
+
+## Binding a provider to the gateway
+
+1. Open **/gateway/providers** → **Bind provider**.
+2. Select one of the **enabled** model providers from the dropdown. Providers not yet enabled appear in [Settings → Model Providers](/integration/rest-api) — enable them there first.
+3. Fill in the gateway-specific fields below.
+4. Click **Bind provider**. The binding shows up in the VK "Provider fallback chain" drawer for every VK in the project.
+
+## Fields
+
+### Model provider <a id="model-provider"></a>
+
+The underlying provider configured in Settings. One binding per provider per project. If a provider is already bound the dropdown omits it (re-edit via the row).
+
+### Slot <a id="slot"></a>
+
+Free-form label used by the VK fallback chain to refer to this binding. Examples: `primary`, `fallback-1`, `high-volume-openai`. Defaults to `primary`.
+
+The slot is **cosmetic** — the gateway dispatches based on the VK fallback chain order, not the slot name. But slot names make the fallback chain human-readable ("primary → fallback-1 → fallback-2") rather than showing opaque IDs.
+
+### Rotation policy <a id="rotation-policy"></a>
+
+Tracks how the underlying credential rotates. **v1 supports `MANUAL` only** — the operator rotates the credential in Settings → Model Providers and the gateway picks up the new value on the next `/changes` long-poll (≤ 30 s).
+
+<Info>Automatic rotation (on schedule) and external-secret-store integration (HashiCorp Vault, AWS Secrets Manager, etc.) are tracked as v1.1 features. Until they land, the dropdown offers `MANUAL` only.</Info>
+
+### Rate limit — RPM <a id="rate-limit-rpm"></a>
+
+**R**equests **p**er **m**inute that the gateway will dispatch through this binding before returning `429 rate_limit_exceeded`. Applied at the binding level; independent of any VK-level rate limit.
+
+Use this to protect a single upstream account from an over-eager VK. The gateway token-bucket enforces with cross-dimension accounting so you can combine per-binding + per-VK limits without double-counting.
+
+Leave blank to inherit the upstream provider's limit (i.e., no gateway-side throttle).
+
+See [Rate limits](/ai-gateway/rate-limits) for the full dimension model.
+
+### Rate limit — TPM <a id="rate-limit-tpm"></a>
+
+**T**okens **p**er **m**inute. Same shape as RPM but counts token usage instead of request count.
+
+<Warning>TPM is a v1.1 feature — the streaming-usage accumulator needs to be wired into the limiter before this can be enforced. In v1, a TPM limit is stored but not enforced; requests are accepted and you get the expected trace + budget accounting.</Warning>
+
+### Rate limit — RPD <a id="rate-limit-rpd"></a>
+
+**R**equests **p**er **d**ay. Rolling 24-hour window, resets at first request after the window ticks. Useful for capping long-tail daily spend.
+
+Only present on the Edit drawer because RPD doesn't make sense for the initial bind (you usually set it after observing traffic).
+
+### Fallback priority (global) <a id="fallback-priority-global"></a>
+
+A tiebreaker used when **multiple bindings** are simultaneously eligible for a VK's fallback chain. Lower number = higher priority. Leave blank to fall back to the VK's explicit ordering (normal case).
+
+Use when you want a single binding to be the "always-first fallback" across every VK in the project, without editing each VK's chain. Example: `fallback-priority-global: 10` on a cheap secondary makes that binding the first fallback for every VK that doesn't override.
+
+## After binding
+
+The new binding shows up in:
+
+- **/gateway/providers** list (the page you're on)
+- **VK fallback chain** dropdown (add/remove/reorder in the VK drawer)
+- **/gateway/usage** aggregation (filter by provider slot or provider name)
+- Gateway traces as `langwatch.provider = <provider_name>` + `langwatch.provider_slot = <slot>`
+
+## Disabling a binding
+
+**Settings → Disable** (soft disable, via the row menu):
+
+- **Existing VKs that reference this binding continue to resolve** — the binding remains valid on the hot path for VKs that haven't been edited.
+- **New VKs cannot select this binding** in the create drawer.
+- **Existing bindings can be re-edited** to change slot / rate limits without undoing the disable.
+
+Disable is idempotent. To delete, use the Archive flow which hard-removes from the VK fallback chain on next bundle refresh.
+
+## Permissions
+
+| Action | Permission |
+|---|---|
+| View bindings | `gatewayProviders:view` |
+| Bind a new provider | `gatewayProviders:manage` |
+| Edit an existing binding | `gatewayProviders:update` |
+| Disable / archive | `gatewayProviders:manage` |
+
+See [RBAC](/ai-gateway/rbac) for the full permission matrix.
+
+## See also
+
+- [Virtual keys](/ai-gateway/virtual-keys) — configure fallback chains referencing these bindings.
+- [Rate limits](/ai-gateway/rate-limits) — RPM / RPD / (v1.1) TPM dimensions explained.
+- [Concepts → Fallback chain](/ai-gateway/concepts#fallback-chain) — why and when the gateway switches providers.
+- [Self-hosting → KMS](/ai-gateway/security#upstream-provider-credentials) — how provider credentials are protected at rest.
