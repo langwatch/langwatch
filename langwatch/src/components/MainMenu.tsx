@@ -240,14 +240,81 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
-            {hasPermission("virtualKeys:view") && (
-              <PageMenuLink
-                path={projectRoutes.gateway.path}
+            {hasPermission("virtualKeys:view") && project && (
+              <CollapsibleMenuGroup
                 icon={featureIcons.gateway.icon}
                 label={projectRoutes.gateway.title}
                 project={project}
-                isActive={router.pathname.includes("/gateway")}
                 showLabel={showExpanded}
+                children={[
+                  {
+                    icon: featureIcons.gateway.icon,
+                    label: projectRoutes.gateway_virtual_keys.title,
+                    href: projectRoutes.gateway_virtual_keys.path.replace(
+                      "[project]",
+                      project.slug,
+                    ),
+                    isActive: router.pathname.includes(
+                      "/gateway/virtual-keys",
+                    ),
+                  },
+                  ...(hasPermission("gatewayBudgets:view")
+                    ? [
+                        {
+                          icon: featureIcons.gateway.icon,
+                          label: projectRoutes.gateway_budgets.title,
+                          href: projectRoutes.gateway_budgets.path.replace(
+                            "[project]",
+                            project.slug,
+                          ),
+                          isActive: router.pathname.includes(
+                            "/gateway/budgets",
+                          ),
+                        },
+                      ]
+                    : []),
+                  ...(hasPermission("gatewayProviders:view")
+                    ? [
+                        {
+                          icon: featureIcons.gateway.icon,
+                          label: projectRoutes.gateway_providers.title,
+                          href: projectRoutes.gateway_providers.path.replace(
+                            "[project]",
+                            project.slug,
+                          ),
+                          isActive: router.pathname.includes(
+                            "/gateway/providers",
+                          ),
+                        },
+                      ]
+                    : []),
+                  ...(hasPermission("gatewayUsage:view")
+                    ? [
+                        {
+                          icon: featureIcons.gateway.icon,
+                          label: projectRoutes.gateway_usage.title,
+                          href: projectRoutes.gateway_usage.path.replace(
+                            "[project]",
+                            project.slug,
+                          ),
+                          isActive: router.pathname.endsWith("/gateway/usage"),
+                        },
+                      ]
+                    : []),
+                  ...(hasPermission("gatewayLogs:view")
+                    ? [
+                        {
+                          icon: featureIcons.gateway.icon,
+                          label: projectRoutes.gateway_audit.title,
+                          href: projectRoutes.gateway_audit.path.replace(
+                            "[project]",
+                            project.slug,
+                          ),
+                          isActive: router.pathname.endsWith("/gateway/audit"),
+                        },
+                      ]
+                    : []),
+                ]}
               />
             )}
 
