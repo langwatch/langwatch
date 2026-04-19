@@ -46,6 +46,8 @@ When debugging locally, `pnpm dev` may tee output to `langwatch/server.log` — 
 langwatch/           # Next.js app (main product)
 langwatch_nlp/       # Python NLP service
 langwatch_server/    # Python server
+services/gateway/    # Go AI Gateway data plane (:5563)
+charts/gateway/      # Helm sub-chart for the gateway
 python-sdk/          # Python SDK
 typescript-sdk/      # TypeScript SDK
 specs/               # BDD feature specs
