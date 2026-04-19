@@ -221,6 +221,10 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/[project]/gateway/audit")),
   },
   {
+    path: "/:project/gateway/cache-rules",
+    ...page(() => import("./pages/[project]/gateway/cache-rules")),
+  },
+  {
     path: "/:project/datasets",
     ...page(() => import("./pages/[project]/datasets")),
   },

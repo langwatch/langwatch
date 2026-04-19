@@ -11,6 +11,7 @@ import {
   LineChart,
   Plug,
   Shield,
+  Zap,
 } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
@@ -296,6 +297,21 @@ export const MainMenu = React.memo(function MainMenu({
                           ),
                           isActive: router.pathname.includes(
                             "/gateway/providers",
+                          ),
+                        },
+                      ]
+                    : []),
+                  ...(hasPermission("gatewayCacheRules:view")
+                    ? [
+                        {
+                          icon: Zap,
+                          label: projectRoutes.gateway_cache_rules.title,
+                          href: projectRoutes.gateway_cache_rules.path.replace(
+                            "[project]",
+                            project.slug,
+                          ),
+                          isActive: router.pathname.includes(
+                            "/gateway/cache-rules",
                           ),
                         },
                       ]
