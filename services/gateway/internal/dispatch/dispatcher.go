@@ -727,6 +727,11 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "model_resolve_failed", err.Error(), "model")
 		return
 	}
+	// Rewrite the body's model field to the provider-native name so Bifrost's
+	// RawRequestBody passthrough sends "gpt-5-mini" upstream instead of
+	// "openai/gpt-5-mini". Applies for alias/explicit_slash sources where
+	// the bare name differs from the request's model string.
+	body = rewriteRequestModel(body, parsed.Model, resolved.Model)
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrModel, resolved.Model)
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrProvider, string(resolved.Provider))
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrModelSource, string(resolved.Source))
