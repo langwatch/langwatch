@@ -86,9 +86,11 @@ This matters for security: don't grant a model via aliases that you wouldn't gra
 
 ## Discovery via `/v1/models`
 
-`GET /v1/models` returns every alias name + every model in `models_allowed` (or every model the VK's providers support, if no allowlist). The response looks like a standard OpenAI `/v1/models` list so SDK-driven pickers work.
+`GET /v1/models` returns three deduplicated + stable-sorted groups: **(1) alias names**, **(2) `models_allowed` entries (globs included, shown verbatim)**, and **(3) provider-type shortcuts** (`openai/*`, `anthropic/*`, `bedrock/*`, `azure/*`, `vertex/*`, `gemini/*` — one per provider bound on the VK). CLIs that auto-configure completion (Codex, Cursor, `openai models list`) consume the whole list uniformly.
 
-Each entry carries a `owned_by` field indicating the resolved provider, so UIs can render "gpt-4o (Azure)" vs "gpt-4o (OpenAI)" when both are present across different VKs.
+Each entry carries an `owned_by` field indicating the resolved provider, so UIs can render "gpt-4o (Azure)" vs "gpt-4o (OpenAI)" when both are present across different VKs.
+
+See [API: `GET /v1/models`](/ai-gateway/api/models) for the full response shape.
 
 ## Trace attributes
 

@@ -4,7 +4,7 @@ description: List the models a virtual key can access through the LangWatch AI G
 sidebarTitle: Models
 ---
 
-Returns the effective model list for the virtual key presented on the request: the union of `model_aliases` keys + every model the VK's providers expose, filtered by `models_allowed` if set.
+Returns the effective model list for the virtual key presented on the request. Entries are deduplicated and stable-sorted across **three groups** — OpenAI-compatible tools (Cursor, Codex, `openai models list`, etc.) treat the whole list uniformly.
 
 ## Request
 
@@ -21,29 +21,23 @@ OpenAI-shape `list` object:
 {
   "object": "list",
   "data": [
-    {
-      "id":       "gpt-5-mini",
-      "object":   "model",
-      "created":  1712000000,
-      "owned_by": "openai"
-    },
-    {
-      "id":       "claude-haiku",
-      "object":   "model",
-      "created":  1712000000,
-      "owned_by": "anthropic"
-    },
-    {
-      "id":       "gpt-4o",
-      "object":   "model",
-      "created":  1712000000,
-      "owned_by": "azure_openai"
-    }
+    { "id": "claude",             "object": "model", "created": 1712000000, "owned_by": "anthropic"    },
+    { "id": "gpt-4o",             "object": "model", "created": 1712000000, "owned_by": "azure_openai" },
+    { "id": "gpt-5-mini",         "object": "model", "created": 1712000000, "owned_by": "openai"       },
+    { "id": "claude-haiku-*",     "object": "model", "created": 1712000000, "owned_by": "anthropic"    },
+    { "id": "anthropic/*",        "object": "model", "created": 1712000000, "owned_by": "anthropic"    },
+    { "id": "openai/*",           "object": "model", "created": 1712000000, "owned_by": "openai"       }
   ]
 }
 ```
 
-`owned_by` reflects the **resolved** provider after the VK's `model_aliases` are applied — not the raw provider at the upstream. This lets UIs render "gpt-4o (Azure)" when the VK routes gpt-4o to Azure.
+### The three groups
+
+1. **Aliases** from the VK's `model_aliases` map — e.g. `claude` resolves to `anthropic/claude-haiku-4-5-20251001`, `gpt-4o` routes to the VK's Azure deployment. `owned_by` reflects the **resolved** provider so UIs can render "gpt-4o (Azure)" correctly.
+2. **`models_allowed` entries** shown verbatim — including globs like `claude-haiku-*`. Clients that support pattern matching (most) pass these through; simpler pickers render them for the human to edit.
+3. **Provider-type shortcuts** — one entry per provider bound on the VK (`openai/*`, `anthropic/*`, `bedrock/*`, `azure/*`, `vertex/*`, `gemini/*`). Tools like Cursor that let the user type the exact model id can pick a concrete model under the shortcut (e.g. `openai/gpt-5-mini`) without waiting for the alias table to be updated. See [Model Aliases → Aliases always win over explicit form](/ai-gateway/model-aliases#aliases-always-win-over-explicit-form--if-both-are-defined) for how the `provider/model` form interacts with aliases.
+
+<Note>The list is deliberately permissive — it covers everything the VK could plausibly route, not a strict enumeration. `models_allowed` globs and provider shortcuts may not expand to real upstream models until you send a real request. The gateway's per-request model resolution remains the source of truth for "will this actually route?"</Note>
 
 ## Permissions
 
@@ -54,6 +48,7 @@ Only requires a valid VK; no extra permission. The returned list is scoped to wh
 - **Model pickers** in UIs that speak the OpenAI API — they call `/v1/models` and render the list.
 - **Pre-flight check** in CI: assert the CI's VK has access to the models your tests depend on.
 - **Debugging aliases**: see what each VK exposes by hitting this with its token.
+- **CLI probes**: coding tools like Codex and Cursor call `/v1/models` on startup to auto-configure completion and model picking. The provider shortcuts (`openai/*`, `anthropic/*`) mean the user can type `openai/gpt-5-mini` directly in the picker without first adding an alias server-side. See [Coding CLI integrations](/ai-gateway/cli/codex).
 
 ## Errors
 
