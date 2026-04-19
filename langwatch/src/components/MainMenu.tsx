@@ -257,6 +257,7 @@ export const MainMenu = React.memo(function MainMenu({
                 label={projectRoutes.gateway.title}
                 project={project}
                 showLabel={showExpanded}
+                defaultExpanded
                 children={[
                   {
                     icon: KeyRound,
@@ -309,19 +310,6 @@ export const MainMenu = React.memo(function MainMenu({
                             project.slug,
                           ),
                           isActive: router.pathname.endsWith("/gateway/usage"),
-                        },
-                      ]
-                    : []),
-                  ...(hasPermission("gatewayLogs:view")
-                    ? [
-                        {
-                          icon: FileClock,
-                          label: projectRoutes.gateway_audit.title,
-                          href: projectRoutes.gateway_audit.path.replace(
-                            "[project]",
-                            project.slug,
-                          ),
-                          isActive: router.pathname.endsWith("/gateway/audit"),
                         },
                       ]
                     : []),
