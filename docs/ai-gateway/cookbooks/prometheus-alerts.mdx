@@ -96,6 +96,46 @@ groups:
             near-limit customers may be over-consuming. Check control-plane
             health + gateway_budget_debit_outbox_dropped_total rate.
 
+      # --- Iter 21 outbox leading-indicator rules
+      # Fill-pct (depth/capacity) leads the absolute-depth rule above and
+      # catches pods with different capacities consistently.
+      - alert: BudgetOutboxFillPctHigh
+        expr: |
+          max by (pod) (gateway_budget_debit_outbox_depth)
+            / max by (pod) (gateway_budget_debit_outbox_capacity) > 0.5
+        for: 5m
+        labels: { severity: warn, team: ai-platform }
+        annotations:
+          summary: "Outbox fill-pct > 50% on {{ $labels.pod }} for 5m"
+          description: |
+            Approaching capacity. See production runbook Recipe 6 — normal
+            bursts self-heal; sustained climb is usually flush failure.
+
+      # Flush-failure rate leads depth climb — catches slow/unreachable
+      # control plane BEFORE events back up enough to alert on depth.
+      - alert: BudgetOutboxFlushFailures
+        expr: rate(gateway_budget_debit_outbox_flush_failures_total[5m]) > 0
+        for: 5m
+        labels: { severity: warn, team: ai-platform }
+        annotations:
+          summary: "Outbox flush failures for 5m on {{ $labels.pod }}"
+          description: |
+            Control plane is slow/unreachable; debits are re-enqueued and
+            safe, but latency to reconcile is growing. Investigate control-
+            plane /budget/debit latency before this turns into a depth alert.
+
+      # 4xx drops = silent data loss. Any non-zero rate is immediately
+      # actionable (signing drift / payload drift / control-plane bug).
+      - alert: BudgetOutbox4xxDrops
+        expr: increase(gateway_budget_debit_outbox_4xx_drops_total[15m]) > 0
+        labels: { severity: page, team: ai-platform }
+        annotations:
+          summary: "Outbox debits are being terminally dropped with 4xx"
+          description: |
+            Silent data loss. Debits are being permanently rejected by the
+            control plane. Most common: LW_GATEWAY_INTERNAL_SECRET drift
+            after rotation. See production runbook Recipe 6.
+
       - alert: BudgetCheckLiveFailRate
         expr: |
           sum(rate(gateway_budget_check_live_total{outcome="transport_error"}[5m]))

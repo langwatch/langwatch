@@ -145,7 +145,8 @@ Iter 12: route-registration fix unblocking UI dogfood. Iter 13: V1-GA-READINESS.
 | 17.16 | `9cb1cab5d` | PR-DESCRIPTION.md — sergey iter 16 credit |
 | 17.17 | `ef7e43935` | sergey iter 17 (per-org /changes) + iter 18 (NetworkPolicy) + iter 19 (gateway CI gate) — scaling.mdx §Per-org /changes, helm.mdx §NetworkPolicy + §Chart and data-plane CI, security.mdx self-hosted note, config.mdx LW_GATEWAY_AUTH_CACHE_CHANGES_POLL_SECONDS annotation |
 | 18 | `7b62b962f` | semantic-caching.feature (new v1.1 roadmap spec, 318 lines) — golden/safety/headers/observability/lifecycle/compat/migration/out-of-scope sections covering the remaining Portkey competitive gap on the caching axis |
-| 19 | *(this commit)* | sergey iter 20 (startup netcheck) — helm.mdx §Startup network check, config.mdx §Startup gate env table, troubleshooting.mdx new "Pod never becomes ready after a deploy" entry distinguishing DNS vs TCP vs firewall error classes |
+| 19 | `2571d6767` | sergey iter 20 (startup netcheck) — helm.mdx §Startup network check, config.mdx §Startup gate env table, troubleshooting.mdx new "Pod never becomes ready after a deploy" entry distinguishing DNS vs TCP vs firewall error classes |
+| 20 | *(this commit)* | NEW cookbooks/grafana-dashboard.mdx (8-row importable Grafana JSON) + sergey iter 21 outbox metrics docs — production-runbook.mdx Recipe 6 "Debit outbox backlog" + prometheus-alerts.mdx three new leading-indicator rules (fill-pct > 50% warn / flush_failures > 0 warn / 4xx_drops > 0 page) |
 
 ### Iter 17/18/19 sync notes (post-compact)
 

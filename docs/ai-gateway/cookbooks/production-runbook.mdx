@@ -140,6 +140,59 @@ go tool pprof http://localhost:6060/debug/pprof/allocs
 - JSON encoding of large `/v1/messages` requests — expected, but if it dominates consider enabling `LW_GATEWAY_MAX_BODY_BYTES` enforcement to reject pathologically large bodies earlier.
 - Per-request compilation of the same regex — should never happen; if it does, Lane A has a caching regression.
 
+## Recipe 6 — Debit outbox backlog
+
+**Symptom:** `gateway_budget_debit_outbox_depth` climbing, or `_4xx_drops_total` increasing, or `_flush_failures_total` non-zero. Budgets may drift from actual spend.
+
+The outbox is the gateway's async spend-accounting path: every request produces a debit that batches into a ring buffer and flushes to the control plane. Four failure classes exist, each with its own signal (iter 21, `f41ea2a`):
+
+| Signal | Metric | Severity | Meaning |
+|---|---|---|---|
+| Depth rising | `gateway_budget_debit_outbox_depth` / `_capacity` | warn | Normal under burst; watch fill-pct |
+| Flush failures | `gateway_budget_debit_outbox_flush_failures_total` | warn | Control-plane is slow/unreachable; events re-enqueued, depth climbs slowly |
+| 4xx drops | `gateway_budget_debit_outbox_4xx_drops_total` | **page** | Silent data loss — signing or payload bug, terminally rejected |
+| Capacity drops | `gateway_budget_debit_outbox_dropped_total` | warn | Ring is full, newest events being evicted — fill-pct was already at 100% |
+
+**Diagnose, in order:**
+
+```bash
+# 1. Fill percentage right now
+kubectl exec -n langwatch deploy/langwatch-gateway -- \
+  wget -qO- http://127.0.0.1:5590/metrics | \
+  grep -E '^gateway_budget_debit_outbox_(depth|capacity)'
+
+# 2. Last 15 min of flush failures (delta)
+# Graph this in Grafana with:
+#   rate(gateway_budget_debit_outbox_flush_failures_total[5m])
+
+# 3. 4xx drops — any non-zero delta is a page
+#   increase(gateway_budget_debit_outbox_4xx_drops_total[15m])
+```
+
+**Interpretation ladder:**
+
+- **Only depth is rising, flush_failures is 0**: normal burst. Fill-pct will self-heal when traffic subsides. Only page if sustained > 80% for > 10m.
+- **flush_failures > 0 and depth is rising**: control plane is unavailable or slow. Check control-plane `/api/internal/gateway/budget` handler latency and error rate. Debits are safe (re-enqueued); they'll drain once the control plane recovers.
+- **4xx_drops > 0**: immediate page. Likely causes, in order of probability:
+  1. HMAC secret drift between gateway and control plane (`LW_GATEWAY_INTERNAL_SECRET` mismatch after rotation).
+  2. Payload schema drift (gateway and control plane deployed with incompatible contract versions).
+  3. Rare: control plane returning 4xx for a specific tenant (archived organization, deleted project).
+- **dropped_total > 0**: the ring filled up and the oldest pending events were evicted before they could flush. Always follows a prolonged control-plane outage. Lost debits are unrecoverable — document the outage window for post-hoc spend reconciliation.
+
+**Fix:**
+
+| Cause | Action |
+|---|---|
+| HMAC drift | Check both env vars point at the same secret; rotate via the dual-secret overlap window described in [Config → Secrets](/ai-gateway/self-hosting/config#secrets) |
+| Control-plane slow | Scale the control plane; ratchet up `LW_GATEWAY_BUDGET_DEBIT_RETRY_MAX` as a temporary buffer |
+| Payload drift | Pin gateway + control-plane to matching versions per the compatibility matrix |
+
+**Alerting** (wire these directly into Alertmanager, see [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts)):
+
+- `rate(gateway_budget_debit_outbox_4xx_drops_total[5m]) > 0` → **page** (silent data loss).
+- `rate(gateway_budget_debit_outbox_flush_failures_total[5m]) > 0 for 5m` → **warn**.
+- `(max(gateway_budget_debit_outbox_depth) / max(gateway_budget_debit_outbox_capacity)) > 0.5 for 5m` → **warn**.
+
 ## Writing findings back
 
 When you find something worth filing:
