@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  Card,
   EmptyState,
   Heading,
   HStack,
@@ -11,7 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
+import { Building2, BrainCircuit, Edit, Folder, MoreVertical, Plus, Trash2, Users } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -63,23 +64,23 @@ export default function ModelsPage() {
     return Object.values(providers).filter((provider) => provider.enabled);
   }, [providers]);
 
-  const notEnabledProviders = useMemo(() => {
-    return Object.keys(modelProvidersRegistry)
-      .filter((providerKey) => {
-        const providerData = providers?.[providerKey as keyof typeof providers];
-        return !providerData?.enabled;
-      })
-      .map((providerKey) => ({
-        provider: providerKey as keyof typeof modelProvidersRegistry,
-        name:
-          modelProvidersRegistry[
-            providerKey as keyof typeof modelProvidersRegistry
-          ]?.name ?? providerKey,
-        icon: modelProviderIcons[
-          providerKey as keyof typeof modelProviderIcons
-        ],
-      }));
-  }, [providers]);
+  // Every registry provider is always addable — iter 109 allows multiple
+  // rows per provider type so users can configure "OpenAI" at org scope
+  // plus another "OpenAI" at project scope (say, a production override).
+  // The prior behavior of hiding already-configured providers prevented
+  // the very multi-instance flow the scope picker exists to support.
+  const addableProviders = useMemo(() => {
+    return Object.keys(modelProvidersRegistry).map((providerKey) => ({
+      provider: providerKey as keyof typeof modelProvidersRegistry,
+      name:
+        modelProvidersRegistry[
+          providerKey as keyof typeof modelProvidersRegistry
+        ]?.name ?? providerKey,
+      icon: modelProviderIcons[
+        providerKey as keyof typeof modelProviderIcons
+      ],
+    }));
+  }, []);
 
   // Check if provider is used for the Default Model only (badge display)
   // When there's only one enabled provider, it is the default by definition
@@ -129,17 +130,14 @@ export default function ModelsPage() {
             >
               <Menu.Trigger asChild>
                 <PageLayout.HeaderButton
-                  disabled={
-                    !hasModelProvidersManagePermission ||
-                    notEnabledProviders.length === 0
-                  }
+                  disabled={!hasModelProvidersManagePermission}
                 >
                   <Plus /> Add Model Provider
                 </PageLayout.HeaderButton>
               </Menu.Trigger>
             </Tooltip>
             <Menu.Content>
-              {notEnabledProviders.map((provider) => (
+              {addableProviders.map((provider) => (
                 <Menu.Item
                   key={provider.provider}
                   value={provider.provider}
@@ -181,10 +179,13 @@ export default function ModelsPage() {
             </EmptyState.Content>
           </EmptyState.Root>
         ) : (
-          <Table.Root width="full">
+          <Card.Root width="full" overflow="hidden">
+            <Card.Body paddingY={0} paddingX={0}>
+          <Table.Root variant="line" size="md" width="full">
             <Table.Header>
               <Table.Row>
                 <Table.ColumnHeader>Provider</Table.ColumnHeader>
+                <Table.ColumnHeader>Scope</Table.ColumnHeader>
                 <Table.ColumnHeader />
               </Table.Row>
             </Table.Header>
@@ -206,15 +207,21 @@ export default function ModelsPage() {
                         <Box width="24px" height="24px">
                           {providerIcon}
                         </Box>
-                        <Text>{providerSpec?.name ?? provider.provider}</Text>
+                        <Text>
+                          {(provider as any).name ??
+                            providerSpec?.name ??
+                            provider.provider}
+                        </Text>
                         {isDefaultProvider(provider.provider) && (
                           <Badge colorPalette="blue">Default Model</Badge>
                         )}
-                        <ProviderScopeChips
-                          scopes={(provider as any).scopes}
-                          fallbackScopeType={(provider as any).scopeType}
-                        />
                       </HStack>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <ProviderScopeChips
+                        scopes={(provider as any).scopes}
+                        fallbackScopeType={(provider as any).scopeType}
+                      />
                     </Table.Cell>
                     <Table.Cell textAlign="right">
                       <Menu.Root>
@@ -275,6 +282,8 @@ export default function ModelsPage() {
               })}
             </Table.Body>
           </Table.Root>
+            </Card.Body>
+          </Card.Root>
         )}
 
         <Dialog.Root
@@ -380,31 +389,35 @@ function ProviderScopeChips({
   return (
     <HStack gap={1} wrap="wrap">
       {entries.map((entry) => {
+        const key = `${entry.scopeType}:${entry.scopeId}`;
         if (entry.scopeType === "ORGANIZATION") {
           return (
-            <Badge
-              key={`ORG:${entry.scopeId}`}
-              colorPalette="blue"
-              variant="subtle"
-              size="sm"
-            >
-              Org
+            <Badge key={key} colorPalette="blue" variant="subtle" size="sm">
+              <HStack gap={1}>
+                <Building2 size={12} aria-hidden />
+                <Text>Organization</Text>
+              </HStack>
             </Badge>
           );
         }
         if (entry.scopeType === "TEAM") {
           return (
-            <Badge
-              key={`TEAM:${entry.scopeId}`}
-              colorPalette="purple"
-              variant="subtle"
-              size="sm"
-            >
-              Team
+            <Badge key={key} colorPalette="purple" variant="subtle" size="sm">
+              <HStack gap={1}>
+                <Users size={12} aria-hidden />
+                <Text>Team</Text>
+              </HStack>
             </Badge>
           );
         }
-        return null;
+        return (
+          <Badge key={key} colorPalette="gray" variant="subtle" size="sm">
+            <HStack gap={1}>
+              <Folder size={12} aria-hidden />
+              <Text>Project</Text>
+            </HStack>
+          </Badge>
+        );
       })}
     </HStack>
   );
