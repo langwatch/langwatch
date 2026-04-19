@@ -33,7 +33,7 @@ Under **AI Gateway → Virtual Keys** click **New virtual key** and fill:
 | Models allowed | Optional allowlist. Blank = "any model the provider credentials support." |
 | Model aliases | Map of client-friendly names → `provider/model`. E.g. `gpt-4o: azure/my-deployment`. |
 | Cache policy | `respect` (default), `force`, or `disable`. |
-| Guardrails | Attach existing LangWatch evaluators as `pre` / `post` / `stream_chunk` hooks. |
+| Guardrails | Attach existing LangWatch evaluators as `pre` / `post` / `stream_chunk` hooks — the drawer has a dedicated picker section listing every project evaluator with `executionMode = AS_GUARDRAIL` (Lane B iter 17, `0541bd096`). Fail-open toggles on pre + post directions surface the concrete 403 / 50 ms / terminal-SSE enforcement shape so operators know what the toggle actually does. See [Guardrails → Attaching guardrails to a VK](/ai-gateway/guardrails#attaching-guardrails-to-a-vk). |
 | Blocked patterns | Regex allow/deny for tool names, MCP servers, URLs. |
 | Initial budget | Optionally attach a budget on creation. Budgets can always be added later. |
 

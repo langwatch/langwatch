@@ -64,12 +64,30 @@ Use cases: real-time PII termination (credit card numbers, emails, phone numbers
 
 ## Attaching guardrails to a VK
 
-Under **AI Gateway → Virtual Keys → <key> → Guardrails**:
+The VK create/edit drawer (Lane B iter 17, `0541bd096`) has three direction sections — **Pre-request**, **Post-response**, **Stream chunk** — each listing every project evaluator whose `executionMode = AS_GUARDRAIL`. Check the box next to an evaluator to attach it to that direction; uncheck to detach. Save the drawer — the gateway picks up the change within 30 s via the `/changes` long-poll.
 
-1. Click **Add guardrail**.
-2. Pick an existing evaluator (or link to *New evaluator* to author one in the usual LangWatch evaluator UI).
-3. Choose direction: pre / post / stream_chunk.
-4. Save.
+Each direction section also has a **Default-block on evaluator failure** toggle. Off (default) = fail closed (matches `guardrails.request_fail_open: false` / `response_fail_open: false`). On = fail open with a `langwatch.guardrail.fail_open=true` trace attribute. The helper copy cites the concrete enforcement shapes so you know what the toggle actually does:
+
+- Pre: blocks return `403 guardrail_blocked` with a zero-cost debit.
+- Post: non-stream blocks replace the response with 403; stream responses flag only (the bytes are already out).
+- Stream chunk: blocks emit a byte-locked terminal SSE error with `code=stream_chunk_blocked`; the 50 ms per-chunk budget fails OPEN by contract regardless of the toggle (stream-chunk fail-open is a performance invariant, not a policy choice).
+
+If the evaluator list is empty, the drawer points you at **Evaluations → New** to author one with `Execution mode = As guardrail`. That's the same evaluator-authoring surface you already use for online evaluations; there's no separate gateway-evaluator editor.
+
+Legacy surface — REST or CLI — still works for scripting:
+
+```bash
+# Attach a post-response guardrail via CLI (same operation as ticking the box)
+langwatch virtual-keys update vk_01HZX... \
+  --guardrail-add post:eval_pii_detector_v2
+
+# Or via REST — full VK config PATCH
+curl -X PATCH https://app.langwatch.ai/api/gateway/v1/virtual-keys/vk_01HZX... \
+  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
+  -d '{"config":{"guardrails":{"post":[{"id":"eval_pii_detector_v2","evaluator":"pii_detection"}],"response_fail_open":false}}}'
+```
+
+Both the drawer and the REST/CLI emit the same `{id, evaluator}` tuple shape into the bundle (contract §4.2), so you can flip between surfaces without resetting configuration.
 
 A VK can have multiple guardrails in each direction; the gateway runs them in parallel and short-circuits on the first `block` decision.
 
