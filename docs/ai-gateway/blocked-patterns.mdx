@@ -125,9 +125,28 @@ They compose: a request passes only if both checks allow it. Use `models_allowed
 
 ## Configuring via the UI
 
-On the VK edit screen, the Blocked Patterns section has three rows (tools / mcp / urls) with an inline regex editor and a "Test this pattern" button that evaluates against sample payloads.
+On the VK edit screen (Gateway → Virtual Keys → **Edit**), the **Blocked Patterns** section has four rows — one per dimension — each with a pair of monospace textareas:
 
-Common presets are available in a dropdown: "No shell execution," "Read-only filesystem," "Official MCPs only," "Internal URLs only."
+| Row | Deny textarea | Allow textarea |
+|---|---|---|
+| **Tools** | RE2 regexes, one per line. Match against `tools[].function.name` (OpenAI) and `tools[].name` (Anthropic). | Non-empty → only tools matching `allow` pass. Empty → deny-only. |
+| **MCP** | RE2 regexes for MCP server names and URLs. | Same allow semantics. |
+| **URLs** | RE2 regexes matched against every `http(s)://` URL extracted from the request body. | Same allow semantics. |
+| **Models** | RE2 regex policy on the `model` field (distinct from the static `models_allowed` glob on the top of the VK form). | Same allow semantics. |
+
+The section header links to the relevant 403 error codes (`tool_not_allowed`, `url_not_allowed`, `model_not_allowed`) and calls out the fail-closed behaviour: **if any regex is invalid, the VK fails with 503 service_unavailable — never silent-bypass**. Fix the pattern, save the VK, and the next request picks it up (the bundle refresh invalidates the broken compiled cache).
+
+Leave a row empty to skip that dimension entirely.
+
+### Common presets
+
+The drawer exposes common starting points (click the helper links next to each textarea):
+
+- **No shell execution** — `^shell\..*`, `^bash$`, `^exec$`, `^run_command$` in Tools → Deny.
+- **Read-only filesystem** — `^filesystem\.(write|delete|chmod|move)$` in Tools → Deny.
+- **Official MCPs only** — `^@modelcontextprotocol/.*`, `^@anthropic-ai/.*` in MCP → Allow.
+- **Internal URLs only** — `^https?://api\.internal\.com/.*` in URLs → Allow.
+- **Block legacy GPT-4** — `^gpt-4(-turbo)?$` in Models → Deny.
 
 ## Performance
 
