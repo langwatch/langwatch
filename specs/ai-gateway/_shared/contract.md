@@ -408,7 +408,8 @@ All errors OpenAI-compatible:
 | `guardrail_blocked` | 403 | Pre- or post-call guardrail returned `block` |
 | `tool_not_allowed` | 403 | Requested tool/MCP matches VK `blocked_patterns.tools` or `blocked_patterns.mcp` (deny-wins, RE2) |
 | `url_not_allowed` | 403 | Any `http(s)://` URL extracted from the request body matches VK `blocked_patterns.urls` deny (or falls outside a non-null `allow`) — extraction is permissive: user messages / tool args / system prompts / anywhere |
-| `cache_override_invalid` | 400 | `X-LangWatch-Cache` header malformed |
+| `cache_override_invalid` | 400 | `X-LangWatch-Cache` header malformed or unknown mode |
+| `cache_override_not_implemented` | 400 | `X-LangWatch-Cache` named a valid-but-v1.1 mode (`force` / `ttl=NNN`). v1 ships `respect` + `disable` only. |
 | `provider_error` | 502 | Upstream provider returned error after fallback exhaustion |
 | `upstream_timeout` | 504 | Upstream timed out after fallback exhaustion |
 | `bad_request` | 400 | Validation error on incoming payload |
@@ -419,7 +420,8 @@ All errors OpenAI-compatible:
 - `X-LangWatch-Request-Id: grq_01HZ...` — opaque gateway request id, also emitted on errors and in OTel trace.
 - `X-LangWatch-Provider: openai|anthropic|...` — which provider was actually used (may differ from requested model due to fallback or alias).
 - `X-LangWatch-Model: gpt-5-mini` — resolved provider model.
-- `X-LangWatch-Cache: hit|miss|bypass|forced` — cache outcome.
+- `X-LangWatch-Cache: hit|miss|bypass|forced` — cache outcome as observed by the gateway.
+- `X-LangWatch-Cache-Mode: respect|disable` — echoes the cache-override mode that was applied to the request (independent of upstream outcome). Emitted on every `/v1/messages` response.
 - `X-LangWatch-Budget-Warning: <scope>:<pct>` — optional, emitted on soft-cap breaches (can repeat).
 - `X-LangWatch-Fallback-Count: <n>` — number of fallbacks attempted before success (0 when primary succeeded).
 
@@ -437,9 +439,9 @@ All errors OpenAI-compatible:
 2. VK config `cache.mode` + `cache.ttl_s`.
 3. Default `respect`.
 
-- `respect` — pass through upstream cache controls as-is.
-- `force` — add ephemeral cache control to any cacheable segment (large prompt prefix, system message, tool definitions) even if client didn't specify. Gateway's own semantic cache kicks in with `ttl_s`.
-- `disable` — strip all cache_control blocks from upstream request, disable gateway semantic cache, force cold call.
+- `respect` (v1) — pass through upstream cache controls as-is (byte-for-byte passthrough).
+- `disable` (v1) — recursively JSON-walk the body and drop every `cache_control` object at any nesting depth (`messages[].content[]`, `system[]`, `tools[]` on Anthropic); disable gateway semantic cache; force cold call. Applied **before** blocked-pattern enforcement so policy evaluation runs on the post-strip body and is deterministic regardless of caller's caching choice.
+- `force` / `ttl=NNN` — **deferred to v1.1**. Valid syntax is accepted by the parser but currently rejected with `400 cache_override_not_implemented`. Provider-specific body mutation (where to inject cache_control, how to respect TTL) ships alongside gateway-side semantic caching.
 
 **Observability:** `X-LangWatch-Cache` response header reports outcome. Token counts in OTel trace include `cache_read_tokens` and `cache_write_tokens` separately so trace UI can show cache economics.
 
