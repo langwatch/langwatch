@@ -136,8 +136,10 @@ Same passthrough discipline.
 ## Observability
 
 - `X-LangWatch-Request-Id` on the first frame.
-- Trace span per chunk is too expensive — the gateway records a single span per request with `langwatch.stream.chunk_count`, `langwatch.stream.first_chunk_ms`, `langwatch.stream.total_ms`.
-- If a mid-stream failure occurred, `langwatch.stream.terminated_at_chunk=N` records where.
+- Trace span per chunk would be too expensive — the gateway records a single span per streaming request with `langwatch.streaming=true` and the normal per-request attrs (`langwatch.model`, `langwatch.usage.*`, `langwatch.duration_ms`, `langwatch.cost_usd`).
+- Mid-stream failures are visible via `gateway_http_requests_total{status="500"}` + the single span's error state + request-id correlation to the gateway log line.
+
+<Info>Per-stream telemetry attrs (`langwatch.stream.chunk_count` / `.first_chunk_ms` / `.total_ms` / `.terminated_at_chunk`) are a v1.1 observability follow-up. In v1, the single-span-per-request model + log-line correlation is the operator signal.</Info>
 
 ## Usage extraction (critical for streaming budgets)
 

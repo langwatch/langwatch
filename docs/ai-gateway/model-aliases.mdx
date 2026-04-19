@@ -94,10 +94,10 @@ See [API: `GET /v1/models`](/ai-gateway/api/models) for the full response shape.
 
 ## Trace attributes
 
-- `langwatch.model_requested` — what the client sent.
-- `langwatch.model_resolved` — final `provider/model` after alias resolution.
+- `langwatch.model` — the final resolved model dispatched to the provider (post alias).
+- `langwatch.model_source` — how it was resolved: `alias` (client sent an alias that mapped), `explicit_slash` (client sent `provider/model`), or `implicit` (client sent a bare name the gateway mapped via defaults).
 
-Filter the LangWatch Messages view by `model_resolved` to see "how many Azure vs OpenAI calls this VK actually made today."
+Filter the LangWatch Messages view by `model_source="alias"` to see "which requests benefited from the VK's alias table today"; filter by `model` to count Azure vs OpenAI dispatches.
 
 ## When NOT to use aliases
 

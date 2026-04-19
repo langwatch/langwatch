@@ -67,7 +67,7 @@ Blocked → `403 tool_not_allowed` (we conflate MCP denials with tool denials fo
 
 **Every `http://` and `https://` URL appearing anywhere in the request body** is extracted and evaluated against `blocked_patterns.urls`. Extraction is deliberately permissive: a URL present in the payload is a URL the model could be asked to fetch, regardless of which JSON key it was nested under — user messages, tool-call arguments, system prompts, all covered. Trailing markdown/JSON punctuation (`.,;:)]}` etc.) is stripped and duplicates are collapsed before matching.
 
-First URL that hits a deny rule (or falls outside a non-null `allow` list) → `403 url_not_allowed` before the request reaches any upstream provider. Trace records `langwatch.policy.blocked=urls:<pattern>`.
+First URL that hits a deny rule (or falls outside a non-null `allow` list) → `403 url_not_allowed` before the request reaches any upstream provider. Attribution via request-id correlation (see [§Tools](#tools) above).
 
 <Note>**Enforcement vs egress control.** This layer stops a *request* from reaching a provider when it contains a disallowed URL. It does **not** prevent a provider from returning a URL that a downstream tool-runner then fetches — that requires an egress proxy on the node running the tool call, which is out of scope for the gateway. Pair blocked URLs with egress controls for defence in depth.</Note>
 
@@ -75,7 +75,7 @@ First URL that hits a deny rule (or falls outside a non-null `allow` list) → `
 
 Every request's `model` field is RE2-matched against the `models` dimension before dispatch. This is policy-by-regex (e.g. "block anything matching `^gpt-4(-turbo)?$`"), distinct from the static `models_allowed` glob allowlist on the VK.
 
-Blocked → `403 model_not_allowed`. Trace records `langwatch.policy.blocked=models:<pattern>`.
+Blocked → `403 model_not_allowed`. Attribution via request-id correlation (see [§Tools](#tools) above).
 
 #### Models dimension vs `models_allowed`
 
