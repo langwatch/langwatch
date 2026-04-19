@@ -237,6 +237,38 @@ func TestApplyCacheOverride_RuleMatchWithPrincipalID(t *testing.T) {
 	}
 }
 
+// TestApplyCacheOverride_RulesExistButNoneMatch closes a coverage
+// gap from iter 48: rules are present in the bundle but NO matcher
+// fires (e.g. principal_id or tag narrow enough to exclude this
+// request). Must be pure passthrough — no mode header emitted, no
+// metric bump, no span attr, no body mutation.
+func TestApplyCacheOverride_RulesExistButNoneMatch(t *testing.T) {
+	d, m := testDispatcher(t)
+	rules := []auth.CacheRuleSpec{
+		{ID: "r_narrow", Priority: 500, Matchers: auth.CacheRuleMatchers{PrincipalID: "someone_else"}, Action: auth.CacheRuleAction{Mode: "disable"}},
+	}
+	b := testBundle(rules) // principal_id on bundle is "user_42", won't match
+
+	rec := httptest.NewRecorder()
+	body := bodyWithCache()
+	out, ok := d.applyCacheOverride(rec, postBody(body), []byte(body), "req_x", b)
+	if !ok {
+		t.Fatal("expected continue")
+	}
+	// Body unchanged
+	if string(out) != body {
+		t.Errorf("no-match must passthrough; got %s", out)
+	}
+	// No mode header (per iter 48 NoRulesNoHeaderPassthrough invariant)
+	if got := rec.Header().Get("X-LangWatch-Cache-Mode"); got != "" {
+		t.Errorf("no-match must not emit mode header; got %q", got)
+	}
+	// Metric never fired for this rule
+	if v := counterValue(t, m, "r_narrow", "DISABLE"); v != 0 {
+		t.Errorf("no-match rule must not bump metric; got %f", v)
+	}
+}
+
 // TestApplyCacheOverride_ModelMatcherFires covers iter 49: extractModelField
 // lets rule.matchers.model fire from inside applyCacheOverride without
 // waiting for parseOpenAIChatBody downstream. Closes the scope note
