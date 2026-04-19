@@ -7,6 +7,7 @@
  */
 import type {
   GatewayBudget,
+  GatewayCacheRule,
   GatewayProviderCredential,
   ModelProvider,
   PrismaClient,
@@ -15,6 +16,7 @@ import type {
   VirtualKey,
 } from "@prisma/client";
 
+import { GatewayCacheRuleService } from "./cacheRule.service";
 import { parseVirtualKeyConfig } from "./virtualKey.config";
 import type { VirtualKeyWithChain } from "./virtualKey.repository";
 
@@ -74,6 +76,27 @@ export type GatewayConfigPayload = {
     resets_at: string;
     on_breach: "block" | "warn";
   }>;
+  // Cache-control rules pre-sorted by priority DESC, enabled-only.
+  // The gateway evaluates them first-match-wins in a linear scan on every
+  // request; the bundle-baked shape preserves the ~700 ns hot path (see
+  // specs/ai-gateway/cache-control-rules.feature §4).
+  cache_rules: Array<{
+    id: string;
+    priority: number;
+    matchers: {
+      vk_id?: string;
+      vk_tags?: string[];
+      vk_prefix?: string;
+      principal_id?: string;
+      model?: string;
+      request_metadata?: Record<string, string>;
+    };
+    action: {
+      mode: "respect" | "force" | "disable";
+      ttl?: number;
+      salt?: string;
+    };
+  }>;
   metadata: Record<string, unknown>;
 };
 
@@ -86,6 +109,9 @@ export class GatewayConfigMaterialiser {
     const project = await this.requireProject(vk.projectId);
     const chain = await this.loadProviderChain(vk);
     const budgets = await this.applicableBudgets(vk, project);
+    const cacheRules = await this.applicableCacheRules(
+      project.team.organizationId,
+    );
     const config = parseVirtualKeyConfig(vk.config);
 
     return {
@@ -142,8 +168,15 @@ export class GatewayConfigMaterialiser {
         resets_at: b.resetsAt.toISOString(),
         on_breach: b.onBreach === "BLOCK" ? "block" : "warn",
       })),
+      cache_rules: cacheRules.map(cacheRuleToWire),
       metadata: config.metadata ?? {},
     };
+  }
+
+  private async applicableCacheRules(
+    organizationId: string,
+  ): Promise<GatewayCacheRule[]> {
+    return GatewayCacheRuleService.create(this.prisma).bundleFor(organizationId);
   }
 
   private async requireProject(
@@ -238,6 +271,19 @@ function scopeToWire(
     case "PRINCIPAL":
       return "principal";
   }
+}
+
+type CacheRuleWire = GatewayConfigPayload["cache_rules"][number];
+
+function cacheRuleToWire(rule: GatewayCacheRule): CacheRuleWire {
+  const matchers = rule.matchers as CacheRuleWire["matchers"];
+  const action = rule.action as CacheRuleWire["action"];
+  return {
+    id: rule.id,
+    priority: rule.priority,
+    matchers,
+    action,
+  };
 }
 
 function subtract(a: string, b: string): string {

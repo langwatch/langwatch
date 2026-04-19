@@ -63,6 +63,9 @@ describe("GatewayConfigMaterialiser", () => {
         gatewayBudget: {
           findMany: async () => [],
         } as any,
+        gatewayCacheRule: {
+          findMany: async () => [],
+        } as any,
       });
       const sut = new GatewayConfigMaterialiser(prisma);
 
@@ -91,6 +94,7 @@ describe("GatewayConfigMaterialiser", () => {
         } as any,
         gatewayProviderCredential: { findMany: async () => [] } as any,
         gatewayBudget: { findMany: async () => [] } as any,
+        gatewayCacheRule: { findMany: async () => [] } as any,
       });
       const sut = new GatewayConfigMaterialiser(prisma);
 
@@ -150,6 +154,7 @@ describe("GatewayConfigMaterialiser", () => {
           ],
         } as any,
         gatewayBudget: { findMany: async () => [] } as any,
+        gatewayCacheRule: { findMany: async () => [] } as any,
       });
       const sut = new GatewayConfigMaterialiser(prisma);
 
@@ -191,6 +196,7 @@ describe("GatewayConfigMaterialiser", () => {
             },
           ],
         } as any,
+        gatewayCacheRule: { findMany: async () => [] } as any,
       });
       const sut = new GatewayConfigMaterialiser(prisma);
 
@@ -208,12 +214,92 @@ describe("GatewayConfigMaterialiser", () => {
       });
     });
 
+    describe("when cache rules are configured for the organisation", () => {
+      it("includes them pre-sorted by priority desc, enabled-only, with matcher/action passthrough", async () => {
+        // Simulates the bundle projection — GatewayCacheRuleService.bundleFor
+        // already filters to enabled=true + archivedAt=null and orders by
+        // priority desc; the materialiser just shapes the wire representation.
+        const prisma = mockPrisma({
+          project: {
+            findUnique: async () => ({
+              id: "project_01",
+              teamId: "team_01",
+              name: "p",
+              slug: "p",
+              team: { id: "team_01", name: "t", organizationId: "org_01" },
+            }),
+          } as any,
+          gatewayProviderCredential: { findMany: async () => [] } as any,
+          gatewayBudget: { findMany: async () => [] } as any,
+          gatewayCacheRule: {
+            findMany: async () => [
+              {
+                id: "rule_enterprise_force",
+                priority: 200,
+                matchers: { vk_tags: ["tier=enterprise"] },
+                action: { mode: "force", ttl: 600 },
+                enabled: true,
+                archivedAt: null,
+              },
+              {
+                id: "rule_gpt5mini_disable",
+                priority: 100,
+                matchers: { model: "gpt-5-mini" },
+                action: { mode: "disable" },
+                enabled: true,
+                archivedAt: null,
+              },
+            ],
+          } as any,
+        });
+        const sut = new GatewayConfigMaterialiser(prisma);
+
+        const bundle = await sut.materialise(stubVk());
+
+        expect(bundle.cache_rules).toHaveLength(2);
+        expect(bundle.cache_rules[0]).toMatchObject({
+          id: "rule_enterprise_force",
+          priority: 200,
+          matchers: { vk_tags: ["tier=enterprise"] },
+          action: { mode: "force", ttl: 600 },
+        });
+        expect(bundle.cache_rules[1]).toMatchObject({
+          id: "rule_gpt5mini_disable",
+          priority: 100,
+          action: { mode: "disable" },
+        });
+      });
+
+      it("emits an empty cache_rules array when none are configured", async () => {
+        const prisma = mockPrisma({
+          project: {
+            findUnique: async () => ({
+              id: "project_01",
+              teamId: "team_01",
+              name: "p",
+              slug: "p",
+              team: { id: "team_01", name: "t", organizationId: "org_01" },
+            }),
+          } as any,
+          gatewayProviderCredential: { findMany: async () => [] } as any,
+          gatewayBudget: { findMany: async () => [] } as any,
+          gatewayCacheRule: { findMany: async () => [] } as any,
+        });
+        const sut = new GatewayConfigMaterialiser(prisma);
+
+        const bundle = await sut.materialise(stubVk());
+
+        expect(bundle.cache_rules).toEqual([]);
+      });
+    });
+
     describe("when the project is missing", () => {
       it("throws a descriptive error", async () => {
         const prisma = mockPrisma({
           project: { findUnique: async () => null } as any,
           gatewayProviderCredential: { findMany: async () => [] } as any,
           gatewayBudget: { findMany: async () => [] } as any,
+          gatewayCacheRule: { findMany: async () => [] } as any,
         });
         const sut = new GatewayConfigMaterialiser(prisma);
 
