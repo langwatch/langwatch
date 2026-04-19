@@ -660,7 +660,7 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
 
 ## 13. Open questions (to resolve in next iterations)
 
-- [ ] **Self-host JWT secret rotation:** how do helm chart + control-plane agree on `LW_GATEWAY_JWT_SECRET` rotation without downtime? — @sergey to propose.
+- [x] **Self-host JWT secret rotation:** how do helm chart + control-plane agree on `LW_GATEWAY_JWT_SECRET` rotation without downtime? — **Resolved in iter 25 (`921365f`).** Gateway's JWT resolver accepts `jwt.VerificationKeySet{current, previous}` when `LW_GATEWAY_JWT_SECRET_PREVIOUS` is set. Helm chart conditionally renders the second `secretKeyRef`. Operator flow is 4 steps: flip control plane → add previous to gateway → rolling restart → remove previous after ~15 min. Startup `jwt_secret_rotation_active` WARN log keeps rotation windows from running indefinitely. See [Self-Hosting → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation-iter-25-921365f).
 - [ ] **Streaming fallback semantics:** the mid-stream policy above is conservative; verify Portkey / Helicone behaviour. — @andr competitor research.
 - [ ] **Budget windows & timezone:** `day` window in whose tz — org's or UTC? — default UTC, org-level override. — @alexis Prisma field.
 - [ ] **Multi-region gateway routing:** do we need region-pinning for data residency? — @sergey + infra.
@@ -672,3 +672,4 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
 
 - **v0.1 (2026-04-18)** — Initial draft consolidated from @sergey + @alexis proposals. @andr ships as base for iteration.
 - **v0.1.1 (2026-04-19)** — Audit for iters 17–22 drift. Wire contract unchanged: §4.3 `/changes` already documents `organization_id` as required (iter 17 landed against this). Iters 18 (NetworkPolicy), 19 (gateway-CI), 20 (startup netcheck), 21 (outbox metrics), 22 (admin bearer-token) are all deployment/operational — they don't alter any wire surface documented in §§3–12. No contract changes required.
+- **v0.1.2 (2026-04-19)** — Close §13 open question on JWT rotation. Iter 25 (`921365f`) ships dual-key `jwt.VerificationKeySet` acceptance via `LW_GATEWAY_JWT_SECRET_PREVIOUS`; operational procedure documented in self-hosting/config.mdx + helm.mdx. Iters 23 (body cap), 24 (graceful drain), 25 (JWT rotation) are deployment/operational — no wire surface drift.

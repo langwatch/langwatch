@@ -17,7 +17,7 @@ These MUST be provided via a Kubernetes Secret (or the equivalent on non-Kuberne
 | `LW_VIRTUAL_KEY_PEPPER` | Peppered HMAC secret used to hash virtual-key secrets at rest | Control plane only; gateway never sees it |
 | `REDIS_URL` | Optional L2 cache for resolved VKs, shared across gateway replicas. On HPA scale-out, new pods warm from L2 (~2 ms) instead of round-tripping `/resolve-key` (~30 ms); shipped in Lane A iter 15 (`6ebeecf`). TTL floored at 30 s; poison entries (decode errors) are `DEL`'d. See [Scaling → Redis L2](/ai-gateway/self-hosting/scaling#redis-l2-optional) | Gateway only |
 
-Rotate `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` together — the gateway supports a 10-minute overlap window (`LW_GATEWAY_JWT_SECRET_PREVIOUS`) so rolling restart doesn't evict every cached JWT at once.
+Rotate `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` together via the dual-key overlap flow (iter 25, `921365f`) — the gateway's JWT resolver accepts both `LW_GATEWAY_JWT_SECRET` (current) and `LW_GATEWAY_JWT_SECRET_PREVIOUS` (the retired key) via `jwt.VerificationKeySet` while both are set; see [Secret rotation](#secret-rotation-iter-25-921365f) below.
 
 ## Routing
 
@@ -93,6 +93,33 @@ Shipped in langwatch-saas `5fe8486` (@sergey Lane A iter 4 pt4) wired to `observ
 | `GATEWAY_MAX_REQUEST_BODY_BYTES` | `10485760` (10 MiB) | Maximum request body size. Enforced by `httpx.MaxBodyBytes` middleware wired **before** auth: a 1 GB drive-by scan never pressures the pod memory limit (512 Mi default) or the auth cache. Declared `Content-Length` above the cap gets 413 immediately (socket is not drained). Unknown-length bodies (chunked) hit `*http.MaxBytesError` at the cap. 10 MiB was chosen to fit ~3 MB of prompt text + base64 images + headroom, comfortably under a 512 Mi pod cap. Raise for orgs shipping large base64 image arrays; lower for edge deployments with known small payload ceilings |
 
 The `Security` config struct is intentionally separate from `Upstream` (per-provider budgets) and `Budget` (spend outbox). Edge protection is a distinct concern and its values belong in their own Helm stanza — see [Helm → Security](/ai-gateway/self-hosting/helm#security-iter-23-79b46bf).
+
+## Secret rotation (iter 25, `921365f`)
+
+### `LW_GATEWAY_JWT_SECRET` zero-downtime rotation
+
+Before iter 25, rotating `LW_GATEWAY_JWT_SECRET` invalidated every outstanding bundle (~15 min TTL) instantly — every in-flight customer request got 401 `invalid_api_key`. No safe rotation short of an announced maintenance window.
+
+With iter 25, the resolver's `Keyfunc` returns `jwt.VerificationKeySet{current, previous}` whenever `LW_GATEWAY_JWT_SECRET_PREVIOUS` is set. `golang-jwt/jwt/v5` natively tries each key in order; current is first so it's the fast path in steady state.
+
+The 4-step zero-downtime rotation flow:
+
+1. **Flip the control-plane signing secret** to the new value. New bundles get signed with `new`.
+2. **Update gateway secrets**: `jwtSecretKey=new`, `jwtSecretPreviousKey=old`. Deploy.
+3. **Rolling restart** picks up both keys. Pre-rotation bundles (signed with `old`) keep verifying via the previous-key fallback. New bundles sign+verify with `new`.
+4. **After the longest pre-rotation bundle TTL has elapsed** (~15 min default), remove `jwtSecretPreviousKey` entirely. Rolling restart again. Strict-mode resumes.
+
+The gateway emits a `jwt_secret_rotation_active` WARN log on boot whenever `JWTSecretPrevious` is set, with explicit "remove once ~15m elapsed" guidance. Accepting a retired key forever is a posture regression — the WARN keeps operators honest.
+
+| Var | Default | Purpose |
+|---|---|---|
+| `LW_GATEWAY_JWT_SECRET_PREVIOUS` | *(empty)* | Retired JWT signing secret. Set during step 2 of the rotation; remove after step 4. Empty = strict mode (default / steady state) |
+
+See [Helm → Secret rotation](/ai-gateway/self-hosting/helm#secret-rotation-iter-25-921365f) for the `values.yaml` shape.
+
+### `LW_GATEWAY_INTERNAL_SECRET` rotation
+
+The HMAC signing secret for `/api/internal/gateway/*` calls uses the same dual-secret pattern — `LW_GATEWAY_INTERNAL_SECRET_PREVIOUS` is accepted alongside the current value during the rolling window, then removed. The mechanics are identical; both secrets can be rotated in the same operation.
 
 ## Graceful shutdown (iter 24, `ea167ca`)
 

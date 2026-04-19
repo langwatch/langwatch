@@ -112,6 +112,30 @@ Token × unit-price lookup, computed per provider using their published pricing.
 
 Cache reads / writes are priced **separately** per provider — Anthropic cache reads are ~10% of regular input tokens, Anthropic cache writes are 125%. The gateway respects these. See [Caching Passthrough](/ai-gateway/caching-passthrough).
 
+## Viewing budget spend (UI)
+
+The **/gateway/budgets** list shows every budget with a utilization bar + hard cap + remaining. Clicking a row opens **/gateway/budgets/[id]** (Lane B iter 18.2, `f85319cc7`) — a detail page mirroring the VK detail page's layout:
+
+- **Utilization header**: hard cap, spent, remaining, `on_breach` mode.
+- **Identity**: name, description, window, timezone, created/updated timestamps.
+- **Resolved scope target**: if `scope.kind = VIRTUAL_KEY`, links to the VK detail page. Similar resolution for `ORGANIZATION` / `TEAM` / `PROJECT` / `PRINCIPAL` — each scope kind surfaces the human name of the target rather than just an id.
+- **Recent 20 debits**: each row shows timestamp, amount, originating VK (deep-linked to the VK detail page), and the `gateway_request_id` for trace search.
+
+Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys" (Lane B iter 18.1, `3cb7a401a`). The sparkline is gated on ≥ 2 data buckets so the 24 h preset doesn't render a single-point chart.
+
+Programmatic equivalent:
+
+```bash
+# List budgets
+langwatch gateway-budgets list
+
+# Spend detail (same data the UI detail page renders)
+curl -sS https://app.langwatch.ai/api/gateway/v1/budgets/<id> \
+  -H "Authorization: Bearer $LANGWATCH_API_KEY"
+```
+
+The REST response includes the resolved scope-target fields the UI uses; the `gatewayBudgets.get` tRPC procedure powers both surfaces from a shared service method.
+
 ## Permissions
 
 | Action | Permission |

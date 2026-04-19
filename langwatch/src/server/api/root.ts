@@ -50,6 +50,7 @@ import { scimTokenRouter } from "./routers/scimToken";
 import { roleBindingRouter } from "./routers/roleBinding";
 import { groupRouter } from "./routers/group";
 import { userRouter } from "./routers/user";
+import { gatewayAuditRouter } from "./routers/gatewayAudit";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayUsageRouter } from "./routers/gatewayUsage";
 import { gatewayProvidersRouter } from "./routers/gatewayProviders";
@@ -113,6 +114,7 @@ const coreRouters = {
   gatewayProviders: gatewayProvidersRouter,
   gatewayBudgets: gatewayBudgetsRouter,
   gatewayUsage: gatewayUsageRouter,
+  gatewayAudit: gatewayAuditRouter,
 };
 
 const eeRouters = {
