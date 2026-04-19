@@ -176,6 +176,7 @@ type openaiChatRequest struct {
 	Model    string          `json:"model"`
 	Stream   bool            `json:"stream,omitempty"`
 	Messages json.RawMessage `json:"messages"`
+	System   json.RawMessage `json:"system,omitempty"` // Anthropic-style /v1/messages carries system separately
 }
 
 // parseOpenAIChatBody peeks at the JSON to pull out {model, stream}. The

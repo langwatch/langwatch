@@ -39,17 +39,26 @@ const (
 	AttrProvider      = "langwatch.provider"
 	AttrModelSource   = "langwatch.model_source" // alias|explicit_slash|implicit
 	AttrStreaming     = "langwatch.streaming"
-	AttrUsageIn       = "langwatch.usage.input_tokens"
-	AttrUsageOut      = "langwatch.usage.output_tokens"
-	// Cache-token counters follow the OTel GenAI semconv per
-	// rchaves's "OTEL semconv all the way" direction — the LangWatch
-	// trace ingest pipeline reads exactly these keys
-	// (langwatch/src/server/tracer/otel.traces.ts §950-970), and the
-	// names are what every OTEL-compliant collector / viewer
-	// (Tempo / Jaeger / Datadog / Grafana) surfaces natively. Internal
-	// code reads them via these constants; drop-and-rename is safe.
+	// Usage counters use the OTel GenAI semconv per rchaves's
+	// "OTEL semconv all the way" direction — the LangWatch trace
+	// canonicaliser (langwatch/src/server/app-layer/traces/
+	// canonicalisation/extractors/genAi.ts §227-243) reads exactly
+	// these keys, and every OTEL-compliant viewer (Tempo / Jaeger /
+	// Datadog / Grafana) surfaces them natively. Using
+	// langwatch.usage.* meant the LangWatch inbox rendered 0 tokens
+	// / $0 cost (rchaves iter 107 dogfood #1b).
+	AttrUsageIn                       = "gen_ai.usage.input_tokens"
+	AttrUsageOut                      = "gen_ai.usage.output_tokens"
 	AttrUsageCacheReadInputTokens     = "gen_ai.usage.cache_read.input_tokens"
 	AttrUsageCacheCreationInputTokens = "gen_ai.usage.cache_creation.input_tokens"
+	// GenAI request / response model + message attributes (OTel
+	// semconv). LangWatch's extractor hoists these into the trace
+	// input / output / token columns automatically.
+	AttrGenAIRequestModel  = "gen_ai.request.model"
+	AttrGenAIResponseModel = "gen_ai.response.model"
+	AttrGenAIInputMessages = "gen_ai.input.messages"
+	AttrGenAIOutputMessages = "gen_ai.output.messages"
+	AttrGenAISystem        = "gen_ai.system"
 	AttrCostUSD       = "langwatch.cost_usd"
 	AttrDurationMS    = "langwatch.duration_ms"
 	AttrStatus        = "langwatch.status"
