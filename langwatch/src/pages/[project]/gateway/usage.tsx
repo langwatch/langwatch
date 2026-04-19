@@ -26,6 +26,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { Link } from "~/components/ui/link";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -136,7 +137,14 @@ function GatewayUsagePage() {
                   <Table.Body>
                     {data.byVirtualKey.map((row) => (
                       <Table.Row key={row.virtualKeyId}>
-                        <Table.Cell>{row.name}</Table.Cell>
+                        <Table.Cell>
+                          <Link
+                            href={`/${project?.slug}/gateway/virtual-keys/${row.virtualKeyId}`}
+                            color="orange.600"
+                          >
+                            {row.name}
+                          </Link>
+                        </Table.Cell>
                         <Table.Cell>
                           <Text fontFamily="mono" fontSize="xs">
                             {row.displayPrefix}…
