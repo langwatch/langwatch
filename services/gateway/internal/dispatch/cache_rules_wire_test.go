@@ -284,6 +284,79 @@ func TestExtractModelField(t *testing.T) {
 	}
 }
 
+// BenchmarkApplyCacheOverride_* measures the full dispatcher path
+// (header check + rule evaluation + body apply) on the hot path, not
+// just the inner cacherules.Evaluate (iter 45's 24 ns/op bench).
+// Pairs with those to validate the ~700 ns spec §4 target end-to-end.
+// Measurements on amd64 VirtualApple @ 2.5 GHz (iter 53):
+//
+//	NoRulesFastPath:       70 ns/op   1 alloc    — empty rules early-out
+//	HeaderOnlyRespect:    252 ns/op   4 allocs   — parse + mode header
+//	RuleHitModeDisable:  5000 ns/op  63 allocs   — evaluator + JSON strip
+//	RuleHitModeForce:    4553 ns/op  64 allocs   — evaluator + JSON inject
+//
+// The no-rules path fits the 700 ns budget with 10× headroom. The
+// rule-hit paths are dominated by JSON marshal/unmarshal of the body
+// (~4-5 μs), which is expected — mutating a multi-KB body can't be
+// sub-microsecond. The evaluator + precedence logic itself stays at
+// ~25 ns per iter 45. If ops needs the rule-hit path faster, the win
+// is switching from encoding/json to a streaming JSON mutator (~5×
+// speedup possible) — flagged as v1.1 perf follow-up.
+func BenchmarkApplyCacheOverride_NoRulesFastPath(b *testing.B) {
+	d, _ := testDispatcher(&testing.T{})
+	bundle := testBundle(nil)
+	body := []byte(bodyWithCache())
+	req := postBody(string(body))
+	rec := httptest.NewRecorder()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = d.applyCacheOverride(rec, req, body, "req_x", bundle)
+	}
+}
+
+func BenchmarkApplyCacheOverride_HeaderOnlyRespect(b *testing.B) {
+	d, _ := testDispatcher(&testing.T{})
+	bundle := testBundle(nil)
+	body := []byte(bodyWithCache())
+	req := postBody(string(body))
+	req.Header.Set("X-LangWatch-Cache", "respect")
+	rec := httptest.NewRecorder()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = d.applyCacheOverride(rec, req, body, "req_x", bundle)
+	}
+}
+
+func BenchmarkApplyCacheOverride_RuleHitModeDisable(b *testing.B) {
+	d, _ := testDispatcher(&testing.T{})
+	rules := []auth.CacheRuleSpec{
+		{ID: "r_disable", Priority: 500, Matchers: auth.CacheRuleMatchers{VKPrefix: "lw_vk_live_"}, Action: auth.CacheRuleAction{Mode: "disable"}},
+	}
+	bundle := testBundle(rules)
+	body := []byte(bodyWithCache())
+	req := postBody(string(body))
+	rec := httptest.NewRecorder()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = d.applyCacheOverride(rec, req, body, "req_x", bundle)
+	}
+}
+
+func BenchmarkApplyCacheOverride_RuleHitModeForce(b *testing.B) {
+	d, _ := testDispatcher(&testing.T{})
+	rules := []auth.CacheRuleSpec{
+		{ID: "r_force", Priority: 500, Matchers: auth.CacheRuleMatchers{VKPrefix: "lw_vk_live_"}, Action: auth.CacheRuleAction{Mode: "force", TTLS: 600}},
+	}
+	bundle := testBundle(rules)
+	body := []byte(`{"system":[{"type":"text","text":"hi"}],"messages":[{"role":"user","content":"ping"}]}`)
+	req := postBody(string(body))
+	rec := httptest.NewRecorder()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _ = d.applyCacheOverride(rec, req, body, "req_x", bundle)
+	}
+}
+
 // sanity check the wire contract: respect does not mutate body at all.
 func TestApplyCacheOverride_RuleRespectIsPurePassthrough(t *testing.T) {
 	d, m := testDispatcher(t)
