@@ -11,6 +11,7 @@ import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import { GatewayAuditLogRepository } from "./auditLog.repository";
+import { serializeRowForAudit } from "./auditSerializer";
 import { ChangeEventRepository } from "./changeEvent.repository";
 import {
   defaultVirtualKeyConfig,
@@ -391,16 +392,11 @@ export class VirtualKeyService {
 }
 
 function serialiseForAudit(vk: VirtualKey): Prisma.InputJsonValue {
+  // Strip secret material. The base serializer already handles BigInt
+  // (revision) safely — see auditSerializer.ts.
   const { hashedSecret, previousHashedSecret, ...safe } = vk as VirtualKey & {
     hashedSecret: string;
     previousHashedSecret: string | null;
   };
-  // Prisma returns `revision` as BigInt; default JSON.stringify throws on
-  // BigInt so we coerce to a decimal string here. (Gateway reads revision
-  // off the bundle wire as a string too — see GatewayConfigPayload.revision.)
-  return JSON.parse(
-    JSON.stringify(safe, (_key, value) =>
-      typeof value === "bigint" ? value.toString() : value,
-    ),
-  );
+  return serializeRowForAudit(safe as unknown as Record<string, unknown>);
 }

@@ -22,6 +22,7 @@ import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
 import { GatewayAuditLogRepository } from "./auditLog.repository";
+import { serializeRowForAudit } from "./auditSerializer";
 import { nextResetAt, shouldResetBudget } from "./budgetWindow";
 import { ChangeEventRepository } from "./changeEvent.repository";
 
@@ -335,7 +336,7 @@ export class GatewayBudgetService {
           action: "BUDGET_CREATED",
           targetKind: "budget",
           targetId: row.id,
-          after: JSON.parse(JSON.stringify(row)),
+          after: serializeRowForAudit(row),
         },
         tx,
       );
@@ -348,7 +349,7 @@ export class GatewayBudgetService {
   async update(input: UpdateBudgetInput): Promise<GatewayBudget> {
     const existing = await this.get(input.id, input.organizationId);
     if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
-    const before = JSON.parse(JSON.stringify(existing));
+    const before = serializeRowForAudit(existing);
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.gatewayBudget.update({
@@ -384,7 +385,7 @@ export class GatewayBudgetService {
           targetKind: "budget",
           targetId: updated.id,
           before,
-          after: JSON.parse(JSON.stringify(updated)),
+          after: serializeRowForAudit(updated),
         },
         tx,
       );
@@ -395,7 +396,7 @@ export class GatewayBudgetService {
   async archive(input: ArchiveBudgetInput): Promise<GatewayBudget> {
     const existing = await this.get(input.id, input.organizationId);
     if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
-    const before = JSON.parse(JSON.stringify(existing));
+    const before = serializeRowForAudit(existing);
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.gatewayBudget.update({
@@ -418,7 +419,7 @@ export class GatewayBudgetService {
           targetKind: "budget",
           targetId: updated.id,
           before,
-          after: JSON.parse(JSON.stringify(updated)),
+          after: serializeRowForAudit(updated),
         },
         tx,
       );
