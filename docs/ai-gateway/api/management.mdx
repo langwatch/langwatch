@@ -282,7 +282,7 @@ Common management-side types:
 
 ## Audit
 
-Every write emits a row in `GatewayAuditLog` — visible under **Settings → Organization → Activity**. Writes via API tokens without an associated user (service tokens) are attributed to `actor = "svc_<projectId>"`.
+Every write emits a row in `GatewayAuditLog` — visible under **/settings/audit-log** (filter by resource type `virtualKey` / `gatewayBudget` / `gatewayProvider`). Writes via API tokens without an associated user (service tokens) are attributed to `actor = "svc_<projectId>"`. See [Audit log](/ai-gateway/audit) for the REST export path + the v1.1 unification roadmap.
 
 ## Rate limits
 
@@ -294,9 +294,9 @@ Both the REST API and the tRPC routers (`virtualKeys.*`, `gatewayBudgets.*`, `ga
 
 This matters for testing: the BDD scenarios in `specs/ai-gateway/public-rest-api.feature` include a parity check that asserts the two surfaces return equivalent data for the same resource after case normalization. If you rely on a field in one, it's guaranteed to exist in the other.
 
-## Future
+## OpenAPI
 
-The REST routes will gain an OpenAPI 3.1 schema via `hono-openapi`'s `describeRoute` annotations (tracked in Lane B iter 7). Once published, the CLI's `VirtualKeysApiService`, `GatewayBudgetsApiService`, `GatewayProvidersApiService` will be regenerated from the schema so any drift between the server and the client is caught at build time.
+All REST routes are annotated with `hono-openapi`'s `describeRoute` schemas (shipped in Lane B iter 8 + hardened through iter 36). The generated OpenAPI 3.1 spec is served at `/api/gateway/v1/openapi.json` and renders inside the platform's API-reference UI. The CLI's `VirtualKeysApiService`, `GatewayBudgetsApiService`, `GatewayProvidersApiService` DTOs are hand-authored against the same schemas; a v1.1 improvement is to regenerate them from the OpenAPI output so drift fails at build time.
 
 ## See also
 

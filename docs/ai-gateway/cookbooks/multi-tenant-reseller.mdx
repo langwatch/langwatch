@@ -199,9 +199,9 @@ Because the response is standard OpenAI-compatible, your error handler only need
 
 ## Audit — who did what
 
-Every write through your backend token is audited with `actor = "svc_<your_project_id>"`, action, target, and metadata. Filter the audit log on `resource_type = "VirtualKey"` to get a per-customer provisioning history. Under **Settings → Organization → Activity** in the LangWatch UI.
+Every write through your backend token is audited with `actor = "svc_<your_project_id>"`, action, target, and metadata. Filter the audit log on `resource_type = "virtualKey"` to get a per-customer provisioning history. Under **/settings/audit-log** in the LangWatch UI.
 
-If you need SIEM export: ClickHouse `GatewayAuditLog` table is queryable. Set up a daily export to your SIEM's ingestion pipeline.
+If you need SIEM export: the Postgres `GatewayAuditLog` table is queryable (not ClickHouse — gateway writes are PG-authoritative per finding #8 architecture). Set up a daily export to your SIEM's ingestion pipeline; see [Audit log](/ai-gateway/audit) for the REST export path (`GET /api/gateway/v1/audit`).
 
 ## Gotchas
 

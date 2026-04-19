@@ -82,7 +82,7 @@ Every write through the REST API or the UI emits a row in `GatewayAuditLog`:
 - `target` — resource id the action affected.
 - `metadata` — JSON diff on update actions.
 
-Audit logs are visible to organization admins under **Settings → Organization → Activity**. Retention: 7 years default, extendable on request.
+Audit logs are visible to organization admins under **/settings/audit-log** (filter by resource type to narrow to gateway mutations). Retention: 7 years default, extendable on request.
 
 Rotations and revocations are considered security-sensitive and generate an organization-wide notification (configurable).
 
