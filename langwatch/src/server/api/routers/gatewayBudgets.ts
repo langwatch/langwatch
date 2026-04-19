@@ -48,7 +48,11 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayBudgetService.create(ctx.prisma);
       const rows = await service.list(input.organizationId);
-      const scopeTargets = await resolveScopeTargetsBatch(ctx.prisma, rows);
+      const scopeTargets = await resolveScopeTargetsBatch(
+        ctx.prisma,
+        rows,
+        input.organizationId,
+      );
       return rows.map((b) => ({
         ...toDto(b),
         scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
@@ -61,7 +65,15 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(ctx.prisma);
       const rows = await service.listForProject(input.projectId);
-      const scopeTargets = await resolveScopeTargetsBatch(ctx.prisma, rows);
+      const project = await ctx.prisma.project.findUnique({
+        where: { id: input.projectId },
+        select: { team: { select: { organizationId: true } } },
+      });
+      const scopeTargets = await resolveScopeTargetsBatch(
+        ctx.prisma,
+        rows,
+        project?.team.organizationId ?? null,
+      );
       return rows.map((b) => ({
         ...toDto(b),
         scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
@@ -174,6 +186,7 @@ export type BudgetListScopeTarget = {
 async function resolveScopeTargetsBatch(
   prisma: import("@prisma/client").PrismaClient,
   budgets: Array<{ scopeType: string; scopeId: string }>,
+  organizationId: string | null,
 ): Promise<Map<string, BudgetListScopeTarget>> {
   const ids: Record<string, Set<string>> = {
     ORGANIZATION: new Set(),
@@ -185,6 +198,20 @@ async function resolveScopeTargetsBatch(
   for (const b of budgets) {
     ids[b.scopeType]?.add(b.scopeId);
   }
+  // VirtualKey is strictly project-scoped; the multitenancy middleware
+  // rejects findMany without projectId / projectId.in in the where
+  // clause. Derive the set of project ids for the budget's org up
+  // front so the VK lookup can filter inside that scope. Cheap — the
+  // Project table is tiny and this only runs when the page loads.
+  const orgProjectIds =
+    ids.VIRTUAL_KEY?.size && organizationId
+      ? await prisma.project
+          .findMany({
+            where: { team: { organizationId } },
+            select: { id: true },
+          })
+          .then((rows) => rows.map((r) => r.id))
+      : [];
   const [orgs, teams, projects, vks, users] = await Promise.all([
     ids.ORGANIZATION?.size
       ? prisma.organization.findMany({
@@ -204,9 +231,12 @@ async function resolveScopeTargetsBatch(
           select: { id: true, name: true, slug: true },
         })
       : Promise.resolve([]),
-    ids.VIRTUAL_KEY?.size
+    ids.VIRTUAL_KEY?.size && orgProjectIds.length
       ? prisma.virtualKey.findMany({
-          where: { id: { in: [...ids.VIRTUAL_KEY!] } },
+          where: {
+            id: { in: [...ids.VIRTUAL_KEY!] },
+            projectId: { in: orgProjectIds },
+          },
           select: {
             id: true,
             name: true,
