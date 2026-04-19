@@ -395,5 +395,12 @@ function serialiseForAudit(vk: VirtualKey): Prisma.InputJsonValue {
     hashedSecret: string;
     previousHashedSecret: string | null;
   };
-  return JSON.parse(JSON.stringify(safe));
+  // Prisma returns `revision` as BigInt; default JSON.stringify throws on
+  // BigInt so we coerce to a decimal string here. (Gateway reads revision
+  // off the bundle wire as a string too — see GatewayConfigPayload.revision.)
+  return JSON.parse(
+    JSON.stringify(safe, (_key, value) =>
+      typeof value === "bigint" ? value.toString() : value,
+    ),
+  );
 }
