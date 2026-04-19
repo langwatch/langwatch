@@ -155,6 +155,85 @@ Returns the `gpc_*` id for the binding, which you then pass to `langwatch virtua
 
 List output colourises health: green `healthy`, yellow `degraded`, red `unhealthy`.
 
+## Cache rules
+
+Operator-authored [cache-control rules](/ai-gateway/cache-control) — force / disable / respect cache behaviour per virtual-key, tag, model, principal, or request metadata. Rules evaluate first-match-wins by priority DESC on the gateway hot path; a matched rule wins over the per-VK default but loses to a per-request `X-LangWatch-Cache` header.
+
+```bash
+# List all cache rules in the current organisation (sorted priority DESC)
+langwatch cache-rules list
+langwatch cache-rules list --format json
+
+# Get a single rule by id
+langwatch cache-rules get <rule_id>
+
+# Create (matchers file OR inline flags; at least one matcher required)
+langwatch cache-rules create \
+  --name force-cache-enterprise \
+  --priority 300 \
+  --mode force --ttl 600 \
+  --match-tag tier=enterprise
+
+# Multiple matchers are ANDed; all of these match the same single rule
+langwatch cache-rules create \
+  --name disable-cache-evals \
+  --priority 200 \
+  --mode disable \
+  --match-vk-prefix lw_vk_eval_ \
+  --match-metadata x-langwatch-suite=evals
+
+# Match by model (exact or trailing-star glob; no regex in v1)
+langwatch cache-rules create \
+  --name force-on-claude-haiku \
+  --priority 150 \
+  --mode force --ttl 300 \
+  --match-model "claude-haiku-*"
+
+# Update (fields not passed are left untouched; matchers/action REPLACE when passed)
+langwatch cache-rules update <rule_id> --priority 400
+langwatch cache-rules update <rule_id> --disable     # soft-toggle enabled=false
+langwatch cache-rules update <rule_id> --enable      # enabled=true
+
+# Archive (soft-delete; stops matching new requests, audit log retains before/after)
+langwatch cache-rules archive <rule_id>
+
+# Bulk import from JSON (idempotent — matches on name; safe to re-run)
+langwatch cache-rules apply --file cache-rules.json
+```
+
+`--mode` is one of `respect`, `force`, `disable`. `--ttl <seconds>` is clamped to `[0, 86400]` and only applies when `--mode force`. `--salt <string>` (max 64 chars) acts as a cache-bust tag — change it on an existing rule to force cache regeneration on next hit.
+
+Matcher flags (all optional; at least one required on create):
+
+| flag | maps to | semantics |
+|---|---|---|
+| `--match-vk <vk_id>` | `vk_id` | Exact match against the VK display prefix |
+| `--match-vk-prefix <str>` | `vk_prefix` | `HasPrefix` against the same VK display prefix |
+| `--match-tag <key=value>` (repeatable) | `vk_tags[]` | AND-subset — VK must carry EVERY listed tag |
+| `--match-principal <user_id>` | `principal_id` | Exact match against the VK's principal user |
+| `--match-model <name-or-glob>` | `model` | Exact or trailing-`*` glob; no regex in v1 |
+| `--match-metadata <key=value>` | `request_metadata` | Exact key-value in the request metadata |
+
+List output colourises `mode` and shows a one-line matcher summary per row:
+
+```
+Priority  Name                     Match                                  Mode      Enabled  Updated
+300       force-cache-enterprise   tags:[tier=enterprise]                 force(600)  ✓      2h ago
+200       disable-cache-evals      vk~lw_vk_eval_*, meta:x-langwatch-…    disable     ✓      2h ago
+100       respect-on-haiku         model=claude-haiku-4-5-20251001        respect     ✓      2h ago
+```
+
+Required permission on the CLI token:
+
+| Command | Permission |
+|---|---|
+| `cache-rules list|get` | `gatewayCacheRules:view` |
+| `cache-rules create` | `gatewayCacheRules:create` |
+| `cache-rules update` | `gatewayCacheRules:update` |
+| `cache-rules archive|apply` | `gatewayCacheRules:delete` + `:create` (apply does both) |
+
+<Info>Rules are organization-scoped; the CLI authenticates to a specific project API token but the REST layer resolves the owning organization transparently. No `--organization` flag needed.</Info>
+
 ## Dogfooding loop
 
 After you've bound a provider and minted a VK, call the gateway end-to-end:
