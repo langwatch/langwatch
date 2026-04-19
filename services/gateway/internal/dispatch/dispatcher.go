@@ -905,8 +905,20 @@ func (d *Dispatcher) enqueueDebit(b *auth.Bundle, grq string, resolved ResolvedM
 }
 
 // extractUsage reads the usage / cost fields off a BifrostChatResponse.
-// Iter 3 pulls only the basic input/output counts; cached-read/write
-// columns are iter 4 once we map Bifrost's per-provider usage extras.
+// Bifrost normalises cached-token accounting across providers:
+//
+//   - Anthropic: cache_read_input_tokens → CachedReadTokens,
+//     cache_creation_input_tokens → CachedWriteTokens (providers/anthropic)
+//   - OpenAI: cached_tokens → CachedReadTokens (no write; their cache is
+//     automatic & billed at 50% discount on read only)
+//   - Azure OpenAI: inherits OpenAI mapping
+//   - Gemini: cached_content_token_count → CachedReadTokens
+//   - Bedrock: inherits the underlying provider's cache semantics
+//
+// PromptTokens already INCLUDES CachedReadTokens + CachedWriteTokens on the
+// Bifrost normalised path (see providers/anthropic/anthropic.go:952), so
+// downstream cost calculation in the control plane must NOT add them again.
+//
 // Cost is intentionally left 0 — control-plane recomputes from tokens
 // using its pricing catalog.
 func extractUsage(resp *bfschemas.BifrostChatResponse) (in, out, cr, cw int, cost float64) {
@@ -915,6 +927,10 @@ func extractUsage(resp *bfschemas.BifrostChatResponse) (in, out, cr, cw int, cos
 	}
 	in = resp.Usage.PromptTokens
 	out = resp.Usage.CompletionTokens
+	if d := resp.Usage.PromptTokensDetails; d != nil {
+		cr = d.CachedReadTokens
+		cw = d.CachedWriteTokens
+	}
 	return
 }
 
