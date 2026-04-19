@@ -56,8 +56,7 @@ vi.mock("~/hooks/useLicenseEnforcement", async () =>
 // Mock scrollIntoView which jsdom doesn't support
 Element.prototype.scrollIntoView = vi.fn();
 
-// TODO(#3022): pre-existing failures unmasked by #3001 — re-enable after fix
-describe.skip("<OnlineEvaluationDrawer /> preconditions", () => {
+describe("<OnlineEvaluationDrawer /> preconditions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetState();
@@ -84,9 +83,9 @@ describe.skip("<OnlineEvaluationDrawer /> preconditions", () => {
 
     // Select trace level
     await waitFor(() => {
-      expect(screen.getByLabelText(/Trace Level/i)).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: /Trace Level/i })).toBeInTheDocument();
     });
-    await user.click(screen.getByLabelText(/Trace Level/i));
+    await user.click(screen.getByRole("radio", { name: /Trace Level/i }));
     await vi.advanceTimersByTimeAsync(50);
 
     // Select evaluator via flow callback
