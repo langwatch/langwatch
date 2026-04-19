@@ -1,0 +1,146 @@
+---
+title: Migrating from Portkey
+description: Move your Portkey gateway configuration to LangWatch — virtual keys, budgets, fallback, guardrails — with a side-by-side mapping of concepts and a concrete code migration.
+sidebarTitle: Migrate from Portkey
+---
+
+Portkey and LangWatch both sit between your app and the upstream LLM providers, and both speak the OpenAI-compatible dialect. The feature surface overlaps heavily but the data-model and governance primitives differ in ways that shape your migration. This cookbook is the concrete end-to-end playbook for teams already on Portkey.
+
+<Note>**Terminology crosswalk.** Portkey and LangWatch use overlapping names for different concepts (e.g. "virtual key" means different things). The table below is the single source of truth — refer back to it whenever a section feels ambiguous.</Note>
+
+## Concept mapping at a glance
+
+| What you did in Portkey | What it becomes in LangWatch | Notes |
+|---|---|---|
+| **Virtual Key** (proxy credential for a single provider account) | **Provider Binding** at a project | LangWatch splits Portkey's "VK" into two primitives — a **ModelProvider** (the actual provider credential, org/team/project-scoped) and a **GatewayProviderCredential** (the gateway-level binding with rate-limit + slot + fallback priority). |
+| **Key / API Key** (client-facing credential) | **Virtual Key** (`lw_vk_live_…`) | LangWatch's VK is what your client code presents. It points to one or more bindings via the fallback chain, attaches budgets, and carries per-caller policy. |
+| **Config** (JSON routing blob) | **VK `config.*` JSON** + **GatewayProviderCredential** fields | LangWatch spreads a Portkey config across two JSON shapes — client-side routing lives in the VK, provider-side defaults live in the binding. |
+| **Budget** (spend cap, key-scoped) | **GatewayBudget** (org / team / project / VK / principal scoped) | LangWatch budgets are hierarchical: a single request is checked against *every* applicable budget, from org down. Portkey scopes at the key level only. |
+| **Guardrails** (input/output filters attached to a key) | **Evaluator monitors with `executionMode=AS_GUARDRAIL`** attached to a VK | LangWatch leverages the existing evaluator/monitor pipeline. Any LangWatch evaluator can become a gateway guardrail — no separate product surface. |
+| **Strategy: fallback** (provider retry ladder) | **VK `config.fallback_chain` + GatewayProviderCredential slots** | Ordered list of slot names (`primary`, `fallback-1`, …) that walk on 5xx/429/timeout per the standard precedence. |
+| **Strategy: loadbalance** (weight-spread across keys) | v1.1 — see §Outstanding | LangWatch v1 doesn't ship multi-key sibling loadbalancing; the Portkey loadbalancer is the biggest v1 gap. v1.1 adds sibling-key rotation under GatewayProviderCredential. |
+| **Cache (Simple)** | **Anthropic `cache_control` passthrough + `X-LangWatch-Cache` override** | LangWatch v1 is pass-through by default (respect Anthropic's explicit cache hints) + rule-based enforcement for force/disable. Semantic caching is v1.1. |
+| **Cache (Semantic)** | v1.1 — `specs/ai-gateway/semantic-caching.feature` drafted | Not in v1. |
+| **Prompt Library** | **LangWatch Prompt Management** (native product surface) | Already-existing LangWatch feature, separate from the gateway. |
+| **Traces / Logs** | **LangWatch Traces** + **GatewayBudgetLedger** + **Audit log** | Every gateway request already fans out to your LangWatch trace view; no extra integration. Budget ledger is the cost-accounting layer; audit log tracks governance mutations. |
+
+## Code migration — the minimum change
+
+If your current Portkey setup looks like:
+
+```ts
+import Portkey from "portkey-ai";
+
+const portkey = new Portkey({
+  apiKey: process.env.PORTKEY_API_KEY,
+  virtualKey: "my-openai-vk",
+});
+
+const response = await portkey.chat.completions.create({ ... });
+```
+
+Your LangWatch equivalent:
+
+```ts
+import OpenAI from "openai";
+
+const openai = new OpenAI({
+  baseURL: "https://gateway.langwatch.ai/v1",
+  apiKey: process.env.LANGWATCH_VK,       // e.g. lw_vk_live_01HZX9K3M...
+});
+
+const response = await openai.chat.completions.create({ ... });
+```
+
+Two things moved:
+
+1. **No Portkey SDK.** LangWatch speaks the OpenAI protocol natively — use any official OpenAI client (Node, Python, Go, Java). Same story for Anthropic: `new Anthropic({ baseURL: "https://gateway.langwatch.ai" })` with your VK as the `apiKey`.
+2. **`virtualKey` header → `apiKey` bearer.** Portkey carries the VK in a custom header; LangWatch just uses the standard bearer so you don't need provider-specific plumbing.
+
+## Config migration — Portkey Config JSON → LangWatch VK + Bindings
+
+A typical Portkey config:
+
+```json
+{
+  "strategy": { "mode": "fallback" },
+  "targets": [
+    { "virtual_key": "openai-vk", "override_params": { "max_tokens": 500 } },
+    { "virtual_key": "anthropic-vk" }
+  ],
+  "cache": { "mode": "simple", "max_age": 3600 },
+  "retry": { "attempts": 3 }
+}
+```
+
+Maps to:
+
+**Step 1 — configure ModelProviders in LangWatch Settings**
+
+Go to **Settings → Model Providers** and add entries for OpenAI + Anthropic with your provider-issued API keys. These are the LangWatch equivalent of Portkey's "Virtual Keys to actual providers" layer, and they're reusable across gateway AND prompt playground AND evaluators.
+
+**Step 2 — create Provider Bindings under the gateway**
+
+From **AI Gateway → Providers → Bind provider**:
+
+| Binding | Slot | Rate limit | Fallback priority |
+|---|---|---|---|
+| OpenAI (from ModelProviders) | `primary` | `rpm=60 rpd=10000` (or your caps) | 1 |
+| Anthropic (from ModelProviders) | `fallback-1` | `rpm=30 rpd=5000` | 2 |
+
+**Step 3 — create a Virtual Key with the fallback chain**
+
+From **AI Gateway → Virtual Keys → New virtual key**:
+
+- **Name**: whatever you called the Portkey config (e.g. `prod-chat`)
+- **Fallback chain**: `primary` then `fallback-1`
+- **Cache policy**: `respect` (default — honours Anthropic `cache_control` passthrough)
+- **Optional**: attach an existing LangWatch evaluator with `executionMode=AS_GUARDRAIL` as a `pre` or `post` hook if you had Portkey guardrails.
+
+The `X-LangWatch-Cache: force` / `X-LangWatch-Cache: disable` header overrides the VK default per-request. Use `force` on idempotent eval harnesses to dedupe cost; use `disable` to bust caches during debugging (equivalent to Portkey's `x-portkey-cache-force-refresh: true`).
+
+**Step 4 — attach a budget**
+
+From **AI Gateway → Budgets → New budget**:
+
+- **Scope**: `project` (or `organization` for fleet-wide) + target the new project
+- **Window**: `month`
+- **Limit**: your Portkey spend cap
+- **on_breach**: `block` (hard-cap, returns 402) or `warn` (soft-cap, adds `X-LangWatch-Budget-Warning` header)
+
+LangWatch budgets stack hierarchically — your org budget PLUS the project budget PLUS any per-VK budget all apply to the same request. This is a deliberate step-up from Portkey's key-scoped budgets and is one of the key enterprise-grade features.
+
+## Rollout pattern — gradual migration without a big-bang
+
+We recommend the following sequence over 2-4 weeks:
+
+1. **Week 1 — shadow traffic.** Mint a LangWatch VK with `config.shadow_mode: true` (v1.1; for v1 just log both upstream responses). Route 1-5% of production traffic through LangWatch alongside Portkey. Compare latency, error rate, and response equality.
+2. **Week 2 — canary by tenant.** Route low-risk tenants (internal users, dev environments) fully through LangWatch. Portkey still carries the majority.
+3. **Week 3 — flip customer traffic.** Route 50% of customer traffic through LangWatch, with a feature flag that can instantly revert.
+4. **Week 4 — decommission Portkey.** Once metrics show parity, null out the Portkey integration. Keep the Portkey org active for 30 days in case of rollback; delete after.
+
+Run `/gateway/usage` spend + `/gateway/audit` mutation history in parallel to your existing Portkey analytics during the rollout — the LangWatch audit log will show you every VK / budget / provider mutation, which is especially useful in the cutover period when your ops team is still adjusting governance.
+
+## Feature-parity gaps (be explicit)
+
+Some Portkey features don't have LangWatch v1 equivalents. If any of these are load-bearing for you, weigh them carefully:
+
+- **Loadbalance strategy** (sibling-key rotation for rate-limit absorption) — LangWatch v1 routes to one credential per provider slot. Sibling-key loadbalancing is on the v1.1 roadmap. Workaround: if you genuinely need it, keep Portkey for those routes, run LangWatch in parallel for governance.
+- **Semantic cache** — LangWatch v1 ships `respect` / `force` / `disable` modes for explicit Anthropic cache_control + a rule engine; semantic similarity lookups are v1.1.
+- **Prompt management embedded in the gateway** — LangWatch has a dedicated Prompt Management product surface that's more powerful than Portkey's embedded library, but it's a separate area rather than a subfolder of the gateway.
+- **Guardrails catalog** — Portkey ships a pre-built library of guardrails; LangWatch reuses the evaluator catalog you already have (and any custom evaluator you've built). For most enterprise teams this is a net win (you own the logic); for quick-start it's a cold start.
+
+## What to watch during + after migration
+
+- **Per-tenant spend** — compare your Portkey invoice amount to `sum(GatewayBudgetLedger.amountUsd)` on the same time window. First-week variance ≤ 3% is normal (different rounding / model-version timings); > 5% warrants investigation.
+- **p99 latency** — LangWatch's gateway hot path is ~700 ns of gateway-local overhead; upstream provider latency dominates. Compare p99 with + without the gateway (shadow mode is the cleanest A/B). Any regression > 10 ms is worth a ticket.
+- **401 rate** — during the VK rollout window, any client still hitting Portkey's endpoint will 404 post-decommission. Set an alert on `gateway_http_requests_total{status="401"}` rate spikes to catch stragglers before customer escalations.
+- **Audit log volume** — your team will mutate more governance-configuration post-migration (budgets, guardrails, rotation policies). Expect 10-50× more audit rows than Portkey's minimal audit surface — plan retention accordingly.
+
+## See also
+
+- [Virtual Keys](/ai-gateway/virtual-keys) — the LangWatch VK reference.
+- [Budgets](/ai-gateway/budgets) — hierarchical budget semantics.
+- [Provider Bindings](/ai-gateway/provider-bindings) — the scope model.
+- [Credential-leak incident response](/ai-gateway/cookbooks/credential-leak-incident) — the "oh no it's on GitHub" playbook.
+- [Cache-control rollout](/ai-gateway/cookbooks/cache-control-rollout) — how to roll cache rules to production.
