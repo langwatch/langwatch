@@ -72,6 +72,14 @@ export const modelProviderRouter = createTRPCRouter({
           .optional()
           .nullable(),
         defaultModel: z.string().optional(),
+        // Principal-style scope (iter 108 #2). Omitted → legacy
+        // project-scoped default preserved. Server still enforces
+        // permission per scope (org admin for ORGANIZATION, team
+        // admin for TEAM, etc) — checkProjectPermission below gates
+        // the PROJECT path; the scope-gated path adds its own
+        // authz check inside the service in a later commit.
+        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]).optional(),
+        scopeId: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("project:update"))
@@ -90,6 +98,8 @@ export const modelProviderRouter = createTRPCRouter({
         customEmbeddingsModels: input.customEmbeddingsModels,
         extraHeaders: input.extraHeaders,
         defaultModel: input.defaultModel,
+        scopeType: input.scopeType,
+        scopeId: input.scopeId,
       });
     }),
 
