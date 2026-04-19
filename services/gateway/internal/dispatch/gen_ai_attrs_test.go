@@ -147,6 +147,46 @@ func TestStampGenAIResponseMeta_NilResponse(t *testing.T) {
 	}
 }
 
+func TestResolveSystemInstructions_PrefersAnthropicTopLevel(t *testing.T) {
+	parsed := openaiChatRequest{
+		System:   json.RawMessage(`"You are a terse assistant."`),
+		Messages: json.RawMessage(`[{"role":"system","content":"ignored"},{"role":"user","content":"hi"}]`),
+	}
+	got := resolveSystemInstructions(parsed)
+	if got != `"You are a terse assistant."` {
+		t.Errorf("Anthropic system should win, got %q", got)
+	}
+}
+
+func TestResolveSystemInstructions_HoistsFromOpenAIMessages(t *testing.T) {
+	parsed := openaiChatRequest{
+		Messages: json.RawMessage(`[{"role":"system","content":"You are a terse assistant."},{"role":"user","content":"hi"}]`),
+	}
+	got := resolveSystemInstructions(parsed)
+	if got == "" {
+		t.Fatal("expected hoisted system instructions")
+	}
+	var arr []map[string]any
+	if err := json.Unmarshal([]byte(got), &arr); err != nil {
+		t.Fatalf("not valid JSON: %v", err)
+	}
+	if len(arr) != 1 || arr[0]["role"] != "system" {
+		t.Errorf("unexpected shape: %v", arr)
+	}
+	if arr[0]["content"] != "You are a terse assistant." {
+		t.Errorf("content mismatch: %v", arr[0]["content"])
+	}
+}
+
+func TestResolveSystemInstructions_EmptyWhenNoSystem(t *testing.T) {
+	parsed := openaiChatRequest{
+		Messages: json.RawMessage(`[{"role":"user","content":"hi"}]`),
+	}
+	if got := resolveSystemInstructions(parsed); got != "" {
+		t.Errorf("expected empty, got %q", got)
+	}
+}
+
 func TestExtractOutputMessages_ShapeMatchesCanonicaliser(t *testing.T) {
 	content := "hello there"
 	role := bfschemas.ChatMessageRoleAssistant
