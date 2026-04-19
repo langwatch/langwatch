@@ -18,7 +18,7 @@ Ships the first version of the **LangWatch AI Gateway** — a Go data plane sitt
 - Anthropic `cache_control` byte-for-byte passthrough (`respect` default), plus `X-LangWatch-Cache: disable` override — recursive JSON-walk strips `cache_control` at any nesting depth (messages/system/tools) for cold-cache benchmarks and bug repros. `force` / `ttl=NNN` parsed but deferred to v1.1 (400 `cache_override_not_implemented`). `X-LangWatch-Cache-Mode` response header echoes applied mode independent of upstream outcome.
 - Per-VK `blocked_patterns` (4 dimensions — tools / mcp / urls / models) enforced with RE2 regex deny/allow (deny-wins). Runs after auth + rate-limit, before body-parse / guardrails / budget / bifrost, so blocked requests incur zero provider cost. URL extraction is permissive (every `http(s)://` URL anywhere in the body). Invalid regex → fail-closed 503 (never silent-bypass).
 - Three guardrail directions — `pre` (block/modify before dispatch), `post` (block/modify/skip-on-content-blocks after upstream returns), `stream_chunk` (terminate-on-block on visible-text frames only, v1 modify deferred). Fail-closed by default on `pre`+`post` with per-direction VK opt-in (`guardrails.request_fail_open` / `response_fail_open`); stream_chunk fail-open-with-metric by contract. Zero-cost `blocked_by_guardrail` debit on post-block so dashboards still see the attempt. Byte-locked terminal SSE frames with distinct `code` (`upstream_mid_stream_failure` vs `stream_chunk_blocked`) so clients can key off the cause.
-- Per-project OTLP routing via `ProjectEndpointRegistry` — customer spans land in the customer's LangWatch project without env config.
+- Per-project trace attribution via `langwatch.project_id` span attribute — gateway ships to a single OTel endpoint; LangWatch ingest files each trace under the owning project at ingest time.
 - Streaming: pre-connection transparent fallback; mid-stream terminate with byte-locked SSE error frame (never silent-switch).
 - Streaming usage extraction across all providers; surfaces `X-LangWatch-Usage-Warning` + span `success_no_usage` when upstream doesn't report.
 - Trace propagation: honours incoming `traceparent`, emits `X-LangWatch-Trace-Id` / `X-LangWatch-Span-Id` / `X-LangWatch-Request-Id` / re-injected `traceparent`.
@@ -31,7 +31,7 @@ Ships the first version of the **LangWatch AI Gateway** — a Go data plane sitt
 - 13 new Prisma models + 8 enums. Internal `/api/internal/gateway/*` (HMAC-signed, ±300 s replay, sig-before-timestamp verify). Public `/api/gateway/v1/*` (standard project API tokens, same service layer as tRPC, full `describeRoute` OpenAPI coverage).
 - 6 new RBAC resources + per-resource actions; ConfigMaterialiser → bundle → JWT on `/resolve-key`; `/changes` long-poll.
 - `LOCAL_DEV_BYPASS_AUTH` for dev environments (BetterAuth-signed cookie).
-- `Project.observabilityEndpoint` + UI to configure per-project OTLP routing.
+- Per-tenant trace attribution via `langwatch.project_id` span attribute — gateway ships to a single endpoint, ingest files under the right project.
 
 ### UI (Vite SPA, `langwatch/src/pages/[project]/gateway/`)
 
@@ -95,7 +95,7 @@ CI gate: > 2× regression blocks PR merges.
 3. `dogfood-03-providers-empty.png` — Providers empty state with "Bind your first provider" CTA
 4. `dogfood-04-usage-empty.png` — Usage page with 24 h / 7 d / 30 d / 90 d window toggles
 5. `dogfood-05-audit-log-empty.png` — Audit log with filter-by-action + filter-by-target pills
-6. `dogfood-06-settings.png` — Gateway Settings (`observability_endpoint` config)
+6. `dogfood-06-settings.png` — Gateway Settings page (pre-removal snapshot — the `observability_endpoint` override surface was deleted in Lane B iter 25 / Lane A iter 34; gateway now routes unconditionally to `GATEWAY_OTEL_DEFAULT_ENDPOINT` with per-project attribution via span attributes)
 7. `dogfood-07-vk-drawer-new.png` — New Virtual Key drawer (pre-iter-23 capability preview)
 8. `dogfood-08-model-providers.png` — Model Providers settings (chrome comparison baseline)
 

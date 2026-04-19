@@ -15,8 +15,8 @@ gateway:
   enabled: true
   replicas: 2
   image:
-    repository: langwatch/ai-gateway
-    tag: v1.0.0
+    repository: ghcr.io/langwatch/ai-gateway
+    tag: v1.0.0  # or a 12-char sha — main pushes `:latest` + `:<sha12>`
   service:
     type: ClusterIP
     port: 7400
