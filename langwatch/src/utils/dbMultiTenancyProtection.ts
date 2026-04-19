@@ -84,6 +84,23 @@ const EXEMPT_MODELS = [
    * organizationId + matcher fields.
    */
   "GatewayCacheRule",
+  /**
+   * ModelProvider switched to principal-style scope (iter 107–108,
+   * ADR-016): each row carries (scopeType, scopeId) mirroring
+   * RoleBinding's tenancy. `findAllAccessibleForProject` walks the
+   * scope ladder (PROJECT→TEAM→ORGANIZATION) with an OR across the
+   * three scope buckets — the OR branches key off scopeId, not
+   * projectId. The service layer re-enforces the tenancy boundary by
+   * first looking up the project row (`project.findUnique`) to derive
+   * the correct teamId + organizationId, then constraining the OR
+   * clauses to those specific IDs. Exempting matches the pattern we
+   * set for every other org-scoped gateway table above.
+   *
+   * Every other repo method (findById/findByProvider/findAll) still
+   * constrains by projectId at the call site; the existing unit
+   * tests pin that shape.
+   */
+  "ModelProvider",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
