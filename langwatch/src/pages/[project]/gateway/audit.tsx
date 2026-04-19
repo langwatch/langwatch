@@ -35,9 +35,12 @@ type AuditAction =
   | "BUDGET_DELETED"
   | "PROVIDER_BINDING_CREATED"
   | "PROVIDER_BINDING_UPDATED"
-  | "PROVIDER_BINDING_DELETED";
+  | "PROVIDER_BINDING_DELETED"
+  | "CACHE_RULE_CREATED"
+  | "CACHE_RULE_UPDATED"
+  | "CACHE_RULE_DELETED";
 
-type TargetKind = "virtual_key" | "budget" | "provider_binding";
+type TargetKind = "virtual_key" | "budget" | "provider_binding" | "cache_rule";
 
 const ACTION_OPTIONS: Array<{ label: string; value: AuditAction | "" }> = [
   { label: "All actions", value: "" },
@@ -52,6 +55,9 @@ const ACTION_OPTIONS: Array<{ label: string; value: AuditAction | "" }> = [
   { label: "Provider binding created", value: "PROVIDER_BINDING_CREATED" },
   { label: "Provider binding updated", value: "PROVIDER_BINDING_UPDATED" },
   { label: "Provider binding deleted", value: "PROVIDER_BINDING_DELETED" },
+  { label: "Cache rule created", value: "CACHE_RULE_CREATED" },
+  { label: "Cache rule updated", value: "CACHE_RULE_UPDATED" },
+  { label: "Cache rule deleted", value: "CACHE_RULE_DELETED" },
 ];
 
 const TARGET_OPTIONS: Array<{ label: string; value: TargetKind | "" }> = [
@@ -59,6 +65,7 @@ const TARGET_OPTIONS: Array<{ label: string; value: TargetKind | "" }> = [
   { label: "Virtual key", value: "virtual_key" },
   { label: "Budget", value: "budget" },
   { label: "Provider binding", value: "provider_binding" },
+  { label: "Cache rule", value: "cache_rule" },
 ];
 
 function AuditLogPage() {

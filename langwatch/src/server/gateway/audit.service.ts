@@ -17,7 +17,7 @@ import type {
 export type AuditListFilters = {
   organizationId: string;
   action?: GatewayAuditAction;
-  targetKind?: "virtual_key" | "budget" | "provider_binding";
+  targetKind?: "virtual_key" | "budget" | "provider_binding" | "cache_rule";
   targetId?: string;
   actorUserId?: string;
   fromDate?: Date;

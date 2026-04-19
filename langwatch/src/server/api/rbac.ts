@@ -62,6 +62,7 @@ export const Resources = {
   GATEWAY_GUARDRAILS: "gatewayGuardrails",
   GATEWAY_LOGS: "gatewayLogs",
   GATEWAY_USAGE: "gatewayUsage",
+  GATEWAY_CACHE_RULES: "gatewayCacheRules",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -145,6 +146,11 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "gatewayGuardrails:manage",
     "gatewayLogs:view",
     "gatewayUsage:view",
+    "gatewayCacheRules:view",
+    "gatewayCacheRules:create",
+    "gatewayCacheRules:update",
+    "gatewayCacheRules:delete",
+    "gatewayCacheRules:manage",
   ],
   [TeamUserRole.MEMBER]: [
     // Projects
@@ -195,6 +201,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "gatewayGuardrails:view",
     "gatewayLogs:view",
     "gatewayUsage:view",
+    "gatewayCacheRules:view",
   ],
   [TeamUserRole.VIEWER]: [
     // Projects
@@ -226,6 +233,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "gatewayGuardrails:view",
     "gatewayLogs:view",
     "gatewayUsage:view",
+    "gatewayCacheRules:view",
   ],
   [TeamUserRole.CUSTOM]: [
     // CUSTOM role permissions fall back to VIEWER if no assignedRoleId or custom role has no permissions
@@ -258,6 +266,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "gatewayGuardrails:view",
     "gatewayLogs:view",
     "gatewayUsage:view",
+    "gatewayCacheRules:view",
   ],
 };
 
