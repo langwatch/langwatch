@@ -116,6 +116,7 @@ const coreRouters = {
   virtualKeys: virtualKeysRouter,
   gatewayProviders: gatewayProvidersRouter,
   gatewayBudgets: gatewayBudgetsRouter,
+  gatewayCacheRules: gatewayCacheRulesRouter,
   gatewayUsage: gatewayUsageRouter,
   gatewayAudit: gatewayAuditRouter,
 };
