@@ -40,9 +40,10 @@ export function ProviderBindingCreateDrawer({
   onCreated,
 }: ProviderBindingCreateDrawerProps) {
   const { project } = useOrganizationTeamProject();
-  const settingsHref = project
-    ? `/${project.slug}/settings/model-providers`
-    : "#";
+  // /settings/* is global (org-scoped), not project-scoped — prefixing with
+  // the project slug yields a broken URL. Settings pages live under /settings
+  // across the platform.
+  const settingsHref = "/settings/model-providers";
   const [modelProviderId, setModelProviderId] = useState("");
   const [slot, setSlot] = useState("primary");
   const [rateLimitRpm, setRateLimitRpm] = useState("");
