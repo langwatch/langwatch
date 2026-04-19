@@ -63,11 +63,16 @@ export const virtualKeyConfigSchema = z.object({
       tools: blockedPatternsSchema.default({ deny: [], allow: null }),
       mcp: blockedPatternsSchema.default({ deny: [], allow: null }),
       urls: blockedPatternsSchema.default({ deny: [], allow: null }),
+      // §5 models dimension — RE2 regex policy distinct from
+      // `modelsAllowed` glob allowlist. Enforced by @sergey iter 8
+      // (internal/blocked) before provider dispatch.
+      models: blockedPatternsSchema.default({ deny: [], allow: null }),
     })
     .default({
       tools: { deny: [], allow: null },
       mcp: { deny: [], allow: null },
       urls: { deny: [], allow: null },
+      models: { deny: [], allow: null },
     }),
   rateLimits: z
     .object({
