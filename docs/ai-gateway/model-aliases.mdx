@@ -6,6 +6,8 @@ sidebarTitle: Model Aliases
 
 A model alias is a per-VK redirect. The client sends `model: "foo"`; the VK's `model_aliases` map turns it into `provider/model/deployment` at dispatch time.
 
+<Info>Aliases are one of three ways to reference a model. See [Model Naming](/ai-gateway/model-naming) for when to use bare (`gpt-5-mini`) vs prefixed (`openai/gpt-5-mini`) vs an alias.</Info>
+
 ```json
 {
   "model_aliases": {
