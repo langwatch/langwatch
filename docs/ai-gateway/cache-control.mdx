@@ -1,0 +1,192 @@
+---
+title: Cache Control
+description: Provider-agnostic cache control for every gateway request — passthrough, per-VK defaults, per-request headers, and v1.1 rule-based overrides.
+sidebarTitle: Cache control
+---
+
+Modern LLM providers offer prompt caching with different shapes: Anthropic uses explicit `cache_control` blocks, OpenAI auto-caches prompts over 1024 tokens, Gemini has an explicit `cachedContent` API, Azure OpenAI inherits OpenAI's behavior, Bedrock Claude inherits Anthropic's. The LangWatch AI Gateway surfaces a single, unified control plane over all of them.
+
+This is a load-bearing feature: prompt caching cuts input-token costs by up to 90% on hot prefixes, and a gateway that reformats or reorders the payload silently invalidates the cache. The gateway is engineered to preserve provider-native caching byte-for-byte by default, and to let operators compose overrides without breaking the primitives underneath.
+
+## The control surface — four layers (v1)
+
+1. **Gateway default** — `respect` (byte-for-byte passthrough). Always safe, never surprises.
+2. **Per-VK default** — `respect` / `disable` today, `force` / `ttl=NNN` in v1.1. Configurable in the VK drawer under "Cache control".
+3. **Cache rules** — simple match/action overrides evaluated at auth-resolve time (bundled with VK config → near-zero hot-path cost). See [Cache rules](#cache-rules).
+4. **Per-request header** — `X-LangWatch-Cache: respect|disable|force|ttl=NNN` on an individual request. Highest precedence when set.
+
+Effective-mode precedence: **per-request header > matched rule > per-VK default > gateway default `respect`**.
+
+## Provider matrix
+
+Not every mode makes sense for every provider. The gateway does the right thing per provider automatically — you don't have to special-case in your client.
+
+| Provider | Native scheme | `respect` behavior | `disable` behavior | `force` (v1.1) | Notes |
+|---|---|---|---|---|---|
+| **Anthropic** (direct + Bedrock + Vertex) | Explicit `cache_control: {type: "ephemeral"\|"persistent"}` on content/system/tool blocks | Bytes forwarded unchanged; provider honours markers (5 min / 1 h TTL) | Recursive JSON-walk drops every `cache_control` key at any nesting depth before dispatch | Gateway injects `cache_control: ephemeral` on large stable prefixes (system + last user turn) if not present | `cache_read_input_tokens` and `cache_creation_input_tokens` separately reported in the trace |
+| **OpenAI** (direct + Azure) | Automatic — prefixes ≥1024 tokens cached, no client flag, 50% discount on cached tokens | Bytes forwarded unchanged (nothing to preserve — provider decides) | No-op on wire; gateway can optionally set a salt via a request-id suffix to break the cache key (future) | No-op — caching is out of the client's control; rule may still force a cache-salt variation for A/B | `usage.prompt_tokens_details.cached_tokens` reported in response |
+| **Gemini** (Vertex + direct) | Explicit `cachedContent` resource — client POSTs to `/v1/cachedContents` then passes `cachedContent: <id>` on generation | Bytes forwarded unchanged; client holds the cache ID | Strips `cachedContent` field from the request → forces cold generation | **Deferred to v1.2** — force-creating a cache ID requires a second upstream call which breaks the zero-hop passthrough framing | TTL minimum 1 min, max 10 min for context caches |
+| **Azure OpenAI** | Inherits OpenAI automatic prefix cache | Same as OpenAI | Same as OpenAI | Same as OpenAI | Configured via Azure's cache-at-deployment toggle — independent of our `force` |
+| **Bedrock Claude** | Inherits Anthropic's `cache_control` shape via converse API | Same as Anthropic | Same as Anthropic | Same as Anthropic (v1.1) | Bedrock region matters — not all regions support Anthropic cache yet |
+| **Vertex Claude** | Inherits Anthropic's shape | Same as Anthropic | Same as Anthropic | Same as Anthropic (v1.1) | — |
+
+The common shape: `respect` is always safe; `disable` always strips cache-related fields (where applicable); `force` is provider-specific injection (v1.1).
+
+## Modes
+
+### `respect` (default)
+
+Gateway forwards every cache-related field (`cache_control` on Anthropic, `cachedContent` on Gemini, etc.) byte-for-byte. The gateway's own semantic cache (if enabled, v1.1 spec) still runs on top — `respect` does not disable it.
+
+This mode is the hard invariant protected by the gateway's byte-level integration test: a request with `cache_control: ephemeral` on a system block must arrive at the provider with identical bytes in identical order. The test diff-compares the forwarded payload against the client's payload — any non-trivial drift fails the build.
+
+### `disable`
+
+Strip every cache-related field at any nesting depth before dispatch:
+
+- Anthropic: recursive JSON-walk drops `cache_control` from `messages[].content[]`, `system[]`, and `tools[]`.
+- Gemini: drops `cachedContent` from the top-level body.
+- OpenAI: no-op on wire (the provider's automatic cache can't be disabled client-side).
+
+Use when:
+- Benchmarking cold-cost in A/B before deciding if a caching tier is worth turning on.
+- Reproducing a cache-dependent bug on a cold call.
+- A specific request must not hit cache for correctness.
+
+The gateway's semantic cache (if enabled, v1.1) is also bypassed when mode is `disable`.
+
+### `force`
+
+For providers that support client-side cache declarations:
+
+- Anthropic (incl. Bedrock Claude + Vertex Claude): gateway injects `cache_control: {type: "ephemeral"}` on the system message and the last user turn if not already present. Shipped in v1.
+- Gemini: deferred to v1.1 — forcing a cache ID requires a separate `/v1/cachedContents` POST which breaks the zero-hop passthrough framing; needs its own spec round.
+- OpenAI / Azure: no-op on wire (their cache is automatic); the mode can still be set by a rule to log intention for observability.
+
+v1 ships Anthropic `force` with TTL-maps-to-ephemeral-or-persistent; Gemini `force` returns `400 cache_override_not_implemented` with a pointer to this page.
+
+### `ttl=NNN`
+
+Same as `force` but carries an explicit TTL in seconds. Provider mapping:
+- Anthropic: chooses `ephemeral` (5 min) or `persistent` (1 h) based on the TTL range; anything above 3600 clamps to `persistent`.
+- Gemini: sets the `ttl` field on `cachedContent` (deferred to v1.2).
+
+Currently returns `400 cache_override_not_implemented`.
+
+## Response headers
+
+Every successful response carries:
+
+- `X-LangWatch-Cache-Mode` — the mode that was applied (`respect` / `disable` / `forced`). Useful for tracing and A/B analysis: a client that sets `X-LangWatch-Cache: disable` should see `X-LangWatch-Cache-Mode: disable` on the response, independent of whether the provider reported a cache outcome.
+- `X-LangWatch-Cache` — the cache outcome:
+  - `hit` — provider served part or all of the prefix from cache.
+  - `miss` — no cache hit.
+  - `bypass` — mode was `disable`.
+  - `forced` — mode was `force` (v1.1).
+
+Usage reporting splits input tokens by origin:
+
+- `cache_read_input_tokens` — served from cache (Anthropic: ~10% of regular price).
+- `cache_creation_input_tokens` — writing to cache (Anthropic: 125% of regular).
+- `input_tokens` — regular cold tokens.
+
+The `/internal/gateway/budget/debit` call forwards all three so budget ledgers reflect accurate cache economics.
+
+## Cache rules
+
+**Simple match/action rules that let operators set cache behavior for groups of requests without touching client code.** Deliberately narrower than Cloudflare Page Rules — enough to demonstrate enterprise cache governance (force 5-min cache on prod internal-api, disable cache for benchmark VKs, etc.) without the matcher combinatorics that would slow the hot path.
+
+Latency budget: rules are resolved **once per VK bundle refresh** (every 30 s on `/changes`) and baked into the bundle as a pre-sorted array. At request time, the gateway walks the sorted array until a match fires — for the expected low single-digit rule count per VK, this is sub-microsecond. Hot-path total overhead stays at ~700 ns.
+
+### Shape
+
+```json
+{
+  "id": "rule_01HZX...",
+  "priority": 100,
+  "match": {
+    "vk_tags": ["env=prod"],
+    "model": "gpt-5-mini",
+    "principal_id": null,
+    "request_metadata": { "X-Request-Source": "internal-api" }
+  },
+  "action": {
+    "mode": "force",
+    "ttl": 300,
+    "salt": "v2"
+  },
+  "enabled": true
+}
+```
+
+### Matchers
+
+Each matcher is optional; all non-null matchers must match for the rule to apply (AND semantics).
+
+- `vk_id` — exact match on virtual-key id.
+- `vk_tags` — every tag in the list must be on the VK (e.g. `["env=prod", "team=ml"]`).
+- `vk_prefix` — match on VK display prefix (`lw_vk_live_01HZX9`).
+- `principal_id` — the user/service account making the call.
+- `model` — exact match on the resolved model (post-alias).
+- `request_metadata` — match on arbitrary client-set metadata headers (`X-Request-Source`, `X-Customer-Tier`, etc.).
+- `time_window` — optional time-of-day / day-of-week constraint.
+
+### Actions
+
+- `mode: respect | disable | force` — as above.
+- `ttl: NNN` — seconds (only meaningful with `force`).
+- `salt: <string>` — cache-key salt for A/B or version invalidation (for the gateway's semantic cache, v1.1).
+
+### Evaluation
+
+- **First-match wins**, sorted by `priority` descending.
+- Rules evaluated once per request, AT auth-resolve time (bundled with VK config), so zero additional upstream latency.
+- Rule hits exposed in observability via `langwatch.cache.rule_id` span attribute + `gateway_cache_rule_hits_total{rule_id, mode, provider}` counter.
+
+### Concrete example — "force 5-min cache on all prod internal-api calls"
+
+```json
+{
+  "priority": 100,
+  "match": {
+    "vk_tags": ["env=prod"],
+    "request_metadata": { "X-Request-Source": "internal-api" }
+  },
+  "action": { "mode": "force", "ttl": 300 }
+}
+```
+
+Every VK in prod serving an internal-api caller gets Anthropic `cache_control: ephemeral` injected on system + last-user blocks. OpenAI requests pass through (no-op). No client change required.
+
+## Enforcement ordering
+
+The cache-override hook runs **before** blocked-pattern enforcement on `/v1/messages`. A `disable`-mode request has its `cache_control` blocks stripped first, then regex checks fire on the post-strip body. This keeps policy evaluation deterministic regardless of the caller's caching choice.
+
+Order on the request pipeline:
+1. Auth resolution (VK → bundle)
+2. Rate limit (per-VK)
+3. **Cache override mode resolution** (header > rule > VK default)
+4. **Cache override apply** (strip / inject)
+5. Blocked patterns (tools / MCP / URLs / models)
+6. Body size cap (iter 23)
+7. Guardrails (pre)
+8. Upstream dispatch
+9. Guardrails (post)
+10. Budget debit
+
+## Why this is load-bearing
+
+From a real observed pattern: a 40k-token system prompt with 100 calls a day against an Anthropic model.
+
+- Without caching: 40k × 100 = 4M input tokens/day at full price. Claude Opus: ~$60/day.
+- With Anthropic ephemeral cache (5-min TTL, 1 write + ~99 reads): 1 write at $75/M + 99 × 40k reads at $6/M ≈ $27/day. **56% cheaper.**
+- With a gateway that reformats the payload and loses the cache: back to $60/day.
+
+This is why the caching-passthrough invariant is tested at the byte level, not just "does the call succeed."
+
+## See also
+
+- [Caching Passthrough](/ai-gateway/caching-passthrough) — the lower-level byte-for-byte invariant that underpins `respect` mode.
+- [Virtual Keys](/ai-gateway/virtual-keys) — per-VK default `cache` config.
+- [API Reference → Errors](/ai-gateway/api/errors) — `cache_override_invalid` / `cache_override_not_implemented` error shapes.
+- [Observability](/ai-gateway/observability) — the trace attributes for cache attribution.
