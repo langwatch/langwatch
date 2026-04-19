@@ -1,5 +1,6 @@
 import {
   Box,
+  Button,
   EmptyState,
   HStack,
   Heading,
@@ -10,7 +11,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { BarChart3 } from "lucide-react";
+import { BarChart3, Download } from "lucide-react";
+import Parse from "papaparse";
 import { useMemo, useState } from "react";
 import {
   Area,
@@ -56,6 +58,56 @@ function GatewayUsagePage() {
 
   const data = summaryQuery.data;
 
+  // Build a single CSV that flattens the three summary slices the
+  // finance reviewer usually wants together: daily spend, spend by
+  // virtual key, and spend by model. Section rows separate the three
+  // tables so a spreadsheet pivot / chart still reads naturally.
+  const exportCsv = () => {
+    if (!data) return;
+    const rows: (string | number)[][] = [];
+    rows.push(["Section", "Key", "Prefix / Model", "Spend (USD)", "Requests"]);
+    rows.push(["daily", "day", "", "", ""]);
+    for (const d of data.byDay) {
+      rows.push(["daily", d.day, "", Number(d.totalUsd).toFixed(6), d.requests]);
+    }
+    rows.push([]);
+    rows.push(["virtual_key", "id", "prefix", "spend", "requests"]);
+    for (const vk of data.byVirtualKey) {
+      rows.push([
+        "virtual_key",
+        vk.name,
+        vk.displayPrefix ?? "",
+        Number(vk.totalUsd).toFixed(6),
+        vk.requests,
+      ]);
+    }
+    rows.push([]);
+    rows.push(["model", "id", "", "spend", "requests"]);
+    for (const m of data.byModel) {
+      rows.push([
+        "model",
+        m.model,
+        "",
+        Number(m.totalUsd).toFixed(6),
+        m.requests,
+      ]);
+    }
+    const csv = Parse.unparse(rows);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    const stamp = new Date().toISOString().split("T")[0];
+    link.setAttribute(
+      "download",
+      `gateway_usage_${project?.slug ?? "project"}_${days}d_${stamp}.csv`,
+    );
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  };
+
   return (
     <GatewayLayout>
       <>
@@ -81,6 +133,15 @@ function GatewayUsagePage() {
                 {p.label}
               </Box>
             ))}
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={exportCsv}
+              disabled={!data || data.totalRequests === 0}
+              marginLeft={2}
+            >
+              <Download size={12} /> Export CSV
+            </Button>
           </HStack>
         </PageLayout.Header>
 
