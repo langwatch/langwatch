@@ -474,3 +474,65 @@ Feature: Customer.io nurturing integration
     And the user traits sent to Customer.io include has_simulations false
     And the user traits sent to Customer.io include has_traces false
     And the user traits sent to Customer.io include has_evaluations false
+
+  # ---------------------------------------------------------------------------
+  # R14: Attribution capture — URL -> Customer.io
+  #
+  # Captures first-touch URL parameters (ref, utm_*) and document.referrer
+  # on the first pageview after hydration, persists them in sessionStorage,
+  # and forwards them through the onboarding signUpData so they land in
+  # Customer.io as identify traits AND signed_up event properties.
+  #
+  # First-touch semantics: once captured, subsequent navigations do not
+  # overwrite the value. This prevents internal link clicks from clobbering
+  # the original acquisition source.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: Attribution hook captures ref param in sessionStorage on first touch
+    Given no existing attribution in sessionStorage
+    And the URL contains "?ref=website"
+    When the attribution capture hook mounts
+    Then sessionStorage key "lw_attrib.ref" equals "website"
+
+  @unit
+  Scenario: Attribution hook does not overwrite existing first-touch values
+    Given sessionStorage "lw_attrib.ref" is already "original"
+    And the URL contains "?ref=later"
+    When the attribution capture hook mounts
+    Then sessionStorage key "lw_attrib.ref" remains "original"
+
+  @unit
+  Scenario: Attribution hook captures full utm tuple when present in URL
+    Given no existing attribution in sessionStorage
+    And the URL contains utm_source, utm_medium, utm_campaign, utm_term, utm_content
+    When the attribution capture hook mounts
+    Then sessionStorage contains all five lw_attrib.utm_* keys with the URL values
+
+  @unit
+  Scenario: Attribution hook captures document.referrer when present
+    Given no existing attribution in sessionStorage
+    And document.referrer is "https://www.langwatch.ai/"
+    When the attribution capture hook mounts
+    Then sessionStorage key "lw_attrib.referrer" equals "https://www.langwatch.ai/"
+
+  @integration
+  Scenario: Signup with ref in URL sends lead_source trait and event property to Customer.io
+    Given a user lands on the app with "?ref=website" in the URL
+    And completes onboarding
+    When the onboarding flow completes
+    Then the user traits sent to Customer.io include lead_source "website"
+    And the "signed_up" event properties include leadSource "website"
+
+  @integration
+  Scenario: Signup forwards utm tuple to Customer.io
+    Given a user lands on the app with utm_source, utm_medium, utm_campaign, utm_term, utm_content in the URL
+    And completes onboarding
+    When the onboarding flow completes
+    Then the user traits sent to Customer.io include utm_source, utm_medium, utm_campaign, utm_term, utm_content
+
+  @integration
+  Scenario: Signup without attribution omits those fields from Customer.io traits
+    Given a user completes onboarding with no attribution data
+    When the onboarding flow completes
+    Then the user traits sent to Customer.io do not include lead_source, utm_source, utm_medium, utm_term, utm_content, or referrer keys

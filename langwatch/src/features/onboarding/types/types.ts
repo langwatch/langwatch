@@ -1,3 +1,5 @@
+import type { Attribution } from "~/hooks/attribution";
+
 export enum OnboardingScreenIndex {
   ORGANIZATION = 0,
   BASIC_INFO = 1,
@@ -60,7 +62,10 @@ export type SolutionType = (typeof SOLUTION_TYPES)[number];
 export type DesireType = (typeof DESIRE_TYPES)[number];
 export type RoleType = (typeof ROLE_TYPES)[number];
 
-export interface OnboardingFormData {
+// First-touch attribution fields (leadSource, utm*, referrer) are sourced
+// from `readAttribution()` and carried on the form via `Partial<Attribution>`
+// so the shape stays single-sourced in `~/hooks/attribution`.
+export interface OnboardingFormData extends Partial<Attribution> {
   organizationName?: string;
   agreement?: boolean;
   usageStyle?: UsageStyle;
@@ -69,7 +74,6 @@ export interface OnboardingFormData {
   solutionType?: SolutionType;
   selectedDesires: DesireType[];
   role?: RoleType;
-  utmCampaign?: string | null;
 }
 
 export interface OnboardingScreen {

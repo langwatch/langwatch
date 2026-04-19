@@ -7,6 +7,7 @@ import { createAppAnalyticsClient } from "~/utils/analyticsClient";
 import { SessionProvider } from "~/utils/auth-client";
 import { ColorModeProvider } from "./components/ui/color-mode";
 import { Toaster } from "./components/ui/toaster";
+import { useAttributionCapture } from "./hooks/useAttributionCapture";
 import { usePostHog } from "./hooks/usePostHog";
 import { ExtraFooterComponents } from "../ee/saas/ExtraFooterComponents";
 import { CommandBarProvider } from "./features/command-bar";
@@ -18,6 +19,11 @@ import { TRPCProvider } from "./utils/api";
  * These wrap around <RouterProvider>.
  */
 export function OuterProviders({ children }: { children: ReactNode }) {
+  // Capture first-touch attribution at the outermost mount point so it
+  // runs on every landing URL — including unauthenticated/public pages —
+  // before any navigation can drop the query string.
+  useAttributionCapture();
+
   return (
     <SessionProvider refetchInterval={0} refetchOnWindowFocus={false}>
       <TRPCProvider>

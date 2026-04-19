@@ -172,6 +172,103 @@ describe("Signup identification hook", () => {
       expect(args.traits.utm_campaign).toBeUndefined();
       expect(args.traits.how_heard).toBeUndefined();
     });
+
+    it("omits lead_source, utm_source, utm_medium, utm_term, utm_content, and referrer from traits", () => {
+      fireSignupNurturingCalls({
+        userId: "user-123",
+        email: "jane@example.com",
+        name: "Jane Doe",
+        organizationId: "org-456",
+        organizationName: "Acme Corp",
+        signUpData: {
+          yourRole: "engineer",
+          companySize: "11-50",
+        },
+      });
+
+      const args = mockNurturing.identifyUser.mock.calls[0]![0];
+      expect(args.traits.lead_source).toBeUndefined();
+      expect(args.traits.utm_source).toBeUndefined();
+      expect(args.traits.utm_medium).toBeUndefined();
+      expect(args.traits.utm_term).toBeUndefined();
+      expect(args.traits.utm_content).toBeUndefined();
+      expect(args.traits.referrer).toBeUndefined();
+    });
+  });
+
+  describe("when signup data includes first-touch attribution", () => {
+    const attributionArgs = {
+      userId: "user-123",
+      email: "jane@example.com",
+      name: "Jane Doe",
+      organizationId: "org-456",
+      organizationName: "Acme Corp",
+      signUpData: {
+        yourRole: "engineer",
+        leadSource: "website",
+        utmSource: "newsletter",
+        utmMedium: "email",
+        utmCampaign: "apr2026",
+        utmTerm: "agents",
+        utmContent: "cta",
+        referrer: "https://www.langwatch.ai/",
+      },
+    };
+
+    it("maps leadSource to lead_source identify trait", () => {
+      fireSignupNurturingCalls(attributionArgs);
+
+      expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
+        userId: "user-123",
+        traits: expect.objectContaining({
+          lead_source: "website",
+        }),
+      });
+    });
+
+    it("maps the utm tuple to snake_case identify traits", () => {
+      fireSignupNurturingCalls(attributionArgs);
+
+      expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
+        userId: "user-123",
+        traits: expect.objectContaining({
+          utm_source: "newsletter",
+          utm_medium: "email",
+          utm_campaign: "apr2026",
+          utm_term: "agents",
+          utm_content: "cta",
+        }),
+      });
+    });
+
+    it("includes referrer in identify traits", () => {
+      fireSignupNurturingCalls(attributionArgs);
+
+      expect(mockNurturing.identifyUser).toHaveBeenCalledWith({
+        userId: "user-123",
+        traits: expect.objectContaining({
+          referrer: "https://www.langwatch.ai/",
+        }),
+      });
+    });
+
+    it("forwards attribution fields as signed_up event properties", () => {
+      fireSignupNurturingCalls(attributionArgs);
+
+      expect(mockNurturing.trackEvent).toHaveBeenCalledWith({
+        userId: "user-123",
+        event: "signed_up",
+        properties: expect.objectContaining({
+          leadSource: "website",
+          utmSource: "newsletter",
+          utmMedium: "email",
+          utmCampaign: "apr2026",
+          utmTerm: "agents",
+          utmContent: "cta",
+          referrer: "https://www.langwatch.ai/",
+        }),
+      });
+    });
   });
 
   describe("when Customer.io API is unavailable", () => {
