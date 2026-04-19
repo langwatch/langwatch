@@ -195,10 +195,27 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
   "vk_id": "vk_01HZX...",
   "providers": [
     {
+      "id": "pc_01HZ...",
       "slot": "primary",
       "type": "openai|anthropic|azure_openai|bedrock|vertex|gemini|custom_openai",
-      "credentials_ref": "pc_01HZ...",  // opaque, resolved to secret inside gateway
-      "config": { /* provider-specific: region, deployment_name, project_id, etc */ }
+      "credentials": {
+        /* Opaque JSON embedded on the wire. Shape varies by provider type —
+           the control plane decrypts ModelProvider.customKeys (per-org KMS)
+           at bundle-materialisation time and emits the cleartext in this
+           field. Gateway never sees encrypted bytes on the wire. Per-type
+           shapes:
+             openai:         { "api_key": "sk-..." }
+             anthropic:      { "api_key": "sk-ant-..." }
+             azure_openai:   { "endpoint": "https://...", "api_key": "..." }
+             bedrock:        { "region": "us-east-1", "access_key": "...", "secret_key": "..." }
+             vertex:         { "region": "...", "project_id": "...", "service_account_json": "..." }
+             gemini:         { "api_key": "..." }
+             custom_openai:  { "base_url": "https://...", "api_key": "..." }  */
+        "api_key": "sk-proj-..."
+      },
+      "base_url": "https://api.openai.com/v1",  // optional, type-specific
+      "region": null,                            // optional, type-specific
+      "config": { /* per-provider tuning: deployment_name, rate_limit, health, etc */ }
     }
   ],
   "fallback": {
@@ -565,7 +582,7 @@ When a spec and this contract disagree, **the contract wins** and the spec is am
 
 LangWatch already stores `ModelProvider` rows (OPENAI_API_KEY etc) for evaluators/playground via litellm. We do **not** duplicate these.
 
-- VK config references `credentials_ref: pc_...` which resolves to the same `ModelProvider` row.
+- VK config's `providers[].id = pc_...` references the `GatewayProviderCredential` row that binds a `ModelProvider`. The materialiser decrypts `ModelProvider.customKeys` (per-org KMS) at bundle-emit time and embeds the cleartext as `providers[].credentials` JSON — gateway never sees encrypted bytes on the wire.
 - Provider credential pool gets a new entity `ProviderCredential` (one-per-provider-per-project can already exist; we extend to allow multiple slots).
 - Playground / evaluators continue to use litellm path (untouched). Gateway uses bifrost/core. Keys are shared, paths are separate. No litellm migration in this epic.
 - A VK can optionally expose itself as a provider inside the playground (`"Use this virtual key in playground"` toggle) — post-MVP nice-to-have, not blocking.
