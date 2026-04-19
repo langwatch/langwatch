@@ -61,6 +61,49 @@ export type ArchiveBudgetInput = {
   actorUserId: string;
 };
 
+export type BudgetScopeTarget =
+  | {
+      kind: "ORGANIZATION";
+      id: string;
+      name: string;
+      secondary: string | null;
+    }
+  | { kind: "TEAM"; id: string; name: string; secondary: string | null }
+  | { kind: "PROJECT"; id: string; name: string; secondary: string | null }
+  | {
+      kind: "VIRTUAL_KEY";
+      id: string;
+      name: string;
+      secondary: string | null;
+      projectSlug: string | null;
+    }
+  | { kind: "PRINCIPAL"; id: string; name: string; secondary: string | null };
+
+export type BudgetLedgerLine = {
+  id: string;
+  virtualKeyId: string;
+  virtualKeyName: string;
+  virtualKeyPrefix: string;
+  amountUsd: string;
+  model: string;
+  status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED";
+  occurredAt: string;
+};
+
+export type BudgetDetail = {
+  budget: GatewayBudget;
+  scopeTarget: BudgetScopeTarget;
+  recentLedger: Array<{
+    id: string;
+    virtualKeyId: string;
+    amountUsd: Prisma.Decimal;
+    model: string;
+    status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED";
+    occurredAt: Date;
+    virtualKey: { name: string; displayPrefix: string } | null;
+  }>;
+};
+
 export type BudgetCheckDecision = "allow" | "soft_warn" | "hard_block";
 
 export type BudgetCheckInput = {
@@ -140,6 +183,112 @@ export class GatewayBudgetService {
     return this.prisma.gatewayBudget.findFirst({
       where: { id, organizationId },
     });
+  }
+
+  /**
+   * Returns the budget plus resolved scope-target label (human-friendly
+   * name for the scope FK) + the last 20 ledger entries for the detail
+   * page. Keeps the target lookup in one round-trip per scope kind so
+   * the detail page doesn't need to chain queries in the UI.
+   */
+  async getDetail(
+    id: string,
+    organizationId: string,
+  ): Promise<BudgetDetail | null> {
+    const budget = await this.get(id, organizationId);
+    if (!budget) return null;
+
+    const [scopeTarget, recentLedger] = await Promise.all([
+      this.resolveScopeTarget(budget),
+      this.prisma.gatewayBudgetLedger.findMany({
+        where: { budgetId: budget.id },
+        orderBy: { occurredAt: "desc" },
+        take: 20,
+        select: {
+          id: true,
+          virtualKeyId: true,
+          amountUsd: true,
+          model: true,
+          status: true,
+          occurredAt: true,
+          virtualKey: { select: { name: true, displayPrefix: true } },
+        },
+      }),
+    ]);
+
+    return { budget, scopeTarget, recentLedger };
+  }
+
+  private async resolveScopeTarget(
+    budget: GatewayBudget,
+  ): Promise<BudgetScopeTarget> {
+    switch (budget.scopeType) {
+      case "ORGANIZATION": {
+        const org = await this.prisma.organization.findUnique({
+          where: { id: budget.scopeId },
+          select: { name: true, slug: true },
+        });
+        return {
+          kind: "ORGANIZATION",
+          id: budget.scopeId,
+          name: org?.name ?? budget.scopeId,
+          secondary: org?.slug ?? null,
+        };
+      }
+      case "TEAM": {
+        const team = await this.prisma.team.findUnique({
+          where: { id: budget.scopeId },
+          select: { name: true, slug: true },
+        });
+        return {
+          kind: "TEAM",
+          id: budget.scopeId,
+          name: team?.name ?? budget.scopeId,
+          secondary: team?.slug ?? null,
+        };
+      }
+      case "PROJECT": {
+        const project = await this.prisma.project.findUnique({
+          where: { id: budget.scopeId },
+          select: { name: true, slug: true },
+        });
+        return {
+          kind: "PROJECT",
+          id: budget.scopeId,
+          name: project?.name ?? budget.scopeId,
+          secondary: project?.slug ?? null,
+        };
+      }
+      case "VIRTUAL_KEY": {
+        const vk = await this.prisma.virtualKey.findUnique({
+          where: { id: budget.scopeId },
+          select: {
+            name: true,
+            displayPrefix: true,
+            project: { select: { slug: true } },
+          },
+        });
+        return {
+          kind: "VIRTUAL_KEY",
+          id: budget.scopeId,
+          name: vk?.name ?? budget.scopeId,
+          secondary: vk?.displayPrefix ? `${vk.displayPrefix}…` : null,
+          projectSlug: vk?.project?.slug ?? null,
+        };
+      }
+      case "PRINCIPAL": {
+        const user = await this.prisma.user.findUnique({
+          where: { id: budget.scopeId },
+          select: { name: true, email: true },
+        });
+        return {
+          kind: "PRINCIPAL",
+          id: budget.scopeId,
+          name: user?.name ?? user?.email ?? budget.scopeId,
+          secondary: user?.email ?? null,
+        };
+      }
+    }
   }
 
   async create(input: CreateBudgetInput): Promise<GatewayBudget> {

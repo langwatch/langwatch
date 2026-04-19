@@ -200,6 +200,10 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/[project]/gateway/budgets")),
   },
   {
+    path: "/:project/gateway/budgets/:id",
+    ...page(() => import("./pages/[project]/gateway/budgets/[id]")),
+  },
+  {
     path: "/:project/gateway/providers",
     ...page(() => import("./pages/[project]/gateway/providers")),
   },

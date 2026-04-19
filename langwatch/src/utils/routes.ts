@@ -189,6 +189,11 @@ export const projectRoutes = {
     title: "Budgets",
     parent: "gateway",
   },
+  gateway_budget_detail: {
+    path: "/[project]/gateway/budgets/[id]",
+    title: "Budget",
+    parent: "gateway_budgets",
+  },
   gateway_providers: {
     path: "/[project]/gateway/providers",
     title: "Providers",

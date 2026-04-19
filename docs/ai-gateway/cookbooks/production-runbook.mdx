@@ -193,6 +193,51 @@ kubectl exec -n langwatch deploy/langwatch-gateway -- \
 - `rate(gateway_budget_debit_outbox_flush_failures_total[5m]) > 0 for 5m` → **warn**.
 - `(max(gateway_budget_debit_outbox_depth) / max(gateway_budget_debit_outbox_capacity)) > 0.5 for 5m` → **warn**.
 
+## Recipe 7 — Stuck drain
+
+**Symptom:** A pod stays in `Terminating` for the full `terminationGracePeriodSeconds`, then gets SIGKILLed. In-flight requests ended abruptly. Alertmanager fires on the `gateway_draining` gauge being 1 for > grace.
+
+The pod received SIGTERM but at least one request handler never returned before `shutdown.timeout` expired. Iter 24 (`ea167ca`) exposes this via two gauges:
+
+| Metric | During healthy drain | During stuck drain |
+|---|---|---|
+| `gateway_draining{pod}` | 1 → 0 at shutdown | 1 until SIGKILL |
+| `gateway_in_flight_requests{pod}` | monotonically → 0 | flat at N > 0 for > grace |
+
+**Diagnose:**
+
+```bash
+# 1. Which pod is stuck, and how many handlers are hanging?
+kubectl get pod -n langwatch -l app=langwatch-gateway \
+  --field-selector=status.phase=Running -o wide | grep Terminating
+
+# 2. Goroutine dump — stuck handlers will show up in Go runtime state
+POD=<terminating pod name>
+kubectl port-forward -n langwatch "$POD" 6060:6060 &
+go tool pprof -top http://localhost:6060/debug/pprof/goroutine
+
+# 3. Find the handler that's not returning
+curl -s http://localhost:6060/debug/pprof/goroutine?debug=1 | \
+  grep -A 20 'internal/dispatch.*streamSSE\|internal/auth\|internal/guardrails'
+```
+
+**Common causes, in order of likelihood:**
+
+1. **Upstream dial hanging without a deadline.** Streaming fallback into a dead region that never returns TLS handshake. `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` should be < `shutdown.timeout`; if it is, the handler should cancel on its own.
+2. **Guardrail evaluator hanging past its budget.** `pre`/`post` have a `guardrail.preTimeout` / `postTimeout` of 1500 ms, but a misconfigured evaluator can still hang if it doesn't respect context cancellation. Check the evaluator service's own SLO.
+3. **A breaker with `open` state but no surrounding deadline.** Rare; fixed in iter 4 but worth ruling out if the stack shows `internal/circuit` waiting.
+4. **Slow custom middleware.** If you've forked the gateway and added middleware that does I/O without context propagation, that's where to look first.
+
+**Fix:**
+
+| Cause | Action |
+|---|---|
+| Upstream hang | Lower `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` below `shutdown.timeout`. Default 60 s — bump `shutdown.timeout` to 65 s + `terminationGracePeriodSeconds` to 80 s if you genuinely need 60 s upstream calls |
+| Guardrail hang | Raise evaluator SLO or set `guardrails.request_fail_open: true` on the VK to fall through on timeout |
+| Custom middleware | Thread `r.Context()` through every I/O call |
+
+**Temporary workaround:** bump `shutdown.timeout` + `terminationGracePeriodSeconds` to give the hanging request time to complete. Only appropriate while you diagnose the root cause — long grace periods slow down rolling deploys and make HPA scale-downs feel sluggish.
+
 ## Writing findings back
 
 When you find something worth filing:

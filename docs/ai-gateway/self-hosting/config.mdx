@@ -94,6 +94,17 @@ Shipped in langwatch-saas `5fe8486` (@sergey Lane A iter 4 pt4) wired to `observ
 
 The `Security` config struct is intentionally separate from `Upstream` (per-provider budgets) and `Budget` (spend outbox). Edge protection is a distinct concern and its values belong in their own Helm stanza — see [Helm → Security](/ai-gateway/self-hosting/helm#security-iter-23-79b46bf).
 
+## Graceful shutdown (iter 24, `ea167ca`)
+
+| Var | Default | Purpose |
+|---|---|---|
+| `GATEWAY_SHUTDOWN_PRE_DRAIN_WAIT` | `5s` | After SIGTERM, the gateway flips `/readyz` to 503 `draining` + the `gateway_draining` gauge to 1, then sleeps this long before calling `server.Shutdown`. Gives the LB endpoint controller (nginx-ingress / kube-proxy) time to remove the pod from the service endpoints. EKS observed propagation is 3-4 s; 5 s leaves margin |
+| `GATEWAY_SHUTDOWN_TIMEOUT` | `15s` | Hard cap on the `server.Shutdown` blocking wait. In-flight handlers get this long to finish; on expiry the server force-closes. Streaming handlers should respect request context cancellation to drain within this window |
+
+The `Shutdown` config struct is intentionally separate from `Security` (edge protection) — shutdown is a lifecycle concern, not a request-pipeline one. Operators should tune the two knobs together: `terminationGracePeriodSeconds` on the pod spec must be ≥ `preDrainWait + timeout + slack` (default chart renders 30 s = 5 + 15 + 10 slack).
+
+During drain: `/livez` and `/startupz` are deliberately unaffected (pod is alive and started, just refusing new work). Liveness staying 200 prevents kubelet from short-circuiting the drain via a `livenessProbe` failure. `/readyz` is the LB signal.
+
 ## Startup gate
 
 | Var | Default | Purpose |
