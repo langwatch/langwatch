@@ -470,14 +470,33 @@ async function upsertModelProvider(
   provider: string,
   envValues: Record<string, string | undefined>,
 ) {
+  const hasRealKey = Object.values(envValues).some((v) => !!v);
   const existing = await prisma.modelProvider.findFirst({
     where: { projectId: project.id, provider },
   });
   if (existing) {
+    // A previous seed run created this row with no env keys (disabled,
+    // customKeys=null). If the env now has real keys, patch it so
+    // dogfood users who only recently exported their OPENAI_API_KEY
+    // don't have to wipe + reseed just to wire provider credentials.
+    const hasExistingKeys =
+      existing.customKeys && typeof existing.customKeys === "object";
+    if (!hasExistingKeys && hasRealKey) {
+      await prisma.modelProvider.update({
+        where: { id: existing.id },
+        data: {
+          enabled: true,
+          customKeys: envValues as Prisma.InputJsonValue,
+        },
+      });
+      console.log(
+        `✓ patched ModelProvider(${provider}) with env-derived keys (${existing.id})`,
+      );
+      return { ...existing, enabled: true };
+    }
     console.log(`· ModelProvider(${provider}) exists (${existing.id})`);
     return existing;
   }
-  const hasRealKey = Object.values(envValues).some((v) => !!v);
   const mp = await prisma.modelProvider.create({
     data: {
       projectId: project.id,
