@@ -96,7 +96,14 @@ export type GatewayConfigPayload = {
     limit_usd: string; // Decimal rendered as string for JSON fidelity
     spent_usd: string;
     remaining_usd: string;
-    resets_at: string;
+    /**
+     * Unix seconds (number). Must match the Go gateway's BudgetSpec.
+     * ResetsAt (int64) — previously emitted as ISO 8601 string here,
+     * which failed JSON decode on the Go side and cascaded into a
+     * "no VK config loaded" 400 on every dispatch against a VK with
+     * reachable budgets (finding #30 follow-up).
+     */
+    resets_at: number;
     on_breach: "block" | "warn";
   }>;
   // Cache-control rules pre-sorted by priority DESC, enabled-only.
@@ -183,7 +190,7 @@ export class GatewayConfigMaterialiser {
         limit_usd: b.limitUsd.toString(),
         spent_usd: b.spentUsd.toString(),
         remaining_usd: subtract(b.limitUsd.toString(), b.spentUsd.toString()),
-        resets_at: b.resetsAt.toISOString(),
+        resets_at: Math.floor(b.resetsAt.getTime() / 1000),
         on_breach: b.onBreach === "BLOCK" ? "block" : "warn",
       })),
       cache_rules: cacheRules.map(cacheRuleToWire),
