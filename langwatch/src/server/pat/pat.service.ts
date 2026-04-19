@@ -14,6 +14,10 @@ import {
 } from "./errors";
 import type { Permission } from "~/server/api/rbac";
 import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
+import {
+  MalformedCustomRolePermissionsError,
+  parseCustomRolePermissions,
+} from "~/server/rbac/custom-role-permissions";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:pat:service");
@@ -250,16 +254,28 @@ export class PatService {
         { meta: { customRoleId, organizationId } },
       );
     }
-    // Fail closed: if permissions is malformed (not a JSON array), we cannot
-    // compute the ceiling and must reject. Falling back to [] would silently
-    // bypass the ceiling check (zero permissions → nothing to verify → accepted).
-    if (!Array.isArray(customRole.permissions)) {
-      throw new PatScopeViolationError(
-        `Custom role ${customRoleId} has malformed permissions`,
-        { meta: { customRoleId, organizationId } },
-      );
+    // Fail closed: if permissions is malformed (not a JSON array of shape-valid
+    // strings), `parseCustomRolePermissions` throws. Mapping to a scope
+    // violation keeps the PAT-create API surface consistent (always 403 on
+    // ceiling failure) while preserving the structural error as a `reason`.
+    let perms: string[];
+    try {
+      perms = parseCustomRolePermissions({
+        customRoleId,
+        permissions: customRole.permissions,
+      });
+    } catch (err) {
+      if (err instanceof MalformedCustomRolePermissionsError) {
+        throw new PatScopeViolationError(
+          `Custom role ${customRoleId} has malformed permissions`,
+          {
+            meta: { customRoleId, organizationId },
+            reasons: [err],
+          },
+        );
+      }
+      throw err;
     }
-    const perms = customRole.permissions as string[];
     for (const perm of perms) {
       const userHas = await checkRoleBindingPermission({
         prisma: this.prisma,

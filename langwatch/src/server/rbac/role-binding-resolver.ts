@@ -10,6 +10,13 @@ import {
   teamRoleHasPermission,
   type Permission,
 } from "../api/rbac";
+import {
+  MalformedCustomRolePermissionsError,
+  parseCustomRolePermissions,
+} from "./custom-role-permissions";
+import { createLogger } from "~/utils/logger/server";
+
+const logger = createLogger("langwatch:rbac:role-binding-resolver");
 // ============================================================================
 // Types
 // ============================================================================
@@ -195,14 +202,35 @@ export async function checkRoleBindingPermission({
         where: { id: binding.customRoleId },
         select: { permissions: true },
       });
-      const perms = Array.isArray(customRole?.permissions)
-        ? (customRole.permissions as string[])
-        : [];
+      // Use the shared parser so shape validation is consistent with the
+      // PAT-create ceiling path. On malformed data we fail safe here (the
+      // caller is a permission check — deny, log, move on) rather than
+      // bubbling the error up, because unrelated principals should not be
+      // blocked by one corrupted custom role.
+      let perms: string[] = [];
+      if (customRole) {
+        try {
+          perms = parseCustomRolePermissions({
+            customRoleId: binding.customRoleId,
+            permissions: customRole.permissions,
+          });
+        } catch (err) {
+          if (err instanceof MalformedCustomRolePermissionsError) {
+            logger.warn(
+              { err, customRoleId: binding.customRoleId },
+              "custom role has malformed permissions; treating as no-grant",
+            );
+          } else {
+            throw err;
+          }
+        }
+      }
       if (perms.length > 0 && hasPermissionWithHierarchy(perms, permission)) {
         return true;
       }
-      // Empty/missing custom role — fall through to the built-in CUSTOM permission
-      // set below, which grants the same `*:view` permissions as a VIEWER binding.
+      // Empty/missing/malformed custom role — fall through to the built-in
+      // CUSTOM permission set below, which grants the same `*:view`
+      // permissions as a VIEWER binding.
     }
 
     // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only
