@@ -49,6 +49,7 @@ export const DEFAULT_VIEWS: DefaultView[] = [
   { id: "evaluations", name: "Evaluations", origin: "evaluation" },
   { id: "simulations", name: "Simulations", origin: "simulation" },
   { id: "playground", name: "Playground", origin: "playground" },
+  { id: "gateway", name: "Gateway", origin: "gateway" },
 ];
 
 /**
