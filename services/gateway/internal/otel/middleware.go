@@ -196,6 +196,28 @@ func AddBoolAttr(ctx context.Context, key string, val bool) {
 	SpanFromContext(ctx).SetAttributes(attribute.Bool(key, val))
 }
 
+// RecordException attaches an exception EVENT to the active span
+// carrying the gateway's structured error code + actionable message.
+// The event shows up as the trace-detail "EXCEPTION" block, replacing
+// the generic "Bad Request" HTTP status text with something the user
+// can act on ("provider X not bound on this VK, try Y…").
+//
+// Does NOT change span status — the middleware's finish still stamps
+// codes.Error on 4xx/5xx, which is correct. Events are additive.
+//
+// Called from error-writing sites in the dispatcher right before
+// gwerrors.Write so the trace carries both the wire error body AND
+// the span event.
+func RecordException(ctx context.Context, errorType, message string) {
+	if message == "" {
+		return
+	}
+	SpanFromContext(ctx).AddEvent("exception", trace.WithAttributes(
+		attribute.String("exception.type", errorType),
+		attribute.String("exception.message", message),
+	))
+}
+
 // ResponseRecorder wraps http.ResponseWriter to capture the status
 // code so the gateway span can record it on End. It preserves
 // http.Flusher if the underlying writer supports it (critical for SSE

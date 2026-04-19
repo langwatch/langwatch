@@ -716,11 +716,19 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	}
 	parsed, err := parseOpenAIChatBody(body)
 	if err != nil {
+		gwotel.RecordException(r.Context(), "bad_json", err.Error())
 		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "bad_json", err.Error(), "")
 		return
 	}
+	// Stamp the requested model BEFORE resolve so model_resolve_failed
+	// spans can show what the caller was trying to call (#77). The
+	// canonicaliser reads gen_ai.request.model; no renderer change
+	// needed.
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOperationName, "chat")
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIRequestModel, parsed.Model)
 	resolved, err := resolveModel(b, parsed.Model)
 	if err != nil {
+		gwotel.RecordException(r.Context(), "model_resolve_failed", err.Error())
 		if isModelNotAllowed(err) || errors.Is(err, errNoMatchingProvider) {
 			gwerrors.Write(w, reqID, gwerrors.TypeModelNotAllowed, "model_not_allowed", err.Error(), "model")
 			return
@@ -733,8 +741,9 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	// "openai/gpt-5-mini". Applies for alias/explicit_slash sources where
 	// the bare name differs from the request's model string.
 	body = rewriteRequestModel(body, parsed.Model, resolved.Model)
+	// Refine the request model to the resolved (post-alias / post-prefix)
+	// value now that resolve succeeded.
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrModel, resolved.Model)
-	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOperationName, "chat")
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIRequestModel, resolved.Model)
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAISystem, string(resolved.Provider))
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrProvider, string(resolved.Provider))
@@ -1482,11 +1491,15 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 	// to speak it directly.
 	parsed, err := parseOpenAIChatBody(body) // shape has `model`, that's all we need here
 	if err != nil {
+		gwotel.RecordException(r.Context(), "bad_json", err.Error())
 		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "bad_json", err.Error(), "")
 		return
 	}
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOperationName, "messages")
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIRequestModel, parsed.Model)
 	resolved, err := resolveModel(b, parsed.Model)
 	if err != nil {
+		gwotel.RecordException(r.Context(), "model_resolve_failed", err.Error())
 		if isModelNotAllowed(err) || errors.Is(err, errNoMatchingProvider) {
 			gwerrors.Write(w, reqID, gwerrors.TypeModelNotAllowed, "model_not_allowed", err.Error(), "model")
 			return
@@ -1495,7 +1508,6 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrModel, resolved.Model)
-	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOperationName, "messages")
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIRequestModel, resolved.Model)
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAISystem, string(resolved.Provider))
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrProvider, string(resolved.Provider))
@@ -1600,11 +1612,15 @@ func (d *Dispatcher) ServeEmbeddings(w http.ResponseWriter, r *http.Request, b *
 	}
 	parsed, err := parseOpenAIChatBody(body)
 	if err != nil {
+		gwotel.RecordException(r.Context(), "bad_json", err.Error())
 		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "bad_json", err.Error(), "")
 		return
 	}
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOperationName, "embeddings")
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIRequestModel, parsed.Model)
 	resolved, err := resolveModel(b, parsed.Model)
 	if err != nil {
+		gwotel.RecordException(r.Context(), "model_resolve_failed", err.Error())
 		if isModelNotAllowed(err) || errors.Is(err, errNoMatchingProvider) {
 			gwerrors.Write(w, reqID, gwerrors.TypeModelNotAllowed, "model_not_allowed", err.Error(), "model")
 			return
@@ -1613,7 +1629,6 @@ func (d *Dispatcher) ServeEmbeddings(w http.ResponseWriter, r *http.Request, b *
 		return
 	}
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrModel, resolved.Model)
-	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOperationName, "embeddings")
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIRequestModel, resolved.Model)
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAISystem, string(resolved.Provider))
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrProvider, string(resolved.Provider))
