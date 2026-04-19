@@ -1520,6 +1520,9 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 	resp, berr, events := d.callChat(r, b, resolved, body, 60*time.Second)
 	fbCount := countFallbacks(events)
 	w.Header().Set("X-LangWatch-Fallback-Count", strconv.Itoa(fbCount))
+	gwotel.AddInt64Attr(r.Context(), "langwatch.fallback.attempts", int64(len(events)))
+	gwotel.AddInt64Attr(r.Context(), "langwatch.fallback.count", int64(fbCount))
+	stampFallbackAttribution(r.Context(), events, b)
 	if berr != nil {
 		d.enqueueDebit(b, grq, resolved, 0, 0, 0, 0, 0, time.Since(t0).Milliseconds(), "provider_error")
 		d.writeBifrostError(w, reqID, berr)
@@ -1672,25 +1675,52 @@ func extractEmbeddingUsage(resp *bfschemas.BifrostEmbeddingResponse) (int, bool)
 // envelope. We pick type based on StatusCode since BifrostError is
 // provider-flavoured.
 func (d *Dispatcher) writeBifrostError(w http.ResponseWriter, reqID string, be *bfschemas.BifrostError) {
+	d.writeBifrostErrorWithModel(w, reqID, be, "")
+}
+
+// writeBifrostErrorWithModel is the model-aware variant used by
+// dispatch paths that have a resolved model in scope. It exists so
+// compat-rejection observability (openai-param-compat.feature §v1
+// observability) can label the metric with the target model without
+// changing every existing callsite.
+func (d *Dispatcher) writeBifrostErrorWithModel(w http.ResponseWriter, reqID string, be *bfschemas.BifrostError, model string) {
 	status := 0
 	if be.StatusCode != nil {
 		status = *be.StatusCode
+	}
+	msg := bfErrorMsg(be)
+	if status >= 400 && status < 500 && d.metrics != nil {
+		if reason := classifyCompatRejection(msg); reason != "" {
+			d.metrics.RecordUpstreamCompatRejected(reason, model)
+		}
 	}
 	switch {
 	case status == http.StatusUnauthorized:
 		gwerrors.Write(w, reqID, gwerrors.TypeProviderError, "provider_auth_failed",
 			"upstream provider returned 401 — the provider credential attached to this VK is invalid; fix it in the AI Gateway → Providers screen", "")
 	case status == http.StatusTooManyRequests:
-		gwerrors.Write(w, reqID, gwerrors.TypeRateLimitExceeded, "upstream_rate_limit", bfErrorMsg(be), "")
+		gwerrors.Write(w, reqID, gwerrors.TypeRateLimitExceeded, "upstream_rate_limit", msg, "")
 	case status >= 500 && status < 600:
-		gwerrors.Write(w, reqID, gwerrors.TypeProviderError, "upstream_5xx", bfErrorMsg(be), "")
+		gwerrors.Write(w, reqID, gwerrors.TypeProviderError, "upstream_5xx", msg, "")
 	case status == http.StatusGatewayTimeout || status == 0:
-		gwerrors.Write(w, reqID, gwerrors.TypeUpstreamTimeout, "upstream_timeout", bfErrorMsg(be), "")
+		gwerrors.Write(w, reqID, gwerrors.TypeUpstreamTimeout, "upstream_timeout", msg, "")
 	case status >= 400 && status < 500:
-		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "upstream_4xx", bfErrorMsg(be), "")
+		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "upstream_4xx", msg, "")
 	default:
-		gwerrors.Write(w, reqID, gwerrors.TypeInternalError, "bifrost_error", bfErrorMsg(be), "")
+		gwerrors.Write(w, reqID, gwerrors.TypeInternalError, "bifrost_error", msg, "")
 	}
+}
+
+// classifyCompatRejection inspects an upstream 4xx error message for
+// known client-library / parameter-shape incompatibilities. Returns
+// the reason bucket, or "" when the error isn't a recognised compat
+// mismatch.
+func classifyCompatRejection(msg string) string {
+	lower := strings.ToLower(msg)
+	if strings.Contains(lower, "max_tokens") && strings.Contains(lower, "max_completion_tokens") {
+		return "legacy_max_tokens"
+	}
+	return ""
 }
 
 func bfErrorMsg(be *bfschemas.BifrostError) string {
