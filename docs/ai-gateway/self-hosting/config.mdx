@@ -86,6 +86,13 @@ Shipped in langwatch-saas `5fe8486` (@sergey Lane A iter 4 pt4) wired to `observ
 | `LW_GATEWAY_BUDGET_DEBIT_RETRY_MAX` | `8` | Outbox retries before shelving. Exponential backoff |
 | `LW_GATEWAY_BUDGET_DEBIT_SHELF_BYTES` | `134217728` (128 MB) | On-disk shelf size for unprocessable debits (4xx from control plane) |
 
+## Startup gate
+
+| Var | Default | Purpose |
+|---|---|---|
+| `GATEWAY_STARTUP_NETCHECK_HOSTS` | *(empty)* | Comma-separated `host:port` list. On startup, the gateway resolves DNS + dials TCP for each entry; any failure causes `/startupz` to stay red, which makes k8s recycle the pod **before** `MarkStarted` fires. Designed to catch `NetworkPolicy` misconfig at deploy time, not first customer request. DNS-class and TCP-class failures are distinguished in the error string so operators can pinpoint which egress rule is wrong. Iter 20 (`f7901b3`). See [Helm → Startup network check](/ai-gateway/self-hosting/helm#startup-network-check-iter-20-f7901b3) |
+| `GATEWAY_STARTUP_NETCHECK_TIMEOUT` | `2s` | Per-host timeout (DNS + TCP combined). Stop-on-first-failure — the probe exits as soon as one host is unreachable |
+
 ## Admin / operator endpoints
 
 | Var | Default | Purpose |

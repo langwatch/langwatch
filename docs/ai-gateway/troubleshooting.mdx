@@ -200,6 +200,27 @@ If the gateway saw a terminal `event: error`, your client isn't parsing SSE corr
 
 See [Streaming](/ai-gateway/streaming).
 
+## Pod never becomes ready after a deploy
+
+**Symptoms:**
+- `kubectl rollout status` hangs, pod cycles through `CrashLoopBackOff` or stays in `Running` with `/startupz` returning 503.
+- First customer request would have failed, but you're catching it at deploy.
+
+**Diagnose:**
+
+```bash
+POD=$(kubectl get pod -n langwatch -l app=langwatch-gateway -o jsonpath='{.items[0].metadata.name}')
+kubectl logs -n langwatch "$POD" | grep -E 'dns resolution failed|tcp dial failed'
+```
+
+**Root causes (iter 20 startup netcheck distinguishes these explicitly):**
+
+- `dns resolution failed: lookup api.openai.com: no such host` — the `NetworkPolicy` is blocking kube-system :53 egress. Check the DNS rule is FIRST in `spec.egress` (order matters in some CNIs) and the `kube-system` selector matches your cluster's DNS namespace (some clusters use `kube-dns`, others a custom namespace).
+- `tcp dial failed: dial tcp <ip>:443: connect: connection refused` — DNS works but provider egress is blocked. Your `egressToProviders` override is too narrow; check the resolved IP is in an allowed CIDR, or widen back to the default (any-IP except RFC1918).
+- `tcp dial failed: i/o timeout` — firewall (VPC security group / on-prem) is dropping the packet silently. DNS worked, `NetworkPolicy` allowed it, but an upstream network layer did not. Check your cloud provider's security groups / NAT gateway rules.
+
+**Fix:** correct the policy or firewall rule, `helm upgrade`, rollout. If you need to deploy immediately without fixing the root cause, temporarily set `gateway.startup.netcheckHosts: []` to disable the probe (but then the first customer request will fail instead — prefer fixing the root cause).
+
 ## First-request latency spike
 
 **Symptoms:**
