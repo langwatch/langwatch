@@ -24,6 +24,7 @@ import {
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
@@ -85,6 +86,12 @@ function GatewayUsagePage() {
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           {summaryQuery.isLoading ? (
             <Spinner />
+          ) : summaryQuery.isError ? (
+            <GatewayErrorPanel
+              title="Failed to load usage"
+              error={summaryQuery.error}
+              onRetry={() => summaryQuery.refetch()}
+            />
           ) : !data || data.totalRequests === 0 ? (
             <EmptyState.Root>
               <EmptyState.Content>

@@ -18,6 +18,7 @@ import { useState } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
+import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { Link } from "~/components/ui/link";
 import { VirtualKeyCreateDrawer } from "~/components/gateway/VirtualKeyCreateDrawer";
@@ -126,6 +127,12 @@ function VirtualKeysPage() {
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           {listQuery.isLoading ? (
             <Spinner />
+          ) : listQuery.isError ? (
+            <GatewayErrorPanel
+              title="Failed to load virtual keys"
+              error={listQuery.error}
+              onRetry={() => listQuery.refetch()}
+            />
           ) : rows.length === 0 ? (
             <EmptyState.Root>
               <EmptyState.Content>
