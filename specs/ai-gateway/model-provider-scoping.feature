@@ -141,7 +141,38 @@ Feature: Cross-scope ModelProvider reuse
     And the filter shows up in the URL query (?scope=TEAM) for shareable-link debugging
 
   # ─────────────────────────────────────────────────────────────────────────
-  # §7. Out of scope for this refactor
+  # §7. Default Model — same scope ladder
+  # ─────────────────────────────────────────────────────────────────────────
+  # Driven by rchaves 2026-04-19 iter 107 follow-up: "model providers AND
+  # default model configs etc" — Default Model config mirrors the provider
+  # scope ladder so an org-admin can set one default for the whole org and
+  # teams/projects override only when they need to.
+
+  Scenario: Default Model inherits org → team → project (first-match-wins)
+    Given an ORG-scoped Default Model "openai/gpt-5-mini" set at "acme"
+    And no team or project override on "acme-api"
+    When a consumer on "acme-api" calls openai.chat.completions.create() with no explicit model param
+    Then the resolved model is "openai/gpt-5-mini"
+
+  Scenario: Project override beats team + org default
+    Given an ORG-scoped Default Model "openai/gpt-5-mini" on "acme"
+    And a TEAM-scoped Default Model "anthropic/claude-haiku-4-5" on "acme-platform"
+    And a PROJECT-scoped Default Model "gemini/gemini-2.5-flash" on "acme-api"
+    When a consumer on "acme-api" calls with no explicit model
+    Then the resolved model is "gemini/gemini-2.5-flash" (project beats team beats org)
+    When the same consumer runs on "acme-pm" (also in acme-platform, no project override)
+    Then the resolved model is "anthropic/claude-haiku-4-5" (team beats org)
+    When the same consumer runs on "acme-eval" (acme-ml team, no team or project override)
+    Then the resolved model is "openai/gpt-5-mini" (falls back to org)
+
+  Scenario: Default Model migration is zero-drift
+    Given a Default Model exists pre-migration with only a projectId set
+    When the scope migration runs
+    Then the row gets scopeType = "PROJECT" and scopeId = the existing projectId
+    And callers on that project see the same resolved model as before
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # §8. Out of scope for this refactor
   # ─────────────────────────────────────────────────────────────────────────
 
   # - Per-provider ACL ("only these teams can bind against OpenAI-ent")
