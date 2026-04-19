@@ -164,8 +164,14 @@ export interface CompatRouter {
 /** @internal Exported for testing only */
 export function buildUrl(
   url: string | { pathname?: string; query?: Record<string, any> },
-  routeParamKeys?: Set<string>
+  routeParamKeys?: Set<string>,
+  currentPathname?: string
 ): string {
+  // React Router's location is the source of truth in an SPA. Callers inside
+  // the useRouter() hook pass it explicitly; other callers fall back to
+  // window.location.pathname, which matches in BrowserRouter but is stale or
+  // wrong under MemoryRouter / race conditions.
+  const effectivePathname = currentPathname ?? window.location.pathname;
   if (typeof url === "string") {
     // For query-only strings ("?foo=bar"), strip route param keys that
     // leaked in from router.query spreads. Components do:
@@ -177,12 +183,12 @@ export function buildUrl(
         searchParams.delete(key);
       }
       const cleaned = searchParams.toString();
-      return cleaned ? `?${cleaned}` : window.location.pathname;
+      return cleaned ? `?${cleaned}` : effectivePathname;
     }
     return url;
   }
   // If pathname is omitted, use the current URL path (Next.js behavior)
-  let pathname = url.pathname ?? window.location.pathname;
+  let pathname = url.pathname ?? effectivePathname;
   const { query } = url;
 
   // Resolve Next.js-style [param] and [[...param]] in pathname using query values.
@@ -410,7 +416,7 @@ export function useRouter(): CompatRouter {
         // When `as` is provided (Next.js (url, as) overload), use it directly.
         // The `as` string is the actual browser URL; `url` is the internal route
         // descriptor which may contain [param] placeholders.
-        const target = _as ?? buildUrl(url, routeParamKeys);
+        const target = _as ?? buildUrl(url, routeParamKeys, location.pathname);
         navigate(target, { replace: false });
         if (options?.scroll !== false) {
           window.scrollTo(0, 0);
@@ -418,7 +424,7 @@ export function useRouter(): CompatRouter {
         return Promise.resolve(true);
       },
       replace: (url, _as?, options?) => {
-        const target = _as ?? buildUrl(url, routeParamKeys);
+        const target = _as ?? buildUrl(url, routeParamKeys, location.pathname);
         navigate(target, { replace: true });
         if (options?.scroll !== false) {
           window.scrollTo(0, 0);
