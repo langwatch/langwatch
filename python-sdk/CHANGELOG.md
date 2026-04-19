@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.21.0...python-sdk@v0.21.1) (2026-04-19)
+
+
+### Bug Fixes
+
+* unskip platform experiment e2e and telemetry context tests ([#3083](https://github.com/langwatch/langwatch/issues/3083)) ([ac2640a](https://github.com/langwatch/langwatch/commit/ac2640af2ca94648708657c01b859612b48854ea))
+
 ## [0.21.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.20.0...python-sdk@v0.21.0) (2026-04-18)
 
 
