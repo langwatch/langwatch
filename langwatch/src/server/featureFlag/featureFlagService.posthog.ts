@@ -78,19 +78,6 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
         },
       },
       async (span) => {
-        // Env-var override: `FEATURE_FLAG_FORCE_ENABLE` is a comma-separated
-        // list of flag keys that are ALWAYS on, regardless of PostHog state.
-        // Used for internal dogfooding pre-GA (e.g. the AI Gateway menu) and
-        // as a break-glass kill-switch for PostHog outages.
-        const forceOn = (process.env.FEATURE_FLAG_FORCE_ENABLE ?? "")
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean);
-        if (forceOn.includes(flagKey)) {
-          span.setAttribute("feature.flag.source", "env-force-enable");
-          return true;
-        }
-
         if (!this.posthog) {
           span.setAttribute("feature.flag.source", "posthog-unavailable");
           return defaultValue;
