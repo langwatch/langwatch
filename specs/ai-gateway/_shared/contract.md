@@ -1,6 +1,6 @@
 # LangWatch AI Gateway — Shared Contract
 
-**Status:** Draft v0.1 (iteration 1, Ralph loop)
+**Status:** Draft v0.1.3 (latest audit 2026-04-19 covers Lane A iters 1–38 + Lane B iters 1–33)
 **Owners:** @ai_gateway_andr (document), @ai_gateway_sergey (Go gateway), @ai_gateway_alexis (Platform/DB)
 **Purpose:** Single source of truth for every wire-level decision shared between the Go gateway service (`langwatch-saas/services/gateway`) and the LangWatch platform control-plane (`langwatch/langwatch`). Every BDD spec in `specs/ai-gateway/` must agree with this file. Disagreements get resolved here first, code changes second.
 
@@ -673,3 +673,8 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
 - **v0.1 (2026-04-18)** — Initial draft consolidated from @sergey + @alexis proposals. @andr ships as base for iteration.
 - **v0.1.1 (2026-04-19)** — Audit for iters 17–22 drift. Wire contract unchanged: §4.3 `/changes` already documents `organization_id` as required (iter 17 landed against this). Iters 18 (NetworkPolicy), 19 (gateway-CI), 20 (startup netcheck), 21 (outbox metrics), 22 (admin bearer-token) are all deployment/operational — they don't alter any wire surface documented in §§3–12. No contract changes required.
 - **v0.1.2 (2026-04-19)** — Close §13 open question on JWT rotation. Iter 25 (`921365f`) ships dual-key `jwt.VerificationKeySet` acceptance via `LW_GATEWAY_JWT_SECRET_PREVIOUS`; operational procedure documented in self-hosting/config.mdx + helm.mdx. Iters 23 (body cap), 24 (graceful drain), 25 (JWT rotation) are deployment/operational — no wire surface drift.
+- **v0.1.3 (2026-04-19)** — Audit for Lane A iters 26–38 + Lane B iters 23–33. **No wire contract changes.** What landed:
+  - Lane A: slowloris HTTP server timeouts (iter 26), SRE observability `gateway_effective_config` + `X-LangWatch-Gateway-Version` header (iter 27), docker CI publishing to `ghcr.io/langwatch/ai-gateway` (iter 35), chart ghcr.io default + helm.mdx port fixes (iter 36), lw-dev helm install runbook (iter 37), live gateway smoke vs running control plane (iter 38). All operational or CI-scoped.
+  - Lane B: VK/budget/provider edit drawers polish, VK drawer capability preview (iter 23), DashboardLayout wrapping (iter 24), `observability_endpoint` override removal (iter 25), BigInt audit serialization fix (iter 27), shared `auditSerializer.ts` (iter 28), `LOCAL_DEV_BYPASS_AUTH` endpoint removal (iter 28), MainMenu expandable gateway group (iter 29), unique per-child icons (iter 29.1), PageLayout.Container refactor (iter 30), `defaultExpanded` on CollapsibleMenuGroup + `/gateway/audit` sub-nav drop (iter 31), multitenancy middleware exempt list for org-scoped gateway models (iter 32), regression tests (iter 33). All UI/control-plane-internal.
+  - Public wire (§§3–12) unchanged. Gateway response headers unchanged. `/api/internal/gateway/*` signing + replay window unchanged. VK format unchanged. Permission names unchanged.
+  - §§7.2+7.3 confirm the `observability_endpoint` removal: per-tenant trace attribution still real (via `langwatch.project_id` span attribute → LangWatch ingest files under owning project), only the customer-override surface removed. No bundle field drift — `observability_endpoint` never shipped on the bundle.
