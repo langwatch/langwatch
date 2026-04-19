@@ -35,6 +35,60 @@ import {
 } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
+import { requirePatPermission } from "~/server/pat/auth-middleware";
+
+// PAT permission ceilings for every gateway-platform route. Legacy project
+// API tokens bypass the ceiling (full access — current behaviour); PATs must
+// have the matching RBAC permission at the project scope. Same pattern as
+// `src/server/routes/misc.ts` (analytics / workflows / traces / triggers).
+const requireVirtualKeysView = requirePatPermission({
+  prisma,
+  permission: "virtualKeys:view",
+});
+const requireVirtualKeysCreate = requirePatPermission({
+  prisma,
+  permission: "virtualKeys:create",
+});
+const requireVirtualKeysUpdate = requirePatPermission({
+  prisma,
+  permission: "virtualKeys:update",
+});
+const requireVirtualKeysRotate = requirePatPermission({
+  prisma,
+  permission: "virtualKeys:rotate",
+});
+const requireVirtualKeysDelete = requirePatPermission({
+  prisma,
+  permission: "virtualKeys:delete",
+});
+const requireGatewayProvidersView = requirePatPermission({
+  prisma,
+  permission: "gatewayProviders:view",
+});
+const requireGatewayProvidersUpdate = requirePatPermission({
+  prisma,
+  permission: "gatewayProviders:update",
+});
+const requireGatewayProvidersManage = requirePatPermission({
+  prisma,
+  permission: "gatewayProviders:manage",
+});
+const requireGatewayBudgetsView = requirePatPermission({
+  prisma,
+  permission: "gatewayBudgets:view",
+});
+const requireGatewayBudgetsCreate = requirePatPermission({
+  prisma,
+  permission: "gatewayBudgets:create",
+});
+const requireGatewayBudgetsUpdate = requirePatPermission({
+  prisma,
+  permission: "gatewayBudgets:update",
+});
+const requireGatewayBudgetsDelete = requirePatPermission({
+  prisma,
+  permission: "gatewayBudgets:delete",
+});
 
 const logger = createLogger("langwatch:api:gateway-platform");
 
@@ -165,6 +219,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireVirtualKeysView,
     async (c) => {
       const project = c.get("project");
       const service = VirtualKeyService.create(prisma);
@@ -203,6 +258,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireVirtualKeysCreate,
     async (c) => {
     const project = c.get("project");
     const body = createVirtualKeySchema.safeParse(await c.req.json());
@@ -261,6 +317,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireVirtualKeysView,
     async (c) => {
       const project = c.get("project");
       const id = c.req.param("id");
@@ -301,6 +358,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireVirtualKeysUpdate,
     async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
@@ -350,6 +408,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireVirtualKeysRotate,
     async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
@@ -383,6 +442,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireVirtualKeysDelete,
     async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
@@ -437,6 +497,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireGatewayProvidersView,
     async (c) => {
     const project = c.get("project");
     const service = GatewayProviderCredentialService.create(prisma);
@@ -482,6 +543,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireGatewayProvidersManage,
     async (c) => {
     const project = c.get("project");
     const raw = (await c.req.json()) as Record<string, unknown>;
@@ -532,6 +594,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireGatewayBudgetsView,
     async (c) => {
     const project = c.get("project");
     const service = GatewayBudgetService.create(prisma);
@@ -579,6 +642,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireGatewayBudgetsCreate,
     async (c) => {
     const project = c.get("project");
     const body = createBudgetSchema.safeParse(await c.req.json());
@@ -623,6 +687,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireGatewayBudgetsUpdate,
     async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
@@ -667,6 +732,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireGatewayBudgetsDelete,
     async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
@@ -705,6 +771,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireGatewayProvidersUpdate,
     async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");
@@ -778,6 +845,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       },
     }),
+    requireGatewayProvidersManage,
     async (c) => {
     const project = c.get("project");
     const id = c.req.param("id");

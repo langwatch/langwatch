@@ -1,0 +1,86 @@
+{{- if .Values.networkPolicy.enabled }}
+# NetworkPolicy for the AI Gateway. Denies-by-default; only traffic
+# matching the allow rules below reaches the pod.
+#
+# Ingress (what can talk TO the gateway):
+#   - Anything on the LB / ingress-nginx namespace hitting :5563
+#     (the public customer surface).
+#   - Prometheus scraper hitting :5563 /metrics.
+#
+# Egress (what the gateway can talk to):
+#   - DNS (kube-system:53 TCP+UDP).
+#   - Control plane (langwatch-app) — resolve-key, config, changes,
+#     budget/check, budget/debit, guardrail/check all hit this one.
+#   - Redis (L2 auth cache) — optional; only when values.redis.url set.
+#   - OpenAI / Anthropic / provider upstreams on 443. These don't live
+#     in-cluster so we allow :443 to any IP. Customers who want a
+#     stricter posture should pin to known egress IPs or route via a
+#     forward proxy.
+#   - OTLP collector on :4318 (optional).
+#
+# pprof is NOT reachable via NetworkPolicy since it binds to 127.0.0.1
+# inside the pod — no selector can reach it. Operators use kubectl
+# port-forward which bypasses NetworkPolicy entirely (it's a tunneled
+# stream via the API server).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "gateway.fullname" . }}
+  labels: {{- include "gateway.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels: {{- include "gateway.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Customer traffic from the ingress controller / load balancer.
+    - from:
+        {{- toYaml .Values.networkPolicy.ingressFrom | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: 5563
+  egress:
+    # DNS — must be allowed before anything else resolves.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Control plane (LangWatch app). Resolve via the in-cluster
+    # selector — less brittle than hardcoding a pod IP.
+    - to:
+        {{- toYaml .Values.networkPolicy.egressToControlPlane | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.networkPolicy.controlPlanePort | default 3000 }}
+    {{- if .Values.redis.url }}
+    # Redis for L2 auth cache — optional.
+    - to:
+        {{- toYaml .Values.networkPolicy.egressToRedis | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: 6379
+    {{- end }}
+    # OTLP collector (optional — only if per-project endpoint is cluster-local).
+    {{- if .Values.networkPolicy.egressToOTLP }}
+    - to:
+        {{- toYaml .Values.networkPolicy.egressToOTLP | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: 4318
+    {{- end }}
+    # Provider upstreams (OpenAI, Anthropic, ...) and any fallback
+    # chain. These live outside the cluster; allow 443 to everything.
+    # Customers who want to pin the egress set: replace this stanza
+    # with explicit IP blocks via networkPolicy.egressToProviders.
+    - to:
+        {{- toYaml .Values.networkPolicy.egressToProviders | nindent 8 }}
+      ports:
+        - protocol: TCP
+          port: 443
+{{- end }}

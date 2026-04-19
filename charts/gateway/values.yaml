@@ -1,0 +1,283 @@
+image:
+  repository: langwatch/gateway
+  tag: ""            # defaults to .Chart.AppVersion
+  pullPolicy: IfNotPresent
+
+replicaCount: 2
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  # Custom metric: requests/sec per pod. Requires Prometheus-adapter.
+  customMetrics:
+    - type: Pods
+      pods:
+        metric:
+          name: lw_gateway_rps
+        target:
+          type: AverageValue
+          averageValue: "150"
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 5563
+
+ingress:
+  enabled: true
+  className: nginx
+  host: gateway.langwatch.ai
+  path: /v1
+  pathType: Prefix
+  tls:
+    enabled: true
+    secretName: gateway-tls
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"        # SSE needs unbuffered
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"     # long-lived streams
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+
+# Control-plane connection (LangWatch app). Port 5560 matches the
+# langwatch Helm chart's main-app Service (consistent with the local-
+# dev port: app=5560, nlp=5561, langevals=5562, gateway=5563).
+controlPlane:
+  baseUrl: http://langwatch-app:5560
+  requestTimeout: 2s
+  longPollTimeout: 25s
+
+# Secrets are injected from an existing Kubernetes Secret — helm never
+# materialises them. Operator creates the Secret via terraform / external
+# secrets operator.
+#
+# JWT secret rotation (zero-downtime):
+#   1. Operator flips control plane to new signing secret.
+#   2. Operator updates the gateway-runtime-secrets k8s Secret: set
+#      jwtSecretKey to the new value AND jwtSecretPreviousKey to the
+#      old value. Tokens signed with either key will verify.
+#   3. Rolling restart of gateway pods picks up both keys.
+#   4. After the longest pre-rotation bundle TTL (~15m by default),
+#      remove jwtSecretPreviousKey from the Secret and roll again.
+secrets:
+  # Key names in the Secret — override if operator uses different names.
+  existingSecretName: gateway-runtime-secrets
+  internalSecretKey: LW_GATEWAY_INTERNAL_SECRET
+  jwtSecretKey: LW_GATEWAY_JWT_SECRET
+  # Opt-in previous-key accept for the rotation window. Leave empty to
+  # disable (strict single-key mode; production steady state).
+  jwtSecretPreviousKey: ""
+
+# Redis for the L2 auth cache (optional but recommended for multi-replica).
+redis:
+  url: ""                # e.g. redis://redis.langwatch.svc:6379/0
+  existingSecretName: "" # optional; referenced as GATEWAY_REDIS_URL if set
+
+cache:
+  lruSize: 50000
+  refreshInterval: 60s
+  jwtRefreshThreshold: 5m
+  bootstrapAllKeys: false   # enterprise opt-in to survive control-plane outage
+
+bifrost:
+  poolSize: 200
+  streamBufferSize: 100
+
+otel:
+  # If empty, gateway uses the LangWatch ingest endpoint derived from
+  # tenant bundle. Set explicitly for self-host single-endpoint deploys.
+  endpoint: ""
+  batchTimeout: 5s
+  maxQueueSize: 8192
+
+logging:
+  level: info   # debug|info|warn|error
+
+# Admin / operator listener. Exposes /debug/pprof/* on a loopback-bound
+# port inside the pod. Operators reach it via `kubectl port-forward`
+# — it is NEVER exposed to the Service / Ingress surface, so safe to
+# leave on by default. Empty string disables the listener entirely.
+#
+# Non-k8s deployments that can't port-forward can move admin.addr to
+# a routable interface (e.g. "0.0.0.0:6060" behind an internal LB or
+# VPN). In that case a bearer token is MANDATORY — the gateway rejects
+# startup if admin.addr is non-loopback and no token is provided.
+# Provide the token via an existing Kubernetes Secret (helm never
+# materialises secrets).
+admin:
+  addr: 127.0.0.1:6060
+  # Opt-in bearer token. Optional on loopback (second defence layer);
+  # required when addr is non-loopback. Leave both empty to disable.
+  existingAuthSecretName: ""
+  authSecretKey: token
+
+# Rate limit live-check tier (contract §4.4). VK-level rate limits
+# (rpm/rpd) are always enforced locally; these knobs gate the live
+# /budget/check reconciliation call that only fires when a cached
+# scope is within `liveThresholdPct` of its hard limit.
+budget:
+  outboxFlushInterval: 2s
+  outboxMaxRetries: 10
+  liveThresholdPct: "0.9"  # 90%
+  liveTimeout: 200ms
+
+guardrails:
+  preTimeout: 800ms
+  postTimeout: 2s
+  streamChunkWindow: 50ms
+
+# Pod-level security.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  runAsGroup: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+# Graceful drain timing. On SIGTERM the pod flips /readyz to 503 so
+# the LB / Service endpoint controller stops routing new traffic, waits
+# preDrainWait for that removal to propagate, then calls server.Shutdown
+# which blocks up to `timeout` for in-flight handlers to finish. Operators
+# watch `gateway_in_flight_requests` to see drain progress.
+#
+# terminationGracePeriodSeconds (pod spec) MUST exceed preDrainWait +
+# timeout + a few seconds of slack, or the kubelet force-kills the pod
+# mid-drain.
+shutdown:
+  preDrainWait: 5s
+  timeout: 15s
+# terminationGracePeriodSeconds is computed from preDrainWait + timeout
+# + 5s slack. Operators with slow LB propagation can override this
+# directly AND bump preDrainWait accordingly.
+terminationGracePeriodSeconds: 30
+
+# Edge protection. Caps request body size so a misconfigured (or
+# hostile) caller can't OOM the pod with a multi-GB body. 10 MiB fits
+# ~3 MiB prompts plus base64 images with room to spare, and sits well
+# below the 512Mi memory limit. Set to 0 to disable (not recommended).
+security:
+  maxRequestBodyBytes: 10485760  # 10 MiB
+
+  # HTTP server slowloris protection. ReadHeaderTimeout catches the
+  # classic TLS-handshake-then-stall; ReadTimeout bounds the whole body
+  # read so a trickling sender can't hold a goroutine indefinitely.
+  # WriteTimeout is INTENTIONALLY not configured — it would terminate
+  # long SSE streams. Use ingress-level timeouts for response caps.
+  #
+  # IdleTimeout > typical nginx-ingress keepalive_timeout (75s) so
+  # nginx closes keep-alive connections first.
+  readHeaderTimeout: 5s
+  readTimeout: 60s
+  idleTimeout: 120s
+
+# Startup probe gating. The netcheck runs once on pod boot and must
+# succeed before /startupz returns 200 — this catches the classic
+# NetworkPolicy misconfig where /healthz passes but the first real
+# upstream request dies on an egress denial (kube-system DNS missing,
+# or provider :443 blocked). Empty list = no probe; greenfield deploys
+# and self-hosted air-gapped setups that route providers via a forward
+# proxy should leave it empty.
+#
+# Format: comma-joined "host:port" entries. DNS resolution AND TCP
+# dial must complete within netcheckTimeout for each host.
+startup:
+  netcheckHosts: []
+  # Example for SaaS production:
+  # netcheckHosts:
+  #   - api.openai.com:443
+  #   - api.anthropic.com:443
+  #   - generativelanguage.googleapis.com:443
+  netcheckTimeout: 2s
+
+# Probe timing. Tuned so a cold pod takes traffic only after /startupz
+# clears, and stops taking traffic the instant /readyz flips.
+probes:
+  startup:
+    initialDelaySeconds: 5
+    periodSeconds: 2
+    failureThreshold: 60   # allows ~2min bootstrap for bootstrapAllKeys tenants
+  readiness:
+    periodSeconds: 5
+    timeoutSeconds: 1
+    failureThreshold: 2
+    successThreshold: 1
+  liveness:
+    periodSeconds: 10
+    timeoutSeconds: 2
+    failureThreshold: 3
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# NetworkPolicy — deny-by-default ingress + egress. Enable in
+# production; dev environments may prefer to leave it off until the
+# selectors are tuned for the local cluster's namespace layout.
+networkPolicy:
+  enabled: false
+
+  # Who can talk TO the gateway (matched as a Kubernetes NetworkPolicy
+  # `from` list). Default = ingress-nginx controller + Prometheus.
+  # Override if you run a different ingress class or scraper.
+  ingressFrom:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: monitoring
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: prometheus
+
+  # Control plane target (egress). Default points at the same-
+  # namespace LangWatch deployment on port 5560 (matches the
+  # langwatch Helm chart's langwatch-app Service).
+  controlPlanePort: 5560
+  egressToControlPlane:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: langwatch-app
+
+  # Redis for L2 auth cache. Matches the default deployment pattern;
+  # if you run Redis elsewhere (managed service, another namespace)
+  # override with ipBlock or a namespace selector.
+  egressToRedis:
+    - podSelector:
+        matchLabels:
+          app.kubernetes.io/name: redis
+
+  # OTLP collector — leave empty to disable the NetworkPolicy rule
+  # when spans export out-of-cluster or per-project endpoints vary.
+  egressToOTLP: []
+
+  # Provider upstreams. Default = allow any IP on 443. Tighten with
+  # cidr blocks for audit-sensitive deployments.
+  egressToProviders:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+          - 10.0.0.0/8
+          - 172.16.0.0/12
+          - 192.168.0.0/16
