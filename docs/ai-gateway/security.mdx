@@ -55,7 +55,7 @@ Once a VK is resolved, the gateway caches a short-lived JWT (15 min TTL) contain
 
 ### Traces
 
-Every span carries `langwatch.{vk_id, project_id, team_id, organization_id}`. The OTel exporter reads `langwatch.project_id` and routes each span to the owning project's ingestion endpoint using that project's collector token. There is no shared collector — N per-project streams, each authenticated separately.
+Every span carries `langwatch.{vk_id, project_id, team_id, organization_id}`. The gateway ships all spans to a single OTel endpoint (`GATEWAY_OTEL_DEFAULT_ENDPOINT`); LangWatch ingest reads `langwatch.project_id` off each span and files the trace under the owning project. Tenant isolation is enforced at the ingest layer: a span's `project_id` must match a project the gateway is authorized to write to (validated via the VK's provider binding at bundle-resolve time), and ClickHouse storage partitions on `TenantId` with middleware-enforced predicates on every query.
 
 Implication: a bug or data leak in one project's span payload cannot land in another project's LangWatch UI. Cross-project queries are impossible from the gateway side.
 
@@ -90,14 +90,16 @@ Rotations and revocations are considered security-sensitive and generate an orga
 
 Six resources, each with standard CRUD + specialized actions:
 
-| Resource | Read | Create | Update | Delete / Rotate |
+| Resource | Read | Create / Attach | Update | Delete / Rotate / Detach |
 |---|---|---|---|---|
 | `virtualKeys` | `virtualKeys:view` | `:create` | `:update` | `:delete`, `:rotate` |
 | `gatewayBudgets` | `:view` | `:create` | `:update` | `:delete` |
-| `gatewayProviders` | `:view` | `:create`, `:attach`, `:detach` | `:update` | `:delete` |
-| `gatewayGuardrails` | `:view` | `:create` | `:update` | `:delete` |
+| `gatewayProviders` | `:view` | — | `:update` | — |
+| `gatewayGuardrails` | `:view` | `:attach` | — | `:detach` |
 | `gatewayLogs` | `:view` | — | — | — |
 | `gatewayUsage` | `:view` | — | — | — |
+
+Each resource also supports a `:manage` permission that acts as a superset of all actions for that resource — useful for custom roles that should get full control over one surface without opening every individual verb.
 
 Permissions bind to principals via the existing LangWatch role system — same roles/groups used elsewhere in the platform. A "VK owner" role (for engineers who create their own dev VKs but can't touch team VKs) is the common pattern; it grants `virtualKeys:{view,create,update,rotate,delete}` on their personally-owned VKs via the `principal_user_id` scope.
 
