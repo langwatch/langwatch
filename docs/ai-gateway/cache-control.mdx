@@ -77,12 +77,12 @@ Currently returns `400 cache_override_not_implemented`.
 
 Every successful response carries:
 
-- `X-LangWatch-Cache-Mode` — the mode that was applied (`respect` / `disable` / `forced`). Useful for tracing and A/B analysis: a client that sets `X-LangWatch-Cache: disable` should see `X-LangWatch-Cache-Mode: disable` on the response, independent of whether the provider reported a cache outcome.
+- `X-LangWatch-Cache-Mode` — the mode that was applied (`respect` / `disable` / `force`). Matches the internal `Kind` enum the Go gateway uses (`services/gateway/internal/cacheoverride`). Useful for tracing and A/B analysis: a client that sets `X-LangWatch-Cache: disable` should see `X-LangWatch-Cache-Mode: disable` on the response, independent of whether the provider reported a cache outcome.
 - `X-LangWatch-Cache` — the cache outcome:
   - `hit` — provider served part or all of the prefix from cache.
   - `miss` — no cache hit.
   - `bypass` — mode was `disable`.
-  - `forced` — mode was `force` (v1.1).
+  - `force` — mode was `force` (v1.1 — deferred with `400 cache_override_not_implemented` in v1).
 
 Usage reporting splits input tokens by origin:
 

@@ -47,7 +47,7 @@ Feature: Cache control rules — operator-defined overrides without client code 
     And a VK "vk_prod_openai" with tags ["env=prod"]
     When a request to /v1/chat/completions resolves to model "gpt-5-mini"
     Then the rule with priority 200 matches first
-    And the response header "X-LangWatch-Cache-Mode" equals "forced"
+    And the response header "X-LangWatch-Cache-Mode" equals "force"
     And span attribute "langwatch.cache.rule_id" equals the priority-200 rule id
 
   Scenario: AND semantics across non-null matchers
@@ -91,7 +91,7 @@ Feature: Cache control rules — operator-defined overrides without client code 
     When a request arrives at /v1/messages with NO cache_control in the body
     Then the forwarded request body has cache_control: {type: "ephemeral"} on system[-1]
     And the forwarded request body has cache_control: {type: "ephemeral"} on messages[-1].content[-1]
-    And the response header "X-LangWatch-Cache-Mode" equals "forced"
+    And the response header "X-LangWatch-Cache-Mode" equals "force"
 
   Scenario: Action "force" on Anthropic does NOT double-inject if client already set cache_control
     Given a cache rule matching VK "vk_prod_anthropic" with action "force" ttl 300
@@ -104,7 +104,7 @@ Feature: Cache control rules — operator-defined overrides without client code 
     And the VK resolves to "gpt-5-mini" (OpenAI)
     When a request arrives at /v1/chat/completions
     Then the forwarded request body is byte-identical to the client's request
-    And the response header "X-LangWatch-Cache-Mode" equals "forced"
+    And the response header "X-LangWatch-Cache-Mode" equals "force"
     And span attribute "langwatch.cache.provider_behavior" equals "automatic"
 
   Scenario: Action "force" on Gemini returns 400 cache_override_not_implemented (v1)
