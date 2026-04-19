@@ -75,7 +75,7 @@ When `LW_GATEWAY_OTEL_TENANT_ROUTER=enabled` (default), the gateway:
 
 Result: customer spans land in the customer's own LangWatch project without any env-var or client-side config. When an operator changes `Project.observabilityEndpoint` in the control plane, the next `/changes` long-poll propagates it ≤ 30 s.
 
-Shipped in langwatch-saas `5fe8486` (@sergey Lane A iter 4 pt4) wired to `observability_endpoint` on the GatewayConfig bundle (@alexis Lane B iter 6 `6cda472ec`).
+Shipped in `5fe8486` (@sergey Lane A iter 4 pt4) wired to `observability_endpoint` on the GatewayConfig bundle (@alexis Lane B iter 6 `6cda472ec`).
 
 ## Guardrails + budgets
 
