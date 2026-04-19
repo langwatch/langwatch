@@ -13,6 +13,7 @@ Ships the first version of the **LangWatch AI Gateway** — a Go data plane sitt
 - `POST /v1/chat/completions`, `POST /v1/messages`, `POST /v1/embeddings`, `GET /v1/models` — OpenAI + Anthropic shape compatibility.
 - Auth via `Authorization: Bearer lw_vk_*`, `x-api-key`, or `api-key`.
 - Per-credential sliding-window circuit breaker (30s / 10 failures / 60s open) + VK-configurable fallback chain with transparent pre-connection switching.
+- Per-VK rate limits: RPM + RPD (golang.org/x/time/rate token buckets, cross-dimension accounting); 429 + `Retry-After` + `X-LangWatch-RateLimit-Dimension: rpm|rpd`. TPM deferred to v1.1.
 - Live `/budget/check` reconciliation for near-limit scopes (≥ 90% of cap) with 200 ms fail-open.
 - Anthropic `cache_control` byte-for-byte passthrough.
 - Per-project OTLP routing via `ProjectEndpointRegistry` — customer spans land in the customer's LangWatch project without env config.
@@ -111,8 +112,8 @@ See `.claude/lane-c-iter12-*.png` and `.claude/lane-c-iter10-*.png`:
 
 ## Contributors (parallel ralph-loop agents)
 
-- **Lane A (@ai_gateway_sergey)** — Go data plane: scaffold (`f551509`), iter 4 in 7 parts (OTel/traceparent `e9b04e6`, fallback+breaker `fa1fee0`, live /budget/check `5808ef2`, per-project OTLP `5fe8486`, streaming usage `56f9134`, streaming fallback `b8016b0`, terraform `2d13a22`), iter 5 metrics (`53c466f`), iter 6 benchmarks (`f43cc20`).
-- **Lane B (@ai_gateway_alexis)** — Control plane + UI: foundation (`7b24eade3`, `e86c09f62`), VK UI (`593571fb4`), public REST (`4e95415da`), edit drawers (`c34577f2f`, `6cda472ec`), dev-bypass + describeRoute (`8f142e274`, `65785403b`), observability UI (`5201e9928`), ConfirmDialog (`6021c1816`).
+- **Lane A (@ai_gateway_sergey)** — Go data plane: scaffold (`f551509`), iter 4 in 7 parts (OTel/traceparent `e9b04e6`, fallback+breaker `fa1fee0`, live /budget/check `5808ef2`, per-project OTLP `5fe8486`, streaming usage `56f9134`, streaming fallback `b8016b0`, terraform `2d13a22`), iter 5 metrics (`53c466f`), iter 6 benchmarks (`f43cc20`), iter 7 per-VK rate limits RPM/RPD (`261b731`).
+- **Lane B (@ai_gateway_alexis)** — Control plane + UI: foundation (`7b24eade3`, `e86c09f62`), VK UI (`593571fb4`), public REST (`4e95415da`), edit drawers (`c34577f2f`, `6cda472ec`), dev-bypass + describeRoute (`8f142e274`, `65785403b`), observability UI (`5201e9928`), ConfirmDialog (`6021c1816`), VK detail page (`8b6579212`).
 - **Lane C (@ai_gateway_andr)** — Specs + docs + CLI + QA: 16 commits across 15 iterations (see `.claude/LANE-C-CUMULATIVE.md`). Shipped the contract, 45+ doc pages, 13 CLI subcommands, 6 BDD spec files, 4 cookbooks, 6 dogfood screenshots, and caught the Vite route-registration oversight (`267ceaec5`) that was blocking UI dogfood.
 
 Full cross-lane readiness inventory at `.claude/V1-GA-READINESS.md`.
