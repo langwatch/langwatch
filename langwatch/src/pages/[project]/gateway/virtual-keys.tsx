@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  Card,
   EmptyState,
   HStack,
   Heading,
@@ -140,7 +141,9 @@ function VirtualKeysPage() {
               </EmptyState.Content>
             </EmptyState.Root>
           ) : (
-            <Table.Root size="sm">
+            <Card.Root width="full" overflow="hidden">
+              <Card.Body paddingY={0} paddingX={0}>
+            <Table.Root variant="line" size="md" width="full">
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
@@ -271,6 +274,8 @@ function VirtualKeysPage() {
                 ))}
               </Table.Body>
             </Table.Root>
+              </Card.Body>
+            </Card.Root>
           )}
         </Box>
       </>
