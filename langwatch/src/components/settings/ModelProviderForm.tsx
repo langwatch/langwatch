@@ -231,7 +231,11 @@ export const EditModelProviderForm = ({
           actions={actions}
           provider={provider}
           teamId={team?.id}
+          teamName={team?.name}
           organizationId={organization?.id}
+          organizationName={organization?.name}
+          projectId={project?.id}
+          projectName={project?.name}
         />
 
         <ExtraHeadersSection

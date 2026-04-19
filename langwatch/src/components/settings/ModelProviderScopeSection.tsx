@@ -1,10 +1,20 @@
-import { Badge, Box, HStack, RadioGroup, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  createListCollection,
+  HStack,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { Building2, Folder, Users } from "lucide-react";
+import { useMemo } from "react";
 import type {
   ModelProviderScopeType,
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import { Select } from "../ui/select";
 import { SmallLabel } from "../SmallLabel";
 
 const SCOPE_DESCRIPTION: Record<ModelProviderScopeType, string> = {
@@ -13,44 +23,53 @@ const SCOPE_DESCRIPTION: Record<ModelProviderScopeType, string> = {
   ORGANIZATION: "Every project in the organization inherits this provider.",
 };
 
+const ScopeIcon = ({ scopeType }: { scopeType: ModelProviderScopeType }) => {
+  if (scopeType === "ORGANIZATION")
+    return <Building2 size={16} aria-hidden />;
+  if (scopeType === "TEAM") return <Users size={16} aria-hidden />;
+  return <Folder size={16} aria-hidden />;
+};
+
 /**
- * Renders the principal-style scope picker for a NEW model provider or a
- * read-only indicator for an existing one.
+ * Scope picker for model providers.
  *
- * Editable radio picker only surfaces for brand-new providers
- * (`provider.id` undefined) so we never silently re-parent credentials
- * across orgs/teams. To change an existing provider's scope, delete it
- * and recreate at the new scope — that path is explicit about the
- * credential lifecycle.
+ * For NEW providers, renders a Chakra Select with three icon-grouped options
+ * (Organization / Teams / Projects). Each option encodes scopeType:scopeId,
+ * though the current build only exposes one scope per hierarchy tier — the
+ * multi-select surface and ModelProviderScope join table land with the
+ * schema migration (iter 109 task #60).
  *
- * For existing providers we still render the current scope as a static
- * badge + helper text, so operators can see at a glance whether they're
- * editing a Project / Team / Organization row (finding #81).
+ * For EXISTING providers the section stays read-only: scope changes on a
+ * persisted credential happen by delete+recreate so we never silently
+ * re-parent a credential across orgs/teams.
  *
- * ORGANIZATION and TEAM radios only appear in the picker when the
- * respective ID is available from useOrganizationTeamProject; otherwise
- * they're silently hidden (e.g. personal-account projects without a team).
+ * For personal-account projects (no org/team context) the section renders
+ * nothing — a scope picker with a single disabled option is just noise.
  */
 export function ProviderScopeSection({
   state,
   actions,
   provider,
   teamId,
+  teamName,
   organizationId,
+  organizationName,
+  projectId,
+  projectName,
 }: {
   state: UseModelProviderFormState;
   actions: UseModelProviderFormActions;
   provider: MaybeStoredModelProvider;
   teamId: string | undefined;
+  teamName?: string;
   organizationId: string | undefined;
+  organizationName?: string;
+  projectId?: string;
+  projectName?: string;
 }) {
   const isExisting = Boolean(provider.id);
   const hasOrgOrTeam = Boolean(organizationId ?? teamId);
 
-  // Existing provider → static "Current scope" indicator (finding #81).
-  // Still return null when there's no org/team context AND the stored row
-  // is the default PROJECT scope — that's 100% of legacy data and the
-  // section would say nothing useful.
   if (isExisting) {
     const storedScope =
       (provider.scopeType as ModelProviderScopeType | undefined) ?? "PROJECT";
@@ -58,7 +77,7 @@ export function ProviderScopeSection({
 
     return (
       <VStack align="start" width="full" gap={2}>
-        <SmallLabel>Availability</SmallLabel>
+        <SmallLabel>Scope</SmallLabel>
         <HStack gap={2}>
           <ScopeReadOnlyBadge scopeType={storedScope} />
           <Text fontSize="xs" color="gray.600">
@@ -75,42 +94,129 @@ export function ProviderScopeSection({
 
   if (!hasOrgOrTeam) return null;
 
-  const description = SCOPE_DESCRIPTION;
+  type ScopeOption = {
+    value: string;
+    label: string;
+    scopeType: ModelProviderScopeType;
+    scopeId: string;
+  };
+
+  const options = useMemo<ScopeOption[]>(() => {
+    const out: ScopeOption[] = [];
+    if (organizationId) {
+      out.push({
+        value: `ORGANIZATION:${organizationId}`,
+        label: organizationName ?? "Organization",
+        scopeType: "ORGANIZATION",
+        scopeId: organizationId,
+      });
+    }
+    if (teamId) {
+      out.push({
+        value: `TEAM:${teamId}`,
+        label: teamName ?? "Team",
+        scopeType: "TEAM",
+        scopeId: teamId,
+      });
+    }
+    if (projectId) {
+      out.push({
+        value: `PROJECT:${projectId}`,
+        label: projectName ?? "Project",
+        scopeType: "PROJECT",
+        scopeId: projectId,
+      });
+    }
+    return out;
+  }, [organizationId, organizationName, teamId, teamName, projectId, projectName]);
+
+  const collection = useMemo(
+    () => createListCollection({ items: options }),
+    [options],
+  );
+
+  const currentScopeType = state.scopeType;
+  const currentValue = useMemo(() => {
+    const match = options.find((o) => o.scopeType === currentScopeType);
+    return match ? [match.value] : [];
+  }, [options, currentScopeType]);
 
   return (
     <VStack align="start" width="full" gap={2}>
-      <SmallLabel>Availability</SmallLabel>
-      <RadioGroup.Root
-        value={state.scopeType}
+      <SmallLabel>Scope</SmallLabel>
+      <Select.Root
+        collection={collection}
+        value={currentValue}
         onValueChange={(details) => {
-          actions.setScopeType(details.value as ModelProviderScopeType);
+          const selected = details.value[0];
+          if (!selected) return;
+          const match = options.find((o) => o.value === selected);
+          if (match) actions.setScopeType(match.scopeType);
         }}
       >
-        <HStack gap={6} wrap="wrap">
-          <RadioGroup.Item value="PROJECT">
-            <RadioGroup.ItemHiddenInput />
-            <RadioGroup.ItemIndicator />
-            <RadioGroup.ItemText>Project</RadioGroup.ItemText>
-          </RadioGroup.Item>
-          {teamId ? (
-            <RadioGroup.Item value="TEAM">
-              <RadioGroup.ItemHiddenInput />
-              <RadioGroup.ItemIndicator />
-              <RadioGroup.ItemText>Team</RadioGroup.ItemText>
-            </RadioGroup.Item>
-          ) : null}
-          {organizationId ? (
-            <RadioGroup.Item value="ORGANIZATION">
-              <RadioGroup.ItemHiddenInput />
-              <RadioGroup.ItemIndicator />
-              <RadioGroup.ItemText>Organization</RadioGroup.ItemText>
-            </RadioGroup.Item>
-          ) : null}
-        </HStack>
-      </RadioGroup.Root>
+        <Select.Trigger>
+          <Select.ValueText placeholder="Select scope">
+            {(items) => {
+              const item = items[0] as ScopeOption | undefined;
+              if (!item) return "Select scope";
+              return (
+                <HStack gap={2}>
+                  <ScopeIcon scopeType={item.scopeType} />
+                  <Text>{item.label}</Text>
+                  <ScopeReadOnlyBadge scopeType={item.scopeType} />
+                </HStack>
+              );
+            }}
+          </Select.ValueText>
+        </Select.Trigger>
+        <Select.Content>
+          {options.some((o) => o.scopeType === "ORGANIZATION") && (
+            <Select.ItemGroup label="Organization">
+              {options
+                .filter((o) => o.scopeType === "ORGANIZATION")
+                .map((option) => (
+                  <Select.Item key={option.value} item={option}>
+                    <HStack gap={2}>
+                      <ScopeIcon scopeType="ORGANIZATION" />
+                      <Text>{option.label}</Text>
+                    </HStack>
+                  </Select.Item>
+                ))}
+            </Select.ItemGroup>
+          )}
+          {options.some((o) => o.scopeType === "TEAM") && (
+            <Select.ItemGroup label="Teams">
+              {options
+                .filter((o) => o.scopeType === "TEAM")
+                .map((option) => (
+                  <Select.Item key={option.value} item={option}>
+                    <HStack gap={2}>
+                      <ScopeIcon scopeType="TEAM" />
+                      <Text>{option.label}</Text>
+                    </HStack>
+                  </Select.Item>
+                ))}
+            </Select.ItemGroup>
+          )}
+          {options.some((o) => o.scopeType === "PROJECT") && (
+            <Select.ItemGroup label="Projects">
+              {options
+                .filter((o) => o.scopeType === "PROJECT")
+                .map((option) => (
+                  <Select.Item key={option.value} item={option}>
+                    <HStack gap={2}>
+                      <ScopeIcon scopeType="PROJECT" />
+                      <Text>{option.label}</Text>
+                    </HStack>
+                  </Select.Item>
+                ))}
+            </Select.ItemGroup>
+          )}
+        </Select.Content>
+      </Select.Root>
       <Box>
         <Text fontSize="xs" color="gray.600">
-          {description[state.scopeType]}
+          {SCOPE_DESCRIPTION[currentScopeType]}
         </Text>
       </Box>
     </VStack>
