@@ -124,6 +124,12 @@ func (c *Config) UnmarshalJSON(data []byte) error {
 type Config struct {
 	VirtualKeyID  string         `json:"vk_id"`
 	Revision      int64          `json:"revision"`
+	// ProjectOTLPToken is the VK's project apiKey, used as X-Auth-Token
+	// on OTLP span exports so spans land in this VK's project's inbox.
+	// Populated by the control-plane materialiser. Empty string =
+	// gateway falls back to GATEWAY_OTEL_DEFAULT_AUTH_TOKEN (dev / a
+	// single-project dogfood environment).
+	ProjectOTLPToken string         `json:"project_otlp_token"`
 	ProviderCreds []ProviderCred `json:"providers"`
 	Fallback      FallbackSpec   `json:"fallback"`
 	// (removed) ObservabilityEndpoint — per-project OTLP override was

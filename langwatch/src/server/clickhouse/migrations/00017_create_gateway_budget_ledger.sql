@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.gateway_budget_ledger_events
     INDEX idx_gateway_request (TenantId, GatewayRequestId) TYPE bloom_filter(0.001) GRANULARITY 1
 )
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}EventTimestamp)
-PARTITION BY toYearMonth(OccurredAt)
+PARTITION BY toYYYYMM(OccurredAt)
 ORDER BY (TenantId, BudgetId, GatewayRequestId)
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
@@ -94,7 +94,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.gateway_budget_scope_totals
     UpdatedAt DateTime64(3) DEFAULT now64(3) CODEC(Delta(8), ZSTD(1))
 )
 ENGINE = AggregatingMergeTree()
-PARTITION BY toYearMonth(PeriodStart)
+PARTITION BY toYYYYMM(PeriodStart)
 ORDER BY (TenantId, Scope, ScopeId, Window, PeriodStart)
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd

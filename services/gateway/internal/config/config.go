@@ -203,10 +203,21 @@ func Load() (*Config, error) {
 			StreamChunkWindow: envDuration("GATEWAY_GUARDRAIL_STREAM_WINDOW", 200*time.Millisecond),
 		},
 		OTel: OTel{
-			DefaultExportEndpoint: env("GATEWAY_OTEL_DEFAULT_ENDPOINT", ""),
-			DefaultAuthToken:      env("GATEWAY_OTEL_DEFAULT_AUTH_TOKEN", ""),
-			BatchTimeout:          envDuration("GATEWAY_OTEL_BATCH_TIMEOUT", 5*time.Second),
-			MaxQueueSize:          envInt("GATEWAY_OTEL_MAX_QUEUE", 8192),
+			// Default to the colocated LangWatch control plane's OTLP
+			// ingest. Works out-of-the-box in dev (pnpm dev) and in
+			// helm-managed self-hosted installs where the control
+			// plane service is reachable at langwatch-app:5560. Override
+			// with GATEWAY_OTEL_DEFAULT_ENDPOINT for cross-cluster or
+			// external-collector deployments.
+			DefaultExportEndpoint: env("GATEWAY_OTEL_DEFAULT_ENDPOINT", "http://localhost:5560/api/otel"),
+			// Only set as an X-Auth-Token fallback for environments that
+			// haven't yet populated per-project token on bundles (e.g.
+			// dev with a pre-refactor cached bundle). Empty = rely on
+			// the per-project resolver hook that wires X-Auth-Token per
+			// request using the VK's project's apiKey.
+			DefaultAuthToken: env("GATEWAY_OTEL_DEFAULT_AUTH_TOKEN", ""),
+			BatchTimeout:     envDuration("GATEWAY_OTEL_BATCH_TIMEOUT", 5*time.Second),
+			MaxQueueSize:     envInt("GATEWAY_OTEL_MAX_QUEUE", 8192),
 		},
 		Bifrost: Bifrost{
 			PoolSize:         envInt("GATEWAY_BIFROST_POOL_SIZE", 200),

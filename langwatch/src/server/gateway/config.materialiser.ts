@@ -58,6 +58,12 @@ export type GatewayConfigPayload = {
   environment: "live" | "test";
   organization_id: string;
   project_id: string;
+  /**
+   * Project API key the gateway uses as X-Auth-Token on OTLP span
+   * export so spans land in this VK's project's inbox. Not a new
+   * secret — same apiKey already authenticates /api/collector.
+   */
+  project_otlp_token: string;
   team_id: string;
   principal_id: string | null;
   providers: ProviderSlot[];
@@ -152,6 +158,14 @@ export class GatewayConfigMaterialiser {
       environment: vk.environment === "LIVE" ? "live" : "test",
       organization_id: project.team.organizationId,
       project_id: project.id,
+      // project_otlp_token lets the gateway authenticate span export to
+      // /api/otel on behalf of this project. The control-plane OTLP
+      // ingest authenticates exactly like /api/collector — per-project
+      // API token on X-Auth-Token — so using the project's apiKey here
+      // makes spans land in the VK's project's inbox (rchaves iter-66
+      // "traces not landing" ask). Bundles already travel inside the
+      // HMAC-signed internal gateway channel, so no new secret boundary.
+      project_otlp_token: project.apiKey,
       team_id: project.teamId,
       principal_id: vk.principalUserId,
       providers: chain.map((row, index) => buildProviderSlot(row, index)),
