@@ -1327,6 +1327,11 @@ export const organizationRouter = createTRPCRouter({
         action: z.string().optional(),
         startDate: z.number().optional(),
         endDate: z.number().optional(),
+        // Gateway deep-link filters — forwarded to the UNION query so a
+        // VK/budget detail page can link operators straight to the
+        // pre-filtered history of that resource.
+        targetKind: z.string().optional(),
+        targetId: z.string().optional(),
       }),
     )
     .use(checkOrganizationPermission("organization:manage"))
@@ -1346,6 +1351,8 @@ export const organizationRouter = createTRPCRouter({
         action: input.action,
         startDate: input.startDate,
         endDate: input.endDate,
+        targetKind: input.targetKind,
+        targetId: input.targetId,
       });
     }),
 });
