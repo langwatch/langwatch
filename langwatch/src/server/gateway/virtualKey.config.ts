@@ -56,8 +56,20 @@ export const virtualKeyConfigSchema = z.object({
       pre: z.array(guardrailRefSchema).default([]),
       post: z.array(guardrailRefSchema).default([]),
       streamChunk: z.array(guardrailRefSchema).default([]),
+      // Fail-open flips from 503 guardrail_upstream_unavailable (default,
+      // fail-closed) to allow-with-warn-log when the evaluator backend is
+      // unreachable. Symmetric per direction — @sergey iter 11 landed the
+      // response side; request side mirrors the same semantic.
+      requestFailOpen: z.boolean().default(false),
+      responseFailOpen: z.boolean().default(false),
     })
-    .default({ pre: [], post: [], streamChunk: [] }),
+    .default({
+      pre: [],
+      post: [],
+      streamChunk: [],
+      requestFailOpen: false,
+      responseFailOpen: false,
+    }),
   blockedPatterns: z
     .object({
       tools: blockedPatternsSchema.default({ deny: [], allow: null }),
