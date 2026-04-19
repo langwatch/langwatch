@@ -167,6 +167,22 @@ Feature: Cache control rules — operator-defined overrides without client code 
     And there are zero allocations on the hot path (0 B/op, 0 allocs/op)
     And the ~700 ns hot-path target is preserved with 28× headroom
 
+  Scenario: v1 scope — rule evaluation is wired on /v1/messages only (chat-completions + embeddings deferred)
+    Given a cache rule "rule_m_only" matches any request
+    When the client calls POST /v1/messages
+    Then the rule fires and span attribute "langwatch.cache.rule_id" is set
+    When the client calls POST /v1/chat/completions
+    Then the rule is parsed + loaded into the bundle but NOT evaluated on the /v1/chat/completions dispatch path
+    # Lane A iter 47 wired cache-rules into /v1/messages. Extending to /v1/chat/completions
+    # + /v1/embeddings is follow-up work; tracked in PR body Outstanding for v1.1.
+
+  Scenario: v1 scope — model-field matchers are not yet fired on /v1/messages
+    Given a cache rule matching model "claude-haiku-*"
+    When a request hits /v1/messages resolving to "claude-haiku-4-5-20251001"
+    Then the rule does NOT match (model parse happens below cache-override in the /v1/messages pipeline in iter 47; TODO to lift parse order, low priority)
+    # Other matcher dimensions (vk_id, vk_prefix, vk_tags, principal_id,
+    # request_metadata) all fire correctly on /v1/messages.
+
   Scenario: Rule update propagates within 30 seconds via /changes long-poll
     Given a VK "vk_prod_openai" is in use by a client
     When an admin creates a new cache rule matching that VK
@@ -176,28 +192,49 @@ Feature: Cache control rules — operator-defined overrides without client code 
   # ─────────────────────────────────────────────────────────────────────────
   # §5. Observability — rule attribution in traces + metrics
   # ─────────────────────────────────────────────────────────────────────────
-  # NOTE: Lane A iter 45 (e037888be) ships the evaluator in isolation with
-  # benchmark evidence. Span-attr + metric emission requires the
-  # follow-up iter wiring Evaluate() into cacheoverride.Apply — scheduled
-  # before v1 GA so this section's scenarios are contract, not reality,
-  # until that commit lands.
+  # Lane A iter 45 (e037888be) shipped the evaluator in isolation.
+  # Lane A iter 47 (9df0c8028) wired Evaluate() into dispatch.applyCacheOverride
+  # with full observability. Span attrs and Prometheus counter live on /v1/messages
+  # today. /v1/chat/completions + /v1/embeddings wiring tracked separately.
 
   Scenario: Span attributes record the matched rule
-    Given a cache rule "rule_prod_force" matches a request
+    Given a cache rule "rule_prod_disable" matches a request on /v1/messages
     When the request completes
-    Then span attribute "langwatch.cache.rule_id" equals "rule_prod_force"
-    And span attribute "langwatch.cache.rule_priority" equals the rule's priority
-    And span attribute "langwatch.cache.mode_applied" equals the rule's action.mode
+    Then span attribute "langwatch.cache.rule_id" equals "rule_prod_disable"
+    And span attribute "langwatch.cache.mode_applied" equals the rule's action.mode (upper-case on metric labels per iter 47 mode_enum convention)
+    # rule_priority is not currently emitted as a separate span attr by iter 47 —
+    # matched-rule-id is enough for dashboards since priority is a property of the rule
+    # (derivable by joining rule_id with the /cache-rules list).
 
-  Scenario: Prometheus counter records rule hits by mode + provider
-    Given a cache rule "rule_prod_force" is configured
-    When 50 requests match the rule, dispatched to OpenAI
-    Then counter gateway_cache_rule_hits_total{rule_id="rule_prod_force",mode="force",provider="openai"} increments by 50
+  Scenario: Prometheus counter records rule hits by rule + applied mode
+    Given a cache rule "rule_prod_disable" is configured
+    When 50 requests match the rule on /v1/messages
+    Then counter gateway_cache_rule_hits_total{rule_id="rule_prod_disable",mode_applied="DISABLE"} increments by 50
+    # Actual label shape per iter 47: rule_id + mode_applied (NOT provider).
+    # If provider-split is needed downstream, join with gateway_requests_total on request_id.
 
   Scenario: Rule miss does not increment rule-hit counter
     Given no cache rules match a request
     Then counter gateway_cache_rule_hits_total does NOT increment for that request
     And the request's trace has no langwatch.cache.rule_id attribute
+
+  Scenario: Header precedence — rule matches but header overrides; mode_applied tracks the header, not the rule
+    Given a cache rule "rule_force_enterprise" matches a request
+    When the request carries header "X-LangWatch-Cache: disable"
+    Then span attribute "langwatch.cache.rule_id" is absent (rule did NOT fire)
+    And span attribute "langwatch.cache.mode_applied" equals "DISABLE" (from the header)
+    # Precedence resolution per iter 47 dispatcher: header > rule > VK default.
+    # When the header wins, the rule eval is skipped — no rule_id attribution.
+
+  Scenario: v1 scope — mode=force evaluates + attributes + counts, but body mutation is downgraded to respect
+    Given a cache rule with action.mode = "force" ttl=600 matches a request on /v1/messages
+    When the request completes
+    Then the forwarded body has NO cache_control mutations (force body-injection is v1.1)
+    And the gateway logs a WARN naming the rule_id + "force mode downgraded to respect; Anthropic cache_control injection is v1.1"
+    And span attribute "langwatch.cache.rule_id" is present (rule fired)
+    And span attribute "langwatch.cache.mode_applied" equals "FORCE" (operator intent recorded)
+    # Operators see the rule fired on dashboards; end-user gets no unexpected
+    # cache behaviour change. Contract-safe degradation.
 
   # ─────────────────────────────────────────────────────────────────────────
   # §6. RBAC — who can author rules

@@ -137,7 +137,7 @@ Feature: Public REST API — /api/gateway/v1/*
       }
       """
     Then the response status is 201
-    And body.id has prefix "gcr_"
+    And body.id is a 21-character nanoid (no prefix — `GatewayCacheRule.id @default(nanoid())`)
     And body.mode_enum = "FORCE"
     # mode_enum is upper-case on wire for Prometheus label filtering convenience;
     # action.mode remains lowercase (matches Kind enum in cacheoverride package).
