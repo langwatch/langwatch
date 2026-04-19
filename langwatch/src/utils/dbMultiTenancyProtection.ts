@@ -101,6 +101,27 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
     return;
   }
 
+  // Gateway auth resolver: findByHashedSecret is the hot-path lookup
+  // that converts an opaque `lw_vk_live_*` bearer token into a
+  // VirtualKey row. The hashedSecret itself is a cryptographic
+  // identifier unique across the platform (HMAC-SHA256 with a
+  // per-deployment pepper), so projectId/organizationId cannot be
+  // known to the caller — the VK row IS what teaches them. The OR
+  // clause here is always shape
+  //   { OR: [{ hashedSecret }, { previousHashedSecret, previousSecretValidUntil }] }
+  // matching virtualKey.repository.ts:findByHashedSecret. Narrow
+  // exemption matches the PublicShare pattern above.
+  if (
+    action === "findFirst" &&
+    model === "VirtualKey" &&
+    Array.isArray(params.args?.where?.OR) &&
+    params.args.where.OR.every(
+      (o: any) => o?.hashedSecret || o?.previousHashedSecret,
+    )
+  ) {
+    return;
+  }
+
   if (action === "create" || action === "createMany") {
     const data =
       action === "create"
