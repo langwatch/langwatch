@@ -2,6 +2,7 @@ package otel
 
 import (
 	"context"
+	"strings"
 	"sync"
 	"time"
 
@@ -154,13 +155,33 @@ func buildOTLPExporter(ctx context.Context, endpoint string, headers map[string]
 		timeout = 5 * time.Second
 	}
 	copts := []otlptracehttp.Option{
-		otlptracehttp.WithEndpointURL(endpoint),
+		otlptracehttp.WithEndpointURL(normalizeTraceEndpoint(endpoint)),
 		otlptracehttp.WithTimeout(timeout),
 	}
 	if len(headers) > 0 {
 		copts = append(copts, otlptracehttp.WithHeaders(headers))
 	}
 	return otlptracehttp.New(ctx, copts...)
+}
+
+// normalizeTraceEndpoint appends `/v1/traces` to the endpoint URL
+// when the caller supplies the OTLP base (as-per
+// OTEL_EXPORTER_OTLP_ENDPOINT convention). Callers who already point
+// at the traces-specific path get it returned unchanged (matches
+// OTEL_EXPORTER_OTLP_TRACES_ENDPOINT convention). This saves
+// operators from guessing between
+// `http://host/api/otel` and `http://host/api/otel/v1/traces` — both
+// work and the LangWatch control-plane OTLP ingest mounts at
+// `/api/otel/v1/traces`.
+func normalizeTraceEndpoint(endpoint string) string {
+	if endpoint == "" {
+		return endpoint
+	}
+	trimmed := strings.TrimRight(endpoint, "/")
+	if strings.HasSuffix(trimmed, "/v1/traces") {
+		return trimmed
+	}
+	return trimmed + "/v1/traces"
 }
 
 func mergeHeaders(a, b map[string]string) map[string]string {
