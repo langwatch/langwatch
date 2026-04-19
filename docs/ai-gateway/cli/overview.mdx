@@ -59,3 +59,72 @@ Each CLI's trace lands in LangWatch live. You can:
 - Run an offline eval comparing Claude Code vs Codex quality on tickets of a given type.
 
 See the per-CLI pages for exact setup commands.
+
+## Verified smoke output
+
+Lane A ran the gateway locally against `pnpm dev` on 2026-04-19 to confirm the response shape CLIs will see. Pinning the transcripts here so integrators can diff their actual output against known-good.
+
+Start the gateway pointed at a running LangWatch control plane on `:5560`:
+
+```bash
+cd services/gateway
+GATEWAY_CONTROL_PLANE_URL=http://localhost:5560 \
+  GATEWAY_ALLOW_INSECURE=1 \
+  go run ./cmd/gateway
+```
+
+### `/healthz` — always 200 once the process is up
+
+```
+HTTP/1.1 200 OK
+Content-Type: application/json
+X-Langwatch-Gateway-Version: dev
+X-Langwatch-Request-Id: req_f5e4fd9f33a8861af4ab328aa00c45
+
+{"status":"ok","version":"dev","uptime_s":0.988610959}
+```
+
+Kubernetes liveness probe target. `X-Langwatch-Gateway-Version` is set from the binary's `main.Version` build-arg — production deploys carry the commit SHA so operators can answer "which pod served this" straight from the response.
+
+### `/v1/models` and `/v1/chat/completions` with no auth — 401 OpenAI-compat envelope
+
+```
+HTTP/1.1 401 Unauthorized
+Content-Type: application/json
+Traceparent: 00-e8aeda507fb93fafd3d2c20bbef283d6-53e32e8f6030ef05-01
+X-Langwatch-Gateway-Version: dev
+X-Langwatch-Request-Id: req_8f1250b94a959c1b2502792c757264
+X-Langwatch-Span-Id: 53e32e8f6030ef05
+X-Langwatch-Trace-Id: e8aeda507fb93fafd3d2c20bbef283d6
+
+{"error":{"type":"invalid_api_key","code":"missing_api_key","message":"missing API key; supply Authorization: Bearer lw_vk_... or x-api-key"}}
+```
+
+The error message names both accepted auth headers — `Authorization: Bearer lw_vk_...` (OpenAI SDK, Claude Code, Cursor, Aider) AND `x-api-key` (Anthropic SDK). Either works against either endpoint.
+
+`Traceparent` + `X-Langwatch-Span-Id` + `X-Langwatch-Trace-Id` are present even on unauth 401s — observability of probe-abuse / misconfigured CLIs is available without inspecting access logs.
+
+### `/startupz` and `/readyz` behavior at cold boot
+
+```
+# /startupz — 503 until the gateway's first successful control-plane resolve
+HTTP/1.1 503 Service Unavailable
+
+# /readyz — 503 with details until auth cache has observed at least one revision
+HTTP/1.1 503 Service Unavailable
+{"status":"degraded","checks":{"control_plane_reachable":"ok","auth_cache_warm":"cache has not observed any revision yet"}}
+```
+
+`auth_cache_warm` flips to `ok` as soon as one VK resolves. This is normal — cold pods report unready until they've seen traffic. In Kubernetes the `startupProbe` covers this with `failureThreshold: 60` (2 min budget).
+
+### Graceful drain on SIGTERM
+
+```
+INFO msg="gateway_draining" pre_drain_wait="5s"
+INFO msg="gateway_shutting_down" timeout="15s"
+INFO msg="gateway_stopped"
+```
+
+Matches the 4-phase drain documented in [self-hosting/helm](/ai-gateway/self-hosting/helm) § Graceful drain.
+
+If your CLI sees one of these response shapes, the gateway is healthy. End-to-end completion through a real VK + provider requires the per-CLI config on each integration page.
