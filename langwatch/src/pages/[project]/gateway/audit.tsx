@@ -297,8 +297,54 @@ function AuditRow({
 }
 
 function DiffSummary({ before, after }: { before: unknown; after: unknown }) {
-  const changes = computeShallowDiff(before, after);
-  if (changes === null) return null; // one side is null/undefined — no meaningful diff
+  const kind = diffKind(before, after);
+  if (kind === "unsupported") return null;
+
+  if (kind === "create") {
+    const fields = flattenObject(after);
+    if (fields.length === 0) return null;
+    return (
+      <VStack align="stretch" gap={1}>
+        <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+          Created with {fields.length} field{fields.length === 1 ? "" : "s"}
+        </Text>
+        <VStack align="stretch" gap={0.5}>
+          {fields.map(({ key, value }) => (
+            <HStack key={key} gap={2} fontSize="xs" align="start">
+              <Code fontSize="2xs" minWidth="140px" flexShrink={0}>
+                {key}
+              </Code>
+              <Code
+                fontSize="2xs"
+                colorPalette="green"
+                variant="surface"
+                maxWidth="80%"
+                overflow="hidden"
+                textOverflow="ellipsis"
+                whiteSpace="nowrap"
+              >
+                {formatValue(value)}
+              </Code>
+            </HStack>
+          ))}
+        </VStack>
+      </VStack>
+    );
+  }
+
+  if (kind === "delete") {
+    const fields = flattenObject(before);
+    if (fields.length === 0) return null;
+    return (
+      <Text fontSize="xs" color="fg.muted">
+        Deleted ({fields.length} field{fields.length === 1 ? "" : "s"} removed —
+        see Before pane below).
+      </Text>
+    );
+  }
+
+  // update: both sides objects.
+  const changes = computeShallowDiff(before, after) ?? [];
   if (changes.length === 0) {
     return (
       <Text fontSize="xs" color="fg.muted">
@@ -346,6 +392,30 @@ function DiffSummary({ before, after }: { before: unknown; after: unknown }) {
       </VStack>
     </VStack>
   );
+}
+
+function diffKind(
+  before: unknown,
+  after: unknown,
+): "create" | "delete" | "update" | "unsupported" {
+  const beforeEmpty = before === null || before === undefined;
+  const afterEmpty = after === null || after === undefined;
+  if (beforeEmpty && afterEmpty) return "unsupported";
+  if (beforeEmpty && isPlainObject(after)) return "create";
+  if (afterEmpty && isPlainObject(before)) return "delete";
+  if (isPlainObject(before) && isPlainObject(after)) return "update";
+  return "unsupported";
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+function flattenObject(
+  v: unknown,
+): Array<{ key: string; value: unknown }> {
+  if (!isPlainObject(v)) return [];
+  return Object.entries(v).map(([key, value]) => ({ key, value }));
 }
 
 function computeShallowDiff(
