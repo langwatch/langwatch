@@ -291,6 +291,7 @@ function VirtualKeyDetailPage() {
         onClose={() => setRevealSecret(null)}
         keyName={revealSecret?.name ?? ""}
         secret={revealSecret?.secret ?? ""}
+        kind="rotate"
       />
     </GatewayLayout>
   );
