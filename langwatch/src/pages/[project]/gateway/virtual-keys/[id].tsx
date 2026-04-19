@@ -12,7 +12,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowLeft, Pencil, RotateCw, Trash2 } from "lucide-react";
+import { ArrowLeft, FileClock, Pencil, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   Area,
@@ -135,6 +135,13 @@ function VirtualKeyDetailPage() {
           <Spacer />
           {vk?.status === "active" && (
             <HStack>
+              <Link
+                href={`/${project?.slug}/gateway/audit?targetKind=virtual_key&targetId=${vk.id}`}
+              >
+                <Button variant="outline" size="sm">
+                  <FileClock size={14} /> Audit history
+                </Button>
+              </Link>
               {canUpdate && (
                 <Button
                   variant="outline"
