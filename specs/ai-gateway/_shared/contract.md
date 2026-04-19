@@ -221,6 +221,13 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
     "urls":   { "deny": [], "allow": ["^https?://allowed\\.example\\.com/.*"] }
   },
   "rate_limits": { "rpm": null, "tpm": null, "rpd": null },
+  /* v1 ships RPM + RPD enforcement (golang.org/x/time/rate token buckets,
+     per-VK, LRU-evicted). Cross-dimension accounting: an RPM denial does
+     NOT burn an RPD token. On breach: HTTP 429 + Retry-After + header
+     X-LangWatch-RateLimit-Dimension: rpm|rpd naming which ceiling fired,
+     error code = vk_rate_limit_exceeded. TPM deferred to v1.1 (requires
+     Redis-coordinated cluster-wide counters; pre-request token count is
+     an estimate too imprecise for a hard cap). */
   "budgets": [
     {
       "scope": "virtual_key", "scope_id": "vk_01HZ...",

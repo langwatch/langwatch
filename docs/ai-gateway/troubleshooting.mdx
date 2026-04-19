@@ -77,16 +77,20 @@ The response payload's `error.message` names the scope that breached — `projec
 
 **Diagnose:**
 
-Check whether the 429 came from your VK's rate-limit config OR from the upstream provider. The response `X-LangWatch-Provider` header plus the error `type` tells you:
+Check whether the 429 came from your VK's rate-limit config OR from the upstream provider. The response headers tell you:
 
-- `type: rate_limit_exceeded` with NO `X-LangWatch-Provider` header — gateway-level VK cap.
-- `type: rate_limit_exceeded` WITH `X-LangWatch-Provider: openai` — upstream quota hit.
+- `error.code = vk_rate_limit_exceeded` + `X-LangWatch-RateLimit-Dimension: rpm|rpd` + `Retry-After: <seconds>` — gateway-level VK cap. The dimension header names which ceiling fired so dashboards can filter.
+- `type: rate_limit_exceeded` WITH `X-LangWatch-Provider: openai` and no `X-LangWatch-RateLimit-Dimension` — upstream quota hit.
+
+Gateway-level enforcement runs **before** guardrails / budget / bifrost so rejected requests don't count upstream tokens. Cross-dimension accounting: if RPM denies, RPD isn't burned (and vice versa) — raising one ceiling doesn't blow through the other.
 
 Upstream 429s will trigger fallback if the VK has a chain configured. Check `X-LangWatch-Fallback-Count` on the next success to see if fallback is working.
 
 **Fix:**
-- If gateway-level: `langwatch virtual-keys update <id> --config-json '{"rate_limits": {"rpm": null, "tpm": null}}'` or raise caps.
+- If gateway-level: `langwatch virtual-keys update <id> --config-json '{"rate_limits": {"rpm": 60, "rpd": 100000}}'` to raise the cap, or `{"rpm": null, "rpd": null}` to disable. Ceiling changes take effect on the next request (limiter invalidates on every bundle refresh).
 - If upstream: add a fallback provider to the VK chain, or request quota from the upstream.
+
+<Note>**TPM (tokens-per-minute) deferred to v1.1.** Token counts aren't known until the provider replies, so pre-estimation can't be a hard cap. TPM will ship with Redis-coordinated cluster-wide counters in v1.1.</Note>
 
 ## `403 tool_not_allowed`
 

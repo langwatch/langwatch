@@ -35,7 +35,7 @@ Errors (like successes) always carry:
 | `model_not_allowed` | `403` | The VK has a `models_allowed` allowlist and the requested model is not in it. Also used when the model/alias doesn't resolve to any configured provider. |
 | `permission_denied` | `403` | The principal lacks the RBAC permission required for the endpoint. |
 | `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope (e.g. `Budget exceeded for scope=project window=month`). |
-| `rate_limit_exceeded` | `429` | VK / project / org rate limit hit on the gateway side, or upstream returned `429` and no fallback was available. |
+| `rate_limit_exceeded` | `429` | Gateway-level (per-VK RPM/RPD) or upstream. Gateway-level adds `code = vk_rate_limit_exceeded`, `Retry-After: <seconds>` (RFC 7231), and `X-LangWatch-RateLimit-Dimension: rpm\|rpd` telling you which ceiling fired. TPM is deferred to v1.1. |
 | `guardrail_blocked` | `403` | A pre- or post-call guardrail returned `block`. `message` references which guardrail and why. |
 | `tool_not_allowed` | `403` | The request references a tool name matched by the VK's `blocked_patterns.tools.deny` (or absent from `allow` if set). |
 | `url_not_allowed` | `403` | Outbound URL in tool-call arguments matched `blocked_patterns.urls.deny`. |
