@@ -234,8 +234,7 @@ func (d *Dispatcher) applyRuleMode(w http.ResponseWriter, r *http.Request, body 
 	// Observability: rule attribution on the span + metric bump.
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrCacheRuleID, match.RuleID)
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrCacheModeApplied, match.Mode)
-	// Priority isn't carried back by the evaluator today — adding it
-	// would require passing the full CacheRuleSpec. Deferred.
+	gwotel.AddInt64Attr(r.Context(), gwotel.AttrCacheRulePriority, int64(match.Priority))
 	d.metrics.RecordCacheRuleHit(match.RuleID, strings.ToUpper(match.Mode))
 	return out, true
 }

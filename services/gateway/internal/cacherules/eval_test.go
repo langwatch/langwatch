@@ -163,6 +163,7 @@ func TestEvaluate_ActionCarriesSaltAndTTL(t *testing.T) {
 	rules := []auth.CacheRuleSpec{
 		{
 			ID:       "r1",
+			Priority: 742,
 			Matchers: auth.CacheRuleMatchers{VKID: "vk_1"},
 			Action:   auth.CacheRuleAction{Mode: "force", TTLS: 3600, Salt: "canary-v2"},
 		},
@@ -176,6 +177,9 @@ func TestEvaluate_ActionCarriesSaltAndTTL(t *testing.T) {
 	}
 	if m.RuleID != "r1" {
 		t.Errorf("rule id not carried: %q", m.RuleID)
+	}
+	if m.Priority != 742 {
+		t.Errorf("priority not carried: got %d want 742", m.Priority)
 	}
 }
 
