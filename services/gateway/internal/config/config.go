@@ -153,8 +153,16 @@ type Guardrails struct {
 
 type OTel struct {
 	DefaultExportEndpoint string
-	BatchTimeout          time.Duration
-	MaxQueueSize          int
+	// DefaultAuthToken, when non-empty, is sent as `X-Auth-Token` on
+	// every span export. The LangWatch control-plane OTLP ingest
+	// authenticates OTLP requests the same way it authenticates
+	// /api/collector — per-project token mapped to a project. This
+	// field makes the gateway's dogfood flow (single project) work
+	// without per-project routing; production self-hosted installs
+	// should prefer per-project routing via the bundle resolver hook.
+	DefaultAuthToken string
+	BatchTimeout     time.Duration
+	MaxQueueSize     int
 }
 
 type Bifrost struct {
@@ -196,6 +204,7 @@ func Load() (*Config, error) {
 		},
 		OTel: OTel{
 			DefaultExportEndpoint: env("GATEWAY_OTEL_DEFAULT_ENDPOINT", ""),
+			DefaultAuthToken:      env("GATEWAY_OTEL_DEFAULT_AUTH_TOKEN", ""),
 			BatchTimeout:          envDuration("GATEWAY_OTEL_BATCH_TIMEOUT", 5*time.Second),
 			MaxQueueSize:          envInt("GATEWAY_OTEL_MAX_QUEUE", 8192),
 		},

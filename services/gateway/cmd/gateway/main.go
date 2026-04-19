@@ -214,8 +214,15 @@ func main() {
 	// the only correct behaviour. When DefaultExportEndpoint is empty we
 	// fall back to a no-op exporter that still participates in W3C
 	// propagation.
+	var defaultOTelHeaders map[string]string
+	if cfg.OTel.DefaultAuthToken != "" {
+		defaultOTelHeaders = map[string]string{
+			"X-Auth-Token": cfg.OTel.DefaultAuthToken,
+		}
+	}
 	otelRouter, err := gwotel.NewRouterExporter(ctx, gwotel.RouterOptions{
 		DefaultEndpoint: cfg.OTel.DefaultExportEndpoint,
+		DefaultHeaders:  defaultOTelHeaders,
 		Timeout:         cfg.ControlPlane.RequestTimeout,
 		Resolver:        projectEndpoints.Lookup,
 	})
