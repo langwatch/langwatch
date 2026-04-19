@@ -54,26 +54,49 @@ Feature: Caching passthrough (Anthropic cache_control + gateway semantic cache)
   Rule: Per-request override header
 
     @integration
-    Scenario: X-LangWatch-Cache: disable strips cache_control from the forwarded request
-      Given a request with cache_control blocks set
+    Scenario: X-LangWatch-Cache: disable recursively strips cache_control at any depth
+      Given a request with cache_control blocks on system[0], messages[2].content[1], and tools[0]
       When I send header "X-LangWatch-Cache: disable"
-      Then the gateway removes cache_control from the forwarded body
+      Then the gateway removes every cache_control key from the forwarded body
       And the response header "X-LangWatch-Cache: bypass" is set
+      And the response header "X-LangWatch-Cache-Mode: disable" echoes the applied mode
 
     @integration
-    Scenario: X-LangWatch-Cache: force adds cache_control to large stable prefixes
-      Given a request without cache_control
-      And the system prompt is >1k tokens
+    Scenario: X-LangWatch-Cache: respect is the default and echoes the applied mode
+      Given a request with cache_control blocks set
+      When no X-LangWatch-Cache header is sent
+      Then the gateway forwards cache_control byte-for-byte
+      And the response header "X-LangWatch-Cache-Mode: respect" echoes the applied mode
+
+    @integration
+    Scenario: X-LangWatch-Cache: force is deferred to v1.1 and 400s in v1
       When I send header "X-LangWatch-Cache: force"
-      Then the gateway injects {"type": "ephemeral"} cache_control on the system message
-      And client-supplied cache_control is preserved (never overwritten)
-      And the response header "X-LangWatch-Cache: forced" is set
+      Then the response status is 400
+      And the error envelope type is "cache_override_not_implemented"
+      And the envelope message points at the v1.1 roadmap
 
     @integration
-    Scenario: malformed X-LangWatch-Cache header returns 400
+    Scenario: X-LangWatch-Cache: ttl=3600 is deferred to v1.1 and 400s in v1
+      When I send header "X-LangWatch-Cache: ttl=3600"
+      Then the response status is 400
+      And the error envelope type is "cache_override_not_implemented"
+
+    @integration
+    Scenario: malformed X-LangWatch-Cache header returns cache_override_invalid
       When I send header "X-LangWatch-Cache: bananas"
       Then the response status is 400
       And the error envelope type is "cache_override_invalid"
+      And the envelope message names the rejected mode
+
+    @integration
+    Scenario: cache-override runs before blocked-pattern enforcement
+      Given a VK with blocked_patterns.models.deny = ["^claude-haiku-4-5$"]
+      And a request that also sets X-LangWatch-Cache: disable
+      When the request is dispatched
+      Then the cache_control blocks are stripped FIRST
+      And the blocked-pattern check evaluates the post-strip body
+      And the response is 403 model_not_allowed (not 400 cache_*)
+      # Deterministic policy evaluation independent of caller's caching choice.
 
   Rule: Cache token accounting in trace
 
