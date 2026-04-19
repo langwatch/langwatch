@@ -1,8 +1,14 @@
 import type { PrismaClient, Project } from "@prisma/client";
+import type { Session } from "~/server/auth";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
+import {
+  assertCanManageAllScopes,
+  canReadAnyScope,
+} from "./modelProvider.authz";
 import {
   ModelProviderRepository,
   type ModelProviderWithScopes,
@@ -13,6 +19,13 @@ import {
   type MaybeStoredModelProvider,
   modelProviders,
 } from "./registry";
+
+/**
+ * Minimal ctx slice this service uses to authorize scope-level writes.
+ * Kept narrow so the service can be constructed from any caller (tRPC,
+ * Hono routes, workers) without dragging the full tRPC Context in.
+ */
+export type AuthzContext = { prisma: PrismaClient; session: Session | null };
 
 /**
  * Input types for service operations
@@ -137,7 +150,20 @@ export class ModelProviderService {
    * - Smart merging: preserves original keys when masked placeholder is sent
    * - Can optionally update project default model
    */
-  async updateModelProvider(input: UpdateModelProviderInput) {
+  /**
+   * Authorizes a write that lands the given set of scope entries on a
+   * ModelProvider. Every entry must pass the per-scope manage check; a
+   * single failure rejects the entire operation (no partial apply).
+   *
+   * When `ctx` is omitted the check is skipped — that path is reserved
+   * for migrations, workers, and other server-internal callers that
+   * already have a trusted root context. tRPC routers and any other
+   * user-driven entrypoint MUST pass ctx.
+   */
+  async updateModelProvider(
+    input: UpdateModelProviderInput,
+    ctx?: AuthzContext,
+  ) {
     const {
       id,
       projectId,
@@ -177,6 +203,14 @@ export class ModelProviderService {
       (input.scopeType && input.scopeId
         ? [{ scopeType: input.scopeType, scopeId: input.scopeId }]
         : undefined);
+
+    // Fail-closed scope authz. Every (scopeType, scopeId) entry in the
+    // target set must pass the caller's manage-permission check; a
+    // single failure aborts the whole operation so partial-success
+    // cannot silently rebind a credential the caller can't see.
+    if (ctx && scopes) {
+      await assertCanManageAllScopes(ctx, scopes);
+    }
 
     return await this.prisma.$transaction(async (tx) => {
       let result;
@@ -264,15 +298,75 @@ export class ModelProviderService {
 
   /**
    * Deletes a model provider.
+   *
+   * Scope authz: the caller must hold the manage-permission on EVERY
+   * current scope entry. A team-level admin cannot silently blow up an
+   * org-shared credential from under an organization they don't
+   * manage.
    */
-  async deleteModelProvider(input: DeleteModelProviderInput) {
+  async deleteModelProvider(
+    input: DeleteModelProviderInput,
+    ctx?: AuthzContext,
+  ) {
     const { id, projectId, provider } = input;
+
+    if (ctx) {
+      const existing = id
+        ? await this.repository.findById(id, projectId)
+        : await this.repository.findByProvider(provider, projectId);
+      if (!existing) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Model provider not found for this project",
+        });
+      }
+      await assertCanManageAllScopes(
+        ctx,
+        existing.scopes.map((s) => ({
+          scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+          scopeId: s.scopeId,
+        })),
+      );
+    }
 
     if (id) {
       return await this.repository.delete(id, projectId);
     } else {
       return await this.repository.deleteByProvider(provider, projectId);
     }
+  }
+
+  /**
+   * Scope-aware read gate for getById. Returns the row when the caller
+   * can see any of its scope entries, otherwise surfaces NOT_FOUND so
+   * clients can't probe ids across tenants.
+   */
+  async getById(
+    id: string,
+    projectId: string,
+    ctx: AuthzContext,
+  ): Promise<ModelProviderWithScopes> {
+    const existing = await this.repository.findById(id, projectId);
+    if (!existing) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Model provider not found",
+      });
+    }
+    const readable = await canReadAnyScope(
+      ctx,
+      existing.scopes.map((s) => ({
+        scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+        scopeId: s.scopeId,
+      })),
+    );
+    if (!readable) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Model provider not found",
+      });
+    }
+    return existing;
   }
 
   // ─────────────────────────────────────────────────────────────────
