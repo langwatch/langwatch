@@ -64,6 +64,16 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 403 permission_denied
     # Demoting the user immediately neutralises outstanding PATs without rotation.
 
+  @integration @rest @pat @security
+  Scenario: PAT fails closed when a linked custom-role row has malformed permissions (583f27ff6)
+    Given a PAT "lwp_broken" linked to a custom role whose `permissions` column is NOT a JSON array
+    # This could happen after a bad migration or direct DB edit.
+    When they send `GET /api/gateway/v1/virtual-keys` with PAT "lwp_broken"
+    Then the response status is 403
+    # The ceiling check raises PatScopeViolationError instead of falling back to empty-array
+    # (which would silently grant an "empty" ceiling and let every call through).
+    # Parity with role-binding-resolver.ts: malformed permissions → no grants → deny.
+
   @integration @rest @pat
   Scenario: Legacy project API tokens bypass PAT ceiling (full access)
     Given a legacy project API token "sess_legacy" tied to project "acme-prod"
