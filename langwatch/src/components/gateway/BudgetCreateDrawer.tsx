@@ -13,6 +13,8 @@ import { useState } from "react";
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+
+import { FieldInfoTooltip } from "./FieldInfoTooltip";
 import { api } from "~/utils/api";
 
 type BudgetCreateDrawerProps = {
@@ -131,7 +133,13 @@ export function BudgetCreateDrawer({
         <Drawer.Body>
           <VStack align="stretch" gap={4}>
             <Field.Root required>
-              <Field.Label>Name</Field.Label>
+              <Field.Label>
+                Name
+                <FieldInfoTooltip
+                  description="Human-readable identifier shown in the list and audit log. Typical patterns: 'org monthly cap', 'acme-eng daily', 'prod-vk-burst'."
+                  docHref="/ai-gateway/budgets#creating-a-budget"
+                />
+              </Field.Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -148,7 +156,13 @@ export function BudgetCreateDrawer({
               />
             </Field.Root>
             <Field.Root required>
-              <Field.Label>Scope</Field.Label>
+              <Field.Label>
+                Scope
+                <FieldInfoTooltip
+                  description="Which resource the budget covers. Budgets are hierarchical — a request is checked against every budget that applies (org + team + project + virtual-key + principal). Any scope in breach blocks or warns per the on_breach action."
+                  docHref="/ai-gateway/budgets#scopes"
+                />
+              </Field.Label>
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
                   value={scopeKind}
@@ -172,7 +186,13 @@ export function BudgetCreateDrawer({
             </Field.Root>
             <HStack gap={4} align="flex-start">
               <Field.Root required flex={1}>
-                <Field.Label>Window</Field.Label>
+                <Field.Label>
+                  Window
+                  <FieldInfoTooltip
+                    description="Time window the limit applies to. Minute / hour / day / week / month reset on a rolling schedule in the budget's timezone. 'total' never resets — useful for burn-down budgets on a fixed-fund project."
+                    docHref="/ai-gateway/budgets#windows"
+                  />
+                </Field.Label>
                 <NativeSelect.Root size="sm">
                   <NativeSelect.Field
                     value={window}
@@ -190,7 +210,13 @@ export function BudgetCreateDrawer({
                 </NativeSelect.Root>
               </Field.Root>
               <Field.Root required flex={1}>
-                <Field.Label>Limit (USD)</Field.Label>
+                <Field.Label>
+                  Limit (USD)
+                  <FieldInfoTooltip
+                    description="Spend ceiling per window in USD. Tracked against provider-computed token costs (summed post-response). Near-limit requests (≥90% of cap) trigger a live reconciliation on the gateway with a 200ms fail-open."
+                    docHref="/ai-gateway/budgets#creating-a-budget"
+                  />
+                </Field.Label>
                 <Input
                   value={limitUsd}
                   onChange={(e) => setLimitUsd(e.target.value)}
@@ -200,7 +226,13 @@ export function BudgetCreateDrawer({
               </Field.Root>
             </HStack>
             <Field.Root required>
-              <Field.Label>On breach</Field.Label>
+              <Field.Label>
+                On breach
+                <FieldInfoTooltip
+                  description="BLOCK: reject new requests with 402 budget_exceeded. WARN: trace annotation only, no user-facing error — useful for soft budgets where ops monitors spend without enforcing a hard cap."
+                  docHref="/ai-gateway/budgets#on_breach"
+                />
+              </Field.Label>
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
                   value={onBreach}

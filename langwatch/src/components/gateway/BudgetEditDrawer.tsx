@@ -16,6 +16,8 @@ import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
+import { FieldInfoTooltip } from "./FieldInfoTooltip";
+
 type BudgetRow = {
   id: string;
   name: string;
@@ -113,7 +115,13 @@ export function BudgetEditDrawer({
         <Drawer.Body>
           <VStack align="stretch" gap={4}>
             <Field.Root required>
-              <Field.Label>Name</Field.Label>
+              <Field.Label>
+                Name
+                <FieldInfoTooltip
+                  description="Short identifier shown in /gateway/usage and audit log. Rename is non-breaking; scope and window are immutable below."
+                  docHref="/ai-gateway/budgets#creating-a-budget"
+                />
+              </Field.Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -140,7 +148,13 @@ export function BudgetEditDrawer({
               </Text>
             </Field.Root>
             <Field.Root required>
-              <Field.Label>Limit (USD)</Field.Label>
+              <Field.Label>
+                Limit (USD)
+                <FieldInfoTooltip
+                  description="Hard cap for the chosen window. Debits accrue in real time against provider-reported cost. Crossing the cap triggers the on_breach action (BLOCK or WARN)."
+                  docHref="/ai-gateway/budgets#creating-a-budget"
+                />
+              </Field.Label>
               <Input
                 value={limitUsd}
                 onChange={(e) => setLimitUsd(e.target.value)}
@@ -153,7 +167,13 @@ export function BudgetEditDrawer({
               </Field.HelperText>
             </Field.Root>
             <Field.Root required>
-              <Field.Label>On breach</Field.Label>
+              <Field.Label>
+                On breach
+                <FieldInfoTooltip
+                  description="BLOCK: reject new requests with 402 budget_exceeded. WARN: trace annotation only, no user-facing error — useful for soft budgets where ops monitors spend without enforcing a hard cap."
+                  docHref="/ai-gateway/budgets#on_breach"
+                />
+              </Field.Label>
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
                   value={onBreach}
