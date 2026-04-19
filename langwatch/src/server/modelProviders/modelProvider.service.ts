@@ -247,7 +247,13 @@ export class ModelProviderService {
     defaultProviders: Record<string, MaybeStoredModelProvider>,
     includeKeys: boolean,
   ): Promise<Record<string, MaybeStoredModelProvider>> {
-    const savedProviders = await this.repository.findAll(projectId);
+    // Walk the principal-scope ladder (iter 107 #2): ORGANIZATION →
+    // TEAM → PROJECT. Current data is 100% PROJECT-scoped post the
+    // backfill migration, so behavior is byte-identical. Rows added
+    // later at org/team scope become visible to every project under
+    // that scope automatically — the whole point of the refactor.
+    const savedProviders =
+      await this.repository.findAllAccessibleForProject(projectId);
 
     return savedProviders
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
