@@ -11,7 +11,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { MoreVertical, Pencil, Plug, Plus, PowerOff, RefreshCw } from "lucide-react";
+import { MoreVertical, Pencil, Plug, Plus, PowerOff } from "lucide-react";
 import { useState } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -80,14 +80,6 @@ function ProvidersPage() {
         <PageLayout.Header>
           <PageLayout.Heading>Providers</PageLayout.Heading>
           <Spacer />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => listQuery.refetch()}
-            loading={listQuery.isFetching}
-          >
-            <RefreshCw size={14} /> Refresh
-          </Button>
           {canManage && (
             <Button
               colorPalette="orange"
@@ -98,7 +90,7 @@ function ProvidersPage() {
             </Button>
           )}
         </PageLayout.Header>
-        <Box padding={6}>
+        <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           {listQuery.isLoading ? (
             <Spinner />
           ) : (listQuery.data ?? []).length === 0 ? (

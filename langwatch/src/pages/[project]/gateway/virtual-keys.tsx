@@ -123,7 +123,7 @@ function VirtualKeysPage() {
           )}
         </PageLayout.Header>
 
-        <Box padding={6}>
+        <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           {listQuery.isLoading ? (
             <Spinner />
           ) : rows.length === 0 ? (
@@ -172,7 +172,6 @@ function VirtualKeysPage() {
                         <Link
                           href={`/${project?.slug}/gateway/virtual-keys/${vk.id}`}
                           fontWeight="medium"
-                          color="orange.600"
                         >
                           {vk.name}
                         </Link>

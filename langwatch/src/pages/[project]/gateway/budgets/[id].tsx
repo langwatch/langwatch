@@ -143,7 +143,7 @@ function BudgetDetailPage() {
           )}
         </PageLayout.Header>
 
-        <Box padding={6}>
+        <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           {detailQuery.isLoading ? (
             <Spinner />
           ) : !budget ? (
