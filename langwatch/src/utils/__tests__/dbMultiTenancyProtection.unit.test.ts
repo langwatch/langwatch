@@ -1,0 +1,133 @@
+import type { Prisma } from "@prisma/client";
+import { describe, expect, it, vi } from "vitest";
+
+import { guardProjectId } from "../dbMultiTenancyProtection";
+
+/**
+ * Regression tests for the multitenancy guard — specifically its exempt
+ * list. The guard rejects any findMany/findFirst without a projectId in
+ * the WHERE clause, which is correct for project-scoped models but
+ * catastrophic for org-scoped ones (silently throws inside every tx,
+ * rolling back the whole mutation).
+ *
+ * Lane B iter 32 (commit 88a66af6d) added 4 org-scoped gateway models
+ * to the exempt list after the bug surfaced on the live budgets page.
+ * These tests lock that in.
+ */
+
+async function runGuard(params: Partial<Prisma.MiddlewareParams> & {
+  model: string;
+  action: Prisma.MiddlewareParams["action"];
+  args: Prisma.MiddlewareParams["args"];
+}): Promise<unknown> {
+  const next = vi.fn(async () => "ok");
+  return guardProjectId(
+    {
+      dataPath: [],
+      runInTransaction: false,
+      ...params,
+    } as Prisma.MiddlewareParams,
+    next,
+  );
+}
+
+describe("guardProjectId — exempt org-scoped gateway models", () => {
+  describe("findMany on GatewayBudget with only organizationId filter", () => {
+    it("does NOT throw (org-scoped; projectId is not applicable)", async () => {
+      await expect(
+        runGuard({
+          model: "GatewayBudget",
+          action: "findMany",
+          args: { where: { organizationId: "org_01", archivedAt: null } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("findMany on GatewayBudgetLedger with only budgetId filter", () => {
+    it("does NOT throw (ledger descends from VirtualKey.projectId via virtualKeyId)", async () => {
+      await expect(
+        runGuard({
+          model: "GatewayBudgetLedger",
+          action: "findMany",
+          args: { where: { budgetId: "b_01" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("create on GatewayChangeEvent without projectId in data", () => {
+    it("does NOT throw — change-events allow null projectId for org-wide mutations", async () => {
+      await expect(
+        runGuard({
+          model: "GatewayChangeEvent",
+          action: "create",
+          args: {
+            data: {
+              organizationId: "org_01",
+              kind: "BUDGET_CREATED",
+              budgetId: "b_01",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("findMany on GatewayAuditLog with organizationId + cursor", () => {
+    it("does NOT throw (audit is org-level, projectId column allows null)", async () => {
+      await expect(
+        runGuard({
+          model: "GatewayAuditLog",
+          action: "findMany",
+          args: {
+            where: {
+              organizationId: "org_01",
+              createdAt: { lt: new Date() },
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+});
+
+describe("guardProjectId — project-scoped gateway models still guarded", () => {
+  describe("findMany on VirtualKey WITHOUT projectId in where", () => {
+    it("STILL throws — VirtualKey is project-scoped (regression guard)", async () => {
+      await expect(
+        runGuard({
+          model: "VirtualKey",
+          action: "findMany",
+          args: { where: { status: "ACTIVE" } },
+        }),
+      ).rejects.toThrow(/requires a 'projectId'/);
+    });
+  });
+
+  describe("findMany on VirtualKey WITH projectId in where", () => {
+    it("does NOT throw (normal project-scoped query)", async () => {
+      await expect(
+        runGuard({
+          model: "VirtualKey",
+          action: "findMany",
+          args: { where: { projectId: "proj_01", status: "ACTIVE" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("create on GatewayProviderCredential WITHOUT projectId in data", () => {
+    it("STILL throws — provider credentials are project-scoped", async () => {
+      await expect(
+        runGuard({
+          model: "GatewayProviderCredential",
+          action: "create",
+          args: {
+            data: { modelProviderId: "mp_01", slot: "primary" },
+          },
+        }),
+      ).rejects.toThrow(/requires a 'projectId'/);
+    });
+  });
+});
