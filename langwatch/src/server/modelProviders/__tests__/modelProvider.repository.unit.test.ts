@@ -10,8 +10,11 @@ vi.mock("../../../utils/encryption", () => ({
   }),
 }));
 
-import type { ModelProvider, PrismaClient } from "@prisma/client";
-import { ModelProviderRepository } from "../modelProvider.repository";
+import type { ModelProvider, ModelProviderScope, PrismaClient } from "@prisma/client";
+import {
+  ModelProviderRepository,
+  type ModelProviderWithScopes,
+} from "../modelProvider.repository";
 import { encrypt, decrypt } from "../../../utils/encryption";
 
 function createMockPrisma() {
@@ -24,20 +27,56 @@ function createMockPrisma() {
       delete: vi.fn(),
       deleteMany: vi.fn(),
     },
+    modelProviderScope: {
+      create: vi.fn(),
+      createMany: vi.fn(),
+      deleteMany: vi.fn(),
+      findMany: vi.fn(),
+    },
     project: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
     },
+    team: {
+      findMany: vi.fn(),
+    },
+    $transaction: vi.fn(async (cb: any) =>
+      typeof cb === "function" ? cb(prismaForTxRef) : cb,
+    ),
   } as unknown as PrismaClient;
 }
 
-function createModelProvider(
-  overrides: Partial<ModelProvider> = {},
-): ModelProvider {
+// Trick so the mocked $transaction can pass back a "tx client" shape.
+// Each createMockPrisma() call replaces prismaForTxRef via the factory
+// used by the repository test harness below.
+let prismaForTxRef: PrismaClient;
+
+function createScope(
+  scopeType: "PROJECT" | "TEAM" | "ORGANIZATION",
+  scopeId: string,
+  modelProviderId: string,
+): ModelProviderScope {
   return {
-    id: "mp_test123",
-    projectId: "proj_test",
-    scopeType: "PROJECT",
-    scopeId: "proj_test",
+    id: `mps_${scopeType}_${scopeId}`,
+    modelProviderId,
+    scopeType,
+    scopeId,
+    createdAt: new Date(),
+  };
+}
+
+function createModelProvider(
+  overrides: Partial<ModelProviderWithScopes> & {
+    scopes?: ModelProviderScope[];
+  } = {},
+): ModelProviderWithScopes {
+  const { scopes, ...rest } = overrides;
+  const id = rest.id ?? "mp_test123";
+  const projectId = rest.projectId ?? "proj_test";
+  return {
+    id,
+    projectId,
+    name: "OpenAI",
     provider: "openai",
     enabled: true,
     customKeys: null,
@@ -47,7 +86,8 @@ function createModelProvider(
     extraHeaders: [],
     createdAt: new Date(),
     updatedAt: new Date(),
-    ...overrides,
+    scopes: scopes ?? [createScope("PROJECT", projectId, id)],
+    ...rest,
   };
 }
 
@@ -58,6 +98,7 @@ describe("ModelProviderRepository", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     prisma = createMockPrisma();
+    prismaForTxRef = prisma as unknown as PrismaClient;
     repository = new ModelProviderRepository(prisma);
   });
 
@@ -168,6 +209,7 @@ describe("ModelProviderRepository", () => {
 
         expect(prisma.modelProvider.findFirst).toHaveBeenCalledWith({
           where: { id: "mp_test123", projectId: "proj_test" },
+          include: { scopes: true },
         });
       });
     });
@@ -259,10 +301,12 @@ describe("ModelProviderRepository", () => {
   });
 
   describe("findAllAccessibleForProject()", () => {
-    // Gates the scope-ladder resolver: project > team > organization.
-    // This is the hot-path the frontend + gateway read from; narrower
-    // scope must win on same-provider collision so project admins can
-    // always override inherited rows (ADR-016).
+    // Gates the multi-scope access resolver: a credential is visible
+    // whenever its ModelProviderScope set intersects the project's
+    // membership tuple (project, team, org). Unlike iter 107/108 we
+    // NO LONGER dedup at the repository layer — same-provider collisions
+    // are legitimate data (multi-instance). The consuming service picks
+    // the narrowest scope for legacy `Record<provider, …>` callers.
     const projectId = "proj_test";
     const teamId = "team_alpha";
     const orgId = "org_acme";
@@ -274,36 +318,32 @@ describe("ModelProviderRepository", () => {
     };
 
     describe("when the project has rows at every scope level", () => {
-      it("returns one row per provider with the narrowest scope winning", async () => {
+      it("returns every accessible row without deduplication", async () => {
         (prisma.project.findUnique as any).mockResolvedValue(projectRow);
 
         const orgOpenAI = createModelProvider({
           id: "mp_org_openai",
           provider: "openai",
-          scopeType: "ORGANIZATION",
-          scopeId: orgId,
           projectId: "proj_sibling",
+          scopes: [createScope("ORGANIZATION", orgId, "mp_org_openai")],
         });
         const teamOpenAI = createModelProvider({
           id: "mp_team_openai",
           provider: "openai",
-          scopeType: "TEAM",
-          scopeId: teamId,
           projectId: "proj_sibling2",
+          scopes: [createScope("TEAM", teamId, "mp_team_openai")],
         });
         const projectOpenAI = createModelProvider({
           id: "mp_project_openai",
           provider: "openai",
-          scopeType: "PROJECT",
-          scopeId: projectId,
           projectId,
+          scopes: [createScope("PROJECT", projectId, "mp_project_openai")],
         });
         const teamAnthropic = createModelProvider({
           id: "mp_team_anthropic",
           provider: "anthropic",
-          scopeType: "TEAM",
-          scopeId: teamId,
           projectId: "proj_sibling",
+          scopes: [createScope("TEAM", teamId, "mp_team_anthropic")],
         });
 
         (prisma.modelProvider.findMany as any).mockResolvedValue([
@@ -315,12 +355,24 @@ describe("ModelProviderRepository", () => {
 
         const results = await repository.findAllAccessibleForProject(projectId);
 
-        const byProvider = new Map(results.map((r) => [r.provider, r]));
-        expect(byProvider.size).toBe(2);
-        // PROJECT beats both TEAM and ORGANIZATION for openai
-        expect(byProvider.get("openai")!.id).toBe("mp_project_openai");
-        // TEAM is the only row for anthropic
-        expect(byProvider.get("anthropic")!.id).toBe("mp_team_anthropic");
+        expect(results).toHaveLength(4);
+        const ids = results.map((r) => r.id).sort();
+        expect(ids).toEqual(
+          [
+            "mp_org_openai",
+            "mp_project_openai",
+            "mp_team_anthropic",
+            "mp_team_openai",
+          ].sort(),
+        );
+        // Each returned row carries its scope set — the repo never
+        // collapses them.
+        const openaiRows = results.filter((r) => r.provider === "openai");
+        expect(openaiRows.map((r) => r.scopes[0]!.scopeType).sort()).toEqual([
+          "ORGANIZATION",
+          "PROJECT",
+          "TEAM",
+        ]);
       });
     });
 
@@ -331,9 +383,8 @@ describe("ModelProviderRepository", () => {
         const orgOpenAI = createModelProvider({
           id: "mp_org_openai",
           provider: "openai",
-          scopeType: "ORGANIZATION",
-          scopeId: orgId,
           projectId: "proj_sibling",
+          scopes: [createScope("ORGANIZATION", orgId, "mp_org_openai")],
         });
         (prisma.modelProvider.findMany as any).mockResolvedValue([orgOpenAI]);
 
@@ -341,7 +392,7 @@ describe("ModelProviderRepository", () => {
 
         expect(results).toHaveLength(1);
         expect(results[0]!.id).toBe("mp_org_openai");
-        expect(results[0]!.scopeType).toBe("ORGANIZATION");
+        expect(results[0]!.scopes[0]!.scopeType).toBe("ORGANIZATION");
       });
     });
 
@@ -358,23 +409,21 @@ describe("ModelProviderRepository", () => {
       });
     });
 
-    describe("when a TEAM row and PROJECT row collide on the same provider", () => {
-      it("PROJECT wins (project admin override)", async () => {
+    describe("when a TEAM row and PROJECT row coexist for the same provider", () => {
+      it("returns both — repo no longer dedupes, service layer picks winner", async () => {
         (prisma.project.findUnique as any).mockResolvedValue(projectRow);
 
         const teamOpenAI = createModelProvider({
           id: "mp_team_openai",
           provider: "openai",
-          scopeType: "TEAM",
-          scopeId: teamId,
           projectId: "proj_sibling",
+          scopes: [createScope("TEAM", teamId, "mp_team_openai")],
         });
         const projectOpenAI = createModelProvider({
           id: "mp_project_openai",
           provider: "openai",
-          scopeType: "PROJECT",
-          scopeId: projectId,
           projectId,
+          scopes: [createScope("PROJECT", projectId, "mp_project_openai")],
         });
         (prisma.modelProvider.findMany as any).mockResolvedValue([
           teamOpenAI,
@@ -383,13 +432,16 @@ describe("ModelProviderRepository", () => {
 
         const results = await repository.findAllAccessibleForProject(projectId);
 
-        expect(results).toHaveLength(1);
-        expect(results[0]!.id).toBe("mp_project_openai");
+        expect(results).toHaveLength(2);
+        expect(results.map((r) => r.id).sort()).toEqual([
+          "mp_project_openai",
+          "mp_team_openai",
+        ]);
       });
     });
 
-    describe("when the query scopes by org + team + project OR list", () => {
-      it("sends all three scope predicates filtered by their scopeId", async () => {
+    describe("when the query filters via the ModelProviderScope join", () => {
+      it("uses { scopes: { some: { OR: [...] } } } with all three scope predicates", async () => {
         (prisma.project.findUnique as any).mockResolvedValue(projectRow);
         (prisma.modelProvider.findMany as any).mockResolvedValue([]);
 
@@ -397,13 +449,14 @@ describe("ModelProviderRepository", () => {
 
         const findManyCall = (prisma.modelProvider.findMany as any).mock
           .calls[0][0];
-        expect(findManyCall.where.OR).toEqual(
+        expect(findManyCall.where.scopes.some.OR).toEqual(
           expect.arrayContaining([
             { scopeType: "PROJECT", scopeId: projectId },
             { scopeType: "TEAM", scopeId: teamId },
             { scopeType: "ORGANIZATION", scopeId: orgId },
           ]),
         );
+        expect(findManyCall.include).toEqual({ scopes: true });
       });
     });
   });
@@ -418,6 +471,7 @@ describe("ModelProviderRepository", () => {
 
         await repository.create({
           projectId: "proj_test",
+          name: "OpenAI",
           provider: "openai",
           enabled: true,
           customKeys: keys,
@@ -440,6 +494,7 @@ describe("ModelProviderRepository", () => {
 
         await repository.create({
           projectId: "proj_test",
+          name: "OpenAI",
           provider: "openai",
           enabled: true,
           customKeys: null,

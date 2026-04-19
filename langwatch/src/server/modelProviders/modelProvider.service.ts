@@ -3,7 +3,11 @@ import { z } from "zod";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
-import { ModelProviderRepository } from "./modelProvider.repository";
+import {
+  ModelProviderRepository,
+  type ModelProviderWithScopes,
+  type ScopeInput,
+} from "./modelProvider.repository";
 import {
   getProviderModelOptions,
   type MaybeStoredModelProvider,
@@ -16,6 +20,7 @@ import {
 export type UpdateModelProviderInput = {
   id?: string;
   projectId: string;
+  name?: string;
   provider: string;
   enabled: boolean;
   customKeys?: Record<string, unknown> | null;
@@ -24,10 +29,18 @@ export type UpdateModelProviderInput = {
   extraHeaders?: { key: string; value: string }[] | null;
   defaultModel?: string;
   /**
-   * Principal-style scope. When omitted, creates default to
-   * scopeType='PROJECT' / scopeId=projectId for backward compat;
-   * updates leave the existing row's scope untouched. Callers that
-   * want to create a team/org-scoped row set both fields.
+   * Full scope set for this credential. When omitted on create, defaults
+   * to `[{ scopeType: "PROJECT", scopeId: projectId }]` for backward
+   * compatibility; when omitted on update, the existing scope set is
+   * preserved. Replace-all semantics: passing `[]` is rejected at the
+   * router boundary.
+   */
+  scopes?: ScopeInput[];
+  /**
+   * Legacy single-scope inputs kept so existing form callers still
+   * compile during the transition. When both `scopes` and these legacy
+   * fields arrive, `scopes` wins; otherwise the pair is promoted to a
+   * single-entry scope array.
    */
   scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId?: string;
@@ -135,6 +148,7 @@ export class ModelProviderService {
       customEmbeddingsModels,
       extraHeaders,
       defaultModel,
+      name,
     } = input;
 
     // Validate provider exists
@@ -155,6 +169,15 @@ export class ModelProviderService {
       projectId,
     );
 
+    // Resolve input scope set. Callers may pass `scopes: [...]` directly,
+    // or a single-scope pair via the legacy `scopeType`/`scopeId` fields.
+    // When neither is given, defer to the create/update defaults.
+    const scopes: ScopeInput[] | undefined =
+      input.scopes ??
+      (input.scopeType && input.scopeId
+        ? [{ scopeType: input.scopeType, scopeId: input.scopeId }]
+        : undefined);
+
     return await this.prisma.$transaction(async (tx) => {
       let result;
 
@@ -165,6 +188,8 @@ export class ModelProviderService {
             projectId,
             provider,
             enabled,
+            name,
+            scopes,
             customModels: customModels ?? [],
             customEmbeddingsModels: customEmbeddingsModels ?? [],
             extraHeaders: extraHeaders ?? [],
@@ -179,11 +204,11 @@ export class ModelProviderService {
             projectId,
             provider,
             enabled,
+            name: name ?? this.deriveDefaultName(provider),
+            scopes,
             customModels: customModels ?? undefined,
             customEmbeddingsModels: customEmbeddingsModels ?? undefined,
             extraHeaders: extraHeaders ?? [],
-            scopeType: input.scopeType,
-            scopeId: input.scopeId,
           },
           validatedKeys,
           customKeysProvided,
@@ -201,6 +226,40 @@ export class ModelProviderService {
 
       return result;
     });
+  }
+
+  /**
+   * Humanized default name for a brand-new ModelProvider when the caller
+   * didn't supply one. Mirrors the backfill in migration
+   * 20260419230000. For collisions within an org the service auto-
+   * suffixes at write time — that suffix logic is handled by the router
+   * because it needs access to the organization id.
+   */
+  private deriveDefaultName(provider: string): string {
+    const humanized: Record<string, string> = {
+      openai: "OpenAI",
+      anthropic: "Anthropic",
+      gemini: "Gemini",
+      azure: "Azure OpenAI",
+      bedrock: "Bedrock",
+      vertex_ai: "Vertex AI",
+      deepseek: "DeepSeek",
+      xai: "xAI",
+      cerebras: "Cerebras",
+      groq: "Groq",
+      azure_safety: "Azure Safety",
+      custom: "Custom (OpenAI-compatible)",
+      cloudflare: "Cloudflare",
+      mistral: "Mistral",
+      cohere: "Cohere",
+      fireworks_ai: "Fireworks AI",
+    };
+    return (
+      humanized[provider] ??
+      provider
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+    );
   }
 
   /**
@@ -257,11 +316,13 @@ export class ModelProviderService {
     defaultProviders: Record<string, MaybeStoredModelProvider>,
     includeKeys: boolean,
   ): Promise<Record<string, MaybeStoredModelProvider>> {
-    // Walk the principal-scope ladder (iter 107 #2): ORGANIZATION →
-    // TEAM → PROJECT. Current data is 100% PROJECT-scoped post the
-    // backfill migration, so behavior is byte-identical. Rows added
-    // later at org/team scope become visible to every project under
-    // that scope automatically — the whole point of the refactor.
+    // Walk the multi-scope access relation: every MP whose scope set
+    // intersects the project's (projectId, teamId, organizationId) is
+    // returned. When the same provider string appears multiple times
+    // (e.g. an ORG row and a PROJECT override), narrower-scope wins for
+    // the legacy `Record<provider, …>` shape we still return here —
+    // new consumers that need the full list should call
+    // `listAccessibleForProject` directly on the service.
     const savedProviders =
       await this.repository.findAllAccessibleForProject(projectId);
 
@@ -282,8 +343,11 @@ export class ModelProviderService {
             "embedding",
           );
 
+          const narrowestScope = this.pickNarrowestScope(mp.scopes);
+
           const provider_: MaybeStoredModelProvider = {
             id: mp.id,
+            name: mp.name,
             provider: mp.provider,
             enabled: mp.enabled,
             customKeys: includeKeys ? mp.customKeys : null,
@@ -300,17 +364,62 @@ export class ModelProviderService {
             extraHeaders: mp.extraHeaders as
               | { key: string; value: string }[]
               | null,
-            scopeType: mp.scopeType as
-              | "ORGANIZATION"
-              | "TEAM"
-              | "PROJECT",
-            scopeId: mp.scopeId,
+            scopes: mp.scopes.map((s) => ({
+              scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+              scopeId: s.scopeId,
+            })),
+            scopeType: narrowestScope.scopeType,
+            scopeId: narrowestScope.scopeId,
           };
 
-          return { ...acc, [mp.provider]: provider_ };
+          // Narrower-scope wins when the same provider string has
+          // multiple accessible rows (preserves iter 107/108 semantics
+          // for the Record<provider, …> consumers).
+          const existing = acc[mp.provider];
+          if (!existing || this.isNarrower(provider_, existing)) {
+            return { ...acc, [mp.provider]: provider_ };
+          }
+          return acc;
         },
         {} as Record<string, MaybeStoredModelProvider>,
       );
+  }
+
+  private scopePriority(
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT" | undefined,
+  ): number {
+    if (scopeType === "PROJECT") return 3;
+    if (scopeType === "TEAM") return 2;
+    if (scopeType === "ORGANIZATION") return 1;
+    return 0;
+  }
+
+  private pickNarrowestScope(
+    scopes: { scopeType: string; scopeId: string }[],
+  ): { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string } {
+    if (scopes.length === 0) {
+      return { scopeType: "PROJECT", scopeId: "" };
+    }
+    const sorted = [...scopes].sort(
+      (a, b) =>
+        this.scopePriority(
+          b.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+        ) -
+        this.scopePriority(
+          a.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+        ),
+    );
+    return {
+      scopeType: sorted[0]!.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+      scopeId: sorted[0]!.scopeId,
+    };
+  }
+
+  private isNarrower(
+    a: MaybeStoredModelProvider,
+    b: MaybeStoredModelProvider,
+  ): boolean {
+    return this.scopePriority(a.scopeType) > this.scopePriority(b.scopeType);
   }
 
   /**
@@ -427,6 +536,8 @@ export class ModelProviderService {
       projectId: string;
       provider: string;
       enabled: boolean;
+      name?: string;
+      scopes?: ScopeInput[];
       customModels: CustomModelsInput;
       customEmbeddingsModels: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
@@ -452,6 +563,8 @@ export class ModelProviderService {
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
         extraHeaders: data.extraHeaders,
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.scopes !== undefined && { scopes: data.scopes }),
         ...(customKeysToSave !== undefined && {
           customKeys: customKeysToSave,
         }),
@@ -463,13 +576,13 @@ export class ModelProviderService {
   private async createNew(
     data: {
       projectId: string;
+      name: string;
       provider: string;
       enabled: boolean;
       customModels?: CustomModelsInput;
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
-      scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
-      scopeId?: string;
+      scopes?: ScopeInput[];
     },
     validatedKeys: Record<string, unknown> | null,
     customKeysProvided: boolean,
@@ -478,13 +591,13 @@ export class ModelProviderService {
     return await this.repository.create(
       {
         projectId: data.projectId,
+        name: data.name,
         provider: data.provider,
         enabled: data.enabled,
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
         extraHeaders: data.extraHeaders,
-        scopeType: data.scopeType,
-        scopeId: data.scopeId,
+        scopes: data.scopes,
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
       },

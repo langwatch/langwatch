@@ -43,6 +43,7 @@ describe("ModelProviderRepository Integration", () => {
       it.skip("encrypts on save and decrypts on read preserving original values", async () => {
         const created = await repository.create({
           projectId,
+          name: "OpenAI",
           provider: "openai",
           enabled: true,
           customKeys: { OPENAI_API_KEY: "sk-test-key-123" },
@@ -83,11 +84,13 @@ describe("ModelProviderRepository Integration", () => {
           data: {
             id,
             projectId,
-            scopeType: "PROJECT",
-            scopeId: projectId,
+            name: "Azure OpenAI",
             provider: "azure",
             enabled: true,
             customKeys: { OPENAI_API_KEY: "sk-legacy-key" },
+            scopes: {
+              create: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
           },
         });
 
@@ -107,6 +110,7 @@ describe("ModelProviderRepository Integration", () => {
       it("preserves null customKeys", async () => {
         const created = await repository.create({
           projectId,
+          name: "Gemini",
           provider: "google",
           enabled: true,
         });
@@ -138,11 +142,13 @@ describe("ModelProviderRepository Integration", () => {
           data: {
             id: plaintextId,
             projectId,
-            scopeType: "PROJECT",
-            scopeId: projectId,
+            name: "Cohere",
             provider: "cohere",
             enabled: true,
             customKeys: { COHERE_API_KEY: "sk-plain" },
+            scopes: {
+              create: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
           },
         });
 
@@ -155,17 +161,20 @@ describe("ModelProviderRepository Integration", () => {
           data: {
             id: nullId,
             projectId,
-            scopeType: "PROJECT",
-            scopeId: projectId,
+            name: "Mistral",
             provider: "mistral",
             enabled: true,
             customKeys: undefined,
+            scopes: {
+              create: [{ scopeType: "PROJECT", scopeId: projectId }],
+            },
           },
         });
 
         // 3. Save one through repository (will be encrypted)
         const encryptedRow = await repository.create({
           projectId,
+          name: "Anthropic",
           provider: "anthropic",
           enabled: true,
           customKeys: { ANTHROPIC_API_KEY: "sk-ant-already" },

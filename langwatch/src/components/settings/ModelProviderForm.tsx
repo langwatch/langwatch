@@ -39,7 +39,9 @@ export const EditModelProviderForm = ({
     projectId: projectId,
   });
   const { closeDrawer } = useDrawer();
-  const { project, team, organization } = useOrganizationTeamProject();
+  const { project, team, organization, hasPermission } = useOrganizationTeamProject();
+  const canManageOrganization = hasPermission("organization:manage");
+  const canManageTeam = hasPermission("team:manage");
 
   // Count enabled providers to determine if this is the only one
   // Include the current provider being edited since it will be enabled when saved
@@ -102,6 +104,8 @@ export const EditModelProviderForm = ({
     isUsingEnvVars,
     teamId: team?.id,
     organizationId: organization?.id,
+    canManageOrganization,
+    canManageTeam,
     onSuccess: () => {
       closeDrawer();
     },

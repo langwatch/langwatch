@@ -44,9 +44,23 @@ Feature: Model Provider Scope and Multi-Instance
     And each chip renders with the matching icon
 
   @visual
-  Scenario: Scope defaults to the current project on create
+  Scenario: Scope defaults to the widest tier the user can manage
     Given I open the Create Model Provider drawer for "openai" from project "web-app"
-    Then the Scope field is pre-filled with project "web-app" only
+    And I have "organization:manage" on org "acme"
+    Then the Scope field is pre-filled with organization "acme"
+
+  @visual
+  Scenario: Scope default falls back to team when I cannot manage the org
+    Given I open the Create Model Provider drawer for "openai" from project "web-app"
+    And I do not have "organization:manage" on "acme"
+    And I have "team:manage" on team "platform"
+    Then the Scope field is pre-filled with team "platform"
+
+  @visual
+  Scenario: Scope default falls back to project when I manage neither org nor team
+    Given I open the Create Model Provider drawer for "openai" from project "web-app"
+    And I have only "project:manage" on "web-app"
+    Then the Scope field is pre-filled with project "web-app"
 
   @integration
   Scenario: Save a provider with multiple scopes
@@ -100,33 +114,30 @@ Feature: Model Provider Scope and Multi-Instance
   # ────────────────────────────────────────────────────────────────────────────
   # Multi-instance per provider type
   # ────────────────────────────────────────────────────────────────────────────
+  #
+  # A credential's display name mirrors the humanized provider label
+  # ("OpenAI", "Anthropic", …) — no auto-suffix, no org-scoped uniqueness
+  # check. Users disambiguate duplicates through the scope chips on the
+  # list page and the scope-grouped header in model selectors.
 
   @integration
-  Scenario: Create a second OpenAI row with auto-suffixed default name
-    Given the org "acme" already has a ModelProvider named "OpenAI" for provider "openai"
+  Scenario: Create a second OpenAI row under a different scope
+    Given the org "acme" already has a ModelProvider named "OpenAI" scoped to project "web-app"
     When I open the Create Model Provider drawer and select provider "openai"
-    Then the Name field is pre-filled with "OpenAI 2"
+    And I keep the default name "OpenAI"
+    And I set the scope to organization "acme"
+    And I click "Save"
+    Then two ModelProviders now exist with name "OpenAI"
+    And each one is disambiguated by its distinct scope set
 
   @integration
-  Scenario: Create a third OpenAI row with further auto-suffix
-    Given the org "acme" has ModelProviders "OpenAI" and "OpenAI 2" for provider "openai"
-    When I open the Create Model Provider drawer and select provider "openai"
-    Then the Name field is pre-filled with "OpenAI 3"
-
-  @integration
-  Scenario: Name must be unique within the organization
-    Given the org "acme" already has a ModelProvider named "OpenAI Production"
-    When I attempt to create a second ModelProvider with the same name
-    Then I see a validation error "Name 'OpenAI Production' is already in use"
-    And the row is not created
-
-  @integration
-  Scenario: Name may collide across different organizations
-    Given org "acme" has a ModelProvider named "OpenAI Production"
-    And org "beta" has no such provider
-    When an admin of "beta" creates a ModelProvider named "OpenAI Production"
-    Then the create succeeds
-    And the two rows live independently, one per org
+  Scenario: Users can edit the name to something custom
+    Given I am editing a ModelProvider row
+    When I change the Name field to "Production OpenAI"
+    And I click "Save"
+    Then the row's name is persisted as "Production OpenAI"
+    # Editing the name is allowed but never required; default humanized
+    # names are enough for the majority of setups.
 
   @visual
   Scenario: Add Model Provider menu stays open for already-configured providers
@@ -335,8 +346,10 @@ Feature: Model Provider Scope and Multi-Instance
   #   INDEX(scopeType, scopeId) for access-resolution
   #
   # Backfill: exactly one ModelProviderScope row per existing ModelProvider,
-  # taken from its (scopeType, scopeId). Name backfilled from a humanized
-  # provider string with ROW_NUMBER() suffix per org on collision.
+  # taken from its pre-migration (scopeType, scopeId) when available, else
+  # defaulting to PROJECT / projectId. Name backfilled verbatim from the
+  # humanized provider string ("OpenAI", "Anthropic", …) — no uniqueness
+  # enforcement, duplicates are disambiguated by scope chips in the UI.
   #
-  # The old (scopeType, scopeId) columns on ModelProvider are kept as legacy
-  # until every caller is migrated; a follow-up migration drops them.
+  # The old (scopeType, scopeId) columns on ModelProvider are dropped in
+  # this same migration — no dual-write window, no follow-up cleanup.
