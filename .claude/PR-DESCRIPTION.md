@@ -8,7 +8,7 @@ Ships the first version of the **LangWatch AI Gateway** — a Go data plane sitt
 
 ## What's new
 
-### Data plane (Go, `langwatch-saas/services/gateway/`)
+### Data plane (Go, `services/gateway/` + chart at `charts/gateway/`)
 
 - `POST /v1/chat/completions`, `POST /v1/messages`, `POST /v1/embeddings`, `GET /v1/models` — OpenAI + Anthropic shape compatibility. `/v1/models` returns three deduplicated groups (aliases, `models_allowed`, provider shortcuts `openai/*`, `anthropic/*`, …) so coding CLIs (Codex, Cursor) auto-configure completion on startup.
 - Auth via `Authorization: Bearer lw_vk_*`, `x-api-key`, or `api-key`.
@@ -86,14 +86,23 @@ CI gate: > 2× regression blocks PR merges.
 
 ### Dogfood screenshots
 
-See `.claude/lane-c-iter12-*.png` and `.claude/lane-c-iter10-*.png`:
+8 screenshots captured in `.claude/screenshots/dogfood-*.png` (gitignored per repo policy — attach inline via PR comment / upload to img402.dev):
 
-1. Virtual Keys empty state with CTA
-2. Budgets list / empty state
-3. Providers list with "Bind your first provider" CTA
-4. Usage page with 24h/7d/30d/90d window toggles
-5. New Virtual Key drawer with name / description / env / provider chain
-6. Gateway Settings (observability_endpoint config)
+1. `dogfood-01-virtual-keys-list.png` — VK empty state with CTA
+2. `dogfood-02-budgets-empty.png` — Budgets empty state
+3. `dogfood-03-providers-empty.png` — Providers empty state with "Bind your first provider" CTA
+4. `dogfood-04-usage-empty.png` — Usage page with 24 h / 7 d / 30 d / 90 d window toggles
+5. `dogfood-05-audit-log-empty.png` — Audit log with filter-by-action + filter-by-target pills
+6. `dogfood-06-settings.png` — Gateway Settings (`observability_endpoint` config)
+7. `dogfood-07-vk-drawer-new.png` — New Virtual Key drawer (captured pre-iter-23, pre-capability-preview panel)
+8. `dogfood-08-model-providers.png` — Model Providers settings (for chrome comparison)
+
+Findings surfaced during the dogfood round, all closed in-session:
+
+- **Finding 1** (VK create drawer too sparse pre-provider) — closed by Lane B iter 23 (`de71fe30d`): "What else you get (configurable after create)" capability preview panel.
+- **Finding 2** (Providers empty-state mentioned Settings → Model Providers without a Link) — closed by Lane B iter 22 (`6029b925c`).
+- **Finding 3** (raw React Router 404 fallback) — closed by same commit: styled `_not-found.tsx` + root ErrorBoundary + catch-all route.
+- **Finding 4** (gateway pages render without main LangWatch dashboard chrome) — filed, Lane B iter 24 queued.
 
 ## Test plan
 
