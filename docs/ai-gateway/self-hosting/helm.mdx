@@ -29,7 +29,7 @@ gateway:
     requests: { cpu: 200m, memory: 256Mi }
     limits:   { cpu: 1,    memory: 1Gi }
   env:
-    LW_GATEWAY_CONTROL_PLANE_URL: "http://langwatch-app:3000"
+    LW_GATEWAY_CONTROL_PLANE_URL: "http://langwatch-app:5560"
     LW_GATEWAY_JWT_SECRET: { secretKeyRef: { name: gateway-secrets, key: jwt } }
     LW_GATEWAY_INTERNAL_SECRET: { secretKeyRef: { name: gateway-secrets, key: internal } }
     LW_GATEWAY_REDIS_URL: redis://langwatch-redis:6379/2
@@ -365,7 +365,7 @@ Everything else is rejected — including traffic from other namespaces, lateral
 **Egress**:
 
 - DNS to `kube-system` on TCP+UDP `:53` (ordering matters — DNS rule MUST come first or other rules fail to resolve hostnames).
-- Control plane (`langwatch-app` label selector) on port `3000` for `/resolve-key` / `/config` / `/changes` / `/budget` / `/guardrail`.
+- Control plane (`langwatch-app` label selector) on port `5560` for `/resolve-key` / `/config` / `/changes` / `/budget` / `/guardrail`. Matches the langwatch chart's `langwatch-app` Service (app=5560, nlp=5561, langevals=5562, gateway=5563).
 - Redis on `:6379` — only rendered when `gateway.redis.url` is set.
 - OTLP `:4318` — only rendered when `gateway.networkPolicy.egressToOTLP` is non-empty.
 - Provider upstreams on `:443` — default `any IP EXCEPT RFC1918` (10/8, 172.16/12, 192.168/16). Teams with explicit compliance posture should override `egressToProviders` with a concrete CIDR allowlist.
