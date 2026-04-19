@@ -4,15 +4,18 @@ description: Per-VK regex allow/deny lists for tool calls, MCP servers, and outb
 sidebarTitle: Blocked Patterns
 ---
 
-Blocked patterns are a lightweight pre-dispatch policy layer: simple regex allow/deny lists for three kinds of request content. Unlike [Guardrails](/ai-gateway/guardrails), no evaluator is involved — it's a synchronous regex match, enforced at the gateway in microseconds.
+Blocked patterns are a lightweight pre-dispatch policy layer: simple regex allow/deny lists for four kinds of request content. Unlike [Guardrails](/ai-gateway/guardrails), no evaluator is involved — it's a synchronous RE2 regex match, enforced at the gateway in microseconds.
 
-Three kinds of patterns:
+Four kinds of patterns:
 
 - **Tools** — matched against the names of tools the client declares.
 - **MCP servers** — matched against MCP server names / URLs the client declares.
 - **URLs** — heuristically matched against outbound URLs in tool-call arguments.
+- **Models** — regex-matched against the requested model id (distinct from the glob-based `models_allowed` allowlist — see [Models dimension vs models_allowed](#models-dimension-vs-models_allowed)).
 
 Each has a `deny` list and an optional `allow` list.
+
+<Note>**Enforcement point:** blocked-pattern checks run immediately after authentication and rate limiting, **before** request-body parsing, guardrails, budget reconciliation, or the upstream provider. A blocked request never incurs a provider token cost, a guardrail evaluator run, or a budget debit. This is the cheapest possible reject path in the dispatcher.</Note>
 
 ## How it works
 
@@ -30,6 +33,10 @@ Each has a `deny` list and an optional `allow` list.
     "urls": {
       "deny":  [],
       "allow": ["^https?://(allowed\\.example\\.com|api\\.internal\\.com)/.*"]
+    },
+    "models": {
+      "deny":  ["^gpt-4(-turbo)?$"],
+      "allow": null
     }
   }
 }
@@ -38,6 +45,8 @@ Each has a `deny` list and an optional `allow` list.
 **Deny semantics:** any value matching a `deny` regex is blocked → 403.
 
 **Allow semantics:** if `allow` is **non-null**, it becomes an allowlist — only values matching `allow` pass through. Anything else is blocked. `allow: null` means "no allowlist, deny-only."
+
+**Regex flavour:** patterns are compiled as [Go RE2](https://github.com/google/re2/wiki/Syntax). This is a linear-time regex engine — lookbehind, backreferences, and unbounded lookahead are not supported (by design, to eliminate ReDoS risk). Escape dots literally and anchor your patterns.
 
 ## What gets checked
 
@@ -56,11 +65,28 @@ Blocked → `403 tool_not_allowed` (we conflate MCP denials with tool denials fo
 
 ### URLs
 
-Heuristic: fields inside `tools[].function.arguments` (OpenAI) or `tools[].input` (Anthropic) whose names match `/url|endpoint|uri|href/i` are string-checked against the URL patterns.
+**Every `http://` and `https://` URL appearing anywhere in the request body** is extracted and evaluated against `blocked_patterns.urls`. Extraction is deliberately permissive: a URL present in the payload is a URL the model could be asked to fetch, regardless of which JSON key it was nested under — user messages, tool-call arguments, system prompts, all covered. Trailing markdown/JSON punctuation (`.,;:)]}` etc.) is stripped and duplicates are collapsed before matching.
 
-This is **advisory** in v1 — hard enforcement of outbound URLs requires an egress proxy on the node running the tool call, which is outside the gateway's responsibility.
+First URL that hits a deny rule (or falls outside a non-null `allow` list) → `403 url_not_allowed` before the request reaches any upstream provider. Trace records `langwatch.policy.blocked=urls:<pattern>`.
 
-Blocked → `403 url_not_allowed`. Trace records `langwatch.policy.blocked=urls:<pattern>`.
+<Note>**Enforcement vs egress control.** This layer stops a *request* from reaching a provider when it contains a disallowed URL. It does **not** prevent a provider from returning a URL that a downstream tool-runner then fetches — that requires an egress proxy on the node running the tool call, which is out of scope for the gateway. Pair blocked URLs with egress controls for defence in depth.</Note>
+
+### Models
+
+Every request's `model` field is RE2-matched against the `models` dimension before dispatch. This is policy-by-regex (e.g. "block anything matching `^gpt-4(-turbo)?$`"), distinct from the static `models_allowed` glob allowlist on the VK.
+
+Blocked → `403 model_not_allowed`. Trace records `langwatch.policy.blocked=models:<pattern>`.
+
+#### Models dimension vs `models_allowed`
+
+Both gate which models a VK can call, but they solve different problems:
+
+| Field | Shape | When to use |
+|---|---|---|
+| `models_allowed` | `["claude-haiku-*", "gpt-5-mini"]` (glob allowlist) | Static, human-readable "these models and no others." Simplest case. |
+| `blocked_patterns.models` | `{deny: [...], allow: [...]}` (RE2 regex) | Policy that needs regex power — "deny any `gpt-4*` except `gpt-4o-mini`," "deny anything not from a provider prefix." |
+
+They compose: a request passes only if both checks allow it. Use `models_allowed` for 90% of cases and reach for `blocked_patterns.models` when regex semantics are actually needed.
 
 ## Common policies
 
@@ -105,7 +131,32 @@ Common presets are available in a dropdown: "No shell execution," "Read-only fil
 
 ## Performance
 
-Pattern checks are synchronous regex evaluations; total latency is sub-millisecond even for VKs with dozens of patterns. Patterns are compiled once and cached in the gateway's per-VK config cache.
+Pattern checks are synchronous RE2 regex evaluations; total latency is sub-microsecond even for VKs with dozens of patterns. Patterns are compiled lazily on the first request that touches a bundle and cached on the bundle; cache auto-invalidates on config refresh.
+
+## Fail-closed behaviour
+
+If the VK's `blocked_patterns` config is malformed (e.g. an invalid regex), the gateway **does not silently bypass policy**. Instead the request is rejected with `503 service_unavailable` and the trace records `langwatch.policy.broken=<dimension>:<error>`. This is deliberate: a policy engine that stops enforcing on bad config is worse than one that errors loudly.
+
+Fix the policy via `langwatch virtual-keys update <id>` (or the UI) and subsequent requests resume immediately — the bundle refresh invalidates the broken compiled cache.
+
+## Example: blocked tool response
+
+```http
+HTTP/1.1 403 Forbidden
+Content-Type: application/json
+X-LangWatch-Request-Id: grq_01HZX9K3MNO...
+
+{
+  "error": {
+    "type":    "tool_not_allowed",
+    "code":    "tool_not_allowed",
+    "message": "Tool 'shell.exec' is blocked by VK policy blocked_patterns.tools.",
+    "param":   "tools[0].function.name"
+  }
+}
+```
+
+The `param` field pinpoints the offending argument so client SDKs can surface a targeted error to end users. See [API: Errors](/ai-gateway/api/errors#blocked-tool) for the full envelope.
 
 ## Combining with guardrails
 

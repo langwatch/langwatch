@@ -32,13 +32,13 @@ Errors (like successes) always carry:
 |---|---|---|
 | `invalid_api_key` | `401` | The `Authorization: Bearer …` / `x-api-key` / `api-key` header is missing, malformed, or points to a non-existent virtual key. |
 | `virtual_key_revoked` | `403` | The VK exists but has been revoked. |
-| `model_not_allowed` | `403` | The VK has a `models_allowed` allowlist and the requested model is not in it. Also used when the model/alias doesn't resolve to any configured provider. |
+| `model_not_allowed` | `403` | The VK has a `models_allowed` allowlist and the requested model is not in it, **or** the model matched a `blocked_patterns.models` deny regex (or fell outside its allow regex). Also used when the model/alias doesn't resolve to any configured provider. |
 | `permission_denied` | `403` | The principal lacks the RBAC permission required for the endpoint. |
 | `budget_exceeded` | `402` | Any hard-cap budget scope that applies to this request is over its limit. `message` names the scope (e.g. `Budget exceeded for scope=project window=month`). |
 | `rate_limit_exceeded` | `429` | Gateway-level (per-VK RPM/RPD) or upstream. Gateway-level adds `code = vk_rate_limit_exceeded`, `Retry-After: <seconds>` (RFC 7231), and `X-LangWatch-RateLimit-Dimension: rpm\|rpd` telling you which ceiling fired. TPM is deferred to v1.1. |
 | `guardrail_blocked` | `403` | A pre- or post-call guardrail returned `block`. `message` references which guardrail and why. |
 | `tool_not_allowed` | `403` | The request references a tool name matched by the VK's `blocked_patterns.tools.deny` (or absent from `allow` if set). |
-| `url_not_allowed` | `403` | Outbound URL in tool-call arguments matched `blocked_patterns.urls.deny`. |
+| `url_not_allowed` | `403` | Any `http://` / `https://` URL extracted from the request body (user messages, tool-call args, system prompts — anywhere) matched `blocked_patterns.urls.deny` or fell outside a non-null `allow` list. |
 | `cache_override_invalid` | `400` | The `X-LangWatch-Cache` header was malformed. |
 | `provider_error` | `502` | An upstream provider returned a non-recoverable error and fallback (if any) was exhausted. |
 | `upstream_timeout` | `504` | An upstream provider exceeded `timeout_ms` and fallback (if any) was exhausted. |
