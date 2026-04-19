@@ -187,7 +187,7 @@ describe("GatewayProviderCredentialService.update", () => {
       const existing = stubRow({
         slot: "fallback-1",
         rateLimitRpm: 500,
-        rotationPolicy: "EXTERNAL_SECRET_STORE",
+        rotationPolicy: "MANUAL",
       });
       const { prisma, updateArgs } = mockPrisma({ existing });
       const sut = GatewayProviderCredentialService.create(prisma);
@@ -204,7 +204,7 @@ describe("GatewayProviderCredentialService.update", () => {
       expect(data.slot).toBe("fallback-1");
       expect(data.rateLimitRpm).toBe(500);
       expect(data.rateLimitRpd).toBe(10_000);
-      expect(data.rotationPolicy).toBe("EXTERNAL_SECRET_STORE");
+      expect(data.rotationPolicy).toBe("MANUAL");
     });
   });
 

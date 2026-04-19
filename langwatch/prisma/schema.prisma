@@ -1398,10 +1398,16 @@ enum VirtualKeyStatus {
     REVOKED
 }
 
+// Rotation policy for gateway provider credentials.
+// v1 ships MANUAL only — operators rotate via the Rotate button in
+// the UI or by calling POST /providers/:id/rotate. Scheduled rotation
+// (AUTO) and external-secret-store integration (Vault / AWS Secrets
+// Manager / GCP Secret Manager) are v1.1 scope; the enum will grow
+// back when those are implemented. Shipping stubbed options here
+// would mislead operators into thinking they're configuring a feature
+// that silently does nothing. See iter 56 dogfood feedback.
 enum GatewayProviderRotationPolicy {
-    AUTO
     MANUAL
-    EXTERNAL_SECRET_STORE
 }
 
 enum GatewayProviderHealthStatus {
