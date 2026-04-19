@@ -19,25 +19,53 @@ Feature: Gateway span shape — mandatory attributes per completed request
   # ─────────────────────────────────────────────────────────────────────────
   # §1. Required attributes on every completed /v1/chat/completions span
   # ─────────────────────────────────────────────────────────────────────────
+  # Per rchaves iter 107: "EVERYTHING should follow the gen_ai specs."
+  # The LangWatch trace pipeline already canonicalises these attributes
+  # from SDK-instrumented clients (see langwatch/src/server/tracer/
+  # otel.traces.ts). Gateway spans MUST carry the same set so UI,
+  # evaluators, and analytics treat gateway traffic identically to
+  # SDK-instrumented traffic.
 
-  Scenario: Success span carries model, cost, and token attributes
-    When the consumer posts a valid /v1/chat/completions through the gateway
-    And the upstream returns a 200 with usage { prompt_tokens: 42, completion_tokens: 128 }
-    Then the exported span has all of the following attributes populated:
-      | attribute                         | expected                          |
-      | langwatch.origin                  | "gateway"                         |
-      | langwatch.vk_id                   | matches the VK id from the bundle |
-      | langwatch.vk_display_prefix       | matches the VK prefix             |
-      | langwatch.project_id              | matches the project that owns VK  |
-      | gen_ai.request.model              | equals the request body "model"   |
-      | gen_ai.response.model             | equals the upstream response model|
-      | gen_ai.system                     | matches the dispatched provider   |
-      | gen_ai.usage.input_tokens         | 42 (integer, > 0)                 |
-      | gen_ai.usage.output_tokens        | 128 (integer, > 0)                |
-      | langwatch.cost_usd                | > 0 (Decimal, 6-place precision)  |
-      | http.request.method               | "POST"                            |
-      | http.response.status_code         | 200                               |
-      | otel.span.status                  | OK                                |
+  Scenario: Success span carries the full gen_ai semconv surface
+    When the consumer posts a /v1/chat/completions with temperature=0.7, top_p=0.9, max_tokens=512, stream=false
+    And the upstream returns a 200 with id="chatcmpl-X", model="gpt-5-mini-2025-08-07", finish_reason="stop", usage { prompt_tokens: 42, completion_tokens: 128 }
+    Then the exported span has ALL of the following attributes populated:
+      # —— LangWatch-side envelope (provenance + attribution) ——
+      | attribute                                    | expected                                      |
+      | langwatch.origin                             | "gateway"                                     |
+      | langwatch.vk_id                              | matches the VK id from the bundle             |
+      | langwatch.vk_display_prefix                  | matches the VK prefix                         |
+      | langwatch.project_id                         | matches the project that owns VK              |
+      | langwatch.cost_usd                           | > 0 (Decimal, 6-place precision)              |
+      # —— gen_ai.request.* ——
+      | gen_ai.operation.name                        | "chat" (embeddings|messages for other paths)  |
+      | gen_ai.system                                | matches the dispatched provider ("openai" etc)|
+      | gen_ai.request.model                         | equals the request body "model"               |
+      | gen_ai.request.temperature                   | 0.7                                           |
+      | gen_ai.request.top_p                         | 0.9                                           |
+      | gen_ai.request.max_tokens                    | 512                                           |
+      | gen_ai.request.stream                        | false                                         |
+      | gen_ai.request.frequency_penalty             | populated when request carried it (optional)  |
+      | gen_ai.request.presence_penalty              | populated when request carried it (optional)  |
+      | gen_ai.request.stop_sequences                | populated when request carried it (optional)  |
+      # —— gen_ai.response.* ——
+      | gen_ai.response.id                           | "chatcmpl-X"                                  |
+      | gen_ai.response.model                        | "gpt-5-mini-2025-08-07"                       |
+      | gen_ai.response.finish_reasons               | ["stop"]                                      |
+      # —— gen_ai.usage.* ——
+      | gen_ai.usage.input_tokens                    | 42 (integer, > 0)                             |
+      | gen_ai.usage.output_tokens                   | 128 (integer, > 0)                            |
+      | gen_ai.usage.total_tokens                    | 170 (derived; absent if input/output absent)  |
+      | gen_ai.usage.cache_read_input_tokens         | populated when upstream returns them          |
+      | gen_ai.usage.cache_creation_input_tokens     | populated when upstream returns them          |
+      # —— gen_ai.input.* / gen_ai.output.* (payload capture — see payload-capture.feature) ——
+      | gen_ai.input.messages                        | populated when VK.capture_payload != "none"   |
+      | gen_ai.system_instructions                   | populated when request carried a system msg  |
+      | gen_ai.output.messages                       | populated when VK.capture_payload != "none"   |
+      # —— HTTP + span status ——
+      | http.request.method                          | "POST"                                        |
+      | http.response.status_code                    | 200                                           |
+      | otel.span.status                             | OK                                            |
 
   Scenario: Token attributes are integers, not strings
     Given the upstream returns usage { prompt_tokens: "42", completion_tokens: "128" }
