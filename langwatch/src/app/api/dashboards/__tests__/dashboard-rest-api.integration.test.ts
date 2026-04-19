@@ -12,9 +12,7 @@ import { prisma } from "~/server/db";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
-// Skipped: app-layer init regression on main after es-migration refactor
-// — see langwatch/langwatch#3240.
-describe.skip("Feature: Dashboard REST API", () => {
+describe("Feature: Dashboard REST API", () => {
   let testApiKey: string;
   let testProjectId: string;
   let testOrganization: Organization;

@@ -13,8 +13,7 @@ import type { DatasetColumns } from "~/server/datasets/types";
 import { FREE_PLAN } from "../../../../../ee/licensing/constants";
 import { app } from "../[[...route]]/app";
 
-// Skipped: app-layer init regression on main (#2508) — see langwatch/langwatch#3240.
-describe.skip("Feature: Dataset File Upload REST API", () => {
+describe("Feature: Dataset File Upload REST API", () => {
   let testApiKey: string;
   let testProjectId: string;
   let testOrganization: Organization;
