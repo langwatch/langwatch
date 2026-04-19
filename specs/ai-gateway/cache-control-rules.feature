@@ -188,7 +188,67 @@ Feature: Cache control rules — operator-defined overrides without client code 
     And every mutation emits an audit log entry
 
   # ─────────────────────────────────────────────────────────────────────────
-  # §7. Open questions (deferred from v1 scope)
+  # §7. UI behaviour — /gateway/cache-rules page (Lane B iter 40, 73552f964)
+  # ─────────────────────────────────────────────────────────────────────────
+
+  Scenario: List view shows priority-ordered rules with matcher + action badges
+    Given three cache rules with priorities 200 / 100 / 50 in the org
+    When the user opens /gateway/cache-rules
+    Then rows appear in descending priority order
+    And each row shows a matcher summary (vk_id / vk_prefix / vk_tags / principal_id / model / request_metadata)
+    And each row shows an action badge colour-coded by mode:
+      | mode    | colour  |
+      | respect | green   |
+      | force   | orange  |
+      | disable | red     |
+    And rules with action.ttl set show a "TTL {seconds}s" indicator
+    And rules with action.salt set show a "salted" indicator
+
+  Scenario: Precedence copy at top of page reminds the operator of ordering
+    When the user opens /gateway/cache-rules
+    Then page header copy contains "per-request header > rule > VK default"
+    And it links to /ai-gateway/cache-control#precedence
+
+  Scenario: Inline enable / disable toggle is one click
+    Given a rule "rule_prod" is currently enabled
+    When the user clicks the Switch in the row's Enabled column
+    Then the rule's enabled flag flips to false
+    And a GatewayChangeEvent is emitted (kind = CACHE_RULE_UPDATED)
+    And a GatewayAuditLog row records the toggle with before/after JSON
+
+  Scenario: Create drawer uses progressive disclosure for mode-dependent fields
+    When the user opens the "New cache rule" drawer
+    Then mode defaults to "respect" and the TTL field is hidden
+    When the user changes mode to "force"
+    Then the TTL field becomes visible
+    When the user changes mode back to "respect" or "disable"
+    Then the TTL field is hidden and its value cleared
+
+  Scenario: Edit drawer round-trips matchers + action via fromWire/toWire
+    Given an existing rule with matchers {vk_tags: ["env=prod"], model: "gpt-5-mini"} and action {mode: "force", ttl: 300}
+    When the user opens the Edit drawer for that rule
+    Then the matcher fields show those exact values
+    And the action fields show mode=force ttl=300
+    When the user saves without changes
+    Then the PATCH body is semantically equivalent to the original (no spurious diffs)
+
+  Scenario: Archive via row menu soft-deletes and emits CACHE_RULE_DELETED event
+    Given a rule "rule_old"
+    When the user clicks "Archive" from the row's menu and confirms
+    Then the rule's archivedAt is set to now
+    And a GatewayChangeEvent (kind = CACHE_RULE_DELETED) is emitted
+    And the rule disappears from the default list view (archived filter off)
+    And an audit log row records the archive with before-JSON preserved
+
+  Scenario: MEMBER role sees the page as read-only (no Create / Edit / Archive actions)
+    Given a user with role MEMBER (gatewayCacheRules:view only)
+    When they open /gateway/cache-rules
+    Then the list renders but the "New cache rule" button is disabled with a tooltip naming the missing permission
+    And row menu Edit + Archive entries are disabled
+    And the Enabled switch is read-only
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # §8. Open questions (deferred from v1 scope)
   # ─────────────────────────────────────────────────────────────────────────
 
   # - time_window matchers (cron-style time-of-day / day-of-week) — deferred
