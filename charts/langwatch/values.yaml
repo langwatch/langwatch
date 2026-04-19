@@ -1502,5 +1502,9 @@ gateway:
     existingSecretName: langwatch-gateway-auth
 
   ## @param gateway.otel.endpoint [string, default: http://langwatch-app:5560/api/otel] OTLP/HTTP ingest URL the gateway exports spans to. In-cluster default targets langwatch-app. Point at an external collector (Honeycomb / Datadog OTLP receiver / Grafana Agent) if you already have one. Leave empty to disable gateway trace export entirely.
+  ## @param gateway.otel.authExistingSecretName [string, default: ""] Name of a Secret carrying the X-Auth-Token attached to every OTLP span export. Production path — rotate the token by rotating the Secret. Required when endpoint points at /api/otel; the ingest rejects unauthenticated spans with 401.
+  ## @param gateway.otel.authSecretKey [string, default: token] Key inside `otel.authExistingSecretName` holding the token.
   otel:
     endpoint: http://langwatch-app:5560/api/otel
+    authExistingSecretName: ""
+    authSecretKey: token

@@ -70,6 +70,16 @@ spec:
                   name: {{ .Values.admin.existingAuthSecretName }}
                   key: {{ .Values.admin.authSecretKey | default "token" }}
             {{- end }}
+            {{- if .Values.otel.authExistingSecretName }}
+            - name: GATEWAY_OTEL_DEFAULT_AUTH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.otel.authExistingSecretName }}
+                  key: {{ .Values.otel.authSecretKey | default "token" }}
+            {{- else if .Values.otel.authToken }}
+            - name: GATEWAY_OTEL_DEFAULT_AUTH_TOKEN
+              value: {{ .Values.otel.authToken | quote }}
+            {{- end }}
           startupProbe:
             httpGet:
               path: /startupz
