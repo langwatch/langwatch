@@ -82,7 +82,7 @@ function GatewayUsagePage() {
           </HStack>
         </PageLayout.Header>
 
-        <Box padding={6}>
+        <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           {summaryQuery.isLoading ? (
             <Spinner />
           ) : !data || data.totalRequests === 0 ? (
@@ -140,7 +140,6 @@ function GatewayUsagePage() {
                         <Table.Cell>
                           <Link
                             href={`/${project?.slug}/gateway/virtual-keys/${row.virtualKeyId}`}
-                            color="orange.600"
                           >
                             {row.name}
                           </Link>
