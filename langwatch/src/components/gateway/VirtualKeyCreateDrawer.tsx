@@ -18,6 +18,7 @@ import { useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
+import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import { api } from "~/utils/api";
 
 import { FieldInfoTooltip } from "./FieldInfoTooltip";
@@ -257,8 +258,16 @@ export function VirtualKeyCreateDrawer({
                     </HStack>
                   </VStack>
                 ) : (
-                  availableProviders.map((p: any, index: number) => {
+                  availableProviders.map((p: any) => {
                     const selected = selectedProviderIds.includes(p.id);
+                    const providerType =
+                      p.modelProviderName ?? p.provider ?? "";
+                    const icon =
+                      providerType in modelProviderIcons
+                        ? modelProviderIcons[
+                            providerType as keyof typeof modelProviderIcons
+                          ]
+                        : null;
                     return (
                       <HStack
                         key={p.id}
@@ -270,9 +279,22 @@ export function VirtualKeyCreateDrawer({
                         cursor="pointer"
                         onClick={() => toggleProvider(p.id)}
                       >
+                        <Box
+                          width="20px"
+                          height="20px"
+                          flexShrink={0}
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="center"
+                          css={{
+                            "& > svg": { width: "100%", height: "100%" },
+                          }}
+                        >
+                          {icon}
+                        </Box>
                         <VStack align="start" gap={0}>
                           <Text fontSize="sm" fontWeight="medium">
-                            {p.modelProviderName ?? p.provider ?? p.id}
+                            {providerType || p.id}
                           </Text>
                           <Text fontSize="xs" color="fg.muted">
                             slot: {p.slot ?? "primary"}
