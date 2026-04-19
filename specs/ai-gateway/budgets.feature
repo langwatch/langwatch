@@ -139,6 +139,32 @@ Feature: AI Gateway — Budgets
       and a reset countdown
 
   @visual
+  Scenario: Budget list Scope column resolves target name with VK link
+    Given budgets exist scoped to "organization acme-demo", "team platform",
+      "project gateway-demo", "virtual_key prod-openai", and "principal user@acme.com"
+    When I open the Budgets list
+    Then each row's Scope cell shows the scope-kind badge on top
+    And the scope-target name below (e.g. "acme-demo", "platform", "gateway-demo")
+    And VK-scope rows link to the VK detail page via an orange link
+    And a muted-parenthesised secondary (slug / displayPrefix / email) follows the name
+
+  @visual
+  Scenario: Budget detail header surfaces Audit history even after archive
+    Given budget "demo-month" was archived yesterday
+    When I open its detail page
+    Then Edit and Archive buttons are hidden (archived — actions are no-op)
+    But the "Audit history" button is still visible and deep-links to
+      /gateway/audit?targetKind=budget&targetId=budget_…
+
+  @visual
+  Scenario: Budget detail Recent debits humanises When + Amount columns
+    Given budget "demo-month" has 300+ ledger debits across the last 30 days
+    When I open the detail page and scroll to "Recent debits"
+    Then the When column shows "3h ago" / "2d ago" with exact timestamp on hover
+    And the Amount column uses smart decimals — 4 places for ≥$1, 5 for 1¢-$1, 6 below 1¢
+    And the Status column uses colored badges (green success, orange provider_error, red blocked)
+
+  @visual
   Scenario: Running close to hard cap surfaces a banner
     Given a budget is ≥ 90% spent with on_breach "block"
     When I am on any AI Gateway screen
