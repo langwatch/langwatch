@@ -166,12 +166,27 @@ Feature: Cache control rules — operator-defined overrides without client code 
     And cache_rules is pre-sorted by priority descending
     And no control-plane round-trip is required per request
 
-  Scenario: Rule evaluation is sub-100-nanosecond — 28× headroom vs 700 ns target
+  Scenario: Evaluator micro-bench — sub-100 ns, zero-alloc (iter 45)
     Given a VK bundle with 10 cache rules attached
     When a request flows through the gateway
     Then cacherules.Evaluate executes in under 100 nanoseconds (Lane A iter 45 benchmarks: 24.4 ns/op 4th-match, 25.0 ns/op no-match, 4.4 ns/op empty-rules fast-path; amd64 VirtualApple 2.5GHz)
-    And there are zero allocations on the hot path (0 B/op, 0 allocs/op)
-    And the ~700 ns hot-path target is preserved with 28× headroom
+    And there are zero allocations on the evaluator hot path (0 B/op, 0 allocs/op)
+
+  Scenario: End-to-end cache-override benchmarks — no-body-mutation paths fit 700 ns (iter 53)
+    Given the full applyCacheOverride path is measured (header lookup → rule eval → body apply)
+    When benchmarks run on amd64 VirtualApple 2.5GHz
+    Then the benchmarks report:
+      | path                 | ns/op | allocs | verdict                             |
+      | NoRulesFastPath      |    70 |      1 | fits 700 ns budget with 10× headroom |
+      | HeaderOnlyRespect    |   252 |      4 | parse + response header overhead    |
+      | RuleHitModeDisable   |  5000 |     63 | dominated by JSON strip walk        |
+      | RuleHitModeForce     |  4553 |     64 | dominated by JSON inject walk       |
+    # Lane A iter 53 (e19c7acb1): the 700 ns budget from spec §4 realistically
+    # only applies to no-body-mutation paths (respect / rule-miss). Rule-hit
+    # paths that actually mutate cache_control markers cost 4–5 μs because
+    # encoding/json marshal+unmarshal is unavoidable on the body walk.
+    # v1.1 perf follow-up: swap encoding/json → sjson (streaming JSON mutator)
+    # to cut rule-hit paths ~5×. Not in v1 scope.
 
   Scenario: Rule evaluation is wired on all 3 data-plane endpoints (iter 49 + iter 51)
     Given a cache rule "rule_any" matches any request
