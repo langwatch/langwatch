@@ -122,7 +122,7 @@ function CacheRulesPage() {
     <GatewayLayout>
       <>
         <PageLayout.Header>
-          <PageLayout.Heading>Cache control</PageLayout.Heading>
+          <PageLayout.Heading>Cache Rules</PageLayout.Heading>
           <Spacer />
           {canCreate && (
             <Button
