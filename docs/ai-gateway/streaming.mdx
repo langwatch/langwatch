@@ -62,7 +62,7 @@ When the primary returns a retryable error **before** any chunk has been sent to
 
 `X-LangWatch-Fallback-Count` reports how many chain slots were skipped before the successful attempt. `0` means the primary worked; `N` means N providers were tried.
 
-Shipped in langwatch-saas `b8016b0` (@sergey Lane A iter 4 pt6).
+Shipped in `b8016b0` (@sergey Lane A iter 4 pt6).
 
 ## `stream_chunk` guardrails
 
@@ -191,7 +191,7 @@ rate(gateway_requests_total{usage_reported="false"}[5m]) > 0
 
 If this fires, a client is streaming without `include_usage` and you're effectively not charging those requests. Sergey's warning header + span status make this observable — wire a Grafana alert on `span.status = success_no_usage` too.
 
-Shipped in langwatch-saas `56f9134` (@sergey Lane A iter 4 pt5).
+Shipped in `56f9134` (@sergey Lane A iter 4 pt5).
 
 ## Non-streaming clients
 

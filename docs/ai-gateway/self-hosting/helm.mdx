@@ -489,7 +489,7 @@ All three timeouts apply to the public listener and the admin listener (iter 22)
 
 ## Chart and data-plane CI (iter 19, `1fd1fc3`)
 
-The upstream repo runs a dedicated `gateway-ci` workflow against every PR that touches `services/gateway/**` or `infrastructure/charts/gateway/**` (paths-filter gated so unrelated PRs don't trigger it). What it guarantees on the chart you're installing:
+The upstream repo runs a dedicated `gateway-ci` workflow against every PR that touches `services/gateway/**` or `charts/gateway/**` (paths-filter gated so unrelated PRs don't trigger it). What it guarantees on the chart you're installing:
 
 - **Go data plane**: `go mod verify`, `go vet`, `go build`, `go test -count=1 -race ./...` across all 14 internal packages. Benchmarks compile under `-run=^$ -benchtime=1x` so Go API drift fails fast without adding benchmark noise to PR logs.
 - **Helm chart**: `helm lint` + two `helm template` renders — one with defaults (must render zero `NetworkPolicy` objects), one with `networkPolicy.enabled=true` + `redis.url=redis://…` (must render exactly one). Both invariants are asserted explicitly; violating either fails the job.
