@@ -9,10 +9,12 @@
 //   - disable: strip every `cache_control` object from the body before
 //     forwarding. Lets customers validate cold-cache baselines and
 //     chase cache-dependent bugs.
-//   - force: NOT IMPLEMENTED v1 — requires provider-specific body
-//     mutation (Anthropic expects `cache_control` on specific message
-//     positions). Deferred to v1.1 alongside the caching-strategy
-//     surface.
+//   - force: Anthropic-shape bodies get `cache_control: ephemeral`
+//     injected on the last system block + last user content block
+//     (per spec §3). Client-set cache_control is preserved — no
+//     double injection. OpenAI-shape bodies (string content) are a
+//     no-op because their caching is automatic. Gemini body-shapes
+//     are not yet supported (needs /cachedContents pre-POST; v1.1).
 //   - ttl=N: NOT IMPLEMENTED v1 — Anthropic doesn't accept explicit
 //     TTL today; modelling this requires either a roadmap bump or
 //     edge-cache at the gateway. Deferred to v1.1.
@@ -67,7 +69,9 @@ func Parse(hdr string) (Mode, error) {
 	case "disable":
 		return Mode{Kind: KindDisable}, nil
 	case "force":
-		return Mode{Kind: KindForce}, ErrNotImplemented
+		// Body-injection for Anthropic-shape bodies; no-op for
+		// OpenAI-shape (their caching is automatic).
+		return Mode{Kind: KindForce}, nil
 	}
 	if strings.HasPrefix(s, "ttl=") {
 		v, err := strconv.Atoi(s[len("ttl="):])
@@ -87,10 +91,90 @@ func Apply(mode Mode, body []byte) ([]byte, error) {
 	if mode.Kind == KindRespect || len(body) == 0 {
 		return body, nil
 	}
-	if mode.Kind != KindDisable {
+	switch mode.Kind {
+	case KindDisable:
+		return stripCacheControl(body)
+	case KindForce:
+		return injectCacheControl(body)
+	case KindTTL:
 		return nil, ErrNotImplemented
 	}
-	return stripCacheControl(body)
+	return nil, ErrNotImplemented
+}
+
+// injectCacheControl walks an Anthropic-shape body and adds
+// cache_control: {type: "ephemeral"} on the last system block +
+// last message content block per spec §3. Returns the body unchanged
+// for bodies that don't look like Anthropic shape (no `messages`
+// or string-content messages) — OpenAI caching is automatic, so
+// force on OpenAI is a documented no-op.
+//
+// Client-set cache_control anywhere on the target block short-circuits
+// the inject — we preserve what the client already sent.
+func injectCacheControl(body []byte) ([]byte, error) {
+	var v any
+	if err := json.Unmarshal(body, &v); err != nil {
+		return nil, fmt.Errorf("cache_override: body not JSON: %w", err)
+	}
+	root, ok := v.(map[string]any)
+	if !ok {
+		return body, nil
+	}
+
+	changed := false
+	// system[-1]: last block of system array, if system is an array
+	// of blocks (Anthropic-shape). String-only systems are OpenAI/
+	// legacy Anthropic and skipped.
+	if sys, ok := root["system"].([]any); ok && len(sys) > 0 {
+		if ensureEphemeral(sys[len(sys)-1]) {
+			changed = true
+		}
+	}
+	// messages[-1].content[-1]: last content block of the last message,
+	// when content is an array (structured Anthropic/OpenAI-multimodal
+	// shape). String content is skipped — injection isn't possible
+	// without promoting the shape, which would be a visible breaking
+	// change for the caller.
+	if msgs, ok := root["messages"].([]any); ok && len(msgs) > 0 {
+		lastMsg, ok := msgs[len(msgs)-1].(map[string]any)
+		if ok {
+			if content, ok := lastMsg["content"].([]any); ok && len(content) > 0 {
+				if ensureEphemeral(content[len(content)-1]) {
+					changed = true
+				}
+			}
+		}
+	}
+
+	if !changed {
+		return body, nil
+	}
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	out := buf.Bytes()
+	if n := len(out); n > 0 && out[n-1] == '\n' {
+		out = out[:n-1]
+	}
+	return out, nil
+}
+
+// ensureEphemeral adds cache_control: {type: "ephemeral"} to the
+// given block if it's a map and doesn't already have cache_control.
+// Returns true when a mutation happened.
+func ensureEphemeral(block any) bool {
+	m, ok := block.(map[string]any)
+	if !ok {
+		return false
+	}
+	if _, present := m["cache_control"]; present {
+		return false
+	}
+	m["cache_control"] = map[string]any{"type": "ephemeral"}
+	return true
 }
 
 // stripCacheControl walks a generic-JSON payload and drops every

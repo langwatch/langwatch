@@ -208,37 +208,35 @@ func (d *Dispatcher) applyHeaderMode(w http.ResponseWriter, r *http.Request, bod
 	return out, true
 }
 
-// applyRuleMode handles the matched-rule path. v1 supports rule.Mode
-// in {respect, disable}; force/ttl are specced but the body-mutation
-// (Anthropic cache_control injection, Gemini cachedContent creation)
-// is v1.1 work — when a v1 gateway encounters rule.Mode=force it
-// degrades to respect + logs a warning rather than failing the request.
+// applyRuleMode handles the matched-rule path. Supports rule.Mode in
+// {respect, disable, force}; Anthropic-shape force injects
+// cache_control: ephemeral on system[-1] + messages[-1].content[-1]
+// per spec §3. OpenAI-shape force is a body-level no-op (their
+// caching is automatic). Gemini force isn't implemented in v1 because
+// it needs a /cachedContents pre-POST that breaks zero-hop.
 func (d *Dispatcher) applyRuleMode(w http.ResponseWriter, r *http.Request, body []byte, reqID string, b *auth.Bundle, match *cacherules.Match) ([]byte, bool) {
-	mode := cacheoverride.Mode{Kind: cacheoverride.Kind(match.Mode)}
-	// v1 safety: force + ttl are spec'd but body-mutation not yet
-	// implemented. Downgrade to respect + record metric so operators
-	// see the rule fired but observe no body change.
-	applied := match.Mode
-	if applied == string(cacheoverride.KindForce) {
-		d.logger.Warn("cache_rule_force_mode_deferred",
-			"rule_id", match.RuleID, "vk_id", b.DisplayPrefix,
-			"reason", "v1 evaluates force matchers but body mutation is v1.1 — treating as respect")
-		applied = string(cacheoverride.KindRespect)
-		mode.Kind = cacheoverride.KindRespect
-	}
+	mode := cacheoverride.Mode{Kind: cacheoverride.Kind(match.Mode), TTLSecs: match.TTLS}
 	out, err := cacheoverride.Apply(mode, body)
 	if err != nil {
-		gwerrors.Write(w, reqID, gwerrors.TypeCacheOverrideInvalid,
-			"cache_override_apply_failed", err.Error(), "cache_rule")
-		return nil, false
+		if errors.Is(err, cacheoverride.ErrNotImplemented) {
+			// ttl=N on a rule today; spec'd but deferred.
+			d.logger.Warn("cache_rule_mode_not_implemented",
+				"rule_id", match.RuleID, "vk_id", b.DisplayPrefix, "mode", match.Mode)
+			// Fall back to passthrough so the request succeeds.
+			out = body
+		} else {
+			gwerrors.Write(w, reqID, gwerrors.TypeCacheOverrideInvalid,
+				"cache_override_apply_failed", err.Error(), "cache_rule")
+			return nil, false
+		}
 	}
-	w.Header().Set("X-LangWatch-Cache-Mode", applied)
+	w.Header().Set("X-LangWatch-Cache-Mode", match.Mode)
 	// Observability: rule attribution on the span + metric bump.
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrCacheRuleID, match.RuleID)
-	gwotel.AddStringAttr(r.Context(), gwotel.AttrCacheModeApplied, applied)
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrCacheModeApplied, match.Mode)
 	// Priority isn't carried back by the evaluator today — adding it
 	// would require passing the full CacheRuleSpec. Deferred.
-	d.metrics.RecordCacheRuleHit(match.RuleID, strings.ToUpper(applied))
+	d.metrics.RecordCacheRuleHit(match.RuleID, strings.ToUpper(match.Mode))
 	return out, true
 }
 
