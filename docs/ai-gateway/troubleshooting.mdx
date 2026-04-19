@@ -171,6 +171,48 @@ If `mode: disable`, that's the problem — `disable` strips `cache_control` bloc
 
 Also check your client is actually sending `cache_control: {type: "ephemeral"}` blocks in the system prompt. Many SDKs don't emit these by default; you often have to pass the system field as a content-blocks array, not a string. See [Caching Passthrough](/ai-gateway/caching-passthrough).
 
+## Request succeeded but no trace in my inbox
+
+**Symptoms:**
+- `/v1/chat/completions` returned `200` with a real model response.
+- Response carried `X-LangWatch-Request-Id`.
+- But the LangWatch **Traces** screen in your project is empty (or doesn't show this request).
+
+**Diagnose:**
+
+```bash
+# 1. Is the gateway configured to export spans at all?
+# In the gateway pod:
+echo "$GATEWAY_OTEL_DEFAULT_ENDPOINT"   # must be non-empty
+echo "$GATEWAY_OTEL_DEFAULT_AUTH_TOKEN" # must be non-empty when endpoint is LangWatch's /api/otel
+
+# 2. Is the exporter reaching the ingest?
+kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
+# Look for:
+#   - "exporter: export succeeded"                 -> spans left the gateway
+#   - "status=401"                                 -> auth-token rejected at ingest
+#   - "status=404"                                 -> endpoint URL is wrong (missing /v1/traces suffix — recent fix)
+#   - "no endpoint configured"                     -> env var wasn't picked up
+```
+
+**Root causes, most to least common:**
+
+1. **Auth token points at the wrong LangWatch project.** `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN` is a LangWatch API key. Traces land in *that key's project* — not necessarily the project owning the VK that served the request. If you're dogfooding with a shared token but multiple projects in the same org, spans may appear under a sibling project's **Traces** screen. Verify the token's project at `Settings → API Keys`.
+
+   <Warning>**Per-project resolver hook is the proper multi-tenant path.** A single static token bucket is a dogfood shortcut; in production you want the gateway to authenticate to `/api/otel` with a token whose project resolves from the VK that served the request, so each tenant's spans land in their own inbox automatically. Track this if you see cross-project leakage.</Warning>
+
+2. **Endpoint is empty.** `GATEWAY_OTEL_DEFAULT_ENDPOINT` unset = no exporter wired. Spans are created in-pod and flushed to a no-op channel. Helm umbrella chart defaults this to `http://langwatch-app:5560/api/otel` — if you've overridden to empty, you've disabled trace export.
+
+3. **Auth token 401s at the ingest.** `/api/otel` rejects unauthenticated or expired tokens with 401; the gateway exporter logs the rejection but the hot path is already done. Rotate the token, update the Secret, roll the gateway pod.
+
+4. **Endpoint URL 404s.** Before the auto-suffix fix, an endpoint like `http://langwatch-app:5560/api/otel` was treated as the full URL; the Go OTLP exporter hit `/api/otel` and got 404 (the receiver is at `/api/otel/v1/traces`). Recent gateway builds append `/v1/traces` automatically when missing. Bump to the latest image.
+
+5. **Sampler dropped the span.** Gateway spans are sampled at 1.0 by default — if you've tuned `GATEWAY_OTEL_SAMPLER_ARG` below 1.0 for cost, spot-checks will miss by design.
+
+6. **Trace landed but under a different project filter.** Check that the **Traces** screen is scoped to the same project as the auth token's project and that the `Origin = Gateway` quick-filter is either off or explicitly selected (the default view excludes non-Gateway origins when "Gateway" is active — and vice-versa).
+
+**Quick sanity check:** filter **Traces** for the last 5 minutes with **Origin = Gateway** and search for your `X-LangWatch-Request-Id`. If the row is there, you were looking at the wrong filter/project. If not, the export path dropped the span — diagnose via the log grep above.
+
 ## Trace-id propagation not working
 
 **Symptoms:**
