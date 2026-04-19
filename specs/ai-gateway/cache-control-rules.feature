@@ -81,6 +81,23 @@ Feature: Cache control rules — operator-defined overrides without client code 
     When a request carries header "X-Customer-Tier: free"
     Then the rule does NOT match
 
+  Scenario: Matcher — model supports trailing-* glob (not full regex, by design)
+    Given a cache rule matching model "claude-haiku-*"
+    When a request resolves to "claude-haiku-4-5-20251001"
+    Then the rule matches
+    When a request resolves to "claude-sonnet-4-6"
+    Then the rule does NOT match
+    # Design note: we deliberately do NOT support regex here — matchers must
+    # be trivially auditable in the UI (Lane A iter 45 evaluator comment).
+
+  Scenario: Matcher — vk_tags is AND-subset (every required tag must be present)
+    Given a cache rule matching vk_tags ["env=prod", "team=ml"]
+    And a VK with tags ["env=prod", "team=ml", "region=eu"]
+    When a request is made with that VK
+    Then the rule matches (extra tag is ignored)
+    Given a VK with tags ["env=prod"] only
+    Then the rule does NOT match (missing "team=ml")
+
   # ─────────────────────────────────────────────────────────────────────────
   # §3. Action behaviour — per-provider dispatch
   # ─────────────────────────────────────────────────────────────────────────
@@ -138,11 +155,12 @@ Feature: Cache control rules — operator-defined overrides without client code 
     And cache_rules is pre-sorted by priority descending
     And no control-plane round-trip is required per request
 
-  Scenario: Rule evaluation is sub-microsecond
-    Given a VK bundle with 20 cache rules attached
+  Scenario: Rule evaluation is sub-100-nanosecond — 28× headroom vs 700 ns target
+    Given a VK bundle with 10 cache rules attached
     When a request flows through the gateway
-    Then cacherules.Resolve executes in under 1 microsecond (benchmark baseline)
-    And the ~700 ns hot-path target is preserved
+    Then cacherules.Evaluate executes in under 100 nanoseconds (Lane A iter 45 benchmarks: 24.4 ns/op 4th-match, 25.0 ns/op no-match, 4.4 ns/op empty-rules fast-path; amd64 VirtualApple 2.5GHz)
+    And there are zero allocations on the hot path (0 B/op, 0 allocs/op)
+    And the ~700 ns hot-path target is preserved with 28× headroom
 
   Scenario: Rule update propagates within 30 seconds via /changes long-poll
     Given a VK "vk_prod_openai" is in use by a client
