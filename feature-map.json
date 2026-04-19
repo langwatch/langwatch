@@ -557,7 +557,7 @@
                 "dataset records update",
                 "dataset records delete"
               ],
-              "skill": "evaluations",
+              "skill": "datasets",
               "docs": "https://langwatch.ai/docs/datasets/programmatic-access.md"
             },
             "platform": {
@@ -747,9 +747,16 @@
       "fetch_langwatch_docs",
       "fetch_scenario_docs"
     ],
+    "cli_meta": [
+      "login",
+      "status",
+      "docs",
+      "scenario-docs"
+    ],
     "meta_skills": {
       "level-up": "Orchestrates tracing + prompts + evaluations + scenarios",
-      "analytics": "Cross-cutting skill for querying performance (works for both code and platform users)"
+      "analytics": "Cross-cutting skill for querying performance (works for both code and platform users)",
+      "datasets": "Generate realistic synthetic evaluation datasets from codebase, prompts, and traces"
     },
     "recipes": {
       "test-cli-usability": "Write scenario tests to ensure your CLI is usable by AI agents",

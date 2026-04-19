@@ -9,6 +9,8 @@ argument-hint: "[what changed, e.g. 'added dataset MCP tools']"
 
 You are maintaining `/feature-map.json` — the **canonical information architecture** for LangWatch. Every platform feature is defined here with its **surfaces** (how it's accessed) and **sync** state (how code and platform relate). All implementations (sidebar, docs, skills, MCP tools) derive from this map.
 
+`/FEATURE_MAP.md` is the human-readable companion — a coverage table derived from the JSON. Keep it in sync when you edit the JSON. Use the **underscore** form (`FEATURE_MAP.md`), matching GitHub's convention for uppercase root files like `CODE_OF_CONDUCT.md` and `PULL_REQUEST_TEMPLATE.md`. Never create a hyphenated `FEATURE-MAP.md` variant.
+
 ## Information Architecture
 
 The hierarchy represents the product's mental model, not the code structure:
