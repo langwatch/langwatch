@@ -28,6 +28,15 @@ export type UseModelProviderFormParams = {
   // keeps working when these are undefined.
   teamId?: string;
   organizationId?: string;
+  /**
+   * Permission predicates used to decide the default scope selection for
+   * a brand-new provider (iter 109). The form opens at the widest scope
+   * the user can manage: ORGANIZATION if they have organization:manage,
+   * else TEAM if they have team:manage, else PROJECT. Callers wire these
+   * from useOrganizationTeamProject's hasPermission helper.
+   */
+  canManageOrganization?: boolean;
+  canManageTeam?: boolean;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 };
@@ -85,14 +94,25 @@ export function useModelProviderForm(
     isUsingEnvVars,
     teamId,
     organizationId,
+    canManageOrganization,
+    canManageTeam,
     onSuccess,
     onError,
   } = params;
 
-  // Scope state — defaults to the stored provider's scope, or PROJECT for
-  // brand-new providers. setScopeType flips it at save time.
+  // Scope state — defaults to the stored provider's scope when editing.
+  // For brand-new providers we open at the widest scope the user can
+  // manage (org > team > project), so an admin lands on the most useful
+  // default instead of having to flip from PROJECT every time.
+  const storedScope = provider.scopeType as ModelProviderScopeType | undefined;
+  const defaultNewScope: ModelProviderScopeType =
+    canManageOrganization && organizationId
+      ? "ORGANIZATION"
+      : canManageTeam && teamId
+        ? "TEAM"
+        : "PROJECT";
   const [scopeType, setScopeType] = useState<ModelProviderScopeType>(
-    (provider.scopeType as ModelProviderScopeType | undefined) ?? "PROJECT",
+    storedScope ?? defaultNewScope,
   );
 
   const scopeId =

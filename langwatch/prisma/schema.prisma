@@ -670,19 +670,17 @@ model Annotation {
 model ModelProvider {
     id                     String                      @id @default(nanoid())
     // Legacy pointer. Always the project the row was originally
-    // created under (or the project itself for scopeType=PROJECT
-    // rows). New callers read scopeType + scopeId for access; the
-    // column stays for backward compatibility.
+    // created under (or a sibling project in the same org/team for
+    // org/team-scoped credentials). Kept so existing per-project
+    // lookups keep compiling; access is granted via ModelProviderScope.
     projectId              String
     project                Project                     @relation(fields: [projectId], references: [id])
-    // Principal-style scope (iter 107 #2): lets an org/team
-    // administrator configure a provider credential once and have
-    // every project under that scope inherit it. Mirrors the
-    // RoleBinding principal pattern. scopeType is one of
-    // "ORGANIZATION" / "TEAM" / "PROJECT"; scopeId is the matching
-    // id of the scoping entity.
-    scopeType              String
-    scopeId                String
+    // Human-readable name (iter 109): one "OpenAI" by default, auto-
+    // suffixed as "OpenAI 2" / "OpenAI 3" when duplicates coexist
+    // under the same organization. Model selectors use this to group
+    // options when multiple instances of the same provider are in
+    // scope for a project.
+    name                   String
     provider               String
     enabled                Boolean
     customKeys             Json?
@@ -692,10 +690,30 @@ model ModelProvider {
     deploymentMapping      Json?
     createdAt              DateTime                    @default(now())
     updatedAt              DateTime                    @default(now()) @updatedAt
+    scopes                 ModelProviderScope[]
     gatewayCredentials     GatewayProviderCredential[]
 
     @@index([projectId])
+}
+
+// Principal-style N-scope access (iter 109, ADR-016 follow-up): a
+// single ModelProvider row can be visible to multiple organizations,
+// teams, or projects. scopeType is one of "ORGANIZATION" / "TEAM" /
+// "PROJECT"; scopeId is the matching id of the scoping entity.
+// Writing an entry requires the caller to hold the matching manage-
+// permission on that entity (organization:manage, team:manage,
+// project:manage). Reads filter by the caller's membership set.
+model ModelProviderScope {
+    id              String   @id @default(nanoid())
+    modelProviderId String
+    modelProvider   ModelProvider @relation(fields: [modelProviderId], references: [id], onDelete: Cascade)
+    scopeType       String
+    scopeId         String
+    createdAt       DateTime @default(now())
+
+    @@unique([modelProviderId, scopeType, scopeId])
     @@index([scopeType, scopeId])
+    @@index([modelProviderId])
 }
 
 model ProjectSecret {

@@ -48,14 +48,20 @@ export type MaybeStoredModelProvider = Omit<
   ModelProvider,
   | "id"
   | "projectId"
-  | "scopeType"
-  | "scopeId"
+  | "name"
   | "createdAt"
   | "updatedAt"
   | "customModels"
   | "customEmbeddingsModels"
 > & {
   id?: string;
+  /**
+   * Human-readable name (iter 109). Optional in the inbound shape used
+   * by form seeding where registry defaults get promoted before a row
+   * exists; persisted rows always carry a value. Defaults derive from
+   * the humanized provider name with auto-suffixing for collisions.
+   */
+  name?: string;
   /** Registry model IDs (populated from the model registry, not user-managed) */
   models?: string[] | null;
   /** Registry embedding model IDs (populated from the model registry) */
@@ -67,9 +73,19 @@ export type MaybeStoredModelProvider = Omit<
   disabledByDefault?: boolean;
   extraHeaders?: { key: string; value: string }[] | null;
   /**
-   * Principal-style scope (iter 107 #2) — present on rows persisted
-   * via the new scope-aware repository. Omitted shape keeps existing
-   * per-project form callers working unchanged.
+   * Multi-scope grant set (iter 109). Every persisted MP has at least
+   * one entry; registry-seeded placeholders for providers that don't
+   * have a row yet omit the field. Consumers that need access-control
+   * reasoning should read this array rather than the collapsed single-
+   * scope pair below.
+   */
+  scopes?: Array<{
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  }>;
+  /**
+   * Narrowest-scope pair derived from `scopes` for legacy callers that
+   * still key by scopeType/scopeId. New code should read `scopes[]`.
    */
   scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId?: string;

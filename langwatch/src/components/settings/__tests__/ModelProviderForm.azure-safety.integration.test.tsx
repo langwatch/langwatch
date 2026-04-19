@@ -53,6 +53,7 @@ vi.mock("../../../hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "test-project", defaultModel: null },
     organization: { id: "org-1" },
+    hasPermission: () => false,
   }),
 }));
 
