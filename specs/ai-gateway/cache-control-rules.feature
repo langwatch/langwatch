@@ -231,10 +231,13 @@ Feature: Cache control rules — operator-defined overrides without client code 
     When the request completes
     Then the forwarded body has NO cache_control mutations (force body-injection is v1.1)
     And the gateway logs a WARN naming the rule_id + "force mode downgraded to respect; Anthropic cache_control injection is v1.1"
-    And span attribute "langwatch.cache.rule_id" is present (rule fired)
-    And span attribute "langwatch.cache.mode_applied" equals "FORCE" (operator intent recorded)
-    # Operators see the rule fired on dashboards; end-user gets no unexpected
-    # cache behaviour change. Contract-safe degradation.
+    And span attribute "langwatch.cache.rule_id" is present (rule fired — operators see which rule matched)
+    And span attribute "langwatch.cache.mode_applied" equals "RESPECT" (APPLIED mode after downgrade — not the rule's requested mode)
+    And counter gateway_cache_rule_hits_total{rule_id=..., mode_applied="RESPECT"} increments
+    # iter 48 regression-test invariant (a8564c46e): mode_applied tracks what
+    # actually happened, not what the rule asked for. Operators join rule_id
+    # (shows rule intent = force from /cache-rules list) with mode_applied
+    # (shows degraded outcome = respect) to spot the deferred-feature gap.
 
   # ─────────────────────────────────────────────────────────────────────────
   # §6. RBAC — who can author rules
