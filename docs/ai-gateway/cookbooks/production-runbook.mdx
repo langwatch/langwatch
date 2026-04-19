@@ -6,7 +6,7 @@ sidebarTitle: Production runbook
 
 When the gateway is slow, stuck, or chewing memory — and the LangWatch trace for a specific bad request has already been checked — this runbook is the next stop. Every recipe here relies on the pprof admin listener, which is bound to `127.0.0.1:6060` by default and therefore never reachable from outside the pod.
 
-<Note>**Don't expose the admin port.** `GATEWAY_ADMIN_ADDR` binds to loopback by design. Never add it to a Kubernetes `Service`, `Ingress`, or NLB target group. If you genuinely need multiple people debugging, use `kubectl port-forward` per-user — it tunnels through the API server and is auditable in Kubernetes audit logs.</Note>
+<Note>**Don't expose the admin port without a token.** `GATEWAY_ADMIN_ADDR` binds to loopback by default. If you genuinely need direct (non-port-forward) access — e.g. non-k8s deploys, or from a corporate VPN — you MUST also set `GATEWAY_ADMIN_AUTH_TOKEN` (iter 22). The gateway refuses to start otherwise. See [Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener-iter-22-af796b8) for the three deployment postures. `kubectl port-forward` remains the simplest option for k8s — it tunnels through the API server and is auditable in Kubernetes audit logs.</Note>
 
 ## Prerequisites
 
@@ -27,7 +27,7 @@ All subsequent `go tool pprof` commands target `http://localhost:6060`.
 
 ### Enabling pprof via Helm
 
-The LangWatch Helm chart exposes the admin listener via a top-level `admin` stanza on the gateway sub-chart. The loopback-bound default is what you want in production — don't widen it to `0.0.0.0` without fronting it with a separate authenticated ingress.
+The LangWatch Helm chart exposes the admin listener via a top-level `admin` stanza on the gateway sub-chart. The loopback-bound default is what you want in production — if you widen it to `0.0.0.0`, also set `admin.existingAuthSecretName` so the built-in bearer-token guard (iter 22) protects pprof. The gateway refuses to start in the bind-non-loopback-without-token configuration.
 
 ```yaml
 gateway:
