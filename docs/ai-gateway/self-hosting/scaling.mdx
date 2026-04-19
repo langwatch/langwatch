@@ -114,11 +114,18 @@ Debits flow through the outbox asynchronously — the gateway batches debits to 
 
 ## Redis L2 (optional)
 
-Enabling `REDIS_URL` adds a shared L2 cache for resolved VKs. Pros: replica cold-start serves traffic immediately (warm from L2 instead of calling `/resolve-key`). Cons: 1 ms per L1-miss — not much, but non-zero.
+Enabling `REDIS_URL` adds a shared L2 cache for resolved VKs. New replicas warm from Redis instead of calling `/resolve-key` for every cold VK: **~30 ms per cold-key round-trip to the control plane vs. ~2 ms per L2 JSON round-trip** (measured against a local miniredis). On a deploy that bounces ten pods, this is the difference between the control plane serving a thundering herd of resolve-key calls and serving roughly zero.
+
+Operational invariants (Lane A iter 15, `6ebeecf`):
+
+- **TTL floor: 30 s** — a bundle about to JWT-expire doesn't land in L2 with near-zero TTL and vanish between write and first read.
+- **Poison-pill isolation** — if a new gateway version can't decode an old entry (field schema drift, corrupt bytes), the decode error is logged, the key is `DEL`'d, and the request resolves as a miss. One bad row can't block a whole tenant.
+- **Compiled regexes are process-local** — `blocked_patterns` RE2 ASTs are `json:"-"` and recompiled on the receiving pod on first use. L2 ships the pattern strings only, which keeps JSON payloads small and avoids cross-pod binary-compat concerns.
 
 **Use L2 when**:
-- Autoscaling frequently adds/removes replicas (high churn).
+- Autoscaling frequently adds/removes replicas (high churn) — this is the primary reason.
 - Tenants have > 50K active VKs (bootstrap payload gets unwieldy).
+- You want to decouple gateway cold-start from control-plane uptime.
 
 **Skip L2 when**:
 - Small-to-medium deployments (< 10K active VKs).

@@ -116,3 +116,52 @@ All use direct `fetch` (secrets/list.ts pattern). Retrofit to openapi-typed clie
   - `f4b9c4fff` — iter 9 pt2 (streaming usage)
   - `3dfc558e6` — iter 10 (streaming fallback docs)
   - `a596901ae` — iter 11 (prometheus alerts)
+
+---
+
+## Addendum: iters 12–17 (v1 GA final push)
+
+Iter 12: route-registration fix unblocking UI dogfood. Iter 13: V1-GA-READINESS.md + prometheus-alerts realignment. Iter 14: scaling.mdx real benchmarks. Iter 15: `View in UI` CLI deep-links. Iter 16: PR-DESCRIPTION.md draft + rate-limit docs (sergey iter 7). Iter 17: post-compact catch-up covering sergey iters 8–14 + alexis iters 13–16 UI reflections.
+
+### Iter 17 sub-commits (12 total)
+
+| # | Commit | Covers |
+|---|---|---|
+| 17 | `51c8e3557` | sergey iter 8 (blocked_patterns tools/MCP/models) + iter 9 (URL blocking with permissive body extraction) — docs/spec alignment on 4-dim deny/allow + fail-closed + RE2 + enforcement-before-body-parse |
+| 17.2 | `94aebde55` | alexis iter 14 UI — blocked_patterns 4-row drawer with fail-closed preview |
+| 17.3 | `85d004578` | sergey iter 10 X-LangWatch-Cache override — respect/disable v1, force/ttl=NNN → 400 cache_override_not_implemented v1.1, new X-LangWatch-Cache-Mode response header, enforcement-before-blocked-pattern ordering |
+| 17.4 | `b9497770e` | PR-DESCRIPTION.md — sergey 8-10 + alexis 13-14.1 credits |
+| 17.5 | `89a874ebd` | caching-passthrough.feature — cache-override scenarios aligned to v1 contract (deep-strip recursive + force/ttl→400 + ordering-before-blocked-pattern) |
+| 17.6 | `426bcf491` | sergey iter 11 post-response guardrails + alexis bundle alignment (`532ed881b`) — zero-cost `blocked_by_guardrail` debit, modify-in-place rewrite, content-block-skip, `guardrails.{request,response}_fail_open` opt-in |
+| 17.7 | `0ceece65e` | sergey iter 12 stream_chunk guardrails — visible-text-only invocation, byte-locked terminator `event: error` with code=stream_chunk_blocked, fail-open-with-metric on timeout/upstream-error, modify NOT implemented v1. Fixed Background on_block=modify drift in guardrails.feature |
+| 17.8 | `a737989ae` | PR-DESCRIPTION.md — sergey iter 11+12 credit |
+| 17.9 | `294fca3ca` | sergey iter 13 /v1/models three-group listing (aliases + models_allowed + provider shortcuts) for Codex/Cursor startup probes |
+| 17.10 | `a4460bfa3` | PR-DESCRIPTION.md — sergey iter 13 credit |
+| 17.11 | `d13d2be81` | sergey iter 14 pprof admin listener — NEW cookbooks/production-runbook.mdx (5 diagnostic recipes) + self-hosting/config.mdx GATEWAY_ADMIN_ADDR reference + docs.json nav |
+| 17.12 | `9d1ded22e` | PR-DESCRIPTION.md — sergey iter 14 credit + cookbook count bump 4→5 |
+
+### Terminal SSE error shapes (locked v1)
+
+Clients that parse SSE `error` frames should key off `error.code`:
+
+| code | type | trigger | retry? |
+|---|---|---|---|
+| `upstream_mid_stream_failure` | `provider_error` | upstream connection dropped mid-stream | yes (client may retry; gateway doesn't silent-switch) |
+| `stream_chunk_blocked` | `guardrail_blocked` | stream_chunk guardrail returned block on a visible delta | no (retry won't help unless input changes) |
+
+Both shapes are byte-locked by the Go test suite. Documented in streaming.mdx §Terminal error shapes and contract.md §7b.
+
+### Error enum additions (iter 17)
+
+- `cache_override_not_implemented` (400) — v1.1 `force` / `ttl=NNN` rejected explicitly (vs `cache_override_invalid` for malformed/unknown)
+- `guardrail_upstream_unavailable` (503) — evaluator service unreachable + fail-closed VK default
+
+### Still pending post-GA
+
+- End-to-end CLI scenario test (needs bifrost-wired data plane + live provider creds)
+- Helm chart e2e on `lw-dev` EKS cluster
+- k6 load test at 5K req/s + 1.5K SSE concurrency on staging
+- Advanced routing v1.1 (Portkey gap — spec already written)
+- Semantic caching v1.1
+
+Lane A scoreboard end-of-GA: 14 iters, 14 Go packages, ~85 tests. Lane B through iter 16 (UI ConfirmDialog / VK detail / rate-limit drawer / provider edit / blocked_patterns UI / cache mode / bundle alignment). Lane C through iter 17.12.
