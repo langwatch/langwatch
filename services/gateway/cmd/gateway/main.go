@@ -107,12 +107,25 @@ func main() {
 		JWTRefreshThreshold: cfg.Cache.JWTRefreshThreshold,
 		Redis:               redisClient,
 		OnBundleResolved: func(b *auth.Bundle) {
-			// Per-project OTLP override was removed in Lane B iter 25;
-			// all spans now route to GATEWAY_OTEL_DEFAULT_ENDPOINT via
-			// the RouterExporter default branch. projectEndpoints
-			// registry is retained as a Resolver slot (always returns
-			// empty → router uses default) to avoid churning the
-			// exporter constructor signature.
+			// Populate per-project OTLP routing so spans exported with
+			// this VK's project_id land in the VK's project inbox. The
+			// endpoint itself doesn't change (single LangWatch
+			// deployment per rchaves iter-25 decision) but X-Auth-Token
+			// must be the project's own apiKey for the control-plane
+			// OTLP ingest to attribute the trace correctly. Without
+			// this hook, every gateway span lands wherever
+			// GATEWAY_OTEL_DEFAULT_AUTH_TOKEN points (dev-only
+			// convenience, incorrect in any multi-project setup).
+			if b != nil && b.Config != nil &&
+				b.JWTClaims.ProjectID != "" &&
+				b.Config.ProjectOTLPToken != "" &&
+				cfg.OTel.DefaultExportEndpoint != "" {
+				projectEndpoints.Set(
+					b.JWTClaims.ProjectID,
+					cfg.OTel.DefaultExportEndpoint,
+					map[string]string{"X-Auth-Token": b.Config.ProjectOTLPToken},
+				)
+			}
 			if ratelimitRef != nil {
 				// Drop cached buckets so the next Allow() rebuilds
 				// with whatever the new revision's ceilings are. The
