@@ -28,6 +28,7 @@ import { GatewayErrorPanel } from "~/components/gateway/GatewayErrorPanel";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Link } from "~/components/ui/link";
+import { Tooltip as UITooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
@@ -116,6 +117,7 @@ function GatewayUsagePage() {
                 <StatTile
                   label="Requests"
                   value={data.totalRequests.toLocaleString()}
+                  help="Every dispatch attempt is counted, including upstream 4xx/5xx responses. Failed-auth requests don't bill tokens but do ledger as 0-cost entries so blip-driven spikes stay visible in ops review."
                 />
                 <StatTile
                   label="Avg $/request"
@@ -296,11 +298,21 @@ function StatTile({
   label,
   value,
   tone,
+  help,
 }: {
   label: string;
   value: string;
   tone?: "red";
+  help?: string;
 }) {
+  const body = (
+    <Stat.Root>
+      <Stat.Label>{label}</Stat.Label>
+      <Stat.ValueText color={tone === "red" ? "red.600" : undefined}>
+        {value}
+      </Stat.ValueText>
+    </Stat.Root>
+  );
   return (
     <Box
       flex={1}
@@ -309,12 +321,7 @@ function StatTile({
       borderRadius="lg"
       padding={4}
     >
-      <Stat.Root>
-        <Stat.Label>{label}</Stat.Label>
-        <Stat.ValueText color={tone === "red" ? "red.600" : undefined}>
-          {value}
-        </Stat.ValueText>
-      </Stat.Root>
+      {help ? <UITooltip content={help}>{body}</UITooltip> : body}
     </Box>
   );
 }

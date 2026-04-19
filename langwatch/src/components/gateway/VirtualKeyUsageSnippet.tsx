@@ -1,4 +1,4 @@
-import { Box, HStack, NativeSelect, Text, VStack } from "@chakra-ui/react";
+import { Box, HStack, Link, NativeSelect, Text, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 
 import { RenderCode } from "~/components/code/RenderCode";
@@ -47,7 +47,7 @@ type Language = "python" | "typescript" | "bash";
 export function VirtualKeyUsageSnippet({
   secret,
   gatewayBaseUrl,
-  title = "How to use",
+  title = "Usage example",
 }: VirtualKeyUsageSnippetProps) {
   const [language, setLanguage] = useState<Language>("python");
   const credential = secret ?? "$LANGWATCH_VK_SECRET";
@@ -113,11 +113,23 @@ console.log(response.choices[0].message.content);`;
           <NativeSelect.Indicator />
         </NativeSelect.Root>
       </HStack>
-      <Box borderRadius="md" overflow="hidden" width="full">
+      <Text fontSize="xs" color="fg.muted">
+        Works with any OpenAI-compatible SDK or coding assistant (Claude
+        Code, Codex, Cursor, Aider).{" "}
+        <Link
+          href="https://langwatch.ai/docs/ai-gateway/quickstart"
+          color="orange.600"
+          target="_blank"
+          rel="noreferrer"
+        >
+          Read more →
+        </Link>
+      </Text>
+      <Box borderRadius="md" overflow="hidden" width="full" fontSize="xs">
         <RenderCode
           code={code}
           language={renderLanguage}
-          style={{ padding: "12px", width: "100%" }}
+          style={{ padding: "10px", width: "100%", fontSize: "12px" }}
         />
       </Box>
       {!secret && (
