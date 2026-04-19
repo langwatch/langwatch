@@ -24,8 +24,10 @@ import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 type BudgetListRow = ReturnType<typeof useBudgetRows>["rows"][number];
 
@@ -160,15 +162,31 @@ function BudgetsPage() {
                         </Badge>
                       </Table.Cell>
                       <Table.Cell>
-                        <Text fontSize="xs">{b.window.toLowerCase()}</Text>
+                        <Badge variant="subtle" colorPalette="gray">
+                          {b.window.toLowerCase()}
+                        </Badge>
                       </Table.Cell>
-                      <Table.Cell minWidth="200px">
+                      <Table.Cell minWidth="220px">
                         <VStack align="stretch" gap={1}>
                           <HStack fontSize="xs">
                             <Text fontWeight="medium">
                               ${spent.toFixed(2)}
                             </Text>
                             <Text color="fg.muted">/ ${limit.toFixed(2)}</Text>
+                            <Spacer />
+                            <Badge
+                              variant="outline"
+                              colorPalette={
+                                pct >= 100
+                                  ? "red"
+                                  : pct >= 80
+                                    ? "orange"
+                                    : "green"
+                              }
+                              fontSize="2xs"
+                            >
+                              {pct.toFixed(0)}%
+                            </Badge>
                           </HStack>
                           <Progress.Root
                             value={pct}
@@ -191,11 +209,19 @@ function BudgetsPage() {
                         </Badge>
                       </Table.Cell>
                       <Table.Cell>
-                        <Text fontSize="xs">
-                          {b.window === "TOTAL"
-                            ? "never"
-                            : new Date(b.resetsAt).toLocaleString()}
-                        </Text>
+                        {b.window === "TOTAL" ? (
+                          <Text fontSize="xs" color="fg.muted">
+                            never
+                          </Text>
+                        ) : (
+                          <Tooltip
+                            content={new Date(b.resetsAt).toLocaleString()}
+                          >
+                            <Text fontSize="xs">
+                              {formatTimeAgo(new Date(b.resetsAt).getTime())}
+                            </Text>
+                          </Tooltip>
+                        )}
                       </Table.Cell>
                       <Table.Cell>
                         {(canUpdate || canDelete) && (
