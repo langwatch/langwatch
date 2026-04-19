@@ -10,12 +10,16 @@ Every write through the REST API, the CLI, the tRPC routers, or the UI emits a r
 
 ## What's logged
 
-| Action | Actor fields | Target |
+Source of truth: `GatewayAuditAction` enum in `langwatch/prisma/schema.prisma`.
+
+| Action enum value | Actor fields | Target |
 |---|---|---|
-| `virtualKey.{created, updated, rotated, revoked}` | `actorUserId` (user) or `actor = svc_<projectId>` (service token) | `virtualKey.<vk_id>` |
-| `gatewayBudget.{created, updated, archived}` | same | `gatewayBudget.<id>` |
-| `gatewayProvider.{created, updated, disabled, attached, detached}` | same | `gatewayProvider.<id>` |
-| `gatewayGuardrail.{attached, detached}` | same | `virtualKey.<vk_id>` (target of the attachment) |
+| `VIRTUAL_KEY_{CREATED, UPDATED, ROTATED, REVOKED, DELETED}` | `actorUserId` (user) or `actor = svc_<projectId>` (service token) | `virtualKey` / `<vk_id>` |
+| `BUDGET_{CREATED, UPDATED, DELETED}` | same | `gatewayBudget` / `<budget_id>` (DELETED is the soft-archive) |
+| `PROVIDER_BINDING_{CREATED, UPDATED, DELETED}` | same | `gatewayProvider` / `<binding_id>` |
+| `CACHE_RULE_{CREATED, UPDATED, DELETED}` | same | `gatewayCacheRule` / `<rule_id>` |
+
+<Info>Guardrail attach/detach events are NOT currently recorded as standalone audit rows — guardrail configuration changes flow through `VIRTUAL_KEY_UPDATED` (the guardrail list is a field on `VirtualKey.config`). Standalone `GUARDRAIL_ATTACHED / DETACHED` actions are a v1.1 follow-up if operators want finer-grained audit.</Info>
 
 Reads are **not** logged — the volume would swamp the ledger without adding governance value. If you need read-access attribution for compliance, use OTel trace logs (every request has `langwatch.principal_id`).
 
@@ -23,8 +27,8 @@ Reads are **not** logged — the volume would swamp the ledger without adding go
 
 Go to **/settings/audit-log** (gated on `gatewayLogs:view`) and filter by resource type to see gateway mutations. Four key affordances:
 
-1. **Filter by action** — `virtualKey.created`, `virtualKey.rotated`, etc. Useful when investigating "did anyone rotate keys during the incident window?".
-2. **Filter by resource type** — `virtualKey` / `gatewayBudget` / `gatewayProvider`. Narrows the view when you're investigating one resource type.
+1. **Filter by action** — `VIRTUAL_KEY_CREATED`, `VIRTUAL_KEY_ROTATED`, etc. (UI picker shows these with friendlier labels; the underlying filter sends the enum value.) Useful when investigating "did anyone rotate keys during the incident window?".
+2. **Filter by resource type** — `virtualKey` / `gatewayBudget` / `gatewayProvider` / `gatewayCacheRule`. Narrows the view when you're investigating one resource type.
 3. **Expand before/after JSON diff** — each update-action row includes the metadata diff, expandable inline. Shows exactly which fields changed and to what.
 4. **Deep-link from the target column** — clicking the target id opens the resource's detail page (VK detail, budget detail, provider detail). Skips the "which key was that?" lookup.
 
@@ -37,7 +41,7 @@ The same data is available via the tRPC router used by the UI — `gatewayAudit.
 ```bash
 curl -sS https://app.langwatch.ai/api/gateway/v1/audit \
   -H "Authorization: Bearer $LANGWATCH_API_KEY" \
-  -G -d "action=virtualKey.revoked" \
+  -G -d "action=VIRTUAL_KEY_REVOKED" \
      -d "since=2026-04-01T00:00:00Z" \
      -d "limit=100"
 ```
@@ -49,7 +53,7 @@ Response shape:
   "data": [
     {
       "id": "aud_01HZ...",
-      "action": "virtualKey.revoked",
+      "action": "VIRTUAL_KEY_REVOKED",
       "actor_user_id": "user_01HZX...",
       "actor_user_email": "alice@example.com",
       "actor": null,
@@ -87,7 +91,7 @@ Rate-limited to 100 req/min/token; use the cursor for large pulls rather than in
 
 - **Can the audit log be tampered with?** Writes are append-only at the service layer — no UPDATE or DELETE is exposed. Deletions are only possible via direct database access, which is control-plane-operator-only and also audit-logged (via Postgres' built-in `pgaudit` extension, configured in the self-hosted deployment guide).
 - **Can an audit entry be forged?** No. Writes happen inside the same transaction as the resource mutation; either both land or neither lands. A caller cannot emit a fake audit entry via REST or CLI.
-- **Notifications on security-sensitive writes.** Rotations and revocations generate an organization-wide notification by default (configurable per org). Users with `gatewayLogs:view` also receive an email summary on `virtualKey.revoked` for keys they own.
+- **Notifications on security-sensitive writes.** Rotations and revocations generate an organization-wide notification by default (configurable per org). Users with `gatewayLogs:view` also receive an email summary on `VIRTUAL_KEY_REVOKED` for keys they own.
 
 ## See also
 
