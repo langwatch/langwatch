@@ -37,7 +37,7 @@ jobs:
               - 'services/gateway/**'
               - '.github/workflows/gateway-ci.yaml'
             chart:
-              - 'infrastructure/charts/gateway/**'
+              - 'charts/gateway/**'
               - '.github/workflows/gateway-ci.yaml'
 
   go:
@@ -82,7 +82,7 @@ jobs:
     timeout-minutes: 10
     defaults:
       run:
-        working-directory: infrastructure/charts/gateway
+        working-directory: charts/gateway
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 

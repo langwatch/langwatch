@@ -25,7 +25,7 @@ fmt:
 
 # --- Helm chart validation ---------------------------------------------------
 
-CHART := ../../infrastructure/charts/gateway
+CHART := ../../charts/gateway
 
 helm-lint:
 	helm lint $(CHART)
