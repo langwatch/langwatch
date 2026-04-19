@@ -29,9 +29,10 @@ type Cache struct {
 	jwtRefreshThreshold time.Duration
 
 	// onBundleResolved is fired whenever a bundle is resolved fresh OR
-	// its config refreshed in-place. Used by main.go to plumb
-	// observability_endpoint → otel.ProjectEndpointRegistry. Hook runs
-	// synchronously on the resolve path, so keep it cheap.
+	// its config refreshed in-place. Used by main.go to invalidate
+	// per-VK rate limit buckets on revision bumps (and previously to
+	// wire per-project OTLP endpoints, removed in Lane B iter 25).
+	// Hook runs synchronously on the resolve path, so keep it cheap.
 	onBundleResolved func(*Bundle)
 
 	mu        sync.Mutex

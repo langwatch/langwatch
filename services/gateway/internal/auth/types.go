@@ -28,17 +28,18 @@ type JWTClaims struct {
 // Config is the warm-path bundle — rich, cached, refreshed by revision.
 // Loaded from GET /internal/gateway/config/:vk_id with If-None-Match.
 type Config struct {
-	VirtualKeyID   string                   `json:"vk_id"`
-	Revision       int64                    `json:"revision"`
-	ProviderCreds  []ProviderCred           `json:"providers"`
-	Fallback       FallbackSpec             `json:"fallback"`
-	// ObservabilityEndpoint is an optional per-project OTLP HTTP endpoint
-	// that the gateway sends its spans to. When null, the gateway falls
-	// back to GATEWAY_OTEL_DEFAULT_ENDPOINT (the shared LangWatch
-	// collector for hosted customers, or the self-hosted collector for
-	// on-prem). Populated by contrast-side config.materialiser iter 6.
-	ObservabilityEndpoint string `json:"observability_endpoint,omitempty"`
-	ModelAliases   map[string]string        `json:"model_aliases"`
+	VirtualKeyID  string         `json:"vk_id"`
+	Revision      int64          `json:"revision"`
+	ProviderCreds []ProviderCred `json:"providers"`
+	Fallback      FallbackSpec   `json:"fallback"`
+	// (removed) ObservabilityEndpoint — per-project OTLP override was
+	// removed in Lane B iter 25 per rchaves (we sell observability,
+	// spans should always route to LangWatch). Gateway now
+	// unconditionally exports to GATEWAY_OTEL_DEFAULT_ENDPOINT. The
+	// JSON field name is retained implicitly via Go's ignore-unknown
+	// semantics: old control planes that still emit the key get their
+	// value silently dropped during Unmarshal.
+	ModelAliases map[string]string `json:"model_aliases"`
 	Cache          CacheConfig              `json:"cache"`
 	Guardrails     GuardrailConfig          `json:"guardrails"`
 	BlockedPatterns BlockedPatternConfig    `json:"blocked_patterns"`
