@@ -14,7 +14,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight, FileClock, RefreshCw } from "lucide-react";
+import { ChevronDown, ChevronRight, FileClock } from "lucide-react";
 import { useState } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -117,14 +117,6 @@ function AuditLogPage() {
         <PageLayout.Header>
           <PageLayout.Heading>Audit log</PageLayout.Heading>
           <Spacer />
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => listQuery.refetch()}
-            loading={listQuery.isFetching}
-          >
-            <RefreshCw size={14} /> Refresh
-          </Button>
         </PageLayout.Header>
 
         <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
