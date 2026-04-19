@@ -200,6 +200,28 @@ If the gateway saw a terminal `event: error`, your client isn't parsing SSE corr
 
 See [Streaming](/ai-gateway/streaming).
 
+## `413 payload_too_large`
+
+**Symptoms:**
+- A request with a large prompt / large base64 image / long tool-call argument list returns 413.
+- Response body: `{"error":{"type":"payload_too_large","message":"request body exceeds 10485760 bytes"}}`.
+
+**Root cause:** the request body exceeded `GATEWAY_MAX_REQUEST_BODY_BYTES` (default 10 MiB, iter 23). The cap is enforced at the edge — before auth, before upstream dispatch — so this is always a client-side payload-size issue, not an auth or provider issue.
+
+**Fix, in increasing order of effort:**
+
+1. Compress / resize large base64 images on the client before including them in the payload. A 4K image base64-encoded is ~6 MB on its own; two in one request exceeds 10 MiB on pure image data.
+2. If the payload is legitimately large and cannot be reduced, bump the cap via Helm:
+   ```yaml
+   gateway:
+     security:
+       maxRequestBodyBytes: 52428800   # 50 MiB
+   ```
+   Roll out, then retry. Coordinate with platform — raising the cap reduces the attack surface cheapness benefit, so it should be a deliberate decision.
+3. If your application frequently sends very large payloads, consider a separate VK with a dedicated gateway deployment tuned for large bodies (`security.maxRequestBodyBytes: 104857600` + increased pod memory) rather than raising the default for all traffic.
+
+**What NOT to do:** disabling the cap (setting to 0 or very large). A public endpoint with no body cap is drive-by-scan-able; an attacker discovers your endpoint and sends a few GB to see if the pod crashes.
+
 ## Pod never becomes ready after a deploy
 
 **Symptoms:**

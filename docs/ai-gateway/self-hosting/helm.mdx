@@ -46,6 +46,12 @@ gateway:
     # existingAuthSecretName: gateway-admin-token  # optional bearer gate
     # authSecretKey: token                         # default "token"
 
+  # Edge protection (Lane A iter 23) — request body size cap
+  # Enforced before auth; a 1 GB drive-by scan cannot pressure the pod memory
+  # limit or the auth cache. Raise for orgs shipping large base64 image arrays.
+  security:
+    maxRequestBodyBytes: 10485760  # 10 MiB; renders as %d int in configmap.yaml
+
   # Budget outbox tuning (Lane A iter 16)
   budget:
     outboxFlushInterval: "1s"
@@ -341,6 +347,29 @@ kubectl exec -n langwatch deploy/langwatch-gateway -- \
 ```
 
 If egress fails with DNS resolution errors, verify the kube-system selector in the chart matches your cluster's DNS namespace (some clusters use `kube-dns` in `kube-system`, others use a custom namespace).
+
+## Security (iter 23, `79b46bf`)
+
+Edge protection lives under a dedicated `security` stanza separate from per-upstream budgets or the debit outbox. First (and currently only) knob is the request body cap:
+
+```yaml
+gateway:
+  security:
+    maxRequestBodyBytes: 10485760   # 10 MiB, default
+```
+
+Why not `budget` or `upstream`? These three concerns fail in different directions and alert differently:
+- `security` — edge, fails fast with 413, operator bumps when large base64 images are legitimate;
+- `budget` — accounting, fails async via outbox, operator investigates debit flow (see [iter 21](/ai-gateway/cookbooks/production-runbook#recipe-6--debit-outbox-backlog));
+- `upstream` — per-provider, fails mid-flight with circuit-breaker trips.
+
+The chart's ConfigMap renders the int as `%d` (iter 23 caught a YAML scientific-notation gotcha via test render — Go's `ParseInt` rejects `1.048576e+07`). If you override this value in a custom `values.yaml`, write integer literals, not floats.
+
+### When to tune
+
+- **Lower** to ~1 MiB if you're fronting a tightly-scoped internal API with known small payloads and want to reject bot scans at the cheapest possible cost.
+- **Raise** to ~50 MiB when a customer's workload includes large base64-encoded images in `vision` messages. You'll know you need it when legitimate requests start returning `413 payload_too_large`; the troubleshooting entry in [Troubleshooting](/ai-gateway/troubleshooting#413-payload_too_large) tells users exactly which env var to bump.
+- **Do not disable**. A body cap is the single cheapest defence against drive-by memory pressure on a public endpoint.
 
 ## Chart and data-plane CI (iter 19, `1fd1fc3`)
 
