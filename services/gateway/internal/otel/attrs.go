@@ -74,3 +74,22 @@ const (
 	HeaderSpanID     = "X-LangWatch-Span-Id"
 	HeaderTraceparent = "traceparent"
 )
+
+// Client-facing request headers the gateway reads to enrich the span
+// without requiring a per-user VK. Useful when a single VK fronts
+// multi-user traffic (a chat UI, a coding assistant shared across a
+// team): callers stamp X-LangWatch-Principal per-request and analytics
+// can slice by end user without minting a VK per user.
+const (
+	// HeaderPrincipal overrides AttrPrincipalID when set. Must match
+	// existing LangWatch principal id format (e.g. user_XXXXXXXXXX) —
+	// the control-plane trace pipeline treats it as an opaque string.
+	HeaderPrincipal = "X-LangWatch-Principal"
+	// HeaderThreadID stamps langwatch.thread_id so gateway spans from
+	// the same conversation can be grouped. Mirrors the SDK-side
+	// convention.
+	HeaderThreadID = "X-LangWatch-Thread-Id"
+
+	// AttrThreadID — matches the canonicaliser's extraction key.
+	AttrThreadID = "langwatch.thread_id"
+)

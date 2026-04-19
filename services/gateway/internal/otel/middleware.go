@@ -3,6 +3,7 @@ package otel
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -133,6 +134,26 @@ func EnrichFromBundle(ctx context.Context, b BundleLike) {
 		attribute.String(AttrPrincipalID, b.PrincipalID()),
 		attribute.String(AttrDisplayPrefix, b.DisplayPrefixStr()),
 	)
+}
+
+// EnrichFromRequestHeaders reads client-facing identity headers off
+// the incoming HTTP request and stamps them on the active span. Called
+// AFTER EnrichFromBundle so request-level values override VK defaults —
+// a VK shared across users surfaces per-user attribution when each
+// caller sets X-LangWatch-Principal themselves.
+//
+// Unknown or empty header values are ignored (no-ops): bundles remain
+// the default source of truth.
+func EnrichFromRequestHeaders(ctx context.Context, r *http.Request) {
+	if r == nil {
+		return
+	}
+	if v := strings.TrimSpace(r.Header.Get(HeaderPrincipal)); v != "" {
+		AddStringAttr(ctx, AttrPrincipalID, v)
+	}
+	if v := strings.TrimSpace(r.Header.Get(HeaderThreadID)); v != "" {
+		AddStringAttr(ctx, AttrThreadID, v)
+	}
 }
 
 // DefaultSpanName maps the common gateway routes to canonical verb
