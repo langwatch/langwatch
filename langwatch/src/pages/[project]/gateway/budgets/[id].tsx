@@ -175,9 +175,21 @@ function BudgetDetailPage() {
                     <Text>
                       Resets:{" "}
                       <strong>
-                        {budget.window === "TOTAL"
-                          ? "never"
-                          : new Date(budget.resetsAt).toLocaleString()}
+                        {budget.window === "TOTAL" ? (
+                          "never"
+                        ) : (
+                          <Tooltip
+                            content={new Date(
+                              budget.resetsAt,
+                            ).toLocaleString()}
+                          >
+                            <span>
+                              {formatTimeAgo(
+                                new Date(budget.resetsAt).getTime(),
+                              )}
+                            </span>
+                          </Tooltip>
+                        )}
                       </strong>
                     </Text>
                     <Text>·</Text>
@@ -205,15 +217,23 @@ function BudgetDetailPage() {
                   />
                 </DetailRow>
                 <DetailRow label="Created">
-                  <Text fontSize="sm" color="fg.muted">
-                    {new Date(budget.createdAt).toLocaleString()}
-                  </Text>
+                  <Tooltip content={new Date(budget.createdAt).toLocaleString()}>
+                    <Text fontSize="sm" color="fg.muted">
+                      {formatTimeAgo(new Date(budget.createdAt).getTime())}
+                    </Text>
+                  </Tooltip>
                 </DetailRow>
                 {budget.lastResetAt && (
                   <DetailRow label="Last reset">
-                    <Text fontSize="sm" color="fg.muted">
-                      {new Date(budget.lastResetAt).toLocaleString()}
-                    </Text>
+                    <Tooltip
+                      content={new Date(budget.lastResetAt).toLocaleString()}
+                    >
+                      <Text fontSize="sm" color="fg.muted">
+                        {formatTimeAgo(
+                          new Date(budget.lastResetAt).getTime(),
+                        )}
+                      </Text>
+                    </Tooltip>
                   </DetailRow>
                 )}
                 {budget.timezone && (
