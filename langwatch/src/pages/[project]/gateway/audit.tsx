@@ -14,7 +14,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { ChevronDown, ChevronRight, FileClock } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, FileClock } from "lucide-react";
 import { useState } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -111,10 +111,40 @@ function AuditLogPage() {
 
   const entries = (listQuery.data?.pages ?? []).flatMap((p) => p.entries);
 
+  // Render a back-link to the originating resource when the audit log
+  // was opened from a detail page (VK, budget) via ?targetKind&targetId.
+  // Lets operators return to the entity they were investigating instead
+  // of browser-back or clearing the filter chip and losing context.
+  const backLink = (() => {
+    if (!urlTargetKind || !urlTargetId || !project?.slug) return null;
+    if (urlTargetKind === "virtual_key") {
+      return {
+        href: `/${project.slug}/gateway/virtual-keys/${urlTargetId}`,
+        label: "Virtual key",
+      };
+    }
+    if (urlTargetKind === "budget") {
+      return {
+        href: `/${project.slug}/gateway/budgets/${urlTargetId}`,
+        label: "Budget",
+      };
+    }
+    return null;
+  })();
+
   return (
     <GatewayLayout>
       <>
         <PageLayout.Header>
+          {backLink && (
+            <HStack>
+              <Link href={backLink.href} color="fg.muted" fontSize="sm">
+                <HStack gap={1}>
+                  <ArrowLeft size={14} /> {backLink.label}
+                </HStack>
+              </Link>
+            </HStack>
+          )}
           <PageLayout.Heading>Audit log</PageLayout.Heading>
           <Spacer />
         </PageLayout.Header>
