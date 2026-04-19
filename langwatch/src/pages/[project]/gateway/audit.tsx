@@ -282,15 +282,114 @@ function AuditRow({
       {expanded && (
         <Table.Row>
           <Table.Cell colSpan={5} background="bg.subtle">
-            <HStack align="stretch" gap={4} padding={2}>
-              <JsonPanel label="Before" value={entry.before} />
-              <JsonPanel label="After" value={entry.after} />
-            </HStack>
+            <VStack align="stretch" gap={3} padding={2}>
+              <DiffSummary before={entry.before} after={entry.after} />
+              <HStack align="stretch" gap={4}>
+                <JsonPanel label="Before" value={entry.before} />
+                <JsonPanel label="After" value={entry.after} />
+              </HStack>
+            </VStack>
           </Table.Cell>
         </Table.Row>
       )}
     </>
   );
+}
+
+function DiffSummary({ before, after }: { before: unknown; after: unknown }) {
+  const changes = computeShallowDiff(before, after);
+  if (changes === null) return null; // one side is null/undefined — no meaningful diff
+  if (changes.length === 0) {
+    return (
+      <Text fontSize="xs" color="fg.muted">
+        No field changes at the top level (nested fields may still differ — see
+        Before/After below).
+      </Text>
+    );
+  }
+  return (
+    <VStack align="stretch" gap={1}>
+      <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+        Changed fields ({changes.length})
+      </Text>
+      <VStack align="stretch" gap={0.5}>
+        {changes.map(({ key, before: b, after: a }) => (
+          <HStack key={key} gap={2} fontSize="xs" align="start">
+            <Code fontSize="2xs" minWidth="140px" flexShrink={0}>
+              {key}
+            </Code>
+            <Code
+              fontSize="2xs"
+              colorPalette="red"
+              variant="surface"
+              maxWidth="40%"
+              overflow="hidden"
+              textOverflow="ellipsis"
+              whiteSpace="nowrap"
+            >
+              {formatValue(b)}
+            </Code>
+            <Text color="fg.muted">→</Text>
+            <Code
+              fontSize="2xs"
+              colorPalette="green"
+              variant="surface"
+              maxWidth="40%"
+              overflow="hidden"
+              textOverflow="ellipsis"
+              whiteSpace="nowrap"
+            >
+              {formatValue(a)}
+            </Code>
+          </HStack>
+        ))}
+      </VStack>
+    </VStack>
+  );
+}
+
+function computeShallowDiff(
+  before: unknown,
+  after: unknown,
+): Array<{ key: string; before: unknown; after: unknown }> | null {
+  if (
+    before === null ||
+    before === undefined ||
+    after === null ||
+    after === undefined
+  ) {
+    return null;
+  }
+  if (
+    typeof before !== "object" ||
+    typeof after !== "object" ||
+    Array.isArray(before) ||
+    Array.isArray(after)
+  ) {
+    return null;
+  }
+  const b = before as Record<string, unknown>;
+  const a = after as Record<string, unknown>;
+  const keys = Array.from(new Set([...Object.keys(b), ...Object.keys(a)]));
+  const changes: Array<{ key: string; before: unknown; after: unknown }> = [];
+  for (const key of keys) {
+    const bv = b[key];
+    const av = a[key];
+    // Cheap stringify compare — not ideal for deep object equality, but
+    // matches the 'did this top-level field change' question we care about.
+    if (JSON.stringify(bv) !== JSON.stringify(av)) {
+      changes.push({ key, before: bv, after: av });
+    }
+  }
+  return changes;
+}
+
+function formatValue(v: unknown): string {
+  if (v === null) return "null";
+  if (v === undefined) return "—";
+  if (typeof v === "string") return `"${v}"`;
+  if (typeof v === "number" || typeof v === "boolean") return String(v);
+  return JSON.stringify(v);
 }
 
 function JsonPanel({ label, value }: { label: string; value: unknown }) {
