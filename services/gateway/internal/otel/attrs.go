@@ -51,14 +51,30 @@ const (
 	AttrUsageOut                      = "gen_ai.usage.output_tokens"
 	AttrUsageCacheReadInputTokens     = "gen_ai.usage.cache_read.input_tokens"
 	AttrUsageCacheCreationInputTokens = "gen_ai.usage.cache_creation.input_tokens"
-	// GenAI request / response model + message attributes (OTel
-	// semconv). LangWatch's extractor hoists these into the trace
-	// input / output / token columns automatically.
-	AttrGenAIRequestModel  = "gen_ai.request.model"
-	AttrGenAIResponseModel = "gen_ai.response.model"
-	AttrGenAIInputMessages = "gen_ai.input.messages"
-	AttrGenAIOutputMessages = "gen_ai.output.messages"
-	AttrGenAISystem        = "gen_ai.system"
+	// GenAI request / response + message attributes (OTel semconv).
+	// The LangWatch canonicaliser hoists these into the trace's
+	// input / output / token / metadata columns; every gateway span
+	// should carry the full set rchaves specified ("EVERYTHING
+	// should follow the gen_ai specs"). Keys are the source of truth
+	// in langwatch/src/server/app-layer/traces/canonicalisation/
+	// extractors/_constants.ts — drop-and-rename is safe because
+	// both sides read the same constant file at lint time.
+	AttrGenAIOperationName    = "gen_ai.operation.name"
+	AttrGenAISystem           = "gen_ai.system"
+	AttrGenAIRequestModel     = "gen_ai.request.model"
+	AttrGenAIRequestTemperature = "gen_ai.request.temperature"
+	AttrGenAIRequestMaxTokens = "gen_ai.request.max_tokens"
+	AttrGenAIRequestTopP      = "gen_ai.request.top_p"
+	AttrGenAIRequestFreqPenalty = "gen_ai.request.frequency_penalty"
+	AttrGenAIRequestPresPenalty = "gen_ai.request.presence_penalty"
+	AttrGenAIRequestStopSeqs  = "gen_ai.request.stop_sequences"
+	AttrGenAIResponseID       = "gen_ai.response.id"
+	AttrGenAIResponseModel    = "gen_ai.response.model"
+	AttrGenAIResponseFinishReasons = "gen_ai.response.finish_reasons"
+	AttrGenAIInputMessages    = "gen_ai.input.messages"
+	AttrGenAIOutputMessages   = "gen_ai.output.messages"
+	AttrGenAISystemInstructions = "gen_ai.system_instructions"
+	AttrGenAIUsageTotalTokens = "gen_ai.usage.total_tokens"
 	AttrCostUSD       = "langwatch.cost_usd"
 	AttrDurationMS    = "langwatch.duration_ms"
 	AttrStatus        = "langwatch.status"

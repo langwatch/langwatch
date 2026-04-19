@@ -734,17 +734,22 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	// the bare name differs from the request's model string.
 	body = rewriteRequestModel(body, parsed.Model, resolved.Model)
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrModel, resolved.Model)
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOperationName, "chat")
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIRequestModel, resolved.Model)
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAISystem, string(resolved.Provider))
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrProvider, string(resolved.Provider))
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrModelSource, string(resolved.Source))
 	gwotel.AddBoolAttr(r.Context(), gwotel.AttrStreaming, parsed.Stream)
+	stampGenAIRequestParams(r.Context(), parsed)
 	// Payload capture: stamp the request messages as
 	// gen_ai.input.messages so the trace pipeline hoists them into
 	// the trace's Input column. ADR-017 v1 scope — gated only by
 	// payload length (see capacity clamp in AddStringAttr-callers).
 	if len(parsed.Messages) > 0 {
 		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIInputMessages, string(parsed.Messages))
+	}
+	if len(parsed.System) > 0 {
+		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAISystemInstructions, string(parsed.System))
 	}
 
 	// Budget precheck against cached snapshot. This is intentionally
@@ -822,6 +827,9 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	d.enqueueDebit(b, grq, resolved, in, out, cr, cw, cost, time.Since(t0).Milliseconds(), "success")
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrUsageIn, int64(in))
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrUsageOut, int64(out))
+	if total := in + out; total > 0 {
+		gwotel.AddInt64Attr(r.Context(), gwotel.AttrGenAIUsageTotalTokens, int64(total))
+	}
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrUsageCacheReadInputTokens, int64(cr))
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrUsageCacheCreationInputTokens, int64(cw))
 	gwotel.AddFloatAttr(r.Context(), gwotel.AttrCostUSD, cost)
@@ -830,9 +838,7 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	if outMsgs := extractOutputMessages(resp); outMsgs != "" {
 		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOutputMessages, outMsgs)
 	}
-	if resp != nil && resp.Model != "" {
-		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIResponseModel, resp.Model)
-	}
+	stampGenAIResponseMeta(r.Context(), resp)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-LangWatch-Provider", string(resolved.Provider))
@@ -1075,6 +1081,95 @@ func extractUsage(resp *bfschemas.BifrostChatResponse) (in, out, cr, cw int, cos
 		cw = d.CachedWriteTokens
 	}
 	return
+}
+
+// stampGenAIRequestParams stamps the OTel gen_ai.request.* attributes
+// from the parsed body. Each field is emitted only when the client
+// actually set it — we never coerce defaults, so the span reflects the
+// wire request verbatim. Keeps gateway traces interchangeable with
+// SDK-instrumented client traces for the same semconv surface.
+func stampGenAIRequestParams(ctx context.Context, parsed openaiChatRequest) {
+	if parsed.Temperature != nil {
+		gwotel.AddFloatAttr(ctx, gwotel.AttrGenAIRequestTemperature, *parsed.Temperature)
+	}
+	if parsed.TopP != nil {
+		gwotel.AddFloatAttr(ctx, gwotel.AttrGenAIRequestTopP, *parsed.TopP)
+	}
+	if parsed.FrequencyPenalty != nil {
+		gwotel.AddFloatAttr(ctx, gwotel.AttrGenAIRequestFreqPenalty, *parsed.FrequencyPenalty)
+	}
+	if parsed.PresencePenalty != nil {
+		gwotel.AddFloatAttr(ctx, gwotel.AttrGenAIRequestPresPenalty, *parsed.PresencePenalty)
+	}
+	// OpenAI's current spec prefers max_completion_tokens; older
+	// clients send max_tokens. We expose whichever the caller used.
+	if parsed.MaxCompletion != nil {
+		gwotel.AddInt64Attr(ctx, gwotel.AttrGenAIRequestMaxTokens, *parsed.MaxCompletion)
+	} else if parsed.MaxTokens != nil {
+		gwotel.AddInt64Attr(ctx, gwotel.AttrGenAIRequestMaxTokens, *parsed.MaxTokens)
+	}
+	if stop := joinStopField(parsed); stop != "" {
+		gwotel.AddStringAttr(ctx, gwotel.AttrGenAIRequestStopSeqs, stop)
+	}
+}
+
+// joinStopField normalises OpenAI-style `stop` (string | string[]) and
+// Anthropic `stop_sequences` (string[]) into a single JSON-encoded
+// array string so the attribute is always parseable downstream.
+// Returns "" when neither field is set.
+func joinStopField(parsed openaiChatRequest) string {
+	if len(parsed.Stop) > 0 && string(parsed.Stop) != "null" {
+		return string(parsed.Stop)
+	}
+	if len(parsed.StopSequences) > 0 && string(parsed.StopSequences) != "null" {
+		return string(parsed.StopSequences)
+	}
+	return ""
+}
+
+// stampGenAIResponseMeta stamps the OTel gen_ai.response.* attributes
+// (id, model, finish_reasons) from the upstream response. Each value
+// is emitted only when present on the payload — omissions are
+// reflected in the span so downstream consumers don't confuse
+// "upstream didn't return X" with "X was empty".
+func stampGenAIResponseMeta(ctx context.Context, resp *bfschemas.BifrostChatResponse) {
+	if resp == nil {
+		return
+	}
+	if resp.ID != "" {
+		gwotel.AddStringAttr(ctx, gwotel.AttrGenAIResponseID, resp.ID)
+	}
+	if resp.Model != "" {
+		gwotel.AddStringAttr(ctx, gwotel.AttrGenAIResponseModel, resp.Model)
+	}
+	if reasons := collectFinishReasons(resp); reasons != "" {
+		gwotel.AddStringAttr(ctx, gwotel.AttrGenAIResponseFinishReasons, reasons)
+	}
+}
+
+// collectFinishReasons returns a JSON-encoded array of the finish
+// reason from every choice — matches the OTel semconv contract (the
+// canonicaliser parses a JSON string array back into the
+// `gen_ai.response.finish_reasons` column).
+func collectFinishReasons(resp *bfschemas.BifrostChatResponse) string {
+	if resp == nil || len(resp.Choices) == 0 {
+		return ""
+	}
+	reasons := make([]string, 0, len(resp.Choices))
+	for _, ch := range resp.Choices {
+		if ch.FinishReason == nil || *ch.FinishReason == "" {
+			continue
+		}
+		reasons = append(reasons, *ch.FinishReason)
+	}
+	if len(reasons) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(reasons)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 // extractOutputMessages marshals response choices into the

@@ -170,13 +170,22 @@ func matchGlob(pattern, s string) bool {
 }
 
 // openaiChatRequest is the subset of the OpenAI chat-completions payload
-// we need for routing. We don't parse all extra params — they pass
-// through via RawRequestBody.
+// we need for routing + span enrichment. The raw body still passes
+// through to Bifrost via RawRequestBody; everything here is extra
+// copy-out for OTel semconv attributes on the gateway span.
 type openaiChatRequest struct {
-	Model    string          `json:"model"`
-	Stream   bool            `json:"stream,omitempty"`
-	Messages json.RawMessage `json:"messages"`
-	System   json.RawMessage `json:"system,omitempty"` // Anthropic-style /v1/messages carries system separately
+	Model           string          `json:"model"`
+	Stream          bool            `json:"stream,omitempty"`
+	Messages        json.RawMessage `json:"messages"`
+	System          json.RawMessage `json:"system,omitempty"` // Anthropic-style /v1/messages carries system separately
+	Temperature     *float64        `json:"temperature,omitempty"`
+	MaxTokens       *int64          `json:"max_tokens,omitempty"`
+	MaxCompletion   *int64          `json:"max_completion_tokens,omitempty"`
+	TopP            *float64        `json:"top_p,omitempty"`
+	FrequencyPenalty *float64       `json:"frequency_penalty,omitempty"`
+	PresencePenalty *float64        `json:"presence_penalty,omitempty"`
+	Stop            json.RawMessage `json:"stop,omitempty"`           // string | string[]
+	StopSequences   json.RawMessage `json:"stop_sequences,omitempty"` // anthropic
 }
 
 // parseOpenAIChatBody peeks at the JSON to pull out {model, stream}. The
