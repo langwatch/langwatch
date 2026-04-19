@@ -60,12 +60,17 @@ Feature: Cache control rules — operator-defined overrides without client code 
     Then the rule does NOT match
     And the response header "X-LangWatch-Cache-Mode" equals the VK default
 
-  Scenario: Matcher — vk_prefix matches substring of VK display prefix
+  Scenario: Matcher — vk_prefix matches a string prefix of the VK display-prefix form
     Given a cache rule matching vk_prefix "lw_vk_eval_"
     And a VK minted with display prefix "lw_vk_eval_01HZX9"
     When a request is made with that VK
     Then the rule matches
     And the rule's action is applied
+    # Invariant (sergey iter 46 clarification): both `matchers.vk_id` and
+    # `matchers.vk_prefix` target the SAME field — the VK's display-prefix
+    # form (e.g. `lw_vk_live_01HZX9K3M...`). vk_id is exact; vk_prefix is
+    # strings.HasPrefix. A rule sets one or the other; setting both would
+    # AND them together (unusual but valid).
 
   Scenario: Matcher — principal_id restricts to one identity
     Given a cache rule matching principal_id "user_01HZX..."
@@ -171,6 +176,11 @@ Feature: Cache control rules — operator-defined overrides without client code 
   # ─────────────────────────────────────────────────────────────────────────
   # §5. Observability — rule attribution in traces + metrics
   # ─────────────────────────────────────────────────────────────────────────
+  # NOTE: Lane A iter 45 (e037888be) ships the evaluator in isolation with
+  # benchmark evidence. Span-attr + metric emission requires the
+  # follow-up iter wiring Evaluate() into cacheoverride.Apply — scheduled
+  # before v1 GA so this section's scenarios are contract, not reality,
+  # until that commit lands.
 
   Scenario: Span attributes record the matched rule
     Given a cache rule "rule_prod_force" matches a request
