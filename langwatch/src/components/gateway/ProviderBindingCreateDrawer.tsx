@@ -18,6 +18,8 @@ import { api } from "~/utils/api";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
+import { FieldInfoTooltip } from "./FieldInfoTooltip";
+
 type ProviderBindingCreateDrawerProps = {
   projectId: string;
   open: boolean;
@@ -124,7 +126,13 @@ export function ProviderBindingCreateDrawer({
         <Drawer.Body>
           <VStack align="stretch" gap={4}>
             <Field.Root required>
-              <Field.Label>Model provider</Field.Label>
+              <Field.Label>
+                Model provider
+                <FieldInfoTooltip
+                  description="The LLM provider whose API key the gateway routes traffic to. Providers are configured once in Settings → Model Providers and reused here."
+                  docHref="/ai-gateway/provider-bindings#model-provider"
+                />
+              </Field.Label>
               {providersQuery.isLoading ? (
                 <Spinner size="sm" />
               ) : available.length === 0 ? (
@@ -184,7 +192,13 @@ export function ProviderBindingCreateDrawer({
               </Field.HelperText>
             </Field.Root>
             <Field.Root>
-              <Field.Label>Slot</Field.Label>
+              <Field.Label>
+                Slot
+                <FieldInfoTooltip
+                  description="Free-text tag used by virtual keys to reference this binding in their fallback chain. Typical names: primary, fallback-1, eu-region, canary. Defaults to 'primary'."
+                  docHref="/ai-gateway/provider-bindings#slot"
+                />
+              </Field.Label>
               <Input
                 value={slot}
                 onChange={(e) => setSlot(e.target.value)}
@@ -200,7 +214,13 @@ export function ProviderBindingCreateDrawer({
                 external-secret-store integration. */}
             <HStack gap={4} align="flex-start">
               <Field.Root flex={1}>
-                <Field.Label>Rate limit (rpm)</Field.Label>
+                <Field.Label>
+                  Rate limit (rpm)
+                  <FieldInfoTooltip
+                    description="Requests Per Minute ceiling on this binding. Sliding window; 429 + Retry-After emitted at breach. Blank = unlimited (upstream provider limits still apply)."
+                    docHref="/ai-gateway/rate-limits#rpm"
+                  />
+                </Field.Label>
                 <Input
                   value={rateLimitRpm}
                   onChange={(e) => setRateLimitRpm(e.target.value)}
@@ -209,7 +229,13 @@ export function ProviderBindingCreateDrawer({
                 />
               </Field.Root>
               <Field.Root flex={1}>
-                <Field.Label>Rate limit (tpm)</Field.Label>
+                <Field.Label>
+                  Rate limit (tpm)
+                  <FieldInfoTooltip
+                    description="Tokens Per Minute ceiling on this binding. Deferred to v1.1 — configurable here now for forward compat, but the gateway does not enforce TPM until the streaming-usage accumulator lands."
+                    docHref="/ai-gateway/rate-limits#tpm"
+                  />
+                </Field.Label>
                 <Input
                   value={rateLimitTpm}
                   onChange={(e) => setRateLimitTpm(e.target.value)}
