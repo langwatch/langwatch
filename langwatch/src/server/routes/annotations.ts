@@ -9,6 +9,10 @@
 import { nanoid } from "nanoid";
 import { Hono } from "hono";
 import { prisma } from "~/server/db";
+import {
+  readClientContext,
+  trackProductAction,
+} from "~/server/telemetry/productAction";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:annotations");
@@ -302,6 +306,20 @@ app.post("/annotations/trace/:trace", async (c) => {
         traceId: trace,
         email,
       },
+    });
+
+    void trackProductAction({
+      action: "annotation_added",
+      projectId: project.id,
+      organizationId: async () => {
+        const t = await prisma.project.findUnique({
+          where: { id: project.id },
+          select: { team: { select: { organizationId: true } } },
+        });
+        return t?.team.organizationId;
+      },
+      route: "/api/annotations/trace/:trace",
+      ...readClientContext((name) => c.req.header(name)),
     });
 
     return c.json({ data: addAnnotation });
