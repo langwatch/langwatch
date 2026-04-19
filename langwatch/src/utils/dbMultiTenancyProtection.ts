@@ -122,6 +122,23 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
     return;
   }
 
+  // Gateway warm-cache resolver: /api/internal/gateway/config/:vk_id
+  // hits findUnique({ where: { id: vkId }}) because the gateway
+  // already authenticated the VK via resolve-key and now needs the
+  // full config payload (keyed by id it learned from the JWT). The
+  // HMAC-signed transport + JWT validation upstream is the tenancy
+  // check; adding projectId here would require a redundant JWT
+  // lookup. Narrow: only findUnique on VirtualKey with a bare id in
+  // the where clause — everything else still under the normal guard.
+  if (
+    action === "findUnique" &&
+    model === "VirtualKey" &&
+    typeof params.args?.where?.id === "string" &&
+    Object.keys(params.args.where).length === 1
+  ) {
+    return;
+  }
+
   if (action === "create" || action === "createMany") {
     const data =
       action === "create"
