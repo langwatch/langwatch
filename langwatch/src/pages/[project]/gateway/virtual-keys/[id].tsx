@@ -133,8 +133,11 @@ function VirtualKeyDetailPage() {
           </HStack>
           <PageLayout.Heading>{vk?.name ?? "Virtual key"}</PageLayout.Heading>
           <Spacer />
-          {vk?.status === "active" && (
+          {vk && (
             <HStack>
+              {/* Audit history stays available even when revoked —
+                  operators forensically investigating a revoked VK
+                  still need its create/update/rotate/revoke trail. */}
               <Link
                 href={`/${project?.slug}/gateway/audit?targetKind=virtual_key&targetId=${vk.id}`}
               >
@@ -142,7 +145,7 @@ function VirtualKeyDetailPage() {
                   <FileClock size={14} /> Audit history
                 </Button>
               </Link>
-              {canUpdate && (
+              {vk.status === "active" && canUpdate && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -151,7 +154,7 @@ function VirtualKeyDetailPage() {
                   <Pencil size={14} /> Edit
                 </Button>
               )}
-              {canRotate && (
+              {vk.status === "active" && canRotate && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -160,7 +163,7 @@ function VirtualKeyDetailPage() {
                   <RotateCw size={14} /> Rotate
                 </Button>
               )}
-              {canUpdate && (
+              {vk.status === "active" && canUpdate && (
                 <Button
                   colorPalette="red"
                   variant="outline"
