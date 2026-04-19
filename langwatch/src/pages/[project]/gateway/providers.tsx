@@ -10,16 +10,33 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Plug, Plus, RefreshCw } from "lucide-react";
+import { MoreVertical, Pencil, Plug, Plus, PowerOff, RefreshCw } from "lucide-react";
 import { useState } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { ProviderBindingCreateDrawer } from "~/components/gateway/ProviderBindingCreateDrawer";
+import { ProviderBindingEditDrawer } from "~/components/gateway/ProviderBindingEditDrawer";
+import { Menu } from "~/components/ui/menu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+
+type ProviderRow = {
+  id: string;
+  modelProviderName: string;
+  slot: string;
+  rateLimitRpm: number | null;
+  rateLimitTpm: number | null;
+  rateLimitRpd: number | null;
+  rotationPolicy: string;
+  fallbackPriorityGlobal: number | null;
+  healthStatus: string;
+  disabledAt: string | null;
+};
 
 function ProvidersPage() {
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -28,7 +45,31 @@ function ProvidersPage() {
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
   );
+  const utils = api.useContext();
+  const disableMutation = api.gatewayProviders.disable.useMutation({
+    onSuccess: () =>
+      utils.gatewayProviders.list.invalidate({ projectId: project?.id }),
+  });
+
   const [bindOpen, setBindOpen] = useState(false);
+  const [editing, setEditing] = useState<ProviderRow | null>(null);
+  const [disabling, setDisabling] = useState<ProviderRow | null>(null);
+
+  const confirmDisable = async () => {
+    if (!disabling || !project?.id) return;
+    try {
+      await disableMutation.mutateAsync({
+        projectId: project.id,
+        id: disabling.id,
+      });
+      setDisabling(null);
+    } catch (error) {
+      toaster.create({
+        title: error instanceof Error ? error.message : "Failed to disable",
+        type: "error",
+      });
+    }
+  };
 
   return (
     <GatewayLayout>
@@ -92,6 +133,7 @@ function ProvidersPage() {
                   <Table.ColumnHeader>Rate limits</Table.ColumnHeader>
                   <Table.ColumnHeader>Rotation</Table.ColumnHeader>
                   <Table.ColumnHeader>Priority</Table.ColumnHeader>
+                  <Table.ColumnHeader></Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
@@ -107,14 +149,44 @@ function ProvidersPage() {
                     <Table.Cell>
                       <VStack align="start" gap={0}>
                         <Text fontSize="xs">rpm: {row.rateLimitRpm ?? "∞"}</Text>
-                        <Text fontSize="xs">tpm: {row.rateLimitTpm ?? "∞"}</Text>
+                        <Text fontSize="xs">rpd: {row.rateLimitRpd ?? "∞"}</Text>
                       </VStack>
                     </Table.Cell>
                     <Table.Cell>
-                      <Badge variant="outline">{row.rotationPolicy.toLowerCase()}</Badge>
+                      <Badge variant="outline">
+                        {row.rotationPolicy.toLowerCase()}
+                      </Badge>
                     </Table.Cell>
                     <Table.Cell>
                       {row.fallbackPriorityGlobal ?? "—"}
+                    </Table.Cell>
+                    <Table.Cell>
+                      {canManage && !row.disabledAt && (
+                        <Menu.Root>
+                          <Menu.Trigger asChild>
+                            <Button variant="ghost" size="xs" aria-label="Actions">
+                              <MoreVertical size={14} />
+                            </Button>
+                          </Menu.Trigger>
+                          <Menu.Content>
+                            <Menu.Item
+                              value="edit"
+                              onClick={() => setEditing(row)}
+                            >
+                              <Pencil size={14} /> Edit
+                            </Menu.Item>
+                            <Menu.Item
+                              value="disable"
+                              onClick={() => setDisabling(row)}
+                            >
+                              <PowerOff size={14} /> Disable
+                            </Menu.Item>
+                          </Menu.Content>
+                        </Menu.Root>
+                      )}
+                      {row.disabledAt && (
+                        <Badge colorPalette="gray">disabled</Badge>
+                      )}
                     </Table.Cell>
                   </Table.Row>
                 ))}
@@ -133,6 +205,31 @@ function ProvidersPage() {
           }}
         />
       )}
+      {project?.id && (
+        <ProviderBindingEditDrawer
+          projectId={project.id}
+          binding={editing}
+          onOpenChange={(open) => {
+            if (!open) setEditing(null);
+          }}
+          onSaved={() => {
+            setEditing(null);
+            void listQuery.refetch();
+          }}
+        />
+      )}
+      <ConfirmDialog
+        open={!!disabling}
+        onOpenChange={(open) => {
+          if (!open) setDisabling(null);
+        }}
+        title={`Disable ${disabling?.modelProviderName ?? "provider"} binding?`}
+        message="VKs routing to this slot will fail over to the next provider in their fallback chain. The underlying ModelProvider credentials are not touched."
+        confirmLabel="Disable binding"
+        tone="warning"
+        loading={disableMutation.isPending}
+        onConfirm={confirmDisable}
+      />
     </GatewayLayout>
   );
 }
