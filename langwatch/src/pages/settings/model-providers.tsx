@@ -16,7 +16,6 @@ import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
 import { api } from "~/utils/api";
-import { ProjectSelector } from "../../components/DashboardLayout";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import {
   ModelSelector,
@@ -43,7 +42,7 @@ import {
 } from "../../utils/modelProviderHelpers";
 
 export default function ModelsPage() {
-  const { project, organization, organizations, hasPermission } =
+  const { project, organization, hasPermission } =
     useOrganizationTeamProject();
   const hasModelProvidersManagePermission = hasPermission("project:manage");
   const { providers, isLoading, refetch } = useModelProvidersSettings({
@@ -114,9 +113,15 @@ export default function ModelsPage() {
         <HStack width="full" marginTop={2}>
           <Heading as="h2">Model Providers</Heading>
           <Spacer />
-          {organizations && project && (
-            <ProjectSelector organizations={organizations} project={project} />
-          )}
+          {/*
+            iter 109 #63: ProjectSelector is gone — Model Providers is now
+            an org-level surface. Scope is set per-row via the drawer's
+            Scope picker (Organization / Team / Project), and each row's
+            scope chips below show where it's accessible. Switching
+            projects from this page used to silently rebind the
+            credential to a different project, which the new scope
+            picker makes explicit instead.
+          */}
           <Menu.Root>
             <Tooltip
               content="You need model provider manage permissions to add new providers."
@@ -205,8 +210,9 @@ export default function ModelsPage() {
                         {isDefaultProvider(provider.provider) && (
                           <Badge colorPalette="blue">Default Model</Badge>
                         )}
-                        <ProviderScopeBadge
-                          scopeType={(provider as any).scopeType}
+                        <ProviderScopeChips
+                          scopes={(provider as any).scopes}
+                          fallbackScopeType={(provider as any).scopeType}
                         />
                       </HStack>
                     </Table.Cell>
@@ -355,27 +361,53 @@ export default function ModelsPage() {
   );
 }
 
-function ProviderScopeBadge({
-  scopeType,
+function ProviderScopeChips({
+  scopes,
+  fallbackScopeType,
 }: {
-  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT" | undefined;
+  scopes?: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
+  fallbackScopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
 }) {
-  if (!scopeType) return null;
-  if (scopeType === "ORGANIZATION") {
-    return (
-      <Badge colorPalette="blue" variant="subtle" size="sm">
-        Org
-      </Badge>
-    );
-  }
-  if (scopeType === "TEAM") {
-    return (
-      <Badge colorPalette="purple" variant="subtle" size="sm">
-        Team
-      </Badge>
-    );
-  }
-  return null;
+  // Prefer the full scope set (iter 109 multi-scope). Fallback to the
+  // collapsed single scopeType for MPs flowing through the legacy
+  // Record<provider, …> shape that haven't been re-serialised yet.
+  const entries = scopes && scopes.length > 0
+    ? scopes
+    : fallbackScopeType
+      ? [{ scopeType: fallbackScopeType, scopeId: "" }]
+      : [];
+  if (entries.length === 0) return null;
+  return (
+    <HStack gap={1} wrap="wrap">
+      {entries.map((entry) => {
+        if (entry.scopeType === "ORGANIZATION") {
+          return (
+            <Badge
+              key={`ORG:${entry.scopeId}`}
+              colorPalette="blue"
+              variant="subtle"
+              size="sm"
+            >
+              Org
+            </Badge>
+          );
+        }
+        if (entry.scopeType === "TEAM") {
+          return (
+            <Badge
+              key={`TEAM:${entry.scopeId}`}
+              colorPalette="purple"
+              variant="subtle"
+              size="sm"
+            >
+              Team
+            </Badge>
+          );
+        }
+        return null;
+      })}
+    </HStack>
+  );
 }
 
 export function TopicClusteringModel() {
