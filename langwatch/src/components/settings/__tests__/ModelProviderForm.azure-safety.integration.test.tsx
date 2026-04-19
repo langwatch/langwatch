@@ -103,6 +103,7 @@ function buildState(
     projectDefaultModel: null,
     projectTopicClusteringModel: null,
     projectEmbeddingsModel: null,
+    scopes: [],
     scopeType: "PROJECT",
     isSaving: false,
     errors: {},
@@ -115,6 +116,7 @@ function buildActions(
 ): UseModelProviderFormActions {
   return {
     setEnabled: vi.fn(),
+    setScopes: vi.fn(),
     setScopeType: vi.fn(),
     setUseApiGateway: vi.fn(),
     setCustomKey: vi.fn(),

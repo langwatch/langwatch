@@ -27,8 +27,15 @@ export type FormSnapshot = {
   projectDefaultModel: string | null;
   projectTopicClusteringModel: string | null;
   projectEmbeddingsModel: string | null;
-  // Principal-style scope (iter 108). Omitted → legacy project-scoped
-  // default preserved by the tRPC layer.
+  /**
+   * Multi-scope selection (iter 109). When present this is the
+   * canonical shape the tRPC layer consumes; `scopeType`/`scopeId`
+   * remain for transitional compat.
+   */
+  scopes?: Array<{
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  }>;
   scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId?: string;
 };
@@ -114,6 +121,7 @@ export function useProviderFormSubmit({
       projectDefaultModel,
       projectTopicClusteringModel,
       projectEmbeddingsModel,
+      scopes,
       scopeType,
       scopeId,
     } = snapshot;
@@ -189,6 +197,10 @@ export function useProviderFormSubmit({
         customModels,
         customEmbeddingsModels,
         extraHeaders: extraHeadersToSend,
+        // Send the full scope array when it's populated; the router
+        // falls back to legacy scopeType/scopeId for callers still
+        // writing through the single-tier path.
+        scopes: scopes && scopes.length > 0 ? scopes : undefined,
         scopeType,
         scopeId,
       });

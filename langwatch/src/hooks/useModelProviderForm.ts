@@ -9,6 +9,11 @@ import { type FormSnapshot, useProviderFormSubmit } from "./useProviderFormSubmi
 
 export type ModelProviderScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 
+export type ScopeSelection = {
+  scopeType: ModelProviderScopeType;
+  scopeId: string;
+};
+
 export type UseModelProviderFormParams = {
   provider: MaybeStoredModelProvider;
   projectId: string | undefined;
@@ -53,6 +58,14 @@ export type UseModelProviderFormState = {
   projectDefaultModel: string | null;
   projectTopicClusteringModel: string | null;
   projectEmbeddingsModel: string | null;
+  /**
+   * Multi-scope selection (iter 109). Every write sends this array to
+   * the tRPC layer and the service fail-closes the whole write if any
+   * single scope is unmanageable by the caller. For backwards-compat
+   * reads, `scopeType` still exposes the narrowest entry's tier.
+   */
+  scopes: ScopeSelection[];
+  /** Narrowest scope tier from `scopes` — kept for the legacy picker. */
   scopeType: ModelProviderScopeType;
   isSaving: boolean;
   errors: {
@@ -62,6 +75,7 @@ export type UseModelProviderFormState = {
 
 export type UseModelProviderFormActions = {
   setEnabled: (enabled: boolean) => Promise<void>;
+  setScopes: (scopes: ScopeSelection[]) => void;
   setScopeType: (scope: ModelProviderScopeType) => void;
   setUseApiGateway: (use: boolean) => void;
   setCustomKey: (key: string, value: string) => void;
@@ -100,27 +114,64 @@ export function useModelProviderForm(
     onError,
   } = params;
 
-  // Scope state — defaults to the stored provider's scope when editing.
-  // For brand-new providers we open at the widest scope the user can
-  // manage (org > team > project), so an admin lands on the most useful
-  // default instead of having to flip from PROJECT every time.
-  const storedScope = provider.scopeType as ModelProviderScopeType | undefined;
+  // Scope state — defaults to the stored provider's scope set when
+  // editing. For brand-new providers we open at the widest scope the
+  // user can manage (org > team > project) so an admin lands on the
+  // most useful default instead of having to flip from PROJECT every
+  // time. Iter 109 made this an array; existing callers that only
+  // expect a single tier still work via the derived `scopeType`.
   const defaultNewScope: ModelProviderScopeType =
     canManageOrganization && organizationId
       ? "ORGANIZATION"
       : canManageTeam && teamId
         ? "TEAM"
         : "PROJECT";
-  const [scopeType, setScopeType] = useState<ModelProviderScopeType>(
-    storedScope ?? defaultNewScope,
-  );
-
-  const scopeId =
-    scopeType === "ORGANIZATION"
+  const defaultScopeId =
+    defaultNewScope === "ORGANIZATION"
       ? organizationId
-      : scopeType === "TEAM"
+      : defaultNewScope === "TEAM"
         ? teamId
         : projectId;
+
+  const initialScopes: ScopeSelection[] =
+    provider.scopes && provider.scopes.length > 0
+      ? provider.scopes.map((s) => ({
+          scopeType: s.scopeType,
+          scopeId: s.scopeId,
+        }))
+      : provider.scopeType && provider.scopeId
+        ? [{ scopeType: provider.scopeType, scopeId: provider.scopeId }]
+        : defaultScopeId
+          ? [{ scopeType: defaultNewScope, scopeId: defaultScopeId }]
+          : [];
+  const [scopes, setScopes] = useState<ScopeSelection[]>(initialScopes);
+
+  // Narrowest tier (PROJECT > TEAM > ORGANIZATION) — legacy consumers
+  // that expected a single `scopeType` pick the most specific one.
+  const scopeType: ModelProviderScopeType = scopes.some(
+    (s) => s.scopeType === "PROJECT",
+  )
+    ? "PROJECT"
+    : scopes.some((s) => s.scopeType === "TEAM")
+      ? "TEAM"
+      : scopes[0]?.scopeType ?? defaultNewScope;
+
+  const scopeId =
+    scopes.find((s) => s.scopeType === scopeType)?.scopeId ?? undefined;
+
+  const setScopeType = useCallback(
+    (next: ModelProviderScopeType) => {
+      const nextId =
+        next === "ORGANIZATION"
+          ? organizationId
+          : next === "TEAM"
+            ? teamId
+            : projectId;
+      if (!nextId) return;
+      setScopes([{ scopeType: next, scopeId: nextId }]);
+    },
+    [organizationId, teamId, projectId],
+  );
 
   // --- Sub-hooks ---
   const credentialKeysHook = useCredentialKeys({ provider });
@@ -149,6 +200,7 @@ export function useModelProviderForm(
       projectTopicClusteringModel:
         defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
+      scopes,
       scopeType,
       scopeId,
     }),
@@ -166,6 +218,7 @@ export function useModelProviderForm(
       defaultProviderHook.projectDefaultModel,
       defaultProviderHook.projectTopicClusteringModel,
       defaultProviderHook.projectEmbeddingsModel,
+      scopes,
       scopeType,
       scopeId,
     ],
@@ -230,12 +283,14 @@ export function useModelProviderForm(
       projectTopicClusteringModel:
         defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
+      scopes,
       scopeType,
       isSaving: formSubmitHook.isSaving,
       errors: formSubmitHook.errors,
     },
     {
       setEnabled: formSubmitHook.setEnabled,
+      setScopes,
       setScopeType,
       setUseApiGateway,
       setCustomKey: credentialKeysHook.setCustomKey,

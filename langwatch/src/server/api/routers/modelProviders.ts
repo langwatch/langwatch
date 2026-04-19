@@ -72,12 +72,20 @@ export const modelProviderRouter = createTRPCRouter({
           .optional()
           .nullable(),
         defaultModel: z.string().optional(),
-        // Principal-style scope (iter 108 #2). Omitted → legacy
-        // project-scoped default preserved. Server still enforces
-        // permission per scope (org admin for ORGANIZATION, team
-        // admin for TEAM, etc) — checkProjectPermission below gates
-        // the PROJECT path; the scope-gated path adds its own
-        // authz check inside the service in a later commit.
+        // Multi-scope writes (iter 109). `scopes` is the canonical shape;
+        // `scopeType`/`scopeId` remain for the transition period so older
+        // callers still compile. When both arrive, `scopes` wins. The
+        // service runs the fail-closed authz check on every entry before
+        // persisting — any non-manageable scope aborts the whole write.
+        scopes: z
+          .array(
+            z.object({
+              scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+              scopeId: z.string().min(1),
+            }),
+          )
+          .min(1, "At least one scope must be selected.")
+          .optional(),
         scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]).optional(),
         scopeId: z.string().optional(),
       }),
@@ -99,6 +107,7 @@ export const modelProviderRouter = createTRPCRouter({
           customEmbeddingsModels: input.customEmbeddingsModels,
           extraHeaders: input.extraHeaders,
           defaultModel: input.defaultModel,
+          scopes: input.scopes,
           scopeType: input.scopeType,
           scopeId: input.scopeId,
         },

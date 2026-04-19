@@ -41,6 +41,7 @@ function buildState(
     projectDefaultModel: null,
     projectTopicClusteringModel: null,
     projectEmbeddingsModel: null,
+    scopes: [],
     scopeType: "PROJECT",
     isSaving: false,
     errors: {},
@@ -53,6 +54,7 @@ function buildActions(
 ): UseModelProviderFormActions {
   return {
     setEnabled: vi.fn(),
+    setScopes: vi.fn(),
     setScopeType: vi.fn(),
     setUseApiGateway: vi.fn(),
     setCustomKey: vi.fn(),
@@ -178,15 +180,15 @@ describe("ProviderScopeSection", () => {
       expect(screen.getByRole("combobox")).toBeInTheDocument();
     });
 
-    it("calls setScopeType when the user picks Team from the select", async () => {
-      const setScopeType = vi.fn();
+    it("calls setScopes with the picked Team entry (iter 109 multi-select)", async () => {
+      const setScopes = vi.fn();
       const user = userEvent.setup();
 
       render(
         <Wrapper>
           <ProviderScopeSection
             state={buildState()}
-            actions={buildActions({ setScopeType })}
+            actions={buildActions({ setScopes })}
             provider={newProvider}
             teamId="team_1"
             teamName="platform"
@@ -202,14 +204,19 @@ describe("ProviderScopeSection", () => {
       // Team option renders by team name.
       await user.click(await screen.findByRole("option", { name: /platform/i }));
 
-      expect(setScopeType).toHaveBeenCalledWith("TEAM");
+      expect(setScopes).toHaveBeenCalledWith([
+        { scopeType: "TEAM", scopeId: "team_1" },
+      ]);
     });
 
     it("shows a scope-specific description for the active scope", () => {
       render(
         <Wrapper>
           <ProviderScopeSection
-            state={buildState({ scopeType: "ORGANIZATION" })}
+            state={buildState({
+              scopeType: "ORGANIZATION",
+              scopes: [{ scopeType: "ORGANIZATION", scopeId: "org_1" }],
+            })}
             actions={buildActions()}
             provider={newProvider}
             teamId="team_1"
@@ -222,6 +229,34 @@ describe("ProviderScopeSection", () => {
 
       expect(
         screen.getByText(/Every project in the organization inherits/i),
+      ).toBeInTheDocument();
+    });
+
+    it("summarises a multi-scope selection across tiers", () => {
+      render(
+        <Wrapper>
+          <ProviderScopeSection
+            state={buildState({
+              scopeType: "TEAM",
+              scopes: [
+                { scopeType: "TEAM", scopeId: "team_1" },
+                { scopeType: "PROJECT", scopeId: "proj_1" },
+              ],
+            })}
+            actions={buildActions()}
+            provider={newProvider}
+            teamId="team_1"
+            teamName="platform"
+            organizationId="org_1"
+            organizationName="acme"
+            projectId="proj_1"
+            projectName="web-app"
+          />
+        </Wrapper>,
+      );
+
+      expect(
+        screen.getByText(/Shared across 1 team \+ 1 project\./i),
       ).toBeInTheDocument();
     });
   });
