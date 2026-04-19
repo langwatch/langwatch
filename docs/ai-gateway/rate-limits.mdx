@@ -74,19 +74,20 @@ Leave a field blank to inherit the upstream provider's own limit (i.e., no gatew
 
 ## Observability
 
-Every rate-limit event emits:
+Rate-limit events surface via the gateway's standard observability primitives — there is no dedicated rate-limit counter in v1:
 
-- **Prometheus counter** `gateway_rate_limit_rejects_total{scope=binding|vk,dimension=rpm|rpd|tpm,vk_id=...,binding_id=...}` — per-bucket reject counts.
-- **Span attribute** on the rejected request: `langwatch.rate_limit.dimension` = `rpm|rpd|tpm`, `langwatch.rate_limit.scope` = `binding|vk`.
-- **Trace status** `rate_limit_exceeded` (distinct from `provider_error`).
+- **HTTP metric** `gateway_http_requests_total{status="429"}` — counts 429s including both gateway-enforced and upstream-reported.
+- **Upstream attempt metric** `gateway_provider_attempts_total{outcome="rate_limit"}` — increments when a 429 came back from the provider (not from gateway-side enforcement). Joining on `status="429"` vs `outcome="rate_limit"` distinguishes gateway-enforced (status 429, no provider_attempts increment on that dimension) from upstream-enforced.
+- **Response header** `X-LangWatch-RateLimit-Dimension` — the downstream key-switch signal (also included in the span error message for trace-level analysis).
+- **Trace error** — the rejected request's span carries `error.type="rate_limit_exceeded"` with the dimension in the message string.
 
-Dashboards join the counter with VK / binding ID to show per-customer / per-provider saturation curves without parsing the trace stream.
+<Info>A dedicated `gateway_rate_limit_rejects_total{dimension}` counter that slices by dimension without needing to parse the trace stream is a v1.1 observability follow-up. Until then, dashboards can filter `gateway_http_requests_total{status="429"}` by the `Retry-After` header or check the `X-LangWatch-RateLimit-Dimension` value in trace attributes at query time.</Info>
 
 ## Cross-replica coordination
 
-In multi-replica deployments the buckets are **per-replica by default**. If your cluster runs N replicas, the effective org-wide RPM is `N × configured_rpm`.
+In multi-replica deployments the buckets are **per-replica by default** — the gateway's limiter is an in-memory `golang.org/x/time/rate` token bucket stored in an LRU cache, zero external dependency on the hot path. If your cluster runs N replicas, the effective org-wide RPM is `N × configured_rpm` (explicit design trade: zero-dependency on the hot path over strict cluster-wide correctness).
 
-For strict cross-replica enforcement (matters at scale), enable Redis-coordinated buckets via `GATEWAY_RATE_LIMIT_REDIS=true` in the Helm chart. This adds a ~2 ms overhead per request on the rate-limit hot path — a fair trade for stricter enforcement.
+<Warning>Redis-coordinated counters for strict cross-replica enforcement are a **v1.1 follow-up** (tracked in `services/gateway/internal/ratelimit/limiter.go` package doc). Deployments that need exact org-wide caps today can set the per-replica limit to `configured / N` and rely on the LB's round-robin to keep pods equally loaded — imperfect but usually fine.</Warning>
 
 ## Permissions
 
