@@ -200,6 +200,35 @@ If the gateway saw a terminal `event: error`, your client isn't parsing SSE corr
 
 See [Streaming](/ai-gateway/streaming).
 
+## "My config override isn't taking effect"
+
+**Symptoms:**
+- You set an env var via Helm or `values.yaml`, deployed, but the gateway behaves as if the default were still in effect.
+- `kubectl exec` + `env` shows the var is set, but the behaviour doesn't match.
+
+**Diagnose:** every gateway pod emits a single structured log line on startup containing the full effective config — every struct, every field, every default after substitution (iter 27, `d70adf6`). This is the canonical source of truth:
+
+```bash
+POD=$(kubectl get pod -n langwatch -l app=langwatch-gateway -o jsonpath='{.items[0].metadata.name}')
+
+# The one log line you always grep for when something feels off
+kubectl logs -n langwatch "$POD" | grep gateway_effective_config | jq .
+```
+
+The line contains every Config struct: `ControlPlane`, `Cache`, `Budget`, `Guardrails`, `OTel`, `Bifrost`, `Startup`, `Security`, `Shutdown`, `Admin`. Secrets pass through a `redact()` helper that emits `"unset"` or `"set(len=N)"` — you can verify the secret is configured without leaking the value, and the length doubles as a sanity check for env-var truncation or `$`-expansion quote-forgotten bugs.
+
+**Common causes when the log shows the expected value but behaviour differs:**
+
+1. Stale pods — you bumped values.yaml but haven't restarted. `kubectl rollout restart deploy/langwatch-gateway`.
+2. The VK's bundled config overrides the pod-level default (e.g. VK has its own `cache.mode`). Check the VK config via `langwatch vk get <id>`.
+3. The control plane hasn't propagated the bundle change. Wait 30 s for the `/changes` long-poll cycle, or restart gateway pods.
+
+**Common causes when the log shows the DEFAULT value despite an env override:**
+
+1. The env var is set on the wrong container in the deployment (e.g. on an init container).
+2. Helm value was set on the wrong key (`gateway.env.X` vs `gateway.X`).
+3. ConfigMap rendered the value as a YAML scientific-notation number (iter 23 gotcha for int64 fields) — check `kubectl describe configmap`.
+
 ## `413 payload_too_large`
 
 **Symptoms:**
