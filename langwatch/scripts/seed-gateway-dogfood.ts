@@ -256,6 +256,26 @@ async function main() {
     });
   }
 
+  // Sync VK.lastUsedAt against the ledger debits we're about to seed
+  // — surfaces realistic relative-time badges on the VK list, rather
+  // than "never" for every key even when there are 378 debits in the
+  // ledger. Mirrors what the gateway audit log debit path will do
+  // post-request in production.
+  const lastUsedMap: Record<string, number> = {
+    [prodOpenaiSecret.vkId]: Date.now() - 12 * 60 * 1000, // 12 min ago
+    [prodClaudeSecret.vkId]: Date.now() - 3 * 60 * 60 * 1000, // 3h ago
+    [evalSuiteSecret.vkId]: Date.now() - 26 * 60 * 60 * 1000, // ~1 day ago
+    [mobileAppSecret.vkId]: Date.now() - 4 * 24 * 60 * 60 * 1000, // 4 days
+    // dev-sandbox-legacy deliberately left null — it's revoked
+  };
+  for (const [vkId, ts] of Object.entries(lastUsedMap)) {
+    await prisma.virtualKey.update({
+      where: { id: vkId },
+      data: { lastUsedAt: new Date(ts) },
+    });
+  }
+  console.log(`✓ backfilled VK.lastUsedAt on ${Object.keys(lastUsedMap).length} keys`);
+
   // Ledger debits — drive byDay sparkline on Usage page + detail page
   // recent-debits panel. Spread across 30 days with weekday bias so
   // the chart shows weekly cadence. Models + providerSlots varied so
