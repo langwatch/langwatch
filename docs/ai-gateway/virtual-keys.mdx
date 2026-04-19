@@ -39,6 +39,24 @@ Under **AI Gateway → Virtual Keys** click **New virtual key** and fill:
 
 Click **Create**. The full secret is revealed inline with a **Copy** button and a **I've saved it, close** confirmation that must be checked before dismissing. After dismiss, the secret is gone for good.
 
+## VK detail page
+
+Clicking a row in the list opens the detail page (`/gateway/virtual-keys/<vk_id>`). Four sections, top-to-bottom:
+
+1. **Header** — name + action bar: **Audit history** (deep-links into `/gateway/audit?targetKind=virtual_key&targetId=<vk_id>` with a pre-filled filter chip showing only this VK's events), **Edit**, **Rotate**, **Revoke**. The Audit history deep-link is the fastest way to reconstruct "who changed this VK, when" during an incident.
+2. **Identity / Activity** — id, prefix, environment, status, description, and humanised **Last used** + **Created** (hover for exact timestamp). Revision number shown when non-zero — increments on every `VIRTUAL_KEY_UPDATED` audit row.
+3. **Provider fallback chain** — ordered rows, each showing provider icon + readable name + slot badge (`primary` / `fallback-1` / `fallback-2` / …) + credential id. Clarifies at-a-glance which provider is in the driver's seat and what falls back when it errors.
+4. **Configuration summary** — compact read-only view (no drawer needed) of the runtime config that's actually in effect:
+   - **Tags** — colored subtle badges, the same strings shown on the list row.
+   - **Cache mode** — badge (`respect` / `force` / `disable`) + TTL on force.
+   - **Rate limits** — `rpm` + `rpd` outline badges (or em-dash if unset).
+   - **Model aliases** — expanded as `alias → target` pairs, up to 5 visible with "+N more" overflow.
+   - **Blocked patterns** — grouped by dimension (`tools` / `mcp` / `urls` / `models`) with red-tinted regex chips; click-through opens the edit drawer at that section.
+   - **Guardrails** — count + direction breakdown (`N pre / M post / K stream_chunk`), each clickable to the guardrail config.
+5. **Usage (last 30 days)** — stat tiles (Total spend / Requests / Avg $/request), a 30-day filled area sparkline, Spend-by-model row, and the top 10 recent debits table (When relative / Model / Tokens in→out / Amount smart-decimals / Latency ms). Guarded on `virtualKeys:view` + `gatewayUsage:view`.
+
+Everything on this page is read-only except the four header actions — edits happen in the drawer (`Edit`) or dedicated flows (`Rotate` / `Revoke`).
+
 ## Rotation
 
 Rotate a VK when you believe the secret may have leaked or as part of routine hygiene.
