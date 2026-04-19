@@ -30,6 +30,7 @@ import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { VirtualKeyEditDrawer } from "~/components/gateway/VirtualKeyEditDrawer";
 import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretReveal";
+import { VirtualKeyUsageSnippet } from "~/components/gateway/VirtualKeyUsageSnippet";
 import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
@@ -238,6 +239,10 @@ function VirtualKeyDetailPage() {
                     {vk.revision}
                   </Text>
                 </DetailRow>
+              </Section>
+
+              <Section title="How to use">
+                <VirtualKeyUsageSnippet />
               </Section>
 
               <Section title="Provider fallback chain">

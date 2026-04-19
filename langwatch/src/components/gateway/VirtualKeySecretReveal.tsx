@@ -12,6 +12,7 @@ import { Check, Copy, Eye, EyeOff } from "lucide-react";
 import { useState } from "react";
 
 import { Dialog } from "~/components/ui/dialog";
+import { VirtualKeyUsageSnippet } from "./VirtualKeyUsageSnippet";
 
 type VirtualKeySecretRevealProps = {
   open: boolean;
@@ -54,7 +55,18 @@ export function VirtualKeySecretReveal({
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={() => {}} closeOnInteractOutside={false}>
+    // role="alertdialog" + closeOnInteractOutside/Escape=false prevent
+    // the operator from losing the show-once secret to an accidental
+    // outside-click or Escape — the only way out is the Close button
+    // at the footer, which itself is gated on the "I've saved this"
+    // checkbox. Cheap belt-and-suspenders vs. orphan VKs.
+    <Dialog.Root
+      open={open}
+      onOpenChange={() => {}}
+      role="alertdialog"
+      closeOnInteractOutside={false}
+      closeOnEscape={false}
+    >
       <Dialog.Content maxWidth="560px">
           <Dialog.Header>
             <Dialog.Title>
@@ -135,6 +147,8 @@ export function VirtualKeySecretReveal({
                   </IconButton>
                 </HStack>
               </VStack>
+
+              <VirtualKeyUsageSnippet secret={secret} />
 
               <HStack>
                 <input

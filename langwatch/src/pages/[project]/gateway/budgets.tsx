@@ -12,8 +12,9 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Archive, Gauge, MoreVertical, Pencil, Plus } from "lucide-react";
+import { Archive, Eye, Gauge, MoreVertical, Pencil, Plus } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "~/utils/compat/next-router";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -53,6 +54,7 @@ function BudgetsPage() {
   const canUpdate = hasPermission("gatewayBudgets:update");
   const canDelete = hasPermission("gatewayBudgets:delete");
 
+  const router = useRouter();
   const { rows, isLoading, isError, error, refetch } = useBudgetRows(
     organization?.id,
   );
@@ -158,7 +160,16 @@ function BudgetsPage() {
                   const limit = Number.parseFloat(b.limitUsd);
                   const pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
                   return (
-                    <Table.Row key={b.id}>
+                    <Table.Row
+                      key={b.id}
+                      cursor="pointer"
+                      _hover={{ bg: "bg.subtle" }}
+                      onClick={() =>
+                        void router.push(
+                          `/${project?.slug}/gateway/budgets/${b.id}`,
+                        )
+                      }
+                    >
                       <Table.Cell>
                         <VStack align="start" gap={0}>
                           <Link
@@ -242,34 +253,45 @@ function BudgetsPage() {
                           </Tooltip>
                         )}
                       </Table.Cell>
-                      <Table.Cell>
-                        {(canUpdate || canDelete) && (
-                          <Menu.Root>
-                            <Menu.Trigger asChild>
-                              <Button variant="ghost" size="xs" aria-label="Actions">
-                                <MoreVertical size={14} />
-                              </Button>
-                            </Menu.Trigger>
-                            <Menu.Content>
-                              {canUpdate && (
-                                <Menu.Item
-                                  value="edit"
-                                  onClick={() => setEditing(b)}
-                                >
-                                  <Pencil size={14} /> Edit
-                                </Menu.Item>
-                              )}
-                              {canDelete && (
-                                <Menu.Item
-                                  value="archive"
-                                  onClick={() => setArchiving(b)}
-                                >
-                                  <Archive size={14} /> Archive
-                                </Menu.Item>
-                              )}
-                            </Menu.Content>
-                          </Menu.Root>
-                        )}
+                      <Table.Cell
+                        onClick={(e) => e.stopPropagation()}
+                        cursor="default"
+                      >
+                        <Menu.Root>
+                          <Menu.Trigger asChild>
+                            <Button variant="ghost" size="xs" aria-label="Actions">
+                              <MoreVertical size={14} />
+                            </Button>
+                          </Menu.Trigger>
+                          <Menu.Content>
+                            <Menu.Item
+                              value="details"
+                              onClick={() =>
+                                void router.push(
+                                  `/${project?.slug}/gateway/budgets/${b.id}`,
+                                )
+                              }
+                            >
+                              <Eye size={14} /> Details
+                            </Menu.Item>
+                            {canUpdate && (
+                              <Menu.Item
+                                value="edit"
+                                onClick={() => setEditing(b)}
+                              >
+                                <Pencil size={14} /> Edit
+                              </Menu.Item>
+                            )}
+                            {canDelete && (
+                              <Menu.Item
+                                value="archive"
+                                onClick={() => setArchiving(b)}
+                              >
+                                <Archive size={14} /> Archive
+                              </Menu.Item>
+                            )}
+                          </Menu.Content>
+                        </Menu.Root>
                       </Table.Cell>
                     </Table.Row>
                   );
