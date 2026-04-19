@@ -1,0 +1,188 @@
+---
+title: Cache-control rollout
+description: Force, disable, or override cache behaviour for specific virtual keys, models, or traffic classes without changing any client code.
+sidebarTitle: Cache-control rollout
+---
+
+[Cache-control rules](/ai-gateway/cache-control) let operators modulate cache behaviour across the gateway fleet with zero client code changes. This cookbook walks through three common rollout scenarios end-to-end: authoring a rule, verifying propagation, inspecting the observability signals, and rolling back.
+
+All three scenarios share the same feedback loop:
+
+1. **Author** the rule (UI, CLI, or REST API — pick whichever fits the workflow)
+2. **Wait ≤ 30 seconds** for the gateway fleet's `/changes` long-poll to refresh VK bundles
+3. **Exercise** the rule with a real request
+4. **Verify** via OTel span attributes + Prometheus counter
+5. **Archive** when the rule has served its purpose
+
+## Scenario 1 — Force Anthropic cache_control for enterprise tier
+
+You've tagged enterprise-tier VKs with `tier=enterprise`. You want every Anthropic request from those VKs to carry `cache_control: {type: "ephemeral"}` on the last system/user block, so large system prompts cost $1/1M input tokens instead of $3/1M on cache hits.
+
+<Warning>v1 note — `force` mode currently attributes + metrics the match but **does not** inject `cache_control` into the body. The gateway WARN-logs the rule id and downgrades to `respect`. Body-mutation force arrives in v1.1 with a Bifrost-provider matrix for every supported cache wire shape.</Warning>
+
+### Author the rule
+
+Pick one path — all three land the same row via the same service layer.
+
+**UI (Platform → AI Gateway → Cache control → New rule):**
+
+- Name: `force-cache-enterprise-anthropic`
+- Priority: `300`
+- Match → VK tags: `tier=enterprise`
+- Match → Model (optional): `claude-*`
+- Action: `force`, TTL: `600`
+
+**CLI:**
+
+```bash
+langwatch cache-rules create \
+  --name force-cache-enterprise-anthropic \
+  --priority 300 \
+  --mode force --ttl 600 \
+  --match-tag tier=enterprise \
+  --match-model "claude-*"
+```
+
+**REST:**
+
+```bash
+curl -X POST https://app.langwatch.ai/api/gateway/v1/cache-rules \
+  -H "Authorization: Bearer $LANGWATCH_PAT" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "force-cache-enterprise-anthropic",
+    "priority": 300,
+    "matchers": {
+      "vk_tags": ["tier=enterprise"],
+      "model": "claude-*"
+    },
+    "action": { "mode": "force", "ttl": 600 }
+  }'
+```
+
+### Wait for propagation
+
+The gateway fleet long-polls `/api/internal/gateway/changes` on a 30-second tick. You don't need to restart pods. Verify with:
+
+```bash
+# From any langwatch-app pod (control plane side)
+curl -sS "$LW_INTERNAL_URL/api/internal/gateway/changes?since=0&limit=5" \
+  -H "X-LangWatch-Gateway-Signature: $(gw_sign)" | jq '.events[] | select(.kind | startswith("CACHE_RULE"))'
+```
+
+### Exercise
+
+Send any request through an enterprise-tagged VK:
+
+```bash
+curl https://gateway.langwatch.ai/v1/messages \
+  -H "Authorization: Bearer lw_vk_live_ENT_01HZX9..." \
+  -H "x-api-key: $LANGWATCH_ANTHROPIC_HEADER" \
+  -d '{ "model": "claude-haiku-4-5-20251001", "max_tokens": 128, "messages": [...] }'
+```
+
+### Verify
+
+The response headers:
+
+```
+X-LangWatch-Cache-Mode: respect      # downgraded per v1 force-deferral
+```
+
+The trace span on LangWatch:
+
+```
+langwatch.cache.rule_id: cm4fKsjhX…          # the rule matched
+langwatch.cache.mode_applied: RESPECT        # APPLIED mode (not the intent)
+```
+
+Prometheus:
+
+```
+gateway_cache_rule_hits_total{rule_id="cm4fKsjhX…", mode_applied="RESPECT"} 1
+```
+
+Operator dashboard query: join `gateway_cache_rule_hits_total by (rule_id, mode_applied)` against `/cache-rules/:id` lookups to surface intent-vs-applied drift. In v1 this drift is the `force`-downgrade window — a useful metric on its own for planning the v1.1 body-mutation rollout.
+
+## Scenario 2 — Disable cache for evaluation traffic
+
+Your eval suite uses dedicated VKs prefixed `lw_vk_eval_*` and tags every request with `X-Langwatch-Suite: evals`. You want these to hit provider caches as rarely as possible — fresh completions keep eval scores honest.
+
+### Author
+
+```bash
+langwatch cache-rules create \
+  --name disable-cache-evals \
+  --priority 200 \
+  --mode disable \
+  --match-vk-prefix lw_vk_eval_ \
+  --match-metadata X-Langwatch-Suite=evals
+```
+
+Matchers are ANDed — this rule only fires when BOTH the VK prefix and the metadata header match. Other eval traffic from non-prefixed VKs stays on the per-VK default.
+
+### Exercise
+
+```bash
+curl https://gateway.langwatch.ai/v1/messages \
+  -H "Authorization: Bearer lw_vk_eval_01HZ..." \
+  -H "X-Langwatch-Suite: evals" \
+  -d '{ "model": "claude-haiku-4-5-20251001", ... "system": [...], "messages": [...] }'
+```
+
+### Verify
+
+```
+X-LangWatch-Cache-Mode: disable
+```
+
+Trace attrs:
+
+```
+langwatch.cache.rule_id:      r_evals_disable
+langwatch.cache.mode_applied: DISABLE
+```
+
+The forwarded request body has every `cache_control` key stripped (recursive JSON walk — Anthropic shape) or `cachedContent` removed (Gemini shape), so the provider can't serve a cache hit.
+
+## Scenario 3 — Cache-bust after a prompt template change
+
+You've rolled out a new system prompt template. Existing cache entries now point at the old wording. You want every enterprise-tier VK to regenerate its cache on next request.
+
+Update the rule's `salt` rather than archive+recreate — this preserves the audit trail and the rule id (so dashboards don't break).
+
+```bash
+langwatch cache-rules update <rule_id> --salt "2026Q2-template-rollout"
+```
+
+Any cache the provider or downstream layer keys by the rule's salt will miss on the next hit and be populated fresh. For providers without explicit TTL / salt support, this is a no-op on the wire but the `rule_id` + `mode_applied` attributes record the intent so dashboards can correlate the rollout.
+
+## Rollback
+
+Archiving a rule stops it matching new requests. History is preserved in the audit log + Prometheus counter.
+
+```bash
+# UI: Cache control → … → Archive
+# CLI:
+langwatch cache-rules archive <rule_id>
+# REST:
+curl -X DELETE https://app.langwatch.ai/api/gateway/v1/cache-rules/<rule_id> \
+  -H "Authorization: Bearer $LANGWATCH_PAT"
+```
+
+DELETE returns `200` + the archived row (not `204`), so scripts can confirm the `archived_at` timestamp before moving on. The gateway fleet picks up the archive on the next `/changes` tick (≤30 s) and stops firing the rule.
+
+## Gotchas
+
+- **At least one matcher is required.** Rules with no matchers that would match every request are unsupported in v1 — that's the per-VK `cache.mode` default's job. Author an explicit matcher instead.
+- **`matchers` and `action` are REPLACED on PATCH.** If you `PATCH /cache-rules/:id` with a `matchers` object, the stored value is replaced wholesale. To add a new matcher, include the existing ones too.
+- **`model` matcher doesn't fire on `/v1/messages` in v1.** Model parsing happens below cache-override in the gateway pipeline for the Anthropic-native endpoint. Use `/v1/chat/completions` or move the model check out of `matchers.model` into a `--match-tag` convention for v1. Full fix tracked as a low-pri iteration lift.
+- **Per-request header always wins.** A client that sends `X-LangWatch-Cache: disable` bypasses every rule. This is intentional — it's the per-request escape hatch for repros and cold-cache benchmarks.
+- **Rules are organization-scoped.** They apply to every VK in the organization, not just the project whose API key you used to author them. Scope a rule narrowly with `matchers.vk_id` / `vk_tags` / `vk_prefix` if you want project- or environment-specific behaviour.
+
+## See also
+
+- [Cache control](/ai-gateway/cache-control) — full per-provider semantics + precedence
+- [CLI reference](/ai-gateway/cli/langwatch-cli#cache-rules) — `langwatch cache-rules` subcommand
+- [Management REST API](/ai-gateway/api/management#cache-rules) — 5-route wire contract
+- [RBAC](/ai-gateway/rbac) — `gatewayCacheRules:*` permission matrix
