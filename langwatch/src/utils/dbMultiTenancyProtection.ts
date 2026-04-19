@@ -65,14 +65,18 @@ const EXEMPT_MODELS = [
    * AI Gateway models. Budgets are organization-level (scopeType +
    * scopeId identifies which target); ledger rows descend from VirtualKey
    * via virtualKeyId rather than a direct projectId column; change-events
-   * and audit logs both allow null projectId for org-level mutations.
-   * VirtualKey and GatewayProviderCredential are project-scoped and stay
-   * under the middleware's normal guard.
+   * and audit logs both allow null projectId for org-level mutations;
+   * VirtualKeyProviderCredential is a join table whose composite PK is
+   * (virtualKeyId, providerCredentialId) — projectId is reachable via
+   * the parent VK but not a direct column. VirtualKey and
+   * GatewayProviderCredential are project-scoped and stay under the
+   * middleware's normal guard.
    */
   "GatewayBudget",
   "GatewayBudgetLedger",
   "GatewayChangeEvent",
   "GatewayAuditLog",
+  "VirtualKeyProviderCredential",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {

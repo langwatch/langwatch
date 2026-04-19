@@ -90,6 +90,40 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
       ).resolves.toBe("ok");
     });
   });
+
+  describe("createMany on VirtualKeyProviderCredential without projectId", () => {
+    it("does NOT throw — join table, projectId reachable via parent VK", async () => {
+      // This path is hit on every VK create + every update that changes the
+      // provider chain (see virtualKey.repository.replaceProviderChain).
+      await expect(
+        runGuard({
+          model: "VirtualKeyProviderCredential",
+          action: "createMany",
+          args: {
+            data: [
+              {
+                virtualKeyId: "vk_01",
+                providerCredentialId: "gpc_01",
+                priority: 0,
+              },
+            ],
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("deleteMany on VirtualKeyProviderCredential by virtualKeyId", () => {
+    it("does NOT throw — same join-table rationale", async () => {
+      await expect(
+        runGuard({
+          model: "VirtualKeyProviderCredential",
+          action: "deleteMany",
+          args: { where: { virtualKeyId: "vk_01" } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
 });
 
 describe("guardProjectId — project-scoped gateway models still guarded", () => {
