@@ -153,9 +153,7 @@ export const MainMenu = React.memo(function MainMenu({
                         project.slug,
                       )
                     : "/auth/signin",
-                  isActive: router.pathname.includes(
-                    "/simulations/scenarios",
-                  ),
+                  isActive: router.pathname.includes("/simulations/scenarios"),
                 },
                 {
                   icon: featureIcons.simulation_runs.icon,
@@ -253,84 +251,96 @@ export const MainMenu = React.memo(function MainMenu({
             />
 
             {hasPermission("virtualKeys:view") && project && (
-              <CollapsibleMenuGroup
-                icon={featureIcons.gateway.icon}
-                label={projectRoutes.gateway.title}
-                project={project}
-                showLabel={showExpanded}
-                defaultExpanded
-                children={[
-                  {
-                    icon: KeyRound,
-                    label: projectRoutes.gateway_virtual_keys.title,
-                    href: projectRoutes.gateway_virtual_keys.path.replace(
-                      "[project]",
-                      project.slug,
-                    ),
-                    isActive: router.pathname.includes(
-                      "/gateway/virtual-keys",
-                    ),
-                  },
-                  ...(hasPermission("gatewayBudgets:view")
-                    ? [
-                        {
-                          icon: Gauge,
-                          label: projectRoutes.gateway_budgets.title,
-                          href: projectRoutes.gateway_budgets.path.replace(
-                            "[project]",
-                            project.slug,
-                          ),
-                          isActive: router.pathname.includes(
-                            "/gateway/budgets",
-                          ),
-                        },
-                      ]
-                    : []),
-                  ...(hasPermission("gatewayProviders:view")
-                    ? [
-                        {
-                          icon: Plug,
-                          label: projectRoutes.gateway_providers.title,
-                          href: projectRoutes.gateway_providers.path.replace(
-                            "[project]",
-                            project.slug,
-                          ),
-                          isActive: router.pathname.includes(
-                            "/gateway/providers",
-                          ),
-                        },
-                      ]
-                    : []),
-                  ...(hasPermission("gatewayCacheRules:view")
-                    ? [
-                        {
-                          icon: Zap,
-                          label: projectRoutes.gateway_cache_rules.title,
-                          href: projectRoutes.gateway_cache_rules.path.replace(
-                            "[project]",
-                            project.slug,
-                          ),
-                          isActive: router.pathname.includes(
-                            "/gateway/cache-rules",
-                          ),
-                        },
-                      ]
-                    : []),
-                  ...(hasPermission("gatewayUsage:view")
-                    ? [
-                        {
-                          icon: LineChart,
-                          label: projectRoutes.gateway_usage.title,
-                          href: projectRoutes.gateway_usage.path.replace(
-                            "[project]",
-                            project.slug,
-                          ),
-                          isActive: router.pathname.endsWith("/gateway/usage"),
-                        },
-                      ]
-                    : []),
-                ]}
-              />
+              <>
+                {" "}
+                <Text
+                  fontSize="11px"
+                  fontWeight="medium"
+                  textTransform="uppercase"
+                  color="gray.500"
+                  paddingX={2}
+                  paddingTop={3}
+                  paddingBottom={1}
+                >
+                  {showExpanded ? "Gateway" : <div>&nbsp;</div>}
+                </Text>
+                <CollapsibleMenuGroup
+                  icon={featureIcons.gateway.icon}
+                  label={projectRoutes.gateway.title}
+                  project={project}
+                  showLabel={showExpanded}
+                  children={[
+                    {
+                      icon: KeyRound,
+                      label: projectRoutes.gateway_virtual_keys.title,
+                      href: projectRoutes.gateway_virtual_keys.path.replace(
+                        "[project]",
+                        project.slug,
+                      ),
+                      isActive: router.pathname.includes(
+                        "/gateway/virtual-keys",
+                      ),
+                    },
+                    ...(hasPermission("gatewayBudgets:view")
+                      ? [
+                          {
+                            icon: Gauge,
+                            label: projectRoutes.gateway_budgets.title,
+                            href: projectRoutes.gateway_budgets.path.replace(
+                              "[project]",
+                              project.slug,
+                            ),
+                            isActive:
+                              router.pathname.includes("/gateway/budgets"),
+                          },
+                        ]
+                      : []),
+                    ...(hasPermission("gatewayProviders:view")
+                      ? [
+                          {
+                            icon: Plug,
+                            label: projectRoutes.gateway_providers.title,
+                            href: projectRoutes.gateway_providers.path.replace(
+                              "[project]",
+                              project.slug,
+                            ),
+                            isActive:
+                              router.pathname.includes("/gateway/providers"),
+                          },
+                        ]
+                      : []),
+                    ...(hasPermission("gatewayCacheRules:view")
+                      ? [
+                          {
+                            icon: Zap,
+                            label: projectRoutes.gateway_cache_rules.title,
+                            href: projectRoutes.gateway_cache_rules.path.replace(
+                              "[project]",
+                              project.slug,
+                            ),
+                            isActive: router.pathname.includes(
+                              "/gateway/cache-rules",
+                            ),
+                          },
+                        ]
+                      : []),
+                    ...(hasPermission("gatewayUsage:view")
+                      ? [
+                          {
+                            icon: LineChart,
+                            label: projectRoutes.gateway_usage.title,
+                            href: projectRoutes.gateway_usage.path.replace(
+                              "[project]",
+                              project.slug,
+                            ),
+                            isActive:
+                              router.pathname.endsWith("/gateway/usage"),
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              </>
             )}
 
             <OpsSection showExpanded={showExpanded} />
@@ -361,8 +371,7 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
   const router = useRouter();
   const { hasAccess } = useOpsPermission();
   const publicEnv = usePublicEnv();
-  const alwaysShow =
-    publicEnv.data?.SHOW_OPS_IN_MAIN_SIDEBAR ?? false;
+  const alwaysShow = publicEnv.data?.SHOW_OPS_IN_MAIN_SIDEBAR ?? false;
   const isOnOpsRoute = router.pathname.startsWith("/ops");
   const shouldShow = hasAccess && (alwaysShow || isOnOpsRoute);
 
@@ -406,7 +415,10 @@ const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
         icon={Activity}
         label="Dashboard"
         href="/ops"
-        isActive={router.pathname === "/ops" || router.pathname.startsWith("/ops/queues")}
+        isActive={
+          router.pathname === "/ops" ||
+          router.pathname.startsWith("/ops/queues")
+        }
         badgeNumber={blockedCount + dlqCount}
         showLabel={showExpanded}
       />

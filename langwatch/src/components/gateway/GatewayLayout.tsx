@@ -16,5 +16,5 @@ import { DashboardLayout } from "~/components/DashboardLayout";
  *   in a single grep.
  */
 export function GatewayLayout({ children }: PropsWithChildren) {
-  return <DashboardLayout compactMenu>{children}</DashboardLayout>;
+  return <DashboardLayout>{children}</DashboardLayout>;
 }
