@@ -24,8 +24,6 @@
  */
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 
-import { env } from "~/env.mjs";
-
 const VK_PREFIX = "lw_vk_";
 const VK_ENVS = ["live", "test"] as const;
 
@@ -131,9 +129,16 @@ export function parseVirtualKey(secret: string): {
   return { environment: env as VirtualKeyEnvironment, ulid, displayPrefix };
 }
 
+// Reads pepper from process.env at call time. env.mjs also validates
+// LW_VIRTUAL_KEY_PEPPER at startup (see env.mjs) — that guard is the
+// production fail-fast path. Here we re-read process.env so tests can
+// mutate it between calls without re-loading the env module. Historically
+// this was `process.env.LW_VIRTUAL_KEY_PEPPER ?? env.LW_VIRTUAL_KEY_PEPPER`
+// — the fallback to the module-level env snapshot made the pepper-missing
+// branch untestable because env.mjs had already snapshotted it at module
+// load. Removed now that the tests stub process.env in beforeEach.
 function getPepper(): string {
-  const pepper =
-    process.env.LW_VIRTUAL_KEY_PEPPER ?? env.LW_VIRTUAL_KEY_PEPPER;
+  const pepper = process.env.LW_VIRTUAL_KEY_PEPPER;
   if (!pepper) {
     throw new VirtualKeyCryptoError(
       "pepper_missing",
