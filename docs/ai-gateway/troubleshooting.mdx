@@ -197,9 +197,9 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 
 **Root causes, most to least common:**
 
-1. **Auth token points at the wrong LangWatch project.** `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN` is a LangWatch API key. Traces land in *that key's project* — not necessarily the project owning the VK that served the request. If you're dogfooding with a shared token but multiple projects in the same org, spans may appear under a sibling project's **Traces** screen. Verify the token's project at `Settings → API Keys`.
+1. **You're still on a static token instead of the per-project resolver.** The gateway resolves the X-Auth-Token from the VK's owning project on every bundle refresh — each tenant's spans route to their own inbox automatically. If you've hand-set `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN` in your pod env, it takes precedence over the per-project token and every project's spans land in whatever project that static token points at. Unset it and let the resolver do its job.
 
-   <Warning>**Per-project resolver hook is the proper multi-tenant path.** A single static token bucket is a dogfood shortcut; in production you want the gateway to authenticate to `/api/otel` with a token whose project resolves from the VK that served the request, so each tenant's spans land in their own inbox automatically. Track this if you see cross-project leakage.</Warning>
+   <Info>**Default dev setup needs no config.** The gateway defaults `GATEWAY_OTEL_DEFAULT_ENDPOINT` to `http://localhost:5560/api/otel` and uses the per-project token from the bundle. `pnpm dev` and `make run-dev` Just Work — no env override needed. Override the endpoint only for prod/self-hosted.</Info>
 
 2. **Endpoint is empty.** `GATEWAY_OTEL_DEFAULT_ENDPOINT` unset = no exporter wired. Spans are created in-pod and flushed to a no-op channel. Helm umbrella chart defaults this to `http://langwatch-app:5560/api/otel` — if you've overridden to empty, you've disabled trace export.
 
