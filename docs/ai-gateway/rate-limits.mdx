@@ -1,0 +1,104 @@
+---
+title: Rate limits
+description: How the gateway enforces RPM and RPD (and v1.1 TPM) across VKs, bindings, and providers — including the precedence model and the 429 envelope.
+sidebarTitle: Rate limits
+---
+
+The gateway enforces rate limits at two independent layers — the **VK** and the **provider binding** — with cross-dimension token-bucket accounting so a request only needs enough tokens in *every* applicable bucket to pass.
+
+## Dimensions
+
+### RPM — requests per minute <a id="rpm"></a>
+
+Classic Leaky-bucket / token-bucket: a counter that refills at `limit / 60` tokens per second, caps at `limit`. Every request consumes 1 token. Bucket empty → the request returns `429 rate_limit_exceeded` with `Retry-After` seconds to refill.
+
+**Good for:** protecting providers from a flood, enforcing a fair-share per customer, giving CI pipelines a known cap.
+
+**Not for:** cost enforcement — use [budgets](/ai-gateway/budgets) for spend caps.
+
+### RPD — requests per day <a id="rpd"></a>
+
+Rolling-24-hour window. Every request consumes 1; counter resets at the first request after the window ticks. RPD and RPM are enforced **jointly** — a request that fits under RPM still fails if RPD is exhausted.
+
+**Good for:** capping long-tail daily spend (cheaper than budgets for simple per-user limits), rate-limiting evaluation runs to stay under a provider's daily quota.
+
+### TPM — tokens per minute (v1.1) <a id="tpm"></a>
+
+<Warning>TPM is a v1.1 feature. In v1 the limit is **accepted and stored** on VK + binding config but not enforced — requests pass through and the trace + budget ledger still record the real token count. Implementation blocker: the streaming-usage accumulator needs to be wired into the limiter before per-stream token counts can pressure the bucket.</Warning>
+
+When v1.1 ships, TPM will consume tokens based on actual usage reported by the provider (or estimated on request body for pre-dispatch shaping). The accounting will be cross-dimension with RPM + RPD, so a request fits if every applicable bucket has room.
+
+## Precedence
+
+The gateway evaluates limits in the order it touches them:
+
+1. **Per-binding** (configured on `/gateway/providers`) — protects a single upstream account from all traffic.
+2. **Per-VK** (configured on `/gateway/virtual-keys` drawer) — protects a specific key from over-sending.
+
+A request must fit under **every** applicable bucket. No override mechanism — combining them is always AND.
+
+## 429 envelope
+
+When the bucket rejects, the response is:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 4
+X-LangWatch-RateLimit-Dimension: rpm
+Content-Type: application/json
+
+{
+  "error": {
+    "type": "rate_limit_exceeded",
+    "code": "rate_limit_exceeded",
+    "message": "Rate limit exceeded on dimension=rpm"
+  }
+}
+```
+
+`X-LangWatch-RateLimit-Dimension` identifies which bucket tripped:
+
+- `rpm` — minute bucket full
+- `rpd` — daily bucket full (only when both RPM and RPD are configured and RPD tripped first)
+- `tpm` — v1.1 only
+
+The client key-switches on this header to show the right error in their own UI (e.g., "daily quota reached, reset at midnight UTC" vs "slow down, try again in a minute").
+
+## Setting limits
+
+**Per VK** — `/gateway/virtual-keys` drawer → "Rate limits (per-VK)" section. See the drawer's `(i)` tooltips for per-field guidance.
+
+**Per binding** — `/gateway/providers` drawer → "Rate limit (rpm)" / "Rate limit (rpd)" / "Rate limit (tpm)" fields. See [Provider bindings → RPM](/ai-gateway/providers#rate-limit-rpm).
+
+Leave a field blank to inherit the upstream provider's own limit (i.e., no gateway-side throttle on that dimension).
+
+## Observability
+
+Every rate-limit event emits:
+
+- **Prometheus counter** `gateway_rate_limit_rejects_total{scope=binding|vk,dimension=rpm|rpd|tpm,vk_id=...,binding_id=...}` — per-bucket reject counts.
+- **Span attribute** on the rejected request: `langwatch.rate_limit.dimension` = `rpm|rpd|tpm`, `langwatch.rate_limit.scope` = `binding|vk`.
+- **Trace status** `rate_limit_exceeded` (distinct from `provider_error`).
+
+Dashboards join the counter with VK / binding ID to show per-customer / per-provider saturation curves without parsing the trace stream.
+
+## Cross-replica coordination
+
+In multi-replica deployments the buckets are **per-replica by default**. If your cluster runs N replicas, the effective org-wide RPM is `N × configured_rpm`.
+
+For strict cross-replica enforcement (matters at scale), enable Redis-coordinated buckets via `GATEWAY_RATE_LIMIT_REDIS=true` in the Helm chart. This adds a ~2 ms overhead per request on the rate-limit hot path — a fair trade for stricter enforcement.
+
+## Permissions
+
+| Action | Permission |
+|---|---|
+| View rate-limit settings | `virtualKeys:view` + `gatewayProviders:view` |
+| Edit per-VK rate limits | `virtualKeys:update` |
+| Edit per-binding rate limits | `gatewayProviders:update` |
+
+## See also
+
+- [Virtual keys](/ai-gateway/virtual-keys#rate-limits) — per-VK limit configuration.
+- [Provider bindings → RPM](/ai-gateway/providers#rate-limit-rpm) — per-binding limit configuration.
+- [Budgets](/ai-gateway/budgets) — spend caps (different shape; use both).
+- [Concepts → Rate limits vs budgets](/ai-gateway/concepts) — when to reach for which.
