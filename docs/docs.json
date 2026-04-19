@@ -479,6 +479,8 @@
             "pages": [
               "ai-gateway/virtual-keys",
               "ai-gateway/budgets",
+              "ai-gateway/provider-bindings",
+              "ai-gateway/rate-limits",
               "ai-gateway/rbac"
             ]
           },
