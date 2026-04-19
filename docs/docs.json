@@ -544,6 +544,7 @@
             "pages": [
               "ai-gateway/self-hosting/helm",
               "ai-gateway/self-hosting/config",
+              "ai-gateway/self-hosting/dns-and-tls",
               "ai-gateway/self-hosting/health-checks",
               "ai-gateway/self-hosting/scaling"
             ]
