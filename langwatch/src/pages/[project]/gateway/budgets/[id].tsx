@@ -108,8 +108,11 @@ function BudgetDetailPage() {
             )}
           </PageLayout.Heading>
           <Spacer />
-          {budget && !isArchived && (
+          {budget && (
             <HStack>
+              {/* Audit history remains reachable even after archive —
+                  the full lifecycle trail stays queryable so operators
+                  can reconstruct why a budget was archived. */}
               <Link
                 href={`/${project?.slug}/gateway/audit?targetKind=budget&targetId=${budget.id}`}
               >
@@ -117,7 +120,7 @@ function BudgetDetailPage() {
                   <FileClock size={14} /> Audit history
                 </Button>
               </Link>
-              {canUpdate && (
+              {!isArchived && canUpdate && (
                 <Button
                   variant="outline"
                   size="sm"
@@ -126,7 +129,7 @@ function BudgetDetailPage() {
                   <Pencil size={14} /> Edit
                 </Button>
               )}
-              {canDelete && (
+              {!isArchived && canDelete && (
                 <Button
                   colorPalette="red"
                   variant="outline"
