@@ -25,9 +25,11 @@ import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 function BudgetDetailPage() {
   const { organization, project, hasPermission } = useOrganizationTeamProject();
@@ -251,9 +253,17 @@ function BudgetDetailPage() {
                       {budget.recentLedger.map((line) => (
                         <Table.Row key={line.id}>
                           <Table.Cell>
-                            <Text fontSize="xs" color="fg.muted">
-                              {new Date(line.occurredAt).toLocaleString()}
-                            </Text>
+                            <Tooltip
+                              content={new Date(
+                                line.occurredAt,
+                              ).toLocaleString()}
+                            >
+                              <Text fontSize="xs" color="fg.muted">
+                                {formatTimeAgo(
+                                  new Date(line.occurredAt).getTime(),
+                                )}
+                              </Text>
+                            </Tooltip>
                           </Table.Cell>
                           <Table.Cell>
                             <Link
@@ -267,7 +277,7 @@ function BudgetDetailPage() {
                             <Code fontSize="xs">{line.model}</Code>
                           </Table.Cell>
                           <Table.Cell>
-                            ${Number(line.amountUsd).toFixed(6)}
+                            {formatAmount(line.amountUsd)}
                           </Table.Cell>
                           <Table.Cell>
                             <StatusBadge status={line.status} />
@@ -410,6 +420,19 @@ function StatusBadge({
           ? "orange"
           : "gray";
   return <Badge colorPalette={palette}>{status.toLowerCase()}</Badge>;
+}
+
+// Human-readable dollar amount for a single ledger debit. The stored
+// value is a fixed-precision Decimal with 6 decimal places; most per-
+// request costs fall in the $0.0001–$1 range, where 6 decimals is
+// noisier than useful in a list. Keep full precision under a cent,
+// drop to 4 above.
+function formatAmount(raw: string | number): string {
+  const n = typeof raw === "number" ? raw : Number(raw);
+  if (!Number.isFinite(n)) return "—";
+  if (n >= 1) return `$${n.toFixed(4)}`;
+  if (n >= 0.01) return `$${n.toFixed(5)}`;
+  return `$${n.toFixed(6)}`;
 }
 
 export default withPermissionGuard("gatewayBudgets:view", {
