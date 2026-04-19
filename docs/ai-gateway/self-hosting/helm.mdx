@@ -159,6 +159,84 @@ Three Kubernetes probes are provided; all hit the gateway's own `/healthz`, `/re
 
 The readiness definition is strict on purpose — a pod should not be hit by the Service until every dependency is usable, otherwise the first requests after a rollout fail.
 
+## NetworkPolicy (iter 18, `cd0506a`)
+
+The gateway chart ships an optional Kubernetes `NetworkPolicy` that implements deny-by-default ingress + egress on the gateway pod. It's **off by default** so dev clusters (which often run without a CNI that supports `NetworkPolicy`) aren't broken by `helm upgrade`. Flip it on in production:
+
+```yaml
+gateway:
+  networkPolicy:
+    enabled: true
+
+    # Optional — restrict OTLP egress to a specific namespace/pod.
+    # Leave empty to skip the OTLP egress rule entirely (not exported externally).
+    egressToOTLP:
+      - namespaceSelector: { matchLabels: { name: observability } }
+        podSelector: { matchLabels: { app: otel-collector } }
+
+    # Optional — lock provider egress to explicit CIDRs (stricter than default).
+    # Default: allow any IP EXCEPT RFC1918 ranges (see below).
+    egressToProviders:
+      - cidr: 104.18.0.0/16    # cloudflare (fronts most providers)
+      - cidr: 52.0.0.0/8       # aws us-east-1 (Anthropic, Bedrock)
+```
+
+### What the default policy allows
+
+**Ingress**:
+
+- `ingress-nginx` namespace → port `5590` (customer traffic via your Ingress).
+- `monitoring` namespace Prometheus pod → port `5590` `/metrics`.
+
+Everything else is rejected — including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The pprof admin listener (iter 14) is loopback-bound on `127.0.0.1:6060` and is unaffected by `NetworkPolicy` because `kubectl port-forward` tunnels through the Kubernetes API server, not the pod network.
+
+**Egress**:
+
+- DNS to `kube-system` on TCP+UDP `:53` (ordering matters — DNS rule MUST come first or other rules fail to resolve hostnames).
+- Control plane (`langwatch-app` label selector) on port `3000` for `/resolve-key` / `/config` / `/changes` / `/budget` / `/guardrail`.
+- Redis on `:6379` — only rendered when `gateway.redis.url` is set.
+- OTLP `:4318` — only rendered when `gateway.networkPolicy.egressToOTLP` is non-empty.
+- Provider upstreams on `:443` — default `any IP EXCEPT RFC1918` (10/8, 172.16/12, 192.168/16). Teams with explicit compliance posture should override `egressToProviders` with a concrete CIDR allowlist.
+
+<Note>The "any IP except RFC1918" default is a compromise: allowing any IP locks lateral movement out of the pod (no hitting internal services by accident) while still working for OpenAI/Anthropic/Bedrock/Vertex/Gemini without operators having to pin CIDR ranges per provider. If your cluster's CNI enforces egress strictly, you can tighten this via `egressToProviders`.</Note>
+
+### Verifying the policy rendered
+
+```bash
+helm template langwatch langwatch/langwatch \
+  -f values.yaml \
+  --set gateway.networkPolicy.enabled=true \
+  | grep -A2 'kind: NetworkPolicy'
+```
+
+Should emit exactly one `NetworkPolicy` with name `langwatch-gateway`. With `enabled=false` (the default), no `NetworkPolicy` object renders. The gateway CI gate (iter 19) asserts both invariants on every PR.
+
+### Inside the pod
+
+To confirm the policy is active at runtime:
+
+```bash
+# Ingress check — should succeed from ingress-nginx, fail from elsewhere
+kubectl exec -n langwatch deploy/langwatch-gateway -- curl -sS http://localhost:5590/healthz
+
+# Egress check — should succeed to api.openai.com, fail to a lateral pod
+kubectl exec -n langwatch deploy/langwatch-gateway -- \
+  curl -sS --max-time 3 https://api.openai.com/v1/models
+```
+
+If egress fails with DNS resolution errors, verify the kube-system selector in the chart matches your cluster's DNS namespace (some clusters use `kube-dns` in `kube-system`, others use a custom namespace).
+
+## Chart and data-plane CI (iter 19, `1fd1fc3`)
+
+The upstream repo runs a dedicated `gateway-ci` workflow against every PR that touches `services/gateway/**` or `infrastructure/charts/gateway/**` (paths-filter gated so unrelated PRs don't trigger it). What it guarantees on the chart you're installing:
+
+- **Go data plane**: `go mod verify`, `go vet`, `go build`, `go test -count=1 -race ./...` across all 14 internal packages. Benchmarks compile under `-run=^$ -benchtime=1x` so Go API drift fails fast without adding benchmark noise to PR logs.
+- **Helm chart**: `helm lint` + two `helm template` renders — one with defaults (must render zero `NetworkPolicy` objects), one with `networkPolicy.enabled=true` + `redis.url=redis://…` (must render exactly one). Both invariants are asserted explicitly; violating either fails the job.
+
+Jobs are timeout-capped (15 m / 10 m) and use concurrency cancellation on force-push, so a runaway test can't burn runner minutes.
+
+Consequence for operators: an upgrade path where `helm upgrade` would have silently dropped `NetworkPolicy`, broken under `-race`, or regressed a benchmark beyond 2× baseline cannot land on `main` without the gate catching it first. Pin your chart version to one of the release tags and `helm diff upgrade` before rollout.
+
 ## Upgrade procedure
 
 The gateway is versioned independently of the LangWatch app, but they share a contract. A gateway version is compatible with control-plane versions within the same major (see the compatibility matrix in the release notes).

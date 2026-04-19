@@ -139,6 +139,19 @@ Iter 12: route-registration fix unblocking UI dogfood. Iter 13: V1-GA-READINESS.
 | 17.10 | `a4460bfa3` | PR-DESCRIPTION.md — sergey iter 13 credit |
 | 17.11 | `d13d2be81` | sergey iter 14 pprof admin listener — NEW cookbooks/production-runbook.mdx (5 diagnostic recipes) + self-hosting/config.mdx GATEWAY_ADMIN_ADDR reference + docs.json nav |
 | 17.12 | `9d1ded22e` | PR-DESCRIPTION.md — sergey iter 14 credit + cookbook count bump 4→5 |
+| 17.13 | `c645d8ac5` | sergey iter 15 Redis L2 — scaling.mdx §Redis L2 rewrite with real numbers, config.mdx REDIS_URL |
+| 17.14 | `1e2f9fa5f` | PR-DESCRIPTION.md — sergey iter 15 credit |
+| 17.15 | `7430708b2` | sergey iter 16 Helm chart sync — helm.mdx values.yaml admin/budget/guardrails stanzas + runbook Helm note |
+| 17.16 | `9cb1cab5d` | PR-DESCRIPTION.md — sergey iter 16 credit |
+| 17.17 | *(this commit)* | sergey iter 17 (per-org /changes) + iter 18 (NetworkPolicy) + iter 19 (gateway CI gate) — scaling.mdx §Per-org /changes, helm.mdx §NetworkPolicy + §Chart and data-plane CI, security.mdx self-hosted note, config.mdx LW_GATEWAY_AUTH_CACHE_CHANGES_POLL_SECONDS annotation |
+
+### Iter 17/18/19 sync notes (post-compact)
+
+**Iter 17 (per-org /changes, `5119261`)** — documented in scaling.mdx as a new H3 under Control-plane capacity. Key teaching point for operators: if control-plane `/changes` hit rate jumps after deploying a gateway version with iter 17, that's the expected behaviour of per-org scoping (previously the gateway was calling without `organization_id`, so the control plane returned empty and no invalidation fired). The cross-link from `LW_GATEWAY_AUTH_CACHE_CHANGES_POLL_SECONDS` to the new Scaling section closes the config.mdx → scaling.mdx loop.
+
+**Iter 18 (NetworkPolicy, `cd0506a`)** — documented as a dedicated H2 in helm.mdx with three sub-sections (allowlist breakdown, render verification via `helm template | grep`, runtime verification via `kubectl exec curl`). Security.mdx gained a sentence under "Self-hosted deployments" pointing at the new section so the security threat-model page cross-references the concrete mitigation. Default is `enabled=false` — deliberate call-out because dev clusters often run CNIs without `NetworkPolicy` enforcement.
+
+**Iter 19 (gateway CI gate, `1fd1fc3`)** — documented as a dedicated H2 "Chart and data-plane CI" in helm.mdx, placed immediately before the Upgrade procedure so operators reading the chart upgrade flow see the guarantee that sits behind each released chart version. Called out both invariants (`networkPolicy.enabled=false` → 0 renders, `=true` → exactly 1 render) since those are the two ways iter 18's policy could silently regress.
 
 ### Terminal SSE error shapes (locked v1)
 
