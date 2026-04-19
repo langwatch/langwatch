@@ -10,7 +10,11 @@ import { z } from "zod";
 
 import { VirtualKeyService } from "~/server/gateway/virtualKey.service";
 import { virtualKeyConfigSchema } from "~/server/gateway/virtualKey.config";
-import { toVirtualKeyCamelDto } from "~/server/gateway/virtualKey.dto";
+import {
+  type EnrichedChainEntry,
+  toVirtualKeyCamelDto,
+} from "~/server/gateway/virtualKey.dto";
+import type { VirtualKeyWithChain } from "~/server/gateway/virtualKey.repository";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -52,7 +56,8 @@ export const virtualKeysRouter = createTRPCRouter({
       if (!vk) {
         throw new TRPCError({ code: "NOT_FOUND" });
       }
-      return toDetail(vk);
+      const enriched = await enrichChain(ctx.prisma, vk);
+      return toVirtualKeyCamelDto(vk, enriched);
     }),
 
   create: protectedProcedure
@@ -156,5 +161,37 @@ export const virtualKeysRouter = createTRPCRouter({
     }),
 });
 
+// List rows don't render the enriched chain — they show a compact
+// "fallback chain length" badge — so we keep the empty-chain shape
+// for performance (no N×2 joins on list pagination). Detail view
+// calls enrichChain() explicitly.
 const toListItem = toVirtualKeyCamelDto;
 const toDetail = toVirtualKeyCamelDto;
+
+async function enrichChain(
+  prisma: import("@prisma/client").PrismaClient,
+  vk: VirtualKeyWithChain,
+): Promise<EnrichedChainEntry[]> {
+  const ids = vk.providerCredentials.map((pc) => pc.providerCredentialId);
+  if (ids.length === 0) return [];
+  const rows = await prisma.gatewayProviderCredential.findMany({
+    where: { projectId: vk.projectId, id: { in: ids } },
+    select: {
+      id: true,
+      slot: true,
+      modelProvider: { select: { provider: true } },
+    },
+  });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  return vk.providerCredentials
+    .map((pc, idx): EnrichedChainEntry | null => {
+      const row = byId.get(pc.providerCredentialId);
+      if (!row) return null;
+      return {
+        providerCredentialId: pc.providerCredentialId,
+        slot: row.slot ?? (idx === 0 ? "primary" : `fallback-${idx}`),
+        providerType: row.modelProvider.provider,
+      };
+    })
+    .filter((e): e is EnrichedChainEntry => e !== null);
+}
