@@ -250,9 +250,16 @@ export class PatService {
         { meta: { customRoleId, organizationId } },
       );
     }
-    const perms = Array.isArray(customRole.permissions)
-      ? (customRole.permissions as string[])
-      : [];
+    // Fail closed: if permissions is malformed (not a JSON array), we cannot
+    // compute the ceiling and must reject. Falling back to [] would silently
+    // bypass the ceiling check (zero permissions → nothing to verify → accepted).
+    if (!Array.isArray(customRole.permissions)) {
+      throw new PatScopeViolationError(
+        `Custom role ${customRoleId} has malformed permissions`,
+        { meta: { customRoleId, organizationId } },
+      );
+    }
+    const perms = customRole.permissions as string[];
     for (const perm of perms) {
       const userHas = await checkRoleBindingPermission({
         prisma: this.prisma,
