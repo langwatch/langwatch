@@ -149,7 +149,20 @@ function BudgetsPage() {
                   <Table.ColumnHeader>Scope</Table.ColumnHeader>
                   <Table.ColumnHeader>Window</Table.ColumnHeader>
                   <Table.ColumnHeader>Spent / Limit</Table.ColumnHeader>
-                  <Table.ColumnHeader>On breach</Table.ColumnHeader>
+                  <Table.ColumnHeader>
+                    <Tooltip
+                      content={
+                        <Text fontSize="xs">
+                          WARN: emits 402-equivalent warning header +
+                          audit event, request proceeds.{"\n"}BLOCK: the
+                          gateway returns HTTP 402 and refuses to
+                          dispatch once the limit is crossed.
+                        </Text>
+                      }
+                    >
+                      <Text as="span">On breach</Text>
+                    </Tooltip>
+                  </Table.ColumnHeader>
                   <Table.ColumnHeader>Resets</Table.ColumnHeader>
                   <Table.ColumnHeader></Table.ColumnHeader>
                 </Table.Row>
