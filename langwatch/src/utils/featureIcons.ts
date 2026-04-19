@@ -19,6 +19,7 @@ import {
   PlayCircle,
   Settings,
   Table,
+  TrainFront,
   TrendingUp,
   Workflow,
 } from "lucide-react";
@@ -128,7 +129,7 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     label: "Evaluators",
   },
   gateway: {
-    icon: KeyRound,
+    icon: TrainFront,
     color: "orange.500",
     label: "AI Gateway",
   },
