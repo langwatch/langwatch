@@ -374,10 +374,11 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
               </NativeSelect.Field>
             </NativeSelect.Root>
             <Field.HelperText>
-              Anthropic honours cache_control inject on force; OpenAI/Azure
-              do automatic caching regardless; Gemini returns 400
-              cache_override_not_implemented on force (v1 — see
-              cache-control.mdx).
+              Force injects cache_control: ephemeral on Anthropic (system[-1]
+              + messages[-1].content[-1], no-double-inject if already present).
+              OpenAI/Azure caching is automatic — force is a wire no-op but
+              still attributes + bumps the rule-hit counter. Gemini force
+              WARNs + passes through today (v1.1 will wire /cachedContents).
             </Field.HelperText>
           </Field.Root>
           {state.actionMode === "force" && (
