@@ -27,7 +27,7 @@ Invoked on the **full completed response** for non-streaming calls, and on the *
 Decisions:
 
 - `allow` — response delivered to client.
-- `block` — for non-streaming, the response is replaced with `403 guardrail_blocked` **before the client sees the assistant text**, and a zero-cost `blocked_by_guardrail` budget debit is recorded so dashboards still see the attempt (cost = $0, the provider call was made and paid for, but the ledger marks it as non-billable to the principal). For streaming, the response has already been delivered; the decision becomes a flag-only (`langwatch.guardrail.post_flag` trace attribute).
+- `block` — for non-streaming, the response is replaced with `403 guardrail_blocked` **before the client sees the assistant text**, and a zero-cost `blocked_by_guardrail` budget debit is recorded so dashboards still see the attempt (cost = $0, the provider call was made and paid for, but the ledger marks it as non-billable to the principal). For streaming, the response has already been delivered; the decision becomes a flag-only (propagated via the evaluator's own trace span, not a dedicated gateway attribute in v1).
 - `modify` — the assistant text is rewritten in place (first choice `content` on `/v1/chat/completions`, first text block on `/v1/messages`); redaction is transparent from the client's perspective. Streaming responses: flag-only.
 
 <Note>**Content-block responses skip post-evaluation.** When the model returns a tool-call response (`tool_calls` on OpenAI, `content: [{type: "tool_use", ...}]` on Anthropic) or an image/file block, there's no assistant text to evaluate — the post-guardrail is skipped rather than attempting to reason about structured output. Use `pre` on the tool-call arguments or a dedicated content-aware guardrail if you need to gate tool calls.</Note>
@@ -38,7 +38,7 @@ Use cases: hallucination detection on RAG outputs, PII leakage detection in resp
 
 By default, post-guardrails **fail closed**: if the evaluator service is unavailable or errors, the response is replaced with `503 guardrail_upstream_unavailable` — the user never sees an ungoverned response.
 
-For VKs where an unavailable guardrail should *not* block (e.g. best-effort redaction on low-stakes traffic), set `guardrails.response_fail_open: true` on the VK config. The gateway then passes the response through with a warning log and a `langwatch.guardrail.fail_open=true` trace attribute.
+For VKs where an unavailable guardrail should *not* block (e.g. best-effort redaction on low-stakes traffic), set `guardrails.response_fail_open: true` on the VK config. The gateway then passes the response through with a warning log. (No dedicated fail_open span attribute is emitted in v1; the response's error class plus the guardrail upstream's own span is how operators trace this path today.)
 
 `pre` guardrails use the same fail-closed default and the same VK opt-out (`guardrails.request_fail_open`).
 
@@ -58,7 +58,7 @@ Decisions:
   The channel is closed immediately after; subsequent upstream chunks are discarded. Same wire shape as a provider-failure terminator, distinguishable by `error.code` (`stream_chunk_blocked` vs `provider_error`). See [Streaming → Mid-stream error shapes](/ai-gateway/streaming#terminal-error-shapes).
 - `modify` — **not implemented in v1.** Chunk-level content rewriting is provider-shape-specific (OpenAI delta JSON vs Anthropic SSE events have different shapes). For v1, "redact on stream" = block and let the client retry without the offending input. A future iter may add provider-aware chunk rewriting once a real customer asks.
 
-Latency budget: **≤50 ms per chunk**. If the evaluator doesn't respond in time, or the upstream guardrail errors, the gateway **fails open** — the chunk passes through with an OTel warning (`langwatch.guardrail.stream_chunk_fail_open=<reason>`) and a bump to `gateway_guardrail_verdicts_total{direction=stream_chunk,verdict=fail_open}`. This is an explicit contract decision: blocking the user's stream on a slow policy service is worse than occasional pass-through — but the metric makes slow/flaky services visible before they become reliability problems.
+Latency budget: **≤50 ms per chunk**. If the evaluator doesn't respond in time, or the upstream guardrail errors, the gateway **fails open** — the chunk passes through with an OTel warning (the WARN log carries the reason) and a bump to `gateway_guardrail_verdicts_total{direction="stream_chunk",verdict="fail_open"}`. This is an explicit contract decision: blocking the user's stream on a slow policy service is worse than occasional pass-through — but the metric makes slow/flaky services visible before they become reliability problems.
 
 Use cases: real-time PII termination (credit card numbers, emails, phone numbers) where the correct behaviour on detection is "stop sending and the user retries." For best-effort redaction that doesn't interrupt the stream, use `post` on the reassembled response instead.
 
@@ -66,7 +66,7 @@ Use cases: real-time PII termination (credit card numbers, emails, phone numbers
 
 The VK create/edit drawer (Lane B iter 17, `0541bd096`) has three direction sections — **Pre-request**, **Post-response**, **Stream chunk** — each listing every project evaluator whose `executionMode = AS_GUARDRAIL`. Check the box next to an evaluator to attach it to that direction; uncheck to detach. Save the drawer — the gateway picks up the change within 30 s via the `/changes` long-poll.
 
-Each direction section also has a **Default-block on evaluator failure** toggle. Off (default) = fail closed (matches `guardrails.request_fail_open: false` / `response_fail_open: false`). On = fail open with a `langwatch.guardrail.fail_open=true` trace attribute. The helper copy cites the concrete enforcement shapes so you know what the toggle actually does:
+Each direction section also has a **Default-block on evaluator failure** toggle. Off (default) = fail closed (matches `guardrails.request_fail_open: false` / `response_fail_open: false`). On = fail open; the gateway WARN-logs the evaluator failure and proceeds. The helper copy cites the concrete enforcement shapes so you know what the toggle actually does:
 
 - Pre: blocks return `403 guardrail_blocked` with a zero-cost debit.
 - Post: non-stream blocks replace the response with 403; stream responses flag only (the bytes are already out).
@@ -95,14 +95,16 @@ A VK can have multiple guardrails in each direction; the gateway runs them in pa
 
 The gateway fans out guardrail calls in parallel (bounded by `MAX_GUARDRAIL_CONCURRENCY`, default 8 per direction). First `block` wins — other in-flight guardrails are cancelled to save cost. `modify` decisions are applied in dependency order (a guardrail's output is input to the next).
 
-## Trace attributes
+## Observability
 
-- `langwatch.guardrail.<direction>.<id>` — recorded per guardrail run with the decision and policies triggered.
-- `langwatch.guardrail.<direction>.blocked` — true when the overall direction resulted in a block.
-- `langwatch.guardrail.<direction>.latency_ms` — per-run latency.
-- `langwatch.guardrail.stream_chunk_timeout` — boolean, set when a stream_chunk guardrail exceeded 50ms.
+**Prometheus counter** `gateway_guardrail_verdicts_total{direction, verdict}` records every verdict the guardrail pipeline returns. Labels:
 
-Click through to the evaluator's run in the LangWatch UI to see the full reasoning.
+- `direction` — `request` | `response` | `stream_chunk`
+- `verdict` — `allow` | `block` | `modify` | `fail_open`
+
+<Info>**v1 wiring caveat**: in the Go data plane, only the `stream_chunk` direction currently emits this metric from the dispatcher hot path. The `request` and `response` directions run the guardrails correctly (block / modify logic works), but the dispatcher doesn't yet call `Metrics.RecordGuardrailVerdict` at those sites. Tracked as a v1 follow-up (finding #17); operators who need per-direction allow-rate dashboards today can proxy from `gateway_http_requests_total{status="403"}` which flips on every block verdict regardless of direction.</Info>
+
+**Span attributes**: the gateway declares `langwatch.guardrail.verdict` as a canonical span attribute for the aggregate verdict, but it is not yet emitted from the dispatcher in v1. Per-guardrail decision detail is visible by clicking through to the evaluator's run in the LangWatch Messages view — the evaluator's own trace carries the policies triggered + reasoning.
 
 ## Permissions
 
