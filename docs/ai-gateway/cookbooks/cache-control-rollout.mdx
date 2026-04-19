@@ -176,7 +176,7 @@ DELETE returns `200` + the archived row (not `204`), so scripts can confirm the 
 
 - **At least one matcher is required.** Rules with no matchers that would match every request are unsupported in v1 — that's the per-VK `cache.mode` default's job. Author an explicit matcher instead.
 - **`matchers` and `action` are REPLACED on PATCH.** If you `PATCH /cache-rules/:id` with a `matchers` object, the stored value is replaced wholesale. To add a new matcher, include the existing ones too.
-- **`model` matcher doesn't fire on `/v1/messages` in v1.** Model parsing happens below cache-override in the gateway pipeline for the Anthropic-native endpoint. Use `/v1/chat/completions` or move the model check out of `matchers.model` into a `--match-tag` convention for v1. Full fix tracked as a low-pri iteration lift.
+- **`model` matchers fire on both endpoints.** Earlier iterations had a caveat that `matchers.model` didn't fire on `/v1/messages` due to pipeline ordering — that was fixed via a cheap single-field JSON peek (`extractModelField`, ~150 ns, zero-alloc on no-rules path). Rules like `matchers.model = "claude-haiku-*"` now match on both `/v1/chat/completions` and `/v1/messages`.
 - **Per-request header always wins.** A client that sends `X-LangWatch-Cache: disable` bypasses every rule. This is intentional — it's the per-request escape hatch for repros and cold-cache benchmarks.
 - **Rules are organization-scoped.** They apply to every VK in the organization, not just the project whose API key you used to author them. Scope a rule narrowly with `matchers.vk_id` / `vk_tags` / `vk_prefix` if you want project- or environment-specific behaviour.
 
