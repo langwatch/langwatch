@@ -48,6 +48,47 @@ Feature: Guardrails wrap every gateway dispatch
       Then the client receives 403 with error.type "guardrail_blocked"
       And the completion was NOT forwarded to the client
       And the budget-debit captures input tokens (provider cost) but nobody saw the output
+      And a zero-cost `blocked_by_guardrail` debit is recorded so dashboards still count the attempt
+
+    @integration
+    Scenario: response-direction modify rewrites the assistant text in place
+      Given the post-guardrail returns verdict=modify for the response
+      When the upstream returns a completion
+      Then the first choice.message.content (or first text block on /v1/messages) is replaced with the rewritten text
+      And the redaction is transparent to the client (no error, no warning header)
+      And the OTel trace has `langwatch.guardrail.post.verdict=modify`
+
+    @integration
+    Scenario: content-block responses skip post-evaluation
+      Given the upstream returns a tool_calls response (no text)
+      When the post-guardrail would otherwise run
+      Then the guardrail is NOT invoked on the tool_calls payload
+      And the OTel trace has `langwatch.guardrail.post.skipped=no_text`
+      # Deny / modify decisions on structured output go through `pre` or a
+      # dedicated content-aware guardrail; post-response only evaluates text.
+
+    @integration
+    Scenario: post-guardrail fires on /v1/chat/completions AND /v1/messages
+      When the post-guardrail returns block on either endpoint
+      Then the client receives 403 guardrail_blocked on both surfaces
+      And the dispatcher path is identical — no per-endpoint divergence
+
+  Rule: Response-direction fail-open opt-in
+
+    @integration
+    Scenario: response-guardrail upstream 503 -> fail-closed by default
+      Given POST /internal/gateway/guardrail/check returns 503 on the post-direction run
+      When the upstream has already returned a completion
+      Then the gateway returns 503 with error.type "guardrail_upstream_unavailable"
+      And the client NEVER sees the ungoverned completion text
+
+    @integration
+    Scenario: response-direction fail-open via VK opt-in
+      Given the VK has `guardrails.response_fail_open: true`
+      When the post-guardrail upstream returns 503
+      Then the gateway passes the upstream completion through unmodified
+      And a warn log is emitted with the VK id and guardrail id
+      And the OTel trace has `langwatch.guardrail.fail_open=true`
 
   Rule: Guardrail latency budget is enforced
 

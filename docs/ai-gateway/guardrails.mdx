@@ -22,15 +22,25 @@ Use cases: prompt-injection detection, PII redaction before data hits a third-pa
 
 ### `post` — flag/block the response
 
-Invoked on the **full completed response** for non-streaming calls, and on the **reassembled stream** for streaming calls.
+Invoked on the **full completed response** for non-streaming calls, and on the **reassembled stream** for streaming calls. Wired on both `/v1/chat/completions` and `/v1/messages`.
 
 Decisions:
 
 - `allow` — response delivered to client.
-- `block` — for non-streaming, response is replaced with `403 guardrail_blocked`. For streaming, the response has already been delivered; the decision becomes a flag-only (`langwatch.guardrail.post_flag` trace attribute).
-- `modify` — response body is rewritten. Streaming responses: flag-only.
+- `block` — for non-streaming, the response is replaced with `403 guardrail_blocked` **before the client sees the assistant text**, and a zero-cost `blocked_by_guardrail` budget debit is recorded so dashboards still see the attempt (cost = $0, the provider call was made and paid for, but the ledger marks it as non-billable to the principal). For streaming, the response has already been delivered; the decision becomes a flag-only (`langwatch.guardrail.post_flag` trace attribute).
+- `modify` — the assistant text is rewritten in place (first choice `content` on `/v1/chat/completions`, first text block on `/v1/messages`); redaction is transparent from the client's perspective. Streaming responses: flag-only.
+
+<Note>**Content-block responses skip post-evaluation.** When the model returns a tool-call response (`tool_calls` on OpenAI, `content: [{type: "tool_use", ...}]` on Anthropic) or an image/file block, there's no assistant text to evaluate — the post-guardrail is skipped rather than attempting to reason about structured output. Use `pre` on the tool-call arguments or a dedicated content-aware guardrail if you need to gate tool calls.</Note>
 
 Use cases: hallucination detection on RAG outputs, PII leakage detection in responses, response-quality spot-checks.
+
+#### Fail-open vs fail-closed
+
+By default, post-guardrails **fail closed**: if the evaluator service is unavailable or errors, the response is replaced with `503 guardrail_upstream_unavailable` — the user never sees an ungoverned response.
+
+For VKs where an unavailable guardrail should *not* block (e.g. best-effort redaction on low-stakes traffic), set `guardrails.response_fail_open: true` on the VK config. The gateway then passes the response through with a warning log and a `langwatch.guardrail.fail_open=true` trace attribute.
+
+`pre` guardrails use the same fail-closed default and the same VK opt-out (`guardrails.request_fail_open`).
 
 ### `stream_chunk` — redact/terminate per-chunk
 
