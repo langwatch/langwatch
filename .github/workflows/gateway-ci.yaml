@@ -1,0 +1,110 @@
+name: gateway-ci
+
+# Gateway-specific CI gate. Runs on any PR or main push that touches
+# the Go service source, go module, Dockerfile, Helm chart, or this
+# workflow itself. Keeps the main build-and-push-artifacts pipeline
+# focused on container publish while we keep a fast feedback loop on
+# gateway changes (~60s target).
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: gateway-ci-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      gateway: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.gateway }}
+      chart: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.chart }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        if: github.event_name != 'workflow_dispatch'
+        id: filter
+        with:
+          filters: |
+            gateway:
+              - 'services/gateway/**'
+              - '.github/workflows/gateway-ci.yaml'
+            chart:
+              - 'infrastructure/charts/gateway/**'
+              - '.github/workflows/gateway-ci.yaml'
+
+  go:
+    needs: changes
+    if: ${{ needs.changes.outputs.gateway == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: services/gateway
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Setup Go
+        uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
+        with:
+          go-version-file: services/gateway/go.mod
+          cache-dependency-path: services/gateway/go.sum
+
+      - name: go mod verify
+        run: go mod verify
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go build
+        run: go build ./...
+
+      - name: go test
+        run: go test -count=1 -race ./...
+
+      - name: go test (benchmarks compile check)
+        # Don't run the benchmarks (too noisy for CI) — just verify
+        # they still compile so a regression in hot-path primitives
+        # breaks the build instead of silently rotting.
+        run: go test -bench=. -benchtime=1x -run=^$ ./internal/auth/ ./internal/circuit/ ./internal/budget/ ./internal/fallback/
+
+  helm:
+    needs: changes
+    if: ${{ needs.changes.outputs.chart == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: infrastructure/charts/gateway
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install helm
+        uses: azure/setup-helm@b9e51907a09c216f16ebe8536097933489208112 # v4
+        with:
+          version: v3.18.0
+
+      - name: helm lint
+        run: helm lint .
+
+      - name: helm template (defaults)
+        run: helm template gateway . --dry-run > /tmp/defaults.yaml
+
+      - name: helm template (network policy on)
+        run: helm template gateway . --set networkPolicy.enabled=true --set redis.url=redis://test:6379 --dry-run > /tmp/netpol.yaml
+
+      - name: Assert NetworkPolicy renders when enabled
+        run: |
+          if ! grep -q "kind: NetworkPolicy" /tmp/netpol.yaml; then
+            echo "NetworkPolicy missing from rendered template"; exit 1
+          fi
+          if grep -q "kind: NetworkPolicy" /tmp/defaults.yaml; then
+            echo "NetworkPolicy should NOT render by default"; exit 1
+          fi
