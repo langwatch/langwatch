@@ -1,9 +1,135 @@
 ---
-title: Rbac
-description: Rbac — LangWatch AI Gateway.
-sidebarTitle: Rbac
+title: RBAC
+description: Role-based access control for the LangWatch AI Gateway — resources, actions, and default role mappings.
+sidebarTitle: RBAC
 ---
 
-<Note>This page is a placeholder. Content coming soon in a later iteration — tracked in specs/ai-gateway/ features and the team kanban.</Note>
+The AI Gateway is governed by LangWatch's existing RBAC system — the same resources-and-actions model you already use for traces, datasets, evaluations, and prompts. Six new resources cover every gateway surface; roles (ADMIN / MEMBER / VIEWER / CUSTOM) are assigned at the **team** level and inherit through the project scope.
 
-See [Overview](/ai-gateway/overview) and [Concepts](/ai-gateway/concepts) for the big-picture view in the meantime.
+<Note>This page documents the default permission matrix. Custom roles can carry any combination of the permissions below — see [Custom Roles](/self-hosting/rbac/custom-roles) for how to define one.</Note>
+
+## Resources
+
+Every gateway UI, tRPC call, and REST endpoint checks one of these six resource keys:
+
+| Resource | What it gates |
+|---|---|
+| `virtualKeys` | VK list / detail / drawer / create / update / rotate / revoke / archive. |
+| `gatewayBudgets` | Budget list / detail / drawer / create / update / archive / spend view. |
+| `gatewayProviders` | Provider-binding list / create / update / disable. (Does not cover the underlying `ModelProvider` credential — that's still `project` scope.) |
+| `gatewayGuardrails` | Attaching / detaching guardrails to a VK (the evaluator itself is still `evaluations` scope). |
+| `gatewayLogs` | Audit log list, filter, export. |
+| `gatewayUsage` | `/gateway/usage` stat tiles + time-windowed spend aggregation. |
+
+## Actions
+
+Each resource supports a subset of the standard CRUD action verbs:
+
+| Action | Semantics |
+|---|---|
+| `view` | Read — list + detail pages + REST `GET` endpoints. |
+| `create` | Mint a new record (VK, budget). |
+| `update` | Edit an existing record's fields (but not delete or rotate). |
+| `rotate` | VK-specific: issue a fresh secret and retire the old one with a 24 h grace window. |
+| `delete` | Soft-delete / archive. Budgets use `archived = true`; VKs use `revoked = true`. Hard-delete is not a gateway operation. |
+| `attach` / `detach` | Guardrail-specific: link / unlink an evaluator to a VK direction (pre / post / stream_chunk). |
+| `manage` | Superset — implies all CRUD actions for the resource. |
+
+The full permission set uses the `<resource>:<action>` format — for example `virtualKeys:rotate`, `gatewayBudgets:manage`, `gatewayGuardrails:attach`. Custom roles can pick any subset.
+
+## Default role matrix
+
+| Permission | ADMIN | MEMBER | VIEWER |
+|---|:-:|:-:|:-:|
+| `virtualKeys:view` | ✓ | ✓ | ✓ |
+| `virtualKeys:create` | ✓ | ✓ | |
+| `virtualKeys:update` | ✓ | ✓ | |
+| `virtualKeys:rotate` | ✓ | ✓ | |
+| `virtualKeys:delete` | ✓ | | |
+| `virtualKeys:manage` | ✓ | | |
+| `gatewayBudgets:view` | ✓ | ✓ | ✓ |
+| `gatewayBudgets:create` | ✓ | | |
+| `gatewayBudgets:update` | ✓ | | |
+| `gatewayBudgets:delete` | ✓ | | |
+| `gatewayBudgets:manage` | ✓ | | |
+| `gatewayProviders:view` | ✓ | ✓ | ✓ |
+| `gatewayProviders:update` | ✓ | | |
+| `gatewayProviders:manage` | ✓ | | |
+| `gatewayGuardrails:view` | ✓ | ✓ | ✓ |
+| `gatewayGuardrails:attach` | ✓ | | |
+| `gatewayGuardrails:detach` | ✓ | | |
+| `gatewayGuardrails:manage` | ✓ | | |
+| `gatewayLogs:view` | ✓ | ✓ | ✓ |
+| `gatewayUsage:view` | ✓ | ✓ | ✓ |
+
+### What each default role can actually do
+
+**ADMIN** — full gateway control. Can mint VKs, set budgets (and delete them), swap provider bindings, attach/detach guardrails, read audit logs, view usage.
+
+**MEMBER** — can mint + rotate their own VKs, read budgets + providers + guardrails, read audit logs, view usage. **Cannot** create or delete budgets (finance-level control lives with admins) and cannot attach/detach guardrails (policy change belongs to admins).
+
+**VIEWER** — read-only across every gateway surface. Can see VKs (but cannot see the secret — the secret is only ever shown at create-time, regardless of role), budgets, provider bindings, guardrail attachments, audit logs, usage.
+
+**CUSTOM** — inherits no gateway permissions by default. A custom role starts empty and must be granted the specific permissions you want.
+
+## Public REST API scoping
+
+Every `/api/gateway/v1/*` endpoint enforces the same permission as its equivalent UI action. The mapping is:
+
+| Endpoint | Permission |
+|---|---|
+| `GET /api/gateway/v1/virtual-keys` | `virtualKeys:view` |
+| `POST /api/gateway/v1/virtual-keys` | `virtualKeys:create` |
+| `PATCH /api/gateway/v1/virtual-keys/:id` | `virtualKeys:update` |
+| `POST /api/gateway/v1/virtual-keys/:id/rotate` | `virtualKeys:rotate` |
+| `POST /api/gateway/v1/virtual-keys/:id/revoke` | `virtualKeys:delete` |
+| `GET /api/gateway/v1/budgets` | `gatewayBudgets:view` |
+| `POST /api/gateway/v1/budgets` | `gatewayBudgets:create` |
+| `PATCH /api/gateway/v1/budgets/:id` | `gatewayBudgets:update` |
+| `POST /api/gateway/v1/budgets/:id/archive` | `gatewayBudgets:delete` |
+| `GET /api/gateway/v1/providers` | `gatewayProviders:view` |
+| `POST /api/gateway/v1/providers` | `gatewayProviders:update` |
+| `POST /api/gateway/v1/providers/:id/disable` | `gatewayProviders:update` |
+| `POST /api/gateway/v1/virtual-keys/:id/guardrails` | `gatewayGuardrails:attach` |
+| `DELETE /api/gateway/v1/virtual-keys/:id/guardrails/:guardrailId` | `gatewayGuardrails:detach` |
+| `GET /api/gateway/v1/audit` | `gatewayLogs:view` |
+| `GET /api/gateway/v1/usage` | `gatewayUsage:view` |
+
+A request with an API token that lacks the required permission returns `403 permission_denied` with the missing permission named in the `error.message`:
+
+```json
+{
+  "error": {
+    "type":    "permission_denied",
+    "code":    "permission_denied",
+    "message": "missing permission: virtualKeys:create",
+    "param":   null
+  }
+}
+```
+
+## Principal-scoped VKs
+
+The default role matrix governs *who can mint a VK* — but the VK itself can be further scoped to a specific principal via the `principal_id` field on the VK record.
+
+- A VK with `principal_id = user_abc` bills every request to that principal's principal-scope budget — regardless of which user's API token is calling the gateway.
+- A VK with `principal_id = null` bills to the VK's project-scope budget (no principal attribution).
+
+This matters for coding-CLI rollouts: you mint a per-engineer VK via `langwatch vk create --principal-id <user>`, and the engineer's spend is metered against their personal cap even if they share the VK secret (which they shouldn't, but defence-in-depth).
+
+## SCIM + SSO
+
+Default role matrix assignments flow through SCIM — when an IdP pushes a user with role `MEMBER`, they pick up the gateway permissions in the MEMBER column above. Custom roles must be assigned via LangWatch UI (SCIM doesn't carry custom-role identifiers); the SCIM integration only maps to ADMIN / MEMBER / VIEWER.
+
+## Changing the permission matrix
+
+Default roles are code-defined in `langwatch/src/server/api/rbac.ts` — see commit history for the shipping order. **Do not edit the default matrix in production** — changes to TEAM_ROLE_PERMISSIONS affect every team on the instance. Use a **custom role** instead: create it in the UI, assign the permissions you want, and assign it to specific users.
+
+For the policy rationale (why MEMBER can mint VKs but not create budgets, etc.), see [spec contract §10 — Permissions](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/_shared/contract.md#10-permissions).
+
+## See also
+
+- [Virtual Keys](/ai-gateway/virtual-keys) — lifecycle, rotation, revoke semantics.
+- [Budgets](/ai-gateway/budgets) — scope semantics + breach behaviours.
+- [API Reference: Management](/ai-gateway/api/management) — all REST endpoints with their permission requirements.
+- [Security](/ai-gateway/security) — threat model, secret handling, HMAC/JWT cryptography.
