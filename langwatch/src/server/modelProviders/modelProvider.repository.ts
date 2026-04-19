@@ -49,6 +49,56 @@ export class ModelProviderRepository {
     return results.map((result) => this.withDecryptedKeys(result));
   }
 
+  /**
+   * Find every ModelProvider row visible to a project under the
+   * principal-scope ladder (iter 107 #2): project-scoped rows,
+   * team-scoped rows whose scopeId matches the project's team, and
+   * org-scoped rows whose scopeId matches the project's organization.
+   *
+   * When the same provider (e.g. "openai") appears at multiple
+   * scopes, the narrower scope wins (project > team > org) so a
+   * project admin can always override an inherited row.
+   */
+  async findAllAccessibleForProject(
+    projectId: string,
+    tx?: Prisma.TransactionClient,
+  ): Promise<ModelProvider[]> {
+    const client = tx ?? this.prisma;
+    const project = await client.project.findUnique({
+      where: { id: projectId },
+      select: { id: true, teamId: true, team: { select: { organizationId: true } } },
+    });
+    if (!project) return [];
+    const results = await client.modelProvider.findMany({
+      where: {
+        OR: [
+          { scopeType: "PROJECT", scopeId: projectId },
+          { scopeType: "TEAM", scopeId: project.teamId },
+          { scopeType: "ORGANIZATION", scopeId: project.team.organizationId },
+        ],
+      },
+    });
+    const scopePriority: Record<string, number> = {
+      PROJECT: 3,
+      TEAM: 2,
+      ORGANIZATION: 1,
+    };
+    const byProvider = new Map<string, ModelProvider>();
+    for (const row of results) {
+      const current = byProvider.get(row.provider);
+      if (
+        !current ||
+        (scopePriority[row.scopeType] ?? 0) >
+          (scopePriority[current.scopeType] ?? 0)
+      ) {
+        byProvider.set(row.provider, row);
+      }
+    }
+    return [...byProvider.values()].map((result) =>
+      this.withDecryptedKeys(result),
+    );
+  }
+
   async create(
     data: {
       projectId: string;
