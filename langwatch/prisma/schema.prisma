@@ -92,7 +92,13 @@ model User {
     groupMemberships        GroupMembership[]
     roleBindings            RoleBinding[]
     personalAccessTokens    PersonalAccessToken[]
-
+    virtualKeysCreated      VirtualKey[]           @relation("VirtualKeyCreatedBy")
+    virtualKeysRevoked      VirtualKey[]           @relation("VirtualKeyRevokedBy")
+    gatewayBudgetsCreated   GatewayBudget[]        @relation("GatewayBudgetCreatedBy")
+    gatewayCacheRulesCreated GatewayCacheRule[]    @relation("GatewayCacheRuleCreatedBy")
+    principalVirtualKeys    VirtualKey[]           @relation("VirtualKeyPrincipalUser")
+    principalGatewayBudgets GatewayBudget[]        @relation("PrincipalScopedGatewayBudgets")
+    gatewayAuditLogs        GatewayAuditLog[]      @relation("GatewayAuditLogActor")
 }
 
 model VerificationToken {
@@ -216,6 +222,7 @@ model Organization {
     licenseLastValidatedAt DateTime?
     gatewayBudgets         GatewayBudget[]      @relation("OrgScopedGatewayBudgets")
     gatewayChangeEvents    GatewayChangeEvent[]
+    gatewayCacheRules      GatewayCacheRule[]
 
     @@index([ssoProvider])
 }
@@ -1442,6 +1449,9 @@ enum GatewayChangeEventKind {
     BUDGET_UPDATED
     BUDGET_DELETED
     PROVIDER_BINDING_UPDATED
+    CACHE_RULE_CREATED
+    CACHE_RULE_UPDATED
+    CACHE_RULE_DELETED
 }
 
 enum GatewayAuditAction {
@@ -1456,6 +1466,15 @@ enum GatewayAuditAction {
     PROVIDER_BINDING_CREATED
     PROVIDER_BINDING_UPDATED
     PROVIDER_BINDING_DELETED
+    CACHE_RULE_CREATED
+    CACHE_RULE_UPDATED
+    CACHE_RULE_DELETED
+}
+
+enum GatewayCacheRuleMode {
+    RESPECT
+    FORCE
+    DISABLE
 }
 
 model VirtualKey {
@@ -1700,4 +1719,51 @@ model GatewayAuditLog {
     @@index([projectId, createdAt])
     @@index([actorUserId])
     @@index([targetKind, targetId])
+}
+
+// AI Gateway cache-control rules — operator-defined overrides without
+// client code changes. Org-scoped; compiled into the VK bundle at
+// /changes-refresh time so the hot path stays at ~700 ns. Matchers +
+// action live as JSON so the wire schema can evolve without migrations.
+// See specs/ai-gateway/cache-control-rules.feature for the contract and
+// docs/ai-gateway/cache-control.mdx for the rules-engine narrative.
+model GatewayCacheRule {
+    id             String               @id @default(nanoid())
+    organizationId String
+    organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+    name           String
+    description    String?
+    priority       Int                  @default(100)
+    enabled        Boolean              @default(true)
+
+    // Matchers are ANDed. Null / empty means "no constraint on this field".
+    // Shape (validated in the service layer, JSON on the wire):
+    //   {
+    //     vk_id?: string,
+    //     vk_tags?: string[],
+    //     vk_prefix?: string,
+    //     principal_id?: string,
+    //     model?: string,
+    //     request_metadata?: Record<string, string>
+    //   }
+    matchers       Json
+
+    // Action applied when the rule matches.
+    //   { mode: "respect"|"force"|"disable", ttl?: number, salt?: string }
+    // `mode` is also captured in `modeEnum` so we can index by it; the
+    // JSON column keeps the full action for forward compatibility with
+    // ttl / salt etc.
+    action         Json
+    modeEnum       GatewayCacheRuleMode
+
+    archivedAt     DateTime?
+
+    createdAt      DateTime             @default(now())
+    updatedAt      DateTime             @default(now()) @updatedAt
+    createdById    String
+    createdBy      User                 @relation("GatewayCacheRuleCreatedBy", fields: [createdById], references: [id])
+
+    @@index([organizationId, archivedAt, priority])
+    @@index([organizationId, enabled, priority])
 }

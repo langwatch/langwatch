@@ -23,9 +23,17 @@ const auditActionEnum = z.enum([
   "PROVIDER_BINDING_CREATED",
   "PROVIDER_BINDING_UPDATED",
   "PROVIDER_BINDING_DELETED",
+  "CACHE_RULE_CREATED",
+  "CACHE_RULE_UPDATED",
+  "CACHE_RULE_DELETED",
 ]);
 
-const targetKindEnum = z.enum(["virtual_key", "budget", "provider_binding"]);
+const targetKindEnum = z.enum([
+  "virtual_key",
+  "budget",
+  "provider_binding",
+  "cache_rule",
+]);
 
 export const gatewayAuditRouter = createTRPCRouter({
   list: protectedProcedure

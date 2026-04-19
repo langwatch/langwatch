@@ -9,7 +9,7 @@ export type AppendAuditInput = {
   projectId?: string | null;
   actorUserId?: string | null;
   action: GatewayAuditAction;
-  targetKind: "virtual_key" | "budget" | "provider_binding";
+  targetKind: "virtual_key" | "budget" | "provider_binding" | "cache_rule";
   targetId: string;
   before?: Prisma.InputJsonValue | null;
   after?: Prisma.InputJsonValue | null;

@@ -53,6 +53,7 @@ import { groupRouter } from "./routers/group";
 import { userRouter } from "./routers/user";
 import { gatewayAuditRouter } from "./routers/gatewayAudit";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
+import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayUsageRouter } from "./routers/gatewayUsage";
 import { gatewayProvidersRouter } from "./routers/gatewayProviders";
 import { virtualKeysRouter } from "./routers/virtualKeys";
