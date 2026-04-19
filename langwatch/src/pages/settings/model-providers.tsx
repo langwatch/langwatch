@@ -144,10 +144,14 @@ export default function ModelsPage() {
                   value={provider.provider}
                   onClick={() => {
                     if (!project?.id) return;
+                    // Always open a blank form — lets users configure
+                    // a second (or third…) instance of an already-
+                    // configured provider at a different scope.
                     openDrawer("editModelProvider", {
                       projectId: project.id,
                       organizationId: organization?.id,
                       providerKey: provider.provider,
+                      modelProviderId: "new",
                     });
                   }}
                 >
