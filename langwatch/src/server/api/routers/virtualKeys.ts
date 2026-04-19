@@ -44,7 +44,11 @@ export const virtualKeysRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const service = VirtualKeyService.create(ctx.prisma);
       const keys = await service.getAll(input.projectId);
-      return keys.map((vk) => toListItem(vk));
+      // Batch-enrich all chains in one query for the whole list so
+      // rows can render provider-type icons without an N+1. One
+      // findMany over GatewayProviderCredential, grouped client-side.
+      const enrichedByVk = await enrichChainsForList(ctx.prisma, keys);
+      return keys.map((vk) => toVirtualKeyCamelDto(vk, enrichedByVk.get(vk.id) ?? []));
     }),
 
   get: protectedProcedure
@@ -167,6 +171,44 @@ export const virtualKeysRouter = createTRPCRouter({
 // calls enrichChain() explicitly.
 const toListItem = toVirtualKeyCamelDto;
 const toDetail = toVirtualKeyCamelDto;
+
+async function enrichChainsForList(
+  prisma: import("@prisma/client").PrismaClient,
+  vks: VirtualKeyWithChain[],
+): Promise<Map<string, EnrichedChainEntry[]>> {
+  const allIds = new Set<string>();
+  for (const vk of vks) {
+    for (const pc of vk.providerCredentials) {
+      allIds.add(pc.providerCredentialId);
+    }
+  }
+  if (allIds.size === 0 || vks.length === 0) return new Map();
+  const projectId = vks[0]!.projectId;
+  const rows = await prisma.gatewayProviderCredential.findMany({
+    where: { projectId, id: { in: [...allIds] } },
+    select: {
+      id: true,
+      slot: true,
+      modelProvider: { select: { provider: true } },
+    },
+  });
+  const byId = new Map(rows.map((r) => [r.id, r]));
+  const result = new Map<string, EnrichedChainEntry[]>();
+  for (const vk of vks) {
+    const entries: EnrichedChainEntry[] = [];
+    vk.providerCredentials.forEach((pc, idx) => {
+      const row = byId.get(pc.providerCredentialId);
+      if (!row) return;
+      entries.push({
+        providerCredentialId: pc.providerCredentialId,
+        slot: row.slot ?? (idx === 0 ? "primary" : `fallback-${idx}`),
+        providerType: row.modelProvider.provider,
+      });
+    });
+    result.set(vk.id, entries);
+  }
+  return result;
+}
 
 async function enrichChain(
   prisma: import("@prisma/client").PrismaClient,
