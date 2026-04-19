@@ -51,6 +51,12 @@ type Config struct {
 	ModelsAllowed   []string                 `json:"models_allowed"`
 	RateLimits     RateLimitConfig          `json:"rate_limits"`
 	Budgets        []BudgetSpec             `json:"budgets"`
+	// CacheRules is the priority-ordered (DESC) list of cache-control
+	// overrides baked into the bundle by the control plane. Evaluation
+	// is first-match-wins on a linear scan by internal/cacherules —
+	// no per-request DB or regex compile. Precedence: per-request
+	// X-LangWatch-Cache header > matched rule > VK Cache default.
+	CacheRules     []CacheRuleSpec          `json:"cache_rules"`
 	Permissions    []string                 `json:"permissions"`
 	FetchedAt      time.Time                `json:"-"`
 }
@@ -120,6 +126,50 @@ type BudgetSpec struct {
 	SpentUSD  float64 `json:"spent_usd"`
 	ResetsAt  int64   `json:"resets_at"`
 	OnBreach  string  `json:"on_breach"` // block|warn
+}
+
+// CacheRuleSpec mirrors the cache-control-rules.feature contract §4.1:
+//
+//	{
+//	  "id": "rule_abc", "priority": 500,
+//	  "matchers": {
+//	    "vk_id": "vk_xxx",              // optional exact
+//	    "vk_prefix": "lw_vk_eval_",     // optional prefix
+//	    "vk_tags": ["env=prod"],        // optional AND-across tags
+//	    "principal_id": "user_123",     // optional exact
+//	    "model": "claude-haiku-*",      // optional glob (simple *)
+//	    "request_metadata": {"k": "v"}  // optional all-match
+//	  },
+//	  "action": {
+//	    "mode": "respect|force|disable",
+//	    "ttl_s": 300,   // only when mode=force
+//	    "salt": "..."   // opt custom key salt
+//	  }
+//	}
+//
+// All matcher fields are optional; unspecified = wildcard. All present
+// matchers must match (AND semantics). Rules are pre-sorted priority
+// DESC by the control plane; the gateway just walks first-match-wins.
+type CacheRuleSpec struct {
+	ID       string            `json:"id"`
+	Priority int               `json:"priority"`
+	Matchers CacheRuleMatchers `json:"matchers"`
+	Action   CacheRuleAction   `json:"action"`
+}
+
+type CacheRuleMatchers struct {
+	VKID            string            `json:"vk_id,omitempty"`
+	VKPrefix        string            `json:"vk_prefix,omitempty"`
+	VKTags          []string          `json:"vk_tags,omitempty"`
+	PrincipalID     string            `json:"principal_id,omitempty"`
+	Model           string            `json:"model,omitempty"` // simple glob: trailing *
+	RequestMetadata map[string]string `json:"request_metadata,omitempty"`
+}
+
+type CacheRuleAction struct {
+	Mode string `json:"mode"` // respect|force|disable
+	TTLS int    `json:"ttl_s,omitempty"`
+	Salt string `json:"salt,omitempty"`
 }
 
 // Bundle is what the cache returns — JWT + Config together, with expiry.
