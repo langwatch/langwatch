@@ -54,6 +54,10 @@ type VirtualKeyDetail = {
       requestFailOpen?: boolean;
       responseFailOpen?: boolean;
     };
+    metadata?: {
+      label?: string;
+      tags?: string[];
+    };
   };
 };
 
@@ -145,6 +149,7 @@ export function VirtualKeyEditDrawer({
     urls: { deny: "", allow: "" },
     models: { deny: "", allow: "" },
   });
+  const [tagsCsv, setTagsCsv] = useState<string>("");
   const [guardrails, setGuardrails] = useState<
     Record<GuardrailDirection, GuardrailRef[]>
   >({ pre: [], post: [], streamChunk: [] });
@@ -164,6 +169,7 @@ export function VirtualKeyEditDrawer({
     );
     setCacheMode(vk.config.cache?.mode ?? "respect");
     setCacheTtlS(vk.config.cache?.ttlS ?? 3600);
+    setTagsCsv((vk.config.metadata?.tags ?? []).join(", "));
     setRpm(vk.config.rateLimits?.rpm?.toString() ?? "");
     setTpm(vk.config.rateLimits?.tpm?.toString() ?? "");
     setRpd(vk.config.rateLimits?.rpd?.toString() ?? "");
@@ -331,6 +337,12 @@ export function VirtualKeyEditDrawer({
             requestFailOpen,
             responseFailOpen,
           },
+          metadata: {
+            tags: tagsCsv
+              .split(",")
+              .map((t) => t.trim())
+              .filter((t) => t.length > 0),
+          },
         },
       });
       onSaved();
@@ -393,6 +405,20 @@ export function VirtualKeyEditDrawer({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
               />
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>Tags</Field.Label>
+              <Input
+                value={tagsCsv}
+                onChange={(e) => setTagsCsv(e.target.value)}
+                placeholder="e.g. tier=enterprise, team=ml"
+              />
+              <Field.HelperText>
+                Comma-separated. Cache-control rules can match on{" "}
+                <code>vk_tags</code> as AND-subset, so rule matchers of{" "}
+                <code>["tier=enterprise"]</code> fire for any VK carrying that
+                tag.
+              </Field.HelperText>
             </Field.Root>
 
             <Separator />

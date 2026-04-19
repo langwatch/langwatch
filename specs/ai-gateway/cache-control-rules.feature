@@ -129,12 +129,18 @@ Feature: Cache control rules — operator-defined overrides without client code 
     And the response header "X-LangWatch-Cache-Mode" equals "force"
     And span attribute "langwatch.cache.provider_behavior" equals "automatic"
 
-  Scenario: Action "force" on Gemini returns 400 cache_override_not_implemented (v1)
+  Scenario: Action "force" on Gemini — WARN + passthrough at Apply layer (v1)
     Given a cache rule matching VK "vk_prod_gemini" with action "force" ttl 300
     And the VK resolves to "gemini-2.5-flash"
     When a request arrives at /v1/chat/completions
-    Then the response status is 400
-    And error.type is "cache_override_not_implemented"
+    Then the forwarded request body is byte-identical (Apply layer returns ErrNotImplemented and the dispatcher falls through to passthrough)
+    And the gateway logs a WARN "cache_rule_mode_not_implemented" naming the rule_id + "gemini"
+    And span attribute "langwatch.cache.rule_id" is present (rule still fired)
+    And counter gateway_cache_rule_hits_total bumps with mode_applied tracking the passthrough outcome
+    # Gemini force needs /cachedContents pre-POST which breaks zero-hop routing —
+    # v1.1 design consideration (sergey iter 50 note). Current behaviour matches
+    # the existing Anthropic-unmutated path for consistency; 400 upgrade can be
+    # done as a follow-up if operators want harder feedback on deferred modes.
     And error.message points at /ai-gateway/cache-control#force
 
   Scenario: Action "disable" strips cache_control from Anthropic body recursively
@@ -234,18 +240,21 @@ Feature: Cache control rules — operator-defined overrides without client code 
     # Precedence resolution per iter 47 dispatcher: header > rule > VK default.
     # When the header wins, the rule eval is skipped — no rule_id attribution.
 
-  Scenario: v1 scope — mode=force evaluates + attributes + counts, but body mutation is downgraded to respect
+  Scenario: mode=force injects Anthropic cache_control + attributes + counts (iter 50 lifted from v1.1 to v1)
     Given a cache rule with action.mode = "force" ttl=600 matches a request on /v1/messages
+    And the VK resolves to an Anthropic model
     When the request completes
-    Then the forwarded body has NO cache_control mutations (force body-injection is v1.1)
-    And the gateway logs a WARN naming the rule_id + "force mode downgraded to respect; Anthropic cache_control injection is v1.1"
-    And span attribute "langwatch.cache.rule_id" is present (rule fired — operators see which rule matched)
-    And span attribute "langwatch.cache.mode_applied" equals "RESPECT" (APPLIED mode after downgrade — not the rule's requested mode)
-    And counter gateway_cache_rule_hits_total{rule_id=..., mode_applied="RESPECT"} increments
-    # iter 48 regression-test invariant (a8564c46e): mode_applied tracks what
-    # actually happened, not what the rule asked for. Operators join rule_id
-    # (shows rule intent = force from /cache-rules list) with mode_applied
-    # (shows degraded outcome = respect) to spot the deferred-feature gap.
+    Then the forwarded body has cache_control: {type: "ephemeral"} injected on system[-1]
+    And the forwarded body has cache_control: {type: "ephemeral"} injected on messages[-1].content[-1]
+    And span attribute "langwatch.cache.rule_id" is present
+    And span attribute "langwatch.cache.mode_applied" equals "FORCE" (real force now, no more downgrade)
+    And counter gateway_cache_rule_hits_total{rule_id=..., mode_applied="FORCE"} increments
+    # Lane A iter 50 (521c4a1b7): force mode fully implemented. Apply layer
+    # injects ephemeral cache_control on system[-1] + messages[-1].content[-1]
+    # when the caller hasn't already set them (no-double-inject invariant).
+    # On OpenAI /v1/chat/completions shape it's a no-op on wire (their caching
+    # is automatic) but rule still fires + metric bumps + span attrs emit.
+    # On Gemini force stays WARN+passthrough pending /cachedContents v1.1 work.
 
   # ─────────────────────────────────────────────────────────────────────────
   # §6. RBAC — who can author rules
