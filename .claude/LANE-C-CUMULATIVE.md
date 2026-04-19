@@ -143,7 +143,9 @@ Iter 12: route-registration fix unblocking UI dogfood. Iter 13: V1-GA-READINESS.
 | 17.14 | `1e2f9fa5f` | PR-DESCRIPTION.md — sergey iter 15 credit |
 | 17.15 | `7430708b2` | sergey iter 16 Helm chart sync — helm.mdx values.yaml admin/budget/guardrails stanzas + runbook Helm note |
 | 17.16 | `9cb1cab5d` | PR-DESCRIPTION.md — sergey iter 16 credit |
-| 17.17 | *(this commit)* | sergey iter 17 (per-org /changes) + iter 18 (NetworkPolicy) + iter 19 (gateway CI gate) — scaling.mdx §Per-org /changes, helm.mdx §NetworkPolicy + §Chart and data-plane CI, security.mdx self-hosted note, config.mdx LW_GATEWAY_AUTH_CACHE_CHANGES_POLL_SECONDS annotation |
+| 17.17 | `ef7e43935` | sergey iter 17 (per-org /changes) + iter 18 (NetworkPolicy) + iter 19 (gateway CI gate) — scaling.mdx §Per-org /changes, helm.mdx §NetworkPolicy + §Chart and data-plane CI, security.mdx self-hosted note, config.mdx LW_GATEWAY_AUTH_CACHE_CHANGES_POLL_SECONDS annotation |
+| 18 | `7b62b962f` | semantic-caching.feature (new v1.1 roadmap spec, 318 lines) — golden/safety/headers/observability/lifecycle/compat/migration/out-of-scope sections covering the remaining Portkey competitive gap on the caching axis |
+| 19 | *(this commit)* | sergey iter 20 (startup netcheck) — helm.mdx §Startup network check, config.mdx §Startup gate env table, troubleshooting.mdx new "Pod never becomes ready after a deploy" entry distinguishing DNS vs TCP vs firewall error classes |
 
 ### Iter 17/18/19 sync notes (post-compact)
 

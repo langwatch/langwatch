@@ -155,9 +155,34 @@ Three Kubernetes probes are provided; all hit the gateway's own `/healthz`, `/re
 
 - **Liveness (`/healthz`)** — returns `200 {"status":"ok"}` as long as the process is alive. Never calls the control-plane.
 - **Readiness (`/readyz`)** — only `200` when: bifrost/core is initialised, at least one provider credential resolves successfully, the control-plane's `/api/internal/gateway/resolve-key` is reachable (or bootstrap cache is populated), and the `/changes` long-poll goroutine is running. Returns `503` with a JSON body listing failed checks otherwise.
-- **Startup (`/startupz`)** — similar to readiness but lenient on bootstrap duration for large VK populations.
+- **Startup (`/startupz`)** — similar to readiness but lenient on bootstrap duration for large VK populations. Optionally runs a one-shot network connectivity probe (iter 20, see below) against a configured host list; if any host fails to resolve or dial, `/startupz` never flips green and k8s recycles the pod.
 
 The readiness definition is strict on purpose — a pod should not be hit by the Service until every dependency is usable, otherwise the first requests after a rollout fail.
+
+### Startup network check (iter 20, `f7901b3`)
+
+When `NetworkPolicy` is enabled (iter 18), a subtly-broken egress rule — typically a missing DNS entry or a provider CIDR typo — passes `/livez` and `/healthz` (which never dial outbound) but causes the first customer request to fail. The startup netcheck closes that gap by running a one-shot DNS-resolve + TCP-dial against a configured host list **before** `MarkStarted` fires, failing the pod at deploy time rather than first request.
+
+```yaml
+gateway:
+  startup:
+    # Leave empty to disable (default, backwards-compatible).
+    # Comma-separated host:port list (same wire format as GATEWAY_STARTUP_NETCHECK_HOSTS).
+    netcheckHosts:
+      - api.openai.com:443
+      - api.anthropic.com:443
+      - generativelanguage.googleapis.com:443
+    netcheckTimeout: 2s
+```
+
+Failure-class distinction (the key operational value): the probe separates DNS resolution failures from TCP dial failures in the error message. If a host fails with `dns resolution failed: ...`, the broken rule is DNS egress — almost always the `kube-system :53` rule in your `NetworkPolicy`. If it fails with `tcp dial failed: ...`, DNS worked but the provider `:443` egress rule is broken (wrong CIDR, wrong port, or a missing `egressToProviders` override). Operators can diagnose deploy failures without running `tcpdump` in the pod.
+
+```bash
+# Grep the pod logs after a failed rollout
+kubectl logs -n langwatch deploy/langwatch-gateway | grep -E 'dns resolution failed|tcp dial failed'
+```
+
+The probe is disabled by default (empty list) so greenfield and air-gapped-via-forward-proxy deploys are unaffected. `helm upgrade` on an existing deploy without overriding `startup.netcheckHosts` renders the same ConfigMap it would have pre-iter-20.
 
 ## NetworkPolicy (iter 18, `cd0506a`)
 
