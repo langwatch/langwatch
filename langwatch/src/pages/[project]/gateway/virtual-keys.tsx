@@ -25,7 +25,9 @@ import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretRev
 import { Menu } from "~/components/ui/menu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { api } from "~/utils/api";
 
 type CreatedSecret = { id: string; name: string; secret: string };
@@ -210,9 +212,19 @@ function VirtualKeysPage() {
                     </Table.Cell>
                     <Table.Cell>{vk.fallbackChainLength}</Table.Cell>
                     <Table.Cell>
-                      {vk.lastUsedAt
-                        ? new Date(vk.lastUsedAt).toLocaleString()
-                        : "—"}
+                      {vk.lastUsedAt ? (
+                        <Tooltip
+                          content={new Date(vk.lastUsedAt).toLocaleString()}
+                        >
+                          <Text fontSize="sm">
+                            {formatTimeAgo(new Date(vk.lastUsedAt).getTime())}
+                          </Text>
+                        </Tooltip>
+                      ) : (
+                        <Text fontSize="sm" color="fg.muted">
+                          never
+                        </Text>
+                      )}
                     </Table.Cell>
                     <Table.Cell>
                       {vk.status === "active" && (
