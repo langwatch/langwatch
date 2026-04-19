@@ -317,10 +317,6 @@ model Project {
     defaultModel             String?
     topicClusteringModel     String?
     embeddingsModel          String?
-    /// AI Gateway — per-project OTLP endpoint the gateway sends spans to.
-    /// Null falls back to GATEWAY_OTEL_DEFAULT_ENDPOINT. Consumed by the
-    /// RouterExporter via contract §4.2 observability_endpoint.
-    observabilityEndpoint    String?
     TriggerSent              TriggerSent[]
     annotationScores         AnnotationScore[]
     publicShares             PublicShare[]
