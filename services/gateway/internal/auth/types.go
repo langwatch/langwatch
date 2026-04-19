@@ -213,13 +213,75 @@ type RateLimitConfig struct {
 }
 
 type BudgetSpec struct {
-	Scope     string  `json:"scope"` // org|team|project|virtual_key|principal
-	ScopeID   string  `json:"scope_id"`
-	Window    string  `json:"window"` // minute|hour|day|week|month|total
-	LimitUSD  float64 `json:"limit_usd"`
-	SpentUSD  float64 `json:"spent_usd"`
-	ResetsAt  int64   `json:"resets_at"`
-	OnBreach  string  `json:"on_breach"` // block|warn
+	Scope    string  `json:"scope"` // org|team|project|virtual_key|principal
+	ScopeID  string  `json:"scope_id"`
+	Window   string  `json:"window"` // minute|hour|day|week|month|total
+	LimitUSD float64 `json:"limit_usd"`
+	SpentUSD float64 `json:"spent_usd"`
+	ResetsAt int64   `json:"resets_at"`
+	OnBreach string  `json:"on_breach"` // block|warn
+}
+
+// UnmarshalJSON accepts either a JSON number or a JSON-string-encoded
+// number for LimitUSD + SpentUSD. Prisma serialises Decimal columns
+// (GatewayBudget.limitUsd, ledger amounts) as strings to preserve
+// precision beyond float64; unless we tolerate that on decode the
+// entire /config/:vk_id payload fails, cascading to "no VK config
+// loaded" on every dispatch against a VK with reachable budgets.
+//
+// Finding #30.
+func (s *BudgetSpec) UnmarshalJSON(data []byte) error {
+	type raw struct {
+		Scope    string          `json:"scope"`
+		ScopeID  string          `json:"scope_id"`
+		Window   string          `json:"window"`
+		LimitUSD json.RawMessage `json:"limit_usd"`
+		SpentUSD json.RawMessage `json:"spent_usd"`
+		ResetsAt int64           `json:"resets_at"`
+		OnBreach string          `json:"on_breach"`
+	}
+	var r raw
+	if err := json.Unmarshal(data, &r); err != nil {
+		return err
+	}
+	s.Scope = r.Scope
+	s.ScopeID = r.ScopeID
+	s.Window = r.Window
+	s.ResetsAt = r.ResetsAt
+	s.OnBreach = r.OnBreach
+	limit, err := decodeDecimal(r.LimitUSD)
+	if err != nil {
+		return fmt.Errorf("limit_usd: %w", err)
+	}
+	s.LimitUSD = limit
+	spent, err := decodeDecimal(r.SpentUSD)
+	if err != nil {
+		return fmt.Errorf("spent_usd: %w", err)
+	}
+	s.SpentUSD = spent
+	return nil
+}
+
+// decodeDecimal accepts a JSON number or JSON-string-encoded number
+// and returns a float64. Null / empty / missing decodes to 0. Shared
+// helper for wire-facing Decimal columns (BudgetSpec + any ledger
+// fields downstream).
+func decodeDecimal(raw json.RawMessage) (float64, error) {
+	if len(raw) == 0 || string(raw) == "null" {
+		return 0, nil
+	}
+	var f float64
+	if err := json.Unmarshal(raw, &f); err == nil {
+		return f, nil
+	}
+	var str string
+	if err := json.Unmarshal(raw, &str); err != nil {
+		return 0, fmt.Errorf("not number or numeric string: %w", err)
+	}
+	if str == "" {
+		return 0, nil
+	}
+	return strconv.ParseFloat(str, 64)
 }
 
 // CacheRuleSpec mirrors the cache-control-rules.feature contract §4.1:
