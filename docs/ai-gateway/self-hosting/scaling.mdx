@@ -112,6 +112,22 @@ The gateway is chatty with the control plane on cold-start (`/bootstrap`) and id
 
 Debits flow through the outbox asynchronously — the gateway batches debits to 50/request or 1s delay, whichever first. Control plane sees **~1 debit/min/active-VK**, not per-request.
 
+### Per-org `/changes` long-poll (iter 17, `5119261`)
+
+The gateway maintains **one long-poll goroutine per organization**, not one global poll. On first `ResolveKey` for an org, `ensureOrgPoller(orgID)` spawns a dedicated goroutine that calls:
+
+```
+GET /api/internal/gateway/changes?organization_id=<org>&since=<rev>&timeout_s=25
+```
+
+The cache keeps a per-org revision cursor (`revByOrg` map). Rationale:
+
+- **Correctness first.** Prior to iter 17 the gateway called `/changes` without `organization_id`; the control plane either 400'd or returned empty, so a VK mutation (rotate / revoke / budget update) did not invalidate cache entries until the JWT expired on its own 15-minute timer. Per-org scoping makes invalidation actually fire when a customer mid-stream-revokes a VK.
+- **Goroutine budget is negligible.** At realistic scale (&lt; 100 active orgs per pod) the per-goroutine ~2 KB stack is an irrelevant memory cost versus the correctness win. Idle gateways don't poll for orgs they've never seen.
+- **Readiness probe unchanged.** The cache still tracks a global `maxRev` for the `/readyz` KnownRevision check — a pod is only ready once it has observed at least one successful `/changes` response (of any scope) since boot.
+
+If your control plane sees a sudden jump in `/changes` hit rate after a deploy, that is the expected behavior of iter 17. The jump is sub-linear in active-org count and amortizes to one request per org per ~25 s.
+
 ## Redis L2 (optional)
 
 Enabling `REDIS_URL` adds a shared L2 cache for resolved VKs. New replicas warm from Redis instead of calling `/resolve-key` for every cold VK: **~30 ms per cold-key round-trip to the control plane vs. ~2 ms per L2 JSON round-trip** (measured against a local miniredis). On a deploy that bounces ten pods, this is the difference between the control plane serving a thundering herd of resolve-key calls and serving roughly zero.

@@ -36,7 +36,7 @@ Rotate `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` together — the
 |---|---|---|
 | `LW_GATEWAY_AUTH_CACHE_L1_SIZE` | `10000` | In-process LRU capacity (per replica) |
 | `LW_GATEWAY_AUTH_CACHE_TTL_SECONDS` | `900` | JWT TTL / L1 expiry. Matches `/resolve-key` JWT `exp` |
-| `LW_GATEWAY_AUTH_CACHE_CHANGES_POLL_SECONDS` | `25` | Long-poll interval against `/api/internal/gateway/changes` |
+| `LW_GATEWAY_AUTH_CACHE_CHANGES_POLL_SECONDS` | `25` | Long-poll interval against `/api/internal/gateway/changes`. Per-org scoped — one goroutine per organization observed on this pod (Lane A iter 17, `5119261`). See [Scaling → Per-org /changes](/ai-gateway/self-hosting/scaling#per-org-changes-long-poll-iter-17-5119261) |
 | `LW_GATEWAY_AUTH_CACHE_BOOTSTRAP` | `true` | On startup, pre-warm L1 via `/bootstrap` call |
 
 See [Auth Cache Architecture](/ai-gateway/observability#auth-cache-architecture) for the two-tier L1/L2 design.
