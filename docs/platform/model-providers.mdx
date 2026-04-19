@@ -56,25 +56,25 @@ Radio options that your role doesn't cover are hidden (not greyed-out) — e.g. 
 
 Once you've picked the scope, the rest of the form is the same as before: provider type (OpenAI / Anthropic / Azure / Bedrock / Vertex / Gemini / Custom OpenAI-compatible), credential fields, optional rotation policy.
 
-## Editing a provider's scope
+## Changing a provider's scope
 
-Widening or narrowing a provider's scope is a common operation (e.g. promoting a successful project-scoped experiment to org-wide, or narrowing a mis-scoped org credential).
+<Note>**v1 behaviour**: scope is set at create time and is immutable in the edit drawer. To change a provider's scope, create a new row at the desired scope, then delete the original. In-place widen/narrow with automatic binding reconciliation is a v1.1 follow-up. The design for that flow is described below for forward reference.</Note>
 
-### Widening (Project → Team → Organisation)
+### v1.1 plan — Widening (Project → Team → Organisation)
 
-Strictly additive. The provider becomes available to more projects; existing bindings continue to work unchanged (they reference the provider by id, not by scope). The edit drawer surfaces a warning: "This provider will become available to every project in the org."
+Strictly additive. The provider becomes available to more projects; existing bindings continue to work unchanged (they reference the provider by id, not by scope). The edit drawer will surface a warning: "This provider will become available to every project in the org."
 
-### Narrowing (Organisation → Team → Project)
+### v1.1 plan — Narrowing (Organisation → Team → Project)
 
-Narrowing can orphan downstream bindings. The edit drawer shows a confirmation modal listing every binding that will be archived, before you save. Archival is explicit — each archived binding emits an audit-log entry so you can reconstruct exactly what happened.
+Narrowing can orphan downstream bindings. The edit drawer will show a confirmation modal listing every binding that will be archived before saving. Archival is explicit — each archived binding emits an audit-log entry so you can reconstruct exactly what happened.
 
-<Warning>Narrowing scope never silent-revokes. If your narrow would leave 4 bindings outside the new scope, the modal shows you exactly those 4 before you confirm.</Warning>
+<Warning>Narrowing scope never silent-revokes. When shipped, the flow will show you exactly which bindings fall outside the new scope before you confirm.</Warning>
 
 ## Overriding an inherited provider at a narrower scope
 
-If a project needs its own OpenAI key — different rate limits, different region, a dedicated billing account — you don't have to remove the inherited one. The inherited row is listed on Settings → Model Providers with a gray background and an **Override at project scope** action in its kebab menu.
+If a project needs its own OpenAI key — different rate limits, different region, a dedicated billing account — you don't have to remove the inherited one. Create a new provider with the same type at **Project** scope; the narrower row takes precedence and is the effective credential. The inherited row remains visible in the list (so you understand where it came from) but is no longer used for resolution on that project.
 
-Clicking override opens the create drawer pre-filled with the inherited row's config but with Scope pre-set to **Project**. You edit only what differs. The new row becomes the effective credential for that project; the inherited row remains visible (so you understand where it came from) but is no longer used.
+<Note>In v1 the inherited row shows its scope badge (Org / Team) but does not have an **Override at project scope** action in its kebab menu — you create the project-scoped row directly from **New provider**. The inline override affordance is a v1.1 follow-up.</Note>
 
 ## AI Gateway provider bindings
 
