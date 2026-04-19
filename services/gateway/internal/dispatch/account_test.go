@@ -90,6 +90,50 @@ func TestAccountConfiguredProvidersIsStandardList(t *testing.T) {
 	}
 }
 
+func TestSetTestProviderBaseURL_SteersGetConfig(t *testing.T) {
+	t.Cleanup(func() { SetTestProviderBaseURL(nil) })
+
+	a := newAccount()
+	// No override set: defaults empty so providers pick their canonical host.
+	cfg, err := a.GetConfigForProvider(bfschemas.OpenAI)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if cfg.NetworkConfig.BaseURL != "" {
+		t.Errorf("want empty default BaseURL, got %q", cfg.NetworkConfig.BaseURL)
+	}
+
+	SetTestProviderBaseURL(map[bfschemas.ModelProvider]string{
+		bfschemas.OpenAI:    "http://127.0.0.1:12345",
+		bfschemas.Anthropic: "http://127.0.0.1:23456",
+	})
+
+	cfg, err = a.GetConfigForProvider(bfschemas.OpenAI)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if cfg.NetworkConfig.BaseURL != "http://127.0.0.1:12345" {
+		t.Errorf("want overridden BaseURL, got %q", cfg.NetworkConfig.BaseURL)
+	}
+
+	cfg, err = a.GetConfigForProvider(bfschemas.Gemini)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if cfg.NetworkConfig.BaseURL != "" {
+		t.Errorf("gemini has no override; want empty, got %q", cfg.NetworkConfig.BaseURL)
+	}
+
+	SetTestProviderBaseURL(nil)
+	cfg, err = a.GetConfigForProvider(bfschemas.OpenAI)
+	if err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if cfg.NetworkConfig.BaseURL != "" {
+		t.Errorf("after clear, want empty, got %q", cfg.NetworkConfig.BaseURL)
+	}
+}
+
 func TestAccountFiltersOtherProviders(t *testing.T) {
 	creds := []byte(`{"api_key":"x"}`)
 	b := bundleWithCreds([]auth.ProviderCred{
