@@ -40,7 +40,7 @@ Project "acme-api" sees:
 
 ## Creating a provider
 
-**Settings → Model Providers → New provider** opens the create drawer with a Scope radio at the top.
+**Settings → Model Providers → New provider** opens the create drawer with an **Availability** radio group near the bottom of the form — three options: Project, Team, Organization.
 
 | Option | Requires | Available to |
 |---|---|---|
@@ -48,7 +48,11 @@ Project "acme-api" sees:
 | **Team** | team-admin on the selected team | every project under the team |
 | **Organisation** | org-admin | every project in the org |
 
-The radio grays out scopes you can't manage, with a tooltip explaining the required role. Default selection is **Project** — least-privilege by default.
+Radio options that your role doesn't cover are hidden (not greyed-out) — e.g. a user on a personal org with no team sees only Project + Organization; a user who doesn't belong to a team sees the Team option omitted. Default selection is **Project** — least-privilege by default. Helper text under the radio describes each scope's blast radius:
+
+- **Project** — Only this project can use this provider.
+- **Team** — Every project in the team inherits this provider.
+- **Organization** — Every project in the organization inherits this provider.
 
 Once you've picked the scope, the rest of the form is the same as before: provider type (OpenAI / Anthropic / Azure / Bedrock / Vertex / Gemini / Custom OpenAI-compatible), credential fields, optional rotation policy.
 
