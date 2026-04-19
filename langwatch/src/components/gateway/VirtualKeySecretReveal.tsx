@@ -5,6 +5,7 @@ import {
   Code,
   HStack,
   IconButton,
+  Separator,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -148,8 +149,12 @@ export function VirtualKeySecretReveal({
                 </HStack>
               </VStack>
 
+              <Separator />
               <VirtualKeyUsageSnippet secret={secret} />
-
+            </VStack>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <HStack width="full" gap={4}>
               <HStack>
                 <input
                   type="checkbox"
@@ -163,16 +168,15 @@ export function VirtualKeySecretReveal({
                   </Text>
                 </label>
               </HStack>
-            </VStack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Button
-              colorPalette="orange"
-              onClick={close}
-              disabled={!confirmed}
-            >
-              Close
-            </Button>
+              <Box flex={1} />
+              <Button
+                colorPalette="orange"
+                onClick={close}
+                disabled={!confirmed}
+              >
+                Close
+              </Button>
+            </HStack>
           </Dialog.Footer>
       </Dialog.Content>
     </Dialog.Root>
