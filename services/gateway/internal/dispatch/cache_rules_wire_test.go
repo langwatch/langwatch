@@ -118,7 +118,9 @@ func TestApplyCacheOverride_RuleDisableStripsCacheControl(t *testing.T) {
 	}
 }
 
-func TestApplyCacheOverride_RuleForceDowngradesToRespect(t *testing.T) {
+func TestApplyCacheOverride_RuleForceInjectsOnAnthropic(t *testing.T) {
+	// Iter 50: force is now implemented for Anthropic-shape bodies.
+	// Body with NO cache_control on the target block gets the marker.
 	d, m := testDispatcher(t)
 	rules := []auth.CacheRuleSpec{
 		{ID: "r_force", Priority: 500, Matchers: auth.CacheRuleMatchers{VKPrefix: "lw_vk_live_"}, Action: auth.CacheRuleAction{Mode: "force", TTLS: 600}},
@@ -126,22 +128,47 @@ func TestApplyCacheOverride_RuleForceDowngradesToRespect(t *testing.T) {
 	b := testBundle(rules)
 
 	rec := httptest.NewRecorder()
-	body := bodyWithCache()
+	// Anthropic-shape body with NO cache_control initially.
+	body := `{"system":[{"type":"text","text":"hi"}],"messages":[{"role":"user","content":"ping"}]}`
 
 	out, ok := d.applyCacheOverride(rec, httptest.NewRequest("POST", "/v1/messages", strings.NewReader(body)), []byte(body), "req_x", b)
 	if !ok {
 		t.Fatal("expected continue")
 	}
-	// v1 deferral: force downgrades to respect, body unchanged
+	// Force injected cache_control on system[-1]
 	if !strings.Contains(string(out), `"cache_control":{"type":"ephemeral"}`) {
-		t.Errorf("force-deferred should preserve cache_control; got %s", out)
+		t.Errorf("force should inject cache_control ephemeral; got %s", out)
 	}
-	if got := rec.Header().Get("X-LangWatch-Cache-Mode"); got != "respect" {
-		t.Errorf("force-deferred X-LangWatch-Cache-Mode=%q want respect", got)
+	if got := rec.Header().Get("X-LangWatch-Cache-Mode"); got != "force" {
+		t.Errorf("X-LangWatch-Cache-Mode=%q want force", got)
 	}
-	// Metric still fires — operators need to see the rule matched
-	if v := counterValue(t, m, "r_force", "RESPECT"); v != 1 {
-		t.Errorf("rule metric should fire once for force→respect downgrade; got %f", v)
+	// Metric fires with FORCE on mode_applied
+	if v := counterValue(t, m, "r_force", "FORCE"); v != 1 {
+		t.Errorf("rule metric should fire once with FORCE label; got %f", v)
+	}
+}
+
+func TestApplyCacheOverride_RuleForceOpenAIShapePassthrough(t *testing.T) {
+	// Force on OpenAI-shape body (string content) is a body-level
+	// no-op — their caching is automatic. Rule still fires so
+	// operators see it in metrics + span attrs.
+	d, m := testDispatcher(t)
+	rules := []auth.CacheRuleSpec{
+		{ID: "r_force_openai", Priority: 500, Matchers: auth.CacheRuleMatchers{VKPrefix: "lw_vk_live_"}, Action: auth.CacheRuleAction{Mode: "force", TTLS: 300}},
+	}
+	b := testBundle(rules)
+
+	rec := httptest.NewRecorder()
+	body := `{"model":"gpt-5-mini","messages":[{"role":"user","content":"ping"}]}`
+	out, ok := d.applyCacheOverride(rec, httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader(body)), []byte(body), "req_x", b)
+	if !ok {
+		t.Fatal("expected continue")
+	}
+	if string(out) != body {
+		t.Errorf("OpenAI shape should be byte-identical on force; got %s", out)
+	}
+	if v := counterValue(t, m, "r_force_openai", "FORCE"); v != 1 {
+		t.Errorf("metric should still fire on OpenAI-shape passthrough; got %f", v)
 	}
 }
 
