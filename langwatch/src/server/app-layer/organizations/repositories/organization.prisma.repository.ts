@@ -4,6 +4,7 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
   type Currency,
+  type GatewayAuditAction,
   type Prisma,
   type PrismaClient,
 } from "@prisma/client";
@@ -930,38 +931,95 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       Object.assign(where, andConditions[0]);
     }
 
-    const totalCount = await this.prisma.auditLog.count({ where });
+    // Gateway audit rows are filtered by the same org + optional project +
+    // date window, PLUS the targetKind/targetId deep-link filter which
+    // only applies to gateway rows. If `targetKind` is set, we skip the
+    // platform AuditLog query entirely (platform rows have no target-kind
+    // concept, so no match is possible by definition).
+    const targetKind = filters.targetKind;
+    const targetId = filters.targetId;
+    const skipPlatform = !!targetKind || !!targetId;
 
-    const auditLogs = await this.prisma.auditLog.findMany({
-      where,
-      take: pageSize,
-      skip: pageOffset,
-      orderBy: { createdAt: "desc" },
-    });
+    const gatewayWhere: Prisma.GatewayAuditLogWhereInput = {
+      organizationId,
+      ...(projectId ? { projectId } : {}),
+      ...(userId ? { actorUserId: userId } : {}),
+      ...(targetKind ? { targetKind } : {}),
+      ...(targetId ? { targetId } : {}),
+      ...(action
+        ? {
+            action: {
+              // Prisma enum filter needs exact-match list; fall through to
+              // a client-side filter if the caller sent a partial action
+              // substring. Platform-side uses `contains`; gateway-side
+              // enums are strict, so accept only a full-enum match here.
+              equals: action as GatewayAuditAction,
+            },
+          }
+        : {}),
+      ...(startDate !== undefined || endDate !== undefined
+        ? {
+            createdAt: {
+              ...(startDate !== undefined ? { gte: new Date(startDate) } : {}),
+              ...(endDate !== undefined ? { lte: new Date(endDate) } : {}),
+            },
+          }
+        : {}),
+    };
 
-    const userIds = [...new Set(auditLogs.map((log) => log.userId))];
+    const [platformTotal, gatewayTotal, platformRows, gatewayRows] =
+      await Promise.all([
+        skipPlatform
+          ? Promise.resolve(0)
+          : this.prisma.auditLog.count({ where }),
+        this.prisma.gatewayAuditLog.count({ where: gatewayWhere }),
+        skipPlatform
+          ? Promise.resolve([])
+          : this.prisma.auditLog.findMany({
+              where,
+              // Over-fetch from each source so the post-merge slice is
+              // stable at small page sizes. Cap the over-fetch to 2×
+              // pageSize per source to bound the memory cost.
+              take: pageSize + pageOffset,
+              orderBy: { createdAt: "desc" },
+            }),
+        this.prisma.gatewayAuditLog.findMany({
+          where: gatewayWhere,
+          take: pageSize + pageOffset,
+          orderBy: { createdAt: "desc" },
+        }),
+      ]);
+
+    // Gather resolver inputs from both sources before the batched fetch.
+    const userIds = [
+      ...new Set([
+        ...platformRows.map((r) => r.userId),
+        ...gatewayRows.map((r) => r.actorUserId).filter((id): id is string => !!id),
+      ]),
+    ];
     const projectIds = [
       ...new Set(
-        auditLogs
-          .map((log) => log.projectId)
-          .filter((id): id is string => !!id),
+        [
+          ...platformRows.map((r) => r.projectId),
+          ...gatewayRows.map((r) => r.projectId),
+        ].filter((id): id is string => !!id),
       ),
     ];
 
-    const users = await this.prisma.user.findMany({
-      where: { id: { in: userIds } },
-      select: { id: true, name: true, email: true },
-    });
-
-    const projects = await this.prisma.project.findMany({
-      where: { id: { in: projectIds } },
-      select: { id: true, name: true },
-    });
-
+    const [users, projects] = await Promise.all([
+      this.prisma.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, email: true },
+      }),
+      this.prisma.project.findMany({
+        where: { id: { in: projectIds } },
+        select: { id: true, name: true },
+      }),
+    ]);
     const userMap = new Map(users.map((u) => [u.id, u]));
     const projectMap = new Map(projects.map((p) => [p.id, p]));
 
-    const enrichedAuditLogs: EnrichedAuditLog[] = auditLogs.map((log) => ({
+    const platformEnriched: EnrichedAuditLog[] = platformRows.map((log) => ({
       id: log.id,
       createdAt: log.createdAt,
       userId: log.userId,
@@ -975,8 +1033,43 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       args: log.args,
       user: userMap.get(log.userId) ?? null,
       project: log.projectId ? (projectMap.get(log.projectId) ?? null) : null,
+      source: "platform" as const,
+      targetKind: null,
+      targetId: null,
+      before: null,
+      after: null,
     }));
 
-    return { auditLogs: enrichedAuditLogs, totalCount };
+    const gatewayEnriched: EnrichedAuditLog[] = gatewayRows.map((log) => ({
+      id: log.id,
+      createdAt: log.createdAt,
+      userId: log.actorUserId ?? "",
+      organizationId: log.organizationId,
+      projectId: log.projectId,
+      action: log.action,
+      payload: log.after ?? log.before ?? null,
+      ipAddress: null,
+      userAgent: null,
+      error: null,
+      args: { before: log.before, after: log.after },
+      user: log.actorUserId ? (userMap.get(log.actorUserId) ?? null) : null,
+      project: log.projectId ? (projectMap.get(log.projectId) ?? null) : null,
+      source: "gateway" as const,
+      targetKind: log.targetKind,
+      targetId: log.targetId,
+      before: log.before,
+      after: log.after,
+    }));
+
+    // Merge + sort by createdAt DESC, then apply the requested page slice.
+    const merged = [...platformEnriched, ...gatewayEnriched].sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime(),
+    );
+    const paginated = merged.slice(pageOffset, pageOffset + pageSize);
+
+    return {
+      auditLogs: paginated,
+      totalCount: platformTotal + gatewayTotal,
+    };
   }
 }

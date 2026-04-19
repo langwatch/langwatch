@@ -128,10 +128,23 @@ export interface AuditLogFilters {
   action?: string;
   startDate?: number;
   endDate?: number;
+  /**
+   * Filter by gateway-resource kind, e.g. "virtual_key" / "budget" /
+   * "provider_binding" / "cache_rule". Only matches rows sourced from
+   * GatewayAuditLog — platform rows have no target-kind concept.
+   */
+  targetKind?: string;
+  /**
+   * Filter to a single target-resource id. Used by the VK/Budget detail
+   * page deep-link pattern; pairs with `targetKind` for type safety.
+   */
+  targetId?: string;
 }
 
 /**
  * Enriched audit log entry with resolved user and project data.
+ * Unified across the platform's `AuditLog` table (source="platform") and
+ * the gateway's `GatewayAuditLog` table (source="gateway").
  */
 export interface EnrichedAuditLog {
   id: string;
@@ -147,6 +160,21 @@ export interface EnrichedAuditLog {
   args: unknown;
   user: { id: string; name: string | null; email: string | null } | null;
   project: { id: string; name: string } | null;
+  /**
+   * Which system wrote this audit row. Platform rows come from
+   * `AuditLog` (org-level actions, evaluator runs, etc); gateway rows
+   * come from `GatewayAuditLog` (VK / budget / provider / cache-rule
+   * mutations).
+   */
+  source: "platform" | "gateway";
+  /** Gateway resource kind — only set when source="gateway". */
+  targetKind: string | null;
+  /** Gateway resource id — only set when source="gateway". */
+  targetId: string | null;
+  /** Gateway-side diff (before state). Only set when source="gateway". */
+  before: unknown;
+  /** Gateway-side diff (after state). Only set when source="gateway". */
+  after: unknown;
 }
 
 /**
