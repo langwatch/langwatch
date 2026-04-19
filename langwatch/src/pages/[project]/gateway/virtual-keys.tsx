@@ -28,6 +28,7 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { api } from "~/utils/api";
 
@@ -221,7 +222,12 @@ function VirtualKeysPage() {
                         {vk.status}
                       </Badge>
                     </Table.Cell>
-                    <Table.Cell>{vk.fallbackChainLength}</Table.Cell>
+                    <Table.Cell>
+                      <ProviderChainBadges
+                        chain={vk.providerChain ?? []}
+                        fallbackLength={vk.fallbackChainLength}
+                      />
+                    </Table.Cell>
                     <Table.Cell>
                       {vk.lastUsedAt ? (
                         <Tooltip
@@ -343,6 +349,64 @@ function VirtualKeysPage() {
         onConfirm={confirmRevoke}
       />
     </GatewayLayout>
+  );
+}
+
+type ChainEntry = {
+  providerCredentialId: string;
+  slot: string;
+  providerType: string;
+};
+
+function ProviderChainBadges({
+  chain,
+  fallbackLength,
+}: {
+  chain: ChainEntry[];
+  fallbackLength: number;
+}) {
+  // Graceful fallback: if the router hasn't enriched yet (or an old
+  // cache returns without providerChain), show the plain count.
+  if (chain.length === 0) {
+    return <Text fontSize="sm">{fallbackLength}</Text>;
+  }
+  const label = chain.map((c) => c.providerType).join(" → ");
+  return (
+    <Tooltip content={label}>
+      <HStack gap={1}>
+        {chain.map((entry, idx) => {
+          const icon =
+            entry.providerType in modelProviderIcons
+              ? modelProviderIcons[
+                  entry.providerType as keyof typeof modelProviderIcons
+                ]
+              : null;
+          return (
+            <HStack
+              key={entry.providerCredentialId}
+              gap={1}
+              align="center"
+            >
+              <Box
+                width="16px"
+                height="16px"
+                display="flex"
+                alignItems="center"
+                justifyContent="center"
+                opacity={idx === 0 ? 1 : 0.6}
+              >
+                {icon}
+              </Box>
+              {idx < chain.length - 1 && (
+                <Text fontSize="2xs" color="fg.muted">
+                  →
+                </Text>
+              )}
+            </HStack>
+          );
+        })}
+      </HStack>
+    </Tooltip>
   );
 }
 
