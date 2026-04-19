@@ -204,6 +204,11 @@ export const projectRoutes = {
     title: "Usage",
     parent: "gateway",
   },
+  gateway_audit: {
+    path: "/[project]/gateway/audit",
+    title: "Audit log",
+    parent: "gateway",
+  },
   ops: {
     path: "/ops",
     title: "Ops",

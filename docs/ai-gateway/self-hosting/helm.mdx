@@ -112,6 +112,41 @@ Then mirror the same values into the LangWatch app's secret (`LW_GATEWAY_INTERNA
 
 `LW_VIRTUAL_KEY_PEPPER` is control-plane-only and should never appear in gateway secrets.
 
+### Secret rotation (iter 25, `921365f`)
+
+Rotate `LW_GATEWAY_JWT_SECRET` (and `LW_GATEWAY_INTERNAL_SECRET`) without downtime using the dual-key overlap pattern. The chart exposes the retired key via a second secret reference:
+
+```yaml
+gateway:
+  secrets:
+    jwtSecretName: gateway-secrets
+    jwtSecretKey: jwt
+    # During rotation: point at the previous key for ~15 min. Remove after.
+    jwtSecretPreviousName: gateway-secrets
+    jwtSecretPreviousKey: jwt-previous
+```
+
+The `deployment.yaml` conditionally renders the second `secretKeyRef` — when `jwtSecretPreviousName` is empty (steady state), no second env var is set and the gateway runs in strict mode.
+
+**4-step zero-downtime flow:**
+
+1. Flip the control-plane signing secret to the new value.
+2. Update the `gateway-secrets` Secret: store both old and new (`jwt = new`, `jwt-previous = old`). `helm upgrade` with `jwtSecretPreviousKey: jwt-previous`.
+3. Rolling restart: new pods pick up both keys. Old bundles verify against `jwt-previous`, new bundles sign+verify with `jwt`.
+4. After ~15 min (longest bundle TTL), remove `jwt-previous` from the Secret and `jwtSecretPreviousName` from values. Rolling restart. Strict mode resumes.
+
+The gateway emits a `jwt_secret_rotation_active` WARN log on boot whenever the previous-key env var is set — operators should monitor for runaway rotation windows (accepting a retired key forever is a security-posture regression).
+
+```bash
+# Alert on rotation window > 30 min
+kubectl logs -n langwatch deploy/langwatch-gateway | \
+  grep jwt_secret_rotation_active
+```
+
+`LW_GATEWAY_INTERNAL_SECRET` rotation uses the identical pattern (`internalSecretPreviousKey`) — the HMAC verifier accepts both secrets during the overlap window. Rotate both together in one operation.
+
+See [Config → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation-iter-25-921365f) for the env-var contract.
+
 ## Networking
 
 The gateway needs to reach:
