@@ -134,8 +134,20 @@ For SSE streaming, a terminal `event: error` frame carries the same envelope and
 
 ```
 event: error
-data: {"error":{"type":"provider_error","code":"provider_error","message":"Upstream connection reset after 2 chunks","param":null}}
+data: {"error":{"type":"provider_error","code":"upstream_mid_stream_failure","message":"Upstream connection reset after 2 chunks","param":null}}
 
 ```
 
 Clients that receive chunks and then an `error` frame should treat the response as incomplete (partial) and `X-LangWatch-Request-Id` still identifies the session in traces.
+
+### Mid-stream `code` values
+
+Once bytes are flowing, the HTTP status is already 200 — so the distinguishing signal for clients is the `code` field inside the terminal frame:
+
+| `code` | Source | Meaning |
+|---|---|---|
+| `upstream_mid_stream_failure` | provider path | Upstream errored, reset, or closed unexpectedly after at least one chunk was emitted. Pre-connection failures fall through the transparent-fallback path and never reach the client, so seeing this code means fallback was either not configured, already exhausted, or the failure happened too late. |
+| `stream_chunk_blocked` | guardrail path | A `stream_chunk` guardrail returned `block` on a visible-text frame before emit. Subsequent upstream chunks are discarded (see [Guardrails → stream_chunk](/ai-gateway/guardrails#stream_chunk)). The channel is closed immediately after the frame. |
+| `guardrail_upstream_unavailable` | guardrail path | Terminal path is flag-only for streaming (see [Guardrails → fail-open vs fail-closed](/ai-gateway/guardrails#fail-open-vs-fail-closed)); you'll see this code only if a future iter wires post-stream enforcement. |
+
+<Note>The `type` on a streaming terminal frame always reflects the category (`provider_error`, `guardrail_blocked`) — clients keying off `type` will already have a usable classification. The `code` is the granular discriminator if you need it (for example, a retry policy that distinguishes "upstream flaked, retry with a different VK" from "guardrail policy said no, don't retry").</Note>
