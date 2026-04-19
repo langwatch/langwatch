@@ -240,6 +240,18 @@ export const EditModelProviderForm = ({
           organizationName={organization?.name}
           projectId={project?.id}
           projectName={project?.name}
+          availableTeams={
+            organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? []
+          }
+          availableProjects={
+            organization?.teams?.flatMap((t) =>
+              t.projects.map((p) => ({
+                id: p.id,
+                name: `${p.name} · ${t.name}`,
+                teamId: t.id,
+              })),
+            ) ?? []
+          }
         />
 
         <ExtraHeadersSection

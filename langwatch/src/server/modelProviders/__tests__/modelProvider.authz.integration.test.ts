@@ -423,6 +423,61 @@ describe.skipIf(isTestcontainersOnly || !hasCredentialsSecret)(
     });
 
     // =========================================================================
+    // Scope replacement on update: passing a new `scopes` array replaces
+    // the whole set atomically. Makes sure the drawer's multi-select
+    // writes don't accidentally accumulate stale rows.
+    // =========================================================================
+
+    describe("given an existing MP with ORG+TEAM scopes", () => {
+      describe("when an org admin replaces it with PROJECT-only", () => {
+        it("drops the old scope rows and leaves only the new one", async () => {
+          const created = await service().updateModelProvider(
+            {
+              projectId: projectAId,
+              provider: "groq",
+              enabled: true,
+              customKeys: { GROQ_API_KEY: `sk-groq-replace-${ns}` },
+              scopes: [
+                { scopeType: "ORGANIZATION", scopeId: organizationId },
+                { scopeType: "TEAM", scopeId: teamAId },
+              ],
+            },
+            ctxFor(orgAdminUserId),
+          );
+          // Sanity check: both scopes persisted.
+          {
+            const stored = await prisma.modelProvider.findFirst({
+              where: { id: created.id, projectId: projectAId },
+              include: { scopes: true },
+            });
+            expect(stored?.scopes).toHaveLength(2);
+          }
+
+          await service().updateModelProvider(
+            {
+              id: created.id,
+              projectId: projectAId,
+              provider: "groq",
+              enabled: true,
+              scopes: [{ scopeType: "PROJECT", scopeId: projectAId }],
+            },
+            ctxFor(orgAdminUserId),
+          );
+
+          const after = await prisma.modelProvider.findFirst({
+            where: { id: created.id, projectId: projectAId },
+            include: { scopes: true },
+          });
+          expect(after?.scopes).toHaveLength(1);
+          expect(after?.scopes[0]).toMatchObject({
+            scopeType: "PROJECT",
+            scopeId: projectAId,
+          });
+        });
+      });
+    });
+
+    // =========================================================================
     // Read gate: NOT_FOUND (not FORBIDDEN) for unreadable scopes
     // =========================================================================
 

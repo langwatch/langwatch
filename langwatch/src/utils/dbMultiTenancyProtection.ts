@@ -101,6 +101,14 @@ const EXEMPT_MODELS = [
    * tests pin that shape.
    */
   "ModelProvider",
+  /**
+   * ModelProviderScope (iter 109) is the N:M join table between a
+   * ModelProvider row and its (scopeType, scopeId) entries. It has no
+   * projectId column — access is always gated through the parent MP
+   * (repository replaces the scope set inside a transaction keyed on
+   * `modelProviderId`). Same rationale as VirtualKeyProviderCredential.
+   */
+  "ModelProviderScope",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
