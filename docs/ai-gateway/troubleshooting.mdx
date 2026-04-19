@@ -297,9 +297,73 @@ When you don't know where to start:
 
 If none of the above narrows it: post in `#ai-gateway-support` with the request id and the full response headers. LangWatch oncall will trace it within an hour.
 
+## `503 guardrail_upstream_unavailable`
+
+**Symptoms:**
+- Requests that previously worked return 503 with `type=guardrail_upstream_unavailable` and `code=guardrail_upstream_unavailable`.
+- The LangWatch evaluator dashboard shows errors or timeouts on evaluators attached to the VK.
+- Metric `gateway_guardrail_verdicts_total{verdict="upstream_unavailable"}` is climbing.
+
+**Root cause:** a `pre` or `post` guardrail's evaluator service (LangEvals, custom webhook evaluator, etc.) is unreachable or erroring, and the VK's fail-open toggle is `false`. The gateway's default is **fail closed** — if policy can't be evaluated, the request is refused rather than passed through ungoverned.
+
+**Diagnose:**
+
+```bash
+# Which guardrails are attached to the VK?
+langwatch virtual-keys get <vk_id> --format json | jq '.config.guardrails'
+
+# Is the fail-open toggle set (per direction)?
+langwatch virtual-keys get <vk_id> --format json | \
+  jq '{req: .config.guardrails.request_fail_open, resp: .config.guardrails.response_fail_open}'
+```
+
+**Fix, in order of preference:**
+1. Restore the evaluator service. Check LangEvals pod / webhook endpoint health. The most common causes are (a) evaluator service OOM-killed by a long-running evaluator, (b) evaluator secret (LLM API key) expired.
+2. If the evaluator is optional (best-effort redaction, nice-to-have), flip fail-open for that direction:
+   ```bash
+   langwatch virtual-keys update <vk_id> --config-json \
+     '{"guardrails": {"response_fail_open": true}}'
+   ```
+   Warning: fail-open means requests pass through ungoverned when evaluators are down. Only do this for low-stakes traffic.
+3. For `stream_chunk` guardrails, the 50 ms per-chunk budget is **fail-open by contract** (no opt-in needed) — blocking the user's stream on a slow policy service is worse than pass-through. Check `langwatch.guardrail.stream_chunk_fail_open=<reason>` trace attributes for why chunks are being passed through.
+
+See [Guardrails → fail-open vs fail-closed](/ai-gateway/guardrails#fail-open-vs-fail-closed).
+
+## `503 blocked_patterns_invalid_regex`
+
+**Symptoms:**
+- All requests through one VK return 503 with `code=blocked_patterns_invalid_regex`.
+- Fail-closed error message names the dimension (`tools`, `mcp`, `urls`, `models`) and the list (`deny` / `allow`).
+
+**Root cause:** one of the RE2 patterns on the VK's `blocked_patterns` failed to compile. The gateway fails **closed** on invalid regex (iter 14) — silent bypass is not an option, because an invalid-regex rule would effectively disable an intended block.
+
+**Diagnose:**
+
+```bash
+langwatch virtual-keys get <vk_id> --format json | jq '.config.blocked_patterns'
+```
+
+Look for patterns with common regex mistakes:
+- Unescaped parentheses — use `\\(` `\\)`
+- Unterminated character classes — `[abc` missing `]`
+- Backrefs `\1` — RE2 doesn't support backreferences (by design, for O(n) guarantees). Use alternation `(a|b)` instead.
+
+**Fix:** update the offending list with a valid pattern. Test the regex with Go's `regexp` package (same RE2 flavour) before saving:
+
+```bash
+# Quick RE2 syntax check
+echo 'test' | docker run -i --rm golang:1.22 go run -e 'package main
+import ("fmt"; "os"; "regexp")
+func main() { _, err := regexp.Compile(os.Args[1]); if err != nil { fmt.Println(err); os.Exit(1) }; fmt.Println("ok") }' '<your_pattern>'
+```
+
+See [Blocked Patterns → RE2 syntax](/ai-gateway/blocked-patterns).
+
 ## See also
 
 - [API: Errors](/ai-gateway/api/errors) — full error-type enum and HTTP status mapping.
 - [Observability](/ai-gateway/observability) — what every span attribute means.
 - [Health Checks](/ai-gateway/self-hosting/health-checks) — interpreting `/readyz` output.
 - [Cookbook: CI smoke test](/ai-gateway/cookbooks/ci-smoke-test) — automate validation.
+- [Cookbook: Production runbook](/ai-gateway/cookbooks/production-runbook) — on-call playbook (graceful drain, outbox backlog, pprof diagnostics).
+- [Cookbook: Grafana dashboard](/ai-gateway/cookbooks/grafana-dashboard) — importable JSON to visualise every metric referenced on this page.
