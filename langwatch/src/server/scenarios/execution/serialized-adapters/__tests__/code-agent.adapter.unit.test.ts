@@ -266,6 +266,7 @@ describe("SerializedCodeAgentAdapter", () => {
       },
     };
 
+    /** @scenario Code agent adapter uses resolved fieldMappings for input assignment */
     it("uses resolved mappings for input assignment in the input record", async () => {
       const adapter = new SerializedCodeAgentAdapter(multiInputConfig, nlpServiceUrl, apiKey);
 
@@ -290,6 +291,7 @@ describe("SerializedCodeAgentAdapter", () => {
       expect(codeNode.data.inputs[1].value).toBe("Search the knowledge base");
     });
 
+    /** @scenario Code agent adapter ignores mappings for nonexistent inputs */
     it("ignores mappings for inputs that do not exist on the agent", async () => {
       const singleInputConfig: CodeAgentData = {
         ...defaultConfig,
@@ -311,6 +313,8 @@ describe("SerializedCodeAgentAdapter", () => {
   });
 
   describe("when no scenarioMappings are on the agent config", () => {
+    /** @scenario Code agent adapter falls back to legacy behavior without mappings */
+    /** @scenario Adapters use legacy behavior when fieldMappings is undefined */
     it("falls back to legacy behavior: first input gets last user message, rest get empty string", async () => {
       const multiInputConfig: CodeAgentData = {
         ...defaultConfig,
