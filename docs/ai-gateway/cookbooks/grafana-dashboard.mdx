@@ -1,0 +1,403 @@
+---
+title: Grafana dashboard
+description: Importable Grafana dashboard JSON for the LangWatch AI Gateway — request rate, provider health, auth cache, budget, guardrail, streaming, and routing.
+sidebarTitle: Grafana dashboard
+---
+
+A single dashboard with every panel you actually look at during an incident. Pairs with [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) and [Production runbook](/ai-gateway/cookbooks/production-runbook) — alerts page you, this dashboard tells you *what* is wrong, the runbook tells you *how to dig*.
+
+## What it covers
+
+Eight rows, top to bottom:
+
+| Row | Panels | Why |
+|---|---|---|
+| Request health | rate, p50/p95/p99, error % | primary SLI row; everything else is causal |
+| Provider health | circuit state, upstream latency, fallback count | which provider is degrading and how often we're saved by fallback |
+| Auth cache | L1 hit rate, L2 hit rate, resolve-key RPS | cache degradation = spike in control-plane load |
+| Budgets & debits | outbox size, debit retries, shelf bytes | outbox pressure before it OOMs |
+| Guardrails | verdicts by direction, blocks by reason | catches both legit policy enforcement and regressions |
+| Streaming | active streams, usage-warning rate | streams that never reported usage = cost blind spot |
+| Cache (passthrough) | hits / bypass / forced — Anthropic discount proxy | cache outcome vs expectation |
+| Infrastructure | pod replicas, CPU, memory, goroutines | k8s-side correlates for everything above |
+
+## Prerequisites
+
+- Grafana ≥ 10.0 (uses time series panels + `$__rate_interval`).
+- A Prometheus data source scraping the gateway's `/metrics`. See [Helm → Monitoring](/ai-gateway/self-hosting/helm#monitoring).
+- The `kube-state-metrics` exporter if you want the infrastructure row — it's how we read pod CPU/memory/replica count.
+
+## Import
+
+Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards → New → Import → Upload JSON**. Set the data source to your Prometheus instance on first import; it propagates to every panel.
+
+```json
+{
+  "title": "LangWatch AI Gateway",
+  "tags": ["langwatch", "ai-gateway", "llm"],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus",
+        "current": { "text": "Prometheus", "value": "Prometheus" }
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": "$datasource",
+        "query": "label_values(gateway_http_requests_total, namespace)",
+        "current": { "text": "langwatch", "value": "langwatch" },
+        "includeAll": false
+      },
+      {
+        "name": "pod",
+        "type": "query",
+        "datasource": "$datasource",
+        "query": "label_values(gateway_http_requests_total{namespace=\"$namespace\"}, pod)",
+        "includeAll": true,
+        "multi": true
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Request health",
+      "gridPos": { "x": 0, "y": 0, "w": 24, "h": 1 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Request rate",
+      "datasource": "$datasource",
+      "gridPos": { "x": 0, "y": 1, "w": 8, "h": 7 },
+      "targets": [{
+        "expr": "sum by (status) (rate(gateway_http_requests_total{namespace=\"$namespace\", pod=~\"$pod\"}[$__rate_interval]))",
+        "legendFormat": "{{status}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Latency (p50 / p95 / p99)",
+      "datasource": "$datasource",
+      "gridPos": { "x": 8, "y": 1, "w": 8, "h": 7 },
+      "targets": [
+        { "expr": "histogram_quantile(0.50, sum by (le) (rate(gateway_http_request_duration_seconds_bucket{namespace=\"$namespace\", pod=~\"$pod\"}[$__rate_interval])))", "legendFormat": "p50" },
+        { "expr": "histogram_quantile(0.95, sum by (le) (rate(gateway_http_request_duration_seconds_bucket{namespace=\"$namespace\", pod=~\"$pod\"}[$__rate_interval])))", "legendFormat": "p95" },
+        { "expr": "histogram_quantile(0.99, sum by (le) (rate(gateway_http_request_duration_seconds_bucket{namespace=\"$namespace\", pod=~\"$pod\"}[$__rate_interval])))", "legendFormat": "p99" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "type": "stat",
+      "title": "5xx rate",
+      "datasource": "$datasource",
+      "gridPos": { "x": 16, "y": 1, "w": 8, "h": 7 },
+      "targets": [{
+        "expr": "sum(rate(gateway_http_requests_total{namespace=\"$namespace\", status=~\"5..\"}[$__rate_interval])) / sum(rate(gateway_http_requests_total{namespace=\"$namespace\"}[$__rate_interval]))"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.01 },
+              { "color": "red", "value": 0.05 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "type": "row",
+      "title": "Provider health",
+      "gridPos": { "x": 0, "y": 8, "w": 24, "h": 1 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Circuit state by credential (0=closed 1=half 2=open)",
+      "datasource": "$datasource",
+      "gridPos": { "x": 0, "y": 9, "w": 12, "h": 7 },
+      "targets": [{
+        "expr": "gateway_circuit_state{namespace=\"$namespace\", pod=~\"$pod\"}",
+        "legendFormat": "{{credential_id}}"
+      }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Upstream latency p95 by provider",
+      "datasource": "$datasource",
+      "gridPos": { "x": 12, "y": 9, "w": 12, "h": 7 },
+      "targets": [{
+        "expr": "histogram_quantile(0.95, sum by (provider, le) (rate(gateway_provider_duration_seconds_bucket{namespace=\"$namespace\"}[$__rate_interval])))",
+        "legendFormat": "{{provider}}"
+      }],
+      "fieldConfig": { "defaults": { "unit": "s" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Fallback events per sec",
+      "datasource": "$datasource",
+      "gridPos": { "x": 0, "y": 16, "w": 24, "h": 6 },
+      "targets": [{
+        "expr": "sum by (from_credential, to_credential) (rate(gateway_fallback_events_total{namespace=\"$namespace\"}[$__rate_interval]))",
+        "legendFormat": "{{from_credential}} → {{to_credential}}"
+      }]
+    },
+
+    {
+      "type": "row",
+      "title": "Auth cache",
+      "gridPos": { "x": 0, "y": 22, "w": 24, "h": 1 }
+    },
+    {
+      "type": "timeseries",
+      "title": "L1 + L2 hit rate",
+      "datasource": "$datasource",
+      "gridPos": { "x": 0, "y": 23, "w": 12, "h": 7 },
+      "targets": [
+        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", layer=\"l1\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "L1 hit rate" },
+        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", layer=\"l2\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "L2 hit rate" }
+      ],
+      "fieldConfig": { "defaults": { "unit": "percentunit" } }
+    },
+    {
+      "type": "timeseries",
+      "title": "Resolve-key round-trips to control plane",
+      "datasource": "$datasource",
+      "gridPos": { "x": 12, "y": 23, "w": 12, "h": 7 },
+      "targets": [{
+        "expr": "sum(rate(gateway_control_plane_requests_total{namespace=\"$namespace\", endpoint=\"resolve-key\"}[$__rate_interval]))"
+      }],
+      "fieldConfig": { "defaults": { "unit": "reqps" } }
+    },
+
+    {
+      "type": "row",
+      "title": "Budgets & debits",
+      "gridPos": { "x": 0, "y": 30, "w": 24, "h": 1 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Budget blocks by scope",
+      "datasource": "$datasource",
+      "gridPos": { "x": 0, "y": 31, "w": 6, "h": 7 },
+      "targets": [{
+        "expr": "sum by (scope) (rate(gateway_budget_blocks_total{namespace=\"$namespace\"}[$__rate_interval]))",
+        "legendFormat": "{{scope}}"
+      }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Outbox fill-pct (depth / capacity)",
+      "description": "Iter 21: capacity gauge is static per-pod, depth is live. Ratio = headroom. > 50% sustained = warn, > 80% = page.",
+      "datasource": "$datasource",
+      "gridPos": { "x": 6, "y": 31, "w": 6, "h": 7 },
+      "targets": [{
+        "expr": "max(gateway_budget_debit_outbox_depth{namespace=\"$namespace\"}) / max(gateway_budget_debit_outbox_capacity{namespace=\"$namespace\"})",
+        "legendFormat": "fill-pct"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.5 },
+              { "color": "red", "value": 0.8 }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Flush failures / sec (control-plane degraded)",
+      "description": "Iter 21: control-plane slow/unreachable → events re-enqueued, fill-pct climbs slowly. This panel leads fill-pct.",
+      "datasource": "$datasource",
+      "gridPos": { "x": 12, "y": 31, "w": 6, "h": 7 },
+      "targets": [{
+        "expr": "sum(rate(gateway_budget_debit_outbox_flush_failures_total{namespace=\"$namespace\"}[$__rate_interval]))"
+      }]
+    },
+    {
+      "type": "stat",
+      "title": "4xx drops (silent data loss)",
+      "description": "Iter 21: any non-zero rate is a page. Signing / payload bug — debits are terminally rejected by the control plane and dropped from the ring.",
+      "datasource": "$datasource",
+      "gridPos": { "x": 18, "y": 31, "w": 6, "h": 7 },
+      "targets": [{
+        "expr": "sum(increase(gateway_budget_debit_outbox_4xx_drops_total{namespace=\"$namespace\"}[5m]))"
+      }],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          }
+        }
+      }
+    },
+
+    {
+      "type": "row",
+      "title": "Guardrails",
+      "gridPos": { "x": 0, "y": 38, "w": 24, "h": 1 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Verdicts by direction",
+      "datasource": "$datasource",
+      "gridPos": { "x": 0, "y": 39, "w": 12, "h": 7 },
+      "targets": [{
+        "expr": "sum by (direction, verdict) (rate(gateway_guardrail_verdicts_total{namespace=\"$namespace\"}[$__rate_interval]))",
+        "legendFormat": "{{direction}} / {{verdict}}"
+      }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Blocks by reason",
+      "datasource": "$datasource",
+      "gridPos": { "x": 12, "y": 39, "w": 12, "h": 7 },
+      "targets": [{
+        "expr": "sum by (reason) (rate(gateway_guardrail_verdicts_total{namespace=\"$namespace\", verdict=\"block\"}[$__rate_interval]))",
+        "legendFormat": "{{reason}}"
+      }]
+    },
+
+    {
+      "type": "row",
+      "title": "Streaming",
+      "gridPos": { "x": 0, "y": 46, "w": 24, "h": 1 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Active streams",
+      "datasource": "$datasource",
+      "gridPos": { "x": 0, "y": 47, "w": 12, "h": 7 },
+      "targets": [{
+        "expr": "sum(gateway_streaming_active{namespace=\"$namespace\", pod=~\"$pod\"})"
+      }]
+    },
+    {
+      "type": "timeseries",
+      "title": "Stream chunk guardrail fail-open rate",
+      "description": "Stream-chunk guardrails fail OPEN by contract. This panel is the only place you see that happening — if it's sustained > 0, investigate the evaluator SLO.",
+      "datasource": "$datasource",
+      "gridPos": { "x": 12, "y": 47, "w": 12, "h": 7 },
+      "targets": [{
+        "expr": "sum(rate(gateway_guardrail_verdicts_total{namespace=\"$namespace\", direction=\"stream_chunk\", verdict=\"fail_open\"}[$__rate_interval]))"
+      }]
+    },
+
+    {
+      "type": "row",
+      "title": "Cache (Anthropic passthrough)",
+      "gridPos": { "x": 0, "y": 54, "w": 24, "h": 1 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Cache outcomes",
+      "datasource": "$datasource",
+      "gridPos": { "x": 0, "y": 55, "w": 24, "h": 7 },
+      "targets": [{
+        "expr": "sum by (outcome) (rate(gateway_cache_hits_total{namespace=\"$namespace\"}[$__rate_interval]))",
+        "legendFormat": "{{outcome}}"
+      }]
+    },
+
+    {
+      "type": "row",
+      "title": "Infrastructure",
+      "gridPos": { "x": 0, "y": 62, "w": 24, "h": 1 }
+    },
+    {
+      "type": "timeseries",
+      "title": "Pod replicas ready",
+      "datasource": "$datasource",
+      "gridPos": { "x": 0, "y": 63, "w": 8, "h": 7 },
+      "targets": [{
+        "expr": "sum(kube_deployment_status_replicas_available{namespace=\"$namespace\", deployment=\"langwatch-gateway\"})"
+      }]
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU + memory per pod",
+      "datasource": "$datasource",
+      "gridPos": { "x": 8, "y": 63, "w": 8, "h": 7 },
+      "targets": [
+        { "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", pod=~\"langwatch-gateway-.*\"}[$__rate_interval]))", "legendFormat": "cpu / {{pod}}" },
+        { "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"langwatch-gateway-.*\"}) / 1024 / 1024", "legendFormat": "mem MB / {{pod}}" }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Goroutines per pod",
+      "description": "Monotonic climb = goroutine leak. See Production runbook Recipe 2.",
+      "datasource": "$datasource",
+      "gridPos": { "x": 16, "y": 63, "w": 8, "h": 7 },
+      "targets": [{
+        "expr": "go_goroutines{namespace=\"$namespace\", pod=~\"langwatch-gateway-.*\"}",
+        "legendFormat": "{{pod}}"
+      }]
+    }
+  ]
+}
+```
+
+## Reading the dashboard during an incident
+
+The panels are deliberately ordered so an on-call engineer scans top-down:
+
+1. **Request health** — is this user-impacting? Latency + error rate together answer it.
+2. **Provider health** — if error rate is up, which provider? If circuit is open, we're degraded but not down (fallback is handling it).
+3. **Auth cache** — if latency is up with upstreams happy, L1 miss spike points at control-plane pressure.
+4. **Budgets & debits** — outbox shelf > 0 for minutes means debits are failing persistently; correlate with control-plane errors.
+5. **Guardrails** — block spikes are either a legit policy enforcement or a regression. `direction` + `reason` disambiguate.
+6. **Streaming** — active streams shows concurrency; fail-open rate is the stream_chunk guardrail escape hatch firing (by design).
+7. **Cache (passthrough)** — Anthropic `cache_control` discount is only visible here; a drop to near-zero hits on a prefix-heavy workload is a regression.
+8. **Infrastructure** — goroutines climbing monotonically is the leak signal. Replicas + CPU correlate HPA pressure to everything above.
+
+## Pairing with alerts and runbook
+
+Use this dashboard as the landing page from each alert's `runbook_url`. Example Alertmanager wiring:
+
+```yaml
+receivers:
+  - name: slack-gateway
+    slack_configs:
+      - channel: '#ai-platform-alerts'
+        title: '{{ .CommonAnnotations.summary }}'
+        text: |
+          {{ .CommonAnnotations.description }}
+
+          <https://grafana.internal/d/langwatch-ai-gateway|Dashboard>
+          <https://langwatch.ai/docs/ai-gateway/cookbooks/production-runbook|Runbook>
+```
+
+When a page fires, the engineer lands on the dashboard, narrows the cause to a row, then opens the runbook recipe that matches that row.
+
+## Skipping panels you don't have metrics for
+
+If you haven't deployed Redis (iter 15), the L2 hit-rate line is flat at zero — harmless. If you haven't enabled `networkPolicy` (iter 18), the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
+
+## See also
+
+- [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) — the rules that tell you *when* to open this dashboard.
+- [Production runbook](/ai-gateway/cookbooks/production-runbook) — what to do when the dashboard pinpoints a row.
+- [Observability](/ai-gateway/observability) — deep-dive on per-tenant OTel routing + span attribute reference.
