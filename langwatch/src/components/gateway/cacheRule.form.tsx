@@ -11,6 +11,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 
+import { FieldInfoTooltip } from "./FieldInfoTooltip";
+
 export type CacheRuleFormState = {
   name: string;
   description: string;
@@ -174,7 +176,13 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
   return (
     <VStack align="stretch" gap={4}>
       <Field.Root required>
-        <Field.Label>Name</Field.Label>
+        <Field.Label>
+          Name
+          <FieldInfoTooltip
+            description="Shown in /gateway/cache-rules list + audit log. Must be unique within the org."
+            docHref="/ai-gateway/cache-control#cache-rules"
+          />
+        </Field.Label>
         <Input
           value={state.name}
           onChange={(e) => set("name", e.target.value)}
@@ -193,7 +201,13 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
       </Field.Root>
       <HStack align="start" gap={4}>
         <Field.Root>
-          <Field.Label>Priority</Field.Label>
+          <Field.Label>
+            Priority
+            <FieldInfoTooltip
+              description="Higher number wins first. Rules are evaluated priority DESC, first-match-wins. Ties break by createdAt ascending."
+              docHref="/ai-gateway/cache-control#cache-rules"
+            />
+          </Field.Label>
           <Input
             type="number"
             min={0}
@@ -239,7 +253,13 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
         </HStack>
         <VStack align="stretch" gap={3}>
           <Field.Root>
-            <Field.Label>Virtual key id (exact)</Field.Label>
+            <Field.Label>
+              Virtual key id (exact)
+              <FieldInfoTooltip
+                description="Exact match against the VK's display prefix (e.g. lw_vk_live_01HZX9K3M...)."
+                docHref="/ai-gateway/cache-control#matchers"
+              />
+            </Field.Label>
             <Input
               value={state.matchVkId}
               onChange={(e) => set("matchVkId", e.target.value)}
@@ -247,7 +267,13 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
             />
           </Field.Root>
           <Field.Root>
-            <Field.Label>Virtual key display prefix (starts-with)</Field.Label>
+            <Field.Label>
+              Virtual key display prefix (starts-with)
+              <FieldInfoTooltip
+                description="strings.HasPrefix against the VK's display prefix. Useful for bulk-matching by env/team convention (e.g. 'lw_vk_eval_' to match every eval-suite VK)."
+                docHref="/ai-gateway/cache-control#matchers"
+              />
+            </Field.Label>
             <Input
               value={state.matchVkPrefix}
               onChange={(e) => set("matchVkPrefix", e.target.value)}
@@ -255,7 +281,13 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
             />
           </Field.Root>
           <Field.Root>
-            <Field.Label>Virtual key tags (comma-separated)</Field.Label>
+            <Field.Label>
+              Virtual key tags (comma-separated)
+              <FieldInfoTooltip
+                description="AND-subset: VK must carry EVERY listed tag. Tag a VK in its edit drawer under 'Tags' (config.metadata.tags)."
+                docHref="/ai-gateway/cache-control#matchers"
+              />
+            </Field.Label>
             <Input
               value={state.matchVkTagsCsv}
               onChange={(e) => set("matchVkTagsCsv", e.target.value)}
@@ -274,7 +306,13 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
             />
           </Field.Root>
           <Field.Root>
-            <Field.Label>Model</Field.Label>
+            <Field.Label>
+              Model
+              <FieldInfoTooltip
+                description="Exact match OR trailing-'*' glob against the resolved upstream model (e.g. 'claude-haiku-*'). No regex in v1. Fires on both /v1/messages + /v1/chat/completions."
+                docHref="/ai-gateway/cache-control#matchers"
+              />
+            </Field.Label>
             <Input
               value={state.matchModel}
               onChange={(e) => set("matchModel", e.target.value)}
@@ -313,7 +351,13 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
         </Text>
         <VStack align="stretch" gap={3}>
           <Field.Root>
-            <Field.Label>Cache control mode</Field.Label>
+            <Field.Label>
+              Cache control mode
+              <FieldInfoTooltip
+                description="respect = passthrough. disable = strip provider cache markers (always-fresh). force = inject cache_control: ephemeral on Anthropic (no-op on OpenAI automatic, WARN+passthrough on Gemini v1)."
+                docHref="/ai-gateway/cache-control#actions"
+              />
+            </Field.Label>
             <NativeSelect.Root size="sm">
               <NativeSelect.Field
                 value={state.actionMode}
@@ -338,7 +382,13 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
           </Field.Root>
           {state.actionMode === "force" && (
             <Field.Root>
-              <Field.Label>TTL (seconds, optional)</Field.Label>
+              <Field.Label>
+                TTL (seconds, optional)
+                <FieldInfoTooltip
+                  description="Clamped to [0, 86400]. Only meaningful on force. Anthropic supports TTL; OpenAI/Gemini treat as best-effort hint."
+                  docHref="/ai-gateway/cache-control#actions"
+                />
+              </Field.Label>
               <Input
                 type="number"
                 min={0}
@@ -354,7 +404,13 @@ export function CacheRuleForm({ state, onChange }: FormProps) {
             </Field.Root>
           )}
           <Field.Root>
-            <Field.Label>Cache salt (optional)</Field.Label>
+            <Field.Label>
+              Cache salt (optional)
+              <FieldInfoTooltip
+                description="Cache-bust tag — changing it forces regeneration on next hit. Max 64 chars. Useful after a prompt template change: update the salt to invalidate all cached responses tied to the old template."
+                docHref="/ai-gateway/cache-control#actions"
+              />
+            </Field.Label>
             <Input
               value={state.actionSalt}
               onChange={(e) => set("actionSalt", e.target.value)}

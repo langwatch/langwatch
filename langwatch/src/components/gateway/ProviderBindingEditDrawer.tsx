@@ -15,6 +15,8 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 
+import { FieldInfoTooltip } from "./FieldInfoTooltip";
+
 type ProviderBindingRow = {
   id: string;
   modelProviderName: string;
@@ -113,7 +115,13 @@ export function ProviderBindingEditDrawer({
               </Text>
             </Field.Root>
             <Field.Root>
-              <Field.Label>Slot</Field.Label>
+              <Field.Label>
+                Slot
+                <FieldInfoTooltip
+                  description="Free-text tag used by virtual keys to reference this binding in their fallback chain. Typical names: primary, fallback-1, eu-region, canary."
+                  docHref="/ai-gateway/provider-bindings#slot"
+                />
+              </Field.Label>
               <Input
                 value={slot}
                 onChange={(e) => setSlot(e.target.value)}
@@ -133,6 +141,10 @@ export function ProviderBindingEditDrawer({
                   <Badge colorPalette="gray" fontSize="2xs" ml={1}>
                     per-binding
                   </Badge>
+                  <FieldInfoTooltip
+                    description="Requests Per Minute ceiling on this binding. Sliding window; 429 + Retry-After emitted at breach. Blank = unlimited (upstream provider limits still apply)."
+                    docHref="/ai-gateway/rate-limits#rpm"
+                  />
                 </Field.Label>
                 <Input
                   value={rateLimitRpm}
@@ -142,7 +154,13 @@ export function ProviderBindingEditDrawer({
                 />
               </Field.Root>
               <Field.Root flex={1}>
-                <Field.Label>Rate limit (rpd)</Field.Label>
+                <Field.Label>
+                  Rate limit (rpd)
+                  <FieldInfoTooltip
+                    description="Rolling-24h request cap. Works jointly with rpm — whichever trips first blocks. Useful for 'daily quota' budgets independent of instantaneous burst."
+                    docHref="/ai-gateway/rate-limits#rpd"
+                  />
+                </Field.Label>
                 <Input
                   value={rateLimitRpd}
                   onChange={(e) => setRateLimitRpd(e.target.value)}
@@ -152,7 +170,13 @@ export function ProviderBindingEditDrawer({
               </Field.Root>
             </HStack>
             <Field.Root>
-              <Field.Label>Fallback priority (global)</Field.Label>
+              <Field.Label>
+                Fallback priority (global)
+                <FieldInfoTooltip
+                  description="Tiebreaker when multiple bindings are eligible for the same VK slot; lower = higher priority. Leave blank to rely only on per-VK fallback chain ordering."
+                  docHref="/ai-gateway/provider-bindings#fallback-priority-global"
+                />
+              </Field.Label>
               <Input
                 value={fallbackPriority}
                 onChange={(e) => setFallbackPriority(e.target.value)}
