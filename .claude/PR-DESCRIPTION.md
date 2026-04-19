@@ -105,7 +105,11 @@ Findings surfaced during the dogfood round, all closed in-session:
 - **Finding 1** (VK create drawer too sparse pre-provider) — closed by Lane B iter 23 (`de71fe30d`). Visible in `dogfood-11`.
 - **Finding 2** (Providers empty-state mentioned Settings → Model Providers without a Link) — closed by Lane B iter 22 (`6029b925c`).
 - **Finding 3** (raw React Router 404 fallback) — closed by same commit: styled `_not-found.tsx` + root ErrorBoundary + catch-all route.
-- **Finding 4** (gateway pages render without main LangWatch dashboard chrome) — closed by Lane B iter 24 (`e32b597cf`): `GatewayLayout` now wraps children in `<DashboardLayout compactMenu>`, matching `SettingsLayout`'s pattern. Visible in `dogfood-09`, `dogfood-10`, `dogfood-11`.
+- **Finding 4** (gateway pages render without main LangWatch dashboard chrome) — closed by Lane B iter 24 (`e32b597cf`): `GatewayLayout` now wraps children in `<DashboardLayout compactMenu>`, matching `SettingsLayout`'s pattern.
+- **Finding 5** (BigInt serialization crash on `GatewayAuditLog` writes) — closed by Lane B iter 27+28 (`5f9d5e3dc`): shared `auditSerializer.ts` with replacer coercing `bigint → decimal string`, matching `GatewayConfigPayload.revision` wire shape.
+- **Finding 6** (dev-bypass endpoint `LOCAL_DEV_BYPASS_AUTH`) — removed by Lane B iter 28 (`5f9d5e3dc`): less code, less risk; scenario tests sign up like every other user.
+- **Finding 7** (duplicate `/gateway/audit` page — already have platform global audit) — closed by Lane B iter 31 (`1303ceb98`): sub-nav entry dropped; viewing lives at `/settings/audit-log` filtered by resource type. Full `GatewayAuditLog → AuditLog` unification scheduled for v1.1.
+- **Finding 8** (Prisma multitenancy middleware silent-killed org-scoped gateway queries) — closed by Lane B iter 32 (`88a66af6d`): exempted `GatewayBudget` / `GatewayBudgetLedger` / `GatewayChangeEvent` / `GatewayAuditLog` from the `projectId`-required guard. Was causing budget pages to spin forever AND rolling back every VK mutation tx at the audit-append step. VK create now writes successfully, budgets list returns, audit append succeeds inside every write tx.
 
 ## Test plan
 
