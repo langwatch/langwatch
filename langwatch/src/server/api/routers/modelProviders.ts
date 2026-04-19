@@ -85,22 +85,25 @@ export const modelProviderRouter = createTRPCRouter({
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
-      return await service.updateModelProvider({
-        id: input.id,
-        projectId: input.projectId,
-        provider: input.provider,
-        enabled: input.enabled,
-        customKeys: input.customKeys as
-          | Record<string, unknown>
-          | null
-          | undefined,
-        customModels: input.customModels,
-        customEmbeddingsModels: input.customEmbeddingsModels,
-        extraHeaders: input.extraHeaders,
-        defaultModel: input.defaultModel,
-        scopeType: input.scopeType,
-        scopeId: input.scopeId,
-      });
+      return await service.updateModelProvider(
+        {
+          id: input.id,
+          projectId: input.projectId,
+          provider: input.provider,
+          enabled: input.enabled,
+          customKeys: input.customKeys as
+            | Record<string, unknown>
+            | null
+            | undefined,
+          customModels: input.customModels,
+          customEmbeddingsModels: input.customEmbeddingsModels,
+          extraHeaders: input.extraHeaders,
+          defaultModel: input.defaultModel,
+          scopeType: input.scopeType,
+          scopeId: input.scopeId,
+        },
+        { prisma: ctx.prisma, session: ctx.session },
+      );
     }),
 
   delete: protectedProcedure
@@ -114,7 +117,10 @@ export const modelProviderRouter = createTRPCRouter({
     .use(checkProjectPermission("project:delete"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
-      return await service.deleteModelProvider(input);
+      return await service.deleteModelProvider(input, {
+        prisma: ctx.prisma,
+        session: ctx.session,
+      });
     }),
 
   /**
