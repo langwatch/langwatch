@@ -36,6 +36,15 @@ const (
 	AttrUsageOut      = "langwatch.usage.output_tokens"
 	AttrUsageCacheR   = "langwatch.usage.cache_read_tokens"
 	AttrUsageCacheW   = "langwatch.usage.cache_write_tokens"
+	// OTel GenAI semconv cache counters. We emit these in parallel
+	// with the langwatch.* proprietary names (v1: belt + suspenders,
+	// every consumer works) — the LangWatch trace ingest pipeline
+	// specifically reads cache_read.input_tokens / cache_creation.input_tokens
+	// per semconv, so emitting only langwatch.* would leave cache
+	// telemetry invisible in the trace UI. Internal consumers can
+	// migrate to the semconv names; v1.1 drops the proprietary duplicates.
+	AttrSemconvCacheReadInputTokens     = "gen_ai.usage.cache_read.input_tokens"
+	AttrSemconvCacheCreationInputTokens = "gen_ai.usage.cache_creation.input_tokens"
 	AttrCostUSD       = "langwatch.cost_usd"
 	AttrDurationMS    = "langwatch.duration_ms"
 	AttrStatus        = "langwatch.status"
