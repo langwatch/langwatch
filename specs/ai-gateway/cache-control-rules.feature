@@ -167,21 +167,27 @@ Feature: Cache control rules — operator-defined overrides without client code 
     And there are zero allocations on the hot path (0 B/op, 0 allocs/op)
     And the ~700 ns hot-path target is preserved with 28× headroom
 
-  Scenario: v1 scope — rule evaluation is wired on /v1/messages only (chat-completions + embeddings deferred)
-    Given a cache rule "rule_m_only" matches any request
+  Scenario: Rule evaluation is wired on both /v1/messages AND /v1/chat/completions (iter 49)
+    Given a cache rule "rule_any" matches any request
     When the client calls POST /v1/messages
     Then the rule fires and span attribute "langwatch.cache.rule_id" is set
     When the client calls POST /v1/chat/completions
-    Then the rule is parsed + loaded into the bundle but NOT evaluated on the /v1/chat/completions dispatch path
-    # Lane A iter 47 wired cache-rules into /v1/messages. Extending to /v1/chat/completions
-    # + /v1/embeddings is follow-up work; tracked in PR body Outstanding for v1.1.
+    Then the rule ALSO fires and attribution emits on the span + metric
+    # Note: on /v1/chat/completions the action.mode=disable is a body-level
+    # no-op because OpenAI's prompt caching is automatic, but observability
+    # (rule_id + mode_applied + gateway_cache_rule_hits_total) is identical.
+    # Embeddings endpoint (/v1/embeddings) still deferred to v1.1.
 
-  Scenario: v1 scope — model-field matchers are not yet fired on /v1/messages
+  Scenario: Model-field matchers fire on both endpoints (iter 49)
     Given a cache rule matching model "claude-haiku-*"
     When a request hits /v1/messages resolving to "claude-haiku-4-5-20251001"
-    Then the rule does NOT match (model parse happens below cache-override in the /v1/messages pipeline in iter 47; TODO to lift parse order, low priority)
-    # Other matcher dimensions (vk_id, vk_prefix, vk_tags, principal_id,
-    # request_metadata) all fire correctly on /v1/messages.
+    Then the rule matches and the action is applied
+    When a request hits /v1/chat/completions resolving to "claude-haiku-4-5-20251001"
+    Then the rule matches and the action is applied
+    # Lane A iter 49 (cf62f72ba) added extractModelField(body) — cheap
+    # single-field JSON peek ~150 ns zero-alloc on no-rules fast path.
+    # Prior iter 47 had this gap ("model parse happens below cache-override");
+    # iter 49 closed it by lifting a one-field extractor above evaluate().
 
   Scenario: Rule update propagates within 30 seconds via /changes long-poll
     Given a VK "vk_prod_openai" is in use by a client
@@ -194,8 +200,10 @@ Feature: Cache control rules — operator-defined overrides without client code 
   # ─────────────────────────────────────────────────────────────────────────
   # Lane A iter 45 (e037888be) shipped the evaluator in isolation.
   # Lane A iter 47 (9df0c8028) wired Evaluate() into dispatch.applyCacheOverride
-  # with full observability. Span attrs and Prometheus counter live on /v1/messages
-  # today. /v1/chat/completions + /v1/embeddings wiring tracked separately.
+  # with full observability.
+  # Lane A iter 49 (cf62f72ba) extended wiring to /v1/chat/completions + lifted
+  # model matchers to fire on /v1/messages via extractModelField().
+  # /v1/embeddings wiring still deferred to v1.1.
 
   Scenario: Span attributes record the matched rule
     Given a cache rule "rule_prod_disable" matches a request on /v1/messages

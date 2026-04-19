@@ -529,6 +529,7 @@ Alexis owns the final shape in Prisma schema; this is the agreed surface.
 - `virtualKeys: view | create | update | delete | manage | rotate`
 - `gatewayBudgets: view | create | update | delete | manage`
 - `gatewayProviders: view | manage` (gateway-only settings layered on existing ModelProvider)
+- `gatewayCacheRules: view | create | update | delete | manage` (Lane B iter 38 — org-scoped cache-control rule CRUD)
 - `gatewayGuardrails: attach | detach`
 - `gatewayLogs: view` (per-project access to gateway request logs)
 - `gatewayUsage: view` (cost/usage reports)
