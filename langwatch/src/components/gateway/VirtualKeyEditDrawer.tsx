@@ -21,6 +21,8 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 
+import { FieldInfoTooltip } from "./FieldInfoTooltip";
+
 type BlockedPattern = { deny: string[]; allow: string[] | null };
 
 type GuardrailRef = { id: string; evaluator: string };
@@ -381,7 +383,13 @@ export function VirtualKeyEditDrawer({
         <Drawer.Body>
           <VStack align="stretch" gap={5}>
             <Field.Root required>
-              <Field.Label>Name</Field.Label>
+              <Field.Label>
+                Name
+                <FieldInfoTooltip
+                  description="Human-readable identifier shown in the list and audit log. Must be unique within the project. Rename is non-breaking — the VK id + secret remain the same."
+                  docHref="/ai-gateway/virtual-keys#creating-a-vk"
+                />
+              </Field.Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -396,7 +404,13 @@ export function VirtualKeyEditDrawer({
               />
             </Field.Root>
             <Field.Root>
-              <Field.Label>Tags</Field.Label>
+              <Field.Label>
+                Tags
+                <FieldInfoTooltip
+                  description="Comma-separated tags attached to this VK. Cache-control rules match VKs on tags using AND-subset semantics — a rule matcher of ['tier=enterprise'] fires for any VK carrying that tag."
+                  docHref="/ai-gateway/cache-control#cache-rules"
+                />
+              </Field.Label>
               <Input
                 value={tagsCsv}
                 onChange={(e) => setTagsCsv(e.target.value)}

@@ -20,6 +20,8 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 
+import { FieldInfoTooltip } from "./FieldInfoTooltip";
+
 type VirtualKeyCreateDrawerProps = {
   projectId: string;
   open: boolean;
@@ -134,7 +136,13 @@ export function VirtualKeyCreateDrawer({
         <Drawer.Body>
           <VStack align="stretch" gap={4}>
             <Field.Root required>
-              <Field.Label>Name</Field.Label>
+              <Field.Label>
+                Name
+                <FieldInfoTooltip
+                  description="Human-readable identifier shown in the list and audit log. Typical pattern: 'prod-openai' or 'codex-cli-team-ml'. Must be unique within the project."
+                  docHref="/ai-gateway/virtual-keys#creating-a-vk"
+                />
+              </Field.Label>
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -152,7 +160,13 @@ export function VirtualKeyCreateDrawer({
               />
             </Field.Root>
             <Field.Root>
-              <Field.Label>Tags</Field.Label>
+              <Field.Label>
+                Tags
+                <FieldInfoTooltip
+                  description="Comma-separated tags attached to this VK. Cache-control rules match VKs on tags using AND-subset semantics — a rule matcher of ['tier=enterprise'] fires for any VK carrying that tag."
+                  docHref="/ai-gateway/cache-control#cache-rules"
+                />
+              </Field.Label>
               <Input
                 value={tagsCsv}
                 onChange={(e) => setTagsCsv(e.target.value)}
@@ -164,7 +178,13 @@ export function VirtualKeyCreateDrawer({
               </Field.HelperText>
             </Field.Root>
             <Field.Root>
-              <Field.Label>Environment</Field.Label>
+              <Field.Label>
+                Environment
+                <FieldInfoTooltip
+                  description="Live keys mint 'lw_vk_live_' prefix; test keys mint 'lw_vk_test_'. Prefix is the accident-prevention signal — the gateway rejects test keys against production providers when 'live-only' mode is set on the org."
+                  docHref="/ai-gateway/virtual-keys#format"
+                />
+              </Field.Label>
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
                   value={environment}
@@ -184,7 +204,13 @@ export function VirtualKeyCreateDrawer({
               </Field.HelperText>
             </Field.Root>
             <Field.Root required>
-              <Field.Label>Provider fallback chain</Field.Label>
+              <Field.Label>
+                Provider fallback chain
+                <FieldInfoTooltip
+                  description="Ordered list of provider bindings. The gateway tries #1 first, then #2 on 5xx/timeout/rate-limit/circuit-breaker. Re-order with drag after creating (not wired yet — use the edit drawer for now)."
+                  docHref="/ai-gateway/concepts#fallback-chain"
+                />
+              </Field.Label>
               <VStack align="stretch" gap={2}>
                 {credentialsQuery.isLoading ? (
                   <HStack>
