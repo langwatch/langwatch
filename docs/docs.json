@@ -561,15 +561,30 @@
           {
             "group": "Features",
             "pages": [
-              "ai-gateway/caching-passthrough",
-              "ai-gateway/guardrails",
-              "ai-gateway/blocked-patterns",
-              "ai-gateway/streaming",
+              {
+                "group": "Caching & Performance",
+                "pages": [
+                  "ai-gateway/caching-passthrough",
+                  "ai-gateway/streaming"
+                ]
+              },
+              {
+                "group": "Safety & Governance",
+                "pages": [
+                  "ai-gateway/guardrails",
+                  "ai-gateway/blocked-patterns",
+                  "ai-gateway/security",
+                  "ai-gateway/audit"
+                ]
+              },
               "ai-gateway/model-aliases",
-              "ai-gateway/observability",
-              "ai-gateway/security",
-              "ai-gateway/audit",
-              "ai-gateway/troubleshooting"
+              {
+                "group": "Operations",
+                "pages": [
+                  "ai-gateway/observability",
+                  "ai-gateway/troubleshooting"
+                ]
+              }
             ]
           },
           {
