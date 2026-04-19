@@ -78,7 +78,7 @@ function BudgetsPage() {
 
   return (
     <GatewayLayout>
-      <PageLayout.Container>
+      <>
         <PageLayout.Header>
           <PageLayout.Heading>Budgets</PageLayout.Heading>
           <Spacer />
@@ -233,7 +233,7 @@ function BudgetsPage() {
             </Table.Root>
           )}
         </Box>
-      </PageLayout.Container>
+      </>
 
       {project?.id && (
         <BudgetCreateDrawer

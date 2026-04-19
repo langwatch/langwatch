@@ -96,7 +96,7 @@ function VirtualKeysPage() {
 
   return (
     <GatewayLayout>
-      <PageLayout.Container>
+      <>
         <PageLayout.Header>
           <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
           <Spacer />
@@ -241,7 +241,7 @@ function VirtualKeysPage() {
             </Table.Root>
           )}
         </Box>
-      </PageLayout.Container>
+      </>
 
       {project?.id && (
         <VirtualKeyCreateDrawer

@@ -74,7 +74,7 @@ function ProvidersPage() {
 
   return (
     <GatewayLayout>
-      <PageLayout.Container>
+      <>
         <PageLayout.Header>
           <PageLayout.Heading>Providers</PageLayout.Heading>
           <Spacer />
@@ -198,7 +198,7 @@ function ProvidersPage() {
             </Table.Root>
           )}
         </Box>
-      </PageLayout.Container>
+      </>
       {project?.id && (
         <ProviderBindingCreateDrawer
           projectId={project.id}

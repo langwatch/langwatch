@@ -55,7 +55,7 @@ function GatewayUsagePage() {
 
   return (
     <GatewayLayout>
-      <PageLayout.Container>
+      <>
         <PageLayout.Header>
           <PageLayout.Heading>Usage</PageLayout.Heading>
           <Spacer />
@@ -182,7 +182,7 @@ function GatewayUsagePage() {
             </VStack>
           )}
         </Box>
-      </PageLayout.Container>
+      </>
     </GatewayLayout>
   );
 }
