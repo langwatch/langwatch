@@ -95,7 +95,7 @@ The new binding shows up in:
 - **/gateway/providers** list (the page you're on)
 - **VK fallback chain** dropdown (add/remove/reorder in the VK drawer)
 - **/gateway/usage** aggregation (filter by provider slot or provider name)
-- Gateway traces as `langwatch.provider = <provider_name>` + `langwatch.provider_slot = <slot>`
+- Gateway traces as `langwatch.provider = <provider_name>` (the slot name is carried on the budget-debit event and in `gateway_provider_attempts_total` labels, but not emitted as a span attribute in v1)
 
 ## Disabling a binding
 
