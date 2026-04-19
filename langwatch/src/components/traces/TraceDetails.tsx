@@ -377,7 +377,7 @@ export function TraceDetails(props: {
               />
             </Tabs.Trigger>
             <Tabs.Trigger value="events">
-              Events
+              User Events
               {trace.data?.events && trace.data.events.length > 0 && (
                 <Text
                   borderRadius={"md"}

@@ -128,14 +128,14 @@ describe("TraceDetails tabs", () => {
   });
 
   describe("when user is a lite member", () => {
-    it("hides Trace Details and Sequence tabs but shows Thread, Evaluations, Events", () => {
+    it("hides Trace Details and Sequence tabs but shows Thread, Evaluations, User Events", () => {
       const tabs = renderTabs({ isLiteMember: true });
 
       expect(tabs).not.toContain("Trace Details");
       expect(tabs).not.toContain("Sequence");
       expect(tabs).toContain("Thread");
       expect(tabs.some((t) => t.startsWith("Evaluations"))).toBe(true);
-      expect(tabs.some((t) => t.startsWith("Events"))).toBe(true);
+      expect(tabs.some((t) => t.startsWith("User Events"))).toBe(true);
     });
   });
 
