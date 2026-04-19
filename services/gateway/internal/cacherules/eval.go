@@ -35,10 +35,11 @@ type Request struct {
 // Match is the outcome of a successful rule match. Callers compose this
 // with the per-request header override — header > rule > VK default.
 type Match struct {
-	RuleID string
-	Mode   string // respect|force|disable
-	TTLS   int    // only meaningful when Mode == "force"
-	Salt   string // optional cache-key salt
+	RuleID   string
+	Priority int
+	Mode     string // respect|force|disable
+	TTLS     int    // only meaningful when Mode == "force"
+	Salt     string // optional cache-key salt
 }
 
 // Evaluate walks rules in the slice order (control plane emits priority
@@ -54,10 +55,11 @@ func Evaluate(rules []auth.CacheRuleSpec, req Request) (Match, bool) {
 		r := &rules[i]
 		if matches(&r.Matchers, req) {
 			return Match{
-				RuleID: r.ID,
-				Mode:   r.Action.Mode,
-				TTLS:   r.Action.TTLS,
-				Salt:   r.Action.Salt,
+				RuleID:   r.ID,
+				Priority: r.Priority,
+				Mode:     r.Action.Mode,
+				TTLS:     r.Action.TTLS,
+				Salt:     r.Action.Salt,
 			}, true
 		}
 	}
