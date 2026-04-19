@@ -16,9 +16,31 @@ No new API keys here — the provider's real credential stays in **Settings → 
 ## Binding a provider to the gateway
 
 1. Open **/gateway/providers** → **Bind provider**.
-2. Select one of the **enabled** model providers from the dropdown. Providers not yet enabled appear in [Settings → Model Providers](/integration/rest-api) — enable them there first.
+2. Select one of the **enabled** model providers you have access to. The dropdown shows providers from every scope you can reach: the current project, any team containing it, and the org above (see [Scope & access](#scope--access) below). Providers not yet enabled appear in **Settings → Model Providers** — enable them there first.
 3. Fill in the gateway-specific fields below.
 4. Click **Bind provider**. The binding shows up in the VK "Provider fallback chain" drawer for every VK in the project.
+
+## Scope & access
+
+Model providers live at one of three scopes — org / team / project — mirroring the RBAC principal-scope pattern. A **provider binding** in a project can reference *any* model provider that scope-chain walks from the binding's project up to the owning org.
+
+| Provider scope | Visible to bindings in… |
+|---|---|
+| `ORGANIZATION` | every project in the org (via any team) |
+| `TEAM` | every project in that team |
+| `PROJECT` | that project only |
+
+The binding picker labels each provider with its scope so you can see where credentials come from at a glance (e.g. `OpenAI (org: acme)`, `OpenAI (project: acme-demo)`).
+
+**Why this matters for multi-project teams**: one central `OpenAI` credential at the organization scope means all downstream projects reuse a single API key + billing account + rotation policy, while still letting individual projects layer their own gateway-level rate limits and slot names via the binding.
+
+**Who can create at each scope** — permission follows the standard LangWatch scope ladder:
+
+| To create a provider at… | Need… |
+|---|---|
+| Project scope | `modelProviders:manage` on the project |
+| Team scope | `modelProviders:manage` on the team |
+| Organization scope | Organization admin |
 
 ## Fields
 
