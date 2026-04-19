@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  Code,
   Field,
   HStack,
   IconButton,
@@ -385,7 +386,13 @@ export function VirtualKeyEditDrawer({
 
             <Separator />
             <Text fontSize="sm" fontWeight="semibold">
-              Rate limits (null = unlimited)
+              Rate limits (blank = unlimited)
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Enforced per-VK in-memory on every gateway replica. On breach the
+              gateway returns HTTP 429 with <Code fontSize="xs">Retry-After</Code>{" "}
+              and <Code fontSize="xs">X-LangWatch-RateLimit-Dimension</Code>.
+              Changes propagate to all replicas within ~60s.
             </Text>
             <HStack gap={4} align="flex-start">
               <Field.Root flex={1}>
@@ -396,15 +403,26 @@ export function VirtualKeyEditDrawer({
                   placeholder="unlimited"
                   inputMode="numeric"
                 />
+                <Field.HelperText>Requests / minute</Field.HelperText>
               </Field.Root>
               <Field.Root flex={1}>
-                <Field.Label>tpm</Field.Label>
+                <Field.Label>
+                  tpm{" "}
+                  <Badge colorPalette="gray" fontSize="2xs" ml={1}>
+                    v1.1
+                  </Badge>
+                </Field.Label>
                 <Input
                   value={tpm}
                   onChange={(e) => setTpm(e.target.value)}
-                  placeholder="unlimited"
+                  placeholder="deferred"
                   inputMode="numeric"
+                  disabled
                 />
+                <Field.HelperText>
+                  Tokens / minute — requires pre-request token estimation;
+                  ships with Redis-coordinated cluster counters.
+                </Field.HelperText>
               </Field.Root>
               <Field.Root flex={1}>
                 <Field.Label>rpd</Field.Label>
@@ -414,6 +432,7 @@ export function VirtualKeyEditDrawer({
                   placeholder="unlimited"
                   inputMode="numeric"
                 />
+                <Field.HelperText>Requests / day</Field.HelperText>
               </Field.Root>
             </HStack>
 
