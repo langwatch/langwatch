@@ -25,6 +25,19 @@ kubectl port-forward -n langwatch "$POD" 6060:6060
 
 All subsequent `go tool pprof` commands target `http://localhost:6060`.
 
+### Enabling pprof via Helm
+
+The LangWatch Helm chart exposes the admin listener via a top-level `admin` stanza on the gateway sub-chart. The loopback-bound default is what you want in production — don't widen it to `0.0.0.0` without fronting it with a separate authenticated ingress.
+
+```yaml
+gateway:
+  admin:
+    addr: "127.0.0.1:6060"   # default — reachable only via kubectl port-forward
+    # addr: ""               # disable pprof entirely (advised for compliance-regulated envs)
+```
+
+Shipped in the chart as of Lane A iter 16 (`a09af36`). Older chart versions pre-date the field — upgrade the chart before troubleshooting, or set the env var directly via `gateway.env.GATEWAY_ADMIN_ADDR`.
+
 ## Recipe 1 — p99 latency spike
 
 **Symptom:** `gateway_http_request_duration_seconds{quantile="0.99"}` jumps from ~300 ms to several seconds. Traces show no single slow upstream.
