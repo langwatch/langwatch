@@ -86,24 +86,23 @@ CI gate: > 2× regression blocks PR merges.
 
 ### Dogfood screenshots
 
-11 screenshots captured in `.claude/screenshots/dogfood-*.png` (gitignored per repo policy — attach inline via PR comment / upload to img402.dev):
+Every gateway page rendered inside the LangWatch dashboard chrome (left main-nav → expandable AI Gateway entry → DashboardLayout `compactMenu` wrapping → gateway content). All shots captured post-finding-4 fix (Lane B iter 24) and post-nav-restructure (Lane B iter 29).
 
-**Pre-fix screenshots (1-8)** — captured before Lane B iters 22-24 closed findings:
+| # | Page / flow | Screenshot | What it demonstrates |
+|:-:|---|---|---|
+| 1 | **Virtual Keys — list** | _pending capture_ | Post-iter-29 main-nav expandable AI Gateway entry + full dashboard chrome; empty-state CTA "Mint your first virtual key" |
+| 2 | **Virtual Keys — create drawer** | _pending capture_ | Name + provider chain picker + rate limits + cache mode + guardrail refs picker (iter 17) + blocked_patterns 4-row editor + "What else you get" capability preview (iter 23) |
+| 3 | **Virtual Keys — detail** | _pending capture_ | Full VK record: secret prefix only (never re-shown), bundled config, revoke/rotate/archive actions, attached budgets + guardrails |
+| 4 | **Budgets — list** | _pending capture_ | Scope pills (org/team/project/principal), window, spent/limit bar, on_breach badge |
+| 5 | **Budgets — detail + byDay sparkline** | _pending capture_ | Iter 18.2 detail page showing per-day spend sparkline reading real `GatewayBudgetLedger` data |
+| 6 | **Providers — binding list** | _pending capture_ | List of per-project ModelProvider bindings with slot (primary/fallback) + rotation mode |
+| 7 | **Providers — create drawer** | _pending capture_ | Bind provider credential to gateway, pick slot, set rotation cadence |
+| 8 | **Usage** | _pending capture_ | 24h / 7d / 30d / 90d window tiles reading real ledger data, cost-by-VK breakdown |
+| 9 | **Audit log** | _pending capture_ | Filter-by-action + filter-by-target pills (iter 19), REST export recipe link, diff viewer for config changes |
+| 10 | **Guardrail picker** (inside VK drawer) | _pending capture_ | Three direction sections (pre / post / stream_chunk) listing every project evaluator with `executionMode = AS_GUARDRAIL`, per-direction fail-open toggle (iter 17) |
+| 11 | **Rate limits section** (inside VK drawer) | _pending capture_ | RPM / RPD with v1.1 badge on TPM |
 
-1. `dogfood-01-virtual-keys-list.png` — VK empty state with CTA (pre finding-4 fix — no dashboard chrome)
-2. `dogfood-02-budgets-empty.png` — Budgets empty state
-3. `dogfood-03-providers-empty.png` — Providers empty state with "Bind your first provider" CTA
-4. `dogfood-04-usage-empty.png` — Usage page with 24 h / 7 d / 30 d / 90 d window toggles
-5. `dogfood-05-audit-log-empty.png` — Audit log with filter-by-action + filter-by-target pills
-6. `dogfood-06-settings.png` — Gateway Settings page (pre-removal snapshot — the `observability_endpoint` override surface was deleted in Lane B iter 25 / Lane A iter 34; gateway now routes unconditionally to `GATEWAY_OTEL_DEFAULT_ENDPOINT` with per-project attribution via span attributes)
-7. `dogfood-07-vk-drawer-new.png` — New Virtual Key drawer (pre-iter-23 capability preview)
-8. `dogfood-08-model-providers.png` — Model Providers settings (chrome comparison baseline)
-
-**Post-fix screenshots (9-11)** — verify findings 1 + 4 closed:
-
-9. `dogfood-09-vk-list-with-chrome.png` — VK list now nested inside full LangWatch dashboard chrome (left icon rail + top bar + project switcher visible)
-10. `dogfood-10-audit-with-chrome.png` — same fix confirmed on audit log
-11. `dogfood-11-vk-drawer-with-capability-preview.png` — VK create drawer showing BOTH fixes together: dashboard chrome AND the "What else you get (configurable after create)" capability preview with Cache / Guardrails / Blocked patterns / Rate limits rows
+Capture environment: fresh `pnpm dev` on `localhost:5560`, signed in via real email+password (LOCAL_DEV_BYPASS_AUTH removed in Lane B iter 28), `acme-demo-*` project populated with at least one provider credential + one VK + one budget to eliminate all empty states, screenshots taken at 1440×900 with DevTools closed.
 
 Findings surfaced during the dogfood round, all closed in-session:
 
