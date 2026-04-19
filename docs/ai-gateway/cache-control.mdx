@@ -1,6 +1,6 @@
 ---
 title: Cache Control
-description: Provider-agnostic cache control for every gateway request — passthrough, per-VK defaults, per-request headers, and v1.1 rule-based overrides.
+description: Provider-agnostic cache control for every gateway request — passthrough, per-VK defaults, per-request headers, and rule-based overrides.
 sidebarTitle: Cache control
 ---
 
@@ -11,9 +11,9 @@ This is a load-bearing feature: prompt caching cuts input-token costs by up to 9
 ## The control surface — four layers (v1)
 
 1. **Gateway default** — `respect` (byte-for-byte passthrough). Always safe, never surprises.
-2. **Per-VK default** — `respect` / `disable` today, `force` / `ttl=NNN` in v1.1. Configurable in the VK drawer under "Cache control".
+2. **Per-VK default** — `respect` / `disable` / `force` configurable in the VK drawer under "Cache control". `ttl=NNN` is deferred to v1.1 at the per-VK level.
 3. **Cache rules** — simple match/action overrides evaluated at auth-resolve time (bundled with VK config → near-zero hot-path cost). See [Cache rules](#cache-rules).
-4. **Per-request header** — `X-LangWatch-Cache: respect|disable|force|ttl=NNN` on an individual request. Highest precedence when set.
+4. **Per-request header** — `X-LangWatch-Cache: respect|disable|force` on an individual request. Highest precedence when set. `ttl=NNN` header value is parsed but still deferred to v1.1 (returns `400 cache_override_not_implemented` with a `cache_rule_mode_not_implemented` WARN on rules).
 
 Effective-mode precedence: **per-request header > matched rule > per-VK default > gateway default `respect`**.
 
@@ -21,16 +21,16 @@ Effective-mode precedence: **per-request header > matched rule > per-VK default 
 
 Not every mode makes sense for every provider. The gateway does the right thing per provider automatically — you don't have to special-case in your client.
 
-| Provider | Native scheme | `respect` behavior | `disable` behavior | `force` (v1.1) | Notes |
+| Provider | Native scheme | `respect` behavior | `disable` behavior | `force` behavior | Notes |
 |---|---|---|---|---|---|
-| **Anthropic** (direct + Bedrock + Vertex) | Explicit `cache_control: {type: "ephemeral"\|"persistent"}` on content/system/tool blocks | Bytes forwarded unchanged; provider honours markers (5 min / 1 h TTL) | Recursive JSON-walk drops every `cache_control` key at any nesting depth before dispatch | Gateway injects `cache_control: ephemeral` on large stable prefixes (system + last user turn) if not present | `cache_read_input_tokens` and `cache_creation_input_tokens` separately reported in the trace |
-| **OpenAI** (direct + Azure) | Automatic — prefixes ≥1024 tokens cached, no client flag, 50% discount on cached tokens | Bytes forwarded unchanged (nothing to preserve — provider decides) | No-op on wire; gateway can optionally set a salt via a request-id suffix to break the cache key (future) | No-op — caching is out of the client's control; rule may still force a cache-salt variation for A/B | `usage.prompt_tokens_details.cached_tokens` reported in response |
-| **Gemini** (Vertex + direct) | Explicit `cachedContent` resource — client POSTs to `/v1/cachedContents` then passes `cachedContent: <id>` on generation | Bytes forwarded unchanged; client holds the cache ID | Strips `cachedContent` field from the request → forces cold generation | **Deferred to v1.2** — force-creating a cache ID requires a second upstream call which breaks the zero-hop passthrough framing | TTL minimum 1 min, max 10 min for context caches |
+| **Anthropic** (direct + Bedrock + Vertex) | Explicit `cache_control: {type: "ephemeral"\|"persistent"}` on content/system/tool blocks | Bytes forwarded unchanged; provider honours markers (5 min / 1 h TTL) | Recursive JSON-walk drops every `cache_control` key at any nesting depth before dispatch | **v1** — gateway injects `cache_control: {type: "ephemeral"}` on `system[-1]` + `messages[-1].content[-1]` when the caller hasn't already set it (no-double-inject invariant) | `cache_read_input_tokens` and `cache_creation_input_tokens` separately reported in the trace |
+| **OpenAI** (direct + Azure) | Automatic — prefixes ≥1024 tokens cached, no client flag, 50% discount on cached tokens | Bytes forwarded unchanged (nothing to preserve — provider decides) | No-op on wire; gateway can optionally set a salt via a request-id suffix to break the cache key (future) | **v1** — no-op on wire (caching is out of the client's control), but the rule still fires + attribution emits + counter bumps for per-rule observability | `usage.prompt_tokens_details.cached_tokens` reported in response |
+| **Gemini** (Vertex + direct) | Explicit `cachedContent` resource — client POSTs to `/v1/cachedContents` then passes `cachedContent: <id>` on generation | Bytes forwarded unchanged; client holds the cache ID | Strips `cachedContent` field from the request → forces cold generation | **v1.1** — force-creating a cache ID requires a second upstream `/v1/cachedContents` call which breaks the zero-hop passthrough framing. Current behaviour: rule fires + attribution emits + counter bumps, Apply layer returns ErrNotImplemented and dispatcher falls through to passthrough with a `cache_rule_mode_not_implemented` WARN | TTL minimum 1 min, max 10 min for context caches |
 | **Azure OpenAI** | Inherits OpenAI automatic prefix cache | Same as OpenAI | Same as OpenAI | Same as OpenAI | Configured via Azure's cache-at-deployment toggle — independent of our `force` |
-| **Bedrock Claude** | Inherits Anthropic's `cache_control` shape via converse API | Same as Anthropic | Same as Anthropic | Same as Anthropic (v1.1) | Bedrock region matters — not all regions support Anthropic cache yet |
-| **Vertex Claude** | Inherits Anthropic's shape | Same as Anthropic | Same as Anthropic | Same as Anthropic (v1.1) | — |
+| **Bedrock Claude** | Inherits Anthropic's `cache_control` shape via converse API | Same as Anthropic | Same as Anthropic | Same as Anthropic (v1) | Bedrock region matters — not all regions support Anthropic cache yet |
+| **Vertex Claude** | Inherits Anthropic's shape | Same as Anthropic | Same as Anthropic | Same as Anthropic (v1) | — |
 
-The common shape: `respect` is always safe; `disable` always strips cache-related fields (where applicable); `force` is provider-specific injection (v1.1).
+The common shape: `respect` is always safe; `disable` always strips cache-related fields (where applicable); `force` is provider-specific injection — shipped in v1 for Anthropic + OpenAI + Bedrock Claude + Vertex Claude, deferred to v1.1 for Gemini only.
 
 ## Modes
 
@@ -59,19 +59,16 @@ The gateway's semantic cache (if enabled, v1.1) is also bypassed when mode is `d
 
 For providers that support client-side cache declarations:
 
-- Anthropic (incl. Bedrock Claude + Vertex Claude): gateway injects `cache_control: {type: "ephemeral"}` on the system message and the last user turn if not already present. Shipped in v1.
-- Gemini: deferred to v1.1 — forcing a cache ID requires a separate `/v1/cachedContents` POST which breaks the zero-hop passthrough framing; needs its own spec round.
-- OpenAI / Azure: no-op on wire (their cache is automatic); the mode can still be set by a rule to log intention for observability.
-
-v1 ships Anthropic `force` with TTL-maps-to-ephemeral-or-persistent; Gemini `force` returns `400 cache_override_not_implemented` with a pointer to this page.
+- **Anthropic (direct + Bedrock Claude + Vertex Claude)** — **v1 shipped**. Gateway injects `cache_control: {type: "ephemeral"}` on `system[-1]` + `messages[-1].content[-1]` when the caller hasn't already set it. Implemented via a recursive JSON walk that targets the last element of each block array; no-double-inject invariant means client-set `cache_control` is preserved byte-for-byte.
+- **OpenAI / Azure** — **v1 shipped (as a no-op on wire)**. Their cache is automatic, so the request body is byte-identical to passthrough, but the rule still fires + `langwatch.cache.rule_id` + `mode_applied=FORCE` span attrs emit + `gateway_cache_rule_hits_total{mode_applied="FORCE"}` counter bumps. Operators get per-rule observability even on providers where `force` is semantically a no-op.
+- **Gemini** — **v1.1 deferred**. Force-creating a cache ID requires a separate `/v1/cachedContents` POST which breaks the zero-hop passthrough framing; needs its own spec round. Current behaviour: rule fires + attribution emits + counter bumps, Apply layer returns ErrNotImplemented and the dispatcher falls through to passthrough with a `cache_rule_mode_not_implemented` WARN naming the rule_id.
 
 ### `ttl=NNN`
 
-Same as `force` but carries an explicit TTL in seconds. Provider mapping:
-- Anthropic: chooses `ephemeral` (5 min) or `persistent` (1 h) based on the TTL range; anything above 3600 clamps to `persistent`.
-- Gemini: sets the `ttl` field on `cachedContent` (deferred to v1.2).
+Same shape as `force` but carries an explicit TTL in seconds. Header-level parse succeeds but Apply is still ErrNotImplemented in v1 — operators opting into a rule-level `ttl` currently see the passthrough behaviour above with the same WARN. v1.1 work will wire per-provider TTL mapping:
 
-Currently returns `400 cache_override_not_implemented`.
+- Anthropic: chooses `ephemeral` (5 min) or `persistent` (1 h) based on the TTL range; anything above 3600 clamps to `persistent`.
+- Gemini: sets the `ttl` field on `cachedContent` (depends on the v1.1 Gemini force work above).
 
 ## Response headers
 
