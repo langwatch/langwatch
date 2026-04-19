@@ -77,6 +77,13 @@ const EXEMPT_MODELS = [
   "GatewayChangeEvent",
   "GatewayAuditLog",
   "VirtualKeyProviderCredential",
+  /**
+   * GatewayCacheRule is organization-level (authored once, applies
+   * across every VK owned by the org based on matcher shape). Same
+   * rationale as GatewayBudget — no projectId column, scoped by
+   * organizationId + matcher fields.
+   */
+  "GatewayCacheRule",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
