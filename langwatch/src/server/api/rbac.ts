@@ -846,8 +846,8 @@ export async function hasOrganizationPermission(
     return permission === "organization:view";
   }
 
-  // All other permissions resolved via ORGANIZATION-scoped RoleBindings
-  return checkPermissionFromBindings({
+  // Primary path: resolve via ORGANIZATION-scoped RoleBindings.
+  const permittedByBindings = await checkPermissionFromBindings({
     prisma: ctx.prisma,
     userId,
     organizationId,
@@ -855,6 +855,29 @@ export async function hasOrganizationPermission(
     organizationRole: orgMember.role,
     permission,
   });
+  if (permittedByBindings) return true;
+
+  // Legacy fallback: users migrated before RoleBindings existed keep their
+  // TeamUser row (with ADMIN/MEMBER/VIEWER role) but may have zero
+  // RoleBindings. For org-scoped permission checks we union across every
+  // TeamUser the user has in the organization — this matches the intent
+  // that org ADMINs / team ADMINs have broad access to org-scoped gateway
+  // resources (audit, org-level budgets, cache rules) without requiring a
+  // RoleBinding backfill first.
+  const teamMemberships = await ctx.prisma.teamUser.findMany({
+    where: { userId, team: { organizationId } },
+    select: { role: true, assignedRoleId: true },
+  });
+  for (const tu of teamMemberships) {
+    const permitted = await resolveBindingPermission(
+      { role: tu.role, customRoleId: tu.assignedRoleId ?? null },
+      orgMember.role,
+      permission,
+      ctx.prisma,
+    );
+    if (permitted) return true;
+  }
+  return false;
 }
 
 // ============================================================================
