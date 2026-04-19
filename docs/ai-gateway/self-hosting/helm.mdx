@@ -36,6 +36,25 @@ gateway:
     LW_GATEWAY_BOOTSTRAP_PULL: "false"
     LW_GATEWAY_CIRCUIT_THRESHOLD: "5"
     LW_GATEWAY_CIRCUIT_WINDOW_SEC: "60"
+
+  # Admin / pprof listener (Lane A iter 14) — loopback-bound by default.
+  # kubectl port-forward is the only supported access path; DO NOT expose.
+  admin:
+    addr: "127.0.0.1:6060"   # set to "" to disable pprof entirely
+
+  # Budget outbox tuning (Lane A iter 16)
+  budget:
+    outboxFlushInterval: "1s"
+    outboxMaxRetries: 8
+    liveThresholdPct: 90      # trigger tier-2 live /budget/check at ≥ this % of cap
+    liveTimeout: "200ms"      # Go duration; fail-open on timeout
+
+  # Per-direction guardrail budgets (Lane A iter 16)
+  guardrails:
+    preTimeout: "1500ms"        # fail-closed unless guardrails.request_fail_open=true on VK
+    postTimeout: "1500ms"       # fail-closed unless guardrails.response_fail_open=true on VK
+    streamChunkWindow: "50ms"   # per-chunk budget; fail-OPEN with verdict metric (contract)
+
   healthcheck:
     livenessProbe:
       httpGet: { path: /healthz, port: 7400 }
@@ -49,6 +68,8 @@ gateway:
       periodSeconds: 10
       failureThreshold: 30
 ```
+
+<Note>The chart ships defaults for every new field (admin / budget / guardrails) — `helm upgrade` from an earlier chart version works without overrides. Lane A iter 16 (`a09af36`) closed the drift where iters 3–15 env knobs weren't exposed in values.yaml.</Note>
 
 Apply:
 
