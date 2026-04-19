@@ -156,7 +156,7 @@ Subject to VK `blocked_patterns.tools` — a blocked tool name returns `403 tool
 }
 ```
 
-Thinking tokens are billed separately by Anthropic. The gateway forwards the `thinking` field unchanged; usage counts appear in `response.usage.thinking_tokens`, recorded in the trace as `langwatch.reasoning_tokens`, and debited into the budget.
+Thinking tokens are billed separately by Anthropic. The gateway forwards the `thinking` field unchanged; usage counts appear in `response.usage.thinking_tokens`, roll into `langwatch.usage.output_tokens` on the trace, and debit the budget. (A dedicated `langwatch.reasoning_tokens` span attribute that separates thinking from non-thinking output tokens is a v1.1 observability follow-up.)
 
 ## Routing via `model` field
 

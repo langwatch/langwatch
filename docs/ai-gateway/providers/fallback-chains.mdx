@@ -73,12 +73,13 @@ See [Streaming → pre-connection fallback / mid-stream failure](/ai-gateway/str
 
 ## Observing the chain in traces
 
-Every attempt is a nested span:
+Fallback attribution today:
 
-- `langwatch.fallback.attempt=0` — primary.
-- `langwatch.fallback.attempt=1` — first fallback.
-- `langwatch.fallback.reason` — the condition that triggered the next attempt (e.g. `5xx:503`, `timeout:30001ms`).
+- Prometheus counter `gateway_provider_attempts_total{outcome}` increments once per attempt, with `outcome` in `primary_success | fallback_success | retryable_5xx | rate_limit | timeout | network | circuit_open | non_retryable`.
 - Response header `X-LangWatch-Fallback-Count: N` — how many fallbacks were attempted before success.
+- Request-id correlation via `X-LangWatch-Request-Id` — join the metric + log line back to the specific trace.
+
+<Info>Per-attempt nested spans (`langwatch.fallback.attempt` / `.reason` attrs) are a v1.1 observability follow-up. In v1, the counter + header give you the aggregate picture; per-attempt reasoning lives in the gateway log line for that request-id.</Info>
 
 If **all** attempts in the chain fail, the gateway returns the last provider's error envelope mapped to the OpenAI-compatible shape (`provider_error` or `upstream_timeout` as the `type`).
 

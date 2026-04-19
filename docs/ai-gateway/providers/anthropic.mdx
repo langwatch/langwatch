@@ -50,7 +50,7 @@ See [Caching Passthrough](/ai-gateway/caching-passthrough) for the full decision
 - **`max_tokens` required** — Anthropic requires `max_tokens` on every Messages request. The gateway does not default-insert a value; a client that omits it gets the upstream 400 back.
 - **System prompt structure** — Anthropic Messages uses a top-level `system` field (string or content blocks), not a message role. OpenAI-SDK clients that send a `system` role message get it rewritten into the top-level field by the translator.
 - **Tool-call streaming deltas** — Anthropic emits `content_block_delta` events with `input_json_delta` partial JSON. The gateway proxies these byte-for-byte post-first-chunk so Claude Code (and any other agent) can reconstruct the tool call incrementally.
-- **`thinking` (extended-reasoning) blocks** — available on Claude Opus / Sonnet extended-thinking models. Blocks appear in the response; pricing is separate. Recorded in the trace as `langwatch.reasoning_tokens`.
+- **`thinking` (extended-reasoning) blocks** — available on Claude Opus / Sonnet extended-thinking models. Blocks appear in the response; pricing is separate. Thinking-token counts roll into `langwatch.usage.output_tokens` + debit the budget; a dedicated `langwatch.reasoning_tokens` span attribute is a v1.1 observability follow-up.
 
 ## Using via Claude Code
 

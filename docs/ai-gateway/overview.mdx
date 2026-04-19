@@ -27,7 +27,7 @@ The LangWatch AI Gateway replaces every direct provider call with a single call 
 - **Tool / MCP / URL policy** — block or allowlist tool calls, MCP server references, or outbound URLs by regex before the request ever leaves your gateway.
 - **Caching passthrough** — Anthropic `cache_control` markers are forwarded byte-for-byte by default (protecting your 90% cache discount). Override per-request with `X-LangWatch-Cache: respect|force|disable`.
 - **Automatic fallback** — per-virtual-key fallback chain (e.g. OpenAI → Anthropic → Bedrock) triggers on 5xx, timeout, 429, or circuit-breaker-open. 400/401 client errors never trigger fallback.
-- **Per-tenant observability** — every request emits a LangWatch trace to the owning project with `langwatch.vk_id`, `langwatch.project_id`, `langwatch.principal_id`, fallback attempts, cache outcome, and full cost breakdown. Shared multi-tenant gateway, per-tenant trace routing.
+- **Per-tenant observability** — every request emits a LangWatch trace to the owning project with `langwatch.virtual_key_id`, `langwatch.project_id`, `langwatch.principal_id`, `langwatch.cost_usd`, cache-hit token breakdown, and status. Shared multi-tenant gateway, per-tenant trace routing.
 - **Coding-CLI integrations** — preserves the tool-call streaming deltas that Claude Code and Codex depend on. Documented setup for the major coding assistants in [CLI Integrations](/ai-gateway/cli/overview).
 - **Self-hostable** — ships as a Helm chart alongside the LangWatch app. Horizontally scales, serves traffic during control-plane outages (with bootstrap mode).
 
