@@ -1,17 +1,19 @@
 import {
   Badge,
+  Box,
   Button,
   Field,
   HStack,
   Input,
   NativeSelect,
+  Separator,
   Spacer,
   Spinner,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { X } from "lucide-react";
+import { Ban, Gauge, Shield, X, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -224,6 +226,9 @@ export function VirtualKeyCreateDrawer({
                 fallback priority; re-order with drag later.
               </Field.HelperText>
             </Field.Root>
+
+            <Separator />
+            <CapabilityPreview />
           </VStack>
         </Drawer.Body>
         <Drawer.Footer>
@@ -248,5 +253,94 @@ export function VirtualKeyCreateDrawer({
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
+  );
+}
+
+/**
+ * Advanced-settings preview inside the create drawer. The actual editors
+ * live in VirtualKeyEditDrawer (full validation + tRPC shape); showing
+ * them at create time would double the drawer surface for minimum-viable
+ * first-use. Listing defaults here conveys the full capability set so
+ * users understand what the gateway offers before committing.
+ */
+function CapabilityPreview() {
+  const rows: Array<{
+    icon: React.ReactNode;
+    label: string;
+    defaultValue: string;
+    detail: string;
+  }> = [
+    {
+      icon: <Zap size={14} />,
+      label: "Cache mode",
+      defaultValue: "respect",
+      detail:
+        "Byte-for-byte passthrough of Anthropic cache_control. Switch to disable/force post-create.",
+    },
+    {
+      icon: <Shield size={14} />,
+      label: "Guardrails",
+      defaultValue: "none",
+      detail:
+        "Attach pre/post/stream_chunk monitors (checkType=AS_GUARDRAIL). Block-by-default, opt-in fail-open per direction.",
+    },
+    {
+      icon: <Ban size={14} />,
+      label: "Blocked patterns",
+      defaultValue: "none",
+      detail:
+        "RE2 regex deny/allow for tools, MCP servers, URLs, and models. Enforced pre-provider-dispatch (zero cost).",
+    },
+    {
+      icon: <Gauge size={14} />,
+      label: "Rate limits",
+      defaultValue: "unlimited",
+      detail:
+        "Per-VK RPM + RPD (TPM in v1.1). 429 + Retry-After emitted by the gateway.",
+    },
+  ];
+  return (
+    <VStack align="stretch" gap={2}>
+      <HStack>
+        <Text fontSize="sm" fontWeight="semibold">
+          What else you get (configurable after create)
+        </Text>
+        <Badge colorPalette="gray" fontSize="2xs">
+          preview
+        </Badge>
+      </HStack>
+      <Box
+        borderWidth="1px"
+        borderColor="border.subtle"
+        borderRadius="md"
+        padding={3}
+      >
+        <VStack align="stretch" gap={3}>
+          {rows.map((row) => (
+            <HStack key={row.label} align="start" gap={3}>
+              <Box color="fg.muted" mt={1}>
+                {row.icon}
+              </Box>
+              <VStack align="start" gap={0} flex={1}>
+                <HStack>
+                  <Text fontSize="sm" fontWeight="medium">
+                    {row.label}
+                  </Text>
+                  <Badge variant="subtle" colorPalette="gray" fontSize="2xs">
+                    default: {row.defaultValue}
+                  </Badge>
+                </HStack>
+                <Text fontSize="xs" color="fg.muted">
+                  {row.detail}
+                </Text>
+              </VStack>
+            </HStack>
+          ))}
+        </VStack>
+      </Box>
+      <Text fontSize="xs" color="fg.muted">
+        Open the key's edit drawer after creation to configure any of these.
+      </Text>
+    </VStack>
   );
 }

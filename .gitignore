@@ -48,6 +48,11 @@ prompts/**
 browser-tests/
 **/.claude/screenshots/
 **/.claude/ralph-loop*.md
+# Loose PNG artifacts left by dogfood / scenario sessions — the convention
+# is to upload to img402.dev and link from the PR body, not to commit binaries.
+**/.claude/*.png
+/dogfood-*.png
+/.browser-test-screenshots/
 
 # Playwright E2E tests
 agentic-e2e-tests/test-results/
