@@ -164,3 +164,81 @@ Feature: AI Gateway — Coding CLI integrations
     Then within 60 seconds every CLI's next request returns 403 virtual_key_revoked
     And the gateway's auth cache for "cli-key" is evicted
     And the /changes long-poll delivered the vk_revoked event to all gateway replicas
+
+  # ============================================================================
+  # langwatch CLI — cache-rules subcommand (alexis iter 45 — 93538e323)
+  # ============================================================================
+  # The CLI is a thin wrapper over /api/gateway/v1/cache-rules; full contract
+  # lives in specs/ai-gateway/cache-control-rules.feature and
+  # specs/ai-gateway/public-rest-api.feature §Cache rules. Scenarios here
+  # pin the CLI-specific UX (flag → wire mapping, bulk-apply idempotency,
+  # required-permission surfacing).
+
+  @integration @cli @cache-rules
+  Scenario: Create a rule with inline matchers (tag + mode + ttl)
+    Given a CLI token with "gatewayCacheRules:create"
+    When I run `langwatch cache-rules create --name force-cache-enterprise --priority 300 --mode force --ttl 600 --match-tag tier=enterprise`
+    Then exit status is 0
+    And POST /api/gateway/v1/cache-rules is called with body:
+      """
+      {
+        "name": "force-cache-enterprise",
+        "priority": 300,
+        "matchers": { "vk_tags": ["tier=enterprise"] },
+        "action":   { "mode": "force", "ttl": 600 }
+      }
+      """
+    And stdout shows the created rule id + mode badge
+
+  @integration @cli @cache-rules
+  Scenario: Repeatable --match-tag flags compose into an AND-subset vk_tags array
+    When I run `langwatch cache-rules create --name multi-tag --mode disable --match-tag env=prod --match-tag team=ml`
+    Then the posted matchers.vk_tags equals ["env=prod", "team=ml"]
+    # Matches the Go evaluator's AND-subset semantics (every listed tag must
+    # be present on the VK for the rule to match).
+
+  @integration @cli @cache-rules
+  Scenario: --match-model accepts trailing-* glob without quoting tripping the shell
+    When I run `langwatch cache-rules create --name haiku-family --mode respect --match-model "claude-haiku-*"`
+    Then the posted matchers.model equals "claude-haiku-*"
+    # CLI docs explicitly quote the glob to prevent zsh expansion.
+
+  @integration @cli @cache-rules
+  Scenario: `update` preserves unspecified fields; specifying matchers/action replaces them
+    Given an existing rule "rule_xxx" with matchers {vk_tags: ["env=prod"], model: "gpt-5-mini"}
+    When I run `langwatch cache-rules update rule_xxx --priority 400`
+    Then the PATCH body has only {"priority": 400}
+    And the stored matchers are unchanged
+    When I run `langwatch cache-rules update rule_xxx --match-model claude-haiku-*`
+    Then the PATCH body has matchers equal to exactly {"model": "claude-haiku-*"}
+    # REPLACE semantics pinned on the CLI path too (mirrors REST §Cache rules PATCH behaviour).
+
+  @integration @cli @cache-rules
+  Scenario: `--enable` / `--disable` toggle the enabled flag without touching other fields
+    Given rule "rule_xxx" is currently enabled
+    When I run `langwatch cache-rules update rule_xxx --disable`
+    Then PATCH body equals {"enabled": false}
+    When I run `langwatch cache-rules update rule_xxx --enable`
+    Then PATCH body equals {"enabled": true}
+
+  @integration @cli @cache-rules
+  Scenario: `archive` returns the archived row so scripts can confirm the timestamp
+    When I run `langwatch cache-rules archive rule_xxx --format json`
+    Then exit status is 0
+    And stdout contains a JSON object with archived_at populated (ISO-8601)
+
+  @integration @cli @cache-rules
+  Scenario: `apply --file cache-rules.json` is idempotent by name (CI-friendly)
+    Given a file `cache-rules.json` with 3 rules keyed by name
+    When I run `langwatch cache-rules apply --file cache-rules.json` twice
+    Then the second run produces zero new rules
+    And existing rules are updated in place (matched by name)
+    And the response summary reports `created=0, updated=3, archived=0`
+
+  @integration @cli @cache-rules @security
+  Scenario: CLI surfaces the exact missing permission on a 403
+    Given a CLI token with only "gatewayCacheRules:view"
+    When I run `langwatch cache-rules create --name x --mode respect --match-tag env=prod`
+    Then exit status is non-zero
+    And stderr contains "permission_denied"
+    And stderr names "gatewayCacheRules:create" as the missing permission
