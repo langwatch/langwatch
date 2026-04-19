@@ -108,10 +108,15 @@ SELECT
     Scope,
     ScopeId,
     Window,
-    toStartOfInterval(
-        OccurredAt,
-        INTERVAL 1
-            multiIf(Window = 'DAY', DAY, Window = 'WEEK', WEEK, Window = 'MONTH', MONTH, DAY)
+    -- All branches must return DateTime64(3) to match the target column.
+    -- toStartOfWeek/toStartOfMonth return Date; toStartOfDay on DateTime64
+    -- returns DateTime64 in newer CH versions. toDateTime64 on every branch
+    -- normalises to a single precision for AggregatingMergeTree.
+    multiIf(
+        Window = 'DAY',   toDateTime64(toStartOfDay(OccurredAt),  3),
+        Window = 'WEEK',  toDateTime64(toStartOfWeek(OccurredAt), 3),
+        Window = 'MONTH', toDateTime64(toStartOfMonth(OccurredAt), 3),
+                          toDateTime64(toStartOfDay(OccurredAt),  3)
     ) AS PeriodStart,
     sumState(AmountUSD) AS SpendUSD,
     sumState(toUInt64(TokensInput)) AS TokensInput,
