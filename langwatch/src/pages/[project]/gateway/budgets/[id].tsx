@@ -14,7 +14,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Archive, ArrowLeft, Pencil, Receipt } from "lucide-react";
+import { Archive, ArrowLeft, FileClock, Pencil, Receipt } from "lucide-react";
 import { useState } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -110,6 +110,13 @@ function BudgetDetailPage() {
           <Spacer />
           {budget && !isArchived && (
             <HStack>
+              <Link
+                href={`/${project?.slug}/gateway/audit?targetKind=budget&targetId=${budget.id}`}
+              >
+                <Button variant="outline" size="sm">
+                  <FileClock size={14} /> Audit history
+                </Button>
+              </Link>
               {canUpdate && (
                 <Button
                   variant="outline"

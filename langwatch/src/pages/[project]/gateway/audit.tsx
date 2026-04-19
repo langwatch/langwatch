@@ -25,6 +25,7 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { useRouter } from "~/utils/compat/next-router";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 type AuditAction =
@@ -73,14 +74,26 @@ const TARGET_OPTIONS: Array<{ label: string; value: TargetKind | "" }> = [
 
 function AuditLogPage() {
   const { organization, project } = useOrganizationTeamProject();
+  const router = useRouter();
+  // URL-seeded filter for deep-links from detail pages, e.g.
+  // /gateway/audit?targetKind=virtual_key&targetId=vk_xxx. Users
+  // clear it via the "Clear filter" button inline with the header.
+  const urlTargetKind =
+    typeof router.query.targetKind === "string"
+      ? (router.query.targetKind as TargetKind)
+      : "";
+  const urlTargetId =
+    typeof router.query.targetId === "string" ? router.query.targetId : "";
   const [action, setAction] = useState<AuditAction | "">("");
-  const [targetKind, setTargetKind] = useState<TargetKind | "">("");
+  const [targetKind, setTargetKind] = useState<TargetKind | "">(urlTargetKind);
+  const [targetId, setTargetId] = useState(urlTargetId);
 
   const listQuery = api.gatewayAudit.list.useInfiniteQuery(
     {
       organizationId: organization?.id ?? "",
       action: action || undefined,
       targetKind: targetKind || undefined,
+      targetId: targetId || undefined,
       limit: 50,
     },
     {
@@ -88,6 +101,13 @@ function AuditLogPage() {
       getNextPageParam: (last) => last.nextCursor,
     },
   );
+
+  const clearTarget = () => {
+    setTargetKind("");
+    setTargetId("");
+    const { targetKind: _tk, targetId: _tid, ...rest } = router.query;
+    void router.replace({ pathname: router.pathname, query: rest });
+  };
 
   const entries = (listQuery.data?.pages ?? []).flatMap((p) => p.entries);
 
@@ -129,9 +149,10 @@ function AuditLogPage() {
               <NativeSelect.Root size="sm">
                 <NativeSelect.Field
                   value={targetKind}
-                  onChange={(e) =>
-                    setTargetKind(e.target.value as TargetKind | "")
-                  }
+                  onChange={(e) => {
+                    setTargetKind(e.target.value as TargetKind | "");
+                    if (!e.target.value) setTargetId("");
+                  }}
                 >
                   {TARGET_OPTIONS.map((opt) => (
                     <option key={opt.value || "all"} value={opt.value}>
@@ -141,6 +162,18 @@ function AuditLogPage() {
                 </NativeSelect.Field>
               </NativeSelect.Root>
             </Box>
+            {targetId && (
+              <Badge
+                colorPalette="orange"
+                variant="surface"
+                gap={1}
+                cursor="pointer"
+                onClick={clearTarget}
+                title="Clear target filter"
+              >
+                target = {targetId.slice(0, 24)}… ×
+              </Badge>
+            )}
           </HStack>
 
           {listQuery.isLoading ? (
