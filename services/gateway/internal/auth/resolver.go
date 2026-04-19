@@ -50,11 +50,11 @@ func (r *httpResolver) SignRequest(req *http.Request, body []byte) {
 }
 
 // ChangeEvent is emitted by the long-poll /changes endpoint when any VK or
-// budget mutation lands.
+// budget mutation lands. Revision is BigInt-as-string on the wire.
 type ChangeEvent struct {
-	VirtualKeyID string `json:"vk_id"`
-	NewRevision  int64  `json:"revision"`
-	Kind         string `json:"kind"` // vk_updated|budget_updated|vk_revoked|config_updated
+	VirtualKeyID string   `json:"vk_id"`
+	NewRevision  BigInt64 `json:"revision"`
+	Kind         string   `json:"kind"` // vk_updated|budget_updated|vk_revoked|config_updated
 }
 
 type httpResolver struct {
@@ -127,9 +127,16 @@ type resolveReq struct {
 	KeyPresented  string `json:"key_presented"`
 	GatewayNodeID string `json:"gateway_node_id"`
 }
+
+// resolveResp mirrors the /api/internal/gateway/resolve-key response.
+// Revision is emitted as a JSON string by the control plane (BigInt
+// serialization survives JSON), so accept it as a string here and
+// parse to int64 below. Earlier iters typed this as int64 which
+// caused silent `json: cannot unmarshal string into int64` errors
+// that surfaced as 503 auth_upstream_unavailable (finding #15).
 type resolveResp struct {
 	JWT           string `json:"jwt"`
-	Revision      int64  `json:"revision"`
+	Revision      string `json:"revision"`
 	KeyID         string `json:"key_id"`
 	DisplayPrefix string `json:"display_prefix"`
 }
@@ -167,6 +174,16 @@ func (r *httpResolver) ResolveKey(ctx context.Context, rawKey string) (*Bundle, 
 	claims, err := r.VerifyJWT(rr.JWT)
 	if err != nil {
 		return nil, fmt.Errorf("resolve-key jwt verify: %w", err)
+	}
+	// Reconcile resolve-key's top-level revision into claims.Revision
+	// (also BigInt-as-string on the wire). Prefer the explicit field
+	// over the JWT claim if both are set and disagree — the claim is
+	// stamped at JWT-sign-time; the top-level is the latest read from
+	// VirtualKey.revision, so it's the canonical fresh value.
+	if rr.Revision != "" {
+		if parsed, perr := strconv.ParseInt(rr.Revision, 10, 64); perr == nil {
+			claims.Revision = parsed
+		}
 	}
 	return &Bundle{
 		JWT:           rr.JWT,
@@ -229,8 +246,10 @@ func (r *httpResolver) WaitForChanges(ctx context.Context, orgID string, sinceRe
 		return nil, fmt.Errorf("changes upstream %d: %s", resp.StatusCode, string(b))
 	}
 	// Contract §4.3 response shape: {current_revision, changes: [...]}.
+	// current_revision is BigInt-as-string on the wire (Prisma BigInt
+	// column); BigInt64 tolerates either number or quoted string.
 	var wrap struct {
-		CurrentRevision int64         `json:"current_revision"`
+		CurrentRevision BigInt64      `json:"current_revision"`
 		Changes         []ChangeEvent `json:"changes"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&wrap); err != nil {

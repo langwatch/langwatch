@@ -56,7 +56,7 @@ func TestResolveKeySuccess(t *testing.T) {
 		})
 		_ = json.NewEncoder(w).Encode(resolveResp{
 			JWT:           jwtStr,
-			Revision:      42,
+			Revision:      "42",
 			KeyID:         "vk_123",
 			DisplayPrefix: "lw_vk_live_testke",
 		})

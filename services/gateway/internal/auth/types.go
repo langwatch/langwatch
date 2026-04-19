@@ -5,8 +5,47 @@ package auth
 
 import (
 	"encoding/json"
+	"fmt"
+	"strconv"
 	"time"
 )
+
+// BigInt64 is int64 on the Go side but accepts either a JSON number
+// or a numeric JSON string on the wire. The control plane serializes
+// Prisma BigInt columns (VirtualKey.revision, GatewayChangeEvent.id,
+// …) as strings to survive the JSON safe-integer range; older iters
+// emitted them as numbers for small values. Types that mirror those
+// columns should use BigInt64 instead of raw int64 so both shapes
+// decode cleanly.
+type BigInt64 int64
+
+func (b *BigInt64) UnmarshalJSON(data []byte) error {
+	if len(data) == 0 || string(data) == "null" {
+		return nil
+	}
+	var n int64
+	if err := json.Unmarshal(data, &n); err == nil {
+		*b = BigInt64(n)
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return fmt.Errorf("bigint: not number or numeric string: %w", err)
+	}
+	if s == "" {
+		return nil
+	}
+	v, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return fmt.Errorf("bigint: %q is not a valid int64: %w", s, err)
+	}
+	*b = BigInt64(v)
+	return nil
+}
+
+func (b BigInt64) MarshalJSON() ([]byte, error) {
+	return []byte(strconv.FormatInt(int64(b), 10)), nil
+}
 
 // JWT is the hot-path auth proof. Verified on every request; carries only
 // identity, not config. See specs/ai-gateway/_shared/contract.md.
@@ -16,6 +55,10 @@ type JWTClaims struct {
 	TeamID         string `json:"team_id"`
 	OrganizationID string `json:"org_id"`
 	PrincipalID    string `json:"principal_id"`
+	// Revision is the VK row's BigInt revision counter. The control
+	// plane signs it as a JSON string (BigInt safely round-trips JSON
+	// only as string), so UnmarshalJSON below accepts either a number
+	// or a numeric string. Go-side math on revisions uses int64.
 	Revision       int64  `json:"revision"`
 	ExpiresAt      int64  `json:"exp"`
 	IssuedAt       int64  `json:"iat"`
@@ -23,6 +66,57 @@ type JWTClaims struct {
 	Audience       string `json:"aud,omitempty"`
 	// Convenience for jwt/v5 Subject; same as VirtualKeyID.
 	Subject string `json:"sub,omitempty"`
+}
+
+// UnmarshalJSON tolerates `revision` as a JSON string (control-plane
+// emit format, BigInt-safe) or a JSON number (earlier iters; kept for
+// backward compat during rollout). All other fields use the default
+// unmarshal path.
+func (c *JWTClaims) UnmarshalJSON(data []byte) error {
+	type plain JWTClaims
+	aux := struct {
+		Revision json.RawMessage `json:"revision"`
+		*plain
+	}{plain: (*plain)(c)}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if len(aux.Revision) == 0 || string(aux.Revision) == "null" {
+		return nil
+	}
+	// Try number first (cheap), then fall back to quoted-string.
+	if err := json.Unmarshal(aux.Revision, &c.Revision); err == nil {
+		return nil
+	}
+	var s string
+	if err := json.Unmarshal(aux.Revision, &s); err != nil {
+		return fmt.Errorf("revision: not a number or numeric string: %w", err)
+	}
+	if s == "" {
+		return nil
+	}
+	v, err := strconv.ParseInt(s, 10, 64)
+	if err != nil {
+		return fmt.Errorf("revision: %q is not a valid int64: %w", s, err)
+	}
+	c.Revision = v
+	return nil
+}
+
+// UnmarshalJSON tolerates Config.Revision as either a JSON number
+// (older iters) or a JSON string (current control-plane emit format,
+// BigInt-safe). See BigInt64 for the shared helper.
+func (c *Config) UnmarshalJSON(data []byte) error {
+	type plain Config
+	aux := struct {
+		Revision BigInt64 `json:"revision"`
+		*plain
+	}{plain: (*plain)(c)}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	c.Revision = int64(aux.Revision)
+	return nil
 }
 
 // Config is the warm-path bundle — rich, cached, refreshed by revision.

@@ -123,7 +123,7 @@ func (cp *controlPlaneMock) handleResolveKey(w http.ResponseWriter, r *http.Requ
 	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	signed, _ := tok.SignedString(cp.jwtSecret)
 	_ = json.NewEncoder(w).Encode(resolveResp{
-		JWT: signed, Revision: claims.Revision,
+		JWT: signed, Revision: strconv.FormatInt(claims.Revision, 10),
 		KeyID: cur.VirtualKeyID, DisplayPrefix: req.KeyPresented[:min(17, len(req.KeyPresented))],
 	})
 }
@@ -156,7 +156,7 @@ func (cp *controlPlaneMock) handleChanges(w http.ResponseWriter, r *http.Request
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"current_revision": cp.revision.Load(),
 		"changes": []ChangeEvent{
-			{VirtualKeyID: cp.current.VirtualKeyID, NewRevision: cp.revision.Load(), Kind: "vk_config_updated"},
+			{VirtualKeyID: cp.current.VirtualKeyID, NewRevision: BigInt64(cp.revision.Load()), Kind: "vk_config_updated"},
 		},
 	})
 }

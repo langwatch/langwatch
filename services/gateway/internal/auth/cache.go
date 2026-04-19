@@ -124,6 +124,21 @@ func (c *Cache) Resolve(ctx context.Context, rawKey string) (*Bundle, error) {
 	if err != nil {
 		return nil, err
 	}
+	// ResolveKey returns bundle with Config=nil — the config half is
+	// fetched separately via /config/:vk_id. On a cold resolve, the
+	// dispatcher needs a populated Config to pass (model/aliases/
+	// fallback/guardrails/blocked_patterns). Fetch eagerly once here
+	// so the first request after a miss doesn't 400 with
+	// model_resolve_failed "no VK config loaded".
+	if b.Config == nil {
+		cfg, _, cfgErr := c.rv.FetchConfig(ctx, b.JWTClaims.VirtualKeyID, 0)
+		if cfgErr != nil {
+			c.logger.Warn("eager_config_fetch_failed",
+				"vk_id", b.JWTClaims.VirtualKeyID, "err", cfgErr.Error())
+		} else if cfg != nil {
+			b.Config = cfg
+		}
+	}
 	c.l1.Add(h, b)
 	if c.l2 != nil {
 		_ = c.writeL2(ctx, h, b)
@@ -240,7 +255,7 @@ func (c *Cache) orgChangesLoop(ctx context.Context, orgID string) {
 				"org_id", orgID, "vk_id", ev.VirtualKeyID,
 				"revision", ev.NewRevision, "kind", ev.Kind)
 			c.InvalidateByVirtualKeyID(ev.VirtualKeyID)
-			c.trackRevision(orgID, ev.NewRevision)
+			c.trackRevision(orgID, int64(ev.NewRevision))
 		}
 	}
 }
