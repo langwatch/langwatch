@@ -216,9 +216,18 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
     "stream_chunk": []
   },
   "blocked_patterns": {
+    /* RE2 regex deny/allow enforced right after auth + rate-limit, before
+       body-parse / guardrails / budget / bifrost. Broken regex → request
+       rejected with 503 service_unavailable (fail-closed, never silent-bypass).
+       URLs dimension extracts every http(s):// URL anywhere in the body
+       (user messages, tool args, system prompts), strips trailing punctuation,
+       dedupes. Models dimension is regex policy — distinct from the static
+       glob `models_allowed` allowlist; both compose (request passes only
+       if both allow). */
     "tools":  { "deny": ["^shell\\.", "^filesystem\\.write$"], "allow": null },
     "mcp":    { "deny": ["^.*@mcp/unverified.*$"], "allow": null },
-    "urls":   { "deny": [], "allow": ["^https?://allowed\\.example\\.com/.*"] }
+    "urls":   { "deny": [], "allow": ["^https?://allowed\\.example\\.com/.*"] },
+    "models": { "deny": ["^gpt-4(-turbo)?$"], "allow": null }
   },
   "rate_limits": { "rpm": null, "tpm": null, "rpd": null },
   /* v1 ships RPM + RPD enforcement (golang.org/x/time/rate token buckets,
@@ -392,13 +401,13 @@ All errors OpenAI-compatible:
 |---|---|---|
 | `invalid_api_key` | 401 | Unknown, malformed, or non-existent VK |
 | `virtual_key_revoked` | 403 | VK exists but is revoked |
-| `model_not_allowed` | 403 | VK has model allowlist and requested model is not in it |
+| `model_not_allowed` | 403 | VK has `models_allowed` glob allowlist and requested model is not in it, **or** matched `blocked_patterns.models` deny regex (or fell outside its allow regex); also when no alias/explicit form resolves to a configured provider |
 | `permission_denied` | 403 | Principal lacks RBAC permission for endpoint |
 | `budget_exceeded` | 402 | Any hard-cap budget scope is over limit |
 | `rate_limit_exceeded` | 429 | VK / project / org rate limit hit |
 | `guardrail_blocked` | 403 | Pre- or post-call guardrail returned `block` |
-| `tool_not_allowed` | 403 | Requested tool/MCP matches VK `blocked_patterns.tools` or `blocked_patterns.mcp` |
-| `url_not_allowed` | 403 | Outbound URL the model wants to call matches VK `blocked_patterns.urls` deny list |
+| `tool_not_allowed` | 403 | Requested tool/MCP matches VK `blocked_patterns.tools` or `blocked_patterns.mcp` (deny-wins, RE2) |
+| `url_not_allowed` | 403 | Any `http(s)://` URL extracted from the request body matches VK `blocked_patterns.urls` deny (or falls outside a non-null `allow`) — extraction is permissive: user messages / tool args / system prompts / anywhere |
 | `cache_override_invalid` | 400 | `X-LangWatch-Cache` header malformed |
 | `provider_error` | 502 | Upstream provider returned error after fallback exhaustion |
 | `upstream_timeout` | 504 | Upstream timed out after fallback exhaustion |

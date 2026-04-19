@@ -45,9 +45,9 @@ curl -s -H "Authorization: Bearer $LANGWATCH_VK" \
   https://gateway.langwatch.ai/v1/models | jq -r '.data[].id' | sort
 ```
 
-If the model's not in the list, it's either (a) blocked by `models_allowed` on the VK, or (b) not exposed by any of the VK's provider bindings.
+If the model's not in the list, it's either (a) blocked by `models_allowed` on the VK, (b) blocked by `blocked_patterns.models` (regex policy — different from the static allowlist), or (c) not exposed by any of the VK's provider bindings.
 
-**Fix:** `langwatch virtual-keys update <id> --config-json '{"models_allowed": null}'` to remove the allowlist, or add the model to it. Or attach a provider credential that actually serves the model.
+**Fix:** `langwatch virtual-keys update <id> --config-json '{"models_allowed": null}'` to remove the allowlist, or add the model to it. For the regex policy, edit `blocked_patterns.models.deny` / `.allow` — see [Blocked Patterns → Models dimension vs models_allowed](/ai-gateway/blocked-patterns#models-dimension-vs-models_allowed) for when to use which. Or attach a provider credential that actually serves the model.
 
 ## `402 budget_exceeded`
 
