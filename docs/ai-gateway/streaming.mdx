@@ -24,18 +24,33 @@ At this point no client-visible byte has been emitted yet, so changes are safe.
 
 Coding CLIs like Claude Code and Codex depend on the exact `content_block_delta` / `input_json_delta` ordering; any reformat breaks their tool-call parser.
 
-### Mid-stream failure
+### Terminal error shapes
 
-If the upstream connection drops after the first chunk:
+Once the first chunk has been sent to the client, the gateway never silent-switches providers. If something goes wrong mid-stream, the stream ends with a terminal `event: error` frame. **Two shapes exist in v1**, distinguishable by `error.code`:
 
-1. Gateway emits a terminal SSE `error` event. The exact frame shape (byte-locked by the test suite so future drift breaks the build):
-    ```
-    event: error
-    data: {"error":{"type":"provider_error","code":"upstream_mid_stream_failure","message":"Upstream connection closed at chunk N: <reason>","param":null}}
+**Upstream connection failure:**
 
-    ```
+```
+event: error
+data: {"error":{"type":"provider_error","code":"upstream_mid_stream_failure","message":"Upstream connection closed at chunk N: <reason>","param":null}}
+
+```
+
+**Stream-chunk guardrail block** (from [stream_chunk guardrails](/ai-gateway/guardrails#stream_chunk--terminate-per-chunk-on-visible-deltas)):
+
+```
+event: error
+data: {"error":{"type":"guardrail_blocked","code":"stream_chunk_blocked","message":"<policy reason>","param":null}}
+
+```
+
+Both frames are byte-locked by the Go test suite — any future shape drift breaks the build. Clients that parse SSE `error` frames should key off `error.code` to distinguish provider failures (retryable after backoff) from policy blocks (retry won't help unless the input changes).
+
+Post-emission sequence for both shapes:
+
+1. Gateway emits the terminal `event: error` frame (shown above).
 2. Gateway closes the client connection.
-3. The failed provider's circuit-breaker counter increments.
+3. For `provider_error`: the failed provider's circuit-breaker counter increments. For `guardrail_blocked`: a verdict metric (`gateway_guardrail_verdicts_total{verdict=block}`) increments instead — the provider is healthy, policy fired.
 
 The gateway **never** silent-switches to the fallback mid-stream. Splicing chunks from two providers would produce an inconsistent response: mismatched tool-call ids, accumulated-content replay, token-accounting drift. The choice is deliberate and enforced in code.
 
@@ -51,13 +66,11 @@ Shipped in langwatch-saas `b8016b0` (@sergey Lane A iter 4 pt6).
 
 ## `stream_chunk` guardrails
 
-Guardrails with `direction: stream_chunk` run on each chunk **before emission**. See [Guardrails](/ai-gateway/guardrails).
+Guardrails with `direction: stream_chunk` run on **chunks with visible delta text** before emission. Frames without visible text — role-only (`{"delta":{"role":"assistant"}}`), tool-call deltas, terminal usage — skip the guardrail call entirely, so ~95% of stream frames are near-zero overhead. See [Guardrails → stream_chunk](/ai-gateway/guardrails#stream_chunk--terminate-per-chunk-on-visible-deltas).
 
-- Budget ≤50 ms per chunk. Slow guardrails fall through with an OTel warning.
-- Decision `block` terminates the stream with SSE `error`. Subsequent chunks are discarded.
-- Decision `modify` replaces the chunk content (body-level text rewrite or full-object rewrite).
-
-Stream-chunk guardrails are the only mechanism that may mutate chunks post-first-chunk — everything else must be a byte-for-byte passthrough.
+- **Budget ≤50 ms per chunk.** Slow or errored guardrails **fail open** — the chunk passes through, `gateway_guardrail_verdicts_total{direction=stream_chunk,verdict=fail_open}` increments, and `langwatch.guardrail.stream_chunk_fail_open=<reason>` is set on the trace. Blocking the user's stream on a slow policy service is worse than occasional pass-through — but the metric surfaces degraded services.
+- **Decision `block`** → terminal `event: error` frame with `type=guardrail_blocked`, `code=stream_chunk_blocked` (see [Terminal error shapes](#terminal-error-shapes)). Channel closed immediately.
+- **Decision `modify`** is **not implemented in v1** — chunk-level rewriting is provider-shape-specific (OpenAI delta JSON vs Anthropic SSE events differ). For v1, "redact on stream" = block + client-retry. A future iter can add provider-aware chunk rewriting.
 
 ## Starting a streaming request
 
