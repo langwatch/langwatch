@@ -185,13 +185,13 @@ func (d *Dispatcher) applyHeaderMode(w http.ResponseWriter, r *http.Request, bod
 	mode, err := cacheoverride.Parse(hdr)
 	if err != nil {
 		if errors.Is(err, cacheoverride.ErrNotImplemented) {
-			gwerrors.Write(w, reqID, gwerrors.TypeCacheOverrideInvalid,
+			writeErr(r.Context(), w, reqID, gwerrors.TypeCacheOverrideInvalid,
 				"cache_override_not_implemented",
 				"X-LangWatch-Cache mode not yet supported in v1 (respect/disable only); see docs for v1.1 roadmap",
 				"X-LangWatch-Cache")
 			return nil, false
 		}
-		gwerrors.Write(w, reqID, gwerrors.TypeCacheOverrideInvalid,
+		writeErr(r.Context(), w, reqID, gwerrors.TypeCacheOverrideInvalid,
 			"cache_override_invalid",
 			err.Error(),
 			"X-LangWatch-Cache")
@@ -199,7 +199,7 @@ func (d *Dispatcher) applyHeaderMode(w http.ResponseWriter, r *http.Request, bod
 	}
 	out, err := cacheoverride.Apply(mode, body)
 	if err != nil {
-		gwerrors.Write(w, reqID, gwerrors.TypeCacheOverrideInvalid,
+		writeErr(r.Context(), w, reqID, gwerrors.TypeCacheOverrideInvalid,
 			"cache_override_apply_failed", err.Error(), "X-LangWatch-Cache")
 		return nil, false
 	}
@@ -225,7 +225,7 @@ func (d *Dispatcher) applyRuleMode(w http.ResponseWriter, r *http.Request, body 
 			// Fall back to passthrough so the request succeeds.
 			out = body
 		} else {
-			gwerrors.Write(w, reqID, gwerrors.TypeCacheOverrideInvalid,
+			writeErr(r.Context(), w, reqID, gwerrors.TypeCacheOverrideInvalid,
 				"cache_override_apply_failed", err.Error(), "cache_rule")
 			return nil, false
 		}
@@ -244,7 +244,7 @@ func (d *Dispatcher) applyRuleMode(w http.ResponseWriter, r *http.Request, body 
 // right after auth, before budget / bifrost — cheapest reject path.
 // Compiles the VK's regex set lazily and stashes on the bundle so
 // subsequent requests reuse the compiled form.
-func (d *Dispatcher) enforceBlockedPatterns(w http.ResponseWriter, b *auth.Bundle, body []byte, reqID string) bool {
+func (d *Dispatcher) enforceBlockedPatterns(ctx context.Context, w http.ResponseWriter, b *auth.Bundle, body []byte, reqID string) bool {
 	if b == nil || b.Config == nil {
 		return true
 	}
@@ -255,7 +255,7 @@ func (d *Dispatcher) enforceBlockedPatterns(w http.ResponseWriter, b *auth.Bundl
 		// Fail-closed: a broken VK config should not let arbitrary
 		// tools through. Return service_unavailable so the operator
 		// can fix the VK without a silent bypass.
-		gwerrors.Write(w, reqID, gwerrors.TypeServiceUnavailable,
+		writeErr(ctx, w, reqID, gwerrors.TypeServiceUnavailable,
 			"blocked_patterns_broken",
 			"virtual key blocked_patterns policy is unparseable; fix the regexes in the VK config",
 			"")
@@ -265,17 +265,17 @@ func (d *Dispatcher) enforceBlockedPatterns(w http.ResponseWriter, b *auth.Bundl
 		return true
 	}
 	if tool, _ := blocked.FirstBlockedTool(blocked.ExtractToolNames(body), compiled); tool != "" {
-		gwerrors.Write(w, reqID, gwerrors.TypeToolNotAllowed,
+		writeErr(ctx, w, reqID, gwerrors.TypeToolNotAllowed,
 			"blocked_tool", "tool "+tool+" is blocked by virtual key policy", "tool")
 		return false
 	}
 	if mcp, _ := blocked.FirstBlockedMCP(blocked.ExtractMCPNames(body), compiled); mcp != "" {
-		gwerrors.Write(w, reqID, gwerrors.TypeToolNotAllowed,
+		writeErr(ctx, w, reqID, gwerrors.TypeToolNotAllowed,
 			"blocked_mcp", "MCP "+mcp+" is blocked by virtual key policy", "mcp")
 		return false
 	}
 	if url, _ := blocked.FirstBlockedURL(blocked.ExtractURLs(body), compiled); url != "" {
-		gwerrors.Write(w, reqID, gwerrors.TypeURLNotAllowed,
+		writeErr(ctx, w, reqID, gwerrors.TypeURLNotAllowed,
 			"blocked_url", "URL "+url+" is blocked by virtual key policy", "url")
 		return false
 	}
@@ -324,7 +324,7 @@ func (d *Dispatcher) enforceRateLimit(w http.ResponseWriter, r *http.Request, b 
 	}
 	w.Header().Set("Retry-After", strconv.Itoa(retrySeconds))
 	w.Header().Set("X-LangWatch-RateLimit-Dimension", decision.Dimension)
-	gwerrors.Write(w, reqID, gwerrors.TypeRateLimitExceeded, "vk_rate_limit_exceeded", decision.Reason, "")
+	writeErr(r.Context(), w, reqID, gwerrors.TypeRateLimitExceeded, "vk_rate_limit_exceeded", decision.Reason, "")
 	return false
 }
 
@@ -694,10 +694,10 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	r.Body.Close()
 	if err != nil {
 		if httpx.IsMaxBytesError(err) {
-			gwerrors.Write(w, reqID, gwerrors.TypePayloadTooLarge, "payload_too_large", "request body exceeds the configured maximum", "")
+			writeErr(r.Context(), w, reqID, gwerrors.TypePayloadTooLarge, "payload_too_large", "request body exceeds the configured maximum", "")
 			return
 		}
-		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "body_read_failed", err.Error(), "")
+		writeErr(r.Context(), w, reqID, gwerrors.TypeBadRequest, "body_read_failed", err.Error(), "")
 		return
 	}
 	// Cache override is evaluated on /v1/chat/completions too — OpenAI
@@ -711,13 +711,13 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	} else {
 		return
 	}
-	if !d.enforceBlockedPatterns(w, b, body, reqID) {
+	if !d.enforceBlockedPatterns(r.Context(), w, b, body, reqID) {
 		return
 	}
 	parsed, err := parseOpenAIChatBody(body)
 	if err != nil {
 		gwotel.RecordException(r.Context(), "bad_json", err.Error())
-		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "bad_json", err.Error(), "")
+		writeErr(r.Context(), w, reqID, gwerrors.TypeBadRequest, "bad_json", err.Error(), "")
 		return
 	}
 	// Stamp the requested model BEFORE resolve so model_resolve_failed
@@ -730,10 +730,10 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		gwotel.RecordException(r.Context(), "model_resolve_failed", err.Error())
 		if isModelNotAllowed(err) || errors.Is(err, errNoMatchingProvider) {
-			gwerrors.Write(w, reqID, gwerrors.TypeModelNotAllowed, "model_not_allowed", err.Error(), "model")
+			writeErr(r.Context(), w, reqID, gwerrors.TypeModelNotAllowed, "model_not_allowed", err.Error(), "model")
 			return
 		}
-		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "model_resolve_failed", err.Error(), "model")
+		writeErr(r.Context(), w, reqID, gwerrors.TypeBadRequest, "model_resolve_failed", err.Error(), "model")
 		return
 	}
 	// Rewrite the body's model field to the provider-native name so Bifrost's
@@ -773,7 +773,7 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	// /budget/check when soft/near-limit.
 	pre := d.budgetPrecheck(r.Context(), b, estimateCostUSD(len(body), resolved.Model))
 	if pre.Decision == budget.DecisionHardStop {
-		gwerrors.Write(w, reqID, gwerrors.TypeBudgetExceeded, "budget_hard_cap_hit", pre.Reason, "")
+		writeErr(r.Context(), w, reqID, gwerrors.TypeBudgetExceeded, "budget_hard_cap_hit", pre.Reason, "")
 		return
 	}
 	for _, wrn := range pre.Warnings {
@@ -784,7 +784,7 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	if gerr != nil {
 		failOpen := b != nil && b.Config != nil && valueMap(b.Config.Guardrails, "request_fail_open") == "true"
 		if !failOpen {
-			gwerrors.Write(w, reqID, gwerrors.TypeServiceUnavailable, "guardrail_upstream_unavailable",
+			writeErr(r.Context(), w, reqID, gwerrors.TypeServiceUnavailable, "guardrail_upstream_unavailable",
 				"guardrail service unavailable: "+gerr.Error(), "")
 			return
 		}
@@ -792,7 +792,7 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 		d.logger.Warn("guardrail_fail_open", "request_id", reqID, "err", gerr.Error())
 	}
 	if gres != nil && gres.Verdict == guardrails.VerdictBlock {
-		gwerrors.Write(w, reqID, gwerrors.TypeGuardrailBlocked, "pre_guardrail_blocked", gres.Reason, "")
+		writeErr(r.Context(), w, reqID, gwerrors.TypeGuardrailBlocked, "pre_guardrail_blocked", gres.Reason, "")
 		// Record the blocked attempt in the budget ledger with zero cost so
 		// operators can see guardrail pressure in usage dashboards.
 		d.enqueueDebit(b, grq, resolved, 0, 0, 0, 0, 0, 0, "blocked_by_guardrail")
@@ -815,7 +815,7 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	if berr != nil {
 		d.enqueueDebit(b, grq, resolved, 0, 0, 0, 0, 0, time.Since(t0).Milliseconds(), "provider_error")
 		d.metrics.ObserveHTTPRequest("/v1/chat/completions", "provider_error", string(resolved.Provider), resolved.Model, time.Since(t0).Seconds())
-		d.writeBifrostError(w, reqID, berr)
+		d.writeBifrostError(r.Context(), w, reqID, berr)
 		return
 	}
 	// Post-response guardrails run after the provider returns but
@@ -826,7 +826,7 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 		failOpen := b != nil && b.Config != nil && valueMap(b.Config.Guardrails, "response_fail_open") == "true"
 		if !failOpen {
 			d.enqueueDebit(b, grq, resolved, 0, 0, 0, 0, 0, time.Since(t0).Milliseconds(), "provider_error")
-			gwerrors.Write(w, reqID, gwerrors.TypeServiceUnavailable,
+			writeErr(r.Context(), w, reqID, gwerrors.TypeServiceUnavailable,
 				"guardrail_upstream_unavailable",
 				"post-guardrail service unavailable: "+pgErr.Error(), "")
 			return
@@ -834,7 +834,7 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 		d.logger.Warn("post_guardrail_fail_open", "request_id", reqID, "err", pgErr.Error())
 	} else if pgRes != nil && pgRes.Verdict == guardrails.VerdictBlock {
 		d.enqueueDebit(b, grq, resolved, 0, 0, 0, 0, 0, time.Since(t0).Milliseconds(), "blocked_by_guardrail")
-		gwerrors.Write(w, reqID, gwerrors.TypeGuardrailBlocked,
+		writeErr(r.Context(), w, reqID, gwerrors.TypeGuardrailBlocked,
 			"post_guardrail_blocked", pgRes.Reason, "")
 		return
 	}
@@ -860,6 +860,18 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	w.Header().Set("X-LangWatch-Model", resolved.Model)
 	_ = json.NewEncoder(w).Encode(resp)
 	d.metrics.ObserveHTTPRequest("/v1/chat/completions", "success", string(resolved.Provider), resolved.Model, time.Since(t0).Seconds())
+}
+
+// writeErr is the error-writing wrapper every handler should use when
+// it has a request context in scope: it records the structured code +
+// actionable message as an OTel exception event on the active span
+// BEFORE writing the HTTP envelope, so the trace's EXCEPTION block
+// renders the message instead of just the generic HTTP status text.
+// Closes @ariana finding #78 class bug across all dispatcher error
+// sites, not just the parse/resolve ones.
+func writeErr(ctx context.Context, w http.ResponseWriter, reqID string, t gwerrors.Type, code, message, param string) {
+	gwotel.RecordException(ctx, code, message)
+	gwerrors.Write(w, reqID, t, code, message, param)
 }
 
 // stampFallbackAttribution emits the §6 attribution attributes on the
@@ -937,7 +949,7 @@ func (d *Dispatcher) serveChatStream(w http.ResponseWriter, r *http.Request, b *
 		// — safe to translate into a normal JSON error envelope. Nothing
 		// has committed the client to SSE framing yet.
 		d.enqueueDebit(b, grq, resolved, 0, 0, 0, 0, 0, time.Since(t0).Milliseconds(), "provider_error")
-		d.writeBifrostError(w, reqID, berr)
+		d.writeBifrostError(r.Context(), w, reqID, berr)
 		return
 	}
 
@@ -1465,10 +1477,10 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 	r.Body.Close()
 	if err != nil {
 		if httpx.IsMaxBytesError(err) {
-			gwerrors.Write(w, reqID, gwerrors.TypePayloadTooLarge, "payload_too_large", "request body exceeds the configured maximum", "")
+			writeErr(r.Context(), w, reqID, gwerrors.TypePayloadTooLarge, "payload_too_large", "request body exceeds the configured maximum", "")
 			return
 		}
-		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "body_read_failed", err.Error(), "")
+		writeErr(r.Context(), w, reqID, gwerrors.TypeBadRequest, "body_read_failed", err.Error(), "")
 		return
 	}
 	// Cache override is evaluated on /v1/messages because Anthropic
@@ -1482,7 +1494,7 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 	} else {
 		return
 	}
-	if !d.enforceBlockedPatterns(w, b, body, reqID) {
+	if !d.enforceBlockedPatterns(r.Context(), w, b, body, reqID) {
 		return
 	}
 	// For /v1/messages we default to anthropic unless the VK routes the
@@ -1492,7 +1504,7 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 	parsed, err := parseOpenAIChatBody(body) // shape has `model`, that's all we need here
 	if err != nil {
 		gwotel.RecordException(r.Context(), "bad_json", err.Error())
-		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "bad_json", err.Error(), "")
+		writeErr(r.Context(), w, reqID, gwerrors.TypeBadRequest, "bad_json", err.Error(), "")
 		return
 	}
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOperationName, "messages")
@@ -1501,10 +1513,10 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		gwotel.RecordException(r.Context(), "model_resolve_failed", err.Error())
 		if isModelNotAllowed(err) || errors.Is(err, errNoMatchingProvider) {
-			gwerrors.Write(w, reqID, gwerrors.TypeModelNotAllowed, "model_not_allowed", err.Error(), "model")
+			writeErr(r.Context(), w, reqID, gwerrors.TypeModelNotAllowed, "model_not_allowed", err.Error(), "model")
 			return
 		}
-		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "model_resolve_failed", err.Error(), "model")
+		writeErr(r.Context(), w, reqID, gwerrors.TypeBadRequest, "model_resolve_failed", err.Error(), "model")
 		return
 	}
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrModel, resolved.Model)
@@ -1521,7 +1533,7 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 	}
 	pre := d.budgetPrecheck(r.Context(), b, estimateCostUSD(len(body), resolved.Model))
 	if pre.Decision == budget.DecisionHardStop {
-		gwerrors.Write(w, reqID, gwerrors.TypeBudgetExceeded, "budget_hard_cap_hit", pre.Reason, "")
+		writeErr(r.Context(), w, reqID, gwerrors.TypeBudgetExceeded, "budget_hard_cap_hit", pre.Reason, "")
 		return
 	}
 	for _, wrn := range pre.Warnings {
@@ -1537,7 +1549,7 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 	stampFallbackAttribution(r.Context(), events, b)
 	if berr != nil {
 		d.enqueueDebit(b, grq, resolved, 0, 0, 0, 0, 0, time.Since(t0).Milliseconds(), "provider_error")
-		d.writeBifrostError(w, reqID, berr)
+		d.writeBifrostError(r.Context(), w, reqID, berr)
 		return
 	}
 	// Post-response guardrails — same semantics as /v1/chat/completions.
@@ -1545,7 +1557,7 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 		failOpen := b != nil && b.Config != nil && valueMap(b.Config.Guardrails, "response_fail_open") == "true"
 		if !failOpen {
 			d.enqueueDebit(b, grq, resolved, 0, 0, 0, 0, 0, time.Since(t0).Milliseconds(), "provider_error")
-			gwerrors.Write(w, reqID, gwerrors.TypeServiceUnavailable,
+			writeErr(r.Context(), w, reqID, gwerrors.TypeServiceUnavailable,
 				"guardrail_upstream_unavailable",
 				"post-guardrail service unavailable: "+pgErr.Error(), "")
 			return
@@ -1553,7 +1565,7 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 		d.logger.Warn("post_guardrail_fail_open", "request_id", reqID, "err", pgErr.Error())
 	} else if pgRes != nil && pgRes.Verdict == guardrails.VerdictBlock {
 		d.enqueueDebit(b, grq, resolved, 0, 0, 0, 0, 0, time.Since(t0).Milliseconds(), "blocked_by_guardrail")
-		gwerrors.Write(w, reqID, gwerrors.TypeGuardrailBlocked,
+		writeErr(r.Context(), w, reqID, gwerrors.TypeGuardrailBlocked,
 			"post_guardrail_blocked", pgRes.Reason, "")
 		return
 	}
@@ -1594,10 +1606,10 @@ func (d *Dispatcher) ServeEmbeddings(w http.ResponseWriter, r *http.Request, b *
 	r.Body.Close()
 	if err != nil {
 		if httpx.IsMaxBytesError(err) {
-			gwerrors.Write(w, reqID, gwerrors.TypePayloadTooLarge, "payload_too_large", "request body exceeds the configured maximum", "")
+			writeErr(r.Context(), w, reqID, gwerrors.TypePayloadTooLarge, "payload_too_large", "request body exceeds the configured maximum", "")
 			return
 		}
-		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "body_read_failed", err.Error(), "")
+		writeErr(r.Context(), w, reqID, gwerrors.TypeBadRequest, "body_read_failed", err.Error(), "")
 		return
 	}
 	// Cache override on /v1/embeddings — all 5 providers' embedding
@@ -1613,7 +1625,7 @@ func (d *Dispatcher) ServeEmbeddings(w http.ResponseWriter, r *http.Request, b *
 	parsed, err := parseOpenAIChatBody(body)
 	if err != nil {
 		gwotel.RecordException(r.Context(), "bad_json", err.Error())
-		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "bad_json", err.Error(), "")
+		writeErr(r.Context(), w, reqID, gwerrors.TypeBadRequest, "bad_json", err.Error(), "")
 		return
 	}
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOperationName, "embeddings")
@@ -1622,10 +1634,10 @@ func (d *Dispatcher) ServeEmbeddings(w http.ResponseWriter, r *http.Request, b *
 	if err != nil {
 		gwotel.RecordException(r.Context(), "model_resolve_failed", err.Error())
 		if isModelNotAllowed(err) || errors.Is(err, errNoMatchingProvider) {
-			gwerrors.Write(w, reqID, gwerrors.TypeModelNotAllowed, "model_not_allowed", err.Error(), "model")
+			writeErr(r.Context(), w, reqID, gwerrors.TypeModelNotAllowed, "model_not_allowed", err.Error(), "model")
 			return
 		}
-		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "model_resolve_failed", err.Error(), "model")
+		writeErr(r.Context(), w, reqID, gwerrors.TypeBadRequest, "model_resolve_failed", err.Error(), "model")
 		return
 	}
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrModel, resolved.Model)
@@ -1654,7 +1666,7 @@ func (d *Dispatcher) ServeEmbeddings(w http.ResponseWriter, r *http.Request, b *
 	resp, berr := d.bifrost.EmbeddingRequest(bfCtx, bfReq)
 	if berr != nil {
 		d.enqueueDebit(b, grq, resolved, 0, 0, 0, 0, 0, time.Since(t0).Milliseconds(), "provider_error")
-		d.writeBifrostError(w, reqID, berr)
+		d.writeBifrostError(r.Context(), w, reqID, berr)
 		return
 	}
 	in, _ := extractEmbeddingUsage(resp)
@@ -1689,8 +1701,8 @@ func extractEmbeddingUsage(resp *bfschemas.BifrostEmbeddingResponse) (int, bool)
 // writeBifrostError translates a bifrost error into our OpenAI-compat
 // envelope. We pick type based on StatusCode since BifrostError is
 // provider-flavoured.
-func (d *Dispatcher) writeBifrostError(w http.ResponseWriter, reqID string, be *bfschemas.BifrostError) {
-	d.writeBifrostErrorWithModel(w, reqID, be, "")
+func (d *Dispatcher) writeBifrostError(ctx context.Context, w http.ResponseWriter, reqID string, be *bfschemas.BifrostError) {
+	d.writeBifrostErrorWithModel(ctx, w, reqID, be, "")
 }
 
 // writeBifrostErrorWithModel is the model-aware variant used by
@@ -1698,7 +1710,7 @@ func (d *Dispatcher) writeBifrostError(w http.ResponseWriter, reqID string, be *
 // compat-rejection observability (openai-param-compat.feature §v1
 // observability) can label the metric with the target model without
 // changing every existing callsite.
-func (d *Dispatcher) writeBifrostErrorWithModel(w http.ResponseWriter, reqID string, be *bfschemas.BifrostError, model string) {
+func (d *Dispatcher) writeBifrostErrorWithModel(ctx context.Context, w http.ResponseWriter, reqID string, be *bfschemas.BifrostError, model string) {
 	status := 0
 	if be.StatusCode != nil {
 		status = *be.StatusCode
@@ -1711,18 +1723,18 @@ func (d *Dispatcher) writeBifrostErrorWithModel(w http.ResponseWriter, reqID str
 	}
 	switch {
 	case status == http.StatusUnauthorized:
-		gwerrors.Write(w, reqID, gwerrors.TypeProviderError, "provider_auth_failed",
+		writeErr(ctx, w, reqID, gwerrors.TypeProviderError, "provider_auth_failed",
 			"upstream provider returned 401 — the provider credential attached to this VK is invalid; fix it in the AI Gateway → Providers screen", "")
 	case status == http.StatusTooManyRequests:
-		gwerrors.Write(w, reqID, gwerrors.TypeRateLimitExceeded, "upstream_rate_limit", msg, "")
+		writeErr(ctx, w, reqID, gwerrors.TypeRateLimitExceeded, "upstream_rate_limit", msg, "")
 	case status >= 500 && status < 600:
-		gwerrors.Write(w, reqID, gwerrors.TypeProviderError, "upstream_5xx", msg, "")
+		writeErr(ctx, w, reqID, gwerrors.TypeProviderError, "upstream_5xx", msg, "")
 	case status == http.StatusGatewayTimeout || status == 0:
-		gwerrors.Write(w, reqID, gwerrors.TypeUpstreamTimeout, "upstream_timeout", msg, "")
+		writeErr(ctx, w, reqID, gwerrors.TypeUpstreamTimeout, "upstream_timeout", msg, "")
 	case status >= 400 && status < 500:
-		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "upstream_4xx", msg, "")
+		writeErr(ctx, w, reqID, gwerrors.TypeBadRequest, "upstream_4xx", msg, "")
 	default:
-		gwerrors.Write(w, reqID, gwerrors.TypeInternalError, "bifrost_error", msg, "")
+		writeErr(ctx, w, reqID, gwerrors.TypeInternalError, "bifrost_error", msg, "")
 	}
 }
 
