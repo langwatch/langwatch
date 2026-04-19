@@ -24262,7 +24262,7 @@ When running on AWS with IRSA (IAM Roles for Service Accounts), you don't need t
 | `SENTRY_DSN` | Sentry DSN for error tracking | — |
 | `METRICS_API_KEY` | API key for metrics collection | — |
 
-## Helm Chart Mapping {#helm-chart-mapping}
+## Helm Chart Mapping
 
 When using the Helm chart, configuration is set in `values.yaml` rather than environment variables directly. Here's how key values map:
 
