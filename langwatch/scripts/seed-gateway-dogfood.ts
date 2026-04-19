@@ -644,6 +644,29 @@ async function seedAuditLog(args: {
   cacheRules: Array<{ id: string; name: string }>;
   providerBindings: Array<{ id: string; slot: string }>;
 }) {
+  // Idempotency guard: GatewayAuditLog has no natural unique key
+  // (PK=nanoid, no composite constraint on target + action + day), so
+  // a second run of this seed would pile on synthetic VIRTUAL_KEY_CREATED
+  // rows and make the Audit page show two (or more) 'created' events per
+  // VK. @ariana finding #10. If the first seeded VK already has any
+  // audit rows attached, assume the full replay ran before and skip.
+  const firstVkId = args.virtualKeys[0]?.id;
+  if (firstVkId) {
+    const alreadySeeded = await prisma.gatewayAuditLog.count({
+      where: {
+        organizationId: args.organizationId,
+        targetKind: "virtual_key",
+        targetId: firstVkId,
+        action: "VIRTUAL_KEY_CREATED",
+      },
+    });
+    if (alreadySeeded > 0) {
+      console.log(
+        "· audit log already seeded (found VIRTUAL_KEY_CREATED for first VK) — skipping replay",
+      );
+      return;
+    }
+  }
   const events: Prisma.GatewayAuditLogCreateManyInput[] = [];
   const now = Date.now();
   const daysAgo = (d: number) => new Date(now - d * 24 * 60 * 60 * 1000);
