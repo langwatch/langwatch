@@ -30,7 +30,6 @@ Ships the first version of the **LangWatch AI Gateway** — a Go data plane sitt
 
 - 13 new Prisma models + 8 enums. Internal `/api/internal/gateway/*` (HMAC-signed, ±300 s replay, sig-before-timestamp verify). Public `/api/gateway/v1/*` (standard project API tokens, same service layer as tRPC, full `describeRoute` OpenAPI coverage).
 - 6 new RBAC resources + per-resource actions; ConfigMaterialiser → bundle → JWT on `/resolve-key`; `/changes` long-poll.
-- `LOCAL_DEV_BYPASS_AUTH` for dev environments (BetterAuth-signed cookie).
 - Per-tenant trace attribution via `langwatch.project_id` span attribute — gateway ships to a single endpoint, ingest files under the right project.
 
 ### UI (Vite SPA, `langwatch/src/pages/[project]/gateway/`)
