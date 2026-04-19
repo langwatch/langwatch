@@ -1500,3 +1500,7 @@ gateway:
   ## @param gateway.secrets.existingSecretName [string, default: langwatch-gateway-auth] Name of the Secret carrying LW_GATEWAY_INTERNAL_SECRET and LW_GATEWAY_JWT_SECRET. Must be created out-of-band (terraform / external-secrets) and shared with langwatch-app's env. The umbrella chart does NOT materialise it.
   secrets:
     existingSecretName: langwatch-gateway-auth
+
+  ## @param gateway.otel.endpoint [string, default: http://langwatch-app:5560/api/otel] OTLP/HTTP ingest URL the gateway exports spans to. In-cluster default targets langwatch-app. Point at an external collector (Honeycomb / Datadog OTLP receiver / Grafana Agent) if you already have one. Leave empty to disable gateway trace export entirely.
+  otel:
+    endpoint: http://langwatch-app:5560/api/otel
