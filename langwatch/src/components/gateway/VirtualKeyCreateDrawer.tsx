@@ -272,10 +272,10 @@ function CapabilityPreview() {
   }> = [
     {
       icon: <Zap size={14} />,
-      label: "Cache mode",
+      label: "Cache control",
       defaultValue: "respect",
       detail:
-        "Byte-for-byte passthrough of Anthropic cache_control. Switch to disable/force post-create.",
+        "Provider-agnostic passthrough — Anthropic cache_control, OpenAI/Azure automatic, Gemini cachedContent. Switch to disable/force post-create.",
     },
     {
       icon: <Shield size={14} />,
