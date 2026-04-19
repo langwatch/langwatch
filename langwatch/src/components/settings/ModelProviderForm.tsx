@@ -60,9 +60,15 @@ export const EditModelProviderForm = ({
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  // Get provider - first try by ID, then fallback to provider key
+  // Get provider - first try by ID, then fallback to provider key.
+  // The `modelProviderId === "new"` sentinel forces a blank form even
+  // when the same providerKey is already configured — that's the
+  // multi-instance flow (iter 109): a user can have multiple OpenAI
+  // rows at different scopes, and the "Add Model Provider" menu routes
+  // through this path.
   const provider: MaybeStoredModelProvider = useMemo(() => {
-    if (providers) {
+    const isExplicitNew = modelProviderId === "new";
+    if (providers && !isExplicitNew) {
       // First try to find by ID
       if (modelProviderId) {
         const existing = Object.values(providers).find(
