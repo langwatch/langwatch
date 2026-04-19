@@ -123,7 +123,7 @@ Other shared env vars referenced across the contract:
 
 - `LW_GATEWAY_INTERNAL_SECRET` — HMAC key for internal endpoints (above).
 - `LW_GATEWAY_JWT_SECRET` — HS256 signing key for the resolve-key JWT (§4.1). Shared between control-plane signer and gateway verifier.
-- `LW_VIRTUAL_KEY_PEPPER` — pepper added to argon2id(vk_secret) before hashing. Control-plane only; never on the gateway.
+- `LW_VIRTUAL_KEY_PEPPER` — HMAC-SHA256 key used as `hex(hmac_sha256(pepper, vk_secret))` for at-rest hashing (§2 justifies HMAC-SHA256 over argon2id on latency/determinism grounds). Control-plane only; never on the gateway.
 
 ### 4.0 `POST /api/internal/gateway/bootstrap`
 
@@ -550,7 +550,7 @@ Scoping rules follow the existing project/team/org hierarchy already in LangWatc
 
 Each lane's feature file elaborates the contract with testable scenarios. Keep these in sync:
 
-- `specs/ai-gateway/virtual-keys.feature` — VK CRUD, show-once-secret, argon2id hashing, provider-creds linking, fallback chain, rotation/revoke, RBAC, attribution, internal endpoints (resolve-key JWT + config/:vk_id ETag + /changes long-poll).
+- `specs/ai-gateway/virtual-keys.feature` — VK CRUD, show-once-secret, peppered HMAC-SHA256 hashing (§2), provider-creds linking, fallback chain, rotation/revoke, RBAC, attribution, internal endpoints (resolve-key JWT + config/:vk_id ETag + /changes long-poll).
 - `specs/ai-gateway/budgets.feature` — hierarchical scopes (org/team/project/vk/principal), windows (min→total), `on_breach: block|warn`, idempotent debit outbox, timezone-aware resets.
 - `specs/ai-gateway/gateway-provider-settings.feature` — `GatewayProviderCredential` binding over existing `ModelProvider` rows; gateway-only settings (rate limits, rotation policy, gateway-only extraHeaders) that must not leak into the legacy litellm path.
 - `specs/ai-gateway/epic.feature` — cross-cutting E2E scenarios (end-to-end request through gateway → fallback → budget debit → per-tenant OTel emit).

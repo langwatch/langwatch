@@ -8,7 +8,11 @@ Feature: AI Gateway — Virtual Keys
   40 chars total — see specs/ai-gateway/_shared/contract.md §2) that the Gateway service resolves to:
   an owning project/team/org, a principal for attribution, a set of provider credentials with a
   fallback chain, model aliases, cache policy, guardrail policy, blocked patterns, and budgets.
-  The secret half is displayed exactly once at creation and stored argon2id-hashed.
+  The secret half is displayed exactly once at creation and stored as a
+  peppered HMAC-SHA256 hash (see contract.md §2 for why HMAC-SHA256 over argon2id:
+  ULID body is already brute-force-infeasible at 130 bits, argon2id would add
+  50-100ms per cold resolve-key and defeat the gateway's latency budget, and
+  deterministic hash enables O(1) lookup by hash).
 
   Background:
     Given I am logged in
@@ -36,10 +40,11 @@ Feature: AI Gateway — Virtual Keys
     And only the key prefix "lw_vk_live_xxxx…" is visible in the list
 
   @integration
-  Scenario: Virtual key secret is stored hashed
+  Scenario: Virtual key secret is stored as peppered HMAC-SHA256 hash
     Given I created a virtual key "demo-key" with secret "lw_vk_live_01HZX9K3M…"
     When the database row for "demo-key" is inspected
-    Then the "hashedSecret" column contains an argon2id hash, not the raw secret
+    Then the "hashedSecret" column contains hex(hmac_sha256(LW_VIRTUAL_KEY_PEPPER, raw_secret))
+    And it does NOT contain the raw secret
     And the "secretPrefix" column contains only the first 12 characters
 
   @visual
