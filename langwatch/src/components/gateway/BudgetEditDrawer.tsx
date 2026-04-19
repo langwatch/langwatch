@@ -9,7 +9,6 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -108,19 +107,8 @@ export function BudgetEditDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <HStack width="full">
-            <Drawer.Title>Edit budget</Drawer.Title>
-            <Spacer />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={close}
-              disabled={updateMutation.isPending}
-              aria-label="Close"
-            >
-              <X size={16} />
-            </Button>
-          </HStack>
+          <Drawer.Title>Edit budget</Drawer.Title>
+          <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={4}>

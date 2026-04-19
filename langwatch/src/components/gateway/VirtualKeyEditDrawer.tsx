@@ -14,7 +14,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { ArrowDown, ArrowUp, Plus, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Plus, Trash2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -375,19 +375,8 @@ export function VirtualKeyEditDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <HStack width="full">
-            <Drawer.Title>Edit virtual key</Drawer.Title>
-            <Spacer />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={close}
-              disabled={updateMutation.isPending}
-              aria-label="Close"
-            >
-              <X size={16} />
-            </Button>
-          </HStack>
+          <Drawer.Title>Edit virtual key</Drawer.Title>
+          <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={5}>

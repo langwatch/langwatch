@@ -13,7 +13,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { Ban, Gauge, Shield, X, Zap } from "lucide-react";
+import { Ban, Gauge, Shield, Zap } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -128,19 +128,8 @@ export function VirtualKeyCreateDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <HStack width="full">
-            <Drawer.Title>New virtual key</Drawer.Title>
-            <Spacer />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClose}
-              disabled={createMutation.isPending}
-              aria-label="Close"
-            >
-              <X size={16} />
-            </Button>
-          </HStack>
+          <Drawer.Title>New virtual key</Drawer.Title>
+          <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={4}>

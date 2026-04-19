@@ -61,9 +61,7 @@ export const gatewayProvidersRouter = createTRPCRouter({
         rateLimitRpm: z.number().int().positive().nullable().optional(),
         rateLimitTpm: z.number().int().positive().nullable().optional(),
         rateLimitRpd: z.number().int().positive().nullable().optional(),
-        rotationPolicy: z
-          .enum(["AUTO", "MANUAL", "EXTERNAL_SECRET_STORE"])
-          .optional(),
+        rotationPolicy: z.enum(["MANUAL"]).optional(),
         extraHeaders: z.record(z.string(), z.string()).nullable().optional(),
         providerConfig: z.record(z.string(), z.any()).nullable().optional(),
         fallbackPriorityGlobal: z.number().int().nullable().optional(),
@@ -89,9 +87,7 @@ export const gatewayProvidersRouter = createTRPCRouter({
         rateLimitRpm: z.number().int().positive().nullable().optional(),
         rateLimitTpm: z.number().int().positive().nullable().optional(),
         rateLimitRpd: z.number().int().positive().nullable().optional(),
-        rotationPolicy: z
-          .enum(["AUTO", "MANUAL", "EXTERNAL_SECRET_STORE"])
-          .optional(),
+        rotationPolicy: z.enum(["MANUAL"]).optional(),
         extraHeaders: z.record(z.string(), z.string()).nullable().optional(),
         providerConfig: z.record(z.string(), z.any()).nullable().optional(),
         fallbackPriorityGlobal: z.number().int().nullable().optional(),
