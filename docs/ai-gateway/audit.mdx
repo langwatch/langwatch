@@ -4,7 +4,9 @@ description: Who did what, when, to which resource — across every VK, budget, 
 sidebarTitle: Audit log
 ---
 
-Every write through the REST API, the CLI, the tRPC routers, or the UI emits a row into `GatewayAuditLog`. Viewable at **/gateway/audit** (Lane B iter 19) and queryable programmatically — the enterprise-governance answer to *"who revoked that key on Tuesday?"* without granting database access.
+Every write through the REST API, the CLI, the tRPC routers, or the UI emits a row into `GatewayAuditLog`. Queryable programmatically via `GET /api/gateway/v1/audit` — the enterprise-governance answer to *"who revoked that key on Tuesday?"* without granting database access.
+
+<Note>**Gateway-specific audit viewing has moved to the platform's global audit log** at `/settings/audit-log` (alexis iter 31, `1303ceb98`). Filter by resource type `virtualKey` / `gatewayBudget` / `gatewayProvider` to see the gateway surface. A full unification — merging `GatewayAuditLog` writes into the main `AuditLog` table so platform admins see every mutation in one view — is scheduled for v1.1. Until then, gateway writes still go to `GatewayAuditLog` and the REST export below remains the programmatic path.</Note>
 
 ## What's logged
 
@@ -19,10 +21,10 @@ Reads are **not** logged — the volume would swamp the ledger without adding go
 
 ## Viewing in the UI
 
-The **/gateway/audit** page is reachable under the Usage nav group (gated on `gatewayLogs:view`). Four key affordances:
+Go to **/settings/audit-log** (gated on `gatewayLogs:view`) and filter by resource type to see gateway mutations. Four key affordances:
 
 1. **Filter by action** — `virtualKey.created`, `virtualKey.rotated`, etc. Useful when investigating "did anyone rotate keys during the incident window?".
-2. **Filter by target kind** — `virtualKey` / `gatewayBudget` / `gatewayProvider`. Narrows the view when you're investigating one resource type.
+2. **Filter by resource type** — `virtualKey` / `gatewayBudget` / `gatewayProvider`. Narrows the view when you're investigating one resource type.
 3. **Expand before/after JSON diff** — each update-action row includes the metadata diff, expandable inline. Shows exactly which fields changed and to what.
 4. **Deep-link from the target column** — clicking the target id opens the resource's detail page (VK detail, budget detail, provider detail). Skips the "which key was that?" lookup.
 
