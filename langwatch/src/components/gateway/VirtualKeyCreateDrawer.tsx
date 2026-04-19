@@ -41,6 +41,7 @@ export function VirtualKeyCreateDrawer({
 }: VirtualKeyCreateDrawerProps) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [tagsCsv, setTagsCsv] = useState("");
   const [environment, setEnvironment] = useState<"live" | "test">("live");
   const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
 
@@ -63,6 +64,7 @@ export function VirtualKeyCreateDrawer({
   const reset = () => {
     setName("");
     setDescription("");
+    setTagsCsv("");
     setEnvironment("live");
     setSelectedProviderIds([]);
   };
@@ -82,12 +84,17 @@ export function VirtualKeyCreateDrawer({
       return;
     }
     try {
+      const tags = tagsCsv
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
       const result = await createMutation.mutateAsync({
         projectId,
         name,
         description: description || undefined,
         environment,
         providerCredentialIds: selectedProviderIds,
+        config: tags.length > 0 ? { metadata: { tags } } : undefined,
       });
       onCreated({
         id: result.virtualKey.id,
@@ -154,6 +161,18 @@ export function VirtualKeyCreateDrawer({
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Optional. Shown in the list."
               />
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>Tags</Field.Label>
+              <Input
+                value={tagsCsv}
+                onChange={(e) => setTagsCsv(e.target.value)}
+                placeholder="e.g. tier=enterprise, team=ml"
+              />
+              <Field.HelperText>
+                Comma-separated. Cache-control rules match VKs on tags as
+                AND-subset.
+              </Field.HelperText>
             </Field.Root>
             <Field.Root>
               <Field.Label>Environment</Field.Label>
