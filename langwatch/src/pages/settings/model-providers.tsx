@@ -205,6 +205,9 @@ export default function ModelsPage() {
                         {isDefaultProvider(provider.provider) && (
                           <Badge colorPalette="blue">Default Model</Badge>
                         )}
+                        <ProviderScopeBadge
+                          scopeType={(provider as any).scopeType}
+                        />
                       </HStack>
                     </Table.Cell>
                     <Table.Cell textAlign="right">
@@ -350,6 +353,29 @@ export default function ModelsPage() {
       </VStack>
     </SettingsLayout>
   );
+}
+
+function ProviderScopeBadge({
+  scopeType,
+}: {
+  scopeType: "ORGANIZATION" | "TEAM" | "PROJECT" | undefined;
+}) {
+  if (!scopeType) return null;
+  if (scopeType === "ORGANIZATION") {
+    return (
+      <Badge colorPalette="blue" variant="subtle" size="sm">
+        Org
+      </Badge>
+    );
+  }
+  if (scopeType === "TEAM") {
+    return (
+      <Badge colorPalette="purple" variant="subtle" size="sm">
+        Team
+      </Badge>
+    );
+  }
+  return null;
 }
 
 export function TopicClusteringModel() {
