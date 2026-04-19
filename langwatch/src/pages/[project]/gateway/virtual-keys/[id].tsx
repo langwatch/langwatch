@@ -636,7 +636,22 @@ function ProviderChainTable({
               </Table.Cell>
               <Table.Cell>
                 <HStack gap={2}>
-                  {Icon}
+                  <Box
+                    width="20px"
+                    height="20px"
+                    flexShrink={0}
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    css={{
+                      "& > svg": {
+                        width: "100%",
+                        height: "100%",
+                      },
+                    }}
+                  >
+                    {Icon}
+                  </Box>
                   <Text fontSize="sm" fontWeight="medium">
                     {entry.providerType || "—"}
                   </Text>

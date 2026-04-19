@@ -390,10 +390,17 @@ function ProviderChainBadges({
               <Box
                 width="16px"
                 height="16px"
+                flexShrink={0}
                 display="flex"
                 alignItems="center"
                 justifyContent="center"
                 opacity={idx === 0 ? 1 : 0.6}
+                css={{
+                  "& > svg": {
+                    width: "100%",
+                    height: "100%",
+                  },
+                }}
               >
                 {icon}
               </Box>

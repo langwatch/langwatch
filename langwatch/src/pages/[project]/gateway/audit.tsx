@@ -127,7 +127,7 @@ function AuditLogPage() {
           </Button>
         </PageLayout.Header>
 
-        <Box padding={6}>
+        <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           <HStack gap={3} mb={4}>
             <Box>
               <NativeSelect.Root size="sm">
@@ -312,7 +312,7 @@ function AuditRow({
               {entry.targetKind.replace("_", " ")}
             </Badge>
             {targetHref ? (
-              <Link href={targetHref} color="orange.600">
+              <Link href={targetHref}>
                 <Code fontSize="xs">{entry.targetId}</Code>
               </Link>
             ) : (

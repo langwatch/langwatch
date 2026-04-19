@@ -96,7 +96,7 @@ function BudgetsPage() {
           )}
         </PageLayout.Header>
 
-        <Box padding={6}>
+        <Box padding={6} width="full" maxWidth="1600px" marginX="auto">
           {isLoading ? (
             <Spinner />
           ) : rows.length === 0 ? (
@@ -148,7 +148,6 @@ function BudgetsPage() {
                         <VStack align="start" gap={0}>
                           <Link
                             href={`/${project?.slug}/gateway/budgets/${b.id}`}
-                            color="orange.600"
                           >
                             <Text fontWeight="medium">{b.name}</Text>
                           </Link>
