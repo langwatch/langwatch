@@ -171,6 +171,45 @@ async function main() {
     });
   }
 
+  // Cache rules — three priorities exercising the three action modes.
+  // Priority DESC order demonstrates first-match-wins clearly in the UI.
+  await upsertCacheRule({
+    organizationId: project.team.organizationId,
+    name: "force-cache-enterprise",
+    description:
+      "Force cache on Anthropic for enterprise-tagged VKs to reduce cold-start TTFT",
+    priority: 300,
+    matchers: { vk_tags: ["tier=enterprise"] },
+    action: { mode: "force", ttl: 600 },
+    modeEnum: "FORCE",
+    actorUserId,
+  });
+  await upsertCacheRule({
+    organizationId: project.team.organizationId,
+    name: "disable-cache-evals",
+    description:
+      "Disable cache for evaluation traffic so every eval hits a fresh completion",
+    priority: 200,
+    matchers: {
+      vk_prefix: "lw_vk_eval_",
+      request_metadata: { "x-langwatch-suite": "evals" },
+    },
+    action: { mode: "disable" },
+    modeEnum: "DISABLE",
+    actorUserId,
+  });
+  await upsertCacheRule({
+    organizationId: project.team.organizationId,
+    name: "respect-on-haiku",
+    description:
+      "Default passthrough for Anthropic Haiku — demonstrates respect mode in the list",
+    priority: 100,
+    matchers: { model: "claude-haiku-4-5-20251001" },
+    action: { mode: "respect" },
+    modeEnum: "RESPECT",
+    actorUserId,
+  });
+
   console.log("");
   console.log("╔══════════════════════════════════════════════════════════════╗");
   console.log("║  VK SECRETS — capture NOW, we don't store the raw secret.    ║");
@@ -355,6 +394,46 @@ async function upsertBudget(args: {
     },
   });
   console.log(`✓ created budget '${args.name}' (${row.id})`);
+  return row;
+}
+
+async function upsertCacheRule(args: {
+  organizationId: string;
+  name: string;
+  description: string;
+  priority: number;
+  matchers: Record<string, unknown>;
+  action: { mode: "respect" | "force" | "disable"; ttl?: number; salt?: string };
+  modeEnum: "RESPECT" | "FORCE" | "DISABLE";
+  actorUserId: string;
+}) {
+  const existing = await prisma.gatewayCacheRule.findFirst({
+    where: {
+      organizationId: args.organizationId,
+      name: args.name,
+      archivedAt: null,
+    },
+  });
+  if (existing) {
+    console.log(
+      `· cache rule '${args.name}' exists (${existing.id}) — skipping`,
+    );
+    return existing;
+  }
+  const row = await prisma.gatewayCacheRule.create({
+    data: {
+      organizationId: args.organizationId,
+      name: args.name,
+      description: args.description,
+      priority: args.priority,
+      enabled: true,
+      matchers: args.matchers as Prisma.InputJsonValue,
+      action: args.action as unknown as Prisma.InputJsonValue,
+      modeEnum: args.modeEnum,
+      createdById: args.actorUserId,
+    },
+  });
+  console.log(`✓ created cache rule '${args.name}' (${row.id})`);
   return row;
 }
 
