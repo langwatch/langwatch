@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: build test test-unit test-integration lint run tidy fmt helm-lint helm-dry-run helm-e2e-smoke
+.PHONY: build test test-unit test-integration lint run run-dev tidy fmt helm-lint helm-dry-run helm-e2e-smoke
 
 build:
 	go build -o bin/gateway ./cmd/gateway
@@ -15,6 +15,17 @@ test-integration:
 
 run:
 	GATEWAY_ALLOW_INSECURE=1 GATEWAY_LOG_LEVEL=debug go run ./cmd/gateway
+
+# `run-dev` sources the control-plane .env so LW_GATEWAY_* shared
+# secrets and GATEWAY_OTEL_* settings flow through without manually
+# exporting them. Intended for the dogfood loop where the gateway and
+# langwatch/ app run side-by-side on localhost. Requires a .env next
+# to langwatch/ (not committed).
+DEV_ENV_FILE ?= ../../langwatch/.env
+run-dev:
+	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed langwatch/.env first" && exit 1)
+	@set -a; . $(DEV_ENV_FILE); set +a; \
+		GATEWAY_ALLOW_INSECURE=1 GATEWAY_LOG_LEVEL=debug go run ./cmd/gateway
 
 tidy:
 	go mod tidy
