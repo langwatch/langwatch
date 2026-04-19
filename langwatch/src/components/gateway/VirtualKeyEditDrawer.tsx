@@ -316,6 +316,40 @@ export function VirtualKeyEditDrawer({
         modelAliases[pair.from.trim()] = pair.to.trim();
       }
     }
+    // Save-time ambiguity rejection per rchaves constraint: the hot
+    // path accepts anything that resolves in the pre-built map, so
+    // conflicts must be caught here before the config is persisted.
+    // We check that every alias whose target carries a provider
+    // prefix points to a provider actually bound on this VK — the
+    // runtime errProviderNotBound would still catch it, but surfacing
+    // the mismatch while the operator is editing keeps the feedback
+    // loop short. See /ai-gateway/model-naming.
+    const boundProviderTypes = new Set(
+      providerIds
+        .map(
+          (id) =>
+            availableProviders.find((p: any) => p.id === id)?.modelProviderName,
+        )
+        .filter((t): t is string => !!t),
+    );
+    const aliasValidationErrors: string[] = [];
+    for (const [from, to] of Object.entries(modelAliases)) {
+      if (!to.includes("/")) continue;
+      const providerPrefix = to.split("/", 1)[0];
+      if (providerPrefix && !boundProviderTypes.has(providerPrefix)) {
+        aliasValidationErrors.push(
+          `Alias "${from}" → "${to}" references provider "${providerPrefix}", which is not bound on this VK (bound: ${[...boundProviderTypes].join(", ") || "none"}).`,
+        );
+      }
+    }
+    if (aliasValidationErrors.length > 0) {
+      toaster.create({
+        title: "Model alias refers to an unbound provider",
+        description: aliasValidationErrors.join(" "),
+        type: "error",
+      });
+      return;
+    }
     try {
       await updateMutation.mutateAsync({
         projectId: vk.projectId,
