@@ -85,23 +85,20 @@ CI gate: > 2× regression blocks PR merges.
 
 ### Dogfood screenshots
 
-Every gateway page rendered inside the LangWatch dashboard chrome (left main-nav → expandable AI Gateway entry → DashboardLayout `compactMenu` wrapping → gateway content). All shots captured post-finding-4 fix (Lane B iter 24) and post-nav-restructure (Lane B iter 29).
+Every gateway page captured inside the LangWatch dashboard chrome (left main-nav with expandable AI Gateway group → DashboardLayout `compactMenu` wrapping → gateway content). Captured post-finding-4 fix (Lane B iter 24), post-nav-restructure (Lane B iter 29), and post-unique-icons polish (Lane B iter 29.1).
 
 | # | Page / flow | Screenshot | What it demonstrates |
 |:-:|---|---|---|
-| 1 | **Virtual Keys — list** | _pending capture_ | Post-iter-29 main-nav expandable AI Gateway entry + full dashboard chrome; empty-state CTA "Mint your first virtual key" |
-| 2 | **Virtual Keys — create drawer** | _pending capture_ | Name + provider chain picker + rate limits + cache mode + guardrail refs picker (iter 17) + blocked_patterns 4-row editor + "What else you get" capability preview (iter 23) |
-| 3 | **Virtual Keys — detail** | _pending capture_ | Full VK record: secret prefix only (never re-shown), bundled config, revoke/rotate/archive actions, attached budgets + guardrails |
-| 4 | **Budgets — list** | _pending capture_ | Scope pills (org/team/project/principal), window, spent/limit bar, on_breach badge |
-| 5 | **Budgets — detail + byDay sparkline** | _pending capture_ | Iter 18.2 detail page showing per-day spend sparkline reading real `GatewayBudgetLedger` data |
-| 6 | **Providers — binding list** | _pending capture_ | List of per-project ModelProvider bindings with slot (primary/fallback) + rotation mode |
-| 7 | **Providers — create drawer** | _pending capture_ | Bind provider credential to gateway, pick slot, set rotation cadence |
-| 8 | **Usage** | _pending capture_ | 24h / 7d / 30d / 90d window tiles reading real ledger data, cost-by-VK breakdown |
-| 9 | **Audit log** | _pending capture_ | Filter-by-action + filter-by-target pills (iter 19), REST export recipe link, diff viewer for config changes |
-| 10 | **Guardrail picker** (inside VK drawer) | _pending capture_ | Three direction sections (pre / post / stream_chunk) listing every project evaluator with `executionMode = AS_GUARDRAIL`, per-direction fail-open toggle (iter 17) |
-| 11 | **Rate limits section** (inside VK drawer) | _pending capture_ | RPM / RPD with v1.1 badge on TPM |
+| 1 | **Virtual Keys — list (empty)** | [view](https://i.img402.dev/ony988vss6.png) | Main-nav icon rail on the left, AI Gateway entry visible. Empty-state illustration + "Mint your first virtual key" CTA. Title renders cleanly with collapsed nav. |
+| 2 | **Virtual Keys — create drawer** | [view](https://i.img402.dev/0j02mnozcg.png) | Name + description + Live/Test environment toggle + Provider fallback chain picker (with link to /gateway/providers for setup if empty) + "What else you get (configurable after create)" capability preview with Cache mode / Guardrails / Blocked patterns / Rate limits rows (iter 23 addition). Create button disabled while chain is empty. |
+| 3 | **Budgets — list (empty)** | [view](https://i.img402.dev/ukecrsugln.png) | Empty-state icon + "Hierarchical budgets enforce a spend ceiling across organization, team, project, virtual-key, or principal" explainer + "New budget" CTA. |
+| 4 | **Providers — list (empty)** | [view](https://i.img402.dev/mdjzkandbi.png) | Empty-state with link back to `Settings → Model Providers` for initial credential configuration + "Bind your first provider" CTA. Emphasises that gateway binds existing credentials rather than duplicating them. |
+| 5 | **Usage** | [view](https://i.img402.dev/m7w40yvzlc.png) | Window toggle pills (Last 24h / 7d / 30d / 90d) with 30d selected. Empty-state explaining that spend shows up after the gateway debits budgets post-request (iter 18.2 ledger-backed). |
+| 6 | **Audit log** | [view](https://i.img402.dev/hhjcorcy8g.png) | Filter-by-action + filter-by-target pills (iter 19) above an empty-state explaining that audit entries are written in the same transaction as every gateway mutation (VK create/update/rotate/revoke, budget CRUD, provider binding changes). |
 
-Capture environment: fresh `pnpm dev` on `localhost:5560`, signed in via real email+password (LOCAL_DEV_BYPASS_AUTH removed in Lane B iter 28), `acme-demo-*` project populated with at least one provider credential + one VK + one budget to eliminate all empty states, screenshots taken at 1440×900 with DevTools closed.
+Capture environment: `pnpm dev` on `localhost:5560`, signed in via real email+password (LOCAL_DEV_BYPASS_AUTH was removed in Lane B iter 28 — scenario tests sign up like any other user). `acme-demo-*` project empty by design — every shot demonstrates that the empty-state is informative + has a CTA, not a dead end. 1440×900 viewport, DevTools closed.
+
+Additional shots with populated data (VK detail, budget sparkline, providers bound, guardrail picker expanded, rate limits section, real trace in Messages view) follow up after Lane B's happy-path dogfood round mints a working VK + binds OpenAI credentials.
 
 Findings surfaced during the dogfood round, all closed in-session:
 
