@@ -631,12 +631,7 @@ export const app = new Hono<{ Variables: Variables }>()
       rateLimitTpm: (raw.rate_limit_tpm as number | null) ?? null,
       rateLimitRpd: (raw.rate_limit_rpd as number | null) ?? null,
       rotationPolicy:
-        typeof raw.rotation_policy === "string"
-          ? (raw.rotation_policy.toUpperCase() as
-              | "AUTO"
-              | "MANUAL"
-              | "EXTERNAL_SECRET_STORE")
-          : undefined,
+        typeof raw.rotation_policy === "string" ? "MANUAL" : undefined,
       extraHeaders: (raw.extra_headers as Prisma.InputJsonValue | null) ?? null,
       providerConfig: (raw.provider_config as Prisma.InputJsonValue | null) ?? null,
       fallbackPriorityGlobal:
@@ -870,12 +865,7 @@ export const app = new Hono<{ Variables: Variables }>()
           ? undefined
           : (raw.rate_limit_rpd as number | null),
       rotationPolicy:
-        typeof raw.rotation_policy === "string"
-          ? (raw.rotation_policy.toUpperCase() as
-              | "AUTO"
-              | "MANUAL"
-              | "EXTERNAL_SECRET_STORE")
-          : undefined,
+        typeof raw.rotation_policy === "string" ? "MANUAL" : undefined,
       extraHeaders:
         raw.extra_headers === undefined
           ? undefined

@@ -28,7 +28,10 @@ export type CreateProviderCredentialInput = {
   rateLimitRpm?: number | null;
   rateLimitTpm?: number | null;
   rateLimitRpd?: number | null;
-  rotationPolicy?: "AUTO" | "MANUAL" | "EXTERNAL_SECRET_STORE";
+  // v1 ships MANUAL only; AUTO + EXTERNAL_SECRET_STORE are v1.1 scope.
+  // Kept on the type so the column continues to accept writes, but
+  // callers have no reason to set anything other than the default.
+  rotationPolicy?: "MANUAL";
   extraHeaders?: Prisma.InputJsonValue | null;
   providerConfig?: Prisma.InputJsonValue | null;
   fallbackPriorityGlobal?: number | null;
