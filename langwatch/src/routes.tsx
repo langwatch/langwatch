@@ -7,6 +7,7 @@ import {
 } from "react-router";
 import NProgress from "nprogress";
 import { InnerProviders } from "./AppProviders";
+import NotFoundOrErrorPage from "./pages/_not-found";
 
 /**
  * Root layout — wraps all routes.
@@ -435,11 +436,21 @@ const routes: RouteObject[] = [
     path: "/@project/*",
     ...page(() => import("./pages/@project/[...path]/index")),
   },
+
+  // Catch-all 404 — must stay last. Replaces the React Router dev fallback
+  // (the raw "Hey developer 👋" string) with a styled page.
+  {
+    path: "*",
+    ...page(() => import("./pages/_not-found")),
+  },
 ];
 
 export const router = createBrowserRouter([
   {
     Component: RootLayout,
+    // ErrorBoundary catches render + loader throws anywhere below this node
+    // and renders the same fallback used by the catch-all 404 route.
+    ErrorBoundary: NotFoundOrErrorPage,
     children: routes,
   },
 ]);

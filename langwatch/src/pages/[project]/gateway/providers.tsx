@@ -19,6 +19,7 @@ import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { ProviderBindingCreateDrawer } from "~/components/gateway/ProviderBindingCreateDrawer";
 import { ProviderBindingEditDrawer } from "~/components/gateway/ProviderBindingEditDrawer";
+import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
@@ -107,9 +108,12 @@ function ProvidersPage() {
                 <EmptyState.Title>No providers bound to the gateway yet</EmptyState.Title>
                 <EmptyState.Description>
                   Configure an OpenAI / Anthropic / Azure / Bedrock / Vertex
-                  provider in <strong>Settings → Model Providers</strong>, then
-                  bind it to the AI Gateway here. The gateway reuses the
-                  existing ModelProvider credentials; binding only adds
+                  provider in{" "}
+                  <Link href="/settings/model-providers" color="orange.600">
+                    Settings → Model Providers
+                  </Link>
+                  , then bind it to the AI Gateway here. The gateway reuses
+                  the existing ModelProvider credentials; binding only adds
                   gateway-specific settings like rate limits and rotation.
                 </EmptyState.Description>
                 {canManage && (
