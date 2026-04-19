@@ -495,9 +495,15 @@ export function VirtualKeyEditDrawer({
             </VStack>
 
             <Separator />
-            <Text fontSize="sm" fontWeight="semibold">
-              Model aliases
-            </Text>
+            <HStack>
+              <Text fontSize="sm" fontWeight="semibold">
+                Model aliases
+              </Text>
+              <FieldInfoTooltip
+                description="Rewrite the model name a client requests before it reaches the provider. Useful for mapping 'gpt-4o' → 'gpt-4o-mini' for cost control, or fanning one logical model across providers."
+                docHref="/ai-gateway/model-aliases"
+              />
+            </HStack>
             <Text fontSize="xs" color="fg.muted">
               Rewrite the model name a client requests before it reaches the
               provider. Useful to map "gpt-4o" → "gpt-4o-mini" for cost control,
@@ -535,9 +541,15 @@ export function VirtualKeyEditDrawer({
             </VStack>
 
             <Separator />
-            <Text fontSize="sm" fontWeight="semibold">
-              Cache control
-            </Text>
+            <HStack>
+              <Text fontSize="sm" fontWeight="semibold">
+                Cache control
+              </Text>
+              <FieldInfoTooltip
+                description="Per-VK default cache mode. Per-request X-LangWatch-Cache header + matching cache rules override. See the doc for the 3-layer precedence model and per-provider semantics."
+                docHref="/ai-gateway/cache-control"
+              />
+            </HStack>
             <Text fontSize="xs" color="fg.muted">
               Provider-agnostic: Anthropic uses explicit cache_control
               markers, OpenAI/Azure cache prompts automatically, Gemini
@@ -566,8 +578,8 @@ export function VirtualKeyEditDrawer({
                     <option value="disable">
                       Disable — strip cache directives before dispatch
                     </option>
-                    <option value="force" disabled>
-                      Force — v1.1 (returns 400 cache_override_not_implemented)
+                    <option value="force">
+                      Force — inject cache_control on Anthropic (OpenAI auto, Gemini WARN)
                     </option>
                   </NativeSelect.Field>
                 </NativeSelect.Root>
@@ -587,9 +599,15 @@ export function VirtualKeyEditDrawer({
             </HStack>
 
             <Separator />
-            <Text fontSize="sm" fontWeight="semibold">
-              Rate limits (blank = unlimited)
-            </Text>
+            <HStack>
+              <Text fontSize="sm" fontWeight="semibold">
+                Rate limits (blank = unlimited)
+              </Text>
+              <FieldInfoTooltip
+                description="Per-VK rpm/rpd on the gateway hot path. Independent of per-binding rate limits — whichever trips first blocks. TPM is v1.1 (requires token estimation + Redis cluster counters)."
+                docHref="/ai-gateway/rate-limits"
+              />
+            </HStack>
             <Text fontSize="xs" color="fg.muted">
               Enforced per-VK in-memory on every gateway replica. On breach the
               gateway returns HTTP 429 with <Code fontSize="xs">Retry-After</Code>{" "}
@@ -639,9 +657,15 @@ export function VirtualKeyEditDrawer({
             </HStack>
 
             <Separator />
-            <Text fontSize="sm" fontWeight="semibold">
-              Blocked patterns
-            </Text>
+            <HStack>
+              <Text fontSize="sm" fontWeight="semibold">
+                Blocked patterns
+              </Text>
+              <FieldInfoTooltip
+                description="RE2 regex deny/allow lists across 4 dimensions: tools, MCP servers, URLs, models. Enforced pre-dispatch (zero provider cost). Deny wins."
+                docHref="/ai-gateway/blocked-patterns"
+              />
+            </HStack>
             <Text fontSize="xs" color="fg.muted">
               RE2 regex deny/allow lists enforced on the gateway before the
               request reaches the provider. Deny wins across both lists.
@@ -701,9 +725,15 @@ export function VirtualKeyEditDrawer({
             ))}
 
             <Separator />
-            <Text fontSize="sm" fontWeight="semibold">
-              Guardrails
-            </Text>
+            <HStack>
+              <Text fontSize="sm" fontWeight="semibold">
+                Guardrails
+              </Text>
+              <FieldInfoTooltip
+                description="Attach LangWatch evaluators as pre (request) / post (response) / stream_chunk hooks. Fail-closed by default; per-direction fail-open opt-in. stream_chunk is always fail-open-with-metric by contract."
+                docHref="/ai-gateway/guardrails"
+              />
+            </HStack>
             <Text fontSize="xs" color="fg.muted">
               Attach project-level guardrail monitors (marked "as guardrail"
               in Evaluations) to run on each direction. Fan-out is parallel
