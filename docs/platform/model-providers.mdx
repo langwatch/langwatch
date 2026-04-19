@@ -80,6 +80,8 @@ If a project needs its own OpenAI key — different rate limits, different regio
 
 Every `GatewayProviderCredential` (the thing a VK is bound to) references a `ModelProvider` by id — independent of the provider's scope. So **scope changes never break bindings**, and binding creation works identically whether the bound provider is org, team, or project.
 
+<Note>**Provider scope ≠ binding scope.** A binding is always **per-project** (it belongs to a project's VK). What an org-scoped provider enables is (a) **visibility** — every project in the org sees the provider in Settings + the Bind drawer, (b) **credential sharing** — the decrypted API key comes from the one org row, so rotation at the org level propagates everywhere. Each project still creates its own binding because gateway-specific knobs (rate limits, slot, fallback priority) are per-project decisions. An org-scoped provider visible across 5 projects that all want gateway routing still needs 5 binding operations — that's intentional, preserves governance and budget attribution.</Note>
+
 The AI Gateway → Providers → Bind provider drawer groups the Select options by scope origin:
 
 ```
