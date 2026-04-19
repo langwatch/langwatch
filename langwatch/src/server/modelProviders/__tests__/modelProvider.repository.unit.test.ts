@@ -33,6 +33,8 @@ function createModelProvider(
   return {
     id: "mp_test123",
     projectId: "proj_test",
+    scopeType: "PROJECT",
+    scopeId: "proj_test",
     provider: "openai",
     enabled: true,
     customKeys: null,

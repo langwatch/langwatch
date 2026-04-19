@@ -500,6 +500,8 @@ async function upsertModelProvider(
   const mp = await prisma.modelProvider.create({
     data: {
       projectId: project.id,
+      scopeType: "PROJECT",
+      scopeId: project.id,
       provider,
       enabled: hasRealKey,
       customKeys: hasRealKey

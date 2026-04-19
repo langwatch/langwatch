@@ -109,6 +109,8 @@ describe("Model Providers API", () => {
         await prisma.modelProvider.create({
           data: {
             projectId: testProjectId,
+            scopeType: "PROJECT",
+            scopeId: testProjectId,
             provider: "openai",
             enabled: true,
             customKeys: { OPENAI_API_KEY: "sk-real-key-12345" },
@@ -174,6 +176,8 @@ describe("Model Providers API", () => {
         await prisma.modelProvider.create({
           data: {
             projectId: testProjectId,
+            scopeType: "PROJECT",
+            scopeId: testProjectId,
             provider: "openai",
             enabled: true,
             customKeys: { OPENAI_API_KEY: "sk-original-key" },
