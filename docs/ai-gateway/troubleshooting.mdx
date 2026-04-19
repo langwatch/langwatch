@@ -90,6 +90,18 @@ Upstream 429s will trigger fallback if the VK has a chain configured. Check `X-L
 - If gateway-level: `langwatch virtual-keys update <id> --config-json '{"rate_limits": {"rpm": 60, "rpd": 100000}}'` to raise the cap, or `{"rpm": null, "rpd": null}` to disable. Ceiling changes take effect on the next request (limiter invalidates on every bundle refresh).
 - If upstream: add a fallback provider to the VK chain, or request quota from the upstream.
 
+<Warning>
+**Rate-limit changes look broken when the `/changes` long-poll is
+unreachable.** The gateway's cached VK bundle only refreshes when the
+control-plane's `/api/internal/gateway/changes` endpoint is reachable
+and responding within the gateway's `GATEWAY_LONG_POLL_TIMEOUT + 5s`
+deadline. If long-polls are timing out (look for `changes long-poll
+error` in the gateway log), bundles stay stale indefinitely — a fresh
+`langwatch virtual-keys update` that tightens `rpm` will appear to
+have no effect. Verify connectivity and client timeout headroom before
+concluding the limiter itself is broken.
+</Warning>
+
 <Note>**TPM (tokens-per-minute) deferred to v1.1.** Token counts aren't known until the provider replies, so pre-estimation can't be a hard cap. TPM will ship with Redis-coordinated cluster-wide counters in v1.1.</Note>
 
 ## `403 tool_not_allowed`
