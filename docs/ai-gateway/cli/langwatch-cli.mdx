@@ -199,6 +199,12 @@ langwatch cache-rules archive <rule_id>
 
 # Bulk import from JSON (idempotent — matches on name; safe to re-run)
 langwatch cache-rules apply --file cache-rules.json
+
+# Bulk export to JSON — round-trips with apply --file (enables
+# git-backed rule ops: commit cache-rules.json to your infra monorepo,
+# apply --file on deploy, re-export after ad-hoc UI edits)
+langwatch cache-rules export                           # → stdout
+langwatch cache-rules export --file cache-rules.json   # → file
 ```
 
 `--mode` is one of `respect`, `force`, `disable`. `--ttl <seconds>` is clamped to `[0, 86400]` and only applies when `--mode force`. `--salt <string>` (max 64 chars) acts as a cache-bust tag — change it on an existing rule to force cache regeneration on next hit.
@@ -227,10 +233,11 @@ Required permission on the CLI token:
 
 | Command | Permission |
 |---|---|
-| `cache-rules list|get` | `gatewayCacheRules:view` |
+| `cache-rules list|get|export` | `gatewayCacheRules:view` |
 | `cache-rules create` | `gatewayCacheRules:create` |
 | `cache-rules update` | `gatewayCacheRules:update` |
-| `cache-rules archive|apply` | `gatewayCacheRules:delete` + `:create` (apply does both) |
+| `cache-rules archive` | `gatewayCacheRules:delete` |
+| `cache-rules apply` | `gatewayCacheRules:delete` + `:create` + `:update` (apply does all three) |
 
 <Info>Rules are organization-scoped; the CLI authenticates to a specific project API token but the REST layer resolves the owning organization transparently. No `--organization` flag needed.</Info>
 
