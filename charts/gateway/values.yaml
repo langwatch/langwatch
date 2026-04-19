@@ -102,8 +102,13 @@ bifrost:
   streamBufferSize: 100
 
 otel:
-  # If empty, gateway uses the LangWatch ingest endpoint derived from
-  # tenant bundle. Set explicitly for self-host single-endpoint deploys.
+  # OTLP/HTTP ingest URL the gateway exports spans to. Umbrella chart
+  # defaults this to http://langwatch-app:5560/api/otel so gateway traces
+  # land in the control plane and flow into the Origin=Gateway trace view.
+  # Point at an external collector for self-host installs that centralise
+  # telemetry elsewhere (Honeycomb / Datadog OTLP / Grafana Agent).
+  # Empty disables trace export — spans are still created + finalised
+  # in-pod but never flushed.
   endpoint: ""
   batchTimeout: 5s
   maxQueueSize: 8192
