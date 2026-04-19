@@ -1,11 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  AgentsApiService,
-  AgentsApiError,
-} from "@/client-sdk/services/agents/agents-api.service";
+import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listAgentsCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -64,16 +62,7 @@ export const listAgentsCommand = async (options?: { format?: string }): Promise<
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof AgentsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching agents: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "fetch agents" });
     process.exit(1);
   }
 };

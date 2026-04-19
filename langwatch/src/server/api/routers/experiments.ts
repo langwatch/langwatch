@@ -7,6 +7,7 @@ import {
 } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
+import { DomainError } from "../../app-layer/domain-error";
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -54,6 +55,20 @@ import { enforceLicenseLimit } from "../../license-enforcement";
 
 type TRPCContext = ReturnType<typeof createInnerTRPCContext>;
 
+/** Maps experiment domain errors to TRPCError using kind discriminant. */
+const mapExperimentError = (error: unknown): never => {
+  if (
+    error instanceof DomainError &&
+    error.kind === "experiment_not_found"
+  ) {
+    throw new TRPCError({ code: "NOT_FOUND", message: error.message });
+  }
+  throw error;
+};
+
+/** Experiment service from app dependency container. */
+const experimentService = () => getApp().experiments;
+
 export const experimentsRouter = createTRPCRouter({
   saveExperiment: protectedProcedure
     .input(
@@ -67,6 +82,8 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
+      const experiments = experimentService();
+
       // Enforce experiment limit only when creating new experiments
       if (!input.experimentId) {
         await enforceLicenseLimit(ctx, input.projectId, "experiments");
@@ -74,8 +91,15 @@ export const experimentsRouter = createTRPCRouter({
 
       let workflowId = input.dsl.workflow_id;
       const name =
-        input.workbenchState.name ?? (await findNextDraftName(input.projectId));
-      const slug = slugify(name);
+        input.workbenchState.name ??
+        (await experiments.findNextDraftName({
+          projectId: input.projectId,
+        }));
+      const slug = await experiments.generateUniqueSlug({
+        baseSlug: slugify(name),
+        projectId: input.projectId,
+        excludeExperimentId: input.experimentId,
+      });
 
       if (input.experimentId) {
         const currentExperiment = await prisma.experiment.findUnique({
@@ -166,25 +190,30 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       const experimentId = input.experimentId ?? `experiment_${nanoid()}`;
-      const experimentData = {
-        name,
-        slug,
-        projectId: input.projectId,
-        type: ExperimentType.BATCH_EVALUATION_V2,
-        workflowId,
-        workbenchState: input.workbenchState,
-      };
 
-      await prisma.experiment.upsert({
-        where: {
-          id: experimentId,
-          projectId: input.projectId,
+      await experiments.saveWithSlugRetry({
+        initialSlug: slug,
+        execute: (s) => {
+          const data = {
+            name,
+            slug: s,
+            projectId: input.projectId,
+            type: ExperimentType.BATCH_EVALUATION_V2,
+            workflowId,
+            workbenchState: input.workbenchState,
+          };
+          return prisma.experiment.upsert({
+            where: { id: experimentId, projectId: input.projectId },
+            update: data,
+            create: { ...data, id: experimentId },
+          });
         },
-        update: experimentData,
-        create: {
-          ...experimentData,
-          id: experimentId,
-        },
+        regenerateSlug: () =>
+          experiments.generateUniqueSlug({
+            baseSlug: slugify(name),
+            projectId: input.projectId,
+            excludeExperimentId: input.experimentId,
+          }),
       });
 
       // For some reason, prisma upsert sometimes return not an experiment but {count: 0}, so we need to refetch it
@@ -215,6 +244,7 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
+      const experiments = experimentService();
       const experimentId =
         input.experimentId ?? generate(KSUID_RESOURCES.EXPERIMENT).toString();
 
@@ -230,41 +260,49 @@ export const experimentsRouter = createTRPCRouter({
         await enforceLicenseLimit(ctx, input.projectId, "experiments");
       }
 
-      // For new experiments, use the ID as the slug (guaranteed unique)
+      // For new experiments, deduplicate the slug to avoid constraint violations
       // For existing experiments, keep the same slug to avoid breaking URLs
       const name =
-        input.state.name || (await findNextDraftName(input.projectId));
+        input.state.name ||
+        (await experiments.findNextDraftName({
+          projectId: input.projectId,
+        }));
 
+      const rawSlug = input.state.experimentSlug ?? experimentId.slice(-8);
       let slug: string;
       if (isNewExperiment) {
-        // New experiment: prefer the slug from state (set by frontend redirect),
-        // otherwise use last 8 chars of the ID for a shorter, cleaner URL
-        slug = input.state.experimentSlug ?? experimentId.slice(-8);
+        slug = await experiments.generateUniqueSlug({
+          baseSlug: rawSlug,
+          projectId: input.projectId,
+        });
       } else {
-        // Existing experiment: keep the same slug to avoid breaking URLs
         slug = existing.slug;
       }
 
       // Convert to plain JSON for Prisma storage
       const workbenchStateJson = JSON.parse(JSON.stringify(input.state));
-      const experimentData = {
-        name,
-        slug,
-        projectId: input.projectId,
-        type: ExperimentType.EVALUATIONS_V3,
-        workbenchState: workbenchStateJson,
-      };
 
-      await prisma.experiment.upsert({
-        where: {
-          id: experimentId,
-          projectId: input.projectId,
+      await experiments.saveWithSlugRetry({
+        initialSlug: slug,
+        execute: (s) => {
+          const data = {
+            name,
+            slug: s,
+            projectId: input.projectId,
+            type: ExperimentType.EVALUATIONS_V3,
+            workbenchState: workbenchStateJson,
+          };
+          return prisma.experiment.upsert({
+            where: { id: experimentId, projectId: input.projectId },
+            update: data,
+            create: { ...data, id: experimentId },
+          });
         },
-        update: experimentData,
-        create: {
-          ...experimentData,
-          id: experimentId,
-        },
+        regenerateSlug: () =>
+          experiments.generateUniqueSlug({
+            baseSlug: rawSlug,
+            projectId: input.projectId,
+          }),
       });
 
       const updatedExperiment = await prisma.experiment.findUnique({
@@ -293,10 +331,12 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await getExperimentBySlug(
-        input.projectId,
-        input.experimentSlug,
-      );
+      const experiment = await experimentService()
+        .getBySlug({
+          projectId: input.projectId,
+          slug: input.experimentSlug,
+        })
+        .catch(mapExperimentError);
 
       if (experiment.type !== ExperimentType.EVALUATIONS_V3) {
         throw new TRPCError({
@@ -405,28 +445,19 @@ export const experimentsRouter = createTRPCRouter({
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       if (input.experimentId) {
-        const experiment = await prisma.experiment.findFirst({
-          where: {
-            id: input.experimentId,
+        return await experimentService()
+          .getById({
             projectId: input.projectId,
-          },
-        });
-
-        if (!experiment) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Experiment not found",
-          });
-        }
-
-        return experiment;
+            id: input.experimentId,
+          })
+          .catch(mapExperimentError);
       } else if (input.experimentSlug) {
-        const experiment = await getExperimentBySlug(
-          input.projectId,
-          input.experimentSlug,
-        );
-
-        return experiment;
+        return await experimentService()
+          .getBySlug({
+            projectId: input.projectId,
+            slug: input.experimentSlug,
+          })
+          .catch(mapExperimentError);
       }
 
       throw new TRPCError({
@@ -445,10 +476,12 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await getExperimentBySlug(
-        input.projectId,
-        input.experimentSlug,
-      );
+      const experiment = await experimentService()
+        .getBySlug({
+          projectId: input.projectId,
+          slug: input.experimentSlug,
+        })
+        .catch(mapExperimentError);
 
       const workflow = experiment.workflowId
         ? await prisma.workflow.findUnique({
@@ -472,13 +505,9 @@ export const experimentsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiments = await prisma.experiment.findMany({
-        where: {
-          projectId: input.projectId,
-        },
+      return await experimentService().getAll({
+        projectId: input.projectId,
       });
-
-      return experiments;
     }),
 
   getAllForEvaluationsList: protectedProcedure
@@ -609,10 +638,12 @@ export const experimentsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await getExperimentBySlug(
-        input.projectId,
-        input.experimentSlug,
-      );
+      const experiment = await experimentService()
+        .getBySlug({
+          projectId: input.projectId,
+          slug: input.experimentSlug,
+        })
+        .catch(mapExperimentError);
 
       const steps = await getApp().dspySteps.steps.getStepsByExperiment({
         tenantId: input.projectId,
@@ -676,10 +707,12 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await getExperimentBySlug(
-        input.projectId,
-        input.experimentSlug,
-      );
+      const experiment = await experimentService()
+        .getBySlug({
+          projectId: input.projectId,
+          slug: input.experimentSlug,
+        })
+        .catch(mapExperimentError);
 
       try {
         const step = await getApp().dspySteps.steps.getStep({
@@ -728,10 +761,12 @@ export const experimentsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), experimentId: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await getExperimentById(
-        input.projectId,
-        input.experimentId,
-      );
+      const experiment = await experimentService()
+        .getById({
+          projectId: input.projectId,
+          id: input.experimentId,
+        })
+        .catch(mapExperimentError);
 
       const experimentRunService = ExperimentRunService.create(prisma);
       const runsByExperimentId = await experimentRunService.listRuns({
@@ -752,10 +787,12 @@ export const experimentsRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await getExperimentById(
-        input.projectId,
-        input.experimentId,
-      );
+      const experiment = await experimentService()
+        .getById({
+          projectId: input.projectId,
+          id: input.experimentId,
+        })
+        .catch(mapExperimentError);
 
       const experimentRunService = ExperimentRunService.create(prisma);
       return experimentRunService.getRun({
@@ -1025,48 +1062,34 @@ export const experimentsRouter = createTRPCRouter({
 
       // Create new experiment with unique slug
       const experimentName = experiment.name ?? experiment.slug;
-      const baseSlug = slugify(experimentName);
+      const experiments = experimentService();
+      const initialSlug = await experiments.generateUniqueSlug({
+        baseSlug: slugify(experimentName),
+        projectId: input.projectId,
+      });
 
-      // Find a unique slug by appending -2, -3, etc. if needed
-      const MAX_ATTEMPTS = 100;
-      let newSlug = baseSlug;
-      let index = 2;
-      let attempts = 0;
-
-      while (attempts < MAX_ATTEMPTS) {
-        const existingExperiment = await ctx.prisma.experiment.findFirst({
-          where: {
-            projectId: input.projectId,
-            slug: newSlug,
-          },
-        });
-
-        if (!existingExperiment) {
-          break;
-        }
-
-        newSlug = `${baseSlug}-${index}`;
-        index++;
-        attempts++;
-      }
-
-      // Fallback to random suffix if we hit the limit (should never happen in practice)
-      if (attempts >= MAX_ATTEMPTS) {
-        newSlug = `${baseSlug}-${nanoid(8)}`;
-      }
-
-      const newExperiment = await ctx.prisma.experiment.create({
-        data: {
-          id: `experiment_${nanoid()}`,
-          name: experimentName,
-          slug: newSlug,
-          projectId: input.projectId,
-          type: experiment.type,
-          workflowId,
-          ...(experiment.workbenchState && {
-            workbenchState: experiment.workbenchState as Prisma.InputJsonValue,
+      const { result: newExperiment } = await experiments.saveWithSlugRetry({
+        initialSlug,
+        execute: (s) =>
+          ctx.prisma.experiment.create({
+            data: {
+              id: `experiment_${nanoid()}`,
+              name: experimentName,
+              slug: s,
+              projectId: input.projectId,
+              type: experiment.type,
+              workflowId,
+              ...(experiment.workbenchState && {
+                workbenchState:
+                  experiment.workbenchState as Prisma.InputJsonValue,
+              }),
+            },
           }),
-        },
+        regenerateSlug: () =>
+          experiments.generateUniqueSlug({
+            baseSlug: slugify(experimentName),
+            projectId: input.projectId,
+          }),
       });
 
       return { experiment: newExperiment, workflow: newWorkflow };
@@ -1079,90 +1102,11 @@ export const experimentsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
-      const experiment = await prisma.experiment.findFirst({
-        where: { projectId: input.projectId },
-        orderBy: { createdAt: "desc" },
+      return await experimentService().getLatest({
+        projectId: input.projectId,
       });
-
-      return experiment;
     }),
 });
-
-const getExperimentBySlug = async (
-  projectId: string,
-  experimentSlug: string,
-) => {
-  const experiment = await prisma.experiment.findFirst({
-    where: {
-      projectId: projectId,
-      slug: experimentSlug,
-    },
-  });
-
-  if (!experiment) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Experiment not found",
-    });
-  }
-
-  return experiment;
-};
-
-const getExperimentById = async (projectId: string, experimentId: string) => {
-  const experiment = await prisma.experiment.findFirst({
-    where: {
-      projectId: projectId,
-      id: experimentId,
-    },
-  });
-
-  if (!experiment) {
-    throw new TRPCError({
-      code: "NOT_FOUND",
-      message: "Experiment not found",
-    });
-  }
-
-  return experiment;
-};
-
-
-const findNextDraftName = async (projectId: string) => {
-  const experiments = await prisma.experiment.findMany({
-    select: {
-      name: true,
-      slug: true,
-    },
-    where: {
-      projectId: projectId,
-      name: {
-        startsWith: "Draft",
-      },
-    },
-  });
-
-  const slugs = new Set(
-    (
-      await prisma.experiment.findMany({
-        select: { slug: true },
-        where: { projectId: projectId },
-      })
-    ).map((e) => e.slug),
-  );
-
-  let draftName;
-  let index = experiments.length + 1;
-  while (true) {
-    draftName = `Draft Evaluation (${index})`;
-    if (!slugs.has(slugify(draftName))) {
-      break;
-    }
-    index++;
-  }
-
-  return draftName;
-};
 
 /**
  * Copies an EVALUATIONS_V3 experiment to another project.
@@ -1240,45 +1184,30 @@ const copyEvaluationsV3Experiment = async ({
 
   // Generate unique slug for the new experiment
   const experimentName = experiment.name ?? experiment.slug;
-  const baseSlug = slugify(experimentName);
+  const experiments = experimentService();
+  const initialSlug = await experiments.generateUniqueSlug({
+    baseSlug: slugify(experimentName),
+    projectId: targetProjectId,
+  });
 
-  const MAX_ATTEMPTS = 100;
-  let newSlug = baseSlug;
-  let index = 2;
-  let attempts = 0;
-
-  while (attempts < MAX_ATTEMPTS) {
-    const existingExperiment = await ctx.prisma.experiment.findFirst({
-      where: {
+  const { result: newExperiment } = await experiments.saveWithSlugRetry({
+    initialSlug,
+    execute: (s) =>
+      ctx.prisma.experiment.create({
+        data: {
+          id: generate("eval").toString(),
+          name: experimentName,
+          slug: s,
+          projectId: targetProjectId,
+          type: ExperimentType.EVALUATIONS_V3,
+          workbenchState: workbenchState as Prisma.InputJsonValue,
+        },
+      }),
+    regenerateSlug: () =>
+      experiments.generateUniqueSlug({
+        baseSlug: slugify(experimentName),
         projectId: targetProjectId,
-        slug: newSlug,
-      },
-    });
-
-    if (!existingExperiment) {
-      break;
-    }
-
-    newSlug = `${baseSlug}-${index}`;
-    index++;
-    attempts++;
-  }
-
-  // Fallback to random suffix if we hit the limit
-  if (attempts >= MAX_ATTEMPTS) {
-    newSlug = `${baseSlug}-${nanoid(8)}`;
-  }
-
-  // Create the new experiment
-  const newExperiment = await ctx.prisma.experiment.create({
-    data: {
-      id: generate("eval").toString(),
-      name: experimentName,
-      slug: newSlug,
-      projectId: targetProjectId,
-      type: ExperimentType.EVALUATIONS_V3,
-      workbenchState: workbenchState as Prisma.InputJsonValue,
-    },
+      }),
   });
 
   return { experiment: newExperiment, workflow: null };

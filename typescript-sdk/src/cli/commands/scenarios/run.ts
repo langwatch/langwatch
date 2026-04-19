@@ -2,10 +2,10 @@ import chalk from "chalk";
 import ora from "ora";
 import {
   SuitesApiService,
-  SuitesApiError,
   type SuiteTarget,
 } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 function parseTarget(targetStr: string): SuiteTarget {
   const colonIndex = targetStr.indexOf(":");
@@ -154,16 +154,7 @@ export const runScenarioCommand = async (
     // Clean up ephemeral suite
     await suitesService.delete(suite.id).catch(() => undefined);
   } catch (error) {
-    spinner.fail();
-    if (error instanceof SuitesApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "run scenario" });
     process.exit(1);
   }
 };

@@ -11,10 +11,9 @@ vi.mock("~/utils/logger/server", () => ({
   }),
 }));
 
-vi.mock("~/server/scenarios/scenario.queue", () => ({
+vi.mock("~/server/scenarios/scenario.ids", () => ({
   generateBatchRunId: () => "batch-run-123",
-  scheduleScenarioRun: vi.fn().mockResolvedValue({ id: "job-1" }),
-  scenarioQueue: { getJob: vi.fn() },
+  generateScenarioRunId: () => "scenario-run-id-1",
 }));
 
 vi.mock("~/server/suites/suite-set-id", () => ({
@@ -67,8 +66,7 @@ describe("SuiteRunService", () => {
         expect(typeof result.items[0]?.scenarioRunId).toBe("string");
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("returns batchRunId and setId in the result", async () => {
+      it("returns batchRunId and setId in the result", async () => {
         const result = await service.startRun({
           suiteId: "suite-1",
           projectId: "project-1",

@@ -1,6 +1,5 @@
 import promBundle from "express-prom-bundle";
 import { createServer, type IncomingMessage, type ServerResponse } from "http";
-import fs from "fs";
 import path from "path";
 import { register } from "prom-client";
 import { getApp } from "./server/app-layer/app";
@@ -13,6 +12,7 @@ import { createLogger } from "./utils/logger/server";
 // Hono — unified API router
 import type { Hono } from "hono";
 import { createApiRouter } from "./server/api-router";
+import { serveStaticOrFallback } from "./server/static-handler";
 
 const logger = createLogger("langwatch:start");
 
@@ -73,7 +73,7 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   const cspHeader = [
     "default-src 'self'",
     "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev",
-    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.pendo.io https://client.crisp.chat https://*.google.com https://*.reo.dev https://fonts.googleapis.com",
+    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.pendo.io https://client.crisp.chat https://*.google.com https://*.reo.dev https://fonts.googleapis.com https://unpkg.com",
     "img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://*.googletagmanager.com https://*.pendo.io https://*.google-analytics.com https://www.google.com https://*.reo.dev",
     "font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://client.crisp.chat https://www.google.com https://*.reo.dev https://fonts.gstatic.com",
     "object-src 'none'",
@@ -97,7 +97,9 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // eslint-disable-next-line @typescript-eslint/no-misused-promises
   const server = createServer(async (req, res) => {
     try {
-      const pathname = (req.url ?? "/").split("?")[0] ?? "/";
+      // Collapse runs of slashes so paths like `//authorize` resolve to `/authorize`
+      // instead of failing the absolute-path guard on the SPA fallback below.
+      const pathname = ((req.url ?? "/").split("?")[0] ?? "/").replace(/\/{2,}/g, "/");
 
       // Apply security headers to all responses
       for (const [key, value] of Object.entries(securityHeaders)) {
@@ -148,25 +150,8 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
 
       // ---- Production: serve static assets + SPA fallback ----
       if (clientDistDir) {
-        // Sanitize: reject any pathname containing traversal sequences before touching the filesystem
-        const normalizedRelative = path.normalize(pathname.slice(1));
-        if (normalizedRelative.startsWith("..") || path.isAbsolute(normalizedRelative)) {
-          res.statusCode = 400;
-          res.end("Bad Request");
-          return;
-        }
-        const staticPath = path.join(clientDistDir, normalizedRelative);
-        if (fs.existsSync(staticPath) && fs.statSync(staticPath).isFile()) {
-          serveStaticFile(res, staticPath, pathname);
-          return;
-        }
-        // SPA fallback — serve index.html for all non-API routes
-        const indexHtml = path.join(clientDistDir, "index.html");
-        if (fs.existsSync(indexHtml)) {
-          res.setHeader("Content-Type", "text/html");
-          fs.createReadStream(indexHtml).pipe(res);
-          return;
-        }
+        const handled = serveStaticOrFallback({ res, pathname, clientDistDir });
+        if (handled) return;
       }
 
       res.statusCode = 404;
@@ -295,29 +280,6 @@ async function routeThroughHono(
     res.end(await honoRes.text());
   }
   return true;
-}
-
-function serveStaticFile(res: ServerResponse, filePath: string, pathname: string) {
-  const ext = path.extname(filePath);
-  const mimeTypes: Record<string, string> = {
-    ".js": "application/javascript",
-    ".mjs": "application/javascript",
-    ".css": "text/css",
-    ".html": "text/html",
-    ".json": "application/json",
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".svg": "image/svg+xml",
-    ".ico": "image/x-icon",
-    ".woff": "font/woff",
-    ".woff2": "font/woff2",
-    ".wasm": "application/wasm",
-  };
-  res.setHeader("Content-Type", mimeTypes[ext] ?? "application/octet-stream");
-  if (pathname.startsWith("/assets/")) {
-    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
-  }
-  fs.createReadStream(filePath).pipe(res);
 }
 
 function readBody(req: IncomingMessage): Promise<Uint8Array> {

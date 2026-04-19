@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const getGraphCommand = async (
   id: string,
@@ -20,9 +22,8 @@ export const getGraphCommand = async (
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to fetch graph (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to fetch graph: ${message}`);
       process.exit(1);
     }
 
@@ -66,12 +67,7 @@ export const getGraphCommand = async (
     );
     console.log();
   } catch (error) {
-    spinner.fail();
-    console.error(
-      chalk.red(
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
-      )
-    );
+    failSpinner({ spinner, error, action: "fetch graph" });
     process.exit(1);
   }
 };

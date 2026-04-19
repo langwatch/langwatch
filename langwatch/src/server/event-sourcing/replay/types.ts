@@ -55,6 +55,7 @@ export interface ReplayConfig {
   projections: RegisteredFoldProjection[];
   tenantIds: string[];
   since: string;
+  aggregateIds?: string[];
   batchSize?: number;
   aggregateBatchSize?: number;
   concurrency?: number;

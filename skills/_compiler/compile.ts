@@ -77,16 +77,25 @@ function parseSkillMd(skillPath: string): ParsedSkill {
 // Reference resolution
 // ──────────────────────────────────────────────────
 
-function resolveReferences(body: string, skillDir: string): string {
-  // Replace [text](_shared/file.md) with inlined content
+function resolveReferences(
+  body: string,
+  skillDir: string,
+  seenShared: Set<string>
+): string {
+  // Replace `See [text](_shared/file.md).` (or just `[text](_shared/file.md)`)
+  // with inlined content the first time it's referenced, and a short "(see X
+  // above)" stub on subsequent references within the same compile run.
   return body.replace(
-    /(?:See\s+)?\[([^\]]+)\]\((_shared\/[^)]+\.md)\)(?:\s*for[^.]*\.)?/g,
-    (_match, _text: string, refPath: string) => {
+    /(?:See\s+)?\[([^\]]+)\]\((_shared\/[^)]+\.md)\)\.?/g,
+    (_match, text: string, refPath: string) => {
+      if (seenShared.has(refPath)) {
+        return `(see "${text}" above)`;
+      }
+      seenShared.add(refPath);
       const fullPath = path.join(skillDir, refPath);
       if (fs.existsSync(fullPath)) {
         return fs.readFileSync(fullPath, "utf8").trim();
       }
-      // Also check in the skills root _shared
       const rootPath = path.join(skillsRoot, refPath);
       if (fs.existsSync(rootPath)) {
         return fs.readFileSync(rootPath, "utf8").trim();
@@ -134,57 +143,9 @@ Once they provide it, use it wherever you see a placeholder below.`;
     );
 }
 
-// ──────────────────────────────────────────────────
-// Deduplication
-// ──────────────────────────────────────────────────
-
-function deduplicateSharedContent(sections: string[]): string {
-  if (sections.length <= 1) return sections.join("\n\n---\n\n");
-
-  // Track which shared blocks we've already included
-  const seen = new Set<string>();
-  const deduplicated: string[] = [];
-
-  for (const section of sections) {
-    const lines = section.split("\n");
-    const filtered: string[] = [];
-    let skipUntilNextHeader = false;
-    let currentSharedBlock = "";
-
-    for (const line of lines) {
-      // Detect shared content blocks (MCP setup, API key setup, etc.)
-      if (line.startsWith("# Installing the LangWatch MCP") ||
-          line.startsWith("# LangWatch API Key Setup") ||
-          line.startsWith("# Fetching LangWatch Docs Without MCP")) {
-        if (seen.has(line)) {
-          skipUntilNextHeader = true;
-          currentSharedBlock = line;
-          continue;
-        }
-        seen.add(line);
-      }
-
-      if (skipUntilNextHeader) {
-        // Skip until we hit the next major section header
-        if (line.startsWith("## Step") || line.startsWith("## Common") || line.startsWith("# ")) {
-          if (line !== currentSharedBlock) {
-            skipUntilNextHeader = false;
-            filtered.push(`(See MCP/API key setup above)`);
-            filtered.push("");
-            filtered.push(line);
-          }
-        }
-        continue;
-      }
-
-      filtered.push(line);
-    }
-
-    deduplicated.push(filtered.join("\n"));
-  }
-
-  return deduplicated.join("\n\n---\n\n");
-}
+// Deduplication is handled in `resolveReferences` via the `seenShared` set —
+// each `_shared/*.md` partial is inlined exactly once per compile run; later
+// references collapse to a short "(see X above)" stub.
 
 // ──────────────────────────────────────────────────
 // Level-up composition
@@ -205,7 +166,10 @@ function getComposedSkillNames(skillName: string): string[] {
 // Compilation
 // ──────────────────────────────────────────────────
 
-function compileSkill(skillName: string): { body: string; userPrompt?: string } {
+function compileSkill(
+  skillName: string,
+  seenShared: Set<string>
+): { body: string; userPrompt?: string } {
   const skillDir = path.join(skillsRoot, skillName);
   const skillMdPath = path.join(skillDir, "SKILL.md");
 
@@ -215,7 +179,7 @@ function compileSkill(skillName: string): { body: string; userPrompt?: string } 
 
   const parsed = parseSkillMd(skillMdPath);
   const userPrompt = parsed.frontmatter["user-prompt"]?.replace(/^["']|["']$/g, "");
-  return { body: resolveReferences(parsed.body, skillDir), userPrompt };
+  return { body: resolveReferences(parsed.body, skillDir, seenShared), userPrompt };
 }
 
 function compile(options: CompileOptions): string {
@@ -229,40 +193,46 @@ function compile(options: CompileOptions): string {
   // Remove duplicates while preserving order
   const uniqueSkills = [...new Set(expandedSkills)];
 
-  // For composed skills, get the user-prompt from the original (not expanded) skill
+  // Track which `_shared/*.md` files we've already inlined for this compile
+  // run; second references collapse to "(see X above)" stubs.
+  const seenShared = new Set<string>();
+
+  // For composed skills, get the user-prompt from the original (not expanded)
+  // skill — but use a throwaway `seenShared` set so we don't pollute the real one.
   const originalUserPrompt = skills.length === 1
-    ? compileSkill(skills[0]).userPrompt
+    ? compileSkill(skills[0], new Set()).userPrompt
     : undefined;
 
-  // Compile each expanded skill
-  const compiledResults = uniqueSkills.map(compileSkill);
+  // Compile each expanded skill, threading the shared `seen` set so partials
+  // are inlined exactly once across the composition.
+  const compiledResults = uniqueSkills.map((s) => compileSkill(s, seenShared));
   const compiledSections = compiledResults.map((r) => r.body);
 
   // Use user-prompt from the original skill, falling back to first expanded
   const userPrompt = originalUserPrompt || compiledResults[0]?.userPrompt;
 
-  // Deduplicate shared content
-  let combined: string;
-  if (uniqueSkills.length === 1) {
-    combined = compiledSections[0];
-  } else {
-    combined = deduplicateSharedContent(compiledSections);
-  }
-
   // Apply API key handling
-  combined = handleApiKey(combined, mode, apiKey);
+  const combined = handleApiKey(
+    compiledSections.join("\n\n---\n\n"),
+    mode,
+    apiKey
+  );
 
   const header = userPrompt
     ? `${userPrompt}\n\nYou are using LangWatch for your AI agent project. Follow these instructions.`
     : `You are using LangWatch for your AI agent project. Follow these instructions.`;
 
-  const apiKeyNote = mode === "platform"
-    ? ``
-    : `\n\nIMPORTANT: You will need a LangWatch API key. Check if LANGWATCH_API_KEY is already in the project's .env file. If not, ask the user for it — they can get one at https://app.langwatch.ai/authorize. If they have a LANGWATCH_ENDPOINT in .env, they are on a self-hosted instance — use that endpoint instead of app.langwatch.ai.`;
+  // Both notes live as `_shared/*.md` partials so non-engineers can edit them
+  // without touching this script. They're injected in both docs and platform
+  // modes — even when the platform pre-populates a key, an agent that falls
+  // back to the CLI still needs to know LANGWATCH_API_KEY conventions.
+  const readSharedNote = (filename: string): string =>
+    fs.readFileSync(path.join(skillsRoot, "_shared", filename), "utf8").trim();
 
-  const mcpNote = `\nFirst, try to install the LangWatch MCP server for access to documentation and platform tools. If installation fails, you can fetch docs directly via the URLs provided below.\n`;
+  const apiKeyNote = `\n\n${readSharedNote("api-key-setup.md")}`;
+  const cliNote = `\n${readSharedNote("cli-install.md")}\n`;
 
-  return `${header}${apiKeyNote}${mcpNote}\n${combined}`;
+  return `${header}${apiKeyNote}${cliNote}\n${combined}`;
 }
 
 // ──────────────────────────────────────────────────

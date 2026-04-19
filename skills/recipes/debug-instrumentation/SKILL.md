@@ -2,30 +2,42 @@
 name: debug-instrumentation
 description: Debug and improve your LangWatch traces. Inspects production traces for missing input/output, disconnected spans, unlabeled traces, and missing metadata. Use when traces look broken or incomplete.
 license: MIT
-compatibility: Requires LangWatch MCP with API key. Works with any coding agent.
+compatibility: Requires the `langwatch` CLI with a valid `LANGWATCH_API_KEY`. Works with any coding agent.
 metadata:
   category: recipe
 ---
 
 # Debug Your LangWatch Instrumentation
 
-This recipe uses the LangWatch MCP to inspect your production traces and identify instrumentation issues.
+This recipe uses the `langwatch` CLI to inspect your production traces and identify instrumentation issues.
 
 ## Prerequisites
 
-The LangWatch MCP must be installed with a valid API key. See [MCP Setup](../../_shared/mcp-setup.md).
+See [CLI Setup](_shared/cli-setup.md).
 
 ## Step 1: Fetch Recent Traces
 
-Call `search_traces` with a recent time range (last 24h or 7d) to get an overview:
+```bash
+langwatch trace search --limit 25 --start-date 2026-01-01 --format json
+```
 
+(Adjust `--start-date` to "last 24h" or "last 7d" — the CLI accepts ISO strings.)
+
+For each trace, ask:
 - How many traces are there?
 - Do they have inputs and outputs populated, or are they `<empty>`?
 - Are there labels and metadata (user_id, thread_id)?
 
+`langwatch status` is a fast sanity check that the CLI is talking to the right project.
+
 ## Step 2: Inspect Individual Traces
 
-For traces that look problematic, call `get_trace` with the trace ID to see the full span hierarchy:
+```bash
+langwatch trace get <traceId>            # Human-readable digest
+langwatch trace get <traceId> -f json    # Full span hierarchy as JSON
+```
+
+For traces that look problematic, check for:
 
 - **Empty input/output**: The most common issue. Check if `autotrack_openai_calls(client)` (Python) or `experimental_telemetry` (TypeScript/Vercel AI) is configured.
 - **Disconnected spans**: Spans that don't connect to a parent trace. Usually means `@langwatch.trace()` decorator is missing on the entry function.
@@ -35,7 +47,13 @@ For traces that look problematic, call `get_trace` with the trace ID to see the 
 
 ## Step 3: Read the Integration Docs
 
-Use `fetch_langwatch_docs` to read the integration guide for the project's framework. Compare the recommended setup with what's in the code.
+Use the CLI to read the integration guide for the project's framework. Compare the recommended setup with what's in the code.
+
+```bash
+langwatch docs                                  # Browse the docs index
+langwatch docs integration/python/guide         # Python (or your framework)
+langwatch docs integration/typescript/guide     # TypeScript (or your framework)
+```
 
 ## Step 4: Apply Fixes
 
@@ -43,7 +61,7 @@ For each issue found:
 1. Identify the root cause in the code
 2. Apply the fix following the framework-specific docs
 3. Run the application to generate new traces
-4. Re-inspect with `search_traces` to verify the fix
+4. Re-inspect with `langwatch trace search` and `langwatch trace get` to verify the fix
 
 ## Step 5: Verify Improvement
 
@@ -51,6 +69,11 @@ After fixes, compare before/after:
 - Are inputs/outputs now populated?
 - Are spans properly nested?
 - Are labels and metadata present?
+
+You can also export a sample for diff:
+```bash
+langwatch trace export --format jsonl --limit 50 -o traces.jsonl
+```
 
 ## Common Issues and Fixes
 

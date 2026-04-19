@@ -1,10 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  SuitesApiService,
-  SuitesApiError,
-} from "@/client-sdk/services/suites";
+import { SuitesApiService } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const runSuiteCommand = async (
   id: string,
@@ -133,16 +131,7 @@ export const runSuiteCommand = async (
     console.log(`  ${chalk.gray("Batch Run ID:")} ${chalk.green(result.batchRunId)}`);
     console.log();
   } catch (error) {
-    spinner.fail();
-    if (error instanceof SuitesApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "run suite" });
     process.exit(1);
   }
 };

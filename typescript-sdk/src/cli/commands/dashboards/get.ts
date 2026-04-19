@@ -1,10 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  DashboardsApiService,
-  DashboardsApiError,
-} from "@/client-sdk/services/dashboards/dashboards-api.service";
+import { DashboardsApiService } from "@/client-sdk/services/dashboards/dashboards-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const getDashboardCommand = async (
   id: string,
@@ -32,18 +30,12 @@ export const getDashboardCommand = async (
     console.log(`    ${chalk.gray("Graphs:")}  ${Array.isArray(dashboard.graphs) ? dashboard.graphs.length : 0}`);
     console.log(`    ${chalk.gray("Created:")} ${new Date(dashboard.createdAt).toLocaleString()}`);
     console.log(`    ${chalk.gray("Updated:")} ${new Date(dashboard.updatedAt).toLocaleString()}`);
+    if (dashboard.platformUrl) {
+      console.log(`    ${chalk.bold("View:")}   ${chalk.underline(dashboard.platformUrl)}`);
+    }
     console.log();
   } catch (error) {
-    spinner.fail();
-    if (error instanceof DashboardsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "fetch dashboard" });
     process.exit(1);
   }
 };

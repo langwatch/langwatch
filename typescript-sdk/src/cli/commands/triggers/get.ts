@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const getTriggerCommand = async (
   id: string,
@@ -19,7 +21,8 @@ export const getTriggerCommand = async (
     });
 
     if (!response.ok) {
-      spinner.fail(response.status === 404 ? `Trigger "${id}" not found` : `Failed (${response.status})`);
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to fetch trigger "${id}": ${message}`);
       process.exit(1);
     }
 
@@ -34,6 +37,7 @@ export const getTriggerCommand = async (
       alertType: string | null;
       createdAt: string;
       updatedAt: string;
+      platformUrl?: string;
     };
 
     spinner.succeed(`Found trigger "${trigger.name}"`);
@@ -52,6 +56,9 @@ export const getTriggerCommand = async (
     console.log(`    ${chalk.gray("Alert:")}   ${trigger.alertType ?? chalk.gray("—")}`);
     console.log(`    ${chalk.gray("Message:")} ${trigger.message ?? chalk.gray("—")}`);
     console.log(`    ${chalk.gray("Created:")} ${new Date(trigger.createdAt).toLocaleString()}`);
+    if (trigger.platformUrl) {
+      console.log(`    ${chalk.bold("View:")}   ${chalk.underline(trigger.platformUrl)}`);
+    }
 
     if (Object.keys(trigger.filters).length > 0) {
       console.log();
@@ -61,8 +68,7 @@ export const getTriggerCommand = async (
 
     console.log();
   } catch (error) {
-    spinner.fail();
-    console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`));
+    failSpinner({ spinner, error, action: "fetch trigger" });
     process.exit(1);
   }
 };

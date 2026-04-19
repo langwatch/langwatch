@@ -19,11 +19,17 @@ import {
   evaluatorServiceMiddleware,
 } from "../../middleware/evaluator-service";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import {
   apiResponseEvaluatorSchema,
   createEvaluatorInputSchema,
   updateEvaluatorInputSchema,
 } from "./schemas";
+
+const apiResponseEvaluatorWithPlatformUrlSchema =
+  apiResponseEvaluatorSchema.extend({
+    platformUrl: z.string().url(),
+  });
 
 const logger = createLogger("langwatch:api:evaluators");
 
@@ -52,7 +58,7 @@ app.get(
         description: "Success",
         content: {
           "application/json": {
-            schema: resolver(z.array(apiResponseEvaluatorSchema)),
+            schema: resolver(z.array(apiResponseEvaluatorWithPlatformUrlSchema)),
           },
         },
       },
@@ -68,7 +74,13 @@ app.get(
       projectId: project.id,
     });
 
-    return c.json(apiResponseEvaluatorSchema.array().parse(evaluators));
+    return c.json(apiResponseEvaluatorSchema.array().parse(evaluators).map((e) => ({
+      ...e,
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${e.id}`,
+      }),
+    })));
   },
 );
 
@@ -83,7 +95,7 @@ app.get(
         description: "Success",
         content: {
           "application/json": {
-            schema: resolver(apiResponseEvaluatorSchema),
+            schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
           },
         },
       },
@@ -124,7 +136,14 @@ app.get(
       });
     }
 
-    return c.json(apiResponseEvaluatorSchema.parse(evaluator));
+    const parsed = apiResponseEvaluatorSchema.parse(evaluator);
+    return c.json({
+      ...parsed,
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsed.id}`,
+      }),
+    });
   },
 );
 
@@ -140,7 +159,7 @@ app.post(
         description: "Success",
         content: {
           "application/json": {
-            schema: resolver(apiResponseEvaluatorSchema),
+            schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
           },
         },
       },
@@ -173,7 +192,14 @@ app.post(
       "Successfully created evaluator",
     );
 
-    return c.json(apiResponseEvaluatorSchema.parse(enriched));
+    const parsedCreated = apiResponseEvaluatorSchema.parse(enriched);
+    return c.json({
+      ...parsedCreated,
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsedCreated.id}`,
+      }),
+    });
   },
 );
 
@@ -188,7 +214,7 @@ app.put(
         description: "Success",
         content: {
           "application/json": {
-            schema: resolver(apiResponseEvaluatorSchema),
+            schema: resolver(apiResponseEvaluatorWithPlatformUrlSchema),
           },
         },
       },
@@ -268,7 +294,14 @@ app.put(
       "Successfully updated evaluator",
     );
 
-    return c.json(apiResponseEvaluatorSchema.parse(enriched));
+    const parsedUpdated = apiResponseEvaluatorSchema.parse(enriched);
+    return c.json({
+      ...parsedUpdated,
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/evaluators?drawer.open=evaluatorEditor&drawer.evaluatorId=${parsedUpdated.id}`,
+      }),
+    });
   },
 );
 

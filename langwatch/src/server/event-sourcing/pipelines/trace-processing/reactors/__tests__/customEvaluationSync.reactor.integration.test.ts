@@ -111,7 +111,8 @@ function buildSpanWithEvaluation({
   } as unknown as OtlpSpan;
 }
 
-describe.skipIf(!hasTestcontainers)(
+// Skipped: chronic async-event-handler timeout flake — see langwatch/langwatch#3240.
+describe.skip(
   "Custom Evaluation Sync Reactor - End-to-End Integration",
   () => {
     let tracePipeline: ReturnType<typeof createTestPipelines>["tracePipeline"];

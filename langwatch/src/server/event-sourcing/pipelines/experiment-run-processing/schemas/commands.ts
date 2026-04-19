@@ -58,6 +58,19 @@ export type RecordEvaluatorResultCommandData = z.infer<
   typeof recordEvaluatorResultCommandDataSchema
 >;
 
+export const computeExperimentRunMetricsCommandDataSchema = z.object({
+  tenantId: z.string(),
+  runId: z.string(),
+  experimentId: z.string(),
+  traceId: z.string(),
+  totalCost: z.number(),
+  occurredAt: z.number(),
+});
+
+export type ComputeExperimentRunMetricsCommandData = z.infer<
+  typeof computeExperimentRunMetricsCommandDataSchema
+>;
+
 export const completeExperimentRunCommandDataSchema = z.object({
   tenantId: z.string(),
   runId: z.string(),

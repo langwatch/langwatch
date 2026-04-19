@@ -10,6 +10,7 @@ import {
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -40,6 +41,7 @@ describe("Analytics Skill", () => {
       fs.cpSync(sharedSrc, sharedDir, { recursive: true });
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Agent performance analytics",
         description:
           "User wants to understand how their agent has been performing.",
@@ -49,7 +51,7 @@ describe("Analytics Skill", () => {
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent used LangWatch MCP tools to query analytics or search traces",
+              "Agent used the `langwatch` CLI (e.g. `langwatch analytics query` or `langwatch trace search`) to query analytics or search traces",
               "Agent provided a summary of performance data",
             ],
           }),
@@ -69,6 +71,6 @@ describe("Analytics Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 });

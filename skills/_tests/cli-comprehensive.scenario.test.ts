@@ -10,13 +10,13 @@ import {
   createClaudeCodeAgent,
   setupLocalCli,
   toolCallFix,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, ".env") });
-dotenv.config({ path: path.resolve(__dirname, "../../typescript-sdk/.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
@@ -51,13 +51,13 @@ Then run CLI commands:
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI status + structured output",
         description:
           "Developer wants to understand their LangWatch project using the CLI, getting structured JSON data from multiple commands.",
         agents: [
           createClaudeCodeAgent({
             workingDirectory: tempFolder,
-            skipMcp: true,
           }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
@@ -93,7 +93,7 @@ Then run CLI commands:
 
       expect(result.success).toBe(true);
     },
-    600_000,
+    900_000,
   );
 
   it.skipIf(isCI)(
@@ -124,13 +124,13 @@ Prompt management commands:
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI prompt version management",
         description:
           "Developer wants to inspect prompt versions and tags using the LangWatch CLI.",
         agents: [
           createClaudeCodeAgent({
             workingDirectory: tempFolder,
-            skipMcp: true,
           }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
@@ -166,6 +166,6 @@ Prompt management commands:
 
       expect(result.success).toBe(true);
     },
-    600_000,
+    900_000,
   );
 });

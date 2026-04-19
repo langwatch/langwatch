@@ -202,6 +202,7 @@ export function createRouterMock() {
           : "/test";
       return {
         query: state.mockQuery,
+        pathname: "",
         asPath,
         push: mockPush,
         replace: mockPush,

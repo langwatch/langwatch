@@ -1,10 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  AnalyticsApiService,
-  AnalyticsApiError,
-} from "@/client-sdk/services/analytics/analytics-api.service";
+import { AnalyticsApiService } from "@/client-sdk/services/analytics/analytics-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 const METRIC_PRESETS: Record<string, { metric: string; aggregation: string }> = {
   "trace-count": { metric: "metadata.trace_id", aggregation: "cardinality" },
@@ -130,16 +128,7 @@ export const queryAnalyticsCommand = async (options: {
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof AnalyticsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error querying analytics: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "query analytics" });
     process.exit(1);
   }
 };

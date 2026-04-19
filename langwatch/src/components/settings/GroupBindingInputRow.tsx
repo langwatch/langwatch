@@ -9,10 +9,11 @@ import {
 } from "@chakra-ui/react";
 import { RoleBindingScopeType } from "@prisma/client";
 import { Search } from "lucide-react";
-import { useState } from "react";
+import { forwardRef, useImperativeHandle, useMemo, useState } from "react";
 import { InputGroup } from "~/components/ui/input-group";
 import { Select } from "~/components/ui/select";
 import { toaster } from "~/components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 // ── Shared display helpers ────────────────────────────────────────────────────
@@ -61,52 +62,94 @@ const BASE_ROLE_ITEMS = [
 
 // ── BindingInputRow ───────────────────────────────────────────────────────────
 
-export function BindingInputRow({
+export type BindingInputRowHandle = {
+  /** Return the uncommitted binding if all required fields are filled, otherwise null. Resets the row. */
+  flush: () => PendingBinding | null;
+};
+
+export const BindingInputRow = forwardRef<
+  BindingInputRowHandle,
+  {
+    organizationId: string;
+    onAdd: (binding: PendingBinding) => void;
+    buttonLabel?: string;
+    isPending?: boolean;
+  }
+>(function BindingInputRow({
   organizationId,
   onAdd,
   buttonLabel = "Add",
   isPending = false,
-}: {
-  organizationId: string;
-  onAdd: (binding: PendingBinding) => void;
-  buttonLabel?: string;
-  isPending?: boolean;
-}) {
+}, ref) {
   const [scopeType, setScopeType] = useState<RoleBindingScopeType>(RoleBindingScopeType.TEAM);
   const [scopeId, setScopeId] = useState("");
   const [roleValue, setRoleValue] = useState("MEMBER");
   const [customRoleId, setCustomRoleId] = useState<string | undefined>(undefined);
   const [teamSearch, setTeamSearch] = useState("");
+  const [projectTeamId, setProjectTeamId] = useState("");
+  const [projectTeamSearch, setProjectTeamSearch] = useState("");
   const [projectSearch, setProjectSearch] = useState("");
+  // True only when the user has changed something since the last add/flush
+  const [isDirty, setIsDirty] = useState(false);
 
+  const { organization } = useOrganizationTeamProject();
   const teams = api.team.getTeamsWithMembers.useQuery({ organizationId });
   const customRoles = api.role.getAll.useQuery({ organizationId });
 
-  const roleItems = [
+  const roleItems = useMemo(() => [
     ...BASE_ROLE_ITEMS,
     ...(customRoles.data ?? []).map((r) => ({
       label: r.name,
       value: `CUSTOM:${r.id}`,
       customRoleId: r.id,
     })),
-  ];
-  const roleCollection = createListCollection({ items: roleItems });
+  ], [customRoles.data]);
+  const roleCollection = useMemo(() => createListCollection({ items: roleItems }), [roleItems]);
 
-  const allTeamItems = (teams.data ?? []).map((t) => ({ label: t.name, value: t.id }));
-  const teamItems = teamSearch
-    ? allTeamItems.filter((t) => t.label.toLowerCase().includes(teamSearch.toLowerCase()))
-    : allTeamItems;
-  const teamCollection = createListCollection({ items: teamItems });
+  const allTeamItems = useMemo(
+    () => (teams.data ?? []).map((t) => ({ label: t.name, value: t.id })),
+    [teams.data],
+  );
+  const teamItems = useMemo(
+    () => teamSearch
+      ? allTeamItems.filter((t) => t.label.toLowerCase().includes(teamSearch.toLowerCase()))
+      : allTeamItems,
+    [allTeamItems, teamSearch],
+  );
+  const teamCollection = useMemo(() => createListCollection({ items: teamItems }), [teamItems]);
 
-  const allProjectItems = (teams.data ?? [])
-    .flatMap((t) => t.projects.map((p) => ({ label: p.name, value: p.id })))
-    .sort((a, b) => a.label.localeCompare(b.label));
-  const projectItems = projectSearch
-    ? allProjectItems.filter((p) => p.label.toLowerCase().includes(projectSearch.toLowerCase()))
-    : allProjectItems;
-  const projectCollection = createListCollection({ items: projectItems });
+  // For project cascade: teams that have at least one project
+  const allProjectTeamItems = useMemo(
+    () => (teams.data ?? [])
+      .filter((t) => t.projects.length > 0)
+      .map((t) => ({ label: t.name, value: t.id })),
+    [teams.data],
+  );
+  const projectTeamItems = useMemo(
+    () => projectTeamSearch
+      ? allProjectTeamItems.filter((t) => t.label.toLowerCase().includes(projectTeamSearch.toLowerCase()))
+      : allProjectTeamItems,
+    [allProjectTeamItems, projectTeamSearch],
+  );
+  const projectTeamCollection = useMemo(() => createListCollection({ items: projectTeamItems }), [projectTeamItems]);
+
+  // Projects filtered to the selected team
+  const allProjectItems = useMemo(
+    () => (teams.data ?? [])
+      .find((t) => t.id === projectTeamId)
+      ?.projects.map((p) => ({ label: p.name, value: p.id })) ?? [],
+    [teams.data, projectTeamId],
+  );
+  const projectItems = useMemo(
+    () => projectSearch
+      ? allProjectItems.filter((p) => p.label.toLowerCase().includes(projectSearch.toLowerCase()))
+      : allProjectItems,
+    [allProjectItems, projectSearch],
+  );
+  const projectCollection = useMemo(() => createListCollection({ items: projectItems }), [projectItems]);
 
   function getScopeName() {
+    if (scopeType === RoleBindingScopeType.ORGANIZATION) return organization?.name ?? "Organization";
     if (scopeType === RoleBindingScopeType.TEAM)
       return allTeamItems.find((t) => t.value === scopeId)?.label;
     if (scopeType === RoleBindingScopeType.PROJECT)
@@ -114,10 +157,13 @@ export function BindingInputRow({
     return undefined;
   }
 
-  function handleAdd() {
+  const isReady =
+    isDirty && (scopeId !== "" || scopeType === RoleBindingScopeType.ORGANIZATION);
+
+  function buildBinding(): PendingBinding {
     const cid = customRoleId;
     const cname = cid ? customRoles.data?.find((r) => r.id === cid)?.name : undefined;
-    onAdd({
+    return {
       roleValue,
       role: cid ? "CUSTOM" : roleValue,
       customRoleId: cid,
@@ -125,9 +171,30 @@ export function BindingInputRow({
       scopeType,
       scopeId: scopeType === RoleBindingScopeType.ORGANIZATION ? organizationId : scopeId,
       scopeName: getScopeName(),
-    });
-    setScopeId("");
+    };
   }
+
+  function resetRow() {
+    setScopeId("");
+    setProjectTeamId("");
+    setProjectTeamSearch("");
+    setIsDirty(false);
+  }
+
+  function handleAdd() {
+    if (!isReady) return;
+    onAdd(buildBinding());
+    resetRow();
+  }
+
+  useImperativeHandle(ref, () => ({
+    flush() {
+      if (!isReady) return null;
+      const binding = buildBinding();
+      resetRow();
+      return binding;
+    },
+  }));
 
   return (
     <HStack gap={2} mt={2} flexWrap="wrap">
@@ -143,6 +210,7 @@ export function BindingInputRow({
             setRoleValue(v);
             setCustomRoleId(undefined);
           }
+          setIsDirty(true);
         }}
         size="sm"
         width="160px"
@@ -164,7 +232,10 @@ export function BindingInputRow({
           setScopeType((e.value[0] as RoleBindingScopeType) ?? RoleBindingScopeType.TEAM);
           setScopeId("");
           setTeamSearch("");
+          setProjectTeamId("");
+          setProjectTeamSearch("");
           setProjectSearch("");
+          setIsDirty(true);
         }}
         size="sm"
         width="130px"
@@ -181,7 +252,7 @@ export function BindingInputRow({
         <Select.Root
           collection={teamCollection}
           value={scopeId ? [scopeId] : []}
-          onValueChange={(e) => setScopeId(e.value[0] ?? "")}
+          onValueChange={(e) => { setScopeId(e.value[0] ?? ""); setIsDirty(true); }}
           size="sm"
           width="160px"
         >
@@ -210,36 +281,71 @@ export function BindingInputRow({
       )}
 
       {scopeType === RoleBindingScopeType.PROJECT && (
-        <Select.Root
-          collection={projectCollection}
-          value={scopeId ? [scopeId] : []}
-          onValueChange={(e) => setScopeId(e.value[0] ?? "")}
-          size="sm"
-          width="160px"
-        >
-          <Select.Trigger><Select.ValueText placeholder="Select project..." /></Select.Trigger>
-          <Select.Content>
-            <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
-              <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
-                <Input
-                  size="sm"
-                  placeholder="Search projects..."
-                  value={projectSearch}
-                  onChange={(e) => setProjectSearch(e.target.value)}
-                  onKeyDown={(e) => e.stopPropagation()}
-                />
-              </InputGroup>
-            </Box>
-            {projectItems.map((item) => (
-              <Select.Item key={item.value} item={item}>{item.label}</Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Root>
+        <>
+          <Select.Root
+            collection={projectTeamCollection}
+            value={projectTeamId ? [projectTeamId] : []}
+            onValueChange={(e) => {
+              setProjectTeamId(e.value[0] ?? "");
+              setScopeId("");
+              setProjectSearch("");
+            }}
+            size="sm"
+            width="160px"
+          >
+            <Select.Trigger><Select.ValueText placeholder="Select team..." /></Select.Trigger>
+            <Select.Content>
+              <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
+                <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
+                  <Input
+                    size="sm"
+                    placeholder="Search teams..."
+                    value={projectTeamSearch}
+                    onChange={(e) => setProjectTeamSearch(e.target.value)}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  />
+                </InputGroup>
+              </Box>
+              {projectTeamItems.map((item) => (
+                <Select.Item key={item.value} item={item}>{item.label}</Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+
+          {projectTeamId && (
+            <Select.Root
+              collection={projectCollection}
+              value={scopeId ? [scopeId] : []}
+              onValueChange={(e) => { setScopeId(e.value[0] ?? ""); setIsDirty(true); }}
+              size="sm"
+              width="160px"
+            >
+              <Select.Trigger><Select.ValueText placeholder="Select project..." /></Select.Trigger>
+              <Select.Content>
+                <Box position="sticky" top={0} zIndex={1} bg="bg" pb={1}>
+                  <InputGroup startElement={<Search size={14} />} startOffset="2px" width="full">
+                    <Input
+                      size="sm"
+                      placeholder="Search projects..."
+                      value={projectSearch}
+                      onChange={(e) => setProjectSearch(e.target.value)}
+                      onKeyDown={(e) => e.stopPropagation()}
+                    />
+                  </InputGroup>
+                </Box>
+                {projectItems.map((item) => (
+                  <Select.Item key={item.value} item={item}>{item.label}</Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          )}
+        </>
       )}
 
       <Button
         size="sm"
-        disabled={!scopeId && scopeType !== RoleBindingScopeType.ORGANIZATION}
+        colorPalette={isReady ? "blue" : undefined}
+        disabled={!isReady}
         loading={isPending}
         onClick={handleAdd}
       >
@@ -247,7 +353,7 @@ export function BindingInputRow({
       </Button>
     </HStack>
   );
-}
+});
 
 // ── AddBindingForm ────────────────────────────────────────────────────────────
 

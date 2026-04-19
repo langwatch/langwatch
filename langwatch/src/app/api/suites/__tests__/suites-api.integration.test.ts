@@ -245,7 +245,12 @@ describe("Feature: Suites REST API", () => {
 
     it("rejects duplicate names", async () => {
       const scenario = await createScenario("Dupe Scenario");
-      await createSuite({ name: "Duplicate Name", scenarioIds: [scenario.id] });
+      // Create first suite via the API so the service assigns the canonical slug
+      await helpers.api.post("/api/suites", {
+        name: "Duplicate Name",
+        scenarioIds: [scenario.id],
+        targets: [{ type: "http", referenceId: "agent_abc" }],
+      });
 
       const res = await helpers.api.post("/api/suites", {
         name: "Duplicate Name",

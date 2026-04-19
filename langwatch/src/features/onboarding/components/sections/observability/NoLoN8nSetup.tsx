@@ -12,7 +12,7 @@ import type React from "react";
 import { useMemo } from "react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "../../../../../components/ui/color-mode";
-import bashSnippet from "../../../regions/observability/codegen/snippets/noandlo/n8n.snippet.sh";
+import bashSnippet from "../../../regions/observability/codegen/snippets/noandlo/n8n.snippet.sh?raw";
 
 export const NoLoN8nSetup: React.FC = () => {
   const { colorMode } = useColorMode();

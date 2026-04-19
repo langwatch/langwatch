@@ -2,7 +2,43 @@
 # which is expected as we don't care about integration-level API reporting in this test.
 
 import json
+import os
+
+import pytest
+
+import langwatch
 from langwatch.telemetry.tracing import LangWatchTrace
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _ensure_tracer_installed():
+    """Install a real TracerProvider so `with trace:` produces a recording root span.
+
+    Without this, the OpenTelemetry default is a no-op tracer whose spans are
+    NonRecordingSpan instances with no `.attributes`, so the test that reads
+    `trace.root_span._span.attributes` falls over with an AttributeError.
+    """
+    prev_env_api_key = os.environ.get("LANGWATCH_API_KEY")
+    prev_api_key = getattr(langwatch, "_api_key", None)
+    prev_endpoint = getattr(langwatch, "_endpoint", None)
+
+    os.environ["LANGWATCH_API_KEY"] = "test-key-for-tracing"
+    langwatch._api_key = "test-key-for-tracing"
+    langwatch._endpoint = "http://localhost:5560"
+    try:
+        langwatch.setup()
+    except Exception:
+        # Tracer may already be installed by a sibling test module.
+        pass
+    try:
+        yield
+    finally:
+        if prev_env_api_key is None:
+            os.environ.pop("LANGWATCH_API_KEY", None)
+        else:
+            os.environ["LANGWATCH_API_KEY"] = prev_env_api_key
+        langwatch._api_key = prev_api_key
+        langwatch._endpoint = prev_endpoint
 
 
 def test_metadata_initialization_and_update_merge():

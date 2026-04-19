@@ -192,6 +192,67 @@ export async function batchGetCutoffEventIds({
 }
 
 /**
+ * Load ALL events for a set of aggregates in a single ClickHouse query.
+ * No eventTypes filter — different projections may need different event types,
+ * so we load everything and let callers filter by cutoff per aggregate.
+ *
+ * Returns events grouped by aggregate key (`{tenantId}:{aggregateType}:{aggregateId}`).
+ */
+export async function loadEventsForAggregatesBulk({
+  client,
+  tenantId,
+  aggregateIds,
+  cutoffs,
+}: {
+  client: ClickHouseClient;
+  tenantId: string;
+  aggregateIds: string[];
+  cutoffs: Map<string, CutoffInfo>;
+}): Promise<Map<string, ReplayEvent[]>> {
+  if (aggregateIds.length === 0) return new Map();
+
+  const result = await client.query({
+    query: `
+      SELECT EventId, EventTimestamp, EventOccurredAt, EventType, EventPayload,
+             EventVersion, TenantId, AggregateType, AggregateId, ProcessingTraceparent
+      FROM event_log
+      WHERE TenantId = {tenantId:String}
+        AND AggregateId IN ({aggregateIds:Array(String)})
+      ORDER BY AggregateId, EventTimestamp ASC, EventId ASC
+    `,
+    query_params: { tenantId, aggregateIds },
+    format: "JSONEachRow",
+  });
+
+  const rows = (await result.json()) as ClickHouseEventRow[];
+  const grouped = new Map<string, ReplayEvent[]>();
+
+  for (const row of rows) {
+    const key = `${tenantId}:${row.AggregateType}:${row.AggregateId}`;
+    const cutoff = cutoffs.get(key);
+
+    // Skip events beyond the cutoff for this aggregate
+    if (cutoff) {
+      const eventTimestamp =
+        typeof row.EventTimestamp === "string"
+          ? parseInt(row.EventTimestamp, 10)
+          : row.EventTimestamp;
+      if (eventTimestamp > cutoff.timestamp) continue;
+      if (eventTimestamp === cutoff.timestamp && row.EventId > cutoff.eventId) continue;
+    }
+
+    let list = grouped.get(key);
+    if (!list) {
+      list = [];
+      grouped.set(key, list);
+    }
+    list.push(rowToEvent(row));
+  }
+
+  return grouped;
+}
+
+/**
  * Load events for a batch of aggregates up to a max cutoff, with cursor-based pagination.
  */
 export async function batchLoadAggregateEvents({

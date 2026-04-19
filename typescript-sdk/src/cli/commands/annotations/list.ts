@@ -1,11 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  AnnotationsApiService,
-  AnnotationsApiError,
-} from "@/client-sdk/services/annotations/annotations-api.service";
+import { AnnotationsApiService } from "@/client-sdk/services/annotations/annotations-api.service";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable, formatRelativeTime } from "../../utils/formatting";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listAnnotationsCommand = async (options: {
   traceId?: string;
@@ -76,16 +74,7 @@ export const listAnnotationsCommand = async (options: {
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof AnnotationsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching annotations: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "fetch annotations" });
     process.exit(1);
   }
 };

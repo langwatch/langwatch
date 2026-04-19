@@ -337,10 +337,11 @@ export const useOpenTargetEditor = () => {
           }
         };
 
-        // Set flow callbacks for the evaluator editor using the centralized helper
-        // This ensures we never forget a required callback
-        setFlowCallbacks(
-          "evaluatorEditor",
+        // Set flow callbacks for the evaluator editor using the centralized helper.
+        // onMappingChange is registered here (durable) instead of inside mappingsConfig
+        // (ephemeral complexProps) so it survives in-app drawer navigation and
+        // ErrorBoundary remounts (not hard browser reloads — those clear all state).
+        setFlowCallbacks("evaluatorEditor",
           createEvaluatorEditorCallbacks({
             targetId: target.id,
             updateTarget,
@@ -348,10 +349,10 @@ export const useOpenTargetEditor = () => {
           }),
         );
 
+        // Build mappings config without onMappingChange — callback is durable via flowCallbacks
         const mappingsConfig = {
           availableSources,
           initialMappings: uiMappings,
-          onMappingChange: handleMappingChange,
         };
 
         // Pass initialLocalConfig from target state so drawer resumes unsaved changes

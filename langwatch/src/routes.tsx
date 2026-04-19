@@ -42,8 +42,31 @@ function RootLayout() {
  * React Router's lazy keeps the OLD route visible while the new module loads,
  * eliminating the gray flash that React.lazy + Suspense causes.
  */
+// Minimum gap between self-triggered reloads. Short enough that a second
+// deploy mid-session still reloads; long enough to avoid a loop if the server
+// is genuinely returning broken chunks.
+const CHUNK_RELOAD_COOLDOWN_MS = 10_000;
+
 const page = (importFn: () => Promise<{ default: React.ComponentType }>) => ({
-  lazy: () => importFn().then((m) => ({ Component: m.default })),
+  lazy: () =>
+    importFn().then((m) => ({ Component: m.default })).catch((err: unknown) => {
+      const msg = err instanceof Error ? err.message.toLowerCase() : "";
+      const isChunkError =
+        msg.includes("loading chunk") ||
+        msg.includes("dynamically imported module") ||
+        msg.includes("importing a module script failed");
+
+      if (!isChunkError) throw err;
+
+      const lastReloadAt = Number(
+        sessionStorage.getItem("chunk-reload-at") ?? "0"
+      );
+      if (Date.now() - lastReloadAt > CHUNK_RELOAD_COOLDOWN_MS) {
+        sessionStorage.setItem("chunk-reload-at", String(Date.now()));
+        window.location.reload();
+      }
+      throw err;
+    }),
 });
 
 const routes: RouteObject[] = [
@@ -55,7 +78,7 @@ const routes: RouteObject[] = [
   // Top-level pages
   { path: "/", ...page(() => import("./pages/index")) },
   { path: "/authorize", ...page(() => import("./pages/authorize")) },
-  { path: "/admin", ...page(() => import("./pages/admin/index")) },
+  { path: "/admin/*", ...page(() => import("./pages/admin/index")) },
   { path: "/invite/accept", ...page(() => import("./pages/invite/accept")) },
   { path: "/mcp/authorize", ...page(() => import("./pages/mcp/authorize")) },
   { path: "/share/:id", ...page(() => import("./pages/share/[id]")) },
@@ -104,10 +127,6 @@ const routes: RouteObject[] = [
   {
     path: "/settings/members",
     ...page(() => import("./pages/settings/members")),
-  },
-  {
-    path: "/settings/members/:userId",
-    ...page(() => import("./pages/settings/members/[userId]")),
   },
   {
     path: "/settings/model-costs",
@@ -331,6 +350,44 @@ const routes: RouteObject[] = [
   {
     path: "/:project/simulations",
     ...page(() => import("./pages/[project]/simulations/[[...path]]")),
+  },
+
+  // Ops
+  { path: "/ops", ...page(() => import("./pages/ops/index")) },
+  { path: "/ops/queues", ...page(() => import("./pages/ops/queues")) },
+  { path: "/ops/dejaview", ...page(() => import("./pages/ops/dejaview")) },
+  { path: "/ops/foundry", ...page(() => import("./pages/ops/foundry")) },
+  {
+    path: "/ops/projections",
+    ...page(() => import("./pages/ops/projections")),
+  },
+  {
+    path: "/ops/projections/:runId",
+    ...page(() => import("./pages/ops/projections/[runId]")),
+  },
+  {
+    path: "/ops/backoffice",
+    ...page(() => import("./pages/ops/backoffice")),
+  },
+  {
+    path: "/ops/backoffice/users",
+    ...page(() => import("./pages/ops/backoffice/users")),
+  },
+  {
+    path: "/ops/backoffice/organizations",
+    ...page(() => import("./pages/ops/backoffice/organizations")),
+  },
+  {
+    path: "/ops/backoffice/projects",
+    ...page(() => import("./pages/ops/backoffice/projects")),
+  },
+  {
+    path: "/ops/backoffice/subscriptions",
+    ...page(() => import("./pages/ops/backoffice/subscriptions")),
+  },
+  {
+    path: "/ops/backoffice/organization-features",
+    ...page(() => import("./pages/ops/backoffice/organization-features")),
   },
 
   // @project redirect — Next.js parallel route that redirects /@project/path to /:project/path

@@ -1,6 +1,7 @@
-import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const deleteTriggerCommand = async (
   id: string,
@@ -20,7 +21,8 @@ export const deleteTriggerCommand = async (
     });
 
     if (!response.ok) {
-      spinner.fail(response.status === 404 ? `Trigger "${id}" not found` : `Failed (${response.status})`);
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to delete trigger "${id}": ${message}`);
       process.exit(1);
     }
 
@@ -31,8 +33,7 @@ export const deleteTriggerCommand = async (
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    spinner.fail();
-    console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`));
+    failSpinner({ spinner, error, action: "delete trigger" });
     process.exit(1);
   }
 };

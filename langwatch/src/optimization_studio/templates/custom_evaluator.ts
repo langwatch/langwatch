@@ -245,7 +245,6 @@ Return your judgment as either TRUE (no significant cognitive biases) or FALSE (
         behave_as: "evaluator",
         inputs: [
           { identifier: "passed", type: "bool" },
-          { identifier: "details", type: "str" },
         ],
       } satisfies End,
     },
@@ -257,14 +256,6 @@ Return your judgment as either TRUE (no significant cognitive biases) or FALSE (
       sourceHandle: "outputs.answer",
       target: "llm_call",
       targetHandle: "inputs.llm_output",
-      type: "default",
-    },
-    {
-      id: "e1-2",
-      source: "llm_call",
-      sourceHandle: "outputs.reasoning",
-      target: "end",
-      targetHandle: "inputs.details",
       type: "default",
     },
     {

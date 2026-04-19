@@ -38,7 +38,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { Payload } from "recharts/types/component/DefaultTooltipContent";
+import type { Formatter, NameType, Payload, ValueType } from "recharts/types/component/DefaultTooltipContent";
 import { useRouter } from "~/utils/compat/next-router";
 import type { z } from "zod";
 import type { FilterField } from "~/server/filters/types";
@@ -576,10 +576,10 @@ const CustomGraph_ = React.memo(
 
     const formatDate = (date: string) =>
       formatChartDate({ date, timeScale, daysDifference });
-    const tooltipValueFormatter = (
-      value: number | string,
-      _: string,
-      payload: Payload<any, any>,
+    const tooltipValueFormatter: Formatter<ValueType, NameType> = (
+      value,
+      _,
+      payload,
     ) => {
       if (payload.dataKey === "date") {
         return formatDate(value as string);

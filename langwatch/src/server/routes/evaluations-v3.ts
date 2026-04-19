@@ -36,6 +36,7 @@ import {
   runOrchestrator,
 } from "~/server/evaluations-v3/execution/orchestrator";
 import { runStateManager } from "~/server/evaluations-v3/execution/runStateManager";
+import { ExperimentRunService } from "~/server/evaluations-v3/services/experiment-run.service";
 import {
   executionRequestSchema,
   type EvaluationV3Event,
@@ -526,4 +527,54 @@ app.get("/runs/:runId", async (c) => {
     startedAt: runState.startedAt,
     finishedAt: runState.finishedAt,
   });
+});
+
+// ── GET /runs/:runId/results (full per-row results from ClickHouse) ──
+app.get("/runs/:runId/results", async (c) => {
+  const { runId } = c.req.param();
+
+  const authResult = await authenticateApiKey(c);
+  if ("error" in authResult) {
+    return c.json({ error: authResult.error }, { status: authResult.status });
+  }
+  const { project } = authResult;
+
+  // Look up experiment by slug or find the experiment that owns this runId
+  const experimentSlug = c.req.query("experimentSlug");
+
+  let experiment;
+  if (experimentSlug) {
+    experiment = await prisma.experiment.findFirst({
+      where: { projectId: project.id, slug: experimentSlug },
+    });
+  }
+
+  if (!experiment) {
+    // Try to find experiment by scanning runs (fallback)
+    experiment = await prisma.experiment.findFirst({
+      where: { projectId: project.id },
+      orderBy: { updatedAt: "desc" },
+    });
+  }
+
+  if (!experiment) {
+    return c.json({ error: "Experiment not found" }, { status: 404 });
+  }
+
+  try {
+    const experimentRunService = ExperimentRunService.create(prisma);
+    const run = await experimentRunService.getRun({
+      projectId: project.id,
+      experimentId: experiment.id,
+      runId,
+    });
+
+    return c.json(run);
+  } catch (error) {
+    logger.error({ error, runId }, "Failed to fetch run results");
+    return c.json(
+      { error: "Run not found or results not yet available" },
+      { status: 404 },
+    );
+  }
 });

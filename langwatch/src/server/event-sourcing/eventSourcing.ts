@@ -89,6 +89,7 @@ export class EventSourcing {
     string,
     PipelineWithCommandHandlers<any, any>
   >();
+  private readonly _definitions: StaticPipelineDefinition<any, any, any>[] = [];
   private readonly projectionRegistry: ProjectionRegistry<Event>;
 
   // Infrastructure — lazily initialized
@@ -201,6 +202,11 @@ export class EventSourcing {
     return pipeline;
   }
 
+  /** Returns the static definitions captured during register() calls. */
+  get definitions(): ReadonlyArray<StaticPipelineDefinition<any, any, any>> {
+    return this._definitions;
+  }
+
   /**
    * Registers a static pipeline definition with the runtime infrastructure.
    * Takes a static definition (created with `definePipeline()`) and connects it
@@ -228,6 +234,8 @@ export class EventSourcing {
         },
       },
       () => {
+        this._definitions.push(definition);
+
         type ReturnType = PipelineWithCommandHandlers<
           RegisteredPipeline<EventType, ProjectionTypes>,
           [Commands] extends [NoCommands]

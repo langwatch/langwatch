@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const updateSecretCommand = async (
   id: string,
@@ -25,9 +27,8 @@ export const updateSecretCommand = async (
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to update secret (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to update secret: ${message}`);
       process.exit(1);
     }
 
@@ -48,12 +49,7 @@ export const updateSecretCommand = async (
     console.log(`  ${chalk.gray("Name:")} ${chalk.cyan(secret.name)}`);
     console.log();
   } catch (error) {
-    spinner.fail();
-    console.error(
-      chalk.red(
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
-      )
-    );
+    failSpinner({ spinner, error, action: "update secret" });
     process.exit(1);
   }
 };

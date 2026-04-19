@@ -5,6 +5,7 @@ import type {
   ExperimentRunStartedEvent,
   EvaluatorResultEvent,
   TargetResultEvent,
+  TraceMetricsComputedEvent,
 } from "./events";
 
 export function isExperimentRunStartedEvent(
@@ -23,6 +24,12 @@ export function isEvaluatorResultEvent(
   event: ExperimentRunProcessingEvent,
 ): event is EvaluatorResultEvent {
   return event.type === EXPERIMENT_RUN_EVENT_TYPES.EVALUATOR_RESULT;
+}
+
+export function isTraceMetricsComputedEvent(
+  event: ExperimentRunProcessingEvent,
+): event is TraceMetricsComputedEvent {
+  return event.type === EXPERIMENT_RUN_EVENT_TYPES.TRACE_METRICS_COMPUTED;
 }
 
 export function isExperimentRunCompletedEvent(

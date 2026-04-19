@@ -14,6 +14,7 @@ import {
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import { handleError } from "../../middleware";
 import { SuiteService } from "~/server/suites/suite.service";
 import { SuiteDomainError } from "~/server/suites/errors";
@@ -42,6 +43,10 @@ const suiteResponseSchema = z.object({
   labels: z.array(z.string()),
   createdAt: z.string(),
   updatedAt: z.string(),
+});
+
+const suiteResponseWithPlatformUrlSchema = suiteResponseSchema.extend({
+  platformUrl: z.string().url(),
 });
 
 const createSuiteInputSchema = z.object({
@@ -129,7 +134,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(z.array(suiteResponseSchema)),
+              schema: resolver(z.array(suiteResponseWithPlatformUrlSchema)),
             },
           },
         },
@@ -142,7 +147,13 @@ export const app = new Hono<{ Variables: Variables }>()
       const service = createService();
       const suites = await service.getAll({ projectId: project.id });
 
-      return c.json(suites.map(toSuiteResponse));
+      return c.json(suites.map((s) => ({
+        ...toSuiteResponse(s),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/simulations/run-plans/${s.slug}`,
+        }),
+      })));
     },
   )
 
@@ -157,7 +168,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(suiteResponseSchema),
+              schema: resolver(suiteResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -181,7 +192,13 @@ export const app = new Hono<{ Variables: Variables }>()
         return c.json({ error: "Suite not found" }, 404);
       }
 
-      return c.json(toSuiteResponse(suite));
+      return c.json({
+        ...toSuiteResponse(suite),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/simulations/run-plans/${suite.slug}`,
+        }),
+      });
     },
   )
 
@@ -196,7 +213,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Suite created",
           content: {
             "application/json": {
-              schema: resolver(suiteResponseSchema),
+              schema: resolver(suiteResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -214,7 +231,13 @@ export const app = new Hono<{ Variables: Variables }>()
           ...body,
           projectId: project.id,
         });
-        return c.json(toSuiteResponse(suite), 201);
+        return c.json({
+          ...toSuiteResponse(suite),
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/simulations/run-plans/${suite.slug}`,
+          }),
+        }, 201);
       } catch (error) {
         if (error instanceof SuiteDomainError) {
           return c.json({ error: error.message }, 400);
@@ -235,7 +258,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Suite updated",
           content: {
             "application/json": {
-              schema: resolver(suiteResponseSchema),
+              schema: resolver(suiteResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -261,7 +284,13 @@ export const app = new Hono<{ Variables: Variables }>()
           projectId: project.id,
           data: body,
         });
-        return c.json(toSuiteResponse(suite));
+        return c.json({
+          ...toSuiteResponse(suite),
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/simulations/run-plans/${suite.slug}`,
+          }),
+        });
       } catch (error) {
         if (error instanceof SuiteDomainError) {
           return c.json({ error: error.message }, 400);
@@ -282,7 +311,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Suite duplicated",
           content: {
             "application/json": {
-              schema: resolver(suiteResponseSchema),
+              schema: resolver(suiteResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -302,7 +331,13 @@ export const app = new Hono<{ Variables: Variables }>()
       const service = createService();
       try {
         const suite = await service.duplicate({ id, projectId: project.id });
-        return c.json(toSuiteResponse(suite), 201);
+        return c.json({
+          ...toSuiteResponse(suite),
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/simulations/run-plans/${suite.slug}`,
+          }),
+        }, 201);
       } catch (error) {
         if (error instanceof SuiteDomainError) {
           return c.json({ error: error.message }, 404);

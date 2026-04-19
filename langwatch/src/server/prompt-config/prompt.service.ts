@@ -100,6 +100,13 @@ export type VersionedPrompt = {
   _count?: {
     copiedPrompts?: number;
   };
+  /**
+   * Tags currently pointing at the version returned in this response.
+   * For list/get responses, these are the tags that resolve to the
+   * latest/requested version specifically — not the entire prompt's tag set.
+   * For versions endpoint, these are the tags pointing at the row's version.
+   */
+  tags: Array<{ name: string; versionId: string }>;
 };
 
 /**
@@ -138,7 +145,25 @@ export class PromptService {
       organizationId,
     });
 
-    return configs.map((config) => this.transformToVersionedPrompt(config));
+    const latestVersionIds = configs
+      .map((c) => c.latestVersion.id)
+      .filter((id): id is string => !!id);
+    const tagsByVersionId = await this.getTagsByVersionIds({
+      versionIds: latestVersionIds,
+      projectId,
+    });
+
+    return configs.map((config) => {
+      const latestVersionId = config.latestVersion.id ?? "";
+      return this.transformToVersionedPrompt(
+        config,
+        this.withLatestTag({
+          tags: tagsByVersionId.get(latestVersionId) ?? [],
+          currentVersionId: latestVersionId,
+          latestVersionId,
+        }),
+      );
+    });
   }
 
   /**
@@ -175,9 +200,16 @@ export class PromptService {
       params.organizationId ??
       (await this.getOrganizationIdFromProjectId(projectId));
 
+    // `latest` is a virtual tag that is never stored in the PromptTag table
+    // (see parsePromptShorthand, which also normalizes it away). Treat
+    // `tag: "latest"` as "no tag filter" so that what we advertise in the
+    // response (tags: [{name: "latest"}]) is round-trippable via ?tag=latest.
+    const normalizedTag =
+      params.tag === "latest" ? undefined : params.tag;
+
     // If a tag is provided, resolve it to a versionId
     let resolvedVersionId = params.versionId;
-    if (params.tag) {
+    if (normalizedTag) {
       const config = await this.repository.getPromptByIdOrHandle({
         idOrHandle,
         projectId,
@@ -189,13 +221,13 @@ export class PromptService {
       }
 
       const tagId = await this.resolveTagNameToId({
-        tagName: params.tag,
+        tagName: normalizedTag,
         organizationId,
       });
 
       if (!tagId) {
         throw new NotFoundError(
-          `Tag "${params.tag}" not found for prompt "${idOrHandle}"`,
+          `Tag "${normalizedTag}" not found for prompt "${idOrHandle}"`,
         );
       }
 
@@ -207,7 +239,7 @@ export class PromptService {
 
       if (!versionTag) {
         throw new NotFoundError(
-          `Tag "${params.tag}" not found for prompt "${idOrHandle}"`,
+          `Tag "${normalizedTag}" not found for prompt "${idOrHandle}"`,
         );
       }
 
@@ -228,7 +260,35 @@ export class PromptService {
       return null;
     }
 
-    return this.transformToVersionedPrompt(config);
+    const currentVersionId = config.latestVersion.id ?? "";
+    const latestVersionId = await this.getLatestVersionIdForConfig({
+      configId: config.id,
+      projectId,
+    });
+
+    // Only fetch assignments for the versions we actually need (the returned
+    // version and, when it differs, the latest version for the "latest" tag
+    // comparison) — not the whole tag history for the config.
+    const versionIdsToQuery = Array.from(
+      new Set(
+        [currentVersionId, latestVersionId].filter(
+          (id): id is string => !!id,
+        ),
+      ),
+    );
+    const tagsByVersionId = await this.getTagsByVersionIds({
+      versionIds: versionIdsToQuery,
+      projectId,
+    });
+
+    return this.transformToVersionedPrompt(
+      config,
+      this.withLatestTag({
+        tags: tagsByVersionId.get(currentVersionId) ?? [],
+        currentVersionId,
+        latestVersionId,
+      }),
+    );
   }
 
   /**
@@ -264,11 +324,29 @@ export class PromptService {
         organizationId,
       })) as LatestConfigVersionSchema[];
 
+    const versionIds = versions
+      .map((v) => v.id)
+      .filter((id): id is string => !!id);
+    const tagsByVersionId = await this.getTagsByVersionIds({
+      versionIds,
+      projectId: params.projectId,
+    });
+
+    // Repo returns versions sorted by createdAt desc, so versions[0] is latest.
+    const latestVersionId = versions[0]?.id ?? "";
+
     return versions.map((version) =>
-      this.transformToVersionedPrompt({
-        ...config,
-        latestVersion: version,
-      }),
+      this.transformToVersionedPrompt(
+        {
+          ...config,
+          latestVersion: version,
+        },
+        this.withLatestTag({
+          tags: tagsByVersionId.get(version.id ?? "") ?? [],
+          currentVersionId: version.id ?? "",
+          latestVersionId,
+        }),
+      ),
     );
   }
 
@@ -406,7 +484,14 @@ export class PromptService {
         : undefined,
     });
 
-    return this.transformToVersionedPrompt(config);
+    // A freshly created prompt's only version is also the latest; no custom
+    // tag assignments exist yet (those are attached by the route in a second
+    // step), so the only tag to surface is the built-in "latest".
+    const newVersionId = config.latestVersion.id ?? "";
+    return this.transformToVersionedPrompt(
+      config,
+      newVersionId ? [{ name: "latest", versionId: newVersionId }] : [],
+    );
   }
 
   /**
@@ -466,10 +551,23 @@ export class PromptService {
       projectId,
     )) as LatestConfigVersionSchema;
 
-    return this.transformToVersionedPrompt({
-      ...updatedConfig,
-      latestVersion,
-    } as LlmConfigWithLatestVersion);
+    const latestVersionId = latestVersion.id ?? "";
+    const tagsByVersionId = await this.getTagsByVersionIds({
+      versionIds: latestVersionId ? [latestVersionId] : [],
+      projectId,
+    });
+
+    return this.transformToVersionedPrompt(
+      {
+        ...updatedConfig,
+        latestVersion,
+      } as LlmConfigWithLatestVersion,
+      this.withLatestTag({
+        tags: tagsByVersionId.get(latestVersionId) ?? [],
+        currentVersionId: latestVersionId,
+        latestVersionId,
+      }),
+    );
   }
 
   /**
@@ -571,10 +669,19 @@ export class PromptService {
             },
           });
 
-        return this.transformToVersionedPrompt({
-          ...updatedConfig,
-          latestVersion: updatedVersion,
-        } as LlmConfigWithLatestVersion);
+        // The new version we just created is now the latest. Custom tags
+        // assigned by the route run after this transaction returns, so the
+        // only tag to surface here is the built-in "latest".
+        const newVersionId = updatedVersion.id ?? "";
+        return this.transformToVersionedPrompt(
+          {
+            ...updatedConfig,
+            latestVersion: updatedVersion,
+          } as LlmConfigWithLatestVersion,
+          newVersionId
+            ? [{ name: "latest", versionId: newVersionId }]
+            : [],
+        );
       },
     );
 
@@ -924,6 +1031,7 @@ export class PromptService {
    */
   private transformToVersionedPrompt(
     config: Omit<LlmConfigWithLatestVersion, "deletedAt">,
+    tags: Array<{ name: string; versionId: string }>,
   ): VersionedPrompt {
     const prompt = config.latestVersion.configData.prompt;
 
@@ -983,6 +1091,7 @@ export class PromptService {
       commitMessage: config.latestVersion.commitMessage,
       copiedFromPromptId: config.copiedFromPromptId ?? null,
       _count: config._count ?? undefined,
+      tags,
     };
   }
 
@@ -1110,6 +1219,78 @@ export class PromptService {
       projectId: params.projectId,
       userId: params.userId,
     });
+  }
+
+  /**
+   * Fetches the tag assignments pointing at exactly the given versionIds,
+   * grouped by versionId. Delegates to the repository so the service keeps
+   * no raw Prisma access. Callers should pass only the versionIds they
+   * actually need (not the full history of a config) to keep this bounded.
+   */
+  private async getTagsByVersionIds(params: {
+    versionIds: string[];
+    projectId: string;
+  }): Promise<Map<string, Array<{ name: string; versionId: string }>>> {
+    const map = new Map<string, Array<{ name: string; versionId: string }>>();
+
+    if (params.versionIds.length === 0) return map;
+
+    const assignments = await this.tagRepository.findByVersionIds({
+      versionIds: params.versionIds,
+      projectId: params.projectId,
+    });
+
+    for (const assignment of assignments) {
+      const bucket = map.get(assignment.versionId) ?? [];
+      bucket.push({
+        name: assignment.promptTag.name,
+        versionId: assignment.versionId,
+      });
+      map.set(assignment.versionId, bucket);
+    }
+
+    return map;
+  }
+
+  /**
+   * Returns the id of the latest (by createdAt desc) version for a config,
+   * or an empty string when no version exists. Delegates to the versions
+   * repository's non-throwing finder so real DB errors surface as
+   * exceptions instead of being silently swallowed into "".
+   */
+  private async getLatestVersionIdForConfig(params: {
+    configId: string;
+    projectId: string;
+  }): Promise<string> {
+    return (
+      (await this.repository.versions.findLatestId({
+        configId: params.configId,
+        projectId: params.projectId,
+      })) ?? ""
+    );
+  }
+
+  /**
+   * Prepends the built-in "latest" tag when the current version is the latest
+   * for its prompt. "latest" is a first-class, protected tag (see PromptTagService)
+   * that always resolves to the newest version, so it belongs in the response
+   * alongside any custom tags that happen to point at this version.
+   */
+  private withLatestTag(params: {
+    tags: Array<{ name: string; versionId: string }>;
+    currentVersionId: string;
+    latestVersionId: string;
+  }): Array<{ name: string; versionId: string }> {
+    if (
+      !params.currentVersionId ||
+      params.currentVersionId !== params.latestVersionId
+    ) {
+      return params.tags;
+    }
+    return [
+      { name: "latest", versionId: params.latestVersionId },
+      ...params.tags,
+    ];
   }
 
   /**

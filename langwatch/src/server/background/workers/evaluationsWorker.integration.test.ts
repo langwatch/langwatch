@@ -242,7 +242,7 @@ describe("updateEvaluationStatusInES", () => {
     });
   });
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
+  // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
   it.skip("should insert a new trace check if none exists", async () => {
     await updateEvaluationStatusInES({
       check,
@@ -276,7 +276,7 @@ describe("updateEvaluationStatusInES", () => {
     });
   });
 
-  // TODO(#3048): pre-existing failure unmasked by #3001
+  // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
   it.skip("should update an existing trace check", async () => {
     // Insert the initial document
     await updateEvaluationStatusInES({

@@ -295,7 +295,7 @@ export function SubscriptionPage() {
     return (
       <SettingsLayout>
         <Flex justifyContent="center" padding={8}>
-          <Text color="red.500">
+          <Text color="red.fg">
             Failed to load subscription information. Please try again later.
           </Text>
         </Flex>
@@ -367,13 +367,13 @@ export function SubscriptionPage() {
         <Flex justifyContent="space-between" alignItems="flex-start">
           <VStack align="start" gap={1}>
             <Heading size="xl">Billing</Heading>
-            <Text color="gray.500">
+            <Text color="fg.muted">
               For questions about billing,{" "}
               <Link
                 href="mailto:sales@langwatch.ai"
                 fontWeight="semibold"
-                color="gray.700"
-                _hover={{ color: "gray.900" }}
+                color="fg"
+                _hover={{ color: "fg" }}
               >
                 contact us
               </Link>
@@ -416,7 +416,7 @@ export function SubscriptionPage() {
               </>
             )}
             <Link href="/settings/plans">
-              <Button variant="ghost" size="sm" color="gray.600">
+              <Button variant="ghost" size="sm" color="fg.muted">
                 All plans <ArrowRight size={14} />
               </Button>
             </Link>
@@ -426,21 +426,21 @@ export function SubscriptionPage() {
         {showSuccess && (
           <Box
             data-testid="subscription-success"
-            backgroundColor="green.50"
+            backgroundColor="green.subtle"
             borderWidth={1}
-            borderColor="green.200"
+            borderColor="green.muted"
             borderRadius="md"
             padding={4}
           >
             <VStack align="start" gap={1}>
               <HStack gap={2}>
-                <Check size={16} color="green" />
-                <Text fontWeight="semibold" color="green.800">
+                <Check size={16} color="var(--chakra-colors-green-solid)" />
+                <Text fontWeight="semibold" color="green.fg">
                   Subscription activated successfully!
                 </Text>
               </HStack>
               {showUpgradeCredit && (
-                <Text fontSize="sm" color="green.700" data-testid="credit-notice">
+                <Text fontSize="sm" color="green.fg" data-testid="credit-notice">
                   Your previous plan has been prorated. Any unused credit has been
                   applied to your account and will offset future invoices.
                 </Text>

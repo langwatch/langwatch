@@ -740,6 +740,75 @@ describe("applySpanToSummary token timing from OTel instrumentation events (@reg
     });
   });
 
+  describe("when span has First Token Stream Event (OpenInference)", () => {
+    it("computes timeToFirstToken from First Token Stream Event", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 3000,
+        durationMs: 2000,
+        events: [
+          { name: "First Token Stream Event", timeUnixMs: 1200, attributes: {} },
+        ],
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToFirstTokenMs).toBe(200);
+    });
+  });
+
+  describe("when span has gen_ai.server.time_to_first_token attribute (Strands SDK)", () => {
+    it("computes timeToFirstToken from the span attribute when no events exist", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 4000,
+        durationMs: 3000,
+        events: [],
+        spanAttributes: {
+          "gen_ai.server.time_to_first_token": 2046,
+        },
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToFirstTokenMs).toBe(2046);
+    });
+
+    it("coerces string attribute to number", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 4000,
+        durationMs: 3000,
+        events: [],
+        spanAttributes: {
+          "gen_ai.server.time_to_first_token": "3125",
+        },
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToFirstTokenMs).toBe(3125);
+    });
+
+    it("prefers event-based TTFT over the span attribute", () => {
+      const span = createTestSpan({
+        startTimeUnixMs: 1000,
+        endTimeUnixMs: 4000,
+        durationMs: 3000,
+        events: [
+          { name: "first_token", timeUnixMs: 1300, attributes: {} },
+        ],
+        spanAttributes: {
+          "gen_ai.server.time_to_first_token": 500,
+        },
+      });
+
+      const result = applySpanToSummary({ state: createInitState(), span });
+
+      expect(result.timeToFirstTokenMs).toBe(300);
+    });
+  });
+
   describe("when span has gen_ai.content.chunk events (already supported)", () => {
     it("computes timeToFirstToken as before", () => {
       const span = createTestSpan({

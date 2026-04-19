@@ -4,6 +4,7 @@ import { checkApiKey } from "../utils/apiKey";
 import {
   createLangWatchApiClient,
 } from "@/internal/api/client";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const statusCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -13,13 +14,21 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
   const endpoint = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
   const spinner = ora("Fetching project status...").start();
 
-  const results: Record<string, { count: number; error?: string }> = {};
+  const results: Record<string, { count: number; error?: string; status?: number }> = {};
 
-  async function fetchCount(url: string): Promise<{ data: unknown; error?: string }> {
+  async function fetchCount(url: string): Promise<{ data: unknown; error?: unknown; status?: number }> {
     const response = await fetch(`${endpoint}${url}`, {
       headers: { "X-Auth-Token": apiKey },
     });
-    if (!response.ok) return { data: null, error: "fetch failed" };
+    if (!response.ok) {
+      let body: unknown;
+      try {
+        body = await response.json();
+      } catch {
+        body = undefined;
+      }
+      return { data: null, error: body ?? response.statusText, status: response.status };
+    }
     const data = await response.json();
     return { data, error: undefined };
   }
@@ -41,9 +50,16 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
   await Promise.allSettled(
     fetchers.map(async ({ key, fn }) => {
       try {
-        const { data, error } = await fn();
+        const result = await fn();
+        const { data, error } = result;
+        const status = (result as { status?: number; response?: { status?: number } }).status
+          ?? (result as { response?: { status?: number } }).response?.status;
         if (error) {
-          results[key] = { count: 0, error: "fetch failed" };
+          results[key] = {
+            count: 0,
+            error: formatApiErrorMessage({ error, options: { status } }),
+            status,
+          };
           return;
         }
         if (Array.isArray(data)) {
@@ -57,17 +73,46 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
         } else {
           results[key] = { count: 0 };
         }
-      } catch {
-        results[key] = { count: 0, error: "unavailable" };
+      } catch (err) {
+        results[key] = { count: 0, error: formatApiErrorMessage({ error: err }) };
       }
     }),
   );
 
-  spinner.succeed("Project status");
+  const errorCount = Object.values(results).filter((r) => r.error).length;
+  const totalCount = Object.values(results).length;
+
+  if (errorCount === totalCount && totalCount > 0) {
+    spinner.fail("Project status — all resource fetches failed");
+  } else {
+    spinner.succeed("Project status");
+  }
 
   if (options?.format === "json") {
     console.log(JSON.stringify(results, null, 2));
     return;
+  }
+
+  // If every resource failed — likely auth/endpoint/server issue. Show a
+  // clear diagnostic so the user knows what to check instead of puzzling
+  // over a grid of red error messages.
+  if (errorCount === totalCount && totalCount > 0) {
+    const sampleError = Object.values(results).find((r) => r.error)?.error ?? "";
+    const statuses = Object.values(results)
+      .map((r) => r.status)
+      .filter((s): s is number => typeof s === "number");
+    const allUnauthorized = statuses.length > 0 && statuses.every((s) => s === 401 || s === 403);
+    console.log();
+    console.log(chalk.red("  ✗ Could not fetch any project resources."));
+    console.log(chalk.gray(`    Reason: ${sampleError}`));
+    console.log();
+    if (allUnauthorized) {
+      console.log(chalk.gray(`    Your API key appears to be invalid or revoked. Re-run ${chalk.cyan("langwatch login")} or check ${chalk.cyan("LANGWATCH_API_KEY")}.`));
+    } else {
+      console.log(chalk.gray(`    Check ${chalk.cyan("LANGWATCH_API_KEY")} (current endpoint: ${chalk.cyan(endpoint)}).`));
+    }
+    console.log();
+    process.exit(1);
   }
 
   console.log();

@@ -154,7 +154,7 @@ clickhouse:
 ```
 
 <Note>
-The TTL must be divisible by 7 (ClickHouse partitions data weekly). The default of 49 days means data stays on fast local storage for ~7 weeks before moving to S3.
+We recommend setting the TTL to a multiple of 7 (e.g., 7, 14, 28, 49) to align with ClickHouse's weekly partition boundaries for more efficient data management. The default of 49 days means data stays on fast local storage for ~7 weeks before moving to S3.
 </Note>
 
 ### Cost Savings

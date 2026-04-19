@@ -1,11 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  ScenariosApiService,
-  ScenariosApiError,
-} from "@/client-sdk/services/scenarios";
+import { ScenariosApiService } from "@/client-sdk/services/scenarios";
 import type { UpdateScenarioBody } from "@/client-sdk/services/scenarios";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const updateScenarioCommand = async (
   id: string,
@@ -35,16 +33,7 @@ export const updateScenarioCommand = async (
       console.log(JSON.stringify(scenario, null, 2));
     }
   } catch (error) {
-    spinner.fail();
-    if (error instanceof ScenariosApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error updating scenario: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "update scenario" });
     process.exit(1);
   }
 };

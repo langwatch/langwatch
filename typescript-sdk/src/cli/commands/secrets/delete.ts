@@ -1,6 +1,7 @@
-import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const deleteSecretCommand = async (
   id: string,
@@ -21,9 +22,8 @@ export const deleteSecretCommand = async (
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to delete secret (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to delete secret: ${message}`);
       process.exit(1);
     }
 
@@ -38,12 +38,7 @@ export const deleteSecretCommand = async (
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    spinner.fail();
-    console.error(
-      chalk.red(
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`
-      )
-    );
+    failSpinner({ spinner, error, action: "delete secret" });
     process.exit(1);
   }
 };

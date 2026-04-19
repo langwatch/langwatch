@@ -33,7 +33,7 @@ describe("Collector Worker Integration Tests", () => {
   });
 
   describe("ignore_timestamps_on_write functionality", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should preserve existing timestamps when ignore_timestamps_on_write is true and trace exists", async () => {
       const traceId = `test-trace-preserve-${nanoid()}`;
       const spanId1 = `test-span-1-${nanoid()}`;
@@ -153,7 +153,7 @@ describe("Collector Worker Integration Tests", () => {
       );
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should use provided timestamps when ignore_timestamps_on_write is true but no existing trace exists", async () => {
       const traceId = `test-trace-new-${nanoid()}`;
       const spanId = `test-span-new-${nanoid()}`;
@@ -215,7 +215,7 @@ describe("Collector Worker Integration Tests", () => {
       expect(trace.timestamps.started_at).toBe(providedStartedAt);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should use existing timestamps when ignore_timestamps_on_write is false or not set", async () => {
       const traceId = `test-trace-normal-${nanoid()}`;
       const spanId = `test-span-normal-${nanoid()}`;
@@ -289,7 +289,7 @@ describe("Collector Worker Integration Tests", () => {
   });
 
   describe("cost calculation and aggregation", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should correctly aggregate costs from multiple spans in a single job", async () => {
       const traceId = `test-trace-cost-aggregation-${nanoid()}`;
       const spanId1 = `test-span-cost-1-${nanoid()}`;
@@ -386,7 +386,7 @@ describe("Collector Worker Integration Tests", () => {
       ).toBeUndefined();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should correctly aggregate costs when adding new spans to existing trace", async () => {
       const traceId = `test-trace-cost-incremental-${nanoid()}`;
       const spanId1 = `test-span-incremental-1-${nanoid()}`;
@@ -494,7 +494,7 @@ describe("Collector Worker Integration Tests", () => {
       ).toBe(0.0002);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should handle spans with undefined or null costs correctly", async () => {
       const traceId = `test-trace-cost-null-${nanoid()}`;
       const spanId1 = `test-span-null-1-${nanoid()}`;
@@ -576,7 +576,7 @@ describe("Collector Worker Integration Tests", () => {
       ).toBeUndefined();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should return null total_cost when no spans have costs", async () => {
       const traceId = `test-trace-no-cost-${nanoid()}`;
       const spanId1 = `test-span-no-cost-1-${nanoid()}`;
@@ -652,7 +652,7 @@ describe("Collector Worker Integration Tests", () => {
       ).toBeUndefined();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should deduplicate spans and calculate costs correctly", async () => {
       const traceId = `test-trace-deduplication-${nanoid()}`;
       const spanId = `test-span-deduplication-${nanoid()}`;

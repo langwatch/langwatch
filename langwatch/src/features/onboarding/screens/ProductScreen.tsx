@@ -7,6 +7,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectBySlugOrLatest } from "~/hooks/useProjectBySlugOrLatest";
 import { OnboardingContainer } from "../components/containers/OnboardingContainer";
 
+import { ScreenLifecycle } from "../components/ScreenLifecycle";
 import { ActiveProjectProvider } from "../contexts/ActiveProjectContext";
 import { useProductFlow } from "../hooks/use-product-flow";
 import { useCreateProductScreens } from "./create-product-screens";
@@ -22,7 +23,7 @@ export const ProductScreen: React.FC = () => {
   const { organization, isLoading } = useOrganizationTeamProject({
     redirectToOnboarding: true,
   });
-  const { project: activeProject } = useProjectBySlugOrLatest(organization);
+  const { project: activeProject, slug: skipSlug } = useProjectBySlugOrLatest(organization);
 
   // Delay showing skeleton to avoid flicker on fast loads
   const [delayedLoading, setDelayedLoading] = useState(false);
@@ -62,6 +63,7 @@ export const ProductScreen: React.FC = () => {
 
   return (
     <AnalyticsBoundary name="onboarding_product" sendViewedEvent>
+      <ScreenLifecycle />
       <OnboardingContainer
         title={currentScreen.heading}
         subTitle={currentScreen.subHeading}
@@ -70,14 +72,21 @@ export const ProductScreen: React.FC = () => {
         widthVariant={currentScreen.widthVariant ?? "narrow"}
         showBackButton={canGoBack}
         onBack={() => navigation.prevScreen()}
-        skipHref={activeProject?.slug ? `/${activeProject.slug}` : undefined}
+        skipHref={skipSlug ? `/${skipSlug}` : undefined}
       >
         <Box w="full">
           <ActiveProjectProvider
             value={{ project: activeProject, organization }}
           >
             {!isLoading && currentScreen.component ? (
-              <currentScreen.component />
+              <AnalyticsBoundary
+                key={currentScreen.id}
+                name={currentScreen.id}
+                sendViewedEvent
+              >
+                <ScreenLifecycle />
+                <currentScreen.component />
+              </AnalyticsBoundary>
             ) : null}
           </ActiveProjectProvider>
         </Box>

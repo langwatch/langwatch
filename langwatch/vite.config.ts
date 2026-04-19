@@ -61,12 +61,4 @@ export default defineConfig({
       },
     },
   },
-  // Load .snippet files as raw strings (previously handled by webpack/turbopack)
-  assetsInclude: [
-    "**/*.snippet.sts",
-    "**/*.snippet.go",
-    "**/*.snippet.sh",
-    "**/*.snippet.py",
-    "**/*.snippet.yaml",
-  ],
 });

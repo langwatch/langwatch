@@ -113,7 +113,9 @@ def parse_workflow(
         node.data.name = normalize_name_to_class_name(node.data.name or "")
 
     node_templates = {
-        node.id: parse_component(node, workflow, format) for node in nodes
+        node.id: parse_component(node, workflow, format)
+        for node in nodes
+        if node.type not in ("entry", "end")
     }
 
     inputs = workflow_inputs(workflow)
@@ -363,9 +365,9 @@ def parse_component(
                         f"Unknown agent_type '{agent_type}' for agent {node.data.name}"
                     )
         case "entry":
-            return "", "None", {}
+            raise ValueError("Entry nodes cannot be executed as standalone components")
         case "end":
-            return "", "None", {}
+            raise ValueError("End nodes cannot be executed as standalone components")
         case _:
             raise ValueError(f"Unknown node type: {node.type}")
 

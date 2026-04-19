@@ -24,6 +24,7 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { FormatMoney } from "../../optimization_studio/components/FormatMoney";
 import { VersionBox } from "../../optimization_studio/components/History";
 import type { AppRouter } from "../../server/api/root";
+import { useDejaViewLink } from "../../hooks/useDejaViewLink";
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { getColorForString } from "../../utils/rotatingColors";
@@ -62,6 +63,11 @@ export function BatchEvaluationV2({
     experiment,
     runId: selectedRunId,
     isFinished,
+  });
+
+  const dejaView = useDejaViewLink({
+    aggregateId: selectedRunId,
+    tenantId: project.id,
   });
 
   return (
@@ -109,6 +115,17 @@ export function BatchEvaluationV2({
                   colorPalette="orange"
                 >
                   <ExternalLink size={16} /> Open Workflow
+                </Button>
+              </Link>
+            )}
+            {dejaView.href && (
+              <Link href={dejaView.href}>
+                <Button
+                  size="sm"
+                  colorPalette="gray"
+                  marginBottom="-6px"
+                >
+                  DejaView
                 </Button>
               </Link>
             )}

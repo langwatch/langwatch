@@ -246,6 +246,15 @@ export async function* executeCell(
     // Create set of target nodes for the result mapper
     const targetNodes = new Set([cell.targetId]);
 
+    // Build evaluator target node IDs for explicit evaluator-as-target detection
+    const cellConfig: ResultMapperConfig = {
+      ...resultMapperConfig,
+      evaluatorTargetNodeIds:
+        cell.targetConfig.type === "evaluator"
+          ? new Set([cell.targetId])
+          : undefined,
+    };
+
     // Generate OTEL-compliant trace ID for this cell execution
     // Reuse existing traceId if provided (for evaluator reruns to append to existing trace)
     const traceId = cell.traceId ?? generateOtelTraceId();
@@ -328,7 +337,7 @@ export async function* executeCell(
           event,
           cell.rowIndex,
           targetNodes,
-          resultMapperConfig,
+          cellConfig,
         );
         if (mappedEvent) {
           yield mappedEvent;
@@ -408,7 +417,7 @@ export async function* executeCell(
               event,
               cell.rowIndex,
               targetNodes,
-              resultMapperConfig,
+              cellConfig,
             );
             if (mappedEvent) {
               yield mappedEvent;

@@ -12,6 +12,7 @@ import {
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import { handleError } from "../../middleware";
 import { SimulationFacade } from "~/server/simulations/simulation.facade";
 
@@ -43,6 +44,10 @@ const scenarioRunResponseSchema = z.object({
   updatedAt: z.number(),
   durationInMs: z.number(),
   totalCost: z.number().optional(),
+});
+
+const scenarioRunResponseWithPlatformUrlSchema = scenarioRunResponseSchema.extend({
+  platformUrl: z.string().url(),
 });
 
 const batchSummarySchema = z.object({
@@ -94,7 +99,7 @@ export const app = new Hono<{ Variables: Variables }>()
           content: {
             "application/json": {
               schema: resolver(z.object({
-                runs: z.array(scenarioRunResponseSchema),
+                runs: z.array(scenarioRunResponseWithPlatformUrlSchema),
                 hasMore: z.boolean().optional(),
                 nextCursor: z.string().optional(),
               })),
@@ -124,7 +129,16 @@ export const app = new Hono<{ Variables: Variables }>()
         }
 
         const runs = "runs" in result ? result.runs : [];
-        return c.json({ runs, hasMore: false });
+        return c.json({
+          runs: runs.map((r) => ({
+            ...r,
+            platformUrl: platformUrl({
+              projectSlug: project.slug,
+              path: `/simulations`,
+            }),
+          })),
+          hasMore: false,
+        });
       }
 
       if (scenarioSetId) {
@@ -137,7 +151,13 @@ export const app = new Hono<{ Variables: Variables }>()
         });
 
         return c.json({
-          runs: result.runs,
+          runs: result.runs.map((r) => ({
+            ...r,
+            platformUrl: platformUrl({
+              projectSlug: project.slug,
+              path: `/simulations`,
+            }),
+          })),
           hasMore: result.hasMore,
           nextCursor: result.nextCursor,
         });
@@ -155,7 +175,13 @@ export const app = new Hono<{ Variables: Variables }>()
       }
 
       return c.json({
-        runs: result.runs,
+        runs: result.runs.map((r) => ({
+          ...r,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/simulations`,
+          }),
+        })),
         hasMore: result.hasMore,
         nextCursor: result.nextCursor,
       });
@@ -173,7 +199,7 @@ export const app = new Hono<{ Variables: Variables }>()
           description: "Success",
           content: {
             "application/json": {
-              schema: resolver(scenarioRunResponseSchema),
+              schema: resolver(scenarioRunResponseWithPlatformUrlSchema),
             },
           },
         },
@@ -200,7 +226,13 @@ export const app = new Hono<{ Variables: Variables }>()
         return c.json({ error: "Simulation run not found" }, 404);
       }
 
-      return c.json(run);
+      return c.json({
+        ...run,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/simulations`,
+        }),
+      });
     },
   )
 

@@ -140,7 +140,8 @@ describe("Model Providers API", () => {
 
   describe("PUT /api/model-providers/:provider", () => {
     describe("when creating a new provider", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: route exists but requires CREDENTIALS_SECRET env var for AES-256-GCM encryption of customKeys.
+      // Set CREDENTIALS_SECRET (32-byte hex) in test env to enable.
       it.skip("creates the provider and returns masked response", async () => {
         const res = await helpers.api.put("/api/model-providers/openai", {
           enabled: true,
@@ -180,7 +181,8 @@ describe("Model Providers API", () => {
         });
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: route exists but requires CREDENTIALS_SECRET env var for AES-256-GCM encryption of customKeys.
+      // Set CREDENTIALS_SECRET (32-byte hex) in test env to enable.
       it.skip("updates the provider settings", async () => {
         const res = await helpers.api.put("/api/model-providers/openai", {
           enabled: false,

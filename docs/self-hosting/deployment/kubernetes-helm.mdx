@@ -249,7 +249,7 @@ clickhouse:
     useEnvironmentCredentials: true
   cold:
     enabled: true
-    defaultTtlDays: 49
+    defaultTtlDays: 49  # Recommend multiples of 7 to align with weekly partition boundaries
   backup:
     enabled: true
 

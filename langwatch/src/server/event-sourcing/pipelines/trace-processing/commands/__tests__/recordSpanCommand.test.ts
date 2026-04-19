@@ -92,8 +92,7 @@ describe("RecordSpanCommand", () => {
 
   describe("handle", () => {
     describe("PII redaction", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("calls PII redaction service with piiRedactionLevel from command", async () => {
+      it("calls PII redaction service with piiRedactionLevel from command", async () => {
         const command = createMockCommand(
           "project-123",
           "trace-1",
@@ -106,24 +105,24 @@ describe("RecordSpanCommand", () => {
 
         expect(mockRedactSpan).toHaveBeenCalledWith(
           expect.objectContaining({ traceId: "trace-1", spanId: "span-1" }),
+          expect.any(Object),
           "STRICT",
         );
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("defaults to ESSENTIAL when piiRedactionLevel is not provided", async () => {
+      it("defaults to ESSENTIAL when piiRedactionLevel is not provided", async () => {
         const command = createMockCommand("project-456", "trace-1", "span-1");
 
         await handler.handle(command);
 
         expect(mockRedactSpan).toHaveBeenCalledWith(
           expect.any(Object),
+          expect.anything(),
           "ESSENTIAL",
         );
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
-      it.skip("uses DISABLED level when specified", async () => {
+      it("uses DISABLED level when specified", async () => {
         const command = createMockCommand(
           "project-789",
           "trace-1",
@@ -136,6 +135,7 @@ describe("RecordSpanCommand", () => {
 
         expect(mockRedactSpan).toHaveBeenCalledWith(
           expect.any(Object),
+          expect.anything(),
           "DISABLED",
         );
       });

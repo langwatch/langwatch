@@ -30,6 +30,10 @@ jobs:
         with:
           version: 10.24.0
 
+      - name: Build mcp-server
+        working-directory: mcp-server
+        run: pnpm install --frozen-lockfile && pnpm run build
+
       - name: Install dependencies
         run: |
           cd langwatch

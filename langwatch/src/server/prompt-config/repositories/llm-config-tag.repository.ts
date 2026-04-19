@@ -122,6 +122,27 @@ export class PromptTagAssignmentRepository {
   }
 
   /**
+   * Returns every tag assignment (with its PromptTag) that points at any of
+   * the given versionIds within the project. Used by read paths that need
+   * to surface tags alongside the returned version(s) without loading the
+   * entire tag history for the config.
+   */
+  async findByVersionIds(params: {
+    versionIds: string[];
+    projectId: string;
+  }): Promise<(PromptTagAssignment & { promptTag: PromptTag })[]> {
+    if (params.versionIds.length === 0) return [];
+    return this.prisma.promptTagAssignment.findMany({
+      where: {
+        projectId: params.projectId,
+        versionId: { in: params.versionIds },
+      },
+      include: { promptTag: true },
+      orderBy: { createdAt: "asc" },
+    });
+  }
+
+  /**
    * Get a tag assignment by config ID and tagId.
    * Callers must resolve tag name → tagId before calling this method.
    */

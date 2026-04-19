@@ -6,6 +6,7 @@ import {
   StartExperimentRunCommand,
   RecordTargetResultCommand,
   RecordEvaluatorResultCommand,
+  ComputeExperimentRunMetricsCommand,
   CompleteExperimentRunCommand,
 } from "./commands";
 import { ExperimentRunResultStorageMapProjection, type ClickHouseExperimentRunResultRecord } from "./projections/experimentRunResultStorage.mapProjection";
@@ -58,6 +59,7 @@ export function createExperimentRunProcessingPipeline(deps: ExperimentRunProcess
     .withCommand("startExperimentRun", StartExperimentRunCommand)
     .withCommand("recordTargetResult", RecordTargetResultCommand)
     .withCommand("recordEvaluatorResult", RecordEvaluatorResultCommand)
+    .withCommand("computeExperimentRunMetrics", ComputeExperimentRunMetricsCommand)
     .withCommand("completeExperimentRun", CompleteExperimentRunCommand)
     .build();
 }

@@ -142,7 +142,7 @@ for idx, row in experiment.loop(dataset.iterrows()):
         },
     )
 
-# Print summary and exit on failure
+# Print summary and exit with code 1 on failure
 experiment.print_summary()
 ```
   </Tab>
@@ -178,7 +178,7 @@ await experiment.run(
   { concurrency: 4 }
 );
 
-// Print summary and exit on failure
+// Print summary and exit with code 1 on failure
 experiment.printSummary();
 ```
   </Tab>
@@ -251,6 +251,7 @@ for idx, row in experiment.loop(dataset.iterrows()):
 
     experiment.submit(compare, idx, row)
 
+# Print summary and exit with code 1 on failure
 experiment.print_summary()
 ```
 

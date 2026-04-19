@@ -413,6 +413,8 @@ def test_sql_query_equivalence():
     assert result.details
 
 
+# Skipped due to LLM-judged non-determinism — see langwatch/langwatch#3240.
+@pytest.mark.skip(reason="flaky LLM eval score; tracked in #3240")
 def test_summarization_score():
     evaluator = RagasSummarizationScoreEvaluator(settings=RagasSettings())
 

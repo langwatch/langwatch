@@ -28,6 +28,8 @@ export type DatasetMetadata = {
   createdAt?: string;
   /** When the dataset was last updated */
   updatedAt?: string;
+  /** URL to view this dataset on the LangWatch platform */
+  platformUrl?: string;
 };
 
 /**
@@ -84,6 +86,7 @@ export type GetDatasetApiResponse = {
   columnTypes: DatasetColumnType[];
   createdAt?: string;
   updatedAt?: string;
+  platformUrl?: string;
   data: Array<{
     id: string;
     datasetId: string;

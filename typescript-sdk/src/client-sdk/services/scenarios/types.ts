@@ -2,7 +2,10 @@ import type { paths } from "@/internal/generated/openapi/api-client";
 
 export type ScenarioResponse = NonNullable<
   paths["/api/scenarios"]["get"]["responses"]["200"]["content"]["application/json"]
->[number];
+>[number] & {
+  /** URL to view this scenario on the LangWatch platform */
+  platformUrl?: string;
+};
 
 export type CreateScenarioBody = NonNullable<
   paths["/api/scenarios"]["post"]["requestBody"]

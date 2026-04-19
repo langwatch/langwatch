@@ -62,7 +62,6 @@ export const listCommand = async (options?: { format?: string }): Promise<void> 
       );
     }
   } catch (error) {
-    spinner.fail("Failed to fetch datasets");
-    handleDatasetCommandError(error, "listing datasets");
+    handleDatasetCommandError({ spinner, error, context: "list datasets" });
   }
 };

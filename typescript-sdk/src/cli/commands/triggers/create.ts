@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const createTriggerCommand = async (
   name: string,
@@ -52,13 +54,12 @@ export const createTriggerCommand = async (
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to create trigger (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to create trigger: ${message}`);
       process.exit(1);
     }
 
-    const trigger = await response.json() as { id: string; name: string; action: string };
+    const trigger = await response.json() as { id: string; name: string; action: string; platformUrl?: string };
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
     if (options.format === "json") {
@@ -69,13 +70,15 @@ export const createTriggerCommand = async (
     console.log();
     console.log(`  ${chalk.gray("ID:")}     ${chalk.green(trigger.id)}`);
     console.log(`  ${chalk.gray("Action:")} ${trigger.action}`);
+    if (trigger.platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(trigger.platformUrl)}`);
+    }
     console.log();
   } catch (error) {
-    spinner.fail();
     if (error instanceof SyntaxError) {
-      console.error(chalk.red("Error: --filters must be valid JSON"));
+      spinner.fail(chalk.red("--filters must be valid JSON"));
     } else {
-      console.error(chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`));
+      failSpinner({ spinner, error, action: "create trigger" });
     }
     process.exit(1);
   }

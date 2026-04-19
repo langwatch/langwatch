@@ -10,14 +10,13 @@ import {
   createClaudeCodeAgent,
   setupLocalCli,
   toolCallFix,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-dotenv.config({ path: path.resolve(__dirname, ".env") });
-// Also load typescript-sdk .env for LANGWATCH_ENDPOINT
-dotenv.config({ path: path.resolve(__dirname, "../../typescript-sdk/.env") });
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
@@ -56,11 +55,12 @@ Then run CLI commands directly:
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI scenario CRUD",
         description:
           "Developer wants to manage agent test scenarios using the LangWatch CLI (not MCP).",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder, skipMcp: true }),
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -95,7 +95,7 @@ Then run CLI commands directly:
 
       expect(result.success).toBe(true);
     },
-    600_000,
+    900_000,
   );
 
   it.skipIf(isCI)(
@@ -128,11 +128,12 @@ Then: \`langwatch dataset records list qa-test-set\`
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI dataset upload",
         description:
           "Developer wants to upload a CSV dataset using the LangWatch CLI via Bash (not MCP).",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder, skipMcp: true }),
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -167,7 +168,7 @@ Then: \`langwatch dataset records list qa-test-set\`
 
       expect(result.success).toBe(true);
     },
-    600_000,
+    900_000,
   );
 
   it.skipIf(isCI)(
@@ -195,11 +196,12 @@ Then: \`langwatch trace search --limit 5\`
       );
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "CLI analytics query",
         description:
           "Developer wants to check analytics using the LangWatch CLI via Bash (not MCP).",
         agents: [
-          createClaudeCodeAgent({ workingDirectory: tempFolder, skipMcp: true }),
+          createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
@@ -238,6 +240,6 @@ Then: \`langwatch trace search --limit 5\`
 
       expect(result.success).toBe(true);
     },
-    600_000,
+    900_000,
   );
 });

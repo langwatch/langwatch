@@ -20,7 +20,11 @@
                 "python": "langwatch.trace",
                 "typescript": "langwatch"
               },
-              "cli": ["trace search", "trace get", "trace export"],
+              "cli": [
+                "trace search",
+                "trace get",
+                "trace export"
+              ],
               "skill": "tracing",
               "docs": "https://langwatch.ai/docs/integration/overview.md"
             },
@@ -41,11 +45,16 @@
         {
           "id": "observability.analytics",
           "name": "Analytics",
-          "description": "Query timeseries analytics \u2014 costs, latency, token usage, error rates",
+          "description": "Query timeseries analytics — costs, latency, token usage, error rates",
           "surfaces": {
             "code": {
-              "sdk": null,
-              "cli": ["analytics query"],
+              "sdk": {
+                "python": "langwatch.analytics",
+                "typescript": "langwatch.analytics"
+              },
+              "cli": [
+                "analytics query"
+              ],
               "skill": "analytics",
               "docs": null
             },
@@ -68,7 +77,7 @@
         {
           "id": "observability.user-events",
           "name": "User Events",
-          "description": "Track user interactions \u2014 thumbs up/down, selected text, custom events",
+          "description": "Track user interactions — thumbs up/down, selected text, custom events",
           "surfaces": {
             "code": {
               "sdk": {
@@ -96,8 +105,16 @@
           "description": "Expert labeling, trace review, and structured evaluation workflows",
           "surfaces": {
             "code": {
-              "sdk": null,
-              "cli": ["annotation list", "annotation get", "annotation create", "annotation delete"],
+              "sdk": {
+                "python": "langwatch.annotations",
+                "typescript": "langwatch.annotations"
+              },
+              "cli": [
+                "annotation list",
+                "annotation get",
+                "annotation create",
+                "annotation delete"
+              ],
               "skill": null,
               "docs": null
             },
@@ -136,7 +153,10 @@
                 "python": "langwatch.experiment",
                 "typescript": "langwatch.experiments"
               },
-              "cli": ["evaluation run", "evaluation status"],
+              "cli": [
+                "evaluation run",
+                "evaluation status"
+              ],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/experiments/sdk.md"
             },
@@ -161,10 +181,16 @@
           "surfaces": {
             "code": {
               "sdk": {
-                "python": "langwatch.evaluation",
-                "typescript": null
+                "python": "langwatch.monitors",
+                "typescript": "langwatch.monitors"
               },
-              "cli": ["monitor list", "monitor get", "monitor create", "monitor update", "monitor delete"],
+              "cli": [
+                "monitor list",
+                "monitor get",
+                "monitor create",
+                "monitor update",
+                "monitor delete"
+              ],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/guardrails/code-integration.md"
             },
@@ -203,10 +229,17 @@
           "surfaces": {
             "code": {
               "sdk": {
-                "python": "langwatch-scenario",
-                "typescript": "@langwatch/scenario"
+                "python": "langwatch.scenarios",
+                "typescript": "langwatch.scenarios"
               },
-              "cli": ["scenario list", "scenario get", "scenario create", "scenario update", "scenario run", "scenario delete"],
+              "cli": [
+                "scenario list",
+                "scenario get",
+                "scenario create",
+                "scenario update",
+                "scenario run",
+                "scenario delete"
+              ],
               "skill": "scenarios",
               "docs": "https://langwatch.ai/scenario/introduction/getting-started.md"
             },
@@ -234,8 +267,14 @@
           "description": "View and inspect simulation execution results",
           "surfaces": {
             "code": {
-              "sdk": null,
-              "cli": ["simulation-run list", "simulation-run get"],
+              "sdk": {
+                "python": null,
+                "typescript": "langwatch.simulationRuns"
+              },
+              "cli": [
+                "simulation-run list",
+                "simulation-run get"
+              ],
               "skill": null,
               "docs": null
             },
@@ -259,7 +298,10 @@
           "description": "Bundle scenarios with targets for batch execution and repeated testing",
           "surfaces": {
             "code": {
-              "sdk": null,
+              "sdk": {
+                "python": "langwatch.suites",
+                "typescript": "langwatch.suites"
+              },
               "cli": [
                 "suite list",
                 "suite get",
@@ -378,7 +420,7 @@
     {
       "id": "library",
       "name": "Library",
-      "description": "Reusable components \u2014 agents, workflows, evaluators, and datasets",
+      "description": "Reusable components — agents, workflows, evaluators, and datasets",
       "children": [
         {
           "id": "library.agents",
@@ -386,8 +428,18 @@
           "description": "Agent definitions used in simulations and experiments",
           "surfaces": {
             "code": {
-              "sdk": null,
-              "cli": ["agent list", "agent get", "agent create", "agent run", "agent update", "agent delete"],
+              "sdk": {
+                "python": "langwatch.agents",
+                "typescript": "langwatch.agents"
+              },
+              "cli": [
+                "agent list",
+                "agent get",
+                "agent create",
+                "agent run",
+                "agent update",
+                "agent delete"
+              ],
               "skill": null,
               "docs": null
             },
@@ -415,8 +467,17 @@
           "description": "Visual workflow builder for LLM pipelines",
           "surfaces": {
             "code": {
-              "sdk": null,
-              "cli": ["workflow list", "workflow get", "workflow update", "workflow run", "workflow delete"],
+              "sdk": {
+                "python": "langwatch.workflows",
+                "typescript": "langwatch.workflows"
+              },
+              "cli": [
+                "workflow list",
+                "workflow get",
+                "workflow update",
+                "workflow run",
+                "workflow delete"
+              ],
               "skill": null,
               "docs": null
             },
@@ -439,14 +500,20 @@
         {
           "id": "library.evaluators",
           "name": "Evaluators",
-          "description": "Scoring functions \u2014 built-in library and custom configurations",
+          "description": "Scoring functions — built-in library and custom configurations",
           "surfaces": {
             "code": {
               "sdk": {
                 "python": "langwatch.evaluators",
                 "typescript": "langwatch.evaluators"
               },
-              "cli": ["evaluator list", "evaluator get", "evaluator create", "evaluator update", "evaluator delete"],
+              "cli": [
+                "evaluator list",
+                "evaluator get",
+                "evaluator create",
+                "evaluator update",
+                "evaluator delete"
+              ],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/evaluations/evaluators/built-in-evaluators.md"
             },
@@ -477,7 +544,19 @@
                 "python": "langwatch.dataset",
                 "typescript": "langwatch.datasets"
               },
-              "cli": ["dataset list", "dataset create", "dataset get", "dataset delete", "dataset upload", "dataset download", "dataset update", "dataset records list", "dataset records add", "dataset records update", "dataset records delete"],
+              "cli": [
+                "dataset list",
+                "dataset create",
+                "dataset get",
+                "dataset delete",
+                "dataset upload",
+                "dataset download",
+                "dataset update",
+                "dataset records list",
+                "dataset records add",
+                "dataset records update",
+                "dataset records delete"
+              ],
               "skill": "evaluations",
               "docs": "https://langwatch.ai/docs/datasets/programmatic-access.md"
             },
@@ -513,8 +592,22 @@
       "description": "Custom analytics dashboards with configurable graphs",
       "surfaces": {
         "code": {
-          "sdk": null,
-          "cli": ["dashboard list", "dashboard get", "dashboard update", "dashboard create", "dashboard delete", "graph list", "graph get", "graph create", "graph update", "graph delete"],
+          "sdk": {
+            "python": "langwatch.dashboards",
+            "typescript": "langwatch.dashboards"
+          },
+          "cli": [
+            "dashboard list",
+            "dashboard get",
+            "dashboard update",
+            "dashboard create",
+            "dashboard delete",
+            "graph list",
+            "graph get",
+            "graph create",
+            "graph update",
+            "graph delete"
+          ],
           "skill": null,
           "docs": null
         },
@@ -541,8 +634,17 @@
       "description": "Automated actions triggered by conditions — email alerts, Slack notifications, dataset additions",
       "surfaces": {
         "code": {
-          "sdk": null,
-          "cli": ["trigger list", "trigger get", "trigger create", "trigger update", "trigger delete"],
+          "sdk": {
+            "python": "langwatch.triggers",
+            "typescript": "langwatch.triggers"
+          },
+          "cli": [
+            "trigger list",
+            "trigger get",
+            "trigger create",
+            "trigger update",
+            "trigger delete"
+          ],
           "skill": null,
           "docs": null
         },
@@ -573,8 +675,14 @@
           "description": "Configure LLM provider API keys for platform features",
           "surfaces": {
             "code": {
-              "sdk": null,
-              "cli": ["model-provider list", "model-provider set"],
+              "sdk": {
+                "python": "langwatch.model_providers",
+                "typescript": "langwatch.modelProviders"
+              },
+              "cli": [
+                "model-provider list",
+                "model-provider set"
+              ],
               "skill": null,
               "docs": null
             },
@@ -598,8 +706,17 @@
           "description": "Manage encrypted environment variables for agents and workflows",
           "surfaces": {
             "code": {
-              "sdk": null,
-              "cli": ["secret list", "secret get", "secret create", "secret update", "secret delete"],
+              "sdk": {
+                "python": "langwatch.secrets",
+                "typescript": "langwatch.secrets"
+              },
+              "cli": [
+                "secret list",
+                "secret get",
+                "secret create",
+                "secret update",
+                "secret delete"
+              ],
               "skill": null,
               "docs": null
             },

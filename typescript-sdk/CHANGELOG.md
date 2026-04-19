@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.25.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.24.0...typescript-sdk@v0.25.0) (2026-04-18)
+
+
+### Features
+
+* **sdk:** add Experiment.print_summary for CI parity with platform runs ([#3318](https://github.com/langwatch/langwatch/issues/3318)) ([942c6ec](https://github.com/langwatch/langwatch/commit/942c6ec70747cbed9ac9828034474a939a7433ab))
+* **skills:** make skills CLI-only and add `langwatch docs` / `scenario-docs` ([#3274](https://github.com/langwatch/langwatch/issues/3274)) ([b7aefef](https://github.com/langwatch/langwatch/commit/b7aefefb006560f3e8ba8f49128522f8caeb1a7b))
+
+
+### Bug Fixes
+
+* **typescript-sdk:** de-flake create-tracing-proxy integration tests ([#3097](https://github.com/langwatch/langwatch/issues/3097)) ([306fdd2](https://github.com/langwatch/langwatch/commit/306fdd2aba33f8c0f9fb1a17de7cff903eeb8f95))
+* **typescript-sdk:** de-flake create-tracing-proxy integration tests ([#3294](https://github.com/langwatch/langwatch/issues/3294)) ([306fdd2](https://github.com/langwatch/langwatch/commit/306fdd2aba33f8c0f9fb1a17de7cff903eeb8f95))
+* **typescript-sdk:** un-skip OTLP integration tests ([#3240](https://github.com/langwatch/langwatch/issues/3240)) ([#3291](https://github.com/langwatch/langwatch/issues/3291)) ([928a0df](https://github.com/langwatch/langwatch/commit/928a0df2108266508c9437b0083db1bbdaac9825))
+
+## [0.24.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.23.0...typescript-sdk@v0.24.0) (2026-04-17)
+
+
+### Features
+
+* **prompts:** expose tags on prompt list/get/versions ([#3271](https://github.com/langwatch/langwatch/issues/3271)) ([023c2d5](https://github.com/langwatch/langwatch/commit/023c2d5c4cb30296411740a5da3a8526d94a8f1c))
+
+
+### Bug Fixes
+
+* surface meaningful CLI errors + allow archived prompt handle reuse ([#3263](https://github.com/langwatch/langwatch/issues/3263)) ([ffe2e75](https://github.com/langwatch/langwatch/commit/ffe2e75422773368610cbfcec6906a7fe4ffb7ff))
+
+
+### Code Refactoring
+
+* **ci:** consolidate *-ci.yml and *-ci-unmodified.yml pairs ([#3231](https://github.com/langwatch/langwatch/issues/3231)) ([bcea648](https://github.com/langwatch/langwatch/commit/bcea64835bbb3dd00d7431f278da23d0b47de827))
+
+## [0.23.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.22.0...typescript-sdk@v0.23.0) (2026-04-16)
+
+
+### Features
+
+* add platformUrl to all API responses and CLI output ([#3242](https://github.com/langwatch/langwatch/issues/3242)) ([dffed28](https://github.com/langwatch/langwatch/commit/dffed28161f880c0682cf2e77ee906618c5dce6a))
+* expose all platform features via TypeScript and Python SDKs ([#3210](https://github.com/langwatch/langwatch/issues/3210)) ([d3148a8](https://github.com/langwatch/langwatch/commit/d3148a8839ecd9c10b725bcb00bc428795d5901d))
+
 ## [0.22.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.21.0...typescript-sdk@v0.22.0) (2026-04-14)
 
 

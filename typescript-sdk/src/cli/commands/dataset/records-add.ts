@@ -98,7 +98,6 @@ export const recordsAddCommand = async (
       console.log(`  ${chalk.bold("ID:")} ${record.id}`);
     });
   } catch (error) {
-    spinner.fail("Failed to add records");
-    handleDatasetCommandError(error, "adding records");
+    handleDatasetCommandError({ spinner, error, context: "add records" });
   }
 };

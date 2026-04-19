@@ -1,6 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const createMonitorCommand = async (
   name: string,
@@ -55,9 +57,8 @@ export const createMonitorCommand = async (
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Failed to create monitor (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to create monitor: ${message}`);
       process.exit(1);
     }
 
@@ -66,6 +67,7 @@ export const createMonitorCommand = async (
       name: string;
       checkType: string;
       executionMode: string;
+      platformUrl?: string;
     };
 
     spinner.succeed(`Monitor "${monitor.name}" created (${monitor.id})`);
@@ -79,17 +81,15 @@ export const createMonitorCommand = async (
     console.log(`  ${chalk.gray("ID:")}   ${chalk.green(monitor.id)}`);
     console.log(`  ${chalk.gray("Type:")} ${monitor.checkType}`);
     console.log(`  ${chalk.gray("Mode:")} ${monitor.executionMode}`);
+    if (monitor.platformUrl) {
+      console.log(`  ${chalk.bold("View:")}  ${chalk.underline(monitor.platformUrl)}`);
+    }
     console.log();
   } catch (error) {
-    spinner.fail();
     if (error instanceof SyntaxError) {
-      console.error(chalk.red("Error: --parameters must be valid JSON"));
+      spinner.fail(chalk.red("--parameters must be valid JSON"));
     } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`
-        )
-      );
+      failSpinner({ spinner, error, action: "create monitor" });
     }
     process.exit(1);
   }

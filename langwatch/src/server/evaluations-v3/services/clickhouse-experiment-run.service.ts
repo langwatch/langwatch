@@ -122,15 +122,18 @@ export class ClickHouseExperimentRunService {
           // Fetch run summaries
           const runsResult = await clickHouseClient.query({
             query: `
-              SELECT * FROM (
-                SELECT *
-                FROM experiment_runs
-                WHERE TenantId = {tenantId:String}
-                  AND ExperimentId IN ({experimentIds:Array(String)})
-                ORDER BY RunId, UpdatedAt DESC
-                LIMIT 1 BY TenantId, RunId, ExperimentId
-              )
-              ORDER BY CreatedAt DESC
+              SELECT *
+              FROM experiment_runs AS t
+              WHERE t.TenantId = {tenantId:String}
+                AND t.ExperimentId IN ({experimentIds:Array(String)})
+                AND (t.TenantId, t.RunId, t.ExperimentId, t.UpdatedAt) IN (
+                  SELECT TenantId, RunId, ExperimentId, max(UpdatedAt)
+                  FROM experiment_runs
+                  WHERE TenantId = {tenantId:String}
+                    AND ExperimentId IN ({experimentIds:Array(String)})
+                  GROUP BY TenantId, RunId, ExperimentId
+                )
+              ORDER BY t.CreatedAt DESC
               LIMIT 10000
             `,
             query_params: {
@@ -175,7 +178,7 @@ export class ClickHouseExperimentRunService {
           // Fetch per-evaluator breakdown for all runs.
           //
           // Dedup uses an IN-tuple subquery on (key columns, OccurredAt) instead
-          // of LIMIT 1 BY. ClickHouse's LIMIT 1 BY reads every selected column
+          // of the per-row dedup anti-pattern. That pattern reads every selected column
           // (including heavy payloads like EvaluationDetails / EvaluationInputs)
           // before deduplicating, which can OOM on large parts. The IN-tuple
           // pattern resolves dedup using only lightweight key columns and the
@@ -436,7 +439,7 @@ export class ClickHouseExperimentRunService {
           // BatchEvaluation invocations).
           //
           // Dedup uses an IN-tuple subquery on (key columns, OccurredAt) rather
-          // than LIMIT 1 BY: ClickHouse's LIMIT 1 BY reads every selected column
+          // than the per-row dedup anti-pattern. That pattern reads every selected column
           // (including heavy payloads like DatasetEntry / EvaluationDetails)
           // before deduplicating, which can OOM on large parts. The IN-tuple
           // pattern resolves dedup using only lightweight key columns and the
@@ -484,9 +487,18 @@ export class ClickHouseExperimentRunService {
           const itemRows =
             (await itemsResult.json()) as ClickHouseExperimentRunItemRow[];
 
+          // Enrich target items with costs from trace_summaries.
+          // The SDK doesn't send costs in recordTargetResult, but the
+          // trace processing pipeline computes them from LLM span data.
+          const enrichedItems = await this.enrichItemsWithTraceCosts(
+            clickHouseClient,
+            projectId,
+            itemRows,
+          );
+
           const result = mapClickHouseItemsToRunWithItems({
             runRecord,
-            items: itemRows,
+            items: enrichedItems,
             projectId: runRecord.TenantId,
           });
 
@@ -516,4 +528,103 @@ export class ClickHouseExperimentRunService {
     );
   }
 
+  /**
+   * Enriches experiment run items with cost data from trace_summaries.
+   *
+   * SDK experiments don't send costs inline — costs are computed by the
+   * trace processing pipeline from LLM span model/token data. This method
+   * looks up trace costs and backfills them onto target items.
+   *
+   * For multi-target experiments where multiple items share the same traceId,
+   * the trace cost is split evenly across items (each target execution is
+   * a child span of the same iteration trace).
+   */
+  private async enrichItemsWithTraceCosts(
+    clickHouseClient: Awaited<ReturnType<typeof getClickHouseClientForProject>> & object,
+    projectId: string,
+    items: ClickHouseExperimentRunItemRow[],
+  ): Promise<ClickHouseExperimentRunItemRow[]> {
+    // Collect unique traceIds from target items that are missing costs
+    const traceIds = [
+      ...new Set(
+        items
+          .filter((i) => i.ResultType === "target" && i.TraceId && i.TargetCost === null)
+          .map((i) => i.TraceId!)
+      ),
+    ];
+
+    if (traceIds.length === 0) return items;
+
+    try {
+      const traceCostResult = await clickHouseClient.query({
+        query: `
+          SELECT
+            TraceId,
+            TotalCost
+          FROM trace_summaries
+          WHERE TenantId = {tenantId:String}
+            AND TraceId IN ({traceIds:Array(String)})
+            AND (TenantId, TraceId, UpdatedAt) IN (
+              SELECT TenantId, TraceId, max(UpdatedAt)
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+                AND TraceId IN ({traceIds:Array(String)})
+              GROUP BY TenantId, TraceId
+            )
+        `,
+        query_params: { tenantId: projectId, traceIds },
+        format: "JSONEachRow",
+      });
+
+      const traceCostRows = await traceCostResult.json<{
+        TraceId: string;
+        TotalCost: number | null;
+      }>();
+
+      if (traceCostRows.length === 0) return items;
+
+      const costByTraceId = new Map<string, number>();
+      for (const row of traceCostRows) {
+        if (row.TotalCost !== null && row.TotalCost > 0) {
+          costByTraceId.set(row.TraceId, row.TotalCost);
+        }
+      }
+
+      // Count how many target items share each traceId (for cost splitting)
+      const targetCountByTraceId = new Map<string, number>();
+      for (const item of items) {
+        if (item.ResultType === "target" && item.TraceId && costByTraceId.has(item.TraceId)) {
+          targetCountByTraceId.set(
+            item.TraceId,
+            (targetCountByTraceId.get(item.TraceId) ?? 0) + 1,
+          );
+        }
+      }
+
+      // Enrich items with costs
+      return items.map((item) => {
+        if (
+          item.ResultType !== "target" ||
+          !item.TraceId ||
+          item.TargetCost !== null
+        ) {
+          return item;
+        }
+
+        const traceCost = costByTraceId.get(item.TraceId);
+        if (traceCost === undefined) return item;
+
+        const targetCount = targetCountByTraceId.get(item.TraceId) ?? 1;
+        const perItemCost = Number((traceCost / targetCount).toFixed(6));
+
+        return { ...item, TargetCost: perItemCost };
+      });
+    } catch (error) {
+      this.logger.warn(
+        { projectId, error: error instanceof Error ? error.message : error },
+        "Failed to enrich items with trace costs — returning items without costs",
+      );
+      return items;
+    }
+  }
 }

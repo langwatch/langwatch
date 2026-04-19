@@ -147,7 +147,11 @@ describe("<SubscriptionPage/>", () => {
   // ============================================================================
 
   describe("when the subscription page loads", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: Code bug in SubscriptionPage.tsx — `isUpgradePlanRequired` has a duplicate
+    // bare `isDeveloperPlan` condition making it always true for free plans regardless of
+    // whether any seat changes are planned. The upgrade-plan-block therefore renders on every
+    // page load for free-plan orgs. Fix: remove the redundant unconditional `isDeveloperPlan`
+    // term from the OR chain in the `isUpgradePlanRequired` expression.
     it.skip("displays current plan block and hides upgrade plan block by default", async () => {
       renderSubscriptionPage();
 
@@ -219,7 +223,7 @@ describe("<SubscriptionPage/>", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: Same code bug — `isUpgradePlanRequired` always true for free plans.
     it.skip("hides the upgrade block before seat changes", async () => {
       renderSubscriptionPage();
 

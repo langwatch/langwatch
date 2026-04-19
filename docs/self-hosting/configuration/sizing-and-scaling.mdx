@@ -146,7 +146,7 @@ spec:
 ### ClickHouse cold storage (S3)
 
 - Enable with `clickhouse.cold.enabled: true`
-- Default TTL: 49 days (data older than this moves to S3)
+- Default TTL: 49 days (data older than this moves to S3). We recommend multiples of 7 to align with ClickHouse's weekly partition boundaries
 - S3 cost is typically 10-20x cheaper than SSD storage
 
 ### PostgreSQL

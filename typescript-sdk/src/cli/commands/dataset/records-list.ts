@@ -88,7 +88,6 @@ export const recordsListCommand = async (
       ),
     );
   } catch (error) {
-    spinner.fail("Failed to list records");
-    handleDatasetCommandError(error, "listing records");
+    handleDatasetCommandError({ spinner, error, context: "list records" });
   }
 };

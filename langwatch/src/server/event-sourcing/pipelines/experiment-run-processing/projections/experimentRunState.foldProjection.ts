@@ -4,17 +4,20 @@ import {
   type FoldEventHandlers,
 } from "../../../projections/abstractFoldProjection";
 import type { FoldProjectionStore } from "../../../projections/foldProjection.types";
+import { normalizeDurationMs } from "../utils/duration.utils";
 import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../schemas/constants";
 import type {
   ExperimentRunStartedEvent,
   TargetResultEvent,
   EvaluatorResultEvent,
+  TraceMetricsComputedEvent,
   ExperimentRunCompletedEvent,
 } from "../schemas/events";
 import {
   experimentRunStartedEventSchema,
   targetResultEventSchema,
   evaluatorResultEventSchema,
+  traceMetricsComputedEventSchema,
   experimentRunCompletedEventSchema,
 } from "../schemas/events";
 
@@ -51,6 +54,9 @@ export interface ExperimentRunStateData {
   ScoreCount: number;
   PassedCount: number;
   GradedCount: number;
+
+  // Per-trace cost breakdown from ECST (Event-Carried State Transfer)
+  TraceMetrics: Record<string, { totalCost: number }>;
 }
 
 export interface ExperimentRunState extends Projection<ExperimentRunStateData> {
@@ -83,6 +89,7 @@ const experimentRunEvents = [
   experimentRunStartedEventSchema,
   targetResultEventSchema,
   evaluatorResultEventSchema,
+  traceMetricsComputedEventSchema,
   experimentRunCompletedEventSchema,
 ] as const;
 
@@ -129,6 +136,7 @@ export class ExperimentRunStateFoldProjection
       ScoreCount: 0,
       PassedCount: 0,
       GradedCount: 0,
+      TraceMetrics: {},
     };
   }
 
@@ -166,8 +174,9 @@ export class ExperimentRunStateFoldProjection
     }
 
     let totalDurationMs = state.TotalDurationMs;
-    if (event.data.duration != null) {
-      totalDurationMs = (totalDurationMs ?? 0) + event.data.duration;
+    const clampedDuration = normalizeDurationMs(event.data.duration);
+    if (clampedDuration != null) {
+      totalDurationMs = (totalDurationMs ?? 0) + clampedDuration;
     }
 
     const progress = completedCount + failedCount;
@@ -216,6 +225,33 @@ export class ExperimentRunStateFoldProjection
       TotalCost: totalCost,
       AvgScoreBps: avgScoreBps,
       PassRateBps: passRateBps,
+    };
+  }
+
+  handleExperimentRunTraceMetricsComputed(
+    event: TraceMetricsComputedEvent,
+    state: ExperimentRunStateData,
+  ): ExperimentRunStateData {
+    const traceMetrics = {
+      ...state.TraceMetrics,
+      [event.data.traceId]: {
+        totalCost: event.data.totalCost,
+      },
+    };
+
+    // Recompute TotalCost from all trace metrics
+    let totalCost = state.TotalCost ?? 0;
+    // If this trace was already counted, subtract the old value
+    const existingEntry = state.TraceMetrics[event.data.traceId];
+    if (existingEntry) {
+      totalCost -= existingEntry.totalCost;
+    }
+    totalCost += event.data.totalCost;
+
+    return {
+      ...state,
+      TraceMetrics: traceMetrics,
+      TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
     };
   }
 

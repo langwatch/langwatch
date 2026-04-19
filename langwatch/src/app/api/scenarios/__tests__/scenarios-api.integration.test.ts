@@ -208,7 +208,7 @@ describe("Scenarios API", () => {
 
   describe("POST /api/scenarios", () => {
     describe("when given valid data", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
       it.skip("creates a scenario and returns it with an ID", async () => {
         const res = await helpers.api.post("/api/scenarios", {
           name: "Login Flow Happy Path",
@@ -233,7 +233,7 @@ describe("Scenarios API", () => {
     });
 
     describe("when name is empty", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
       it.skip("returns a validation error", async () => {
         const res = await helpers.api.post("/api/scenarios", {
           name: "",
@@ -249,7 +249,7 @@ describe("Scenarios API", () => {
     });
 
     describe("when situation is missing", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: route exists but App singleton (resourceLimitMiddleware, planProvider) not initialized in test env.
       it.skip("returns a validation error", async () => {
         const res = await helpers.api.post("/api/scenarios", {
           name: "A valid name",

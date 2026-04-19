@@ -1,7 +1,7 @@
-import safe from "safe-regex2";
 import { TiktokenClient } from "~/server/app-layer/clients/tokenizer/tiktoken.client";
 import { createLogger } from "../../../../utils/logger/server";
 import { startSpan } from "../../../../utils/posthogErrorCapture";
+import { compileSafeRegex } from "../../../../utils/safeRegex";
 import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
@@ -120,19 +120,12 @@ const getSafeRegex = (pattern: string): RegExp | null => {
   const cached = regexCache.get(pattern);
   if (cached !== undefined) return cached;
 
-  try {
-    const re = new RegExp(pattern);
-    if (!safe(re)) {
-      logger.warn({ pattern }, "skipping unsafe regex in model cost matching");
-      regexCache.set(pattern, null);
-      return null;
-    }
-    regexCache.set(pattern, re);
-    return re;
-  } catch {
-    regexCache.set(pattern, null);
-    return null;
+  const re = compileSafeRegex(pattern);
+  if (!re) {
+    logger.warn({ pattern }, "skipping unsafe regex in model cost matching");
   }
+  regexCache.set(pattern, re);
+  return re;
 };
 
 /**

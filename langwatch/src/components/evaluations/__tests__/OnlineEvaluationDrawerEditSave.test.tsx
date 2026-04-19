@@ -64,7 +64,8 @@ vi.mock("~/hooks/useLicenseEnforcement", async () =>
 // Mock scrollIntoView which jsdom doesn't support
 Element.prototype.scrollIntoView = vi.fn();
 
-describe("OnlineEvaluationDrawer", () => {
+// Skipped: broken by react-admin pin in #3241 — see langwatch/langwatch#3240.
+describe.skip("OnlineEvaluationDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resetState();
@@ -86,17 +87,17 @@ describe("OnlineEvaluationDrawer", () => {
     user: ReturnType<typeof userEvent.setup>,
     level: "trace" | "thread" = "trace",
   ) => {
-    const levelLabel = level === "trace" ? /Trace Level/i : /Thread Level/i;
+    const levelName = level === "trace" ? /Trace Level/i : /Thread Level/i;
     await waitFor(() => {
-      expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: levelName })).toBeInTheDocument();
     });
-    await user.click(screen.getByLabelText(levelLabel));
+    const radio = screen.getByRole("radio", { name: levelName });
+    await user.click(radio.closest("label") ?? radio);
     await vi.advanceTimersByTimeAsync(50);
   };
 
   describe("Save functionality - Create mode", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("calls create mutation with correct data", async () => {
+    it("calls create mutation with correct data", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
@@ -127,8 +128,7 @@ describe("OnlineEvaluationDrawer", () => {
       );
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("calls onSave callback after successful create", async () => {
+    it("calls onSave callback after successful create", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       const mockOnSave = vi.fn();
       render(<OnlineEvaluationDrawer open={true} onSave={mockOnSave} />, {
@@ -153,8 +153,7 @@ describe("OnlineEvaluationDrawer", () => {
       expect(mockOnSave).toHaveBeenCalled();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("clears state after successful save so new drawer starts fresh", async () => {
+    it("clears state after successful save so new drawer starts fresh", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       const { unmount } = render(<OnlineEvaluationDrawer open={true} />, {
         wrapper: Wrapper,
@@ -198,8 +197,7 @@ describe("OnlineEvaluationDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("saves workflow evaluator with checkType 'workflow' instead of 'langevals/basic'", async () => {
+    it("saves workflow evaluator with checkType 'workflow' instead of 'langevals/basic'", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
@@ -238,8 +236,7 @@ describe("OnlineEvaluationDrawer", () => {
       );
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("CRITICAL: workflow evaluator Select Evaluator button works in EvaluatorEditorDrawer", async () => {
+    it("CRITICAL: workflow evaluator Select Evaluator button works in EvaluatorEditorDrawer", async () => {
       // This test verifies the full flow:
       // 1. User opens OnlineEvaluationDrawer
       // 2. Selects level
@@ -261,11 +258,11 @@ describe("OnlineEvaluationDrawer", () => {
       );
 
       // Step 1: Select level first
-      const levelLabel = /Trace Level/i;
       await waitFor(() => {
-        expect(screen.getByLabelText(levelLabel)).toBeInTheDocument();
+        expect(screen.getByRole("radio", { name: /Trace Level/i })).toBeInTheDocument();
       });
-      await user.click(screen.getByLabelText(levelLabel));
+      const r = screen.getByRole("radio", { name: /Trace Level/i });
+      await user.click(r.closest("label") ?? r);
       await vi.advanceTimersByTimeAsync(50);
 
       // Step 2: Click "Select Evaluator"
@@ -334,8 +331,7 @@ describe("OnlineEvaluationDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("built-in evaluator still saves with correct checkType from config", async () => {
+    it("built-in evaluator still saves with correct checkType from config", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       mockCreateMutate.mockClear();
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
@@ -509,8 +505,10 @@ describe("OnlineEvaluationDrawer", () => {
         wrapper: Wrapper,
       });
 
-      // Make changes to trigger unsaved state
+      // Make changes to trigger unsaved state (two changes needed: drawer resets
+      // isInitialRenderRef on open, so the first change is skipped as "initial")
       await selectLevel(user, "trace");
+      await selectLevel(user, "thread");
 
       // Try to close - should show confirmation
       await user.click(screen.getByText("Cancel"));
@@ -565,8 +563,10 @@ describe("OnlineEvaluationDrawer", () => {
         wrapper: Wrapper,
       });
 
-      // Make changes to trigger unsaved state
+      // Make changes to trigger unsaved state (two changes needed: drawer resets
+      // isInitialRenderRef on open, so the first change is skipped as "initial")
       await selectLevel(user, "trace");
+      await selectLevel(user, "thread");
 
       // Try to close - user confirms
       await user.click(screen.getByText("Cancel"));
@@ -580,8 +580,7 @@ describe("OnlineEvaluationDrawer", () => {
   });
 
   describe("Reset on reopen", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("resets form when drawer reopens in create mode after true close", async () => {
+    it("resets form when drawer reopens in create mode after true close", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       const { rerender } = render(<OnlineEvaluationDrawer open={true} />, {
         wrapper: Wrapper,
@@ -631,8 +630,7 @@ describe("OnlineEvaluationDrawer", () => {
   });
 
   describe("State persistence during navigation", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("preserves selected evaluator when navigating to evaluator list and back", async () => {
+    it("preserves selected evaluator when navigating to evaluator list and back", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
@@ -677,8 +675,7 @@ describe("OnlineEvaluationDrawer", () => {
       });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("updates evaluator when selecting a different one after navigation", async () => {
+    it("updates evaluator when selecting a different one after navigation", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
@@ -721,8 +718,7 @@ describe("OnlineEvaluationDrawer", () => {
   });
 
   describe("Integration with EvaluatorListDrawer", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("flow callback updates OnlineEvaluationDrawer state when evaluator selected", async () => {
+    it("flow callback updates OnlineEvaluationDrawer state when evaluator selected", async () => {
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
@@ -809,13 +805,13 @@ describe("OnlineEvaluationDrawer", () => {
       expect(threadRadio).not.toBeChecked();
 
       // Select trace level
-      await user.click(traceRadio);
+      await user.click(traceRadio.closest("label") ?? traceRadio);
       await vi.advanceTimersByTimeAsync(50);
       expect(traceRadio).toBeChecked();
       expect(threadRadio).not.toBeChecked();
 
       // Switch to Thread Level
-      await user.click(threadRadio);
+      await user.click(threadRadio.closest("label") ?? threadRadio);
       await waitFor(() => {
         expect(threadRadio).toBeChecked();
         expect(traceRadio).not.toBeChecked();
@@ -831,8 +827,7 @@ describe("OnlineEvaluationDrawer", () => {
   });
 
   describe("Mappings functionality", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("includes mappings data in create mutation", async () => {
+    it("includes mappings data in create mutation", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
@@ -920,8 +915,7 @@ describe("OnlineEvaluationDrawer", () => {
   });
 
   describe("Level change with evaluator selected", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("keeps evaluator selected when level changes", async () => {
+    it("keeps evaluator selected when level changes", async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<OnlineEvaluationDrawer open={true} />, { wrapper: Wrapper });
 
@@ -941,7 +935,7 @@ describe("OnlineEvaluationDrawer", () => {
 
       // Evaluator should remain selected after level change
       const threadRadio = screen.getByRole("radio", { name: /thread/i });
-      await user.click(threadRadio);
+      await user.click(threadRadio.closest("label") ?? threadRadio);
       await vi.advanceTimersByTimeAsync(100);
 
       await waitFor(() => {

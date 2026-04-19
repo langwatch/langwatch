@@ -49,7 +49,7 @@ export function CurrentPlanBlock({
     <Card.Root
       data-testid="current-plan-block"
       borderWidth={1}
-      borderColor="gray.200"
+      borderColor="border"
     >
       <Card.Body paddingY={5} paddingX={6}>
         <VStack align="stretch" gap={5}>
@@ -91,7 +91,7 @@ export function CurrentPlanBlock({
               )}
             </VStack>
             <VStack align="end" gap={0}>
-              <Text color="gray.500" fontSize="sm">
+              <Text color="fg.muted" fontSize="sm">
                 Members / Seats
               </Text>
               {onUserCountClick ? (
@@ -99,8 +99,8 @@ export function CurrentPlanBlock({
                   as="button"
                   onClick={onUserCountClick}
                   textDecoration="underline"
-                  _hover={{ color: "blue.600", cursor: "pointer" }}
-                  color="gray.900"
+                  _hover={{ color: "blue.fg", cursor: "pointer" }}
+                  color="fg"
                 >
                   <Text
                     fontWeight="semibold"
@@ -114,7 +114,7 @@ export function CurrentPlanBlock({
                 <Text
                   fontWeight="semibold"
                   fontSize="lg"
-                  color="gray.900"
+                  color="fg"
                   data-testid="user-count-link"
                 >
                   {maxSeats != null ? `${userCount}/${maxSeats}` : userCount}
@@ -130,8 +130,8 @@ export function CurrentPlanBlock({
             >
               {features.map((feature, index) => (
                 <HStack key={index} gap={2}>
-                  <Check size={16} color="var(--chakra-colors-blue-500)" />
-                  <Text fontSize="sm" color="gray.600">
+                  <Check size={16} color="var(--chakra-colors-blue-solid)" />
+                  <Text fontSize="sm" color="fg.muted">
                     {feature}
                   </Text>
                 </HStack>
@@ -140,13 +140,13 @@ export function CurrentPlanBlock({
           )}
           {deprecatedNotice && (
             <Box data-testid="tiered-deprecated-notice" paddingTop={1}>
-              <Text fontSize="sm" color="gray.600">
+              <Text fontSize="sm" color="fg.muted">
                 You are on a legacy tiered pricing model.{" "}
                 <Link
                   href="/settings/plans"
                   fontWeight="semibold"
-                  color="gray.800"
-                  _hover={{ color: "gray.900" }}
+                  color="fg"
+                  _hover={{ color: "fg" }}
                 >
                   Update your plan
                 </Link>{" "}

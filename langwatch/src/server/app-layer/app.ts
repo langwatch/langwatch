@@ -2,7 +2,7 @@ import { createLogger } from "~/utils/logger/server";
 import { EventSourcing } from "../event-sourcing/eventSourcing";
 import type { AppCommands } from "../event-sourcing/pipelineRegistry";
 import type { AppConfig } from "./config";
-import type { AppDependencies } from "./dependencies";
+import type { AppDependencies, OpsDependencies } from "./dependencies";
 
 const logger = createLogger("langwatch:app");
 
@@ -17,18 +17,26 @@ export class App {
   readonly dspySteps: AppDependencies["dspySteps"];
   readonly simulations: AppDependencies["simulations"] & AppCommands["simulations"];
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
+  readonly experiments: AppDependencies["experiments"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
   readonly tokenizer: AppDependencies["tokenizer"];
   readonly usage: AppDependencies["usage"];
   readonly planProvider: AppDependencies["planProvider"];
   readonly subscription?: AppDependencies["subscription"];
+  readonly webhookService?: AppDependencies["webhookService"];
+  readonly stripeClient?: AppDependencies["stripeClient"];
   readonly notifications: AppDependencies["notifications"];
   readonly nurturing?: AppDependencies["nurturing"];
   readonly usageLimits: AppDependencies["usageLimits"];
+  readonly ops?: OpsDependencies;
 
   /** Keeps EventSourcing infrastructure safe from the greedy garbage men */
   private readonly _eventSourcing?: EventSourcing;
+
+  get eventSourcing(): EventSourcing | undefined {
+    return this._eventSourcing;
+  }
   private readonly _gracefulCloseables: Array<{
     name: string;
     close: () => Promise<void>;
@@ -36,12 +44,15 @@ export class App {
 
   constructor(deps: AppDependencies) {
     this.config = deps.config;
+    this.experiments = deps.experiments;
     this.organizations = deps.organizations;
     this.projects = deps.projects;
     this.tokenizer = deps.tokenizer;
     this.usage = deps.usage;
     this.planProvider = deps.planProvider;
     this.subscription = deps.subscription;
+    this.webhookService = deps.webhookService;
+    this.stripeClient = deps.stripeClient;
     this.notifications = deps.notifications;
     this.nurturing = deps.nurturing;
     this.usageLimits = deps.usageLimits;
@@ -52,6 +63,7 @@ export class App {
     this.dspySteps = deps.dspySteps;
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
     this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
+    this.ops = deps.ops;
     this._eventSourcing = deps._eventSourcing;
     this._gracefulCloseables = deps._gracefulCloseables ?? [];
   }

@@ -2,6 +2,8 @@ import chalk from "chalk";
 import ora from "ora";
 import fs from "fs";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const exportTracesCommand = async (options: {
   startDate?: string;
@@ -50,9 +52,8 @@ export const exportTracesCommand = async (options: {
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      spinner.fail(`Export failed (${response.status})`);
-      console.error(chalk.red(`Error: ${errorBody}`));
+      const message = await formatFetchError(response);
+      spinner.fail(`Export failed: ${message}`);
       process.exit(1);
     }
 
@@ -97,10 +98,7 @@ export const exportTracesCommand = async (options: {
       process.stdout.write(output);
     }
   } catch (error) {
-    spinner.fail();
-    console.error(
-      chalk.red(`Error: ${error instanceof Error ? error.message : "Unknown error"}`),
-    );
+    failSpinner({ spinner, error, action: "export traces" });
     process.exit(1);
   }
 };

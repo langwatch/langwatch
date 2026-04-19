@@ -106,7 +106,6 @@ export const downloadCommand = async (
       ),
     );
   } catch (error) {
-    spinner.fail("Failed to download dataset");
-    handleDatasetCommandError(error, "downloading dataset");
+    handleDatasetCommandError({ spinner, error, context: "download dataset" });
   }
 };

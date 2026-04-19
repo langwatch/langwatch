@@ -3,10 +3,15 @@ import dspy
 from langwatch_nlp.studio.dspy.llm_node import LLMNode
 from langwatch_nlp.studio.parser import parse_component, materialized_component_class
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
+import pytest
 from langwatch_nlp.studio.types.dsl import (
     Code,
     CodeNode,
     DatasetInline,
+    End,
+    EndNode,
+    Entry,
+    EntryNode,
     Field,
     FieldType,
     LLMConfig,
@@ -254,3 +259,50 @@ class GenerateAnswer(dspy.Module):
     code, class_name, _ = parse_component(node, basic_workflow, format=True)
     with materialized_component_class(code, class_name) as Module:
         assert issubclass(Module, dspy.Module)
+
+
+class TestParseComponentEntryAndEndNodes:
+    """Regression tests for entry/end nodes returning 'None' as class name.
+
+    Entry and end nodes are structural workflow nodes that cannot be executed
+    as standalone components. Previously, parse_component returned the string
+    "None" as the class_name, which caused an AttributeError when
+    materialized_component_class tried getattr(module, "None").
+    """
+
+    def test_parse_component_raises_for_entry_node(self):
+        node = EntryNode(
+            id="entry",
+            data=Entry(
+                name="Entry",
+                outputs=[
+                    Field(
+                        identifier="question",
+                        type=FieldType.str,
+                    ),
+                ],
+                train_size=0.5,
+                test_size=0.5,
+                seed=42,
+            ),
+        )
+
+        with pytest.raises(ValueError, match="Entry nodes cannot be executed as standalone components"):
+            parse_component(node, basic_workflow)
+
+    def test_parse_component_raises_for_end_node(self):
+        node = EndNode(
+            id="end",
+            data=End(
+                name="End",
+                inputs=[
+                    Field(
+                        identifier="output",
+                        type=FieldType.str,
+                    ),
+                ],
+            ),
+        )
+
+        with pytest.raises(ValueError, match="End nodes cannot be executed as standalone components"):
+            parse_component(node, basic_workflow)

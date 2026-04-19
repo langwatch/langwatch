@@ -1,11 +1,9 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  SuitesApiService,
-  SuitesApiError,
-} from "@/client-sdk/services/suites";
+import { SuitesApiService } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const listSuitesCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -65,16 +63,7 @@ export const listSuitesCommand = async (options?: { format?: string }): Promise<
       ),
     );
   } catch (error) {
-    spinner.fail();
-    if (error instanceof SuitesApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error fetching suites: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "fetch suites" });
     process.exit(1);
   }
 };

@@ -28,7 +28,7 @@ describe("Collector Worker Merging Logic Tests", () => {
   });
 
   describe("Basic Trace Merging", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should create and update a trace with spans", async () => {
       const traceId = `test-trace-${nanoid()}`;
       const spanId = `test-span-${nanoid()}`;
@@ -122,7 +122,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       expect(trace.spans?.[0]?.name).toBe("Updated Call");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should add new spans to existing trace", async () => {
       const traceId = `test-trace-add-${nanoid()}`;
       const spanId1 = `test-span-1-${nanoid()}`;
@@ -203,7 +203,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       );
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should preserve span input/output when update provides none", async () => {
       const traceId = `test-log-record-${nanoid()}`;
       const spanId = `test-span-${nanoid()}`;
@@ -287,7 +287,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       expect(span?.name).toBe("Updated Log Record Call");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should override span input/output when update provides values", async () => {
       const traceId = `test-log-record-explicit-${nanoid()}`;
       const spanId = `test-span-${nanoid()}`;
@@ -374,7 +374,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       expect(span?.output?.value).toBe(JSON.stringify("New output"));
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should not change trace-level I/O when update provides none", async () => {
       const traceId = `test-trace-normal-${nanoid()}`;
       const spanId = `test-span-${nanoid()}`;
@@ -449,7 +449,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       expect(trace.expected_output?.value).toBe("New expected output");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should override existing span input/output when update provides values", async () => {
       const traceId = `test-preserve-existing-${nanoid()}`;
       const spanId = `test-span-${nanoid()}`;
@@ -536,7 +536,7 @@ describe("Collector Worker Merging Logic Tests", () => {
   });
 
   describe("Trace-Level Input/Output Merging", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should not change trace-level I/O when update provides none", async () => {
       const traceId = `test-trace-io-update-${nanoid()}`;
       const spanId = `test-span-${nanoid()}`;
@@ -614,7 +614,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       expect(trace.metadata?.custom?.version).toBe("2.0");
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should override trace-level I/O when update provides values", async () => {
       const traceId = `test-trace-io-preserve-${nanoid()}`;
       const spanId1 = `test-span-1-${nanoid()}`;
@@ -711,7 +711,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       expect(logSpan?.output?.value).toBe(JSON.stringify("Log record output"));
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should override trace-level I/O from latest update span", async () => {
       const traceId = `test-trace-io-allow-update-${nanoid()}`;
       const spanId1 = `test-span-1-${nanoid()}`;
@@ -798,7 +798,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       expect(trace.spans).toHaveLength(2);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should override trace-level I/O each time update provides values", async () => {
       const traceId = `test-trace-mixed-flags-${nanoid()}`;
       const spanId1 = `test-span-1-${nanoid()}`;
@@ -936,7 +936,7 @@ describe("Collector Worker Merging Logic Tests", () => {
   });
 
   describe("Concurrent Merging", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should not lose spans under concurrent updates", async () => {
       const traceId = `test-trace-concurrent-${nanoid()}`;
       const spanIds = Array.from({ length: 6 }, () => `span-${nanoid()}`);
@@ -987,7 +987,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       }
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should deduplicate same span_id under concurrent updates and keep non-empty I/O", async () => {
       const traceId = `test-trace-concurrent-same-${nanoid()}`;
       const spanId = `span-${nanoid()}`;
@@ -1080,7 +1080,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       expect(hasA || hasB).toBe(true);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should prefer non-empty I/O in three-way race on same span_id", async () => {
       const traceId = `test-trace-concurrent-3way-${nanoid()}`;
       const spanId = `span-${nanoid()}`;
@@ -1190,7 +1190,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       ]).toContain(s.output?.value);
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: requires live Elasticsearch. Run with ES available (make dev-full) to enable.
     it.skip("should preserve existing non-empty I/O if later concurrent update omits I/O", async () => {
       const traceId = `test-trace-concurrent-omit-${nanoid()}`;
       const spanId = `span-${nanoid()}`;

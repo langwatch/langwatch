@@ -77,7 +77,7 @@ export type EvaluatorMappingsConfig = {
   /** Initial mappings in UI format - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback when a mapping changes - used to persist to store */
-  onMappingChange: (
+  onMappingChange?: (
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
@@ -116,19 +116,23 @@ export type EvaluatorEditorDrawerProps = {
    */
   onLocalConfigChange?: (config: LocalEvaluatorConfig | undefined) => void;
   /**
-   * Initial local config to load (for resuming unpublished changes).
-   * When provided, overrides DB data for form initialization.
-   */
-  initialLocalConfig?: LocalEvaluatorConfig;
-  /**
-   * Callback when an evaluator mapping changes.
-   * Prefer passing this via setFlowCallbacks("evaluatorEditor", { onMappingChange })
-   * so it persists across drawer navigation. Falls back to mappingsConfig.onMappingChange.
+   * Callback for when a variable mapping changes.
+   *
+   * This prop exists so `setFlowCallbacks("evaluatorEditor", { onMappingChange })`
+   * is type-safe (the flow callbacks registry derives from drawer props).
+   * Callers must NOT pass it directly — it must go through setFlowCallbacks so
+   * the non-serializable function survives ErrorBoundary remounts and drawer
+   * navigation (it cannot be persisted through the ephemeral complexProps path).
    */
   onMappingChange?: (
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
+  /**
+   * Initial local config to load (for resuming unpublished changes).
+   * When provided, overrides DB data for form initialization.
+   */
+  initialLocalConfig?: LocalEvaluatorConfig;
 };
 
 /**
@@ -156,16 +160,14 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     drawerParams.evaluatorId ??
     (complexProps.evaluatorId as string | undefined);
 
-  // Get mappingsConfig from props or complexProps
+  // onMappingChange is registered via setFlowCallbacks because it is a
+  // non-serializable function that must survive drawer lifecycle events
+  // (in-app navigation, ErrorBoundary remount) rather than being embedded
+  // in the ephemeral mappingsConfig/complexProps path.
   const mappingsConfig =
     props.mappingsConfig ??
     (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
-
-  // Resolve onMappingChange: top-level prop → flowCallbacks → mappingsConfig
-  const onMappingChange =
-    props.onMappingChange ??
-    (flowCallbacks?.onMappingChange as EvaluatorEditorDrawerProps["onMappingChange"]) ??
-    mappingsConfig?.onMappingChange;
+  const onMappingChange = flowCallbacks?.onMappingChange;
 
   // Get custom save button text from props or complexProps
   const saveButtonText =
@@ -760,7 +762,7 @@ type EvaluatorMappingsSectionProps = {
   /** Initial mappings - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback to persist changes to store */
-  onMappingChange: (
+  onMappingChange?: (
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
@@ -892,7 +894,7 @@ function EvaluatorMappingsSection({
       });
 
       // Persist to store
-      onMappingChange(identifier, mapping);
+      onMappingChange?.(identifier, mapping);
     },
     [onMappingChange],
   );

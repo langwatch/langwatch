@@ -19,6 +19,7 @@ import {
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import {
   BadRequestError,
   InternalServerError,
@@ -131,7 +132,16 @@ export const app = new Hono<{ Variables: Variables }>()
         limit,
       });
 
-      return c.json(result);
+      return c.json({
+        ...result,
+        data: result.data.map((d: { id: string; slug?: string }) => ({
+          ...d,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/datasets/${d.id}`,
+          }),
+        })),
+      });
     },
   )
 
@@ -163,6 +173,10 @@ export const app = new Hono<{ Variables: Variables }>()
             columnTypes: dataset.columnTypes,
             createdAt: dataset.createdAt,
             updatedAt: dataset.updatedAt,
+            platformUrl: platformUrl({
+              projectSlug: project.slug,
+              path: `/datasets/${dataset.id}`,
+            }),
           },
           201,
         );
@@ -453,6 +467,10 @@ export const app = new Hono<{ Variables: Variables }>()
         columnTypes: dataset.columnTypes,
         createdAt: dataset.createdAt,
         updatedAt: dataset.updatedAt,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/datasets/${dataset.id}`,
+        }),
         data: records,
       });
     },
@@ -498,6 +516,10 @@ export const app = new Hono<{ Variables: Variables }>()
           columnTypes: updated.columnTypes,
           createdAt: updated.createdAt,
           updatedAt: updated.updatedAt,
+          platformUrl: platformUrl({
+            projectSlug: project.slug,
+            path: `/datasets/${updated.id}`,
+          }),
         });
       } catch (error) {
         if (error instanceof Error && error.name === "DatasetConflictError") {

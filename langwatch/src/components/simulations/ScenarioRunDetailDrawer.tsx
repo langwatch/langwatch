@@ -15,6 +15,7 @@ import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
+import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useDrawerRunCallbacks } from "~/hooks/useDrawerRunCallbacks";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -26,6 +27,7 @@ import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { TraceDetails } from "../traces/TraceDetails";
+import { Link } from "../ui/link";
 import { hasNoResults } from "./scenario-run-status.utils";
 import { Drawer } from "../ui/drawer";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
@@ -57,6 +59,10 @@ export function ScenarioRunDetailDrawer({
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
 
   const scenarioRunId = params.scenarioRunId;
+  const dejaView = useDejaViewLink({
+    aggregateId: scenarioRunId,
+    tenantId: project?.id,
+  });
 
   const { data: scenarioState, error: runStateError, refetch } = api.scenarios.getRunState.useQuery(
     {
@@ -269,6 +275,13 @@ export function ScenarioRunDetailDrawer({
                         <ExternalLink size={14} />
                         Open Thread
                       </Button>
+                    )}
+                    {dejaView.href && (
+                      <Link href={dejaView.href}>
+                        <Button colorPalette="gray" size="sm">
+                          DejaView
+                        </Button>
+                      </Link>
                     )}
                     <Drawer.CloseTrigger />
                   </HStack>

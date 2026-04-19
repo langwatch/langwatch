@@ -1,10 +1,8 @@
 import chalk from "chalk";
 import ora from "ora";
-import {
-  WorkflowsApiService,
-  WorkflowsApiError,
-} from "@/client-sdk/services/workflows/workflows-api.service";
+import { WorkflowsApiService } from "@/client-sdk/services/workflows/workflows-api.service";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const deleteWorkflowCommand = async (id: string, options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -18,16 +16,11 @@ export const deleteWorkflowCommand = async (id: string, options?: { format?: str
     workflowName = workflow.name;
     resolveSpinner.succeed(`Found workflow "${workflowName}"`);
   } catch (error) {
-    resolveSpinner.fail();
-    if (error instanceof WorkflowsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error finding workflow: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({
+      spinner: resolveSpinner,
+      error,
+      action: `find workflow "${id}"`,
+    });
     process.exit(1);
   }
 
@@ -40,16 +33,11 @@ export const deleteWorkflowCommand = async (id: string, options?: { format?: str
       console.log(JSON.stringify({ id, name: workflowName, archived: true }, null, 2));
     }
   } catch (error) {
-    deleteSpinner.fail();
-    if (error instanceof WorkflowsApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error archiving workflow: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({
+      spinner: deleteSpinner,
+      error,
+      action: `archive workflow "${workflowName}"`,
+    });
     process.exit(1);
   }
 };

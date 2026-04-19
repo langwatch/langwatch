@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 import threading
 import time
 from typing import List, Optional, Any, Literal
@@ -325,7 +326,7 @@ class EvaluationReporting:
                 "Content-Type": "application/json",
             },
             data=json.dumps(body, cls=SerializableWithStringFallback, ensure_ascii=False),  # type: ignore
-            timeout=60,
+            timeout=int(os.getenv("NLP_DSPY_EVAL_LOG_TIMEOUT_SECONDS", "60")),
         )
         if response.status_code != 200:
             logger.error(

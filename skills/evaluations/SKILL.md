@@ -1,14 +1,14 @@
 ---
 name: evaluations
 user-prompt: "Set up evaluations for my agent"
-description: Set up comprehensive evaluations for your AI agent with LangWatch — experiments (batch testing), evaluators (scoring functions), datasets, online evaluation (production monitoring), and guardrails (real-time blocking). Supports both code (SDK) and platform (MCP) approaches. Use when the user wants to evaluate, test, benchmark, monitor, or safeguard their agent.
+description: Set up comprehensive evaluations for your AI agent with LangWatch — experiments (batch testing), evaluators (scoring functions), datasets, online evaluation (production monitoring), and guardrails (real-time blocking). Supports both code (SDK) and platform (CLI) approaches. Use when the user wants to evaluate, test, benchmark, monitor, or safeguard their agent.
 license: MIT
-compatibility: Requires Node.js for MCP setup. Works with Claude Code, Claude Web, and similar AI assistants.
+compatibility: Works with Claude Code and similar AI assistants. The `langwatch` CLI is the only interface for platform operations and documentation.
 ---
 
 # Set Up Evaluations for Your Agent
 
-LangWatch Evaluations is a comprehensive quality assurance system. Understand which part the user needs:
+LangWatch Evaluations is a comprehensive QA system. Map the user's request to one branch:
 
 | User says... | They need... | Go to... |
 |---|---|---|
@@ -20,74 +20,60 @@ LangWatch Evaluations is a comprehensive quality assurance system. Understand wh
 
 ## Where Evaluations Fit
 
-Evaluations sit at the **component level of the testing pyramid** — they test specific aspects of your agent with many input/output examples. This is different from scenarios (end-to-end multi-turn conversation testing).
+Evaluations sit at the **component level** of the testing pyramid — they test specific aspects of an agent with many input/output examples. Different from scenarios (end-to-end multi-turn).
 
-Use evaluations when:
-- You have many examples with clear correct/incorrect answers
-- Testing RAG retrieval accuracy
-- Benchmarking classification, routing, or detection tasks
-- Running CI/CD quality gates
-
-Use scenarios instead when:
-- Testing multi-turn agent conversation behavior
-- Validating complex tool-calling sequences
-- Checking agent decision-making in realistic situations
-
-For onboarding, create 1-2 Jupyter notebooks (or scripts) maximum. Focus on generating domain-realistic data that's as close to real-world inputs as possible.
+Use evaluations when you have many examples with clear correct answers, or for CI quality gates. Use scenarios for multi-turn behavior and tool-calling sequences.
 
 ## Determine Scope
 
-If the user's request is **general** ("set up evaluations", "evaluate my agent"):
-- Read the full codebase to understand the agent's architecture
+If the user's request is **general** ("set up evaluations"):
+- Read the codebase to understand the agent
 - Study git history to understand what changed and why — focus on agent behavior changes, prompt tweaks, bug fixes. Read commit messages for context.
-- Set up comprehensive evaluation coverage (experiment + evaluators + dataset)
-- After the experiment is working, transition to consultant mode: summarize results and suggest domain-specific improvements. See [Consultant Mode](_shared/consultant-mode.md).
+- Set up an experiment + evaluator + dataset
+- After the experiment is working, summarize results and suggest improvements (consultant mode — see end of skill).
 
-If the user's request is **specific** ("add a faithfulness evaluator", "create a dataset for RAG testing"):
-- Focus on the specific evaluation need
+If the user's request is **specific** ("add a faithfulness evaluator"):
+- Focus on the specific need
 - Create the targeted evaluator, dataset, or experiment
-- Verify it works in context
+- Verify it works
 
 ## Detect Context
 
-1. Check if you're in a codebase (look for `package.json`, `pyproject.toml`, `requirements.txt`, etc.)
-2. If **YES** → use the **Code approach** for experiments (SDK) and guardrails (code integration)
-3. If **NO** → use the **CLI approach** for evaluators, monitors, and datasets (preferred over MCP)
-4. If ambiguous → ask the user: "Do you want to write evaluation code or set things up via CLI?"
+If you're in a codebase (`package.json`, `pyproject.toml`, etc.) — use the SDK for experiments and guardrails; use the CLI for evaluators, datasets, monitors. If there is no codebase, drive everything via the CLI. If ambiguous, ask the user.
 
 Some features are code-only (experiments, guardrails) and some are platform-only (monitors). Evaluators work on both surfaces.
 
 ## Plan Limits
 
-See [Plan Limits](_shared/plan-limits.md) for how to handle free plan limits gracefully. Focus on delivering value within the limits — create 1-2 high-quality experiments with domain-realistic data rather than many shallow ones. Do NOT try to work around limits by deleting existing resources. Show the user the value of what you created before suggesting an upgrade.
+See [Plan Limits](_shared/plan-limits.md).
 
 ## Prerequisites
 
-**Preferred: Use the LangWatch CLI** (see [CLI Setup](_shared/cli-setup.md))
+See [CLI Setup](_shared/cli-setup.md).
 
-The CLI is the primary interface for agents. If the CLI is not available, fall back to MCP tools.
+Then read the evaluations overview:
 
-See [MCP Setup](_shared/mcp-setup.md) for MCP installation as an alternative.
-
-If MCP installation fails, see [docs fallback](_shared/llms-txt-fallback.md).
-
-Read the evaluations overview first: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/overview.md`
+```bash
+langwatch docs evaluations/overview
+```
 
 ## Step A: Experiments (Batch Testing) — Code Approach
 
-Create a script or notebook that runs your agent against a dataset and measures quality.
+Create a script or notebook that runs the agent against a dataset and measures quality.
 
-1. Read the SDK docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/experiments/sdk.md`
-2. Analyze the agent's code to understand what it does
-3. Create a dataset with representative examples that are as close to real-world inputs as possible. Focus on domain realism — the dataset should look like actual production data the agent would encounter.
+1. Read the SDK docs:
+   ```bash
+   langwatch docs evaluations/experiments/sdk
+   ```
+2. Analyze the agent code to understand its inputs/outputs.
+3. Create a dataset with examples that look like real production data — domain-realistic, not generic.
 4. Create the experiment file:
 
-**Python — Jupyter Notebook (.ipynb):**
+**Python (Jupyter):**
 ```python
 import langwatch
 import pandas as pd
 
-# Dataset tailored to the agent's domain
 data = {
     "input": ["domain-specific question 1", "domain-specific question 2"],
     "expected_output": ["expected answer 1", "expected answer 2"],
@@ -106,7 +92,7 @@ for index, row in evaluation.loop(df.iterrows()):
     )
 ```
 
-**TypeScript — Script (.ts):**
+**TypeScript:**
 ```typescript
 import { LangWatch } from "langwatch";
 
@@ -127,42 +113,25 @@ await evaluation.run(dataset, async ({ item, index }) => {
 });
 ```
 
-5. Run the experiment to verify it works
-
-### Verify by Running
-
-ALWAYS run the experiment after creating it. If it fails, fix it. An experiment that isn't executed is useless.
-
-For Python notebooks: Create an accompanying script to run it:
-```python
-# run_experiment.py
-import subprocess
-subprocess.run(["jupyter", "nbconvert", "--to", "notebook", "--execute", "experiment.ipynb"], check=True)
-```
-
-Or simply run the cells in order via the notebook interface.
-
-For TypeScript: `npx tsx experiment.ts`
+5. Run it. ALWAYS execute the experiment after creating it — an unrun experiment is useless. For Python notebooks: run the cells, or `jupyter nbconvert --to notebook --execute`. For TypeScript: `npx tsx experiment.ts`.
 
 ## Step B: Online Evaluation (Production Monitoring & Guardrails)
 
-Online evaluation has two modes:
+### Platform mode: Monitors (continuous async scoring)
 
-### Platform mode: Monitors
-Set up monitors that continuously score production traffic.
+```bash
+langwatch docs evaluations/online-evaluation/overview
+```
 
-1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/online-evaluation/overview.md`
-2. Configure via the platform UI:
-   - Go to https://app.langwatch.ai → Evaluations → Monitors
-   - Create a new monitor with "When a message arrives" trigger
-   - Select evaluators (e.g., PII Detection, Faithfulness)
-   - Enable monitoring
+Create monitors via the CLI (`langwatch monitor --help` for the flag set). Optionally configure further at https://app.langwatch.ai → Evaluations → Monitors.
 
-### Code mode: Guardrails
-Add code to block harmful content before it reaches users (synchronous, real-time).
+### Code mode: Guardrails (synchronous blocking)
 
-1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/guardrails/code-integration.md`
-2. Add guardrail checks in your agent code:
+```bash
+langwatch docs evaluations/guardrails/code-integration
+```
+
+Add guardrail checks in agent code:
 
 ```python
 import langwatch
@@ -177,63 +146,35 @@ def my_agent(user_input):
     )
     if not guardrail.passed:
         return "I can't help with that request."
-    # Continue with normal processing...
+    ...
 ```
 
-Key distinction: Monitors **measure** (async, observability). Guardrails **act** (sync, enforcement via code with `as_guardrail=True`).
+Key distinction: Monitors **measure** (async). Guardrails **act** (sync via `as_guardrail=True`).
 
 ## Step C: Evaluators (Scoring Functions)
 
-Create or configure evaluators — the functions that score your agent's outputs.
+Read the docs first:
 
-### Code Approach
-1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/evaluations/evaluators/overview.md`
-2. Browse available evaluators: `https://langwatch.ai/docs/evaluations/evaluators/list.md`
-3. Use evaluators in experiments via the SDK:
-   ```python
-   evaluation.evaluate("ragas/faithfulness", index=idx, data={...})
-   ```
-
-### CLI Approach (Preferred for Agents)
 ```bash
-langwatch evaluator list                                    # List evaluators
-langwatch evaluator create "My Evaluator" --type langevals/llm_judge
-langwatch evaluator get <idOrSlug>                          # View details
-langwatch evaluator update <idOrSlug> --name "New Name"     # Update
-langwatch evaluation run <slug> --wait                      # Run evaluation and wait
-langwatch evaluation status <runId>                         # Check run status
+langwatch docs evaluations/evaluators/overview
+langwatch docs evaluations/evaluators/list      # Browse available evaluators
 ```
 
-### Platform Approach (CLI preferred)
-```bash
-langwatch evaluator list                                      # List evaluators
-langwatch evaluator get <idOrSlug>                            # Get details
-langwatch evaluator create "Name" --type langevals/llm_judge  # Create
-langwatch evaluator update <idOrSlug> --name "New Name"       # Update
-```
+In code, call evaluators via the SDK as shown in Step A. To create or manage evaluators on the platform, use `langwatch evaluator --help`. If unsure which `--type` values are valid, run `langwatch evaluator create --help` first.
 
-If the CLI is not available, use MCP tools as a fallback:
-1. Call `discover_schema` with category "evaluators" to see available types
-2. Use `platform_create_evaluator` to create an evaluator on the platform
-
-This is useful for setting up LLM-as-judge evaluators, custom evaluators, or configuring evaluators that will be used in platform experiments and monitors.
+If you need an LLM-as-judge evaluator, verify a model provider is configured (`langwatch model-provider list`).
 
 ## Step D: Datasets
 
-Create test datasets for experiments.
+Read the docs first:
 
-### CLI Approach (Preferred for Agents)
 ```bash
-langwatch dataset list                                      # List datasets
-langwatch dataset create "My Dataset" -c input:string,output:string
-langwatch dataset upload my-dataset data.csv                # Upload CSV/JSON
-langwatch dataset records list my-dataset                   # View records
-langwatch dataset download my-dataset -f csv                # Download
+langwatch docs datasets/overview
+langwatch docs datasets/programmatic-access
+langwatch docs datasets/ai-dataset-generation
 ```
 
-### Docs Approach
-1. Read the docs: call `fetch_langwatch_docs` with url `https://langwatch.ai/docs/datasets/overview.md`
-2. Generate a dataset tailored to your agent:
+Use `langwatch dataset --help` for create/upload/download. Generate data tailored to the agent:
 
 | Agent type | Dataset examples |
 |---|---|
@@ -249,87 +190,17 @@ CRITICAL: The dataset MUST be specific to what the agent ACTUALLY does. Before g
 2. Read the agent's function signatures and tool definitions
 3. Understand the agent's domain, persona, and constraints
 
-Then generate data that reflects EXACTLY this agent's real-world usage. For example:
-- If the system prompt says "respond in tweet-like format with emojis" → your dataset inputs should be things users would ask this specific bot, and expected outputs should be short emoji-laden responses
-- If the agent is a SQL assistant → your dataset should have natural language queries with expected SQL
-- If the agent handles refunds → your dataset should have refund scenarios
+Then generate data reflecting EXACTLY this agent's real-world usage. NEVER use generic examples like "What is 2+2?", "What is the capital of France?", or "Explain quantum computing" — every example must be something a real user of THIS specific agent would say.
 
-NEVER use generic examples like "What is 2+2?", "What is the capital of France?", or "Explain quantum computing". These are useless for evaluating the specific agent. Every single example must be something a real user of THIS specific agent would actually say.
+## Consultant Mode
 
-3. For programmatic dataset access: `https://langwatch.ai/docs/datasets/programmatic-access.md`
-4. For AI-generated datasets: `https://langwatch.ai/docs/datasets/ai-dataset-generation.md`
+Once the experiment is working, summarize results and suggest 2-3 domain-specific improvements based on what you learned from the codebase.
 
----
-
-## Platform Approach: Prompts + Evaluators (No Code)
-
-When the user has no codebase and wants to set up evaluation building blocks on the platform.
-Use the CLI as the primary interface:
-
-### Create or Update a Prompt
-
-```bash
-langwatch prompt list                             # List existing prompts
-langwatch prompt create my-prompt                 # Create a new prompt YAML
-langwatch prompt push                             # Push to the platform
-langwatch prompt versions my-prompt               # View version history
-langwatch prompt tag assign my-prompt production  # Tag a version
-```
-
-### Check Model Providers
-
-Before creating evaluators, verify model providers are configured:
-
-```bash
-langwatch model-provider list                     # Check existing providers
-langwatch model-provider set openai --api-key sk-... # Set up a provider
-```
-
-### Create an Evaluator
-
-```bash
-langwatch evaluator list                          # See available evaluators
-langwatch evaluator create "Quality Judge" --type langevals/llm_judge
-langwatch evaluator get <idOrSlug> --format json  # View details
-```
-
-### Create a Dataset
-
-```bash
-langwatch dataset create "Test Data" -c input:string,expected_output:string
-langwatch dataset upload test-data data.csv       # Upload from CSV/JSON/JSONL
-langwatch dataset records list test-data           # View records
-```
-
-### Set Up Monitors (Online Evaluation)
-
-```bash
-langwatch monitor create "Toxicity Check" --check-type ragas/toxicity
-langwatch monitor create "PII Detection" --check-type presidio/pii_detection --sample 0.5
-langwatch monitor list                            # View all monitors
-```
-
-### Test in the Platform
-
-Go to https://app.langwatch.ai and:
-1. Navigate to your project's Prompts section
-2. Open the prompt you created
-3. Use the Prompt Playground to test variations
-4. Set up an experiment in the Experiments section using your prompt, evaluator, and dataset
-
-### MCP Fallback
-
-If the CLI is not available, use MCP tools instead (`platform_create_prompt`, `platform_create_evaluator`, etc.).
+See [Consultant Mode](_shared/consultant-mode.md).
 
 ## Common Mistakes
 
 - Do NOT say "run an evaluation" — be specific: experiment, monitor, or guardrail
 - Do NOT use generic/placeholder datasets — generate domain-specific examples
-- Do NOT use MCP tools for code-based features (experiments, guardrails) — write code
-- Prefer the `langwatch` CLI over MCP tools for platform features (evaluators, monitors, datasets)
-- Only use MCP tools as a fallback when the CLI is not available
 - Do NOT skip running the experiment to verify it works
-- Monitors **measure** (async), guardrails **act** (sync, via code with `as_guardrail=True`) — both are online evaluation
-- Always set up `LANGWATCH_API_KEY` in `.env`
-- Always call `discover_schema` before creating evaluators via MCP to understand available types
-- Do NOT create prompts with `langwatch prompt create` CLI when using the platform approach — that's for code-based projects
+- Monitors **measure** (async), guardrails **act** (sync, via code with `as_guardrail=True`)

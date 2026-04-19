@@ -86,21 +86,25 @@ describe("groupRunsByBatchId() with scenarioSetIds", () => {
 
   describe("when given runs with scenario set IDs", () => {
     it("groups runs and includes scenarioSetId for each batch", () => {
+      const now = Date.now();
       const runs = [
         makeScenarioRunData({
           batchRunId: "batch_1",
           scenarioRunId: "run_1",
           scenarioId: "scen_1",
+          timestamp: now,
         }),
         makeScenarioRunData({
           batchRunId: "batch_1",
           scenarioRunId: "run_2",
           scenarioId: "scen_2",
+          timestamp: now,
         }),
         makeScenarioRunData({
           batchRunId: "batch_2",
           scenarioRunId: "run_3",
           scenarioId: "scen_3",
+          timestamp: now - 1000,
         }),
       ];
 

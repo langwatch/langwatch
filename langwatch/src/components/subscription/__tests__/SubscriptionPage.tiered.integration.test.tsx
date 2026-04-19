@@ -184,7 +184,10 @@ describe("<SubscriptionPage/>", () => {
         expect(screen.queryByTestId("tiered-pricing-alert")).not.toBeInTheDocument();
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: Code bug in SubscriptionPage.tsx — `isUpgradePlanRequired` has a
+      // duplicate bare `isDeveloperPlan` condition making it always true for free-plan orgs.
+      // The `|| isDeveloperPlan` term at the end of the OR chain fires unconditionally, so
+      // upgrade-plan-block renders even before any seat changes are planned.
       it.skip("hides upgrade plan block on free plan without seat changes", async () => {
         renderSubscriptionPage();
 

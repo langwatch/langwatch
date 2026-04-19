@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@prisma/client";
 import type { ClickHouseClient } from "@clickhouse/client";
+import { prisma as globalPrisma } from "~/server/db";
 import { getClickHouseClientForProject, isClickHouseEnabled, type ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { esClient, TRACE_INDEX, traceIndexId } from "../elasticsearch";
 import { EventSourcing } from "../event-sourcing";
@@ -22,6 +23,7 @@ import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/ev
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
+import { ExperimentService } from "../experiments/experiment.service";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
 import { NullOrganizationRepository } from "./organizations/repositories/organization.repository";
@@ -55,7 +57,12 @@ import { PlanProviderService } from "./subscription/plan-provider";
 import { createCompositePlanProvider } from "./subscription/composite-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { EESubscriptionService } from "../../../ee/billing/services/subscription.service";
+import { EEWebhookService, type WebhookService } from "../../../ee/billing/services/webhookService";
+import { handleLicensePurchase } from "../../../ee/billing/services/licensePurchaseHandler";
 import { getSaaSPlanProvider } from "../../../ee/billing";
+import { InviteService } from "../invites/invite.service";
+import { env } from "~/env.mjs";
+import { getPostHogInstance } from "~/server/posthog";
 import { getLicenseHandler } from "../subscriptionHandler";
 import { FREE_PLAN } from "../../../ee/licensing/constants";
 import { createStripeClient } from "../../../ee/billing/stripe/stripeClient";
@@ -71,6 +78,17 @@ import { NotificationService } from "../../../ee/billing/notifications/notificat
 import { NurturingService } from "../../../ee/billing/nurturing/nurturing.service";
 import { NotificationRepository } from "../../../ee/billing/notifications/repositories/notification.repository";
 import { UsageLimitService } from "../../../ee/billing/notifications/usage-limit.service";
+import { QueueService } from "./ops/queue.service";
+import { EventExplorerService } from "./ops/event-explorer.service";
+import { ReplayService } from "./ops/replay.service";
+import { QueueRedisRepository } from "./ops/repositories/queue.redis.repository";
+import { NullQueueRepository } from "./ops/repositories/queue.repository";
+import { ReplayRedisRepository } from "./ops/repositories/replay.redis.repository";
+import { NullReplayRepository } from "./ops/repositories/replay.repository";
+import { EventExplorerClickHouseRepository } from "./ops/repositories/event-explorer.clickhouse.repository";
+import { NullEventExplorerRepository } from "./ops/repositories/event-explorer.repository";
+import { getOpsMetricsCollector } from "./ops/metrics-collector";
+import { getSharedClickHouseClient } from "~/server/clickhouse/clickhouseClient";
 import { traced } from "./tracing";
 import { TraceService } from "../traces/trace.service";
 import { runEvaluationWorkflow } from "../workflows/runWorkflow";
@@ -101,7 +119,7 @@ export function initializeWorkerApp(): App {
 export function initializeDefaultApp(options?: { processRole?: ProcessRole }): App {
   if (globalForApp.__langwatch_app) return globalForApp.__langwatch_app;
 
-  const { prisma } = require("../db") as { prisma: PrismaClient; };
+  const prisma = globalPrisma;
   const config = createAppConfigFromEnv({ processRole: options?.processRole });
 
   const clickhouseEnabled = !!config.clickhouseUrl || isClickHouseEnabled();
@@ -117,6 +135,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
   const redis = config.skipRedis ? null : createRedisConnectionFromConfig({
     url: config.redisUrl,
     clusterEndpoints: config.redisClusterEndpoints,
+    db: config.redisDbIndex,
   });
 
   const broadcast = new BroadcastService(redis);
@@ -154,6 +173,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     "EvaluationRunService",
   );
 
+  const experiments = traced(
+    ExperimentService.create(prisma),
+    "ExperimentService",
+  );
   const organizations = traced(
     new OrganizationService(
       new PrismaOrganizationRepository(prisma),
@@ -231,8 +254,10 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
   let subscription: SubscriptionService | undefined;
   let usageReportingService: StripeUsageReportingService | undefined;
+  let webhookService: WebhookService | undefined;
+  let stripeClient: ReturnType<typeof createStripeClient> | undefined;
   if (config.isSaas) {
-    const stripeClient = createStripeClient();
+    stripeClient = createStripeClient();
     usageReportingService = new StripeUsageReportingService({ stripe: stripeClient, meterId: meters.BILLABLE_EVENTS });
     const seatEventFns = createSeatEventSubscriptionFns({ stripe: stripeClient, db: prisma });
     subscription = EESubscriptionService.create({
@@ -240,6 +265,19 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       db: prisma,
       itemCalculator: subscriptionItemCalculator,
       seatEventFns,
+    });
+    webhookService = EEWebhookService.create({
+      db: prisma,
+      stripe: stripeClient,
+      itemCalculator: subscriptionItemCalculator,
+      // Pass planProvider explicitly — InviteService.create defaults to
+      // getApp().planProvider, but we're still inside initializeDefaultApp
+      // so the App singleton isn't available yet.
+      inviteApprover: InviteService.create(prisma, { planProvider }),
+      licensePurchaseHandler: { handle: handleLicensePurchase },
+      licensePaymentLinkId: env.STRIPE_LICENSE_PAYMENT_LINK_ID,
+      licensePrivateKey: env.LANGWATCH_LICENSE_PRIVATE_KEY,
+      getPostHog: () => getPostHogInstance(),
     });
   }
 
@@ -401,11 +439,32 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     planProvider,
   });
 
+  const queueRepo = redis
+    ? new QueueRedisRepository(redis)
+    : new NullQueueRepository();
+  const replayRepo = redis
+    ? new ReplayRedisRepository(redis)
+    : new NullReplayRepository();
+  const sharedCh = getSharedClickHouseClient();
+  const eventExplorerRepo = sharedCh
+    ? new EventExplorerClickHouseRepository(sharedCh)
+    : new NullEventExplorerRepository();
+
+  const ops = {
+    queues: new QueueService(queueRepo),
+    eventExplorer: new EventExplorerService(eventExplorerRepo),
+    replay: new ReplayService(replayRepo),
+    metricsCollector: redis
+      ? getOpsMetricsCollector({ redis, queueRepo })
+      : null,
+  };
+
   return initializeApp({
     config,
     broadcast,
     traces,
     evaluations,
+    experiments,
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
@@ -415,10 +474,13 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     usage,
     planProvider,
     subscription,
+    webhookService,
+    stripeClient,
     notifications,
     nurturing,
     usageLimits,
     commands,
+    ops,
     _eventSourcing: es,
     _gracefulCloseables: gracefulCloseables,
   });
@@ -426,6 +488,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
 /** Tests — noop commands, null-backed services. */
 export function createTestApp(overrides?: Partial<AppDependencies>): App {
+  const testPrisma = globalPrisma;
   const noop = async () => { };
   const config: AppConfig = {
     nodeEnv: "test",
@@ -478,6 +541,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       execution: void 0 as unknown as AppDependencies["evaluations"]["execution"],
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
+    experiments: ExperimentService.create(testPrisma),
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: { runs: SuiteRunService.create({ resolveClickHouseClient: null, startSuiteRun: noop, queueSimulationRun: noop }) },
     organizations: nullOrganizations,
@@ -499,6 +563,12 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     notifications: NotificationService.createNull(),
     nurturing: undefined,
     usageLimits: UsageLimitService.createNull(),
+    ops: {
+      queues: new QueueService(new NullQueueRepository()),
+      eventExplorer: new EventExplorerService(new NullEventExplorerRepository()),
+      replay: new ReplayService(new NullReplayRepository()),
+      metricsCollector: null,
+    },
     commands: {
       traces: { recordSpan: noop, assignTopic: noop, recordLog: noop, recordMetric: noop, resolveOrigin: noop, addAnnotation: noop, removeAnnotation: noop, bulkSyncAnnotations: noop } satisfies AppCommands["traces"],
       evaluations: {
@@ -511,6 +581,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
         startExperimentRun: noop,
         recordTargetResult: noop,
         recordEvaluatorResult: noop,
+        computeExperimentRunMetrics: noop,
         completeExperimentRun: noop,
       } as AppCommands["experimentRuns"],
       simulations: {

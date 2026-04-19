@@ -152,7 +152,7 @@ describe("onboarding.initializeOrganization integration", () => {
   });
 
   describe("when onboarding completes successfully", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: initializeOrganization sends Slack notification via App singleton and requires IS_SAAS + STRIPE_SECRET_KEY env vars.
     it.skip("creates the organization and dispatches the signup notification", async () => {
       mockSendSlackSignupEvent.mockResolvedValue(undefined);
 
@@ -186,7 +186,7 @@ describe("onboarding.initializeOrganization integration", () => {
   });
 
   describe("when sending the signup notification fails", () => {
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: initializeOrganization sends Slack notification via App singleton and requires IS_SAAS + STRIPE_SECRET_KEY env vars.
     it.skip("still completes onboarding and persists the organization", async () => {
       mockSendSlackSignupEvent.mockRejectedValue(new Error("Slack down"));
 

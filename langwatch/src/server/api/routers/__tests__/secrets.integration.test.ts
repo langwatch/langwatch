@@ -48,7 +48,7 @@ describe("Secrets Endpoints", () => {
 
   describe("create", () => {
     describe("when creating a secret with valid input", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: secrets.create/update/delete call encrypt() which requires CREDENTIALS_SECRET env var (32-byte hex).
       it.skip("creates the secret and returns metadata without the value", async () => {
         const result = await caller.secrets.create({
           projectId,
@@ -64,7 +64,7 @@ describe("Secrets Endpoints", () => {
         expect(result.createdAt).toBeInstanceOf(Date);
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: secrets.create/update/delete call encrypt() which requires CREDENTIALS_SECRET env var (32-byte hex).
       it.skip("encrypts the value in the database", async () => {
         const result = await caller.secrets.create({
           projectId,
@@ -115,7 +115,7 @@ describe("Secrets Endpoints", () => {
     });
 
     describe("when a secret with the same name already exists", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: secrets.create/update/delete call encrypt() which requires CREDENTIALS_SECRET env var (32-byte hex).
       it.skip("returns a CONFLICT error", async () => {
         await caller.secrets.create({
           projectId,
@@ -139,7 +139,7 @@ describe("Secrets Endpoints", () => {
 
   describe("list", () => {
     describe("when listing secrets for a project", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: secrets.create/update/delete call encrypt() which requires CREDENTIALS_SECRET env var (32-byte hex).
       it.skip("returns secrets sorted by name without values", async () => {
         await caller.secrets.create({ projectId, name: "ZEBRA_KEY", value: "v1" });
         await caller.secrets.create({ projectId, name: "ALPHA_KEY", value: "v2" });
@@ -164,7 +164,7 @@ describe("Secrets Endpoints", () => {
 
   describe("update", () => {
     describe("when updating a secret value", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: secrets.create/update/delete call encrypt() which requires CREDENTIALS_SECRET env var (32-byte hex).
       it.skip("replaces the encrypted value in the database", async () => {
         const created = await caller.secrets.create({
           projectId,
@@ -202,7 +202,7 @@ describe("Secrets Endpoints", () => {
 
   describe("delete", () => {
     describe("when deleting a secret", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: secrets.create/update/delete call encrypt() which requires CREDENTIALS_SECRET env var (32-byte hex).
       it.skip("removes the secret from the project", async () => {
         const created = await caller.secrets.create({
           projectId,

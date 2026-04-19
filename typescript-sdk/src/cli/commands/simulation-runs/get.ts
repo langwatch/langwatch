@@ -1,10 +1,59 @@
 import chalk from "chalk";
 import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
+import { formatFetchError } from "../../utils/formatFetchError";
+import { failSpinner } from "../../utils/spinnerError";
+
+/**
+ * Flattens Anthropic-style content (string OR array of {type:text|tool_use|tool_result|thinking})
+ * into a readable single-line string. Thinking blocks are dropped; tool_use shows the tool name;
+ * tool_result inlines the result text. Falls back to JSON.stringify for unknown shapes.
+ */
+function renderContent(raw: unknown): string {
+  if (typeof raw === "string") {
+    // Try one round of JSON parse so single Anthropic blocks (`{"type":"thinking",...}`)
+    // and array-stringified content render as readable text instead of raw JSON.
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("{") || trimmed.startsWith("[")) {
+      try {
+        return renderContent(JSON.parse(trimmed));
+      } catch {
+        return raw;
+      }
+    }
+    return raw;
+  }
+  if (Array.isArray(raw)) {
+    return raw.map(renderContent).filter(Boolean).join("\n");
+  }
+  if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    switch (obj.type) {
+      case "thinking":
+        return ""; // drop reasoning blobs
+      case "text":
+        return typeof obj.text === "string" ? obj.text : "";
+      case "tool_use": {
+        const name = typeof obj.name === "string" ? obj.name : "?";
+        return chalk.yellow(`[tool ${name}]`);
+      }
+      case "tool_result": {
+        const inner = renderContent(obj.content);
+        return inner ? chalk.gray(`[result] `) + inner : "";
+      }
+      default:
+        try { return JSON.stringify(obj); } catch { return ""; }
+    }
+  }
+  if (raw === null || raw === undefined) return "";
+  if (typeof raw === "string") return raw;
+  if (typeof raw === "number" || typeof raw === "boolean") return String(raw);
+  return "";
+}
 
 export const getSimulationRunCommand = async (
   runId: string,
-  options?: { format?: string },
+  options?: { format?: string; full?: boolean },
 ): Promise<void> => {
   checkApiKey();
 
@@ -23,13 +72,8 @@ export const getSimulationRunCommand = async (
     );
 
     if (!response.ok) {
-      if (response.status === 404) {
-        spinner.fail(`Simulation run "${runId}" not found`);
-      } else {
-        const errorBody = await response.text();
-        spinner.fail(`Failed to fetch simulation run (${response.status})`);
-        console.error(chalk.red(`Error: ${errorBody}`));
-      }
+      const message = await formatFetchError(response);
+      spinner.fail(`Failed to fetch simulation run: ${message}`);
       process.exit(1);
     }
 
@@ -103,25 +147,23 @@ export const getSimulationRunCommand = async (
     if (run.messages && run.messages.length > 0) {
       console.log();
       console.log(chalk.bold("  Conversation:"));
+      const truncate = !options?.full;
       for (const msg of run.messages) {
         const roleColor = msg.role === "user" ? chalk.blue
           : msg.role === "assistant" ? chalk.green
           : chalk.gray;
-        const content = msg.content.length > 200
-          ? msg.content.slice(0, 200) + "..."
-          : msg.content;
+        let content = renderContent(msg.content);
+        if (!content) continue;
+        if (truncate && content.length > 400) {
+          content = content.slice(0, 400) + chalk.gray("… (--full to see all)");
+        }
         console.log(`    ${roleColor(`[${msg.role}]`)} ${content}`);
       }
     }
 
     console.log();
   } catch (error) {
-    spinner.fail();
-    console.error(
-      chalk.red(
-        `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-      ),
-    );
+    failSpinner({ spinner, error, action: "fetch simulation run" });
     process.exit(1);
   }
 };

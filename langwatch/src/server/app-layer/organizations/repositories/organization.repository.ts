@@ -221,6 +221,9 @@ export interface OrganizationRepository {
   }): Promise<void>;
   getPricingModel(organizationId: string): Promise<string | null>;
   getStripeCustomerId(organizationId: string): Promise<string | null>;
+  findByStripeCustomerId(
+    stripeCustomerId: string,
+  ): Promise<{ id: string } | null>;
   findNameById(
     organizationId: string,
   ): Promise<{ id: string; name: string } | null>;
@@ -315,6 +318,12 @@ export class NullOrganizationRepository implements OrganizationRepository {
   }
 
   async getStripeCustomerId(_organizationId: string): Promise<string | null> {
+    return null;
+  }
+
+  async findByStripeCustomerId(
+    _stripeCustomerId: string,
+  ): Promise<{ id: string } | null> {
     return null;
   }
 

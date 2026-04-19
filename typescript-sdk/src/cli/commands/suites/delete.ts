@@ -1,10 +1,7 @@
-import chalk from "chalk";
 import ora from "ora";
-import {
-  SuitesApiService,
-  SuitesApiError,
-} from "@/client-sdk/services/suites";
+import { SuitesApiService } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
+import { failSpinner } from "../../utils/spinnerError";
 
 export const deleteSuiteCommand = async (
   id: string,
@@ -24,16 +21,7 @@ export const deleteSuiteCommand = async (
       console.log(JSON.stringify(result, null, 2));
     }
   } catch (error) {
-    spinner.fail();
-    if (error instanceof SuitesApiError) {
-      console.error(chalk.red(`Error: ${error.message}`));
-    } else {
-      console.error(
-        chalk.red(
-          `Error: ${error instanceof Error ? error.message : "Unknown error"}`,
-        ),
-      );
-    }
+    failSpinner({ spinner, error, action: "delete suite" });
     process.exit(1);
   }
 };

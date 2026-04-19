@@ -120,7 +120,6 @@ app.post("/generate", async (c) => {
 
     const result = await generateObject({
       model,
-      mode: "tool",
       schema: scenarioSchema,
       system: SYSTEM_PROMPT,
       prompt: userPrompt,

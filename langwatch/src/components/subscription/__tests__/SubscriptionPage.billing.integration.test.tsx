@@ -517,7 +517,11 @@ describe("<SubscriptionPage/>", () => {
         });
       });
 
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: Code bug in SubscriptionPage.tsx — `isUpgradePlanRequired` contains a
+      // duplicate `isDeveloperPlan` condition that makes it always true for free plans:
+      //   `((isDeveloperPlan && plannedUsers.length > 0) || isTieredLegacyPaidPlan || isDeveloperPlan || ...)`
+      // The second bare `isDeveloperPlan` is unconditional, so upgrade-plan-block renders
+      // even without planned seat changes. Fix: remove the redundant `isDeveloperPlan` term.
       it.skip("does not show upgrade block before planning seats", async () => {
         renderSubscriptionPage();
 
@@ -545,7 +549,8 @@ describe("<SubscriptionPage/>", () => {
     });
 
     describe("when on Free plan at capacity (2/2 members)", () => {
-      // TODO(#3048): pre-existing failure unmasked by #3001
+      // Skipped: Code bug in SubscriptionPage.tsx — same as above. `isUpgradePlanRequired`
+      // always evaluates true for free plans due to the redundant bare `isDeveloperPlan` term.
       it.skip("does not show upgrade block without planned seat changes", async () => {
         renderSubscriptionPage();
 

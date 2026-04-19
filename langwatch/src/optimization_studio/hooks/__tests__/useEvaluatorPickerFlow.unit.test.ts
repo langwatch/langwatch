@@ -439,8 +439,7 @@ describe("useEvaluatorPickerFlow()", () => {
       expect(result.current.pendingEvaluatorRef.current).toBeNull();
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("computes inputs and outputs from evaluatorType when provided", () => {
+    it("computes inputs and outputs from evaluatorType when provided", () => {
       const { result } = renderHook(() => useEvaluatorPickerFlow());
 
       act(() => {
@@ -487,15 +486,13 @@ describe("useEvaluatorPickerFlow()", () => {
             ],
             outputs: [
               { identifier: "passed", type: "bool" },
-              { identifier: "details", type: "str" },
             ],
           }),
         }),
       );
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
-    it.skip("computes score-based outputs for ragas evaluator type", () => {
+    it("computes score-based outputs for ragas evaluator type", () => {
       const { result } = renderHook(() => useEvaluatorPickerFlow());
 
       act(() => {
@@ -541,7 +538,6 @@ describe("useEvaluatorPickerFlow()", () => {
             ],
             outputs: [
               { identifier: "score", type: "float" },
-              { identifier: "details", type: "str" },
             ],
           }),
         }),

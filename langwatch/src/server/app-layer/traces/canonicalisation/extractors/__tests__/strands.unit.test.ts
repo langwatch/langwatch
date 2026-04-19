@@ -156,6 +156,73 @@ describe("StrandsExtractor", () => {
       expect(ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES]).toBeUndefined();
     });
 
+    it("preserves conversation order across interleaved roles", () => {
+      const ctx = createStrandsContext({}, [
+        {
+          name: "gen_ai.user.message",
+          attributes: { content: "First question" },
+        },
+        {
+          name: "gen_ai.assistant.message",
+          attributes: { content: "First answer" },
+        },
+        {
+          name: "gen_ai.user.message",
+          attributes: { content: "Follow-up question" },
+        },
+        {
+          name: "gen_ai.assistant.message",
+          attributes: { content: "Follow-up answer" },
+        },
+        {
+          name: "gen_ai.user.message",
+          attributes: { content: "Current turn" },
+        },
+      ]);
+
+      extractor.apply(ctx);
+
+      const messages = JSON.parse(
+        ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as string,
+      ) as Array<{ role: string; content: string }>;
+      expect(messages).toEqual([
+        { role: "user", content: "First question" },
+        { role: "assistant", content: "First answer" },
+        { role: "user", content: "Follow-up question" },
+        { role: "assistant", content: "Follow-up answer" },
+        { role: "user", content: "Current turn" },
+      ]);
+    });
+
+    it("promotes system message to system_instruction even when not first event", () => {
+      const ctx = createStrandsContext({}, [
+        {
+          name: "gen_ai.user.message",
+          attributes: { content: "Hi" },
+        },
+        {
+          name: "gen_ai.system.message",
+          attributes: { content: "Be helpful" },
+        },
+        {
+          name: "gen_ai.assistant.message",
+          attributes: { content: "Hello!" },
+        },
+      ]);
+
+      extractor.apply(ctx);
+
+      expect(ctx.out[ATTR_KEYS.GEN_AI_SYSTEM_INSTRUCTIONS]).toBe("Be helpful");
+
+      const messages = JSON.parse(
+        ctx.out[ATTR_KEYS.GEN_AI_INPUT_MESSAGES] as string,
+      ) as Array<{ role: string }>;
+      expect(messages).toEqual([
+        { role: "user", content: "Hi" },
+        { role: "assistant", content: "Hello!" },
+      ]);
+    });
+
     it("strips system messages from input and promotes to system_instruction", () => {
       const ctx = createStrandsContext({}, [
         {

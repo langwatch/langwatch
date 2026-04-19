@@ -70,13 +70,15 @@ export const uploadCommand = async (
       console.log();
       console.log(`  ${chalk.bold("Slug:")}    ${result.dataset.slug}`);
       console.log(`  ${chalk.bold("ID:")}      ${result.dataset.id}`);
+      if (result.dataset.platformUrl) {
+        console.log(`  ${chalk.bold("View:")}    ${chalk.underline(result.dataset.platformUrl)}`);
+      }
     } else {
       spinner.succeed(
         `Uploaded ${filename} to "${chalk.cyan(slugOrId)}" (${recordCount} record${recordCount !== 1 ? "s" : ""})`,
       );
     }
   } catch (error) {
-    spinner.fail("Failed to upload file");
-    handleDatasetCommandError(error, "uploading file");
+    handleDatasetCommandError({ spinner, error, context: "upload file" });
   }
 };

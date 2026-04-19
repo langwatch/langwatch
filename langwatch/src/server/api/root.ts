@@ -51,6 +51,7 @@ import { roleBindingRouter } from "./routers/roleBinding";
 import { groupRouter } from "./routers/group";
 import { userRouter } from "./routers/user";
 import { workflowRouter } from "./routers/workflows";
+import { opsRouter } from "./routers/ops";
 
 const coreRouters = {
   agents: agentsRouter,
@@ -103,6 +104,7 @@ const coreRouters = {
   scimToken: scimTokenRouter,
   roleBinding: roleBindingRouter,
   group: groupRouter,
+  ops: opsRouter,
 };
 
 const eeRouters = {

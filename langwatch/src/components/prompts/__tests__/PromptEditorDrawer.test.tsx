@@ -91,6 +91,9 @@ vi.mock("~/optimization_studio/components/nodes/Nodes", () => ({
   TypeLabel: ({ type }: { type: string }) => <span>{type}</span>,
 }));
 
+// Track initialConfigValues passed to usePromptConfigForm
+const capturedInitialConfigValues: unknown[] = [];
+
 // Mock usePromptConfigForm to return a real form
 const mockDefaultFormValues = {
   isNew: true,
@@ -112,6 +115,7 @@ vi.mock("~/prompts/hooks/usePromptConfigForm", () => ({
   }: {
     initialConfigValues?: unknown;
   }) => {
+    capturedInitialConfigValues.push(initialConfigValues);
     // eslint-disable-next-line react-hooks/rules-of-hooks
     const methods = useForm({
       defaultValues: initialConfigValues ?? mockDefaultFormValues,
@@ -269,9 +273,20 @@ vi.mock("~/components/outputs", () => ({
   FormOutputsSection: () => <div data-testid="outputs-field">Outputs</div>,
 }));
 
-// Mock buildDefaultFormValues
+// Mock buildDefaultFormValues — supports overrides to test initialLocalConfig seeding
 vi.mock("~/prompts/utils/buildDefaultFormValues", () => ({
-  buildDefaultFormValues: () => mockDefaultFormValues,
+  buildDefaultFormValues: (
+    overrides?: Record<string, unknown>,
+  ) => {
+    if (!overrides) return mockDefaultFormValues;
+    // Deep merge overrides into defaults (simplified for test)
+    const merged = JSON.parse(JSON.stringify(mockDefaultFormValues));
+    const ov = overrides as any;
+    if (ov?.version?.configData) {
+      Object.assign(merged.version.configData, ov.version.configData);
+    }
+    return merged;
+  },
 }));
 
 // Mock the conversion utils
@@ -320,6 +335,7 @@ const renderWithProviders = (ui: React.ReactElement) => {
 describe("PromptEditorDrawer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    capturedInitialConfigValues.length = 0;
     mockGetByIdOrHandle.mockReturnValue({ data: undefined, isLoading: false });
     // Default: form values equal saved values (no changes)
     mockAreFormValuesEqual.mockReturnValue(true);
@@ -919,12 +935,86 @@ describe("PromptEditorDrawer", () => {
     });
   });
 
+  describe("when initialLocalConfig has custom inputs (#3155 regression)", () => {
+    it("initializes form with custom inputs instead of default 'input' field", () => {
+      const initialLocalConfig = {
+        llm: { model: "openai/gpt-5-mini" },
+        messages: [
+          {
+            role: "user" as const,
+            content: "Check this for bias: {{llm_output}}",
+          },
+        ],
+        inputs: [{ identifier: "llm_output", type: "str" as const }],
+        outputs: [{ identifier: "output", type: "str" as const }],
+      };
+
+      renderWithProviders(
+        <PromptEditorDrawer
+          open={true}
+          initialLocalConfig={initialLocalConfig}
+          onLocalConfigChange={vi.fn()}
+        />,
+      );
+
+      // The very first configValues passed to usePromptConfigForm must
+      // contain the custom "llm_output" input, NOT the default "input".
+      // Before the fix, configValues was always buildDefaultFormValues()
+      // which has inputs: [{identifier: "input"}], causing a race where
+      // the form watch fires with "input" before the init effect runs.
+      const firstCall = capturedInitialConfigValues[0] as Record<
+        string,
+        unknown
+      >;
+      const inputs = (
+        firstCall as {
+          version: {
+            configData: { inputs: Array<{ identifier: string }> };
+          };
+        }
+      ).version.configData.inputs;
+      expect(inputs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ identifier: "llm_output" }),
+        ]),
+      );
+      expect(inputs).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ identifier: "input" }),
+        ]),
+      );
+    });
+
+    it("keeps default 'input' field when no initialLocalConfig is provided", () => {
+      renderWithProviders(<PromptEditorDrawer open={true} />);
+
+      const firstCall = capturedInitialConfigValues[0] as {
+        version: { configData: { inputs: Array<{ identifier: string }> } };
+      };
+      const inputs = firstCall.version.configData.inputs;
+      expect(inputs).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ identifier: "input" }),
+        ]),
+      );
+    });
+  });
+
   describe("License enforcement (prompts limit)", () => {
     beforeEach(() => {
       mockGetByIdOrHandle.mockReturnValue({ data: undefined, isLoading: false });
     });
 
-    // TODO(#3048): pre-existing failure unmasked by #3001
+    // Skipped: The save button for new prompts is disabled (shows "Saved") until
+    // `hasUnsavedChanges` becomes true. That state is driven by a react-hook-form
+    // watch() subscription set up in a useEffect, which fires asynchronously after
+    // mount when form values actually change — not on initial render. Since the
+    // test uses a mocked form with pre-filled content but never triggers a form
+    // value change event, the subscription never fires and the button stays disabled,
+    // so the ChangeHandleDialog never opens and checkAndProceed is never reached.
+    // Fix requires either: (a) firing a real input change event to trigger the
+    // watch subscription, or (b) initialising hasUnsavedChanges eagerly for new
+    // prompts when the form already has content on mount.
     it.skip("calls checkAndProceed when creating new prompt", async () => {
       // For new prompts, hasUnsavedChanges is true when messages have content
       // Set message content so save button is enabled

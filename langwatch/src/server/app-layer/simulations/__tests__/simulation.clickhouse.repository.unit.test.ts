@@ -381,12 +381,12 @@ describe("SimulationClickHouseRepository", () => {
             {
               BatchRunId: "batch-1",
               MaxCreatedAt: "3000",
-              ScenarioSetId: "__internal__foo__suite",
+              NormalizedSetId: "__internal__foo__suite",
             },
             {
               BatchRunId: "batch-2",
               MaxCreatedAt: "2000",
-              ScenarioSetId: "__internal__bar__suite",
+              NormalizedSetId: "__internal__bar__suite",
             },
           ],
           [
@@ -445,12 +445,12 @@ describe("SimulationClickHouseRepository", () => {
             {
               BatchRunId: "batch-1",
               MaxCreatedAt: "3000",
-              ScenarioSetId: "__internal__a__suite",
+              NormalizedSetId: "__internal__a__suite",
             },
             {
               BatchRunId: "batch-2",
               MaxCreatedAt: "2000",
-              ScenarioSetId: "__internal__b__suite",
+              NormalizedSetId: "__internal__b__suite",
             },
           ],
           [
