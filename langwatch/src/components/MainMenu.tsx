@@ -1,6 +1,17 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import { Activity, Anvil, Film, History, Shield } from "lucide-react";
+import {
+  Activity,
+  Anvil,
+  FileClock,
+  Film,
+  Gauge,
+  History,
+  KeyRound,
+  LineChart,
+  Plug,
+  Shield,
+} from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
 import { useOpsPermission } from "../hooks/useOpsPermission";
@@ -248,7 +259,7 @@ export const MainMenu = React.memo(function MainMenu({
                 showLabel={showExpanded}
                 children={[
                   {
-                    icon: featureIcons.gateway.icon,
+                    icon: KeyRound,
                     label: projectRoutes.gateway_virtual_keys.title,
                     href: projectRoutes.gateway_virtual_keys.path.replace(
                       "[project]",
@@ -261,7 +272,7 @@ export const MainMenu = React.memo(function MainMenu({
                   ...(hasPermission("gatewayBudgets:view")
                     ? [
                         {
-                          icon: featureIcons.gateway.icon,
+                          icon: Gauge,
                           label: projectRoutes.gateway_budgets.title,
                           href: projectRoutes.gateway_budgets.path.replace(
                             "[project]",
@@ -276,7 +287,7 @@ export const MainMenu = React.memo(function MainMenu({
                   ...(hasPermission("gatewayProviders:view")
                     ? [
                         {
-                          icon: featureIcons.gateway.icon,
+                          icon: Plug,
                           label: projectRoutes.gateway_providers.title,
                           href: projectRoutes.gateway_providers.path.replace(
                             "[project]",
@@ -291,7 +302,7 @@ export const MainMenu = React.memo(function MainMenu({
                   ...(hasPermission("gatewayUsage:view")
                     ? [
                         {
-                          icon: featureIcons.gateway.icon,
+                          icon: LineChart,
                           label: projectRoutes.gateway_usage.title,
                           href: projectRoutes.gateway_usage.path.replace(
                             "[project]",
@@ -304,7 +315,7 @@ export const MainMenu = React.memo(function MainMenu({
                   ...(hasPermission("gatewayLogs:view")
                     ? [
                         {
-                          icon: featureIcons.gateway.icon,
+                          icon: FileClock,
                           label: projectRoutes.gateway_audit.title,
                           href: projectRoutes.gateway_audit.path.replace(
                             "[project]",
