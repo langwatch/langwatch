@@ -160,9 +160,11 @@ function BudgetsPage() {
                         </VStack>
                       </Table.Cell>
                       <Table.Cell>
-                        <Badge colorPalette="gray">
-                          {b.scopeType.toLowerCase()}
-                        </Badge>
+                        <ScopeCell
+                          scopeType={b.scopeType}
+                          scopeTarget={b.scopeTarget ?? null}
+                          projectSlug={project?.slug ?? null}
+                        />
                       </Table.Cell>
                       <Table.Cell>
                         <Badge variant="subtle" colorPalette="gray">
@@ -298,6 +300,53 @@ function BudgetsPage() {
         onConfirm={confirmArchive}
       />
     </GatewayLayout>
+  );
+}
+
+type ScopeTarget = {
+  kind: string;
+  id: string;
+  name: string;
+  secondary?: string | null;
+  projectSlug?: string | null;
+};
+
+function ScopeCell({
+  scopeType,
+  scopeTarget,
+  projectSlug,
+}: {
+  scopeType: string;
+  scopeTarget: ScopeTarget | null;
+  projectSlug: string | null;
+}) {
+  const kindLabel = scopeType.toLowerCase().replace("_", " ");
+  const vkHref =
+    scopeTarget?.kind === "VIRTUAL_KEY"
+      ? `/${scopeTarget.projectSlug ?? projectSlug ?? ""}/gateway/virtual-keys/${scopeTarget.id}`
+      : null;
+  return (
+    <VStack align="start" gap={0.5}>
+      <Badge colorPalette="gray">{kindLabel}</Badge>
+      {scopeTarget && (
+        <HStack gap={1}>
+          {vkHref ? (
+            <Link href={vkHref} color="orange.600" fontSize="xs">
+              {scopeTarget.name}
+            </Link>
+          ) : (
+            <Text fontSize="xs" fontWeight="medium">
+              {scopeTarget.name}
+            </Text>
+          )}
+          {scopeTarget.secondary && (
+            <Text fontSize="2xs" color="fg.muted">
+              ({scopeTarget.secondary})
+            </Text>
+          )}
+        </HStack>
+      )}
+    </VStack>
   );
 }
 
