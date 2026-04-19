@@ -556,8 +556,7 @@
               "ai-gateway/cookbooks/multi-tenant-reseller",
               "ai-gateway/cookbooks/prometheus-alerts",
               "ai-gateway/cookbooks/grafana-dashboard",
-              "ai-gateway/cookbooks/production-runbook",
-              "ai-gateway/cookbooks/disaster-recovery"
+              "ai-gateway/cookbooks/production-runbook"
             ]
           }
         ]
