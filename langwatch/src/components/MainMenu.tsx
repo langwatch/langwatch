@@ -338,6 +338,20 @@ export const MainMenu = React.memo(function MainMenu({
                           },
                         ]
                       : []),
+                    ...(hasPermission("gatewayLogs:view")
+                      ? [
+                          {
+                            icon: FileClock,
+                            label: projectRoutes.gateway_audit.title,
+                            href: projectRoutes.gateway_audit.path.replace(
+                              "[project]",
+                              project.slug,
+                            ),
+                            isActive:
+                              router.pathname.includes("/gateway/audit"),
+                          },
+                        ]
+                      : []),
                   ]}
                 />
               </>
