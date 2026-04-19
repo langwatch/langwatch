@@ -1571,6 +1571,12 @@ func (d *Dispatcher) ServeEmbeddings(w http.ResponseWriter, r *http.Request, b *
 		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "model_resolve_failed", err.Error(), "model")
 		return
 	}
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrModel, resolved.Model)
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOperationName, "embeddings")
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIRequestModel, resolved.Model)
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAISystem, string(resolved.Provider))
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrProvider, string(resolved.Provider))
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrModelSource, string(resolved.Source))
 	// Bifrost v1.4.22 validates `req.Input == nil || all-nested-nil` on
 	// embedding requests BEFORE honouring the raw-body passthrough flag
 	// (core/bifrost.go:922). Stub a non-nil Input with empty text so
@@ -1595,11 +1601,33 @@ func (d *Dispatcher) ServeEmbeddings(w http.ResponseWriter, r *http.Request, b *
 		d.writeBifrostError(w, reqID, berr)
 		return
 	}
-	d.enqueueDebit(b, grq, resolved, 0, 0, 0, 0, 0, time.Since(t0).Milliseconds(), "success")
+	in, _ := extractEmbeddingUsage(resp)
+	d.enqueueDebit(b, grq, resolved, in, 0, 0, 0, 0, time.Since(t0).Milliseconds(), "success")
+	if in > 0 {
+		gwotel.AddInt64Attr(r.Context(), gwotel.AttrUsageIn, int64(in))
+		gwotel.AddInt64Attr(r.Context(), gwotel.AttrGenAIUsageTotalTokens, int64(in))
+	}
+	gwotel.AddInt64Attr(r.Context(), gwotel.AttrDurationMS, time.Since(t0).Milliseconds())
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrStatus, "success")
+	if resp != nil && resp.Model != "" {
+		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIResponseModel, resp.Model)
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-LangWatch-Request-Id", reqID)
 	w.Header().Set("X-LangWatch-Provider", string(resolved.Provider))
 	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// extractEmbeddingUsage pulls the prompt token count off a Bifrost
+// embedding response. Embeddings only have input tokens — no
+// generation side — so we return a single (in, ok) pair. Falls back
+// to 0 when Usage is absent, matching the #74 contract "no usage →
+// omit, don't zero".
+func extractEmbeddingUsage(resp *bfschemas.BifrostEmbeddingResponse) (int, bool) {
+	if resp == nil || resp.Usage == nil {
+		return 0, false
+	}
+	return resp.Usage.PromptTokens, true
 }
 
 // writeBifrostError translates a bifrost error into our OpenAI-compat
