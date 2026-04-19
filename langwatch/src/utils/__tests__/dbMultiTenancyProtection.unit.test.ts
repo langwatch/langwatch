@@ -124,6 +124,40 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
       ).resolves.toBe("ok");
     });
   });
+
+  describe("findMany on GatewayCacheRule with only organizationId filter", () => {
+    it("does NOT throw (org-scoped; cache rules apply across every VK in the org)", async () => {
+      await expect(
+        runGuard({
+          model: "GatewayCacheRule",
+          action: "findMany",
+          args: { where: { organizationId: "org_01", archivedAt: null } },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
+
+  describe("create on GatewayCacheRule without projectId in data", () => {
+    it("does NOT throw — cache rules carry organizationId, never projectId", async () => {
+      await expect(
+        runGuard({
+          model: "GatewayCacheRule",
+          action: "create",
+          args: {
+            data: {
+              organizationId: "org_01",
+              name: "force-cache-on-enterprise",
+              priority: 200,
+              matchers: { vk_tags: ["tier=enterprise"] },
+              action: { mode: "force", ttl: 300 },
+              modeEnum: "FORCE",
+              createdById: "usr_01",
+            },
+          },
+        }),
+      ).resolves.toBe("ok");
+    });
+  });
 });
 
 describe("guardProjectId — project-scoped gateway models still guarded", () => {
