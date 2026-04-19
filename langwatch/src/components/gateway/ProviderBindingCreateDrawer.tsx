@@ -9,7 +9,6 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { X } from "lucide-react";
 import { useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -23,7 +22,11 @@ type ProviderBindingCreateDrawerProps = {
   onCreated: () => void;
 };
 
-type RotationPolicy = "MANUAL" | "AUTO" | "EXTERNAL_SECRET_STORE";
+// Rotation policy: v1 ships MANUAL only. Scheduled rotation + external
+// secret store integration are v1.1; the field is omitted from the
+// create UI since there's only one valid value — the column stays in
+// the DB (defaulted to MANUAL) so forward-compat works when v1.1
+// lands. See iter 56 dogfood feedback.
 
 export function ProviderBindingCreateDrawer({
   projectId,
@@ -33,7 +36,6 @@ export function ProviderBindingCreateDrawer({
 }: ProviderBindingCreateDrawerProps) {
   const [modelProviderId, setModelProviderId] = useState("");
   const [slot, setSlot] = useState("primary");
-  const [rotationPolicy, setRotationPolicy] = useState<RotationPolicy>("MANUAL");
   const [rateLimitRpm, setRateLimitRpm] = useState("");
   const [rateLimitTpm, setRateLimitTpm] = useState("");
 
@@ -56,7 +58,6 @@ export function ProviderBindingCreateDrawer({
   const reset = () => {
     setModelProviderId("");
     setSlot("primary");
-    setRotationPolicy("MANUAL");
     setRateLimitRpm("");
     setRateLimitTpm("");
   };
@@ -77,7 +78,6 @@ export function ProviderBindingCreateDrawer({
         projectId,
         modelProviderId,
         slot: slot || undefined,
-        rotationPolicy,
         rateLimitRpm: rateLimitRpm ? Number.parseInt(rateLimitRpm, 10) : null,
         rateLimitTpm: rateLimitTpm ? Number.parseInt(rateLimitTpm, 10) : null,
       });
@@ -86,7 +86,8 @@ export function ProviderBindingCreateDrawer({
       onOpenChange(false);
     } catch (error) {
       toaster.create({
-        title: error instanceof Error ? error.message : "Failed to bind provider",
+        title:
+          error instanceof Error ? error.message : "Failed to bind provider",
         type: "error",
       });
     }
@@ -99,9 +100,7 @@ export function ProviderBindingCreateDrawer({
   const boundIds = new Set(
     (existingBindingsQuery.data ?? []).map((b) => b.modelProviderId),
   );
-  const available = enabledProviders.filter(
-    (p: any) => !boundIds.has(p.id),
-  );
+  const available = enabledProviders.filter((p: any) => !boundIds.has(p.id));
 
   return (
     <Drawer.Root
@@ -112,19 +111,8 @@ export function ProviderBindingCreateDrawer({
     >
       <Drawer.Content>
         <Drawer.Header>
-          <HStack width="full">
-            <Drawer.Title>Bind provider to gateway</Drawer.Title>
-            <Spacer />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={close}
-              disabled={createMutation.isPending}
-              aria-label="Close"
-            >
-              <X size={16} />
-            </Button>
-          </HStack>
+          <Drawer.Title>Bind provider to gateway</Drawer.Title>
+          <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
           <VStack align="stretch" gap={4}>
@@ -168,25 +156,10 @@ export function ProviderBindingCreateDrawer({
                 Logical name used in the fallback chain. Defaults to "primary".
               </Field.HelperText>
             </Field.Root>
-            <Field.Root>
-              <Field.Label>Rotation policy</Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  value={rotationPolicy}
-                  onChange={(e) =>
-                    setRotationPolicy(
-                      (e.target.value as RotationPolicy) ?? "MANUAL",
-                    )
-                  }
-                >
-                  <option value="MANUAL">Manual</option>
-                  <option value="AUTO">Automatic (rotate on schedule)</option>
-                  <option value="EXTERNAL_SECRET_STORE">
-                    External secret store (HashiCorp Vault, etc.)
-                  </option>
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-            </Field.Root>
+            {/* Rotation policy field intentionally omitted — v1 is
+                manual-only (see iter 56 dogfood). Backend defaults
+                new rows to MANUAL; v1.1 lands scheduled rotation +
+                external-secret-store integration. */}
             <HStack gap={4} align="flex-start">
               <Field.Root flex={1}>
                 <Field.Label>Rate limit (rpm)</Field.Label>

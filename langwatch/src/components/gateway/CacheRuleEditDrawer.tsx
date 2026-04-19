@@ -1,5 +1,4 @@
 import { Button, HStack, Spacer } from "@chakra-ui/react";
-import { X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
@@ -100,19 +99,8 @@ export function CacheRuleEditDrawer({ rule, onOpenChange, onSaved }: Props) {
     >
       <Drawer.Content>
         <Drawer.Header>
-          <HStack width="full">
-            <Drawer.Title>Edit cache rule</Drawer.Title>
-            <Spacer />
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleClose}
-              aria-label="Close"
-              disabled={updateMutation.isPending}
-            >
-              <X size={16} />
-            </Button>
-          </HStack>
+          <Drawer.Title>Edit cache rule</Drawer.Title>
+          <Drawer.CloseTrigger />
         </Drawer.Header>
         <Drawer.Body>
           <CacheRuleForm state={state} onChange={setState} />
