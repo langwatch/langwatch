@@ -671,3 +671,4 @@ Auth: existing LangWatch API tokens (personal access or service-account) present
 ## 13. Changelog
 
 - **v0.1 (2026-04-18)** — Initial draft consolidated from @sergey + @alexis proposals. @andr ships as base for iteration.
+- **v0.1.1 (2026-04-19)** — Audit for iters 17–22 drift. Wire contract unchanged: §4.3 `/changes` already documents `organization_id` as required (iter 17 landed against this). Iters 18 (NetworkPolicy), 19 (gateway-CI), 20 (startup netcheck), 21 (outbox metrics), 22 (admin bearer-token) are all deployment/operational — they don't alter any wire surface documented in §§3–12. No contract changes required.

@@ -127,7 +127,7 @@ ClickHouse:
 
 In a self-hosted deployment, the gateway and control plane both run in your infrastructure. Data never leaves your cluster except on outbound calls to LLM providers. You own every secret, every KMS key, every audit log, and every trace.
 
-The gateway Helm chart ships a deny-by-default `NetworkPolicy` (opt-in, iter 18) that locks lateral traffic — only `ingress-nginx` and Prometheus can reach the pod, and egress is limited to DNS, the control plane, Redis (if configured), OTLP (if configured), and provider upstream IPs. Operator debug surfaces (pprof, iter 14) are loopback-bound and unreachable over any Service. See [Self-Hosting → Helm → NetworkPolicy](/ai-gateway/self-hosting/helm#networkpolicy-iter-18-cd0506a).
+The gateway Helm chart ships a deny-by-default `NetworkPolicy` (opt-in, iter 18) that locks lateral traffic — only `ingress-nginx` and Prometheus can reach the pod, and egress is limited to DNS, the control plane, Redis (if configured), OTLP (if configured), and provider upstream IPs. The operator debug surface (pprof, iter 14) is loopback-bound by default and unreachable over any Service; deployments that need direct access can bind non-loopback with a required bearer token (iter 22) — the gateway refuses to start in the bind-public-without-token configuration. See [Self-Hosting → Helm → NetworkPolicy](/ai-gateway/self-hosting/helm#networkpolicy-iter-18-cd0506a) and [Self-Hosting → Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener-iter-22-af796b8).
 
 See [Self-Hosting → Helm](/ai-gateway/self-hosting/helm) for the deployment topology.
 

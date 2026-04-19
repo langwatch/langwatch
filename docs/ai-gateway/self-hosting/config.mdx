@@ -97,9 +97,21 @@ Shipped in langwatch-saas `5fe8486` (@sergey Lane A iter 4 pt4) wired to `observ
 
 | Var | Default | Purpose |
 |---|---|---|
-| `GATEWAY_ADMIN_ADDR` | `127.0.0.1:6060` | Loopback-bound listener exposing Go `net/http/pprof` for heap / goroutine / profile / allocs / mutex / block dumps. **Never** reachable from the NLB — separate HTTP server, loopback interface, opt-out via empty string |
+| `GATEWAY_ADMIN_ADDR` | `127.0.0.1:6060` | Listener exposing Go `net/http/pprof` for heap / goroutine / profile / allocs / mutex / block dumps. Default is loopback-only — reachable exclusively via `kubectl port-forward`. Set to empty string to disable the listener entirely. Set to `0.0.0.0:6060` (or similar) to listen non-loopback; **in that case a bearer token is required** (iter 22) |
+| `GATEWAY_ADMIN_AUTH_TOKEN` | *(empty)* | Bearer token guarding the admin listener (iter 22, `af796b8`). Compared via `crypto/subtle.ConstantTimeCompare`. Required whenever `GATEWAY_ADMIN_ADDR` is non-loopback and `GATEWAY_ALLOW_INSECURE` is unset; the gateway refuses to start otherwise with a clear error naming both env vars |
+| `GATEWAY_ALLOW_INSECURE` | `false` | Escape hatch to run a non-loopback admin listener without a bearer token. Exists for test harnesses — never set this in production |
 
-Operator workflow (safe-by-default because the port isn't in any Service):
+Three deployment postures for the admin listener:
+
+**1. Disabled.** Set `GATEWAY_ADMIN_ADDR=""`. No pprof at all. Pick this for compliance-regulated deployments where live profiling is not permitted.
+
+**2. Loopback-only (default).** `GATEWAY_ADMIN_ADDR=127.0.0.1:6060`, no token. Operator access is via `kubectl port-forward` through the Kubernetes API server, which is auditable in cluster audit logs. Bearer token is optional and works as a second defence layer.
+
+**3. Bearer-gated non-loopback.** `GATEWAY_ADMIN_ADDR=0.0.0.0:6060` + `GATEWAY_ADMIN_AUTH_TOKEN` in a Kubernetes Secret. Pick this for non-k8s deployments (systemd / Nomad / plain Docker) where port-forward isn't available, or when you want direct access through your cluster's internal LB.
+
+See [Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener-iter-22-af796b8) for the Helm values shape.
+
+Operator workflow (loopback posture, safe-by-default because the port isn't in any Service):
 
 ```bash
 # Forward the admin port from a specific pod

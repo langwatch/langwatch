@@ -38,9 +38,13 @@ gateway:
     LW_GATEWAY_CIRCUIT_WINDOW_SEC: "60"
 
   # Admin / pprof listener (Lane A iter 14) — loopback-bound by default.
-  # kubectl port-forward is the only supported access path; DO NOT expose.
+  # kubectl port-forward is the supported access path in the default posture.
+  # For non-k8s deploys that can't port-forward, bind non-loopback AND supply
+  # an existingAuthSecretName to gate the listener with a bearer token (iter 22).
   admin:
     addr: "127.0.0.1:6060"   # set to "" to disable pprof entirely
+    # existingAuthSecretName: gateway-admin-token  # optional bearer gate
+    # authSecretKey: token                         # default "token"
 
   # Budget outbox tuning (Lane A iter 16)
   budget:
@@ -183,6 +187,93 @@ kubectl logs -n langwatch deploy/langwatch-gateway | grep -E 'dns resolution fai
 ```
 
 The probe is disabled by default (empty list) so greenfield and air-gapped-via-forward-proxy deploys are unaffected. `helm upgrade` on an existing deploy without overriding `startup.netcheckHosts` renders the same ConfigMap it would have pre-iter-20.
+
+## Admin listener (iter 22, `af796b8`)
+
+The gateway's `net/http/pprof` diagnostic surface ships behind a dedicated listener. Three deployment postures, pick the one that matches your cluster:
+
+### Posture 1: disabled
+
+```yaml
+gateway:
+  admin:
+    addr: ""
+```
+
+No pprof. Use this for compliance-regulated deployments that forbid live profiling. Forfeits the [production runbook](/ai-gateway/cookbooks/production-runbook) recipes — you're back to restart-as-debugging for p99 spikes, goroutine leaks, etc.
+
+### Posture 2: loopback-only (default)
+
+```yaml
+gateway:
+  admin:
+    addr: "127.0.0.1:6060"
+    # existingAuthSecretName: <unset>   # optional, works as a defence-in-depth layer
+```
+
+Listener binds `127.0.0.1:6060`, reachable only via `kubectl port-forward`. This is the default posture and appropriate for k8s deployments — `kubectl port-forward` tunnels through the Kubernetes API server, so every access is authenticated against your cluster's RBAC and logged in the cluster audit trail.
+
+Supplying `existingAuthSecretName` in this posture is allowed and recommended as a second layer of defence — the listener still binds loopback but also requires the bearer token.
+
+### Posture 3: bearer-gated non-loopback
+
+```yaml
+gateway:
+  admin:
+    addr: "0.0.0.0:6060"
+    existingAuthSecretName: gateway-admin-token
+    authSecretKey: token                # key within the Secret; default "token"
+```
+
+Where:
+
+```bash
+kubectl create secret generic gateway-admin-token \
+  --from-literal=token="$(openssl rand -hex 32)" \
+  -n langwatch
+```
+
+Listener binds on all interfaces and enforces `Authorization: Bearer <token>` on every request. Token comparison uses `crypto/subtle.ConstantTimeCompare` — no timing side-channel on length or prefix. The chart NEVER materialises the token into its own values or ConfigMap; only the reference to the pre-existing Secret flows through.
+
+Pick this for:
+- non-k8s deploys (systemd, Nomad, plain Docker) where `kubectl port-forward` isn't available;
+- k8s deploys behind a corporate VPN or internal LB where operators want direct HTTP access without going through `kubectl exec`.
+
+### Safety net
+
+The gateway's `config.validate()` runs at startup and enforces:
+
+> **Non-loopback `GATEWAY_ADMIN_ADDR` + empty `GATEWAY_ADMIN_AUTH_TOKEN` + unset `GATEWAY_ALLOW_INSECURE`** ⇒ the gateway refuses to start with an error naming both env vars.
+
+This is the critical safety net: an operator who accidentally binds the admin listener to `0.0.0.0` without a token won't silently expose unauthenticated pprof to the pod network. The pod crashes, k8s backs off, and the boot logs name the env variable to fix. `GATEWAY_ALLOW_INSECURE=true` exists only for test harnesses — never set it in production.
+
+### Accessing pprof with the bearer token
+
+```bash
+TOKEN=$(kubectl get secret gateway-admin-token -n langwatch -o jsonpath='{.data.token}' | base64 -d)
+
+# pprof's -source_token flag threads the Authorization header through
+go tool pprof \
+  -source_token "Bearer $TOKEN" \
+  http://gateway.your-corp.internal:6060/debug/pprof/heap
+
+# Or curl-based workflow
+curl -sS -H "Authorization: Bearer $TOKEN" \
+  http://gateway.your-corp.internal:6060/debug/pprof/goroutine?debug=1 \
+  | head -100
+```
+
+Every `RequireBearer` 401 emits a clean `WWW-Authenticate: Bearer realm=gateway-admin` challenge. Credentials monitoring (GitHub secret-scanning, Cloudflare Secret Scanner) will pick up accidental commits of the token — rotate via the standard Secret rotation flow if that happens.
+
+### Observability
+
+The startup log line is enriched with `auth_required` and `loopback_only` booleans so operators have an audit breadcrumb:
+
+```json
+{"msg":"admin_listening","addr":"0.0.0.0:6060","auth_required":true,"loopback_only":false}
+```
+
+Grep for this in your log pipeline if you want to assert on it in a compliance check.
 
 ## NetworkPolicy (iter 18, `cd0506a`)
 
