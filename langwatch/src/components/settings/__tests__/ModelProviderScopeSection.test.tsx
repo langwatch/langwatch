@@ -90,7 +90,34 @@ describe("ProviderScopeSection", () => {
   });
 
   describe("when the provider already exists", () => {
-    it("does not render (scope cannot be changed after create)", () => {
+    it("renders a read-only scope badge in an org/team context (finding #81)", () => {
+      render(
+        <Wrapper>
+          <ProviderScopeSection
+            state={buildState()}
+            actions={buildActions()}
+            provider={{ ...existingProvider, scopeType: "ORGANIZATION" } as any}
+            teamId="team_1"
+            organizationId="org_1"
+          />
+        </Wrapper>,
+      );
+
+      expect(screen.getByText(/Availability/i)).toBeInTheDocument();
+      expect(screen.getByText(/^Organization$/i)).toBeInTheDocument();
+      // No radios — read-only
+      expect(screen.queryAllByRole("radio")).toHaveLength(0);
+      // Helper copy for the reparent-means-recreate contract
+      expect(
+        screen.getByText(/Scope is fixed after create/i),
+      ).toBeInTheDocument();
+    });
+
+    it("shows 'Project' badge for a project-scoped row when org/team exists", () => {
+      // acme-demo (organization present) + legacy PROJECT-scoped row.
+      // Rendering the Project badge in-drawer is fine — users need scope
+      // context while editing, unlike in the list where 100% of rows being
+      // Project-scoped would be visual noise.
       render(
         <Wrapper>
           <ProviderScopeSection
@@ -99,6 +126,22 @@ describe("ProviderScopeSection", () => {
             provider={existingProvider}
             teamId="team_1"
             organizationId="org_1"
+          />
+        </Wrapper>,
+      );
+
+      expect(screen.getByText(/^Project$/i)).toBeInTheDocument();
+    });
+
+    it("does not render for a project-scoped row on a personal-account project (no org/team)", () => {
+      render(
+        <Wrapper>
+          <ProviderScopeSection
+            state={buildState()}
+            actions={buildActions()}
+            provider={existingProvider}
+            teamId={undefined}
+            organizationId={undefined}
           />
         </Wrapper>,
       );
