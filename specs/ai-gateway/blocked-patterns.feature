@@ -166,17 +166,18 @@ Feature: Blocked patterns — regex policy on tools, MCP servers, URLs, and mode
   # §7. Observability
   # ─────────────────────────────────────────────────────────────────────────
 
-  Scenario: Trace attribute langwatch.policy.blocked records the match
+  Scenario: Blocked request returns the proper gwerrors envelope
     Given a request is blocked by blocked_patterns.tools.deny
-    Then the trace has span attribute "langwatch.policy.blocked" = "tools:^shell\\."
-    And span attribute "langwatch.status" = "blocked"
-    And span attribute "langwatch.provider" is absent (no dispatch happened)
-
-  Scenario: Metric gateway_blocked_requests_total{dimension,reason} increments per block
-    Given requests are blocked across all 4 dimensions (tools / mcp / urls / models)
-    Then gateway_blocked_requests_total{dimension="tools",reason="deny"} increments for tools blocks
-    And gateway_blocked_requests_total{dimension="urls",reason="allow_miss"} increments for allow-miss URL blocks
-    And the metric supports per-VK breakdown via the vk_id label
+    Then the response is 403
+    And error.type = "tool_not_allowed" (for tools) or "url_not_allowed" / "model_not_allowed" for the other dimensions
+    And the WARN log line "blocked_patterns_compile_failed" fires when a compile error breaks policy (v1)
+    # Per-dimension span attribute (langwatch.policy.blocked) and a
+    # dedicated gateway_blocked_requests_total counter are tracked as
+    # v1.1 observability follow-ups. In v1, block attribution flows via:
+    #   - the 403 error envelope (type + code)
+    #   - gateway_http_requests_total{status="403"} counter
+    #   - the gateway_request_id response header → trace correlation
+    # See observability.mdx §Per-feature attributes v1-gap callout.
 
   # ─────────────────────────────────────────────────────────────────────────
   # §8. RBAC — gatewayVirtualKeys:update governs who authors blocked_patterns

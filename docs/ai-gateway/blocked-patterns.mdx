@@ -55,7 +55,7 @@ Each has a `deny` list and an optional `allow` list.
 OpenAI Chat Completions: matched against `tools[].function.name`.
 Anthropic Messages: matched against `tools[].name`.
 
-Blocked → `403 tool_not_allowed` with the offending name in `error.message`. The trace records `langwatch.policy.blocked=tools:<name>`.
+Blocked → `403 tool_not_allowed` with the offending name in `error.message`. (In v1, block attribution flows via the `X-LangWatch-Request-Id` response header → trace correlation; a dedicated `langwatch.policy.blocked` span attribute is a v1.1 observability follow-up.)
 
 ### MCP servers
 
@@ -154,7 +154,7 @@ Pattern checks are synchronous RE2 regex evaluations; total latency is sub-micro
 
 ## Fail-closed behaviour
 
-If the VK's `blocked_patterns` config is malformed (e.g. an invalid regex), the gateway **does not silently bypass policy**. Instead the request is rejected with `503 service_unavailable` and the trace records `langwatch.policy.broken=<dimension>:<error>`. This is deliberate: a policy engine that stops enforcing on bad config is worse than one that errors loudly.
+If the VK's `blocked_patterns` config is malformed (e.g. an invalid regex), the gateway **does not silently bypass policy**. Instead the request is rejected with `503 service_unavailable` and the gateway WARN-logs `blocked_patterns_compile_failed` + `blocked_patterns_broken` with the dimension + error text. This is deliberate: a policy engine that stops enforcing on bad config is worse than one that errors loudly. (A dedicated `langwatch.policy.broken` span attribute is a v1.1 observability follow-up; v1 operators correlate via the request-id header.)
 
 Fix the policy via `langwatch virtual-keys update <id>` (or the UI) and subsequent requests resume immediately — the bundle refresh invalidates the broken compiled cache.
 
@@ -187,7 +187,7 @@ Use patterns for deterministic rules (tool names, URL allowlists) and guardrails
 
 Every block emits:
 
-- Trace attribute `langwatch.policy.blocked=<kind>:<pattern>`.
 - `GatewayAuditLog` row with actor principal, VK id, policy kind, matched pattern, offending value (truncated to 64 chars), request id.
+- `X-LangWatch-Request-Id` response header for joining the 403 back to the trace stream.
 
-Use the audit log to identify repeat offenders and tune patterns.
+(A dedicated `langwatch.policy.blocked=<kind>:<pattern>` span attribute is tracked as a v1.1 observability follow-up. In v1, use the audit log + request-id correlation to identify repeat offenders and tune patterns.)
