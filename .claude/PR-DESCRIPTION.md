@@ -1,4 +1,4 @@
-# feat(ai-gateway): LangWatch AI Gateway v1 GA
+# feat(ai-gateway): ship v1 GA — virtual keys, budgets, guardrails, Go data plane
 
 ## Summary
 
