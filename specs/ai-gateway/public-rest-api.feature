@@ -38,6 +38,63 @@ Feature: Public REST API — /api/gateway/v1/*
     And error.code references "virtualKeys:create"
 
   # ============================================================================
+  # Personal Access Token permission ceiling (b8fb945b3 — PAT rebase follow-up)
+  # ============================================================================
+
+  @integration @rest @pat
+  Scenario: PATs exercise routes only within their scoped role (permission ceiling)
+    Given a user "alice" has role-bindings at project scope:
+      | permission               |
+      | virtualKeys:view         |
+      | virtualKeys:rotate       |
+    And that user issues a PAT "lwp_alice_ro" scoped to the SAME bindings
+    When they send `GET /api/gateway/v1/virtual-keys` with PAT "lwp_alice_ro"
+    Then the response status is 200
+    When they send `POST /api/gateway/v1/virtual-keys` with PAT "lwp_alice_ro"
+    Then the response status is 403 permission_denied
+    And error.code references "virtualKeys:create" as the missing permission
+    When they send `POST /api/gateway/v1/virtual-keys/vk_xxx/rotate` with PAT "lwp_alice_ro"
+    Then the response status is 200
+
+  @integration @rest @pat
+  Scenario: PAT effective access = PAT bindings ∩ user's current bindings
+    Given a PAT "lwp_bob_admin" originally scoped to "virtualKeys:manage" when user "bob" had that role
+    And user "bob"'s role has since been demoted to MEMBER (no :create, :update, :rotate, :delete)
+    When they send `POST /api/gateway/v1/virtual-keys` with PAT "lwp_bob_admin"
+    Then the response status is 403 permission_denied
+    # Demoting the user immediately neutralises outstanding PATs without rotation.
+
+  @integration @rest @pat
+  Scenario: Legacy project API tokens bypass PAT ceiling (full access)
+    Given a legacy project API token "sess_legacy" tied to project "acme-prod"
+    When they send `POST /api/gateway/v1/virtual-keys` with token "sess_legacy"
+    Then the response status is 201
+    # Project tokens predate PATs and keep full access for backcompat —
+    # same behavior the PAT PR (#3213) established for every other unified-auth route.
+
+  Scenario Outline: PAT ceiling mapping for every gateway REST route (b8fb945b3)
+    Given a PAT with only "<permission>"
+    When they send `<method> <path>`
+    Then the response is allowed (200/201) on a matching permission and 403 on a mismatch
+
+    Examples:
+      | method | path                                          | permission                 |
+      | GET    | /api/gateway/v1/virtual-keys                  | virtualKeys:view           |
+      | POST   | /api/gateway/v1/virtual-keys                  | virtualKeys:create         |
+      | GET    | /api/gateway/v1/virtual-keys/:id              | virtualKeys:view           |
+      | PATCH  | /api/gateway/v1/virtual-keys/:id              | virtualKeys:update         |
+      | POST   | /api/gateway/v1/virtual-keys/:id/rotate       | virtualKeys:rotate         |
+      | POST   | /api/gateway/v1/virtual-keys/:id/revoke       | virtualKeys:delete         |
+      | GET    | /api/gateway/v1/providers                     | gatewayProviders:view      |
+      | POST   | /api/gateway/v1/providers                     | gatewayProviders:manage    |
+      | PATCH  | /api/gateway/v1/providers/:id                 | gatewayProviders:update    |
+      | DELETE | /api/gateway/v1/providers/:id                 | gatewayProviders:manage    |
+      | GET    | /api/gateway/v1/budgets                       | gatewayBudgets:view        |
+      | POST   | /api/gateway/v1/budgets                       | gatewayBudgets:create      |
+      | PATCH  | /api/gateway/v1/budgets/:id                   | gatewayBudgets:update      |
+      | DELETE | /api/gateway/v1/budgets/:id                   | gatewayBudgets:delete      |
+
+  # ============================================================================
   # Virtual keys
   # ============================================================================
 
