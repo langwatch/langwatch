@@ -20,6 +20,7 @@ import { CredentialsSection } from "./ModelProviderCredentialsSection";
 import { CustomModelInputSection } from "./ModelProviderCustomModelInput";
 import { DefaultProviderSection } from "./ModelProviderDefaultSection";
 import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
+import { ProviderScopeSection } from "./ModelProviderScopeSection";
 
 export type EditModelProviderFormProps = {
   projectId?: string | undefined;
@@ -38,7 +39,7 @@ export const EditModelProviderForm = ({
     projectId: projectId,
   });
   const { closeDrawer } = useDrawer();
-  const { project } = useOrganizationTeamProject();
+  const { project, team, organization } = useOrganizationTeamProject();
 
   // Count enabled providers to determine if this is the only one
   // Include the current provider being edited since it will be enabled when saved
@@ -99,6 +100,8 @@ export const EditModelProviderForm = ({
     project,
     enabledProvidersCount,
     isUsingEnvVars,
+    teamId: team?.id,
+    organizationId: organization?.id,
     onSuccess: () => {
       closeDrawer();
     },
@@ -221,6 +224,14 @@ export const EditModelProviderForm = ({
           organizationId={organizationId}
           apiKeyValidationError={apiKeyValidationError}
           onApiKeyValidationClear={clearApiKeyError}
+        />
+
+        <ProviderScopeSection
+          state={state}
+          actions={actions}
+          provider={provider}
+          teamId={team?.id}
+          organizationId={organization?.id}
         />
 
         <ExtraHeadersSection

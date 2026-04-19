@@ -27,6 +27,10 @@ export type FormSnapshot = {
   projectDefaultModel: string | null;
   projectTopicClusteringModel: string | null;
   projectEmbeddingsModel: string | null;
+  // Principal-style scope (iter 108). Omitted → legacy project-scoped
+  // default preserved by the tRPC layer.
+  scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId?: string;
 };
 
 export type UseProviderFormSubmitState = {
@@ -110,6 +114,8 @@ export function useProviderFormSubmit({
       projectDefaultModel,
       projectTopicClusteringModel,
       projectEmbeddingsModel,
+      scopeType,
+      scopeId,
     } = snapshot;
 
     try {
@@ -183,6 +189,8 @@ export function useProviderFormSubmit({
         customModels,
         customEmbeddingsModels,
         extraHeaders: extraHeadersToSend,
+        scopeType,
+        scopeId,
       });
 
       // Update project default models if useAsDefaultProvider is enabled
