@@ -21,8 +21,10 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
 import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 type AuditAction =
   | "VIRTUAL_KEY_CREATED"
@@ -239,9 +241,11 @@ function AuditRow({
           </IconButton>
         </Table.Cell>
         <Table.Cell>
-          <Text fontSize="xs" color="fg.muted">
-            {new Date(entry.createdAt).toLocaleString()}
-          </Text>
+          <Tooltip content={new Date(entry.createdAt).toLocaleString()}>
+            <Text fontSize="xs" color="fg.muted">
+              {formatTimeAgo(new Date(entry.createdAt).getTime())}
+            </Text>
+          </Tooltip>
         </Table.Cell>
         <Table.Cell>
           {entry.actorName || entry.actorEmail ? (
