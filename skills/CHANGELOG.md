@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.0](https://github.com/langwatch/langwatch/compare/skills@v0.3.0...skills@v0.4.0) (2026-04-19)
+
+
+### Features
+
+* **skills:** make skills CLI-only and add `langwatch docs` / `scenario-docs` ([#3274](https://github.com/langwatch/langwatch/issues/3274)) ([b7aefef](https://github.com/langwatch/langwatch/commit/b7aefefb006560f3e8ba8f49128522f8caeb1a7b))
+
 ## [0.3.0](https://github.com/langwatch/langwatch/compare/skills@v0.2.0...skills@v0.3.0) (2026-04-17)
 
 
