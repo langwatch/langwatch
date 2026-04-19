@@ -22,7 +22,7 @@ Every gateway request **must** carry a VK. The VK resolves at the gateway to:
 - **Model aliases** — a map like `{"gpt-4o": "azure/my-deployment"}` that lets the VK redirect a client-friendly model name to a specific provider/deployment.
 - **Cache policy**, **guardrail attachments**, **blocked patterns**, and **budgets** (see below).
 
-**Show-once secret:** the full key is displayed exactly once at creation and stored argon2id-hashed. Only a short prefix (`lw_vk_live_01HZX9`) remains visible in the UI. Rotation replaces the secret (old secret valid 24h grace); revocation propagates to gateway caches within 60 seconds.
+**Show-once secret:** the full key is displayed exactly once at creation and stored as a peppered HMAC-SHA256 hash (see [Security → Virtual keys](/ai-gateway/security#virtual-keys) for the hashing-scheme rationale). Only a short prefix (`lw_vk_live_01HZX9`) remains visible in the UI. Rotation replaces the secret (old secret valid 24 h grace); revocation propagates to gateway caches within 60 seconds.
 
 See [Virtual Keys](/ai-gateway/virtual-keys) for CRUD, rotation, and revocation details.
 

@@ -21,7 +21,7 @@ The LangWatch AI Gateway replaces every direct provider call with a single call 
 
 - **OpenAI-compatible endpoint** at `/v1/chat/completions`, `/v1/embeddings`, `/v1/models`, etc. Drop in `OPENAI_BASE_URL=https://gateway.langwatch.ai/v1` and `OPENAI_API_KEY=lw_vk_live_…` and every existing OpenAI-SDK codebase works unchanged.
 - **Anthropic-compatible endpoint** at `/v1/messages` so Claude Code and native Anthropic SDKs work by setting `ANTHROPIC_BASE_URL` and `ANTHROPIC_AUTH_TOKEN` to your gateway URL and a LangWatch virtual key.
-- **Virtual keys** — LangWatch-issued credentials (`lw_vk_live_<ulid>`) with project/team/org scope. Show-once secrets, argon2id-hashed, rotatable, revokable within 60 seconds.
+- **Virtual keys** — LangWatch-issued credentials (`lw_vk_live_<ulid>`) with project/team/org scope. Show-once secrets, peppered-HMAC-SHA256 hashed, rotatable, revokable within 60 seconds.
 - **Hierarchical budgets** — enforce spend limits at organisation, team, project, virtual-key, or principal scope with windowed periods (minute → total) and soft-warn or hard-block semantics.
 - **Per-request guardrails** — invoke your LangWatch evaluators inline on the request, response, or each streaming chunk. Decisions: `allow`, `block`, `modify` (redact).
 - **Tool / MCP / URL policy** — block or allowlist tool calls, MCP server references, or outbound URLs by regex before the request ever leaves your gateway.
