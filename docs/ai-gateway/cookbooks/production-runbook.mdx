@@ -1,0 +1,146 @@
+---
+title: Production runbook
+description: Diagnose p99 spikes, goroutine leaks, memory growth, and other "why is the gateway slow?" incidents using the loopback-bound pprof admin listener.
+sidebarTitle: Production runbook
+---
+
+When the gateway is slow, stuck, or chewing memory — and the LangWatch trace for a specific bad request has already been checked — this runbook is the next stop. Every recipe here relies on the pprof admin listener, which is bound to `127.0.0.1:6060` by default and therefore never reachable from outside the pod.
+
+<Note>**Don't expose the admin port.** `GATEWAY_ADMIN_ADDR` binds to loopback by design. Never add it to a Kubernetes `Service`, `Ingress`, or NLB target group. If you genuinely need multiple people debugging, use `kubectl port-forward` per-user — it tunnels through the API server and is auditable in Kubernetes audit logs.</Note>
+
+## Prerequisites
+
+One-time setup on your operator laptop:
+
+```bash
+# Go toolchain with pprof (matches gateway's Go version)
+go version  # expect 1.26+
+
+# Pick one pod to focus on
+POD=$(kubectl get pod -n langwatch -l app=langwatch-gateway -o jsonpath='{.items[0].metadata.name}')
+
+# Open the tunnel in one terminal and leave it running
+kubectl port-forward -n langwatch "$POD" 6060:6060
+```
+
+All subsequent `go tool pprof` commands target `http://localhost:6060`.
+
+## Recipe 1 — p99 latency spike
+
+**Symptom:** `gateway_http_request_duration_seconds{quantile="0.99"}` jumps from ~300 ms to several seconds. Traces show no single slow upstream.
+
+**Diagnose:**
+
+```bash
+# 30-second CPU profile while the spike is live
+go tool pprof http://localhost:6060/debug/pprof/profile?seconds=30
+
+# Inside pprof:
+(pprof) top20
+(pprof) web     # opens an SVG flame graph in your browser
+```
+
+**What to look for:**
+
+- A single function using > 50% of CPU that's not one of: `tls.conn.Handshake`, `net/http.(*conn).serve`, `json.Decoder.Decode`. Those are expected under load.
+- Lock contention on `internal/auth` or `internal/fallback` — hot in `sync.(*Mutex).Lock`. Usually means the L1 cache is evicting faster than it's filling; consider raising `LW_GATEWAY_AUTH_CACHE_L1_SIZE`.
+- RE2 compilation in `internal/blocked` on every request — means the bundle isn't caching compiled regexes. Check for frequent `/changes` churn (revision bumps on every request ≠ normal).
+
+## Recipe 2 — Goroutine leak
+
+**Symptom:** `go_goroutines` climbs monotonically over hours, never GCs. Memory follows.
+
+**Diagnose:**
+
+```bash
+# Live goroutine dump as SVG
+go tool pprof -svg http://localhost:6060/debug/pprof/goroutine > /tmp/goroutines.svg
+open /tmp/goroutines.svg
+
+# Or aggregate counts by creation site
+curl -s http://localhost:6060/debug/pprof/goroutine?debug=1 | head -100
+```
+
+**What to look for:**
+
+- Hundreds of goroutines parked in `chan receive` inside `internal/fallback.Walk` — means a fallback attempt is hanging on a context that never cancels. Check `LW_GATEWAY_UPSTREAM_TIMEOUT_MS`.
+- Goroutines stuck in `internal/guardrails.CheckChunk` — likely a guardrail evaluator that never returns and exceeds the 50 ms budget. Check the evaluator service logs.
+- Streaming goroutines (`internal/dispatch.streamSSE`) that outlive their request context — client disconnect without `ctx.Done()` firing usually points at a missing `close` somewhere.
+
+Fix options: restart the offending pod (workaround), or file a bug with the `/tmp/goroutines.svg` attached.
+
+## Recipe 3 — Memory growth
+
+**Symptom:** RSS climbs from 200 MB to > 1 GB over a day. OOM eventually follows.
+
+**Diagnose:**
+
+```bash
+# Live heap snapshot
+go tool pprof http://localhost:6060/debug/pprof/heap
+
+# Inside pprof:
+(pprof) top20 -cum
+(pprof) list internal/auth    # source-level attribution
+```
+
+**What to look for:**
+
+- `internal/auth.(*Cache).Put` holding more than ~1 MB per cached bundle — unusual, a bundle should be ≤ 50 KB. Oversized `blocked_patterns.urls.allow` with thousands of entries can trigger this.
+- `internal/dispatch` buffered responses — if streaming responses are being accumulated instead of flushed per-chunk, every request consumes full response size. Check for `bufio.NewWriter` wrapping a streaming writer anywhere.
+- Outbox shelving (`LW_GATEWAY_BUDGET_DEBIT_SHELF_BYTES`) — a long control-plane outage can push debits to disk. Check the outbox directory size.
+
+## Recipe 4 — Mutex or block profiling for contention
+
+**Symptom:** CPU is low, request rate is low, but latency is up. Suggests blocking, not computation.
+
+Enable on a specific pod (requires a restart with `LW_GATEWAY_PPROF_BLOCK_RATE=1` and `LW_GATEWAY_PPROF_MUTEX_FRACTION=1` in the env — off by default because they have measurable overhead).
+
+```bash
+# Top mutex holders
+go tool pprof http://localhost:6060/debug/pprof/mutex
+
+# Top blockers (I/O, channels, locks)
+go tool pprof http://localhost:6060/debug/pprof/block
+```
+
+**What to look for:**
+
+- Contention on `internal/ratelimit.(*Bucket).Allow` — means a VK's RPM is bursting past the token-bucket refill rate and every request is waiting. Raise RPM or investigate the caller.
+- Contention on the L1 auth cache — see Recipe 1.
+
+## Recipe 5 — Allocation churn (GC pressure)
+
+**Symptom:** `go_gc_pause_seconds_sum` is growing too fast; p99 spikes correlate with GC.
+
+**Diagnose:**
+
+```bash
+# Alloc-only heap (who's creating the most garbage)
+go tool pprof http://localhost:6060/debug/pprof/allocs
+
+(pprof) top20 -cum
+```
+
+**What to look for:**
+
+- JSON encoding of large `/v1/messages` requests — expected, but if it dominates consider enabling `LW_GATEWAY_MAX_BODY_BYTES` enforcement to reject pathologically large bodies earlier.
+- Per-request compilation of the same regex — should never happen; if it does, Lane A has a caching regression.
+
+## Writing findings back
+
+When you find something worth filing:
+
+1. Grab the `.pb.gz` with `go tool pprof -symbolize=remote -proto http://localhost:6060/debug/pprof/heap > /tmp/heap.pb.gz`.
+2. Attach it to the issue along with:
+   - Pod name + image digest (`kubectl get pod -n langwatch -o yaml | grep image`).
+   - `X-LangWatch-Request-Id` from one exemplar bad request.
+   - `kubectl top pod` output around the spike.
+3. For urgent escalation, post in `#ai-gateway-support` with the request id.
+
+## See also
+
+- [Config → Admin / operator endpoints](/ai-gateway/self-hosting/config#admin--operator-endpoints) — env-var reference.
+- [Health Checks](/ai-gateway/self-hosting/health-checks) — `/readyz` output to interpret alongside pprof.
+- [Troubleshooting](/ai-gateway/troubleshooting) — symptom-first diagnostic index for non-pprof issues (401 / 403 / 429 / 502).
+- [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) — alert rules that tell you *when* to reach for this runbook.
