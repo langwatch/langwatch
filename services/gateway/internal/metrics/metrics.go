@@ -55,6 +55,12 @@ type Metrics struct {
 	InFlightRequests   prometheus.Gauge
 	Draining           prometheus.Gauge
 	CacheRuleHits      *prometheus.CounterVec
+	// UpstreamCompatRejected tracks upstream 4xx responses that look
+	// like a client-library / parameter-shape compatibility mismatch
+	// (e.g. gpt-5-* rejecting legacy `max_tokens`). Operators can
+	// `rate(...)` the counter to decide whether the v1.1 translation
+	// layer from openai-param-compat.feature is worth shipping.
+	UpstreamCompatRejected *prometheus.CounterVec
 }
 
 // New builds a fresh Metrics bundle. Callers own the returned struct
@@ -181,6 +187,13 @@ func New() *Metrics {
 		},
 		[]string{"rule_id", "mode_applied"},
 	)
+	m.UpstreamCompatRejected = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Name: "gateway_upstream_compat_rejected_total",
+			Help: "Upstream 4xx responses classified as client-library / parameter-shape mismatches. `reason` is the specific compat bucket (legacy_max_tokens, etc.); `model` identifies the target model family. Operators can rate(...[5m]) to decide whether a v1.1 translation layer is worth shipping.",
+		},
+		[]string{"reason", "model"},
+	)
 	reg.MustRegister(
 		m.HTTPRequests, m.HTTPDuration,
 		m.ProviderAttempts, m.CircuitState,
@@ -191,8 +204,20 @@ func New() *Metrics {
 		m.StreamingNoUsage, m.GuardrailVerdicts,
 		m.InFlightRequests, m.Draining,
 		m.CacheRuleHits,
+		m.UpstreamCompatRejected,
 	)
 	return m
+}
+
+// RecordUpstreamCompatRejected increments the compat-rejection counter.
+// `reason` is one of the known compat buckets (legacy_max_tokens); new
+// buckets can be added over time, but the label cardinality stays low
+// because reasons are enumerated at the call site.
+func (m *Metrics) RecordUpstreamCompatRejected(reason, model string) {
+	if m == nil {
+		return
+	}
+	m.UpstreamCompatRejected.WithLabelValues(reason, model).Inc()
 }
 
 // ObserveHTTPRequest records one request's completion.
