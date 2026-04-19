@@ -714,19 +714,57 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
         </HStack>
       </DetailRow>
       <DetailRow label="Model aliases">
-        <Text fontSize="sm" color={aliasCount > 0 ? undefined : "fg.muted"}>
-          {aliasCount > 0 ? `${aliasCount} rewrite${aliasCount > 1 ? "s" : ""}` : "—"}
-        </Text>
+        {aliasCount === 0 ? (
+          <Text fontSize="sm" color="fg.muted">
+            —
+          </Text>
+        ) : (
+          <VStack align="start" gap={1}>
+            {Object.entries(config.modelAliases ?? {})
+              .slice(0, 5)
+              .map(([alias, target]) => (
+                <HStack key={alias} gap={1} fontSize="xs">
+                  <Code fontSize="xs">{alias}</Code>
+                  <Text color="fg.muted">→</Text>
+                  <Code fontSize="xs">{target}</Code>
+                </HStack>
+              ))}
+            {aliasCount > 5 && (
+              <Text fontSize="xs" color="fg.muted">
+                + {aliasCount - 5} more (see Edit drawer)
+              </Text>
+            )}
+          </VStack>
+        )}
       </DetailRow>
       <DetailRow label="Blocked patterns">
-        <Text
-          fontSize="sm"
-          color={blockedCount > 0 ? undefined : "fg.muted"}
-        >
-          {blockedCount > 0
-            ? `${blockedCount} deny rule${blockedCount > 1 ? "s" : ""} across tools / mcp / urls / models`
-            : "—"}
-        </Text>
+        {blockedCount === 0 ? (
+          <Text fontSize="sm" color="fg.muted">
+            —
+          </Text>
+        ) : (
+          <VStack align="start" gap={1}>
+            {(["tools", "mcp", "urls", "models"] as const).map((dim) => {
+              const deny = config.blockedPatterns?.[dim]?.deny ?? [];
+              if (deny.length === 0) return null;
+              return (
+                <HStack key={dim} gap={1} flexWrap="wrap" fontSize="xs">
+                  <Text fontWeight="medium" minWidth="48px">
+                    {dim}:
+                  </Text>
+                  {deny.slice(0, 4).map((pattern) => (
+                    <Code key={pattern} fontSize="2xs" colorPalette="red">
+                      {pattern}
+                    </Code>
+                  ))}
+                  {deny.length > 4 && (
+                    <Text color="fg.muted">+ {deny.length - 4} more</Text>
+                  )}
+                </HStack>
+              );
+            })}
+          </VStack>
+        )}
       </DetailRow>
       <DetailRow label="Guardrails">
         <Text
