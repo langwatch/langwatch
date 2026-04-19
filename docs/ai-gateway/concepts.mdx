@@ -98,7 +98,7 @@ Overrides per-request:
 
 Per-VK default set via VK config `cache.mode`. Per-request header wins.
 
-Cache outcome is reported back in `X-LangWatch-Cache: hit|miss|bypass|forced` response header and recorded in the trace with separate `cache_read_tokens` / `cache_write_tokens` counters.
+Cache outcome is reported back in `X-LangWatch-Cache: hit|miss|bypass|force` response header and recorded in the trace with separate `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.cache_creation.input_tokens` counters (OTel GenAI semconv).
 
 ## Guardrails
 
@@ -128,7 +128,7 @@ Attributes always present:
 
 - `langwatch.vk_id`, `langwatch.project_id`, `langwatch.team_id`, `langwatch.org_id`, `langwatch.principal_id`.
 - Nested spans per fallback attempt with `langwatch.fallback.attempt=N` and `langwatch.fallback.reason`.
-- `langwatch.cache_read_tokens` / `cache_write_tokens`.
+- `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.cache_creation.input_tokens` (OTel GenAI semconv).
 - `langwatch.budget.breached_scope` when a request was blocked.
 - `langwatch.policy.blocked` when a tool/MCP/URL was blocked.
 - `langwatch.guardrail.post_flag` when post-hoc guardrails flagged a completed response.

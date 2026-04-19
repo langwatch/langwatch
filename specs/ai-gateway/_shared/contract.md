@@ -426,7 +426,7 @@ All errors OpenAI-compatible:
 - `X-LangWatch-Request-Id: grq_01HZ...` — opaque gateway request id, also emitted on errors and in OTel trace.
 - `X-LangWatch-Provider: openai|anthropic|...` — which provider was actually used (may differ from requested model due to fallback or alias).
 - `X-LangWatch-Model: gpt-5-mini` — resolved provider model.
-- `X-LangWatch-Cache: hit|miss|bypass|forced` — cache outcome as observed by the gateway.
+- `X-LangWatch-Cache: hit|miss|bypass|force` — cache outcome as observed by the gateway. (`force` is v1.1 — deferred with 400 cache_override_not_implemented in v1; header value matches the internal `Kind` enum in `services/gateway/internal/cacheoverride`.)
 - `X-LangWatch-Cache-Mode: respect|disable` — echoes the cache-override mode that was applied to the request (independent of upstream outcome). Emitted on every `/v1/messages` response.
 - `X-LangWatch-Budget-Warning: <scope>:<pct>` — optional, emitted on soft-cap breaches (can repeat).
 - `X-LangWatch-Fallback-Count: <n>` — number of fallbacks attempted before success (0 when primary succeeded).
@@ -449,7 +449,7 @@ All errors OpenAI-compatible:
 - `disable` (v1) — recursively JSON-walk the body and drop every `cache_control` object at any nesting depth (`messages[].content[]`, `system[]`, `tools[]` on Anthropic); disable gateway semantic cache; force cold call. Applied **before** blocked-pattern enforcement so policy evaluation runs on the post-strip body and is deterministic regardless of caller's caching choice.
 - `force` / `ttl=NNN` — **deferred to v1.1**. Valid syntax is accepted by the parser but currently rejected with `400 cache_override_not_implemented`. Provider-specific body mutation (where to inject cache_control, how to respect TTL) ships alongside gateway-side semantic caching.
 
-**Observability:** `X-LangWatch-Cache` response header reports outcome. Token counts in OTel trace include `cache_read_tokens` and `cache_write_tokens` separately so trace UI can show cache economics.
+**Observability:** `X-LangWatch-Cache` response header reports outcome. Token counts in OTel trace use OpenTelemetry GenAI semconv: `gen_ai.usage.cache_read.input_tokens` and `gen_ai.usage.cache_creation.input_tokens` are set separately so trace UI can show cache economics. Proprietary `langwatch.usage.cache_*_tokens` attrs were dropped in Lane A iter 42 per "OTEL semconv all the way".
 
 ---
 

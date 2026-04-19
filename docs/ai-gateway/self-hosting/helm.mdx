@@ -192,7 +192,7 @@ The gateway exposes Prometheus metrics at `/metrics`:
 - `gateway_requests_total{provider, model, status}` — count of requests by provider and final status.
 - `gateway_request_duration_seconds_bucket` — histogram of end-to-end latency.
 - `gateway_provider_duration_seconds_bucket{provider}` — upstream provider latency.
-- `gateway_cache_hits_total{outcome=hit|miss|bypass|forced}`.
+- `gateway_cache_hits_total{outcome=hit|miss|bypass|force}`.
 - `gateway_budget_blocks_total{scope}` — budget hard-cap rejections.
 - `gateway_guardrail_blocks_total{direction}` — guardrail rejections.
 - `gateway_circuit_state{provider}` — 0 closed / 1 half-open / 2 open.

@@ -44,7 +44,7 @@ Per-VK overrides available on the binding:
 
 OpenAI automatically caches prompt prefixes ≥ 1024 tokens in most GPT-4 / GPT-5 / o-series models. There's no `cache_control` block to preserve — OpenAI just handles it. The gateway forwards requests untouched in `mode=respect`, so cache hits are observed naturally.
 
-The `usage.prompt_tokens_details.cached_tokens` field in the response is populated on cache hits and mirrored into the trace as `langwatch.cache_read_tokens`.
+The `usage.prompt_tokens_details.cached_tokens` field in the response is populated on cache hits and mirrored into the trace as `gen_ai.usage.cache_read.input_tokens` (OTel GenAI semconv). OpenAI has no write-to-cache dimension, so `gen_ai.usage.cache_creation.input_tokens` is unset.
 
 ## Reasoning tokens (o-series)
 

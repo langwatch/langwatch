@@ -36,10 +36,10 @@ On self-hosted deployments, set `GATEWAY_OTEL_DEFAULT_ENDPOINT` to your in-clust
 | `langwatch.model_requested` | What the client sent. |
 | `langwatch.model_resolved` | Final provider/model after alias resolution. |
 | `langwatch.cost_usd` | Computed cost for this request. |
-| `langwatch.tokens.input` / `output` | Regular input/output tokens. |
-| `langwatch.cache_read_tokens` / `cache_write_tokens` | Provider-native cache counters. |
+| `gen_ai.usage.input_tokens` / `gen_ai.usage.output_tokens` | Regular input/output tokens (OTel GenAI semconv). |
+| `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.cache_creation.input_tokens` | Provider-native cache counters (OTel GenAI semconv — iter 42 dropped proprietary `langwatch.usage.*` names in favour of these). |
 | `langwatch.reasoning_tokens` | Reasoning tokens (o-series, Claude extended thinking). |
-| `langwatch.cache.outcome` | `hit` / `miss` / `bypass` / `forced`. |
+| `langwatch.cache.outcome` | `hit` / `miss` / `bypass` / `force`. |
 | `langwatch.status` | Final status: `success` / `provider_error` / `blocked_by_guardrail` / `budget_exceeded` / etc. |
 | `langwatch.client.name` | Heuristic client name from User-Agent (e.g. `claude-code`, `codex`, `openai-python`). |
 
@@ -60,7 +60,7 @@ Attribute-based filters in the Messages view compose into dashboards:
 
 - "All gateway traffic this week": `attr.langwatch.endpoint != ""`.
 - "Claude Code usage by engineer": `attr.langwatch.client.name = "claude-code"`, group by `principal_id`.
-- "Cache-economics dashboard": sum `cache_read_tokens` / `input_tokens` over 7 days.
+- "Cache-economics dashboard": sum `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.input_tokens` over 7 days.
 - "Fallback incidents": `attr.langwatch.fallback.attempt > 0`, group by `fallback.reason`.
 - "Blocked by policy": `attr.langwatch.policy.blocked != ""`.
 

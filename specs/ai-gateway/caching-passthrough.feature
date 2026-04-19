@@ -101,10 +101,11 @@ Feature: Caching passthrough (Anthropic cache_control + gateway semantic cache)
   Rule: Cache token accounting in trace
 
     @integration
-    Scenario: OTel trace reports cache_read and cache_write tokens separately
+    Scenario: OTel trace reports cache_read and cache_creation tokens separately (semconv-only post iter 42)
       Given a cache-hit request against Anthropic
       When I inspect the exported trace
-      Then span attributes include `langwatch.usage.input_tokens`
-      And span attributes include `langwatch.usage.cache_read_tokens`
-      And span attributes include `langwatch.usage.cache_write_tokens`
+      Then span attributes include `gen_ai.usage.input_tokens`
+      And span attributes include `gen_ai.usage.cache_read.input_tokens`
+      And span attributes include `gen_ai.usage.cache_creation.input_tokens`
+      And the proprietary `langwatch.usage.cache_*_tokens` attrs are ABSENT (dropped in iter 42 per "OTEL semconv all the way")
       And the cost calculation in budget/debit uses the discounted cache_read rate (10% of list)
