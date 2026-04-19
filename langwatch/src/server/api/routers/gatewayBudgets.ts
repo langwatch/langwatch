@@ -48,7 +48,11 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       await requireOrgAccess(ctx, input.organizationId);
       const service = GatewayBudgetService.create(ctx.prisma);
       const rows = await service.list(input.organizationId);
-      return rows.map(toDto);
+      const scopeTargets = await resolveScopeTargetsBatch(ctx.prisma, rows);
+      return rows.map((b) => ({
+        ...toDto(b),
+        scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
+      }));
     }),
 
   listForProject: protectedProcedure
@@ -57,7 +61,11 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const service = GatewayBudgetService.create(ctx.prisma);
       const rows = await service.listForProject(input.projectId);
-      return rows.map(toDto);
+      const scopeTargets = await resolveScopeTargetsBatch(ctx.prisma, rows);
+      return rows.map((b) => ({
+        ...toDto(b),
+        scopeTarget: scopeTargets.get(`${b.scopeType}:${b.scopeId}`) ?? null,
+      }));
     }),
 
   get: protectedProcedure
@@ -150,6 +158,114 @@ export const gatewayBudgetsRouter = createTRPCRouter({
       return toDto(row);
     }),
 });
+
+export type BudgetListScopeTarget = {
+  kind: string;
+  id: string;
+  name: string;
+  secondary: string | null;
+  projectSlug?: string | null;
+};
+
+// Batch-resolves scope target (name + secondary) for a list of budgets,
+// grouping by scopeType so each scope gets at most one findMany. Detail
+// view uses the equivalent per-budget path in GatewayBudgetService; list
+// needed its own implementation to avoid N queries per page.
+async function resolveScopeTargetsBatch(
+  prisma: import("@prisma/client").PrismaClient,
+  budgets: Array<{ scopeType: string; scopeId: string }>,
+): Promise<Map<string, BudgetListScopeTarget>> {
+  const ids: Record<string, Set<string>> = {
+    ORGANIZATION: new Set(),
+    TEAM: new Set(),
+    PROJECT: new Set(),
+    VIRTUAL_KEY: new Set(),
+    PRINCIPAL: new Set(),
+  };
+  for (const b of budgets) {
+    ids[b.scopeType]?.add(b.scopeId);
+  }
+  const [orgs, teams, projects, vks, users] = await Promise.all([
+    ids.ORGANIZATION?.size
+      ? prisma.organization.findMany({
+          where: { id: { in: [...ids.ORGANIZATION!] } },
+          select: { id: true, name: true, slug: true },
+        })
+      : Promise.resolve([]),
+    ids.TEAM?.size
+      ? prisma.team.findMany({
+          where: { id: { in: [...ids.TEAM!] } },
+          select: { id: true, name: true, slug: true },
+        })
+      : Promise.resolve([]),
+    ids.PROJECT?.size
+      ? prisma.project.findMany({
+          where: { id: { in: [...ids.PROJECT!] } },
+          select: { id: true, name: true, slug: true },
+        })
+      : Promise.resolve([]),
+    ids.VIRTUAL_KEY?.size
+      ? prisma.virtualKey.findMany({
+          where: { id: { in: [...ids.VIRTUAL_KEY!] } },
+          select: {
+            id: true,
+            name: true,
+            displayPrefix: true,
+            project: { select: { slug: true } },
+          },
+        })
+      : Promise.resolve([]),
+    ids.PRINCIPAL?.size
+      ? prisma.user.findMany({
+          where: { id: { in: [...ids.PRINCIPAL!] } },
+          select: { id: true, name: true, email: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const out = new Map<string, BudgetListScopeTarget>();
+  for (const o of orgs) {
+    out.set(`ORGANIZATION:${o.id}`, {
+      kind: "ORGANIZATION",
+      id: o.id,
+      name: o.name,
+      secondary: o.slug,
+    });
+  }
+  for (const t of teams) {
+    out.set(`TEAM:${t.id}`, {
+      kind: "TEAM",
+      id: t.id,
+      name: t.name,
+      secondary: t.slug,
+    });
+  }
+  for (const p of projects) {
+    out.set(`PROJECT:${p.id}`, {
+      kind: "PROJECT",
+      id: p.id,
+      name: p.name,
+      secondary: p.slug,
+    });
+  }
+  for (const vk of vks) {
+    out.set(`VIRTUAL_KEY:${vk.id}`, {
+      kind: "VIRTUAL_KEY",
+      id: vk.id,
+      name: vk.name,
+      secondary: vk.displayPrefix ? `${vk.displayPrefix}…` : null,
+      projectSlug: vk.project?.slug ?? null,
+    });
+  }
+  for (const u of users) {
+    out.set(`PRINCIPAL:${u.id}`, {
+      kind: "PRINCIPAL",
+      id: u.id,
+      name: u.name ?? u.email ?? u.id,
+      secondary: u.email ?? null,
+    });
+  }
+  return out;
+}
 
 function toDto(b: import("@prisma/client").GatewayBudget) {
   return {
