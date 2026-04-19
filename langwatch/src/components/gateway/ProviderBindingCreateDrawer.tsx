@@ -1,9 +1,9 @@
 import {
+  Box,
   Button,
   Field,
   HStack,
   Input,
-  NativeSelect,
   Spacer,
   Spinner,
   Text,
@@ -12,8 +12,11 @@ import {
 import { useState } from "react";
 
 import { Drawer } from "~/components/ui/drawer";
+import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
+import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 type ProviderBindingCreateDrawerProps = {
   projectId: string;
@@ -34,6 +37,10 @@ export function ProviderBindingCreateDrawer({
   onOpenChange,
   onCreated,
 }: ProviderBindingCreateDrawerProps) {
+  const { project } = useOrganizationTeamProject();
+  const settingsHref = project
+    ? `/${project.slug}/settings/model-providers`
+    : "#";
   const [modelProviderId, setModelProviderId] = useState("");
   const [slot, setSlot] = useState("primary");
   const [rateLimitRpm, setRateLimitRpm] = useState("");
@@ -121,28 +128,59 @@ export function ProviderBindingCreateDrawer({
               {providersQuery.isLoading ? (
                 <Spinner size="sm" />
               ) : available.length === 0 ? (
-                <Text fontSize="sm" color="fg.muted">
-                  All enabled model providers are already bound. Enable another
-                  one in Settings → Model Providers.
-                </Text>
-              ) : (
-                <NativeSelect.Root size="sm">
-                  <NativeSelect.Field
-                    value={modelProviderId}
-                    onChange={(e) => setModelProviderId(e.target.value)}
+                <VStack align="stretch" gap={2}>
+                  <Text fontSize="sm" color="fg.muted">
+                    All enabled model providers are already bound, or none are
+                    configured yet.
+                  </Text>
+                  <Link
+                    href={settingsHref}
+                    color="orange.600"
+                    fontSize="sm"
+                    fontWeight="medium"
                   >
-                    <option value="">Select a provider…</option>
-                    {available.map((p: any) => (
-                      <option key={p.id} value={p.id}>
-                        {p.provider}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                </NativeSelect.Root>
+                    Configure providers in Settings →
+                  </Link>
+                </VStack>
+              ) : (
+                <VStack align="stretch" gap={2}>
+                  {available.map((p: any) => {
+                    const selected = modelProviderId === p.id;
+                    const icon =
+                      modelProviderIcons[
+                        p.provider as keyof typeof modelProviderIcons
+                      ];
+                    return (
+                      <HStack
+                        key={p.id}
+                        borderWidth="1px"
+                        borderColor={selected ? "orange.400" : "border.subtle"}
+                        borderRadius="md"
+                        paddingX={3}
+                        paddingY={2}
+                        cursor="pointer"
+                        onClick={() => setModelProviderId(p.id)}
+                        background={selected ? "orange.50" : undefined}
+                        _hover={{ borderColor: "orange.300" }}
+                      >
+                        <Box width="20px" height="20px" flexShrink={0}>
+                          {icon}
+                        </Box>
+                        <Text fontSize="sm" fontWeight="medium">
+                          {p.provider}
+                        </Text>
+                      </HStack>
+                    );
+                  })}
+                </VStack>
               )}
               <Field.HelperText>
-                Gateway reuses the ModelProvider API key already configured in
-                settings. Binding only adds gateway-specific settings.
+                Gateway reuses the ModelProvider API key from{" "}
+                <Link href={settingsHref} color="orange.600">
+                  Settings → Model Providers
+                </Link>
+                . Binding only adds gateway-specific settings (rate limits,
+                fallback priority).
               </Field.HelperText>
             </Field.Root>
             <Field.Root>
