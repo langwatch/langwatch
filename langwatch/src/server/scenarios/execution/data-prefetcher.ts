@@ -12,6 +12,7 @@
 
 import { z } from "zod";
 import { env } from "~/env.mjs";
+import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
 
@@ -168,7 +169,20 @@ export async function prefetchScenarioData(
   }
   const project = projectResult.data;
 
-  const adapterData = await fetchAgentData(context.projectId, target, deps);
+  const adapterResult = await fetchAgentData(context.projectId, target, deps);
+  if (adapterResult !== null && "success" in adapterResult && !adapterResult.success) {
+    // Hydration failure from workflow DSL — surface structured error
+    logger.warn(
+      { projectId: context.projectId, targetType: target.type, reason: adapterResult.reason },
+      `Workflow LLM hydration failed: ${adapterResult.message}`,
+    );
+    return {
+      success: false,
+      error: adapterResult.message,
+      reason: adapterResult.reason,
+    };
+  }
+  const adapterData = adapterResult as TargetAdapterData | null;
   if (!adapterData) {
     logger.warn(
       { projectId: context.projectId, targetType: target.type, targetReferenceId: target.referenceId },
@@ -273,11 +287,14 @@ async function fetchProject(
   };
 }
 
+/** Failure result propagated from hydrateLlmParameters through the fetch chain */
+type HydrationFailure = { success: false; reason: ModelParamsFailureReason; message: string };
+
 async function fetchAgentData(
   projectId: string,
   target: TargetConfig,
   deps: DataPrefetcherDependencies,
-): Promise<TargetAdapterData | null> {
+): Promise<TargetAdapterData | HydrationFailure | null> {
   if (target.type === "prompt") {
     return fetchPromptConfigData(projectId, target.referenceId, deps.promptFetcher);
   }
@@ -285,12 +302,13 @@ async function fetchAgentData(
     return fetchCodeAgentData(projectId, target.referenceId, deps.agentFetcher);
   }
   if (target.type === "workflow") {
-    return fetchWorkflowAgentData(
+    return fetchWorkflowAgentData({
       projectId,
-      target.referenceId,
-      deps.agentFetcher,
-      deps.workflowVersionFetcher,
-    );
+      agentId: target.referenceId,
+      agentFetcher: deps.agentFetcher,
+      workflowVersionFetcher: deps.workflowVersionFetcher,
+      modelParamsProvider: deps.modelParamsProvider,
+    });
   }
   return fetchHttpAgentData(projectId, target.referenceId, deps.agentFetcher);
 }
@@ -432,12 +450,19 @@ interface WorkflowField {
   type: string;
 }
 
-async function fetchWorkflowAgentData(
-  projectId: string,
-  agentId: string,
-  agentFetcher: AgentFetcher,
-  workflowVersionFetcher: WorkflowVersionFetcher,
-): Promise<WorkflowAgentData | null> {
+async function fetchWorkflowAgentData({
+  projectId,
+  agentId,
+  agentFetcher,
+  workflowVersionFetcher,
+  modelParamsProvider,
+}: {
+  projectId: string;
+  agentId: string;
+  agentFetcher: AgentFetcher;
+  workflowVersionFetcher: WorkflowVersionFetcher;
+  modelParamsProvider: ModelParamsProvider;
+}): Promise<WorkflowAgentData | HydrationFailure | null> {
   const agent = await agentFetcher.findById({ projectId, id: agentId });
   if (!agent || agent.type !== "workflow") return null;
 
@@ -459,18 +484,167 @@ async function fetchWorkflowAgentData(
   });
   if (!latest) return null;
 
-  const { inputs, outputs } = extractWorkflowIO(latest.dsl);
+  const hydrateResult = await hydrateLlmParameters({
+    dsl: latest.dsl,
+    projectId,
+    modelParamsProvider,
+  });
+
+  if (!hydrateResult.success) {
+    return { success: false, reason: hydrateResult.reason, message: hydrateResult.message };
+  }
+
+  const { inputs, outputs } = extractWorkflowIO(hydrateResult.dsl);
 
   return {
     type: "workflow",
     agentId: agent.id,
     workflowId: latest.workflowId,
-    workflow: latest.dsl,
+    workflow: hydrateResult.dsl,
     inputs,
     outputs,
     scenarioMappings: config.scenarioMappings,
     scenarioOutputField: config.scenarioOutputField,
   };
+}
+
+/** Discriminated result type returned by hydrateLlmParameters */
+type HydrateLlmResult =
+  | { success: true; dsl: Record<string, unknown> }
+  | { success: false; reason: ModelParamsFailureReason; message: string };
+
+/**
+ * Injects litellm_params into every llm-type parameter across all DSL nodes.
+ *
+ * Mirrors addEnvs.ts node-parameter hydration but uses the prefetcher's
+ * ModelParamsProvider abstraction so the child process never needs DB access.
+ * We dedupe by model string to avoid N provider lookups for N identical nodes.
+ *
+ * Provider-lookup failures are surfaced as structured failures rather than
+ * silently skipped — a partial hydration still reaches the NLP service with
+ * "dummy" api_key and causes the same AuthenticationError this PR fixes.
+ */
+async function hydrateLlmParameters({
+  dsl,
+  projectId,
+  modelParamsProvider,
+}: {
+  dsl: Record<string, unknown>;
+  projectId: string;
+  modelParamsProvider: ModelParamsProvider;
+}): Promise<HydrateLlmResult> {
+  const nodes = Array.isArray(dsl.nodes) ? (dsl.nodes as unknown[]) : [];
+  if (nodes.length === 0) return { success: true, dsl };
+
+  // Resolve the fallback model: workflow.default_llm.model or DEFAULT_MODEL
+  const defaultLlm =
+    typeof dsl.default_llm === "object" && dsl.default_llm !== null
+      ? (dsl.default_llm as Record<string, unknown>)
+      : null;
+  const defaultModel =
+    typeof defaultLlm?.model === "string" && defaultLlm.model.length > 0
+      ? defaultLlm.model
+      : DEFAULT_MODEL;
+
+  // Collect unique models needed before hitting the provider
+  const modelsNeeded = new Set<string>();
+  for (const node of nodes) {
+    if (typeof node !== "object" || node === null) continue;
+    const n = node as Record<string, unknown>;
+    const nodeData =
+      typeof n.data === "object" && n.data !== null
+        ? (n.data as Record<string, unknown>)
+        : null;
+    const rawParameters = nodeData?.parameters;
+    const parameters = Array.isArray(rawParameters) ? (rawParameters as unknown[]) : [];
+    for (const param of parameters) {
+      if (typeof param !== "object" || param === null) continue;
+      const p = param as Record<string, unknown>;
+      if (p.type !== "llm") continue;
+      const value = typeof p.value === "object" && p.value !== null
+        ? (p.value as Record<string, unknown>)
+        : null;
+      const model =
+        typeof value?.model === "string" && value.model.length > 0
+          ? value.model
+          : defaultModel;
+      modelsNeeded.add(model);
+    }
+  }
+
+  if (modelsNeeded.size === 0) return { success: true, dsl };
+
+  // Fetch litellm_params for each unique model — fail fast on first failure.
+  // Partial hydration is not safe: a partially-hydrated DSL still reaches the
+  // NLP service with "dummy" api_key for the un-hydrated nodes.
+  const litellmParamsByModel = new Map<string, Record<string, unknown>>();
+  const prepareResults = await Promise.all(
+    Array.from(modelsNeeded).map(async (model) => {
+      const result = await modelParamsProvider.prepare(projectId, model);
+      return { model, result };
+    }),
+  );
+
+  for (const { model, result } of prepareResults) {
+    if (!result.success) {
+      logger.warn(
+        { projectId, model, reason: result.reason },
+        `Failed to hydrate llm parameter: ${result.message}`,
+      );
+      return { success: false, reason: result.reason, message: result.message };
+    }
+    litellmParamsByModel.set(model, result.params as Record<string, unknown>);
+  }
+
+  const hydratedNodes = nodes.map((node) => {
+    if (typeof node !== "object" || node === null) return node;
+    const n = node as Record<string, unknown>;
+    const data =
+      typeof n.data === "object" && n.data !== null
+        ? (n.data as Record<string, unknown>)
+        : null;
+    if (!data) return node;
+
+    const parameters = Array.isArray(data.parameters)
+      ? (data.parameters as unknown[])
+      : null;
+    if (!parameters) return node;
+
+    const hydratedParams = parameters.map((param) => {
+      if (typeof param !== "object" || param === null) return param;
+      const p = param as Record<string, unknown>;
+      if (p.type !== "llm") return param;
+
+      const existingValue =
+        typeof p.value === "object" && p.value !== null
+          ? (p.value as Record<string, unknown>)
+          : null;
+      const model =
+        typeof existingValue?.model === "string" && existingValue.model.length > 0
+          ? existingValue.model
+          : defaultModel;
+
+      const litellmParams = litellmParamsByModel.get(model);
+      if (!litellmParams) return param;
+
+      // Use existing value if present, otherwise fall back to default_llm or { model }.
+      // Normalize to snake_case to match addEnvs.ts behaviour (e.g. maxTokens → max_tokens).
+      const rawBaseValue =
+        existingValue ??
+        defaultLlm ??
+        { model };
+      // Cast through unknown then to the expected intersection type — rawBaseValue is opaque
+      // Record<string, unknown> from the DSL and normalizeToSnakeCase is safe on any object.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const normalizedBase = normalizeToSnakeCase(rawBaseValue as any);
+
+      return { ...p, value: { ...normalizedBase, litellm_params: litellmParams } };
+    });
+
+    return { ...n, data: { ...data, parameters: hydratedParams } };
+  });
+
+  return { success: true, dsl: { ...dsl, nodes: hydratedNodes } };
 }
 
 /**
