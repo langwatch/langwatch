@@ -21,6 +21,8 @@ import { Drawer } from "~/components/ui/drawer";
 import { toaster } from "~/components/ui/toaster";
 import { api } from "~/utils/api";
 
+type BlockedPattern = { deny: string[]; allow: string[] | null };
+
 type VirtualKeyDetail = {
   id: string;
   projectId: string;
@@ -37,7 +39,45 @@ type VirtualKeyDetail = {
       tpm: number | null;
       rpd: number | null;
     };
+    blockedPatterns?: {
+      tools?: BlockedPattern;
+      mcp?: BlockedPattern;
+      urls?: BlockedPattern;
+      models?: BlockedPattern;
+    };
   };
+};
+
+type Dimension = "tools" | "mcp" | "urls" | "models";
+
+const DIMENSION_META: Record<
+  Dimension,
+  { label: string; placeholderDeny: string; helper: string }
+> = {
+  tools: {
+    label: "Tools",
+    placeholderDeny: "e.g. ^shell_.*\ndelete_user",
+    helper:
+      "RE2 regexes matched against OpenAI tools[].function.name + Anthropic tools[].name. Deny wins.",
+  },
+  mcp: {
+    label: "MCP servers",
+    placeholderDeny: "e.g. unapproved\\.example\\.com",
+    helper:
+      "Matched against mcp_servers[].name and .url. Deny wins; applies before dispatch.",
+  },
+  urls: {
+    label: "URLs",
+    placeholderDeny: "e.g. internal\\.corp\\..*",
+    helper:
+      "Extracted from the raw request body (user messages, tool args, system prompts). First deny match → 403 url_not_allowed.",
+  },
+  models: {
+    label: "Models (policy)",
+    placeholderDeny: "e.g. gpt-4o-search.*",
+    helper:
+      "RE2 regex policy distinct from the glob `modelsAllowed` allowlist above. Use this to enforce company policy (e.g. no non-deterministic models).",
+  },
 };
 
 type VirtualKeyEditDrawerProps = {
@@ -65,6 +105,14 @@ export function VirtualKeyEditDrawer({
   const [rpm, setRpm] = useState<string>("");
   const [tpm, setTpm] = useState<string>("");
   const [rpd, setRpd] = useState<string>("");
+  const [blocked, setBlocked] = useState<
+    Record<Dimension, { deny: string; allow: string }>
+  >({
+    tools: { deny: "", allow: "" },
+    mcp: { deny: "", allow: "" },
+    urls: { deny: "", allow: "" },
+    models: { deny: "", allow: "" },
+  });
 
   useEffect(() => {
     if (!vk) return;
@@ -82,7 +130,48 @@ export function VirtualKeyEditDrawer({
     setRpm(vk.config.rateLimits?.rpm?.toString() ?? "");
     setTpm(vk.config.rateLimits?.tpm?.toString() ?? "");
     setRpd(vk.config.rateLimits?.rpd?.toString() ?? "");
+    const bp = vk.config.blockedPatterns ?? {};
+    setBlocked({
+      tools: {
+        deny: (bp.tools?.deny ?? []).join("\n"),
+        allow: (bp.tools?.allow ?? []).join("\n"),
+      },
+      mcp: {
+        deny: (bp.mcp?.deny ?? []).join("\n"),
+        allow: (bp.mcp?.allow ?? []).join("\n"),
+      },
+      urls: {
+        deny: (bp.urls?.deny ?? []).join("\n"),
+        allow: (bp.urls?.allow ?? []).join("\n"),
+      },
+      models: {
+        deny: (bp.models?.deny ?? []).join("\n"),
+        allow: (bp.models?.allow ?? []).join("\n"),
+      },
+    });
   }, [vk]);
+
+  const parseLines = (value: string): string[] =>
+    value
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter((line) => line.length > 0);
+
+  const buildBlockedPatterns = () => {
+    const result: Record<
+      Dimension,
+      { deny: string[]; allow: string[] | null }
+    > = {} as Record<Dimension, { deny: string[]; allow: string[] | null }>;
+    for (const dim of ["tools", "mcp", "urls", "models"] as Dimension[]) {
+      const deny = parseLines(blocked[dim].deny);
+      const allowLines = parseLines(blocked[dim].allow);
+      result[dim] = {
+        deny,
+        allow: allowLines.length > 0 ? allowLines : null,
+      };
+    }
+    return result;
+  };
 
   const utils = api.useContext();
   const credentialsQuery = api.gatewayProviders.list.useQuery(
@@ -165,6 +254,7 @@ export function VirtualKeyEditDrawer({
             tpm: tpm ? Number.parseInt(tpm, 10) : null,
             rpd: rpd ? Number.parseInt(rpd, 10) : null,
           },
+          blockedPatterns: buildBlockedPatterns(),
         },
       });
       onSaved();
@@ -436,11 +526,73 @@ export function VirtualKeyEditDrawer({
               </Field.Root>
             </HStack>
 
+            <Separator />
+            <Text fontSize="sm" fontWeight="semibold">
+              Blocked patterns
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              RE2 regex deny/allow lists enforced on the gateway before the
+              request reaches the provider. Deny wins across both lists.
+              First-match rejection returns <Code fontSize="xs">403</Code> with
+              code <Code fontSize="xs">tool_not_allowed</Code> /{" "}
+              <Code fontSize="xs">mcp_not_allowed</Code> /{" "}
+              <Code fontSize="xs">url_not_allowed</Code> /{" "}
+              <Code fontSize="xs">model_not_allowed</Code>. One pattern per
+              line. Broken regex → <Code fontSize="xs">503</Code> fail-closed
+              (never silent bypass).
+            </Text>
+            {(["tools", "mcp", "urls", "models"] as Dimension[]).map((dim) => (
+              <Box key={dim}>
+                <HStack justify="space-between" mb={1}>
+                  <Text fontSize="sm" fontWeight="medium">
+                    {DIMENSION_META[dim].label}
+                  </Text>
+                </HStack>
+                <Text fontSize="xs" color="fg.muted" mb={2}>
+                  {DIMENSION_META[dim].helper}
+                </Text>
+                <HStack gap={3} align="flex-start">
+                  <Field.Root flex={1}>
+                    <Field.Label fontSize="xs">Deny</Field.Label>
+                    <Textarea
+                      value={blocked[dim].deny}
+                      onChange={(e) =>
+                        setBlocked((prev) => ({
+                          ...prev,
+                          [dim]: { ...prev[dim], deny: e.target.value },
+                        }))
+                      }
+                      placeholder={DIMENSION_META[dim].placeholderDeny}
+                      rows={3}
+                      fontFamily="mono"
+                      fontSize="xs"
+                    />
+                  </Field.Root>
+                  <Field.Root flex={1}>
+                    <Field.Label fontSize="xs">Allow (optional)</Field.Label>
+                    <Textarea
+                      value={blocked[dim].allow}
+                      onChange={(e) =>
+                        setBlocked((prev) => ({
+                          ...prev,
+                          [dim]: { ...prev[dim], allow: e.target.value },
+                        }))
+                      }
+                      placeholder="leave blank = no allowlist"
+                      rows={3}
+                      fontFamily="mono"
+                      fontSize="xs"
+                    />
+                  </Field.Root>
+                </HStack>
+              </Box>
+            ))}
+
             <Box paddingTop={2}>
               <Text fontSize="xs" color="fg.muted">
-                Advanced controls (guardrails, blocked patterns for
-                tools/MCP/URLs, fallback triggers, principal binding) are
-                editable via the REST/CLI until a dedicated tab lands.
+                Advanced controls (guardrails, fallback triggers, principal
+                binding) are editable via the REST/CLI until a dedicated tab
+                lands.
               </Text>
             </Box>
           </VStack>
