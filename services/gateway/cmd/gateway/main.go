@@ -101,7 +101,12 @@ func main() {
 		JWTRefreshThreshold: cfg.Cache.JWTRefreshThreshold,
 		Redis:               redisClient,
 		OnBundleResolved: func(b *auth.Bundle) {
-			projectEndpoints.Set(b.ProjectID(), b.Config.ObservabilityEndpoint, nil)
+			// Per-project OTLP override was removed in Lane B iter 25;
+			// all spans now route to GATEWAY_OTEL_DEFAULT_ENDPOINT via
+			// the RouterExporter default branch. projectEndpoints
+			// registry is retained as a Resolver slot (always returns
+			// empty → router uses default) to avoid churning the
+			// exporter constructor signature.
 			if ratelimitRef != nil {
 				// Drop cached buckets so the next Allow() rebuilds
 				// with whatever the new revision's ceilings are. The
