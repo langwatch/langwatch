@@ -12,6 +12,15 @@ import {
 } from "@chakra-ui/react";
 import { BarChart3 } from "lucide-react";
 import { useMemo, useState } from "react";
+import {
+  Area,
+  AreaChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
@@ -111,6 +120,8 @@ function GatewayUsagePage() {
                 />
               </HStack>
 
+              {data.byDay.length >= 2 && <SpendSparkline byDay={data.byDay} />}
+
               <VStack align="stretch" gap={2}>
                 <Heading size="sm">Top virtual keys</Heading>
                 <Table.Root size="sm">
@@ -174,6 +185,86 @@ function GatewayUsagePage() {
       </PageLayout.Container>
     </GatewayLayout>
   );
+}
+
+function SpendSparkline({
+  byDay,
+}: {
+  byDay: Array<{ day: string; totalUsd: string; requests: number }>;
+}) {
+  const points = useMemo(
+    () =>
+      byDay.map((p) => ({
+        day: p.day,
+        spendUsd: Number(p.totalUsd),
+        requests: p.requests,
+      })),
+    [byDay],
+  );
+  return (
+    <VStack align="stretch" gap={2}>
+      <HStack>
+        <Heading size="sm">Spend over time</Heading>
+        <Spacer />
+        <Text fontSize="xs" color="fg.muted">
+          ledger-backed, day-bucketed UTC
+        </Text>
+      </HStack>
+      <Box
+        borderWidth="1px"
+        borderColor="border.subtle"
+        borderRadius="lg"
+        padding={3}
+        height="220px"
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={points} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
+            <defs>
+              <linearGradient id="spendFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#f97316" stopOpacity={0.35} />
+                <stop offset="100%" stopColor="#f97316" stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+            <XAxis
+              dataKey="day"
+              tick={{ fontSize: 11, fill: "#64748b" }}
+              tickFormatter={formatDayTick}
+              minTickGap={24}
+            />
+            <YAxis
+              tick={{ fontSize: 11, fill: "#64748b" }}
+              tickFormatter={(v: number) => `$${v.toFixed(2)}`}
+              width={56}
+            />
+            <Tooltip
+              formatter={(value, name) =>
+                name === "spendUsd"
+                  ? [`$${Number(value).toFixed(4)}`, "Spend"]
+                  : [value, name]
+              }
+              labelFormatter={(label) => String(label ?? "")}
+              contentStyle={{ fontSize: 12 }}
+            />
+            <Area
+              type="monotone"
+              dataKey="spendUsd"
+              stroke="#f97316"
+              strokeWidth={2}
+              fill="url(#spendFill)"
+              isAnimationActive={false}
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </Box>
+    </VStack>
+  );
+}
+
+function formatDayTick(day: string): string {
+  const [, mm, dd] = day.split("-");
+  if (!mm || !dd) return day;
+  return `${mm}/${dd}`;
 }
 
 function StatTile({
