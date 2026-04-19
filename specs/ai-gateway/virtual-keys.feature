@@ -54,6 +54,22 @@ Feature: AI Gateway — Virtual Keys
     Then each row shows: name, prefix, status badge, last-used timestamp,
       fallback chain summary, budget status summary
 
+  @visual
+  Scenario: Virtual key list renders the fallback chain as stacked provider icons
+    Given virtual key "prod-openai" has a provider chain [openai primary, anthropic fallback-1]
+    When I open the virtual keys list
+    Then the Providers column shows the OpenAI icon at full opacity
+    And the Anthropic fallback icon at 60% opacity after a "→" separator
+    And hovering the chain exposes a tooltip reading "openai → anthropic"
+
+  @visual
+  Scenario: Virtual key list Last-used column shows relative time
+    Given virtual key "prod-openai" was last used 3 hours ago
+    And virtual key "dev-sandbox-legacy" was never used
+    When I open the virtual keys list
+    Then the prod-openai row shows "about 3 hours ago" with the exact timestamp on hover
+    And the dev-sandbox-legacy row shows "never" in muted text
+
   # ============================================================================
   # Create-drawer capability preview (Lane B iter 23) — minimum-viable
   # creation surface with a read-only preview of advanced settings.
@@ -176,8 +192,16 @@ Feature: AI Gateway — Virtual Keys
     When I click "Rotate secret" on "prod-key"
     And I confirm the rotation
     Then a new secret "lw_vk_live_01HZX9K3MB…" is generated and shown once
-    And the previous secret no longer authenticates at the gateway after a max 60s cache window
-    And an audit log entry "virtualKey.rotated" is recorded
+    And the previous secret stays valid for 24 hours (grace window) so clients can roll over
+    And an audit log entry "VIRTUAL_KEY_ROTATED" is recorded
+
+  @integration
+  Scenario: Rotate secret-reveal dialog surfaces the 24h grace window
+    Given I rotated virtual key "prod-key" and the reveal dialog opens
+    Then I see a blue info alert titled "24-hour grace window active"
+    And the alert body explains the previous secret keeps working for 24 hours
+    And the alert is in addition to the orange warning "You will only see this secret once"
+    And the dialog title reads "Save your rotated secret" (not the create flow's "Save your virtual key secret")
 
   @integration
   Scenario: Revoke virtual key disables authentication immediately
@@ -232,6 +256,30 @@ Feature: AI Gateway — Virtual Keys
     When I create, rotate, edit, or revoke a virtual key
     Then an audit log row is written with actor, action, target vk_id,
       before and after config snapshots, and timestamp
+
+  @integration
+  Scenario: VK detail has a deep-link Audit history button that pre-filters the log
+    Given virtual key "prod-key" has 4 audit entries (created, updated, rotated, revoked)
+    When I open the VK detail page and click "Audit history"
+    Then I land on /gateway/audit?targetKind=virtual_key&targetId=vk_…
+    And the audit page shows only the 4 entries for that VK
+    And I see a clickable "target = vk_…" chip that clears the filter when ×-tapped
+
+  @integration
+  Scenario: Audit history button stays reachable even for revoked VKs
+    Given virtual key "prod-key" has status "revoked"
+    When I open the VK detail page
+    Then the Edit / Rotate / Revoke buttons are hidden
+    But the "Audit history" button is still visible so I can investigate the revocation trail
+
+  @integration
+  Scenario: VK detail Usage section renders populated ledger data
+    Given virtual key "prod-openai" has 629 completed requests over the last 30 days
+    When I open the VK detail page and scroll to "Usage (last 30 days)"
+    Then I see stat tiles for Total spend, Requests, Avg $/request, and Blocked (when > 0)
+    And I see a 30-day area sparkline bucketed by UTC day
+    And I see Spend-by-model badges ordered by total spend desc
+    And I see a Recent-debits table with When (relative-time + exact on hover), Model, Tokens in→out, Amount, Latency ms
 
   @integration
   Scenario: Request attribution includes VK principal on every trace
