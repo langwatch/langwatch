@@ -1,0 +1,11 @@
+-- AI Gateway: drop the per-project OTLP endpoint customisation column.
+-- The gateway sends per-tenant spans to LangWatch's own ingestion
+-- unconditionally — this is our observability product, there is no
+-- customer value in letting them override it to a third-party OTLP
+-- endpoint. The column was never exposed in a shipped release (rolled
+-- back on the same feature branch that added it).
+--
+-- Safe to drop: column was always null in existing rows (no UI write
+-- path reached production). Gateway bundle's `observability_endpoint`
+-- field is also removed in the same change (see GatewayConfigMaterialiser).
+ALTER TABLE "Project" DROP COLUMN IF EXISTS "observabilityEndpoint";

@@ -1,5 +1,5 @@
 import { Box, HStack, VStack } from "@chakra-ui/react";
-import { FileClock, Gauge, KeyRound, LineChart, Plug, Settings } from "lucide-react";
+import { FileClock, Gauge, KeyRound, LineChart, Plug } from "lucide-react";
 import { type PropsWithChildren } from "react";
 
 import { DashboardLayout } from "~/components/DashboardLayout";
@@ -79,14 +79,6 @@ export function GatewayLayout({ children }: PropsWithChildren) {
               icon={<FileClock size={16} />}
             >
               Audit log
-            </MenuLink>
-          )}
-          {hasPermission("project:update") && (
-            <MenuLink
-              href={`/${slug}/gateway/settings`}
-              icon={<Settings size={16} />}
-            >
-              Settings
             </MenuLink>
           )}
         </VStack>
