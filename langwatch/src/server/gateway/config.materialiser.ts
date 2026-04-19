@@ -49,6 +49,8 @@ export type GatewayConfigPayload = {
     pre: { id: string; evaluator: string }[];
     post: { id: string; evaluator: string }[];
     stream_chunk: { id: string; evaluator: string }[];
+    request_fail_open: boolean;
+    response_fail_open: boolean;
   };
   blocked_patterns: {
     tools: { deny: string[]; allow: string[] | null };
@@ -126,6 +128,8 @@ export class GatewayConfigMaterialiser {
         pre: config.guardrails.pre,
         post: config.guardrails.post,
         stream_chunk: config.guardrails.streamChunk,
+        request_fail_open: config.guardrails.requestFailOpen,
+        response_fail_open: config.guardrails.responseFailOpen,
       },
       blocked_patterns: {
         tools: config.blockedPatterns.tools,
