@@ -7,6 +7,8 @@ import (
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"go.opentelemetry.io/otel/attribute"
 
+	"github.com/langwatch/langwatch/services/gateway/internal/auth"
+	"github.com/langwatch/langwatch/services/gateway/internal/fallback"
 	gwotel "github.com/langwatch/langwatch/services/gateway/internal/otel"
 )
 
@@ -140,6 +142,76 @@ func TestSpanShape_ErrorSpanOmitsUsage(t *testing.T) {
 		if _, ok := attrs[key]; ok {
 			t.Errorf("error span should not stamp %s, got %v", key, attrs[key])
 		}
+	}
+}
+
+// TestSpanShape_FallbackAttribution covers span-shape.feature §6.
+// Primary failed, secondary succeeded — the span carries
+// attempts_count = 3 and winning_provider = the secondary's type.
+func TestSpanShape_FallbackAttribution(t *testing.T) {
+	// Ensure the pkg import is used so goimports doesn't strip it.
+	_ = gwotel.AttrFallbackAttemptsCount
+
+	bundle := fakeBundleForFallback()
+	events := []fallback.Event{
+		{Slot: 0, Credential: "pc_openai", Reason: fallback.ReasonRetryable5xx, DurationMS: 100},
+		{Slot: 0, Credential: "pc_openai", Reason: fallback.ReasonRetryable5xx, DurationMS: 80},
+		{Slot: 1, Credential: "pc_anthropic", Reason: fallback.ReasonFallbackSuccess, DurationMS: 60},
+	}
+
+	attrs := spanAttrs(t, func(ctx context.Context) {
+		stampFallbackAttribution(ctx, events, bundle)
+	})
+
+	mustI64(t, attrs, "langwatch.fallback.attempts_count", 3)
+	mustStr(t, attrs, "langwatch.fallback.winning_credential", "pc_anthropic")
+	mustStr(t, attrs, "langwatch.fallback.winning_provider", "anthropic")
+}
+
+// TestSpanShape_FallbackAttribution_PrimarySuccessOnlyOneEvent — when
+// the primary wins first try, the attempt count is 1 and the winning
+// provider is still attributed.
+func TestSpanShape_FallbackAttribution_PrimarySuccess(t *testing.T) {
+	bundle := fakeBundleForFallback()
+	events := []fallback.Event{
+		{Slot: 0, Credential: "pc_openai", Reason: fallback.ReasonPrimarySuccess, DurationMS: 120},
+	}
+	attrs := spanAttrs(t, func(ctx context.Context) {
+		stampFallbackAttribution(ctx, events, bundle)
+	})
+	mustI64(t, attrs, "langwatch.fallback.attempts_count", 1)
+	mustStr(t, attrs, "langwatch.fallback.winning_provider", "openai")
+}
+
+// TestSpanShape_FallbackAttribution_AllFailed — terminal non-success
+// (every slot exhausted) omits the winning_* attrs so the renderer
+// doesn't show a provider that "won" when the request actually 502'd.
+func TestSpanShape_FallbackAttribution_AllFailed(t *testing.T) {
+	bundle := fakeBundleForFallback()
+	events := []fallback.Event{
+		{Slot: 0, Credential: "pc_openai", Reason: fallback.ReasonRetryable5xx, DurationMS: 100},
+		{Slot: 1, Credential: "pc_anthropic", Reason: fallback.ReasonRetryable5xx, DurationMS: 80},
+	}
+	attrs := spanAttrs(t, func(ctx context.Context) {
+		stampFallbackAttribution(ctx, events, bundle)
+	})
+	mustI64(t, attrs, "langwatch.fallback.attempts_count", 2)
+	if _, ok := attrs["langwatch.fallback.winning_provider"]; ok {
+		t.Error("all-failed chain must not stamp winning_provider")
+	}
+	if _, ok := attrs["langwatch.fallback.winning_credential"]; ok {
+		t.Error("all-failed chain must not stamp winning_credential")
+	}
+}
+
+func fakeBundleForFallback() *auth.Bundle {
+	return &auth.Bundle{
+		Config: &auth.Config{
+			ProviderCreds: []auth.ProviderCred{
+				{ID: "pc_openai", Type: "openai"},
+				{ID: "pc_anthropic", Type: "anthropic"},
+			},
+		},
 	}
 }
 

@@ -801,6 +801,7 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	w.Header().Set("X-LangWatch-Fallback-Count", strconv.Itoa(fbCount))
 	gwotel.AddInt64Attr(r.Context(), "langwatch.fallback.attempts", int64(len(events)))
 	gwotel.AddInt64Attr(r.Context(), "langwatch.fallback.count", int64(fbCount))
+	stampFallbackAttribution(r.Context(), events, b)
 	d.recordFallbackEvents(events)
 	if berr != nil {
 		d.enqueueDebit(b, grq, resolved, 0, 0, 0, 0, 0, time.Since(t0).Milliseconds(), "provider_error")
@@ -852,6 +853,42 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	d.metrics.ObserveHTTPRequest("/v1/chat/completions", "success", string(resolved.Provider), resolved.Model, time.Since(t0).Seconds())
 }
 
+// stampFallbackAttribution emits the §6 attribution attributes on the
+// active span: total attempts, winning-slot provider + credential.
+// Safe on empty events (gateway skipped the chain entirely).
+func stampFallbackAttribution(ctx context.Context, events []fallback.Event, b *auth.Bundle) {
+	if len(events) == 0 {
+		return
+	}
+	gwotel.AddInt64Attr(ctx, gwotel.AttrFallbackAttemptsCount, int64(len(events)))
+
+	last := events[len(events)-1]
+	if last.Reason != fallback.ReasonPrimarySuccess && last.Reason != fallback.ReasonFallbackSuccess {
+		return
+	}
+	if last.Credential != "" {
+		gwotel.AddStringAttr(ctx, gwotel.AttrFallbackWinningCredential, last.Credential)
+	}
+	if prov := lookupProviderForCredential(b, last.Credential); prov != "" {
+		gwotel.AddStringAttr(ctx, gwotel.AttrFallbackWinningProvider, prov)
+	}
+}
+
+// lookupProviderForCredential returns the bound provider type (e.g.
+// "openai", "anthropic") for a given provider-credential ID from the
+// VK config, or "" when no match or no config.
+func lookupProviderForCredential(b *auth.Bundle, credID string) string {
+	if b == nil || b.Config == nil || credID == "" {
+		return ""
+	}
+	for _, pc := range b.Config.ProviderCreds {
+		if pc.ID == credID {
+			return pc.Type
+		}
+	}
+	return ""
+}
+
 // countFallbacks returns how many times the engine advanced past a
 // retryable error before the final attempt. 0 = primary succeeded.
 func countFallbacks(events []fallback.Event) int {
@@ -885,6 +922,7 @@ func (d *Dispatcher) serveChatStream(w http.ResponseWriter, r *http.Request, b *
 	w.Header().Set("X-LangWatch-Fallback-Count", strconv.Itoa(fbCount))
 	gwotel.AddInt64Attr(r.Context(), "langwatch.fallback.attempts", int64(len(events)))
 	gwotel.AddInt64Attr(r.Context(), "langwatch.fallback.count", int64(fbCount))
+	stampFallbackAttribution(r.Context(), events, b)
 	if berr != nil {
 		// All chain setup attempts failed before any bytes were flushed
 		// — safe to translate into a normal JSON error envelope. Nothing

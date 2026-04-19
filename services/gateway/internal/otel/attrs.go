@@ -90,6 +90,15 @@ const (
 	AttrCacheRuleID       = "langwatch.cache.rule_id"
 	AttrCacheRulePriority = "langwatch.cache.rule_priority"
 	AttrCacheModeApplied  = "langwatch.cache.mode_applied"
+	// Fallback-chain attribution. attempts_count mirrors the older
+	// langwatch.fallback.attempts key (kept around for back-compat on
+	// dashboards / queries), winning_provider lets operators see
+	// which credential actually produced the response without
+	// walking the full span events list. Contract defined in
+	// specs/ai-gateway/span-shape.feature §6.
+	AttrFallbackAttemptsCount = "langwatch.fallback.attempts_count"
+	AttrFallbackWinningProvider = "langwatch.fallback.winning_provider"
+	AttrFallbackWinningCredential = "langwatch.fallback.winning_credential"
 )
 
 // Standard response header names the gateway emits so client SDKs /
