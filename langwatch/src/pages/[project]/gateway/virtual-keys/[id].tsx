@@ -24,9 +24,12 @@ import { VirtualKeySecretReveal } from "~/components/gateway/VirtualKeySecretRev
 import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+import { formatTimeAgo } from "~/utils/formatTimeAgo";
 
 function VirtualKeyDetailPage() {
   const { project, hasPermission } = useOrganizationTeamProject();
@@ -178,16 +181,24 @@ function VirtualKeyDetailPage() {
 
               <Section title="Activity">
                 <DetailRow label="Last used">
-                  <Text fontSize="sm" color="fg.muted">
-                    {vk.lastUsedAt
-                      ? new Date(vk.lastUsedAt).toLocaleString()
-                      : "never"}
-                  </Text>
+                  {vk.lastUsedAt ? (
+                    <Tooltip content={new Date(vk.lastUsedAt).toLocaleString()}>
+                      <Text fontSize="sm" color="fg.muted">
+                        {formatTimeAgo(new Date(vk.lastUsedAt).getTime())}
+                      </Text>
+                    </Tooltip>
+                  ) : (
+                    <Text fontSize="sm" color="fg.muted">
+                      never
+                    </Text>
+                  )}
                 </DetailRow>
                 <DetailRow label="Created">
-                  <Text fontSize="sm" color="fg.muted">
-                    {new Date(vk.createdAt).toLocaleString()}
-                  </Text>
+                  <Tooltip content={new Date(vk.createdAt).toLocaleString()}>
+                    <Text fontSize="sm" color="fg.muted">
+                      {formatTimeAgo(new Date(vk.createdAt).getTime())}
+                    </Text>
+                  </Tooltip>
                 </DetailRow>
                 <DetailRow label="Revision">
                   <Text fontSize="sm" color="fg.muted">
@@ -197,32 +208,10 @@ function VirtualKeyDetailPage() {
               </Section>
 
               <Section title="Provider fallback chain">
-                {vk.providerCredentialIds.length === 0 ? (
-                  <Text fontSize="sm" color="fg.muted">
-                    No providers bound.
-                  </Text>
-                ) : (
-                  <Table.Root size="sm">
-                    <Table.Header>
-                      <Table.Row>
-                        <Table.ColumnHeader>Order</Table.ColumnHeader>
-                        <Table.ColumnHeader>Credential ID</Table.ColumnHeader>
-                      </Table.Row>
-                    </Table.Header>
-                    <Table.Body>
-                      {vk.providerCredentialIds.map((id, idx) => (
-                        <Table.Row key={id}>
-                          <Table.Cell>
-                            <Badge colorPalette="orange">#{idx + 1}</Badge>
-                          </Table.Cell>
-                          <Table.Cell>
-                            <Code fontSize="xs">{id}</Code>
-                          </Table.Cell>
-                        </Table.Row>
-                      ))}
-                    </Table.Body>
-                  </Table.Root>
-                )}
+                <ProviderChainTable
+                  chain={vk.providerChain ?? []}
+                  fallbackIds={vk.providerCredentialIds}
+                />
               </Section>
 
               <ConfigurationSection config={vk.config as VkConfig | null} />
@@ -329,6 +318,92 @@ type VkConfig = {
   };
   metadata?: { tags?: string[] };
 };
+
+type ChainEntry = {
+  providerCredentialId: string;
+  slot: string;
+  providerType: string;
+};
+
+type ProviderKey = keyof typeof modelProviderIcons;
+
+function resolveIcon(providerType: string): React.ReactNode | null {
+  if (!providerType) return null;
+  if (providerType in modelProviderIcons) {
+    return modelProviderIcons[providerType as ProviderKey];
+  }
+  return null;
+}
+
+function ProviderChainTable({
+  chain,
+  fallbackIds,
+}: {
+  chain: ChainEntry[];
+  fallbackIds: string[];
+}) {
+  // Router's `get` procedure populates providerChain with enriched
+  // info (slot + providerType); list/create/rotate may not. Fall
+  // back to raw IDs if the enriched shape isn't present — keeps the
+  // panel rendering through transient states.
+  const rows: ChainEntry[] =
+    chain.length > 0
+      ? chain
+      : fallbackIds.map((id, idx) => ({
+          providerCredentialId: id,
+          slot: idx === 0 ? "primary" : `fallback-${idx}`,
+          providerType: "",
+        }));
+
+  if (rows.length === 0) {
+    return (
+      <Text fontSize="sm" color="fg.muted">
+        No providers bound.
+      </Text>
+    );
+  }
+
+  return (
+    <Table.Root size="sm">
+      <Table.Header>
+        <Table.Row>
+          <Table.ColumnHeader>Order</Table.ColumnHeader>
+          <Table.ColumnHeader>Provider</Table.ColumnHeader>
+          <Table.ColumnHeader>Slot</Table.ColumnHeader>
+          <Table.ColumnHeader>Credential ID</Table.ColumnHeader>
+        </Table.Row>
+      </Table.Header>
+      <Table.Body>
+        {rows.map((entry, idx) => {
+          const Icon = resolveIcon(entry.providerType);
+          return (
+            <Table.Row key={entry.providerCredentialId}>
+              <Table.Cell>
+                <Badge colorPalette="orange">#{idx + 1}</Badge>
+              </Table.Cell>
+              <Table.Cell>
+                <HStack gap={2}>
+                  {Icon}
+                  <Text fontSize="sm" fontWeight="medium">
+                    {entry.providerType || "—"}
+                  </Text>
+                </HStack>
+              </Table.Cell>
+              <Table.Cell>
+                <Badge variant="subtle" colorPalette="gray">
+                  {entry.slot}
+                </Badge>
+              </Table.Cell>
+              <Table.Cell>
+                <Code fontSize="xs">{entry.providerCredentialId}</Code>
+              </Table.Cell>
+            </Table.Row>
+          );
+        })}
+      </Table.Body>
+    </Table.Root>
+  );
+}
 
 function ConfigurationSection({ config }: { config: VkConfig | null }) {
   if (!config) return null;

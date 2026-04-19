@@ -7,6 +7,19 @@
  */
 import type { VirtualKeyWithChain } from "./virtualKey.repository";
 
+/**
+ * Enriched provider-credential entry for the fallback chain panel on
+ * the VK detail page. The raw `providerCredentialIds: string[]` stays
+ * for backwards-compat with existing callers (list page, public REST),
+ * but the detail view needs provider type + slot to render the chain
+ * with the modelProviderIcons map. See specs/ai-gateway/virtual-keys.feature.
+ */
+export type VirtualKeyProviderChainEntry = {
+  providerCredentialId: string;
+  slot: string;
+  providerType: string;
+};
+
 export type VirtualKeyCamelDto = {
   id: string;
   name: string;
@@ -16,6 +29,7 @@ export type VirtualKeyCamelDto = {
   displayPrefix: string;
   principalUserId: string | null;
   providerCredentialIds: string[];
+  providerChain: VirtualKeyProviderChainEntry[];
   config: unknown;
   revision: string;
   createdAt: string;
@@ -53,6 +67,7 @@ type BaseVk = {
   displayPrefix: string;
   principalUserId: string | null;
   providerCredentialIds: string[];
+  providerChain: VirtualKeyProviderChainEntry[];
   config: unknown;
   revision: string;
   createdAt: string;
@@ -62,9 +77,21 @@ type BaseVk = {
   fallbackChainLength: number;
 };
 
-function baseVk(vk: VirtualKeyWithChain): BaseVk {
+export type EnrichedChainEntry = {
+  providerCredentialId: string;
+  slot: string;
+  providerType: string;
+};
+
+function baseVk(
+  vk: VirtualKeyWithChain,
+  enriched?: EnrichedChainEntry[],
+): BaseVk & { providerChain: VirtualKeyProviderChainEntry[] } {
   const chain = [...vk.providerCredentials].sort(
     (a, b) => a.priority - b.priority,
+  );
+  const enrichedById = new Map(
+    (enriched ?? []).map((e) => [e.providerCredentialId, e]),
   );
   return {
     id: vk.id,
@@ -75,6 +102,14 @@ function baseVk(vk: VirtualKeyWithChain): BaseVk {
     displayPrefix: vk.displayPrefix,
     principalUserId: vk.principalUserId,
     providerCredentialIds: chain.map((c) => c.providerCredentialId),
+    providerChain: chain.map((c) => {
+      const info = enrichedById.get(c.providerCredentialId);
+      return {
+        providerCredentialId: c.providerCredentialId,
+        slot: info?.slot ?? `#${c.priority + 1}`,
+        providerType: info?.providerType ?? "",
+      };
+    }),
     config: vk.config,
     revision: vk.revision.toString(),
     createdAt: vk.createdAt.toISOString(),
@@ -87,8 +122,9 @@ function baseVk(vk: VirtualKeyWithChain): BaseVk {
 
 export function toVirtualKeyCamelDto(
   vk: VirtualKeyWithChain,
+  enriched?: EnrichedChainEntry[],
 ): VirtualKeyCamelDto {
-  return baseVk(vk);
+  return baseVk(vk, enriched);
 }
 
 export function toVirtualKeySnakeDto(
