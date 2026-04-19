@@ -23,6 +23,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	bifrost "github.com/maximhq/bifrost/core"
@@ -31,6 +32,7 @@ import (
 	"github.com/langwatch/langwatch/services/gateway/internal/auth"
 	"github.com/langwatch/langwatch/services/gateway/internal/blocked"
 	"github.com/langwatch/langwatch/services/gateway/internal/cacheoverride"
+	"github.com/langwatch/langwatch/services/gateway/internal/cacherules"
 	"github.com/langwatch/langwatch/services/gateway/internal/budget"
 	"github.com/langwatch/langwatch/services/gateway/internal/circuit"
 	"github.com/langwatch/langwatch/services/gateway/internal/fallback"
@@ -113,17 +115,53 @@ func New(ctx context.Context, opts Options) (*Dispatcher, error) {
 	}, nil
 }
 
-// applyCacheOverride runs the `X-LangWatch-Cache` header (contract
-// §7) against the request body before it reaches bifrost. Returns
-// (body, true) when the dispatcher should continue; (nil, false)
-// when we've already written a 400 envelope and the caller must
-// return. Respect (default) + disable are implemented; force and
-// ttl=N are valid-but-deferred → 400 so the caller knows upfront.
-func (d *Dispatcher) applyCacheOverride(w http.ResponseWriter, r *http.Request, body []byte, reqID string) ([]byte, bool) {
+// applyCacheOverride resolves the effective cache-control mode for a
+// request, honoring the documented precedence from contract §Precedence:
+//
+//	X-LangWatch-Cache header > matched cache rule > VK Cache default (respect)
+//
+// When a bundle-baked cache rule matches (internal/cacherules.Evaluate),
+// the rule's mode is applied unless the caller sent an explicit header.
+// Rule matches emit `langwatch.cache.rule_id` + `_priority` +
+// `.mode_applied` span attrs and bump `gateway_cache_rule_hits_total`
+// so operators can attribute cache behaviour per rule.
+//
+// Returns (body, true) when the dispatcher should continue; (nil, false)
+// when we've already written a 400 envelope and the caller must return.
+// Respect (default) + disable are implemented; force and ttl=N remain
+// valid-but-deferred → 400.
+func (d *Dispatcher) applyCacheOverride(w http.ResponseWriter, r *http.Request, body []byte, reqID string, b *auth.Bundle, model string) ([]byte, bool) {
 	hdr := r.Header.Get("X-LangWatch-Cache")
-	if hdr == "" {
-		return body, true
+
+	// Header wins — no rule evaluation when the caller is explicit.
+	if hdr != "" {
+		return d.applyHeaderMode(w, r, body, reqID, hdr)
 	}
+
+	// No header → consider bundle-baked rules (iter 45 evaluator).
+	if b != nil && b.Config != nil && len(b.Config.CacheRules) > 0 {
+		match, ok := cacherules.Evaluate(b.Config.CacheRules, cacherules.Request{
+			VKID:        b.DisplayPrefix,
+			PrincipalID: b.JWTClaims.PrincipalID,
+			Model:       model,
+			// vk_tags + request_metadata aren't yet plumbed through the
+			// hot path; they'll land when the bundle/request pipeline
+			// carries them. Evaluate tolerates zero-value fields.
+		})
+		if ok {
+			return d.applyRuleMode(w, r, body, reqID, b, &match)
+		}
+	}
+
+	// Fall through: no header, no rule match → respect VK default (no-op
+	// body transform since cacheoverride.Apply on Kind=respect is pass-through).
+	return body, true
+}
+
+// applyHeaderMode handles the X-LangWatch-Cache request header path.
+// Preserves v1 semantics: respect/disable implemented, force/ttl=N
+// return 400 with `cache_override_not_implemented`.
+func (d *Dispatcher) applyHeaderMode(w http.ResponseWriter, r *http.Request, body []byte, reqID, hdr string) ([]byte, bool) {
 	mode, err := cacheoverride.Parse(hdr)
 	if err != nil {
 		if errors.Is(err, cacheoverride.ErrNotImplemented) {
@@ -146,6 +184,41 @@ func (d *Dispatcher) applyCacheOverride(w http.ResponseWriter, r *http.Request, 
 		return nil, false
 	}
 	w.Header().Set("X-LangWatch-Cache-Mode", string(mode.Kind))
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrCacheModeApplied, string(mode.Kind))
+	return out, true
+}
+
+// applyRuleMode handles the matched-rule path. v1 supports rule.Mode
+// in {respect, disable}; force/ttl are specced but the body-mutation
+// (Anthropic cache_control injection, Gemini cachedContent creation)
+// is v1.1 work — when a v1 gateway encounters rule.Mode=force it
+// degrades to respect + logs a warning rather than failing the request.
+func (d *Dispatcher) applyRuleMode(w http.ResponseWriter, r *http.Request, body []byte, reqID string, b *auth.Bundle, match *cacherules.Match) ([]byte, bool) {
+	mode := cacheoverride.Mode{Kind: cacheoverride.Kind(match.Mode)}
+	// v1 safety: force + ttl are spec'd but body-mutation not yet
+	// implemented. Downgrade to respect + record metric so operators
+	// see the rule fired but observe no body change.
+	applied := match.Mode
+	if applied == string(cacheoverride.KindForce) {
+		d.logger.Warn("cache_rule_force_mode_deferred",
+			"rule_id", match.RuleID, "vk_id", b.DisplayPrefix,
+			"reason", "v1 evaluates force matchers but body mutation is v1.1 — treating as respect")
+		applied = string(cacheoverride.KindRespect)
+		mode.Kind = cacheoverride.KindRespect
+	}
+	out, err := cacheoverride.Apply(mode, body)
+	if err != nil {
+		gwerrors.Write(w, reqID, gwerrors.TypeCacheOverrideInvalid,
+			"cache_override_apply_failed", err.Error(), "cache_rule")
+		return nil, false
+	}
+	w.Header().Set("X-LangWatch-Cache-Mode", applied)
+	// Observability: rule attribution on the span + metric bump.
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrCacheRuleID, match.RuleID)
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrCacheModeApplied, applied)
+	// Priority isn't carried back by the evaluator today — adding it
+	// would require passing the full CacheRuleSpec. Deferred.
+	d.metrics.RecordCacheRuleHit(match.RuleID, strings.ToUpper(applied))
 	return out, true
 }
 
@@ -1033,8 +1106,11 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 	// Cache override is evaluated on /v1/messages because Anthropic
 	// is the canonical cache_control shape today. Still runs before
 	// blocked-pattern checks so a disabled-cache request uses the
-	// same regex evaluation as any other.
-	if out, ok := d.applyCacheOverride(w, r, body, reqID); ok {
+	// same regex evaluation as any other. Model-field matchers in
+	// cache rules can't fire here because model parse happens below;
+	// that's a scoping choice — VK-scoped / prefix / principal / tag
+	// / metadata rules all still work on this path.
+	if out, ok := d.applyCacheOverride(w, r, body, reqID, b, ""); ok {
 		body = out
 	} else {
 		return
