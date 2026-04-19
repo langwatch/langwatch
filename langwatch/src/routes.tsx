@@ -7,6 +7,7 @@ import {
 } from "react-router";
 import NProgress from "nprogress";
 import { InnerProviders } from "./AppProviders";
+import NotFoundOrErrorPage from "./pages/_not-found";
 
 /**
  * Root layout — wraps all routes.
@@ -144,6 +145,10 @@ const routes: RouteObject[] = [
     path: "/settings/roles",
     ...page(() => import("./pages/settings/roles")),
   },
+  {
+    path: "/settings/api-keys",
+    ...page(() => import("./pages/settings/api-keys")),
+  },
   { path: "/settings/scim", ...page(() => import("./pages/settings/scim")) },
   {
     path: "/settings/secrets",
@@ -182,6 +187,42 @@ const routes: RouteObject[] = [
   {
     path: "/:project/automations",
     ...page(() => import("./pages/[project]/automations")),
+  },
+  {
+    path: "/:project/gateway",
+    ...page(() => import("./pages/[project]/gateway/index")),
+  },
+  {
+    path: "/:project/gateway/virtual-keys",
+    ...page(() => import("./pages/[project]/gateway/virtual-keys")),
+  },
+  {
+    path: "/:project/gateway/virtual-keys/:id",
+    ...page(() => import("./pages/[project]/gateway/virtual-keys/[id]")),
+  },
+  {
+    path: "/:project/gateway/budgets",
+    ...page(() => import("./pages/[project]/gateway/budgets")),
+  },
+  {
+    path: "/:project/gateway/budgets/:id",
+    ...page(() => import("./pages/[project]/gateway/budgets/[id]")),
+  },
+  {
+    path: "/:project/gateway/providers",
+    ...page(() => import("./pages/[project]/gateway/providers")),
+  },
+  {
+    path: "/:project/gateway/usage",
+    ...page(() => import("./pages/[project]/gateway/usage")),
+  },
+  {
+    path: "/:project/gateway/audit",
+    ...page(() => import("./pages/[project]/gateway/audit")),
+  },
+  {
+    path: "/:project/gateway/cache-rules",
+    ...page(() => import("./pages/[project]/gateway/cache-rules")),
   },
   {
     path: "/:project/datasets",
@@ -395,11 +436,21 @@ const routes: RouteObject[] = [
     path: "/@project/*",
     ...page(() => import("./pages/@project/[...path]/index")),
   },
+
+  // Catch-all 404 — must stay last. Replaces the React Router dev fallback
+  // (the raw "Hey developer 👋" string) with a styled page.
+  {
+    path: "*",
+    ...page(() => import("./pages/_not-found")),
+  },
 ];
 
 export const router = createBrowserRouter([
   {
     Component: RootLayout,
+    // ErrorBoundary catches render + loader throws anywhere below this node
+    // and renders the same fallback used by the catch-all 404 route.
+    ErrorBoundary: NotFoundOrErrorPage,
     children: routes,
   },
 ]);

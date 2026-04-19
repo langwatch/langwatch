@@ -31,6 +31,9 @@ Built for teams that need regression testing, simulations, and production observ
 - [**Open standards, no lock-in**](https://docs.langwatch.ai/integration/opentelemetry/guide)
   OpenTelemetry/OTLP-native. Framework- and LLM-provider agnostic by design.
 
+- [**AI Gateway for governance + cost control**](https://docs.langwatch.ai/ai-gateway/overview)
+  OpenAI/Anthropic-compatible proxy with virtual keys, hierarchical budgets, inline guardrails, automatic fallback across providers, and Anthropic `cache_control` passthrough. ~700 ns hot-path overhead. Ships as a separate Go binary (`services/gateway/`) + Helm sub-chart (`charts/gateway/`).
+
 - [**Collaboration that doesn't slow shipping**](https://docs.langwatch.ai/features/annotations)
   Review runs, annotate failures, and ship fixes faster. Let domain experts label edge cases with [annotations & queues](https://docs.langwatch.ai/features/annotations), keep prompts in Git with the [GitHub integration](https://docs.langwatch.ai/prompt-management/features/essential/github-integration), and [link prompt versions to traces](https://docs.langwatch.ai/prompt-management/features/advanced/link-to-traces).
 

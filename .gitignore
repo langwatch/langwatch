@@ -48,6 +48,19 @@ prompts/**
 browser-tests/
 **/.claude/screenshots/
 **/.claude/ralph-loop*.md
+# Loose PNG artifacts left by dogfood / scenario sessions — the convention
+# is to upload to img402.dev and link from the PR body, not to commit binaries.
+**/.claude/*.png
+/dogfood-*.png
+/.browser-test-screenshots/
+
+# Ralph-loop agent coordination files — internal working state, not shipped.
+# PR body content lives on GitHub; cross-lane readiness + iter journals are
+# local-only. If something here matters long-term it should graduate to
+# docs/ or specs/ instead.
+.claude/LANE-*.md
+.claude/PR-DESCRIPTION.md
+.claude/V1-GA-READINESS.md
 
 # Playwright E2E tests
 agentic-e2e-tests/test-results/

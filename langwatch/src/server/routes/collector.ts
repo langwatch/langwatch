@@ -28,8 +28,15 @@ import {
 } from "../tracer/types.generated";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
 import { createLogger } from "../../utils/logger/server";
+import { TokenResolver } from "../pat/token-resolver";
+import {
+  enforcePatCeiling,
+  extractCredentials,
+  patCeilingDenialResponse,
+} from "../pat/auth-middleware";
 
 const logger = createLogger("langwatch.collector");
+const tokenResolver = TokenResolver.create(prisma);
 
 export const app = new Hono().basePath("/api");
 
@@ -42,14 +49,9 @@ app.post(
   "/collector",
   bodyLimit({ maxSize: 10 * 1024 * 1024 }), // 10MB
   async (c) => {
-    const xAuthToken = c.req.header("x-auth-token");
-    const authHeader = c.req.header("authorization");
+    const credentials = extractCredentials(c);
 
-    const authToken =
-      xAuthToken ??
-      (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
-
-    if (!authToken) {
+    if (!credentials) {
       logger.warn(
         "collector request is not authenticated, no auth token provided",
       );
@@ -83,20 +85,38 @@ app.post(
       return c.json({ message: "Invalid body, expecting json" }, 400);
     }
 
-    const project = await prisma.project.findUnique({
-      where: { apiKey: authToken as string, archivedAt: null },
-      include: {
-        team: true,
-      },
+    const resolved = await tokenResolver.resolve({
+      token: credentials.token,
+      projectId: credentials.projectId,
     });
 
-    if (!project) {
+    if (!resolved) {
       logger.warn(
         "collector request is not authenticated, invalid auth token",
       );
 
       return c.json({ message: "Invalid auth token." }, 401);
     }
+
+    // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
+    // access — ADMIN and MEMBER have it; VIEWER does not, preventing
+    // read-only PATs from ingesting traces.
+    try {
+      await enforcePatCeiling({
+        prisma,
+        resolved,
+        permission: "traces:create",
+      });
+    } catch (error) {
+      const denial = patCeilingDenialResponse(error);
+      logger.warn(
+        { projectId: resolved.project.id, patId: resolved.type === "pat" ? resolved.patId : undefined },
+        "collector request denied by PAT ceiling",
+      );
+      return c.json({ message: denial.message }, denial.status);
+    }
+
+    const project = resolved.project;
 
     logger.info(
       { projectId: project.id },
@@ -242,6 +262,12 @@ app.post(
       );
 
       return c.json({ error: validationError.message }, 400);
+    }
+
+    // Body successfully validated — mark PAT as used if this request was
+    // authenticated via PAT
+    if (resolved.type === "pat") {
+      tokenResolver.markUsed({ patId: resolved.patId });
     }
 
     const { trace_id: nullableTraceId, expected_output: expectedOutput } =

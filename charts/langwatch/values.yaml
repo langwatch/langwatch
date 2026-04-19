@@ -1472,3 +1472,39 @@ redis:
       limits:
         cpu: 500m
         memory: 512Mi
+
+## @section AI Gateway
+## The gateway is a Go service that fronts LLM provider traffic with
+## virtual keys, budgets, guardrails, caching, and fallback routing.
+## See charts/gateway/values.yaml for the full set of knobs; the block
+## below is passed through Helm's subchart value plumbing. Setting
+## `gateway.chartManaged: false` disables the gateway entirely — useful
+## for air-gapped deploys that proxy LLM calls through a separate pipe.
+##
+## Shared auth: LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET live
+## on the umbrella-materialised Secret `{{ .Release.Name }}-gateway-auth`
+## and are referenced by both the langwatch-app Deployment and the
+## gateway Deployment. Rotating either value requires rolling both pods.
+gateway:
+  ## @param gateway.chartManaged [default: true] Lift the AI gateway pod as part of this chart (false = external or off).
+  chartManaged: true
+
+  # The gateway subchart defaults (image, probes, HPA, NetworkPolicy,
+  # PDB, SecurityContext) live in charts/gateway/values.yaml. Common
+  # umbrella-level overrides below; everything else inherits.
+
+  ## @param gateway.controlPlane.baseUrl [string, default: http://langwatch-app:5560] URL the gateway uses to reach langwatch-app. Defaults assume release name `langwatch`.
+  controlPlane:
+    baseUrl: http://langwatch-app:5560
+
+  ## @param gateway.secrets.existingSecretName [string, default: langwatch-gateway-auth] Name of the Secret carrying LW_GATEWAY_INTERNAL_SECRET and LW_GATEWAY_JWT_SECRET. Must be created out-of-band (terraform / external-secrets) and shared with langwatch-app's env. The umbrella chart does NOT materialise it.
+  secrets:
+    existingSecretName: langwatch-gateway-auth
+
+  ## @param gateway.otel.endpoint [string, default: http://langwatch-app:5560/api/otel] OTLP/HTTP ingest URL the gateway exports spans to. In-cluster default targets langwatch-app. Point at an external collector (Honeycomb / Datadog OTLP receiver / Grafana Agent) if you already have one. Leave empty to disable gateway trace export entirely.
+  ## @param gateway.otel.authExistingSecretName [string, default: ""] Name of a Secret carrying the X-Auth-Token attached to every OTLP span export. Production path — rotate the token by rotating the Secret. Required when endpoint points at /api/otel; the ingest rejects unauthenticated spans with 401.
+  ## @param gateway.otel.authSecretKey [string, default: token] Key inside `otel.authExistingSecretName` holding the token.
+  otel:
+    endpoint: http://langwatch-app:5560/api/otel
+    authExistingSecretName: ""
+    authSecretKey: token

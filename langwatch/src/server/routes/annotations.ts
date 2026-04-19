@@ -7,29 +7,73 @@
  * - src/pages/api/annotations/trace/[trace].ts
  */
 import { nanoid } from "nanoid";
+import type { Context } from "hono";
 import { Hono } from "hono";
 import { prisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
+import type { Permission } from "~/server/api/rbac";
+import {
+  enforcePatCeiling,
+  extractCredentials,
+  patCeilingDenialResponse,
+} from "~/server/pat/auth-middleware";
+import { TokenResolver } from "~/server/pat/token-resolver";
 
 const logger = createLogger("langwatch:annotations");
+const tokenResolver = TokenResolver.create(prisma);
 
 export const app = new Hono().basePath("/api");
 
+/**
+ * Authenticates via the unified PAT + legacy-key path and enforces the given
+ * permission ceiling. Returns either a `{ project, markUsed }` context or an
+ * error descriptor the caller surfaces via c.json(...). `markUsed` is
+ * fire-and-forget and a no-op for legacy keys.
+ */
+async function authenticateRequest(
+  c: Context,
+  permission: Permission,
+) {
+  const credentials = extractCredentials(c);
+  if (!credentials) {
+    return {
+      error:
+        "Authentication token is required. Use X-Auth-Token header, Authorization: Bearer token, or Authorization: Basic base64(projectId:token).",
+      status: 401 as const,
+    };
+  }
+
+  const resolved = await tokenResolver.resolve({
+    token: credentials.token,
+    projectId: credentials.projectId,
+  });
+  if (!resolved) {
+    return { error: "Invalid auth token.", status: 401 as const };
+  }
+
+  try {
+    await enforcePatCeiling({ prisma, resolved, permission });
+  } catch (error) {
+    const denial = patCeilingDenialResponse(error);
+    return { error: denial.message, status: denial.status };
+  }
+
+  const markUsed = () => {
+    if (resolved.type === "pat") {
+      tokenResolver.markUsed({ patId: resolved.patId });
+    }
+  };
+
+  return { project: resolved.project, markUsed };
+}
+
 // ---------- GET /api/annotations ----------
 app.get("/annotations", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const auth = await authenticateRequest(c, "annotations:view");
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, auth.status);
   }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+  const { project } = auth;
 
   try {
     const annotations = await prisma.annotation.findMany({
@@ -61,17 +105,11 @@ app.get("/annotations", async (c) => {
 
 // ---------- GET|DELETE|PATCH /api/annotations/:id ----------
 app.get("/annotations/:id", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const auth = await authenticateRequest(c, "annotations:view");
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, auth.status);
   }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+  const { project } = auth;
 
   try {
     const annotationId = c.req.param("id");
@@ -101,17 +139,11 @@ app.get("/annotations/:id", async (c) => {
 });
 
 app.delete("/annotations/:id", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const auth = await authenticateRequest(c, "annotations:manage");
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, auth.status);
   }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+  const { project } = auth;
 
   try {
     const annotationId = c.req.param("id");
@@ -135,17 +167,11 @@ app.delete("/annotations/:id", async (c) => {
 });
 
 app.patch("/annotations/:id", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const auth = await authenticateRequest(c, "annotations:manage");
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, auth.status);
   }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+  const { project } = auth;
 
   try {
     const body = await c.req.json();
@@ -202,17 +228,11 @@ app.patch("/annotations/:id", async (c) => {
 
 // ---------- GET|POST /api/annotations/trace/:trace ----------
 app.get("/annotations/trace/:trace", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const auth = await authenticateRequest(c, "annotations:view");
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, auth.status);
   }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+  const { project } = auth;
 
   try {
     const trace = c.req.param("trace");
@@ -244,17 +264,11 @@ app.get("/annotations/trace/:trace", async (c) => {
 });
 
 app.post("/annotations/trace/:trace", async (c) => {
-  const authToken = c.req.header("x-auth-token");
-  if (!authToken) {
-    return c.json({ message: "X-Auth-Token header is required." }, 401);
+  const auth = await authenticateRequest(c, "annotations:manage");
+  if ("error" in auth) {
+    return c.json({ message: auth.error }, auth.status);
   }
-
-  const project = await prisma.project.findUnique({
-    where: { apiKey: authToken },
-  });
-  if (!project) {
-    return c.json({ message: "Invalid auth token." }, 401);
-  }
+  const { project } = auth;
 
   try {
     const body = await c.req.json();

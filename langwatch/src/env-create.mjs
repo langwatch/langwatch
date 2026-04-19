@@ -46,6 +46,15 @@ export function createEnvConfig() {
       AUTH0_CLIENT_SECRET: z.string().optional(),
       AUTH0_ISSUER: z.string().optional(),
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
+      // Shared HMAC secret between control-plane and the Go AI Gateway service.
+      // See specs/ai-gateway/_shared/contract.md §4 + §9.
+      LW_GATEWAY_INTERNAL_SECRET: z.string().min(32).optional(),
+      // HS256 secret used by control-plane to sign the short-lived JWT that the
+      // gateway verifies on every request (contract §4.1). 32+ chars.
+      LW_GATEWAY_JWT_SECRET: z.string().min(32).optional(),
+      // Argon2id pepper mixed into virtual-key hashing. Rotating this
+      // invalidates all existing VKs — treat as append-only / key-management.
+      LW_VIRTUAL_KEY_PEPPER: z.string().min(32).optional(),
       ELASTICSEARCH_NODE_URL: z.string().optional(),
       ELASTICSEARCH_API_KEY: z.string().optional(),
       ELASTICSEARCH_CONFIGURED: z.boolean().optional(),
@@ -158,6 +167,9 @@ export function createEnvConfig() {
       NEXTAUTH_PROVIDER: process.env.NEXTAUTH_PROVIDER ?? "email",
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
       NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+      LW_GATEWAY_INTERNAL_SECRET: process.env.LW_GATEWAY_INTERNAL_SECRET,
+      LW_GATEWAY_JWT_SECRET: process.env.LW_GATEWAY_JWT_SECRET,
+      LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
       AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
       AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
       AUTH0_ISSUER: process.env.AUTH0_ISSUER,

@@ -102,6 +102,7 @@ function buildState(
     projectDefaultModel: null,
     projectTopicClusteringModel: null,
     projectEmbeddingsModel: null,
+    scopeType: "PROJECT",
     isSaving: false,
     errors: {},
     ...overrides,
@@ -113,6 +114,7 @@ function buildActions(
 ): UseModelProviderFormActions {
   return {
     setEnabled: vi.fn(),
+    setScopeType: vi.fn(),
     setUseApiGateway: vi.fn(),
     setCustomKey: vi.fn(),
     addExtraHeader: vi.fn(),

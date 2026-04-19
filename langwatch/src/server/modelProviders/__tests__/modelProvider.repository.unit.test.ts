@@ -24,6 +24,9 @@ function createMockPrisma() {
       delete: vi.fn(),
       deleteMany: vi.fn(),
     },
+    project: {
+      findUnique: vi.fn(),
+    },
   } as unknown as PrismaClient;
 }
 
@@ -33,6 +36,8 @@ function createModelProvider(
   return {
     id: "mp_test123",
     projectId: "proj_test",
+    scopeType: "PROJECT",
+    scopeId: "proj_test",
     provider: "openai",
     enabled: true,
     customKeys: null,
@@ -249,6 +254,156 @@ describe("ModelProviderRepository", () => {
           ANTHROPIC_API_KEY: "sk-anthropic",
         });
         expect(results[2]!.customKeys).toBeNull();
+      });
+    });
+  });
+
+  describe("findAllAccessibleForProject()", () => {
+    // Gates the scope-ladder resolver: project > team > organization.
+    // This is the hot-path the frontend + gateway read from; narrower
+    // scope must win on same-provider collision so project admins can
+    // always override inherited rows (ADR-016).
+    const projectId = "proj_test";
+    const teamId = "team_alpha";
+    const orgId = "org_acme";
+
+    const projectRow = {
+      id: projectId,
+      teamId,
+      team: { organizationId: orgId },
+    };
+
+    describe("when the project has rows at every scope level", () => {
+      it("returns one row per provider with the narrowest scope winning", async () => {
+        (prisma.project.findUnique as any).mockResolvedValue(projectRow);
+
+        const orgOpenAI = createModelProvider({
+          id: "mp_org_openai",
+          provider: "openai",
+          scopeType: "ORGANIZATION",
+          scopeId: orgId,
+          projectId: "proj_sibling",
+        });
+        const teamOpenAI = createModelProvider({
+          id: "mp_team_openai",
+          provider: "openai",
+          scopeType: "TEAM",
+          scopeId: teamId,
+          projectId: "proj_sibling2",
+        });
+        const projectOpenAI = createModelProvider({
+          id: "mp_project_openai",
+          provider: "openai",
+          scopeType: "PROJECT",
+          scopeId: projectId,
+          projectId,
+        });
+        const teamAnthropic = createModelProvider({
+          id: "mp_team_anthropic",
+          provider: "anthropic",
+          scopeType: "TEAM",
+          scopeId: teamId,
+          projectId: "proj_sibling",
+        });
+
+        (prisma.modelProvider.findMany as any).mockResolvedValue([
+          orgOpenAI,
+          teamOpenAI,
+          projectOpenAI,
+          teamAnthropic,
+        ]);
+
+        const results = await repository.findAllAccessibleForProject(projectId);
+
+        const byProvider = new Map(results.map((r) => [r.provider, r]));
+        expect(byProvider.size).toBe(2);
+        // PROJECT beats both TEAM and ORGANIZATION for openai
+        expect(byProvider.get("openai")!.id).toBe("mp_project_openai");
+        // TEAM is the only row for anthropic
+        expect(byProvider.get("anthropic")!.id).toBe("mp_team_anthropic");
+      });
+    });
+
+    describe("when only an ORGANIZATION row exists", () => {
+      it("the project inherits the ORGANIZATION row", async () => {
+        (prisma.project.findUnique as any).mockResolvedValue(projectRow);
+
+        const orgOpenAI = createModelProvider({
+          id: "mp_org_openai",
+          provider: "openai",
+          scopeType: "ORGANIZATION",
+          scopeId: orgId,
+          projectId: "proj_sibling",
+        });
+        (prisma.modelProvider.findMany as any).mockResolvedValue([orgOpenAI]);
+
+        const results = await repository.findAllAccessibleForProject(projectId);
+
+        expect(results).toHaveLength(1);
+        expect(results[0]!.id).toBe("mp_org_openai");
+        expect(results[0]!.scopeType).toBe("ORGANIZATION");
+      });
+    });
+
+    describe("when the project does not exist", () => {
+      it("returns an empty array without querying modelProvider", async () => {
+        (prisma.project.findUnique as any).mockResolvedValue(null);
+
+        const results = await repository.findAllAccessibleForProject(
+          "proj_missing",
+        );
+
+        expect(results).toEqual([]);
+        expect(prisma.modelProvider.findMany).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a TEAM row and PROJECT row collide on the same provider", () => {
+      it("PROJECT wins (project admin override)", async () => {
+        (prisma.project.findUnique as any).mockResolvedValue(projectRow);
+
+        const teamOpenAI = createModelProvider({
+          id: "mp_team_openai",
+          provider: "openai",
+          scopeType: "TEAM",
+          scopeId: teamId,
+          projectId: "proj_sibling",
+        });
+        const projectOpenAI = createModelProvider({
+          id: "mp_project_openai",
+          provider: "openai",
+          scopeType: "PROJECT",
+          scopeId: projectId,
+          projectId,
+        });
+        (prisma.modelProvider.findMany as any).mockResolvedValue([
+          teamOpenAI,
+          projectOpenAI,
+        ]);
+
+        const results = await repository.findAllAccessibleForProject(projectId);
+
+        expect(results).toHaveLength(1);
+        expect(results[0]!.id).toBe("mp_project_openai");
+      });
+    });
+
+    describe("when the query scopes by org + team + project OR list", () => {
+      it("sends all three scope predicates filtered by their scopeId", async () => {
+        (prisma.project.findUnique as any).mockResolvedValue(projectRow);
+        (prisma.modelProvider.findMany as any).mockResolvedValue([]);
+
+        await repository.findAllAccessibleForProject(projectId);
+
+        const findManyCall = (prisma.modelProvider.findMany as any).mock
+          .calls[0][0];
+        expect(findManyCall.where.OR).toEqual(
+          expect.arrayContaining([
+            { scopeType: "PROJECT", scopeId: projectId },
+            { scopeType: "TEAM", scopeId: teamId },
+            { scopeType: "ORGANIZATION", scopeId: orgId },
+          ]),
+        );
       });
     });
   });

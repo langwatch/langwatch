@@ -83,6 +83,8 @@ describe("ModelProviderRepository Integration", () => {
           data: {
             id,
             projectId,
+            scopeType: "PROJECT",
+            scopeId: projectId,
             provider: "azure",
             enabled: true,
             customKeys: { OPENAI_API_KEY: "sk-legacy-key" },
@@ -136,6 +138,8 @@ describe("ModelProviderRepository Integration", () => {
           data: {
             id: plaintextId,
             projectId,
+            scopeType: "PROJECT",
+            scopeId: projectId,
             provider: "cohere",
             enabled: true,
             customKeys: { COHERE_API_KEY: "sk-plain" },
@@ -151,6 +155,8 @@ describe("ModelProviderRepository Integration", () => {
           data: {
             id: nullId,
             projectId,
+            scopeType: "PROJECT",
+            scopeId: projectId,
             provider: "mistral",
             enabled: true,
             customKeys: undefined,

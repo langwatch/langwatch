@@ -1,0 +1,436 @@
+import {
+  Badge,
+  Box,
+  Button,
+  Field,
+  HStack,
+  Input,
+  NativeSelect,
+  Separator,
+  Spacer,
+  Spinner,
+  Text,
+  Textarea,
+  VStack,
+} from "@chakra-ui/react";
+import { Ban, Gauge, Shield, Zap } from "lucide-react";
+import { useMemo, useState } from "react";
+
+import { Drawer } from "~/components/ui/drawer";
+import { toaster } from "~/components/ui/toaster";
+import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
+import { api } from "~/utils/api";
+
+import { FieldInfoTooltip } from "./FieldInfoTooltip";
+
+type VirtualKeyCreateDrawerProps = {
+  projectId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreated: (result: { id: string; name: string; secret: string }) => void;
+};
+
+/**
+ * "New virtual key" drawer — minimum viable form: name, description, env
+ * toggle, provider-credential multi-pick. Advanced fields (model aliases,
+ * cache mode, fallback triggers) land once the provider-binding UI is in
+ * place; for the first-use scenario the defaults are fine.
+ */
+export function VirtualKeyCreateDrawer({
+  projectId,
+  open,
+  onOpenChange,
+  onCreated,
+}: VirtualKeyCreateDrawerProps) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [tagsCsv, setTagsCsv] = useState("");
+  const [environment, setEnvironment] = useState<"live" | "test">("live");
+  const [selectedProviderIds, setSelectedProviderIds] = useState<string[]>([]);
+
+  const utils = api.useContext();
+  const credentialsQuery = api.gatewayProviders.list.useQuery(
+    { projectId },
+    { enabled: open && !!projectId },
+  );
+  const createMutation = api.virtualKeys.create.useMutation({
+    onSuccess: async () => {
+      await utils.virtualKeys.list.invalidate({ projectId });
+    },
+  });
+
+  const availableProviders = useMemo(
+    () => credentialsQuery.data ?? [],
+    [credentialsQuery.data],
+  );
+
+  const reset = () => {
+    setName("");
+    setDescription("");
+    setTagsCsv("");
+    setEnvironment("live");
+    setSelectedProviderIds([]);
+  };
+
+  const handleClose = () => {
+    if (createMutation.isPending) return;
+    reset();
+    onOpenChange(false);
+  };
+
+  const handleSubmit = async () => {
+    if (!name || selectedProviderIds.length === 0) {
+      toaster.create({
+        title: "Name and at least one provider are required",
+        type: "error",
+      });
+      return;
+    }
+    try {
+      const tags = tagsCsv
+        .split(",")
+        .map((t) => t.trim())
+        .filter((t) => t.length > 0);
+      const result = await createMutation.mutateAsync({
+        projectId,
+        name,
+        description: description || undefined,
+        environment,
+        providerCredentialIds: selectedProviderIds,
+        config: tags.length > 0 ? { metadata: { tags } } : undefined,
+      });
+      onCreated({
+        id: result.virtualKey.id,
+        name: result.virtualKey.name,
+        secret: result.secret,
+      });
+      reset();
+      onOpenChange(false);
+    } catch (error) {
+      toaster.create({
+        title: error instanceof Error ? error.message : "Failed to create virtual key",
+        type: "error",
+      });
+    }
+  };
+
+  const toggleProvider = (id: string) => {
+    setSelectedProviderIds((current) =>
+      current.includes(id)
+        ? current.filter((pid) => pid !== id)
+        : [...current, id],
+    );
+  };
+
+  return (
+    <Drawer.Root
+      open={open}
+      onOpenChange={(details) => handleClose()}
+      placement="end"
+      size="md"
+    >
+      <Drawer.Content>
+        <Drawer.Header>
+          <Drawer.Title>New virtual key</Drawer.Title>
+          <Drawer.CloseTrigger />
+        </Drawer.Header>
+        <Drawer.Body>
+          <VStack align="stretch" gap={4}>
+            <Field.Root required>
+              <Field.Label>
+                Name
+                <FieldInfoTooltip
+                  description="Human-readable identifier shown in the list and audit log. Typical pattern: 'prod-openai' or 'codex-cli-team-ml'. Must be unique within the project."
+                  docHref="/ai-gateway/virtual-keys#creating-a-vk"
+                />
+              </Field.Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. codex-prod"
+                maxLength={128}
+                autoFocus
+              />
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>Description</Field.Label>
+              <Textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Optional. Shown in the list."
+              />
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>
+                Tags
+                <FieldInfoTooltip
+                  description="Comma-separated tags attached to this VK. Cache-control rules match VKs on tags using AND-subset semantics — a rule matcher of ['tier=enterprise'] fires for any VK carrying that tag."
+                  docHref="/ai-gateway/cache-control#cache-rules"
+                />
+              </Field.Label>
+              <Input
+                value={tagsCsv}
+                onChange={(e) => setTagsCsv(e.target.value)}
+                placeholder="e.g. tier=enterprise, team=ml"
+              />
+              <Field.HelperText>
+                Comma-separated. Cache-control rules match VKs on tags as
+                AND-subset.
+              </Field.HelperText>
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>
+                Environment
+                <FieldInfoTooltip
+                  description="Live keys mint 'lw_vk_live_' prefix; test keys mint 'lw_vk_test_'. Prefix is the accident-prevention signal — the gateway rejects test keys against production providers when 'live-only' mode is set on the org."
+                  docHref="/ai-gateway/virtual-keys#format"
+                />
+              </Field.Label>
+              <NativeSelect.Root size="sm">
+                <NativeSelect.Field
+                  value={environment}
+                  onChange={(e) =>
+                    setEnvironment(
+                      (e.target.value as "live" | "test") ?? "live",
+                    )
+                  }
+                >
+                  <option value="live">Live</option>
+                  <option value="test">Test</option>
+                </NativeSelect.Field>
+              </NativeSelect.Root>
+              <Field.HelperText>
+                Shape-of-key prefix (lw_vk_live_ vs lw_vk_test_) for
+                accident-prevention.
+              </Field.HelperText>
+            </Field.Root>
+            <Field.Root required>
+              <Field.Label>
+                Provider fallback chain
+                <FieldInfoTooltip
+                  description="Ordered list of provider bindings. The gateway tries #1 first, then #2 on 5xx/timeout/rate-limit/circuit-breaker. Re-order with drag after creating (not wired yet — use the edit drawer for now)."
+                  docHref="/ai-gateway/concepts#fallback-chain"
+                />
+              </Field.Label>
+              <VStack align="stretch" gap={2}>
+                {credentialsQuery.isLoading ? (
+                  <HStack>
+                    <Spinner size="sm" />
+                    <Text fontSize="sm">Loading providers…</Text>
+                  </HStack>
+                ) : availableProviders.length === 0 ? (
+                  <VStack
+                    align="stretch"
+                    gap={2}
+                    borderWidth="1px"
+                    borderColor="orange.200"
+                    borderRadius="md"
+                    background="orange.50"
+                    padding={3}
+                  >
+                    <Text fontSize="sm" fontWeight="medium">
+                      No provider bindings yet
+                    </Text>
+                    <Text fontSize="xs" color="fg.muted">
+                      A virtual key routes requests through{" "}
+                      <strong>provider bindings</strong> — wrappers around
+                      your configured LLM credentials that carry gateway
+                      settings (rate limits, fallback priority). Create at
+                      least one before minting a VK.
+                    </Text>
+                    <HStack>
+                      <Button
+                        size="xs"
+                        colorPalette="orange"
+                        onClick={() => {
+                          onOpenChange(false);
+                          if (typeof window !== "undefined") {
+                            window.location.href =
+                              window.location.pathname.replace(
+                                /\/gateway.*$/,
+                                "/gateway/providers",
+                              );
+                          }
+                        }}
+                      >
+                        Go to Providers →
+                      </Button>
+                    </HStack>
+                  </VStack>
+                ) : (
+                  availableProviders.map((p: any) => {
+                    const selected = selectedProviderIds.includes(p.id);
+                    const providerType =
+                      p.modelProviderName ?? p.provider ?? "";
+                    const icon =
+                      providerType in modelProviderIcons
+                        ? modelProviderIcons[
+                            providerType as keyof typeof modelProviderIcons
+                          ]
+                        : null;
+                    return (
+                      <HStack
+                        key={p.id}
+                        border="1px solid"
+                        borderColor={selected ? "orange.400" : "border.subtle"}
+                        borderRadius="md"
+                        paddingX={3}
+                        paddingY={2}
+                        cursor="pointer"
+                        onClick={() => toggleProvider(p.id)}
+                      >
+                        <Box
+                          width="20px"
+                          height="20px"
+                          flexShrink={0}
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="center"
+                          css={{
+                            "& > svg": { width: "100%", height: "100%" },
+                          }}
+                        >
+                          {icon}
+                        </Box>
+                        <VStack align="start" gap={0}>
+                          <Text fontSize="sm" fontWeight="medium">
+                            {providerType || p.id}
+                          </Text>
+                          <Text fontSize="xs" color="fg.muted">
+                            slot: {p.slot ?? "primary"}
+                          </Text>
+                        </VStack>
+                        <Spacer />
+                        {selected && (
+                          <Badge colorPalette="orange">
+                            #{selectedProviderIds.indexOf(p.id) + 1}
+                          </Badge>
+                        )}
+                      </HStack>
+                    );
+                  })
+                )}
+              </VStack>
+              <Field.HelperText>
+                Select one or more provider credentials. Order controls
+                fallback priority; re-order with drag later.
+              </Field.HelperText>
+            </Field.Root>
+
+            <Separator />
+            <CapabilityPreview />
+          </VStack>
+        </Drawer.Body>
+        <Drawer.Footer>
+          <HStack width="full">
+            <Spacer />
+            <Button
+              variant="ghost"
+              onClick={handleClose}
+              disabled={createMutation.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              colorPalette="orange"
+              onClick={handleSubmit}
+              loading={createMutation.isPending}
+              disabled={!name || selectedProviderIds.length === 0}
+            >
+              Create
+            </Button>
+          </HStack>
+        </Drawer.Footer>
+      </Drawer.Content>
+    </Drawer.Root>
+  );
+}
+
+/**
+ * Advanced-settings preview inside the create drawer. The actual editors
+ * live in VirtualKeyEditDrawer (full validation + tRPC shape); showing
+ * them at create time would double the drawer surface for minimum-viable
+ * first-use. Listing defaults here conveys the full capability set so
+ * users understand what the gateway offers before committing.
+ */
+function CapabilityPreview() {
+  const rows: Array<{
+    icon: React.ReactNode;
+    label: string;
+    defaultValue: string;
+    detail: string;
+  }> = [
+    {
+      icon: <Zap size={14} />,
+      label: "Cache control",
+      defaultValue: "respect",
+      detail:
+        "Provider-agnostic passthrough — Anthropic cache_control, OpenAI/Azure automatic, Gemini cachedContent. Switch to disable/force post-create.",
+    },
+    {
+      icon: <Shield size={14} />,
+      label: "Guardrails",
+      defaultValue: "none",
+      detail:
+        "Attach pre/post/stream_chunk monitors (checkType=AS_GUARDRAIL). Block-by-default, opt-in fail-open per direction.",
+    },
+    {
+      icon: <Ban size={14} />,
+      label: "Blocked patterns",
+      defaultValue: "none",
+      detail:
+        "RE2 regex deny/allow for tools, MCP servers, URLs, and models. Enforced pre-provider-dispatch (zero cost).",
+    },
+    {
+      icon: <Gauge size={14} />,
+      label: "Rate limits",
+      defaultValue: "unlimited",
+      detail:
+        "Per-VK RPM + RPD (TPM in v1.1). 429 + Retry-After emitted by the gateway.",
+    },
+  ];
+  return (
+    <VStack align="stretch" gap={2}>
+      <HStack>
+        <Text fontSize="sm" fontWeight="semibold">
+          What else you get (configurable after create)
+        </Text>
+        <Badge colorPalette="gray" fontSize="2xs">
+          preview
+        </Badge>
+      </HStack>
+      <Box
+        borderWidth="1px"
+        borderColor="border.subtle"
+        borderRadius="md"
+        padding={3}
+      >
+        <VStack align="stretch" gap={3}>
+          {rows.map((row) => (
+            <HStack key={row.label} align="start" gap={3}>
+              <Box color="fg.muted" mt={1}>
+                {row.icon}
+              </Box>
+              <VStack align="start" gap={0} flex={1}>
+                <HStack>
+                  <Text fontSize="sm" fontWeight="medium">
+                    {row.label}
+                  </Text>
+                  <Badge variant="subtle" colorPalette="gray" fontSize="2xs">
+                    default: {row.defaultValue}
+                  </Badge>
+                </HStack>
+                <Text fontSize="xs" color="fg.muted">
+                  {row.detail}
+                </Text>
+              </VStack>
+            </HStack>
+          ))}
+        </VStack>
+      </Box>
+      <Text fontSize="xs" color="fg.muted">
+        Open the key's edit drawer after creation to configure any of these.
+      </Text>
+    </VStack>
+  );
+}

@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
 import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
 import { useCredentialKeys } from "./useCredentialKeys";
@@ -6,6 +6,8 @@ import { useCustomModels } from "./useCustomModels";
 import { useDefaultProviderSelection } from "./useDefaultProviderSelection";
 import { type ExtraHeader, useExtraHeaders } from "./useExtraHeaders";
 import { type FormSnapshot, useProviderFormSubmit } from "./useProviderFormSubmit";
+
+export type ModelProviderScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
 
 export type UseModelProviderFormParams = {
   provider: MaybeStoredModelProvider;
@@ -20,6 +22,12 @@ export type UseModelProviderFormParams = {
     | undefined;
   enabledProvidersCount: number;
   isUsingEnvVars?: boolean;
+  // Principal-style scope context (iter 108). The team+org IDs come from
+  // useOrganizationTeamProject so the form can render the picker and derive
+  // the scopeId for ORGANIZATION/TEAM selections. Legacy PROJECT scope
+  // keeps working when these are undefined.
+  teamId?: string;
+  organizationId?: string;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 };
@@ -36,6 +44,7 @@ export type UseModelProviderFormState = {
   projectDefaultModel: string | null;
   projectTopicClusteringModel: string | null;
   projectEmbeddingsModel: string | null;
+  scopeType: ModelProviderScopeType;
   isSaving: boolean;
   errors: {
     customKeysRoot?: string;
@@ -44,6 +53,7 @@ export type UseModelProviderFormState = {
 
 export type UseModelProviderFormActions = {
   setEnabled: (enabled: boolean) => Promise<void>;
+  setScopeType: (scope: ModelProviderScopeType) => void;
   setUseApiGateway: (use: boolean) => void;
   setCustomKey: (key: string, value: string) => void;
   addExtraHeader: () => void;
@@ -73,9 +83,24 @@ export function useModelProviderForm(
     project,
     enabledProvidersCount,
     isUsingEnvVars,
+    teamId,
+    organizationId,
     onSuccess,
     onError,
   } = params;
+
+  // Scope state — defaults to the stored provider's scope, or PROJECT for
+  // brand-new providers. setScopeType flips it at save time.
+  const [scopeType, setScopeType] = useState<ModelProviderScopeType>(
+    (provider.scopeType as ModelProviderScopeType | undefined) ?? "PROJECT",
+  );
+
+  const scopeId =
+    scopeType === "ORGANIZATION"
+      ? organizationId
+      : scopeType === "TEAM"
+        ? teamId
+        : projectId;
 
   // --- Sub-hooks ---
   const credentialKeysHook = useCredentialKeys({ provider });
@@ -104,6 +129,8 @@ export function useModelProviderForm(
       projectTopicClusteringModel:
         defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
+      scopeType,
+      scopeId,
     }),
     [
       provider,
@@ -119,6 +146,8 @@ export function useModelProviderForm(
       defaultProviderHook.projectDefaultModel,
       defaultProviderHook.projectTopicClusteringModel,
       defaultProviderHook.projectEmbeddingsModel,
+      scopeType,
+      scopeId,
     ],
   );
 
@@ -181,11 +210,13 @@ export function useModelProviderForm(
       projectTopicClusteringModel:
         defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
+      scopeType,
       isSaving: formSubmitHook.isSaving,
       errors: formSubmitHook.errors,
     },
     {
       setEnabled: formSubmitHook.setEnabled,
+      setScopeType,
       setUseApiGateway,
       setCustomKey: credentialKeysHook.setCustomKey,
       addExtraHeader: extraHeadersHook.addExtraHeader,

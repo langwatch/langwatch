@@ -1,0 +1,213 @@
+---
+title: Scaling
+description: Horizontal scaling, capacity planning, and tuning for the LangWatch AI Gateway.
+sidebarTitle: Scaling
+---
+
+The gateway is a stateless proxy — scale it horizontally. There is no sticky-session requirement because JWTs are self-contained and every replica can serve every VK. Capacity is a function of **upstream latency** and **connection count**, not CPU.
+
+## Baseline
+
+A single gateway replica (2 vCPU, 4 GB RAM) comfortably serves:
+
+- **5,000 req/s** non-streaming Chat Completions (median upstream latency ~800 ms).
+- **1,500 concurrent streaming sessions** (Claude Messages with 2-second TTFB + 30-second body).
+- **15,000 inflight gRPC/HTTP upstream connections** across all providers.
+
+RAM is dominated by the auth L1 cache (avg ~1 KB per cached VK). With `LW_GATEWAY_AUTH_CACHE_L1_SIZE=10000`, budget 10 MB for the cache plus ~2 GB Go runtime overhead.
+
+## Horizontal Pod Autoscaler
+
+```yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: langwatch-gateway
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: langwatch-gateway
+  minReplicas: 3
+  maxReplicas: 30
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target: { type: Utilization, averageUtilization: 60 }
+    - type: Pods
+      pods:
+        metric:
+          name: gateway_inflight_requests
+        target: { type: AverageValue, averageValue: "800" }
+  behavior:
+    scaleUp:
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 30
+    scaleDown:
+      stabilizationWindowSeconds: 300
+```
+
+- **Scale metric: inflight requests per replica**. CPU alone misleads — a gateway replica handling 2,000 streaming connections uses 15% CPU but exhausts connection pools.
+- **Slow scale-down** (5-minute stabilization) to avoid flapping under bursty traffic typical of agentic CLIs.
+- **Minimum 3 replicas** for PDB headroom — `kubectl drain` during an AZ rotation must not take you below 2.
+
+## Pod Disruption Budget
+
+```yaml
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: langwatch-gateway
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels: { app: langwatch-gateway }
+```
+
+Combined with topology spread, a single-AZ failure loses ≤33% of replicas but PDB keeps ≥2 replicas alive in surviving AZs.
+
+## Topology spread
+
+```yaml
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels: { app: langwatch-gateway }
+```
+
+Pairs naturally with 3 replicas across 3 AZs. On 6+ replicas you get 2+ per AZ, surviving an AZ loss without degradation.
+
+## Connection pooling
+
+Go's `net/http.Transport` defaults are aggressive (unbounded idle connections). The gateway clamps them:
+
+```
+MaxIdleConnsPerHost = LW_GATEWAY_UPSTREAM_MAX_CONN_PER_HOST (default 256)
+IdleConnTimeout    = LW_GATEWAY_UPSTREAM_IDLE_TIMEOUT_S      (default 90)
+```
+
+At 5K req/s sustained, each replica holds ~1.5K live connections to OpenAI. Under a full provider outage with active fallback, multiply by the fallback-chain length — budget 3× headroom.
+
+### Ephemeral-port exhaustion
+
+The gateway replica's source port pool is shared across all outbound upstreams. At 10K+ req/s from a single replica, you can exhaust ephemeral ports before CPU tops out. Two mitigations:
+
+1. Add replicas (preferred — stateless scaling is cheap).
+2. Bump `net.ipv4.ip_local_port_range` via a `sysctl` init container: `net.ipv4.ip_local_port_range=1024 65535`.
+
+## Control-plane capacity
+
+The gateway is chatty with the control plane on cold-start (`/bootstrap`) and idle (`/changes` long-poll every 25 s). Control-plane requirements scale **sub-linearly** with gateway replicas:
+
+| Gateway replicas | Control-plane QPS | Typical spend |
+|---|---|---|
+| 3 | ~0.1 req/s | zero concern |
+| 30 | ~1.5 req/s | zero concern |
+| 300 | ~15 req/s | budget 1 Postgres read replica |
+
+Debits flow through the outbox asynchronously — the gateway batches debits to 50/request or 1s delay, whichever first. Control plane sees **~1 debit/min/active-VK**, not per-request.
+
+### Per-org `/changes` long-poll (iter 17, `5119261`)
+
+The gateway maintains **one long-poll goroutine per organization**, not one global poll. On first `ResolveKey` for an org, `ensureOrgPoller(orgID)` spawns a dedicated goroutine that calls:
+
+```
+GET /api/internal/gateway/changes?organization_id=<org>&since=<rev>&timeout_s=25
+```
+
+The cache keeps a per-org revision cursor (`revByOrg` map). Rationale:
+
+- **Correctness first.** Prior to iter 17 the gateway called `/changes` without `organization_id`; the control plane either 400'd or returned empty, so a VK mutation (rotate / revoke / budget update) did not invalidate cache entries until the JWT expired on its own 15-minute timer. Per-org scoping makes invalidation actually fire when a customer mid-stream-revokes a VK.
+- **Goroutine budget is negligible.** At realistic scale (&lt; 100 active orgs per pod) the per-goroutine ~2 KB stack is an irrelevant memory cost versus the correctness win. Idle gateways don't poll for orgs they've never seen.
+- **Readiness probe unchanged.** The cache still tracks a global `maxRev` for the `/readyz` KnownRevision check — a pod is only ready once it has observed at least one successful `/changes` response (of any scope) since boot.
+
+If your control plane sees a sudden jump in `/changes` hit rate after a deploy, that is the expected behavior of iter 17. The jump is sub-linear in active-org count and amortizes to one request per org per ~25 s.
+
+## Redis L2 (optional)
+
+Enabling `REDIS_URL` adds a shared L2 cache for resolved VKs. New replicas warm from Redis instead of calling `/resolve-key` for every cold VK: **~30 ms per cold-key round-trip to the control plane vs. ~2 ms per L2 JSON round-trip** (measured against a local miniredis). On a deploy that bounces ten pods, this is the difference between the control plane serving a thundering herd of resolve-key calls and serving roughly zero.
+
+Operational invariants (Lane A iter 15, `6ebeecf`):
+
+- **TTL floor: 30 s** — a bundle about to JWT-expire doesn't land in L2 with near-zero TTL and vanish between write and first read.
+- **Poison-pill isolation** — if a new gateway version can't decode an old entry (field schema drift, corrupt bytes), the decode error is logged, the key is `DEL`'d, and the request resolves as a miss. One bad row can't block a whole tenant.
+- **Compiled regexes are process-local** — `blocked_patterns` RE2 ASTs are `json:"-"` and recompiled on the receiving pod on first use. L2 ships the pattern strings only, which keeps JSON payloads small and avoids cross-pod binary-compat concerns.
+
+**Use L2 when**:
+- Autoscaling frequently adds/removes replicas (high churn) — this is the primary reason.
+- Tenants have > 50K active VKs (bootstrap payload gets unwieldy).
+- You want to decouple gateway cold-start from control-plane uptime.
+
+**Skip L2 when**:
+- Small-to-medium deployments (< 10K active VKs).
+- You prefer zero external infrastructure dependencies.
+
+## Blue-green deployments
+
+The gateway supports zero-downtime blue-green via two-stage deploy:
+
+1. Deploy `langwatch-gateway-green` alongside `-blue`, same Helm chart, different `replicaCount`.
+2. Verify `/readyz` on green.
+3. Switch the LB target; old connections drain on blue (30 s window).
+4. Delete blue after 5 minutes of green being stable.
+
+Because `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` are identical across colors, JWTs minted on blue validate on green — no cache reset, no customer impact.
+
+## Regional placement
+
+For latency-sensitive deployments, run the gateway in the same region as:
+
+1. Your LangWatch control plane (reduces `/resolve-key` round-trips on cache miss).
+2. Your primary upstream provider (single-digit ms to OpenAI us-east-1, Anthropic us-west-2).
+
+Multi-region deployments: run per-region gateway fleets with independent HPAs. The gateway doesn't federate state cross-region — each replica's L1 is independent. Control plane is the single source of truth; any region can talk to it.
+
+## Benchmarks — hot-path microbenchmarks
+
+Each hot-path primitive is benchmarked with Go's `testing.B`. Baselines measured on Apple M1 Max, Go 1.26.1 (see `BENCHMARKS.md` in the gateway repo):
+
+| Operation | Time | Allocs | When it fires |
+|---|---|---|---|
+| `auth.SignRequest` (HMAC + body hash) | ~2,900 ns | — | Internal calls to control plane only (not hot path) |
+| `auth.KeyHash` (VK → L1 lookup key) | 380 ns | — | Every incoming request |
+| `circuit.Allow` (closed state) | 64 ns | **0** | Every request against a healthy provider |
+| `circuit.Allow` with 500 credentials in pool | 112 ns | — | Large fleet scale |
+| `budget.Precheck` (3-scope cached) | 9 ns | **0** | Every request |
+| `budget.NewULID` | 116 ns | — | Every request (generates `gateway_request_id`) |
+| `fallback.Walk` (primary succeeds) | 119 ns | — | Every request |
+| `fallback.Walk` (falls over one slot) | 243 ns | — | When primary is degraded |
+
+Happy-path pre-bifrost overhead sums to **~700 ns per request** — effectively sub-microsecond. Bifrost + upstream RTT dominate wall time; the gateway's own tax is negligible.
+
+Regressions > 2× any baseline block PR merges per `BENCHMARKS.md` policy. Re-run cadence: monthly, or on any hot-path refactor.
+
+Shipped in `f43cc20` (@sergey Lane A iter 6).
+
+## End-to-end benchmarks — k6 / vegeta
+
+Microbenchmarks validate correctness, not throughput. For full-request testing, point k6 or vegeta at a running gateway:
+
+```bash
+# k6 — non-streaming, 30s, ramping to 500 VUs
+k6 run --vus 500 --duration 30s ./hack/bench/chat.js
+
+# vegeta — sustained 1000 req/s on /v1/chat/completions
+echo 'POST https://gateway.langwatch.ai/v1/chat/completions
+Authorization: Bearer '"$LW_BENCH_VK"'
+Content-Type: application/json
+@body.json' | vegeta attack -duration=30s -rate=1000/s | vegeta report
+```
+
+Targets end-to-end:
+
+- p50 gateway-added latency: **< 2 ms** (measured: primary + hot-path ≈ 700 ns + OTel batch + HTTP serialisation).
+- p99 gateway-added latency: **< 15 ms** (tail captures L1 cache miss → /resolve-key round-trip).
+- Cold-start TTFB (bootstrap disabled): **< 300 ms**.
+- Cold-start TTFB (bootstrap enabled, 10K VKs): **< 3 s to ready, then < 300 ms per request**.
+
+If you're outside these ranges, check [Health Checks](/ai-gateway/self-hosting/health-checks) and [Config](/ai-gateway/self-hosting/config) for tuning knobs before escalating.

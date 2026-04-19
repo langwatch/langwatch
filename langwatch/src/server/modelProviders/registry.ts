@@ -48,6 +48,8 @@ export type MaybeStoredModelProvider = Omit<
   ModelProvider,
   | "id"
   | "projectId"
+  | "scopeType"
+  | "scopeId"
   | "createdAt"
   | "updatedAt"
   | "customModels"
@@ -64,6 +66,13 @@ export type MaybeStoredModelProvider = Omit<
   customEmbeddingsModels?: CustomModelEntry[] | null;
   disabledByDefault?: boolean;
   extraHeaders?: { key: string; value: string }[] | null;
+  /**
+   * Principal-style scope (iter 107 #2) — present on rows persisted
+   * via the new scope-aware repository. Omitted shape keeps existing
+   * per-project form callers working unchanged.
+   */
+  scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId?: string;
 };
 
 // ============================================================================

@@ -1,0 +1,130 @@
+---
+title: Guardrails
+description: Run LangWatch evaluators inline on gateway traffic — pre, post, and per-stream-chunk.
+sidebarTitle: Guardrails
+---
+
+Guardrails are LangWatch evaluators attached to a virtual key. The gateway invokes them inline on every request and (optionally) every response, with three direction modes: `pre` (before dispatch), `post` (after a completed response), and `stream_chunk` (on every SSE chunk before emission).
+
+Evaluators are the same ones you already use for online evaluations in LangWatch — no new authoring surface. PII detection, prompt injection, toxicity, hallucination, regex guards, custom code evaluators — every type you have attached to a project is selectable as a gateway guardrail.
+
+## Direction modes
+
+### `pre` — block/modify the outgoing request
+
+Invoked **before** the gateway dispatches to the upstream provider. Decisions:
+
+- `allow` — dispatch as-is.
+- `block` — return `403 guardrail_blocked` to the client immediately. No upstream call is made. No spend.
+- `modify` — the evaluator returns a rewritten request payload (e.g. with PII redacted). The gateway dispatches the rewritten payload.
+
+Use cases: prompt-injection detection, PII redaction before data hits a third-party provider, regex-based policy enforcement ("no customer emails in prompts").
+
+### `post` — flag/block the response
+
+Invoked on the **full completed response** for non-streaming calls, and on the **reassembled stream** for streaming calls. Wired on both `/v1/chat/completions` and `/v1/messages`.
+
+Decisions:
+
+- `allow` — response delivered to client.
+- `block` — for non-streaming, the response is replaced with `403 guardrail_blocked` **before the client sees the assistant text**, and a zero-cost `blocked_by_guardrail` budget debit is recorded so dashboards still see the attempt (cost = $0, the provider call was made and paid for, but the ledger marks it as non-billable to the principal). For streaming, the response has already been delivered; the decision becomes a flag-only (propagated via the evaluator's own trace span, not a dedicated gateway attribute in v1).
+- `modify` — the assistant text is rewritten in place (first choice `content` on `/v1/chat/completions`, first text block on `/v1/messages`); redaction is transparent from the client's perspective. Streaming responses: flag-only.
+
+<Note>**Content-block responses skip post-evaluation.** When the model returns a tool-call response (`tool_calls` on OpenAI, `content: [{type: "tool_use", ...}]` on Anthropic) or an image/file block, there's no assistant text to evaluate — the post-guardrail is skipped rather than attempting to reason about structured output. Use `pre` on the tool-call arguments or a dedicated content-aware guardrail if you need to gate tool calls.</Note>
+
+Use cases: hallucination detection on RAG outputs, PII leakage detection in responses, response-quality spot-checks.
+
+#### Fail-open vs fail-closed
+
+By default, post-guardrails **fail closed**: if the evaluator service is unavailable or errors, the response is replaced with `503 guardrail_upstream_unavailable` — the user never sees an ungoverned response.
+
+For VKs where an unavailable guardrail should *not* block (e.g. best-effort redaction on low-stakes traffic), set `guardrails.response_fail_open: true` on the VK config. The gateway then passes the response through with a warning log. (No dedicated fail_open span attribute is emitted in v1; the response's error class plus the guardrail upstream's own span is how operators trace this path today.)
+
+`pre` guardrails use the same fail-closed default and the same VK opt-out (`guardrails.request_fail_open`).
+
+### `stream_chunk` — terminate per-chunk on visible deltas
+
+Invoked on **each SSE chunk with visible delta text** before the gateway emits it to the client. Chunks without text — role-only frames (`{"delta":{"role":"assistant"}}`), tool-call frames, terminal usage frames — **skip the guardrail call entirely**. In practice this keeps ~95% of stream frames at pass-through cost.
+
+Decisions:
+
+- `allow` — emit chunk.
+- `block` — terminate the stream with a terminal `event: error`:
+  ```
+  event: error
+  data: {"error":{"type":"guardrail_blocked","code":"stream_chunk_blocked","message":"<reason>"}}
+
+  ```
+  The channel is closed immediately after; subsequent upstream chunks are discarded. Same wire shape as a provider-failure terminator, distinguishable by `error.code` (`stream_chunk_blocked` vs `provider_error`). See [Streaming → Mid-stream error shapes](/ai-gateway/streaming#terminal-error-shapes).
+- `modify` — **not implemented in v1.** Chunk-level content rewriting is provider-shape-specific (OpenAI delta JSON vs Anthropic SSE events have different shapes). For v1, "redact on stream" = block and let the client retry without the offending input. A future iter may add provider-aware chunk rewriting once a real customer asks.
+
+Latency budget: **≤50 ms per chunk**. If the evaluator doesn't respond in time, or the upstream guardrail errors, the gateway **fails open** — the chunk passes through with an OTel warning (the WARN log carries the reason) and a bump to `gateway_guardrail_verdicts_total{direction="stream_chunk",verdict="fail_open"}`. This is an explicit contract decision: blocking the user's stream on a slow policy service is worse than occasional pass-through — but the metric makes slow/flaky services visible before they become reliability problems.
+
+Use cases: real-time PII termination (credit card numbers, emails, phone numbers) where the correct behaviour on detection is "stop sending and the user retries." For best-effort redaction that doesn't interrupt the stream, use `post` on the reassembled response instead.
+
+## Attaching guardrails to a VK
+
+The VK create/edit drawer (Lane B iter 17, `0541bd096`) has three direction sections — **Pre-request**, **Post-response**, **Stream chunk** — each listing every project evaluator whose `executionMode = AS_GUARDRAIL`. Check the box next to an evaluator to attach it to that direction; uncheck to detach. Save the drawer — the gateway picks up the change within 30 s via the `/changes` long-poll.
+
+Each direction section also has a **Default-block on evaluator failure** toggle. Off (default) = fail closed (matches `guardrails.request_fail_open: false` / `response_fail_open: false`). On = fail open; the gateway WARN-logs the evaluator failure and proceeds. The helper copy cites the concrete enforcement shapes so you know what the toggle actually does:
+
+- Pre: blocks return `403 guardrail_blocked` with a zero-cost debit.
+- Post: non-stream blocks replace the response with 403; stream responses flag only (the bytes are already out).
+- Stream chunk: blocks emit a byte-locked terminal SSE error with `code=stream_chunk_blocked`; the 50 ms per-chunk budget fails OPEN by contract regardless of the toggle (stream-chunk fail-open is a performance invariant, not a policy choice).
+
+If the evaluator list is empty, the drawer points you at **Evaluations → New** to author one with `Execution mode = As guardrail`. That's the same evaluator-authoring surface you already use for online evaluations; there's no separate gateway-evaluator editor.
+
+Legacy surface — REST or CLI — still works for scripting:
+
+```bash
+# Attach a post-response guardrail via CLI (same operation as ticking the box)
+langwatch virtual-keys update vk_01HZX... \
+  --guardrail-add post:eval_pii_detector_v2
+
+# Or via REST — full VK config PATCH
+curl -X PATCH https://app.langwatch.ai/api/gateway/v1/virtual-keys/vk_01HZX... \
+  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
+  -d '{"config":{"guardrails":{"post":[{"id":"eval_pii_detector_v2","evaluator":"pii_detection"}],"response_fail_open":false}}}'
+```
+
+Both the drawer and the REST/CLI emit the same `{id, evaluator}` tuple shape into the bundle (contract §4.2), so you can flip between surfaces without resetting configuration.
+
+A VK can have multiple guardrails in each direction; the gateway runs them in parallel and short-circuits on the first `block` decision.
+
+## Running them in parallel
+
+The gateway fans out guardrail calls in parallel (bounded by `MAX_GUARDRAIL_CONCURRENCY`, default 8 per direction). First `block` wins — other in-flight guardrails are cancelled to save cost. `modify` decisions are applied in dependency order (a guardrail's output is input to the next).
+
+## Observability
+
+**Prometheus counter** `gateway_guardrail_verdicts_total{direction, verdict}` records every verdict the guardrail pipeline returns. Labels:
+
+- `direction` — `request` | `response` | `stream_chunk`
+- `verdict` — `allow` | `block` | `modify` | `fail_open`
+
+<Info>**v1 wiring caveat**: in the Go data plane, only the `stream_chunk` direction currently emits this metric from the dispatcher hot path. The `request` and `response` directions run the guardrails correctly (block / modify logic works), but the dispatcher doesn't yet call `Metrics.RecordGuardrailVerdict` at those sites. Tracked as a v1 follow-up (finding #17); operators who need per-direction allow-rate dashboards today can proxy from `gateway_http_requests_total{status="403"}` which flips on every block verdict regardless of direction.</Info>
+
+**Span attributes**: the gateway declares `langwatch.guardrail.verdict` as a canonical span attribute for the aggregate verdict, but it is not yet emitted from the dispatcher in v1. Per-guardrail decision detail is visible by clicking through to the evaluator's run in the LangWatch Messages view — the evaluator's own trace carries the policies triggered + reasoning.
+
+## Permissions
+
+- `gatewayGuardrails:attach` — attach a guardrail to a VK.
+- `gatewayGuardrails:detach` — remove one.
+- Evaluator CRUD uses the existing `evaluations:*` permissions (unchanged).
+
+## Cost
+
+Every guardrail call is a separate LangWatch evaluator run. It's metered against your LangWatch plan the same as any other online-evaluation run.
+
+## Blocking vs modifying — when to pick which
+
+- **Block** when the request/response is unfixable and the only correct behaviour is to fail fast. Example: prompt-injection detected in a user query — never forward.
+- **Modify** when there's a safe redacted version the user should still see. Example: PII in input → redact with `[REDACTED]` markers and forward the rest.
+- **Stream_chunk modify** when real-time is essential. Example: the model is emitting a credit-card number mid-stream; redact before the user sees it.
+
+Start with `allow` + `flag` (just log without blocking) while tuning a guardrail's thresholds. Promote to `block` or `modify` once the false-positive rate is low.
+
+## Further reading
+
+- [Blocked Patterns](/ai-gateway/blocked-patterns) for simpler regex-based denials (tools, MCPs, URLs) that don't need an evaluator.
+- [Streaming](/ai-gateway/streaming) for the full SSE contract.

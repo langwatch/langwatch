@@ -1,0 +1,202 @@
+---
+title: Streaming
+description: SSE semantics, byte-for-byte passthrough, and mid-stream behaviour.
+sidebarTitle: Streaming
+---
+
+LLM streaming over Server-Sent Events is a surprisingly load-bearing surface: coding CLIs parse tool-call deltas incrementally, UX layers render token-by-token, and any gateway that reformats the stream breaks something. The LangWatch AI Gateway is explicit about what it may and may not mutate.
+
+## The streaming contract
+
+### Before the first chunk — mutations allowed
+
+- Gateway may inject response headers (`X-LangWatch-Request-Id`, `X-LangWatch-Provider`, `X-LangWatch-Model`).
+- Pre-call guardrails may rewrite the request payload before dispatch.
+- Fallback chain may transparently switch providers if the primary fails before any chunk arrives.
+
+At this point no client-visible byte has been emitted yet, so changes are safe.
+
+### After the first chunk — strict passthrough
+
+- SSE events are forwarded to the client **byte-for-byte**, in order, without merging, splitting, or reordering.
+- No header injection (except the ones already emitted on the first frame).
+- No mid-stream provider switch — even if the primary dies after chunk N, the gateway will NOT fall back to a secondary provider silently. Instead it terminates the stream.
+
+Coding CLIs like Claude Code and Codex depend on the exact `content_block_delta` / `input_json_delta` ordering; any reformat breaks their tool-call parser.
+
+### Terminal error shapes
+
+Once the first chunk has been sent to the client, the gateway never silent-switches providers. If something goes wrong mid-stream, the stream ends with a terminal `event: error` frame. **Two shapes exist in v1**, distinguishable by `error.code`:
+
+**Upstream connection failure:**
+
+```
+event: error
+data: {"error":{"type":"provider_error","code":"upstream_mid_stream_failure","message":"Upstream connection closed at chunk N: <reason>","param":null}}
+
+```
+
+**Stream-chunk guardrail block** (from [stream_chunk guardrails](/ai-gateway/guardrails#stream_chunk--terminate-per-chunk-on-visible-deltas)):
+
+```
+event: error
+data: {"error":{"type":"guardrail_blocked","code":"stream_chunk_blocked","message":"<policy reason>","param":null}}
+
+```
+
+Both frames are byte-locked by the Go test suite — any future shape drift breaks the build. Clients that parse SSE `error` frames should key off `error.code` to distinguish provider failures (retryable after backoff) from policy blocks (retry won't help unless the input changes).
+
+Post-emission sequence for both shapes:
+
+1. Gateway emits the terminal `event: error` frame (shown above).
+2. Gateway closes the client connection.
+3. For `provider_error`: the failed provider's circuit-breaker counter increments. For `guardrail_blocked`: a verdict metric (`gateway_guardrail_verdicts_total{verdict=block}`) increments instead — the provider is healthy, policy fired.
+
+The gateway **never** silent-switches to the fallback mid-stream. Splicing chunks from two providers would produce an inconsistent response: mismatched tool-call ids, accumulated-content replay, token-accounting drift. The choice is deliberate and enforced in code.
+
+The client is free to retry the request; a fresh request will go through the fallback chain from scratch (which IS allowed to transparently switch providers — see below).
+
+### Pre-connection fallback (transparent)
+
+When the primary returns a retryable error **before** any chunk has been sent to the client (connection failures, pre-first-chunk 5xx / 429 / timeout / network), the gateway walks the VK's `fallback.chain` the same way it does for non-streaming calls. The caller sees exactly one stream, from whichever credential accepted the request.
+
+`X-LangWatch-Fallback-Count` reports how many chain slots were skipped before the successful attempt. `0` means the primary worked; `N` means N providers were tried.
+
+Shipped in `b8016b0` (@sergey Lane A iter 4 pt6).
+
+## `stream_chunk` guardrails
+
+Guardrails with `direction: stream_chunk` run on **chunks with visible delta text** before emission. Frames without visible text — role-only (`{"delta":{"role":"assistant"}}`), tool-call deltas, terminal usage — skip the guardrail call entirely, so ~95% of stream frames are near-zero overhead. See [Guardrails → stream_chunk](/ai-gateway/guardrails#stream_chunk--terminate-per-chunk-on-visible-deltas).
+
+- **Budget ≤50 ms per chunk.** Slow or errored guardrails **fail open** — the chunk passes through, `gateway_guardrail_verdicts_total{direction=stream_chunk,verdict=fail_open}` increments, and `langwatch.guardrail.stream_chunk_fail_open=<reason>` is set on the trace. Blocking the user's stream on a slow policy service is worse than occasional pass-through — but the metric surfaces degraded services.
+- **Decision `block`** → terminal `event: error` frame with `type=guardrail_blocked`, `code=stream_chunk_blocked` (see [Terminal error shapes](#terminal-error-shapes)). Channel closed immediately.
+- **Decision `modify`** is **not implemented in v1** — chunk-level rewriting is provider-shape-specific (OpenAI delta JSON vs Anthropic SSE events differ). For v1, "redact on stream" = block + client-retry. A future iter can add provider-aware chunk rewriting.
+
+## Starting a streaming request
+
+### OpenAI-compatible
+
+```python
+from openai import OpenAI
+client = OpenAI(base_url="https://gateway.langwatch.ai/v1", api_key="lw_vk_live_...")
+
+for chunk in client.chat.completions.create(
+    model="gpt-5-mini",
+    messages=[{"role": "user", "content": "count to 5"}],
+    stream=True,
+):
+    print(chunk.choices[0].delta.content or "", end="")
+```
+
+### Anthropic-compatible
+
+```python
+import anthropic
+client = anthropic.Anthropic(base_url="https://gateway.langwatch.ai", api_key="lw_vk_live_...")
+
+with client.messages.stream(
+    model="claude-haiku-4-5-20251001",
+    max_tokens=64,
+    messages=[{"role": "user", "content": "count to 5"}],
+) as stream:
+    for text in stream.text_stream:
+        print(text, end="")
+```
+
+## Tool-call deltas — what to look for
+
+Anthropic emits this sequence for a tool call:
+
+```
+event: content_block_start
+data: {"index": 1, "content_block": {"type": "tool_use", "id": "tu_01H...", "name": "read_file", "input": {}}}
+
+event: content_block_delta
+data: {"index": 1, "delta": {"type": "input_json_delta", "partial_json": "{\"path\":"}}
+
+event: content_block_delta
+data: {"index": 1, "delta": {"type": "input_json_delta", "partial_json": " \"./README.md\"}"}}
+
+event: content_block_stop
+data: {"index": 1}
+```
+
+Claude Code reassembles `partial_json` chunks into a full JSON object. Any reordering or re-splitting breaks this. The gateway preserves the exact chunk boundaries.
+
+OpenAI emits tool-call deltas as:
+
+```
+data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_abc","function":{"name":"read_file","arguments":""}}]}}]}
+data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\"path\":"}}]}}]}
+data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":" \"./README.md\"}"}}]}}]}
+```
+
+Same passthrough discipline.
+
+## Observability
+
+- `X-LangWatch-Request-Id` on the first frame.
+- Trace span per chunk would be too expensive — the gateway records a single span per streaming request with `langwatch.streaming=true` and the normal per-request attrs (`langwatch.model`, `langwatch.usage.*`, `langwatch.duration_ms`, `langwatch.cost_usd`).
+- Mid-stream failures are visible via `gateway_http_requests_total{status="500"}` + the single span's error state + request-id correlation to the gateway log line.
+
+<Info>Per-stream telemetry attrs (`langwatch.stream.chunk_count` / `.first_chunk_ms` / `.total_ms` / `.terminated_at_chunk`) are a v1.1 observability follow-up. In v1, the single-span-per-request model + log-line correlation is the operator signal.</Info>
+
+## Usage extraction (critical for streaming budgets)
+
+Streaming responses are just as expensive as non-streaming, but the usage block (token counts, cost inputs) arrives asynchronously — typically in the terminal chunk, but providers differ:
+
+| Provider | How usage is reported on a stream |
+|---|---|
+| Anthropic | `message_delta` event with final `usage.output_tokens` (+ `usage.cache_read_input_tokens` when applicable) |
+| OpenAI | Only when the client opts in with `stream_options: {include_usage: true}` — the final data-only chunk carries `usage`. Without the opt-in, usage is never sent over SSE |
+| Bedrock | Usage on the final `message_delta` event, same as Anthropic |
+| Vertex / Gemini | Usage on the terminal `candidates[].finishReason` event |
+
+The gateway watches every chunk for a non-zero usage block and debits the budget ledger based on the last non-empty snapshot. Key behaviour:
+
+- **Empty deltas don't zero-stomp real numbers.** OpenAI's pre-terminal "empty usage" deltas are ignored; the real numbers arrive on the last chunk.
+- **Missing usage is surfaced as a warning.** If the provider never reports usage (OpenAI without `stream_options: {include_usage: true}`), the gateway:
+  - Debits `$0` for that request.
+  - Adds `X-LangWatch-Usage-Warning: provider_did_not_report_usage_on_stream` to the response headers.
+  - Sets `span.status = success_no_usage` so you can alert on it.
+
+### How to always report streaming usage (OpenAI clients)
+
+```python
+for chunk in client.chat.completions.create(
+    model="gpt-5-mini",
+    messages=[...],
+    stream=True,
+    stream_options={"include_usage": True},
+):
+    pass
+```
+
+```ts
+const stream = await openai.chat.completions.create({
+  model: "gpt-5-mini",
+  messages: [...],
+  stream: true,
+  stream_options: { include_usage: true },
+});
+```
+
+This should be default for any client routing through the gateway, otherwise streaming calls show `$0` in your budget reports and budgets don't enforce correctly. The docs-team recommendation is: **wrap your OpenAI SDK in a helper that sets `stream_options.include_usage` by default**, so engineers can't forget.
+
+### Alerting on missing usage
+
+In Prometheus / Grafana:
+
+```promql
+rate(gateway_requests_total{usage_reported="false"}[5m]) > 0
+```
+
+If this fires, a client is streaming without `include_usage` and you're effectively not charging those requests. Sergey's warning header + span status make this observable — wire a Grafana alert on `span.status = success_no_usage` too.
+
+Shipped in `56f9134` (@sergey Lane A iter 4 pt5).
+
+## Non-streaming clients
+
+Requests without `stream: true` are dispatched synchronously, accumulated upstream, and returned as a single JSON response. Pre-call guardrails run on the request; post-call guardrails run on the full response and can block/modify the final body.
+
+The "no mid-stream switch" rule doesn't apply — non-streaming calls can fall back freely because the client only ever sees the final successful response.

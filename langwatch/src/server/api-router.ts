@@ -11,6 +11,7 @@ import { app as dashboardsApp } from "../app/api/dashboards/[[...route]]/app";
 import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as evaluatorsApp } from "../app/api/evaluators/[[...route]]/app";
 import { app as exportTracesApp } from "../app/api/export/traces/[[...route]]/app";
+import { app as gatewayPlatformApp } from "../app/api/gateway-platform/[[...route]]/app";
 import { app as graphsApp } from "../app/api/graphs/[[...route]]/app";
 import { app as modelProvidersApp } from "../app/api/model-providers/[[...route]]/app";
 import { app as monitorsApp } from "../app/api/monitors/[[...route]]/app";
@@ -26,6 +27,7 @@ import { app as workflowsCrudApp } from "../app/api/workflows/[[...route]]/app";
 
 import { app as datasetGenerateApp } from "./routes/dataset-generate";
 import { app as evaluationsV3App } from "./routes/evaluations-v3";
+import { app as gatewayInternalApp } from "./routes/gateway-internal";
 import { app as healthChecksApp } from "./routes/health-checks";
 import { app as otelApp } from "./routes/otel";
 import { app as playgroundApp } from "./routes/playground";
@@ -73,6 +75,7 @@ export function createApiRouter() {
   api.route("/", datasetApp);
   api.route("/", evaluatorsApp);
   api.route("/", exportTracesApp);
+  api.route("/", gatewayPlatformApp);
   api.route("/", graphsApp);
   api.route("/", modelProvidersApp);
   api.route("/", monitorsApp);
@@ -87,6 +90,7 @@ export function createApiRouter() {
   api.route("/", workflowsCrudApp);      // CRUD — complements workflowsApp (code-completion, post_event)
 
   api.route("/", evaluationsV3App);
+  api.route("/", gatewayInternalApp);
   api.route("/", otelApp);
   api.route("/", playgroundApp);
   api.route("/", scenarioGenerateApp);

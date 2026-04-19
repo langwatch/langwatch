@@ -23,6 +23,14 @@ export type UpdateModelProviderInput = {
   customEmbeddingsModels?: CustomModelsInput | null;
   extraHeaders?: { key: string; value: string }[] | null;
   defaultModel?: string;
+  /**
+   * Principal-style scope. When omitted, creates default to
+   * scopeType='PROJECT' / scopeId=projectId for backward compat;
+   * updates leave the existing row's scope untouched. Callers that
+   * want to create a team/org-scoped row set both fields.
+   */
+  scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId?: string;
 };
 
 export type DeleteModelProviderInput = {
@@ -174,6 +182,8 @@ export class ModelProviderService {
             customModels: customModels ?? undefined,
             customEmbeddingsModels: customEmbeddingsModels ?? undefined,
             extraHeaders: extraHeaders ?? [],
+            scopeType: input.scopeType,
+            scopeId: input.scopeId,
           },
           validatedKeys,
           customKeysProvided,
@@ -247,7 +257,13 @@ export class ModelProviderService {
     defaultProviders: Record<string, MaybeStoredModelProvider>,
     includeKeys: boolean,
   ): Promise<Record<string, MaybeStoredModelProvider>> {
-    const savedProviders = await this.repository.findAll(projectId);
+    // Walk the principal-scope ladder (iter 107 #2): ORGANIZATION →
+    // TEAM → PROJECT. Current data is 100% PROJECT-scoped post the
+    // backfill migration, so behavior is byte-identical. Rows added
+    // later at org/team scope become visible to every project under
+    // that scope automatically — the whole point of the refactor.
+    const savedProviders =
+      await this.repository.findAllAccessibleForProject(projectId);
 
     return savedProviders
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
@@ -284,6 +300,11 @@ export class ModelProviderService {
             extraHeaders: mp.extraHeaders as
               | { key: string; value: string }[]
               | null,
+            scopeType: mp.scopeType as
+              | "ORGANIZATION"
+              | "TEAM"
+              | "PROJECT",
+            scopeId: mp.scopeId,
           };
 
           return { ...acc, [mp.provider]: provider_ };
@@ -447,6 +468,8 @@ export class ModelProviderService {
       customModels?: CustomModelsInput;
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
+      scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+      scopeId?: string;
     },
     validatedKeys: Record<string, unknown> | null,
     customKeysProvided: boolean,
@@ -460,6 +483,8 @@ export class ModelProviderService {
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
         extraHeaders: data.extraHeaders,
+        scopeType: data.scopeType,
+        scopeId: data.scopeId,
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
       },

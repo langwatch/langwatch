@@ -107,7 +107,7 @@ export default function SettingsLayout({
         >
           <MenuLink href="/settings">General Settings</MenuLink>
           {!isLiteMember && (
-            <MenuLink href={`/${project?.slug}/setup`}>API Key</MenuLink>
+            <MenuLink href="/settings/api-keys">API Keys</MenuLink>
           )}
 
           <NavSection

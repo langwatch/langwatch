@@ -57,6 +57,50 @@ const EXEMPT_MODELS = [
   "Group",
   "GroupMembership",
   "RoleBinding",
+  /**
+   * PATs are organization-level, scoped by organizationId + userId.
+   */
+  "PersonalAccessToken",
+  /**
+   * AI Gateway models. Budgets are organization-level (scopeType +
+   * scopeId identifies which target); ledger rows descend from VirtualKey
+   * via virtualKeyId rather than a direct projectId column; change-events
+   * and audit logs both allow null projectId for org-level mutations;
+   * VirtualKeyProviderCredential is a join table whose composite PK is
+   * (virtualKeyId, providerCredentialId) — projectId is reachable via
+   * the parent VK but not a direct column. VirtualKey and
+   * GatewayProviderCredential are project-scoped and stay under the
+   * middleware's normal guard.
+   */
+  "GatewayBudget",
+  "GatewayBudgetLedger",
+  "GatewayChangeEvent",
+  "GatewayAuditLog",
+  "VirtualKeyProviderCredential",
+  /**
+   * GatewayCacheRule is organization-level (authored once, applies
+   * across every VK owned by the org based on matcher shape). Same
+   * rationale as GatewayBudget — no projectId column, scoped by
+   * organizationId + matcher fields.
+   */
+  "GatewayCacheRule",
+  /**
+   * ModelProvider switched to principal-style scope (iter 107–108,
+   * ADR-016): each row carries (scopeType, scopeId) mirroring
+   * RoleBinding's tenancy. `findAllAccessibleForProject` walks the
+   * scope ladder (PROJECT→TEAM→ORGANIZATION) with an OR across the
+   * three scope buckets — the OR branches key off scopeId, not
+   * projectId. The service layer re-enforces the tenancy boundary by
+   * first looking up the project row (`project.findUnique`) to derive
+   * the correct teamId + organizationId, then constraining the OR
+   * clauses to those specific IDs. Exempting matches the pattern we
+   * set for every other org-scoped gateway table above.
+   *
+   * Every other repo method (findById/findByProvider/findAll) still
+   * constrains by projectId at the call site; the existing unit
+   * tests pin that shape.
+   */
+  "ModelProvider",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
@@ -70,6 +114,44 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
     model === "PublicShare" &&
     (params.args?.where?.id ||
       (params.args?.where?.resourceType && params.args?.where?.resourceId))
+  ) {
+    return;
+  }
+
+  // Gateway auth resolver: findByHashedSecret is the hot-path lookup
+  // that converts an opaque `lw_vk_live_*` bearer token into a
+  // VirtualKey row. The hashedSecret itself is a cryptographic
+  // identifier unique across the platform (HMAC-SHA256 with a
+  // per-deployment pepper), so projectId/organizationId cannot be
+  // known to the caller — the VK row IS what teaches them. The OR
+  // clause here is always shape
+  //   { OR: [{ hashedSecret }, { previousHashedSecret, previousSecretValidUntil }] }
+  // matching virtualKey.repository.ts:findByHashedSecret. Narrow
+  // exemption matches the PublicShare pattern above.
+  if (
+    action === "findFirst" &&
+    model === "VirtualKey" &&
+    Array.isArray(params.args?.where?.OR) &&
+    params.args.where.OR.every(
+      (o: any) => o?.hashedSecret || o?.previousHashedSecret,
+    )
+  ) {
+    return;
+  }
+
+  // Gateway warm-cache resolver: /api/internal/gateway/config/:vk_id
+  // hits findUnique({ where: { id: vkId }}) because the gateway
+  // already authenticated the VK via resolve-key and now needs the
+  // full config payload (keyed by id it learned from the JWT). The
+  // HMAC-signed transport + JWT validation upstream is the tenancy
+  // check; adding projectId here would require a redundant JWT
+  // lookup. Narrow: only findUnique on VirtualKey with a bare id in
+  // the where clause — everything else still under the normal guard.
+  if (
+    action === "findUnique" &&
+    model === "VirtualKey" &&
+    typeof params.args?.where?.id === "string" &&
+    Object.keys(params.args.where).length === 1
   ) {
     return;
   }
