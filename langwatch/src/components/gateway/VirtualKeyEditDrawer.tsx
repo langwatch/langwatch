@@ -507,7 +507,14 @@ export function VirtualKeyEditDrawer({
 
             <Separator />
             <Text fontSize="sm" fontWeight="semibold">
-              Cache
+              Cache control
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Provider-agnostic: Anthropic uses explicit cache_control
+              markers, OpenAI/Azure cache prompts automatically, Gemini
+              supports cachedContent references. Mode here applies to every
+              provider this VK routes to; the X-LangWatch-Cache request
+              header lets callers override per-request.
             </Text>
             <HStack gap={4} align="flex-start">
               <Field.Root flex={1}>
@@ -525,10 +532,10 @@ export function VirtualKeyEditDrawer({
                     }
                   >
                     <option value="respect">
-                      Respect — byte-for-byte pass-through of cache_control
+                      Respect — pass provider cache directives through unchanged
                     </option>
                     <option value="disable">
-                      Disable — strip cache_control at every nesting depth
+                      Disable — strip cache directives before dispatch
                     </option>
                     <option value="force" disabled>
                       Force — v1.1 (returns 400 cache_override_not_implemented)
