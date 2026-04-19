@@ -1,0 +1,94 @@
+---
+title: Audit log
+description: Who did what, when, to which resource — across every VK, budget, provider, and guardrail mutation.
+sidebarTitle: Audit log
+---
+
+Every write through the REST API, the CLI, the tRPC routers, or the UI emits a row into `GatewayAuditLog`. Viewable at **/gateway/audit** (Lane B iter 19) and queryable programmatically — the enterprise-governance answer to *"who revoked that key on Tuesday?"* without granting database access.
+
+## What's logged
+
+| Action | Actor fields | Target |
+|---|---|---|
+| `virtualKey.{created, updated, rotated, revoked}` | `actorUserId` (user) or `actor = svc_<projectId>` (service token) | `virtualKey.<vk_id>` |
+| `gatewayBudget.{created, updated, archived}` | same | `gatewayBudget.<id>` |
+| `gatewayProvider.{created, updated, disabled, attached, detached}` | same | `gatewayProvider.<id>` |
+| `gatewayGuardrail.{attached, detached}` | same | `virtualKey.<vk_id>` (target of the attachment) |
+
+Reads are **not** logged — the volume would swamp the ledger without adding governance value. If you need read-access attribution for compliance, use OTel trace logs (every request has `langwatch.principal_id`).
+
+## Viewing in the UI
+
+The **/gateway/audit** page is reachable under the Usage nav group (gated on `gatewayLogs:view`). Four key affordances:
+
+1. **Filter by action** — `virtualKey.created`, `virtualKey.rotated`, etc. Useful when investigating "did anyone rotate keys during the incident window?".
+2. **Filter by target kind** — `virtualKey` / `gatewayBudget` / `gatewayProvider`. Narrows the view when you're investigating one resource type.
+3. **Expand before/after JSON diff** — each update-action row includes the metadata diff, expandable inline. Shows exactly which fields changed and to what.
+4. **Deep-link from the target column** — clicking the target id opens the resource's detail page (VK detail, budget detail, provider detail). Skips the "which key was that?" lookup.
+
+Pagination uses a composite `(createdAt, id)` cursor so batched same-millisecond entries (common when an operator does many mutations from a script) don't dedupe or skip. Load-more button, 50 rows per page.
+
+## Querying programmatically
+
+The same data is available via the tRPC router used by the UI — `gatewayAudit.list`. For REST-first consumers, use a project API token against the LangWatch app's audit export endpoint:
+
+```bash
+curl -sS https://app.langwatch.ai/api/gateway/v1/audit \
+  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
+  -G -d "action=virtualKey.revoked" \
+     -d "since=2026-04-01T00:00:00Z" \
+     -d "limit=100"
+```
+
+Response shape:
+
+```json
+{
+  "data": [
+    {
+      "id": "aud_01HZ...",
+      "action": "virtualKey.revoked",
+      "actor_user_id": "user_01HZX...",
+      "actor_user_email": "alice@example.com",
+      "actor": null,
+      "target_kind": "virtualKey",
+      "target_id": "vk_01HZ...",
+      "metadata": { "reason": "rotation cycle" },
+      "created_at": "2026-04-18T16:03:12Z"
+    }
+  ],
+  "next_cursor": "2026-04-18T16:03:10Z|aud_01HZ..."
+}
+```
+
+Actor resolution: `actor_user_id` is set for session / personal-access-token writes (joined from the `User` table so `actor_user_email` comes along). `actor` is set for service-token writes and takes the form `svc_<projectId>`; there's no associated user.
+
+## Retention
+
+Default: 7 years, extendable on request. Stored in the primary app Postgres under `GatewayAuditLog`. The table is partitioned by `createdAt` to keep old-data queries cheap.
+
+## Export
+
+For SIEM / compliance-warehouse pipelines, export via the REST endpoint on a nightly schedule:
+
+```bash
+# Pull everything from the last 24h, stream to your SIEM
+curl -sS "https://app.langwatch.ai/api/gateway/v1/audit?since=$(date -u -v-1d +%Y-%m-%dT%H:%M:%SZ)" \
+  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
+  | jq -c '.data[]' \
+  | your-siem-ingest
+```
+
+Rate-limited to 100 req/min/token; use the cursor for large pulls rather than increasing the `limit` (capped at 500 per request).
+
+## Security considerations
+
+- **Can the audit log be tampered with?** Writes are append-only at the service layer — no UPDATE or DELETE is exposed. Deletions are only possible via direct database access, which is control-plane-operator-only and also audit-logged (via Postgres' built-in `pgaudit` extension, configured in the self-hosted deployment guide).
+- **Can an audit entry be forged?** No. Writes happen inside the same transaction as the resource mutation; either both land or neither lands. A caller cannot emit a fake audit entry via REST or CLI.
+- **Notifications on security-sensitive writes.** Rotations and revocations generate an organization-wide notification by default (configurable per org). Users with `gatewayLogs:view` also receive an email summary on `virtualKey.revoked` for keys they own.
+
+## See also
+
+- [Security](/ai-gateway/security) — how audit fits into the broader governance story.
+- [RBAC → gatewayLogs](/ai-gateway/rbac) — who can view the audit log.
+- [Virtual Keys → Rotation](/ai-gateway/virtual-keys#rotation) — the operation that makes auditability load-bearing.

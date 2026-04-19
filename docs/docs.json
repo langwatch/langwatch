@@ -505,6 +505,7 @@
               "ai-gateway/model-aliases",
               "ai-gateway/observability",
               "ai-gateway/security",
+              "ai-gateway/audit",
               "ai-gateway/troubleshooting"
             ]
           },

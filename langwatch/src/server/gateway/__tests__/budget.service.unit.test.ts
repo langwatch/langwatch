@@ -1,5 +1,5 @@
 import { Prisma, type GatewayBudget, type PrismaClient } from "@prisma/client";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { GatewayBudgetService } from "../budget.service";
 
@@ -213,6 +213,161 @@ describe("GatewayBudgetService.check", () => {
       const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
 
       expect(result.decision).toBe("allow");
+    });
+  });
+});
+
+/**
+ * Scope-target resolution prism test. Each scope kind hits a different
+ * table (organization / team / project / virtualKey / user) and the
+ * resolver must return the right shape with the right human-friendly
+ * name. Covered under one describe so the full prism is visible.
+ */
+describe("GatewayBudgetService.getDetail", () => {
+  type Findable = { findFirst: unknown; findUnique: unknown; findMany: unknown };
+  function mockPrismaWithDetail(
+    budget: GatewayBudget | null,
+    scopeRow: unknown,
+    ledger: unknown[] = [],
+  ): PrismaClient {
+    return {
+      gatewayBudget: {
+        findFirst: vi.fn(async () => budget),
+      },
+      gatewayBudgetLedger: {
+        findMany: vi.fn(async () => ledger),
+      },
+      organization: {
+        findUnique: vi.fn(async () => scopeRow),
+      },
+      team: {
+        findUnique: vi.fn(async () => scopeRow),
+      },
+      project: {
+        findUnique: vi.fn(async () => scopeRow),
+      },
+      virtualKey: {
+        findUnique: vi.fn(async () => scopeRow),
+      },
+      user: {
+        findUnique: vi.fn(async () => scopeRow),
+      },
+    } as unknown as PrismaClient & Record<string, Findable>;
+  }
+
+  describe("when the budget does not exist", () => {
+    it("returns null", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithDetail(null, null),
+      );
+      const detail = await sut.getDetail("b_missing", "org_01");
+      expect(detail).toBeNull();
+    });
+  });
+
+  describe("when scope is ORGANIZATION", () => {
+    it("resolves the scope target to the org name/slug", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithDetail(
+          stubBudget({ scopeType: "ORGANIZATION", scopeId: "org_01" }),
+          { name: "Acme Inc.", slug: "acme" },
+        ),
+      );
+      const detail = await sut.getDetail("b_01", "org_01");
+      expect(detail?.scopeTarget).toEqual({
+        kind: "ORGANIZATION",
+        id: "org_01",
+        name: "Acme Inc.",
+        secondary: "acme",
+      });
+    });
+  });
+
+  describe("when scope is VIRTUAL_KEY", () => {
+    it("includes the display prefix + project slug for linkback", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithDetail(
+          stubBudget({ scopeType: "VIRTUAL_KEY", scopeId: "vk_01" }),
+          {
+            name: "prod-openai",
+            displayPrefix: "lw_live_abc",
+            project: { slug: "proj" },
+          },
+        ),
+      );
+      const detail = await sut.getDetail("b_01", "org_01");
+      expect(detail?.scopeTarget).toEqual({
+        kind: "VIRTUAL_KEY",
+        id: "vk_01",
+        name: "prod-openai",
+        secondary: "lw_live_abc…",
+        projectSlug: "proj",
+      });
+    });
+  });
+
+  describe("when scope is PRINCIPAL", () => {
+    it("prefers user.name but falls back to email then id", async () => {
+      const sut1 = GatewayBudgetService.create(
+        mockPrismaWithDetail(
+          stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }),
+          { name: "Alex Chen", email: "alex@example.com" },
+        ),
+      );
+      expect((await sut1.getDetail("b_01", "org_01"))?.scopeTarget.name).toBe(
+        "Alex Chen",
+      );
+
+      const sut2 = GatewayBudgetService.create(
+        mockPrismaWithDetail(
+          stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }),
+          { name: null, email: "alex@example.com" },
+        ),
+      );
+      expect((await sut2.getDetail("b_01", "org_01"))?.scopeTarget.name).toBe(
+        "alex@example.com",
+      );
+
+      const sut3 = GatewayBudgetService.create(
+        mockPrismaWithDetail(
+          stubBudget({ scopeType: "PRINCIPAL", scopeId: "user_42" }),
+          null,
+        ),
+      );
+      expect((await sut3.getDetail("b_01", "org_01"))?.scopeTarget.name).toBe(
+        "user_42",
+      );
+    });
+  });
+
+  describe("when the target row has been deleted", () => {
+    it("falls back to the raw scopeId instead of throwing", async () => {
+      // Scope FKs are ON DELETE CASCADE, but if the row is stale (null on
+      // lookup) the resolver must not null-pointer-crash. Detail page
+      // should still render.
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithDetail(
+          stubBudget({ scopeType: "TEAM", scopeId: "team_01" }),
+          null,
+        ),
+      );
+      const detail = await sut.getDetail("b_01", "org_01");
+      expect(detail?.scopeTarget.name).toBe("team_01");
+      expect(detail?.scopeTarget.secondary).toBeNull();
+    });
+  });
+
+  describe("ledger join", () => {
+    it("returns the ledger rows limited to the last 20, ordered by occurredAt desc", async () => {
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithDetail(
+          stubBudget(),
+          { name: "Proj", slug: "proj" },
+          [{ id: "l_01", occurredAt: new Date() }],
+        ),
+      );
+      const detail = await sut.getDetail("b_01", "org_01");
+      expect(detail?.recentLedger).toHaveLength(1);
     });
   });
 });

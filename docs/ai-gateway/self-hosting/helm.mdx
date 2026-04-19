@@ -54,11 +54,18 @@ gateway:
     timeout: 15s        # max wait for in-flight handlers to finish
   terminationGracePeriodSeconds: 30
 
-  # Edge protection (Lane A iter 23) — request body size cap
-  # Enforced before auth; a 1 GB drive-by scan cannot pressure the pod memory
-  # limit or the auth cache. Raise for orgs shipping large base64 image arrays.
+  # Edge protection (Lane A iter 23 + iter 26).
+  # maxRequestBodyBytes: enforced before auth; a 1 GB drive-by scan can't
+  #   pressure pod memory or the auth cache. Raise for vision workloads.
+  # Server timeouts (iter 26) close slowloris-style attacks. WriteTimeout
+  #   is DELIBERATELY NOT EXPOSED — whole-response caps kill SSE; per-chunk
+  #   deadlines live in the dispatcher. IdleTimeout MUST exceed your
+  #   nginx-ingress keepalive_timeout (typical 75s) so nginx closes first.
   security:
     maxRequestBodyBytes: 10485760  # 10 MiB; renders as %d int in configmap.yaml
+    readHeaderTimeout: 5s
+    readTimeout: 60s
+    idleTimeout: 120s
 
   # Budget outbox tuning (Lane A iter 16)
   budget:
@@ -460,6 +467,25 @@ The chart's ConfigMap renders the int as `%d` (iter 23 caught a YAML scientific-
 - **Lower** to ~1 MiB if you're fronting a tightly-scoped internal API with known small payloads and want to reject bot scans at the cheapest possible cost.
 - **Raise** to ~50 MiB when a customer's workload includes large base64-encoded images in `vision` messages. You'll know you need it when legitimate requests start returning `413 payload_too_large`; the troubleshooting entry in [Troubleshooting](/ai-gateway/troubleshooting#413-payload_too_large) tells users exactly which env var to bump.
 - **Do not disable**. A body cap is the single cheapest defence against drive-by memory pressure on a public endpoint.
+
+### HTTP server timeouts (iter 26, `87608d5`)
+
+Slowloris-style attacks complete TLS + headers, then trickle the body at 1 B/s holding the handler goroutine indefinitely. Iter 26 closed the gap with three explicit timeouts on the `http.Server`:
+
+```yaml
+gateway:
+  security:
+    readHeaderTimeout: 5s    # TLS-handshake-then-stall probes
+    readTimeout: 60s         # full body read; stops byte-trickle
+    idleTimeout: 120s        # keep-alive cap; MUST exceed nginx keepalive_timeout
+```
+
+Notable omissions:
+
+- **`writeTimeout` is NOT exposed.** It would bound the whole response, which terminates long SSE streams (reasoning models, Claude thinking traces) at the cap. Per-chunk streaming deadlines live in the dispatcher, not here. If you're behind an ingress that enforces its own `proxy_read_timeout`, match it there instead.
+- **`idleTimeout` MUST exceed your nginx-ingress `keepalive_timeout`** (typical 75 s). If the gateway closes first, nginx's pool has dead sockets and a request fails mid-flight. The chart default 120 s is safe under the typical 75 s nginx value; if you run a custom ingress with a longer keepalive, bump this value proportionally.
+
+All three timeouts apply to the public listener and the admin listener (iter 22) identically.
 
 ## Chart and data-plane CI (iter 19, `1fd1fc3`)
 

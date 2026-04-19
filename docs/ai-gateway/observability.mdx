@@ -102,6 +102,7 @@ Every gateway response carries the following headers (as of Lane A iter 4 pt1 �
 | `X-LangWatch-Span-Id` | 16 hex chars | The gateway's own span id for this request |
 | `traceparent` | `00-<trace-id>-<span-id>-01` | W3C traceparent re-injected for downstream stitching — forward to any further hop you call |
 | `X-LangWatch-Request-Id` | `grq_<ULID>` | Gateway-scoped id; use this in support tickets |
+| `X-LangWatch-Gateway-Version` | semver or git-sha | Version of the gateway pod that handled this request (iter 27, `d70adf6`). Present on every response — success AND error — so "which deploy returned this 500?" is answerable without access-log correlation. SDKs can also version-gate on header presence |
 
 ### Client already has a trace
 
