@@ -15,76 +15,73 @@ These MUST be provided via a Kubernetes Secret (or the equivalent on non-Kuberne
 | `LW_GATEWAY_INTERNAL_SECRET` | HMAC secret used for `/api/internal/gateway/*` calls between gateway and LangWatch control plane | Yes — same value in both |
 | `LW_GATEWAY_JWT_SECRET` | HS256 secret for signing the short-lived JWT returned by `/resolve-key` | Yes |
 | `LW_VIRTUAL_KEY_PEPPER` | Peppered HMAC secret used to hash virtual-key secrets at rest | Control plane only; gateway never sees it |
-| `REDIS_URL` | Optional L2 cache for resolved VKs, shared across gateway replicas. On HPA scale-out, new pods warm from L2 (~2 ms) instead of round-tripping `/resolve-key` (~30 ms); shipped in Lane A iter 15 (`6ebeecf`). TTL floored at 30 s; poison entries (decode errors) are `DEL`'d. See [Scaling → Redis L2](/ai-gateway/self-hosting/scaling#redis-l2-optional) | Gateway only |
+| `GATEWAY_REDIS_URL` | Optional L2 cache for resolved VKs, shared across gateway replicas. On HPA scale-out, new pods warm from L2 (~2 ms) instead of round-tripping `/resolve-key` (~30 ms); shipped in Lane A iter 15 (`6ebeecf`). TTL floored at 30 s; poison entries (decode errors) are `DEL`'d. See [Scaling → Redis L2](/ai-gateway/self-hosting/scaling#redis-l2-optional) | Gateway only |
 
 Rotate `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` together via the dual-key overlap flow (iter 25, `921365f`) — the gateway's JWT resolver accepts both `LW_GATEWAY_JWT_SECRET` (current) and `LW_GATEWAY_JWT_SECRET_PREVIOUS` (the retired key) via `jwt.VerificationKeySet` while both are set; see [Secret rotation](#secret-rotation-iter-25-921365f) below.
 
 ## Routing
 
+Source of truth: `services/gateway/internal/config/config.go` `Load()`.
+
 | Var | Default | Purpose |
 |---|---|---|
-| `LW_GATEWAY_LISTEN_ADDR` | `:8080` | Listen addr. Binds `0.0.0.0:8080` in-cluster |
-| `LW_GATEWAY_CONTROL_PLANE_URL` | `https://app.langwatch.ai` | Base URL for `/api/internal/gateway/*` calls |
-| `LW_GATEWAY_NODE_ID` | auto-generated ULID | Unique id for this replica, surfaced in HMAC `X-LangWatch-Gateway-Node` and in traces |
-| `LW_GATEWAY_READ_TIMEOUT_MS` | `30000` | HTTP server read timeout |
-| `LW_GATEWAY_WRITE_TIMEOUT_MS` | `120000` | HTTP server write timeout (streaming-safe) |
-| `LW_GATEWAY_MAX_BODY_BYTES` | `10485760` (10 MB) | Legacy alias retained for backward compat. New deploys should use `GATEWAY_MAX_REQUEST_BODY_BYTES` (see [Edge protection](#edge-protection-iter-23-79b46bf) below) |
+| `GATEWAY_LISTEN_ADDR` | `:5563` | Public HTTP listen addr. LangWatch port convention: app=5560, nlp=5561, langevals=5562, gateway=5563 |
+| `GATEWAY_ADMIN_ADDR` | `127.0.0.1:6060` | Loopback-bound admin listener (pprof / diagnostics). Binding off-loopback requires `GATEWAY_ADMIN_AUTH_TOKEN` or startup fails |
+| `GATEWAY_ADMIN_AUTH_TOKEN` | *(unset)* | Bearer token required for admin listener when bound off-loopback (iter 22, `af796b8`) |
+| `GATEWAY_LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |
+| `GATEWAY_CONTROL_PLANE_URL` | `http://localhost:5560` | Base URL for `/api/internal/gateway/*` calls (HMAC-signed) |
+| `GATEWAY_CONTROL_PLANE_TIMEOUT` | `2s` | Per-call timeout for the control-plane HTTP client |
+| `GATEWAY_LONG_POLL_TIMEOUT` | `25s` | `/api/internal/gateway/changes` long-poll deadline. Per-org scoped; one goroutine per organization observed on this pod (iter 17, `5119261`) |
+| `GATEWAY_NODE_ID` | auto-generated ULID | Unique id for this replica, surfaced in the HMAC `X-LangWatch-Gateway-Node` header |
 
 ## Auth cache
 
 | Var | Default | Purpose |
 |---|---|---|
-| `LW_GATEWAY_AUTH_CACHE_L1_SIZE` | `10000` | In-process LRU capacity (per replica) |
-| `LW_GATEWAY_AUTH_CACHE_TTL_SECONDS` | `900` | JWT TTL / L1 expiry. Matches `/resolve-key` JWT `exp` |
-| `LW_GATEWAY_AUTH_CACHE_CHANGES_POLL_SECONDS` | `25` | Long-poll interval against `/api/internal/gateway/changes`. Per-org scoped — one goroutine per organization observed on this pod (Lane A iter 17, `5119261`). See [Scaling → Per-org /changes](/ai-gateway/self-hosting/scaling#per-org-changes-long-poll-iter-17-5119261) |
-| `LW_GATEWAY_AUTH_CACHE_BOOTSTRAP` | `true` | On startup, pre-warm L1 via `/bootstrap` call |
+| `GATEWAY_CACHE_LRU_SIZE` | `50000` | L1 LRU capacity (per replica) |
+| `GATEWAY_REDIS_URL` | *(unset)* | Optional L2 cache URL for JWT-serialised VK bundles. HPA scale-out pods warm from L2 (~2 ms) instead of round-tripping `/resolve-key`. TTL floored at 30 s; poison entries `DEL`'d (iter 15, `6ebeecf`) |
+| `GATEWAY_CACHE_REFRESH_INTERVAL` | `60s` | Background refresh interval for warm L1 entries |
+| `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS` | `false` | On startup, pre-warm L1 via `/bootstrap` (all-keys snapshot). Off by default — large orgs opt in |
+| `GATEWAY_JWT_REFRESH_THRESHOLD` | `5m` | Refresh JWT when within this window of expiry; backgrounded so the hot path doesn't block |
 
-See [Auth Cache Architecture](/ai-gateway/observability#auth-cache-architecture) for the two-tier L1/L2 design.
+See [Auth Cache Architecture](/ai-gateway/observability#auth-cache-architecture) for the L1/L2 design.
 
-## Providers
+## Providers + upstream
 
-Provider credentials are managed from the UI (Gateway → Providers), not env vars. The gateway fetches them via `/config/:vk_id` per-request and caches them in the L1 JWT alongside the VK config. Upstream-specific tuning:
+Provider credentials are managed from the UI (Gateway → Providers), not env vars. The Go gateway uses Bifrost's defaults for upstream timeouts + circuit-breaker windows; operators tune via Bifrost config (the library we embed), not via env vars on the gateway binary. In v1, only the Bifrost pool size + stream buffer are exposed:
 
 | Var | Default | Purpose |
 |---|---|---|
-| `LW_GATEWAY_UPSTREAM_TIMEOUT_MS` | `60000` | Per-upstream call timeout. Longer than reasonable for most calls; streaming requests extend via write-deadline reset on chunk |
-| `LW_GATEWAY_UPSTREAM_MAX_CONN_PER_HOST` | `256` | Connection pool size per (provider, region) |
-| `LW_GATEWAY_UPSTREAM_IDLE_TIMEOUT_S` | `90` | Keep-alive idle |
-| `LW_GATEWAY_CIRCUIT_WINDOW_S` | `30` | Breaker sliding window |
-| `LW_GATEWAY_CIRCUIT_THRESHOLD` | `10` | Failures inside the window that open the circuit |
-| `LW_GATEWAY_CIRCUIT_COOLDOWN_S` | `60` | How long the circuit stays open before a half-open probe |
+| `GATEWAY_BIFROST_POOL_SIZE` | `200` | Bifrost worker pool |
+| `GATEWAY_BIFROST_STREAM_BUFFER` | `100` | Per-stream buffer slots |
 
-Circuit breaker state is per-replica — no shared Redis dependency. This is intentional: under a large-scale outage, having N replicas rediscover independently is resilient; having them all depend on Redis for breaker state is not.
+<Info>Per-provider circuit breaker + upstream timeout tuning env vars (`LW_GATEWAY_UPSTREAM_*`, `LW_GATEWAY_CIRCUIT_*`) are not currently exposed on the gateway binary — Bifrost internal defaults govern. Tracked as a v1.1 configurability follow-up if operators request finer control.</Info>
 
 ## Tracing
 
 | Var | Default | Purpose |
 |---|---|---|
-| `LW_GATEWAY_OTEL_EXPORTER` | `otlp-http` | One of `otlp-http`, `otlp-grpc`, `none` |
-| `LW_GATEWAY_OTEL_SAMPLING_RATIO` | `1.0` | Head sampler. Gateway-internal spans only — customer traces are passed through untouched |
-| `LW_GATEWAY_OTEL_TENANT_ROUTER` | `enabled` | Per-tenant trace routing — reads `project_id` from the VK bundle on every resolve and routes each span to the owning project's OTel pipeline. See [Observability](/ai-gateway/observability) |
-| `GATEWAY_OTEL_DEFAULT_ENDPOINT` | `https://app.langwatch.ai/otel/v1/traces` | Endpoint the gateway ships all traces to. LangWatch ingest files each trace under the right project via the `langwatch.project_id` span attribute. Self-hosted: point this at your in-cluster OTel collector |
+| `GATEWAY_OTEL_DEFAULT_ENDPOINT` | *(unset; required if you want traces)* | OTLP endpoint the gateway ships all traces to. LangWatch ingest files each trace under the right project via the `langwatch.project_id` span attribute. Self-hosted: point this at your in-cluster OTel collector or LangWatch ingest |
+| `GATEWAY_OTEL_BATCH_TIMEOUT` | `5s` | Batch-span-processor flush interval |
+| `GATEWAY_OTEL_MAX_QUEUE` | `8192` | Batch-span-processor queue cap |
 
 ### Per-project routing (no customer config)
 
-When `LW_GATEWAY_OTEL_TENANT_ROUTER=enabled` (default), the gateway:
+The gateway ALWAYS reads `project_id` from each resolved VK bundle and tags every span with `langwatch.project_id` (plus team, org, principal). Traces are shipped to `GATEWAY_OTEL_DEFAULT_ENDPOINT`; LangWatch ingest uses the span attribute to file each trace under the owning project. Shipped in `5fe8486` (@sergey Lane A iter 4 pt4), wired to the GatewayConfig bundle (@alexis Lane B iter 6 `6cda472ec`); customer-override surface removed in @alexis Lane B iter 25 / @sergey Lane A iter 34 (`0ed2910fc`).
 
-1. Reads `project_id` from each resolved VK bundle.
-2. Tags every span on the request's trace with `langwatch.project_id` (plus team, org, principal).
-3. Ships traces to `GATEWAY_OTEL_DEFAULT_ENDPOINT`; LangWatch ingest uses the span attribute to file each trace under the owning project.
-
-Result: customer spans land in the customer's own LangWatch project without any env-var or client-side config. There is no operator override — we sell observability, so we route everything to the LangWatch pipeline by design.
-
-Shipped in `5fe8486` (@sergey Lane A iter 4 pt4) wired to the GatewayConfig bundle (@alexis Lane B iter 6 `6cda472ec`); customer-override surface removed in @alexis Lane B iter 25 / @sergey Lane A iter 34 (`0ed2910fc`).
+There is no env-var override — LangWatch sells observability, so all traces are routed to the LangWatch pipeline by design.
 
 ## Guardrails + budgets
 
 | Var | Default | Purpose |
 |---|---|---|
-| `LW_GATEWAY_GUARDRAIL_TIMEOUT_MS` | `1500` | Request-level guardrail timeout. Fails closed (blocks request) |
-| `LW_GATEWAY_GUARDRAIL_STREAM_CHUNK_TIMEOUT_MS` | `50` | Per-chunk guardrail timeout during streaming. Fails OPEN (lets chunk through) |
-| `LW_GATEWAY_BUDGET_DEBIT_RETRY_MAX` | `8` | Outbox retries before shelving. Exponential backoff |
-| `LW_GATEWAY_BUDGET_DEBIT_SHELF_BYTES` | `134217728` (128 MB) | On-disk shelf size for unprocessable debits (4xx from control plane) |
+| `GATEWAY_GUARDRAIL_PRE_TIMEOUT` | `800ms` | Request-direction guardrail timeout. Fail-open/closed controlled per-VK by `guardrails.request_fail_open` |
+| `GATEWAY_GUARDRAIL_POST_TIMEOUT` | `2s` | Response-direction guardrail timeout. Fail-open/closed controlled per-VK by `guardrails.response_fail_open` |
+| `GATEWAY_GUARDRAIL_STREAM_WINDOW` | `200ms` | Per-chunk guardrail budget during streaming. Fails open with metric (`gateway_guardrail_verdicts_total{verdict="fail_open"}`) |
+| `GATEWAY_BUDGET_OUTBOX_FLUSH` | `2s` | Budget-debit outbox flush interval |
+| `GATEWAY_BUDGET_OUTBOX_RETRIES` | `10` | Outbox retries before shelving. Exponential backoff |
+| `LW_GATEWAY_BUDGET_LIVE_THRESHOLD` | `0.9` | Trigger live `/budget/check` reconciliation when cached-spend ≥ this fraction of the cap |
+| `LW_GATEWAY_BUDGET_LIVE_TIMEOUT` | `200ms` | Per-call timeout for the live `/budget/check`. Fails open if the control plane doesn't respond in time |
 
 ## Edge protection (iter 23 + 26)
 
