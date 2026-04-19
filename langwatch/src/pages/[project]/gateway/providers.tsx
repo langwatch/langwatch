@@ -25,6 +25,7 @@ import { Link } from "~/components/ui/link";
 import { Menu } from "~/components/ui/menu";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
@@ -295,7 +296,19 @@ function HealthBadge({ status }: { status: string }) {
         : status === "CIRCUIT_OPEN"
           ? "red"
           : "gray";
-  return <Badge colorPalette={palette}>{status.toLowerCase()}</Badge>;
+  const explanation =
+    status === "HEALTHY"
+      ? "Last probe + recent dispatches succeeded."
+      : status === "DEGRADED"
+        ? "Recent dispatches have been partially failing — fallbacks likely kicking in."
+        : status === "CIRCUIT_OPEN"
+          ? "Too many consecutive failures; the gateway is short-circuiting this binding and all traffic moves to fallbacks."
+          : "No probe has run against this binding yet. Status will update after the first dispatch or the next periodic health check.";
+  return (
+    <Tooltip content={explanation}>
+      <Badge colorPalette={palette}>{status.toLowerCase()}</Badge>
+    </Tooltip>
+  );
 }
 
 export default withPermissionGuard("gatewayProviders:view", {

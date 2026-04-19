@@ -230,7 +230,10 @@ export function ProviderBindingCreateDrawer({
                 placeholder="e.g. primary, fallback-1"
               />
               <Field.HelperText>
-                Logical name used in the fallback chain. Defaults to "primary".
+                Logical name used in the fallback chain. Defaults to
+                "primary". Must be unique per provider — binding the
+                same provider with the same slot twice is rejected by
+                the server.
               </Field.HelperText>
             </Field.Root>
             {/* Rotation policy field intentionally omitted — v1 is
