@@ -34,17 +34,15 @@ const (
 	AttrStreaming     = "langwatch.streaming"
 	AttrUsageIn       = "langwatch.usage.input_tokens"
 	AttrUsageOut      = "langwatch.usage.output_tokens"
-	AttrUsageCacheR   = "langwatch.usage.cache_read_tokens"
-	AttrUsageCacheW   = "langwatch.usage.cache_write_tokens"
-	// OTel GenAI semconv cache counters. We emit these in parallel
-	// with the langwatch.* proprietary names (v1: belt + suspenders,
-	// every consumer works) — the LangWatch trace ingest pipeline
-	// specifically reads cache_read.input_tokens / cache_creation.input_tokens
-	// per semconv, so emitting only langwatch.* would leave cache
-	// telemetry invisible in the trace UI. Internal consumers can
-	// migrate to the semconv names; v1.1 drops the proprietary duplicates.
-	AttrSemconvCacheReadInputTokens     = "gen_ai.usage.cache_read.input_tokens"
-	AttrSemconvCacheCreationInputTokens = "gen_ai.usage.cache_creation.input_tokens"
+	// Cache-token counters follow the OTel GenAI semconv per
+	// rchaves's "OTEL semconv all the way" direction — the LangWatch
+	// trace ingest pipeline reads exactly these keys
+	// (langwatch/src/server/tracer/otel.traces.ts §950-970), and the
+	// names are what every OTEL-compliant collector / viewer
+	// (Tempo / Jaeger / Datadog / Grafana) surfaces natively. Internal
+	// code reads them via these constants; drop-and-rename is safe.
+	AttrUsageCacheReadInputTokens     = "gen_ai.usage.cache_read.input_tokens"
+	AttrUsageCacheCreationInputTokens = "gen_ai.usage.cache_creation.input_tokens"
 	AttrCostUSD       = "langwatch.cost_usd"
 	AttrDurationMS    = "langwatch.duration_ms"
 	AttrStatus        = "langwatch.status"
