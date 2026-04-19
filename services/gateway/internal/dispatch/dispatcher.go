@@ -1281,10 +1281,17 @@ func (d *Dispatcher) ServeEmbeddings(w http.ResponseWriter, r *http.Request, b *
 		gwerrors.Write(w, reqID, gwerrors.TypeBadRequest, "model_resolve_failed", err.Error(), "model")
 		return
 	}
+	// Bifrost v1.4.22 validates `req.Input == nil || all-nested-nil` on
+	// embedding requests BEFORE honouring the raw-body passthrough flag
+	// (core/bifrost.go:922). Stub a non-nil Input with empty text so
+	// the validator passes and providers fall through to the raw-body
+	// OpenAI-wire path. Mirrors the chat-path stub shipped in iter 61.
+	emptyText := ""
 	bfReq := &bfschemas.BifrostEmbeddingRequest{
 		Provider:       resolved.Provider,
 		Model:          resolved.Model,
 		RawRequestBody: body,
+		Input:          &bfschemas.EmbeddingInput{Text: &emptyText},
 	}
 	ctx := context.WithValue(
 		withBundle(r.Context(), b),
