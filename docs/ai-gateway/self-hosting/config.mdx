@@ -15,7 +15,7 @@ These MUST be provided via a Kubernetes Secret (or the equivalent on non-Kuberne
 | `LW_GATEWAY_INTERNAL_SECRET` | HMAC secret used for `/api/internal/gateway/*` calls between gateway and LangWatch control plane | Yes — same value in both |
 | `LW_GATEWAY_JWT_SECRET` | HS256 secret for signing the short-lived JWT returned by `/resolve-key` | Yes |
 | `LW_VIRTUAL_KEY_PEPPER` | Peppered HMAC secret used to hash virtual-key secrets at rest | Control plane only; gateway never sees it |
-| `REDIS_URL` | Optional L2 cache for resolved VKs (shared across gateway replicas) | Gateway only |
+| `REDIS_URL` | Optional L2 cache for resolved VKs, shared across gateway replicas. On HPA scale-out, new pods warm from L2 (~2 ms) instead of round-tripping `/resolve-key` (~30 ms); shipped in Lane A iter 15 (`6ebeecf`). TTL floored at 30 s; poison entries (decode errors) are `DEL`'d. See [Scaling → Redis L2](/ai-gateway/self-hosting/scaling#redis-l2-optional) | Gateway only |
 
 Rotate `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` together — the gateway supports a 10-minute overlap window (`LW_GATEWAY_JWT_SECRET_PREVIOUS`) so rolling restart doesn't evict every cached JWT at once.
 
