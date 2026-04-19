@@ -12,7 +12,8 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Building2, BrainCircuit, Edit, Folder, MoreVertical, Plus, Trash2, Users } from "lucide-react";
+import { BrainCircuit, Edit, MoreVertical, Plus, Trash2 } from "lucide-react";
+import { ProviderScopeChips } from "../../components/settings/ProviderScopeChips";
 import { useEffect, useMemo, useState } from "react";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { useDrawer } from "~/hooks/useDrawer";
@@ -367,59 +368,6 @@ export default function ModelsPage() {
         </Dialog.Root>
       </VStack>
     </SettingsLayout>
-  );
-}
-
-function ProviderScopeChips({
-  scopes,
-  fallbackScopeType,
-}: {
-  scopes?: Array<{ scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string }>;
-  fallbackScopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
-}) {
-  // Prefer the full scope set (iter 109 multi-scope). Fallback to the
-  // collapsed single scopeType for MPs flowing through the legacy
-  // Record<provider, …> shape that haven't been re-serialised yet.
-  const entries = scopes && scopes.length > 0
-    ? scopes
-    : fallbackScopeType
-      ? [{ scopeType: fallbackScopeType, scopeId: "" }]
-      : [];
-  if (entries.length === 0) return null;
-  return (
-    <HStack gap={1} wrap="wrap">
-      {entries.map((entry) => {
-        const key = `${entry.scopeType}:${entry.scopeId}`;
-        if (entry.scopeType === "ORGANIZATION") {
-          return (
-            <Badge key={key} colorPalette="blue" variant="subtle" size="sm">
-              <HStack gap={1}>
-                <Building2 size={12} aria-hidden />
-                <Text>Organization</Text>
-              </HStack>
-            </Badge>
-          );
-        }
-        if (entry.scopeType === "TEAM") {
-          return (
-            <Badge key={key} colorPalette="purple" variant="subtle" size="sm">
-              <HStack gap={1}>
-                <Users size={12} aria-hidden />
-                <Text>Team</Text>
-              </HStack>
-            </Badge>
-          );
-        }
-        return (
-          <Badge key={key} colorPalette="gray" variant="subtle" size="sm">
-            <HStack gap={1}>
-              <Folder size={12} aria-hidden />
-              <Text>Project</Text>
-            </HStack>
-          </Badge>
-        );
-      })}
-    </HStack>
   );
 }
 
