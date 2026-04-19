@@ -4,11 +4,45 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
+	"testing"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 
 	"github.com/langwatch/langwatch/services/gateway/internal/auth"
 )
+
+// testProviderBaseURL lets integration tests steer bifrost's upstream URL
+// per-provider at ProviderConfig time (GetConfigForProvider is called by
+// bifrost once per provider at init, not per-request, so this is
+// package-level scoped — fine for single-test-server harnesses).
+//
+// Production code never touches this: SetTestProviderBaseURL panics
+// unless invoked from a running test binary.
+var (
+	testProviderBaseURLMu sync.RWMutex
+	testProviderBaseURL   map[bfschemas.ModelProvider]string
+)
+
+// SetTestProviderBaseURL sets per-provider upstream URLs for bifrost
+// when the gateway is embedded in an integration harness. Callers pass
+// e.g. {bfschemas.OpenAI: "http://127.0.0.1:12345"} to point the OpenAI
+// provider at an httptest server mimicking OpenAI's wire shape.
+// Pass nil to clear. Only callable from *testing.T-bound binaries.
+func SetTestProviderBaseURL(urls map[bfschemas.ModelProvider]string) {
+	if !testing.Testing() {
+		panic("dispatch.SetTestProviderBaseURL is test-only")
+	}
+	testProviderBaseURLMu.Lock()
+	defer testProviderBaseURLMu.Unlock()
+	testProviderBaseURL = urls
+}
+
+func lookupTestProviderBaseURL(provider bfschemas.ModelProvider) string {
+	testProviderBaseURLMu.RLock()
+	defer testProviderBaseURLMu.RUnlock()
+	return testProviderBaseURL[provider]
+}
 
 // vkAccount is the bifrost schemas.Account implementation. It supplies
 // per-request provider credentials by reading the authenticated bundle off
@@ -97,6 +131,9 @@ func (a *vkAccount) GetKeysForProvider(ctx context.Context, providerKey bfschema
 // on ProviderCred.BaseURL and get threaded through in pcToBifrostKey.
 func (a *vkAccount) GetConfigForProvider(providerKey bfschemas.ModelProvider) (*bfschemas.ProviderConfig, error) {
 	cfg := &bfschemas.ProviderConfig{}
+	if url := lookupTestProviderBaseURL(providerKey); url != "" {
+		cfg.NetworkConfig.BaseURL = url
+	}
 	cfg.CheckAndSetDefaults()
 	return cfg, nil
 }
