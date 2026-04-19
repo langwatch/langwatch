@@ -684,6 +684,7 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	w.Header().Set("X-LangWatch-Request-Id", reqID)
 	w.Header().Set("X-LangWatch-Gateway-Request-Id", grq)
 	gwotel.EnrichFromBundle(r.Context(), b)
+	gwotel.EnrichFromRequestHeaders(r.Context(), r)
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrGatewayReqID, grq)
 	if !d.enforceRateLimit(w, r, b, reqID) {
 		return
@@ -1143,6 +1144,7 @@ func (d *Dispatcher) ServeAnthropicMessages(w http.ResponseWriter, r *http.Reque
 	grq := budget.NewULID()
 	w.Header().Set("X-LangWatch-Gateway-Request-Id", grq)
 	gwotel.EnrichFromBundle(r.Context(), b)
+	gwotel.EnrichFromRequestHeaders(r.Context(), r)
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrGatewayReqID, grq)
 	if !d.enforceRateLimit(w, r, b, reqID) {
 		return
@@ -1248,6 +1250,7 @@ func (d *Dispatcher) ServeEmbeddings(w http.ResponseWriter, r *http.Request, b *
 	grq := budget.NewULID()
 	w.Header().Set("X-LangWatch-Gateway-Request-Id", grq)
 	gwotel.EnrichFromBundle(r.Context(), b)
+	gwotel.EnrichFromRequestHeaders(r.Context(), r)
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrGatewayReqID, grq)
 	if !d.enforceRateLimit(w, r, b, reqID) {
 		return
