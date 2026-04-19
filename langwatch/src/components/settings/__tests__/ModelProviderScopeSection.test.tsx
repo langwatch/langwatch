@@ -4,7 +4,16 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+// Zag's select machine calls scrollTo on the options container after a
+// selection; jsdom doesn't implement it, and the thrown TypeError aborts
+// the action chain — onValueChange never runs. Stub it once for the file.
+beforeAll(() => {
+  if (!Element.prototype.scrollTo) {
+    Element.prototype.scrollTo = () => {};
+  }
+});
 
 import type {
   UseModelProviderFormActions,
@@ -103,21 +112,16 @@ describe("ProviderScopeSection", () => {
         </Wrapper>,
       );
 
-      expect(screen.getByText(/Availability/i)).toBeInTheDocument();
+      expect(screen.getByText(/^Scope$/i)).toBeInTheDocument();
       expect(screen.getByText(/^Organization$/i)).toBeInTheDocument();
-      // No radios — read-only
-      expect(screen.queryAllByRole("radio")).toHaveLength(0);
-      // Helper copy for the reparent-means-recreate contract
+      // No combobox on read-only view
+      expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
       expect(
         screen.getByText(/Scope is fixed after create/i),
       ).toBeInTheDocument();
     });
 
     it("shows 'Project' badge for a project-scoped row when org/team exists", () => {
-      // acme-demo (organization present) + legacy PROJECT-scoped row.
-      // Rendering the Project badge in-drawer is fine — users need scope
-      // context while editing, unlike in the list where 100% of rows being
-      // Project-scoped would be visual noise.
       render(
         <Wrapper>
           <ProviderScopeSection
@@ -146,12 +150,12 @@ describe("ProviderScopeSection", () => {
         </Wrapper>,
       );
 
-      expect(screen.queryByText(/Availability/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Scope$/i)).not.toBeInTheDocument();
     });
   });
 
   describe("when the provider is new and the user has an org + team", () => {
-    it("renders all three scope radios", () => {
+    it("renders a scope select (not radios) labeled 'Scope'", () => {
       render(
         <Wrapper>
           <ProviderScopeSection
@@ -159,21 +163,22 @@ describe("ProviderScopeSection", () => {
             actions={buildActions()}
             provider={newProvider}
             teamId="team_1"
+            teamName="platform"
             organizationId="org_1"
+            organizationName="acme"
+            projectId="proj_1"
+            projectName="web-app"
           />
         </Wrapper>,
       );
 
-      expect(screen.getByText(/Availability/i)).toBeInTheDocument();
-      const radioValues = screen
-        .getAllByRole("radio")
-        .map((r) => r.getAttribute("value"));
-      expect(radioValues).toEqual(
-        expect.arrayContaining(["PROJECT", "TEAM", "ORGANIZATION"]),
-      );
+      expect(screen.getByText(/^Scope$/i)).toBeInTheDocument();
+      expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+      // Trigger surfaces as a role=combobox (Chakra Select.Trigger).
+      expect(screen.getByRole("combobox")).toBeInTheDocument();
     });
 
-    it("calls setScopeType when the user picks Team", async () => {
+    it("calls setScopeType when the user picks Team from the select", async () => {
       const setScopeType = vi.fn();
       const user = userEvent.setup();
 
@@ -184,19 +189,23 @@ describe("ProviderScopeSection", () => {
             actions={buildActions({ setScopeType })}
             provider={newProvider}
             teamId="team_1"
+            teamName="platform"
             organizationId="org_1"
+            organizationName="acme"
+            projectId="proj_1"
+            projectName="web-app"
           />
         </Wrapper>,
       );
 
-      // Chakra v3 RadioGroup exposes each item with role=radio, accessible
-      // via the visible label text.
-      await user.click(screen.getByRole("radio", { name: /Team/i }));
+      await user.click(screen.getByRole("combobox"));
+      // Team option renders by team name.
+      await user.click(await screen.findByRole("option", { name: /platform/i }));
 
       expect(setScopeType).toHaveBeenCalledWith("TEAM");
     });
 
-    it("shows a scope-specific description for the active radio", () => {
+    it("shows a scope-specific description for the active scope", () => {
       render(
         <Wrapper>
           <ProviderScopeSection
@@ -204,7 +213,9 @@ describe("ProviderScopeSection", () => {
             actions={buildActions()}
             provider={newProvider}
             teamId="team_1"
+            teamName="platform"
             organizationId="org_1"
+            organizationName="acme"
           />
         </Wrapper>,
       );
@@ -229,12 +240,14 @@ describe("ProviderScopeSection", () => {
         </Wrapper>,
       );
 
-      expect(screen.queryByText(/Availability/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/^Scope$/i)).not.toBeInTheDocument();
     });
   });
 
   describe("when only an org is present (no team)", () => {
-    it("renders Project and Organization but not Team", () => {
+    it("exposes Project and Organization entries but not Team", async () => {
+      const user = userEvent.setup();
+
       render(
         <Wrapper>
           <ProviderScopeSection
@@ -243,15 +256,19 @@ describe("ProviderScopeSection", () => {
             provider={newProvider}
             teamId={undefined}
             organizationId="org_1"
+            organizationName="acme"
+            projectId="proj_1"
+            projectName="web-app"
           />
         </Wrapper>,
       );
 
-      const radios = screen.getAllByRole("radio");
-      const radioLabels = radios.map((r) => r.getAttribute("value"));
-      expect(radioLabels).toContain("PROJECT");
-      expect(radioLabels).toContain("ORGANIZATION");
-      expect(radioLabels).not.toContain("TEAM");
+      await user.click(screen.getByRole("combobox"));
+      const options = await screen.findAllByRole("option");
+      const labels = options.map((el) => el.textContent ?? "");
+      expect(labels.some((l) => /acme/i.test(l))).toBe(true);
+      expect(labels.some((l) => /web-app/i.test(l))).toBe(true);
+      expect(labels.some((l) => /^Team$/i.test(l))).toBe(false);
     });
   });
 });
