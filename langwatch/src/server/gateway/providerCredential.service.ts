@@ -13,6 +13,7 @@ import {
 import { TRPCError } from "@trpc/server";
 
 import { GatewayAuditLogRepository } from "./auditLog.repository";
+import { serializeRowForAudit } from "./auditSerializer";
 import { ChangeEventRepository } from "./changeEvent.repository";
 
 export type GatewayProviderCredentialRow = GatewayProviderCredential & {
@@ -123,7 +124,7 @@ export class GatewayProviderCredentialService {
           action: "PROVIDER_BINDING_CREATED",
           targetKind: "provider_binding",
           targetId: row.id,
-          after: JSON.parse(JSON.stringify(row)),
+          after: serializeRowForAudit(row),
         },
         tx,
       );
@@ -138,7 +139,7 @@ export class GatewayProviderCredentialService {
     if (!existing) {
       throw new TRPCError({ code: "NOT_FOUND" });
     }
-    const before = JSON.parse(JSON.stringify(existing));
+    const before = serializeRowForAudit(existing);
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.gatewayProviderCredential.update({
@@ -193,7 +194,7 @@ export class GatewayProviderCredentialService {
           targetKind: "provider_binding",
           targetId: updated.id,
           before,
-          after: JSON.parse(JSON.stringify(updated)),
+          after: serializeRowForAudit(updated),
         },
         tx,
       );
@@ -209,7 +210,7 @@ export class GatewayProviderCredentialService {
   }): Promise<GatewayProviderCredentialRow> {
     const existing = await this.getById(args.id, args.projectId);
     if (!existing) throw new TRPCError({ code: "NOT_FOUND" });
-    const before = JSON.parse(JSON.stringify(existing));
+    const before = serializeRowForAudit(existing);
 
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.gatewayProviderCredential.update({
@@ -235,7 +236,7 @@ export class GatewayProviderCredentialService {
           targetKind: "provider_binding",
           targetId: updated.id,
           before,
-          after: JSON.parse(JSON.stringify(updated)),
+          after: serializeRowForAudit(updated),
         },
         tx,
       );

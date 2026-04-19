@@ -9,7 +9,6 @@
  */
 import type { Context } from "hono";
 import { Hono } from "hono";
-import { makeSignature } from "better-auth/crypto";
 import { auth } from "~/server/better-auth";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { getServerAuthSession } from "~/server/auth";
@@ -151,84 +150,6 @@ const logoutHandler = async (c: Context) => {
 
 app.get("/auth/logout", logoutHandler);
 app.post("/auth/logout", logoutHandler);
-
-// ---------- GET /api/auth/dev-bypass ----------
-/**
- * Development-only backdoor that mints a BetterAuth-compatible session for a
- * deterministic dev user, skipping the configured SSO provider. Doubly-gated:
- * the route returns 404 unless BOTH `NODE_ENV === "development"` AND
- * `LOCAL_DEV_BYPASS_AUTH === "true"`. No behavior leaks to production even if
- * an operator accidentally sets the flag.
- *
- * Inserts `dev@localhost.langwatch.ai` + a fresh `Session` row whose
- * `sessionToken` is written to the `better-auth.session_token` cookie —
- * `auth.api.getSession` already looks that table up by cookie value, so
- * every downstream auth check (tRPC, Hono middleware) works unchanged.
- *
- * Kept under /api/auth/* because the existing origin gate and cookie-clearing
- * logout logic already cover this path.
- */
-app.get("/auth/dev-bypass", async (c) => {
-  if (
-    env.NODE_ENV !== "development" ||
-    env.LOCAL_DEV_BYPASS_AUTH !== "true"
-  ) {
-    return c.json({ error: "not_found" }, 404);
-  }
-
-  const DEV_EMAIL = "dev@localhost.langwatch.ai";
-  const user = await prisma.user.upsert({
-    where: { email: DEV_EMAIL },
-    update: {},
-    create: {
-      email: DEV_EMAIL,
-      name: "Local Dev User",
-      emailVerified: true,
-    },
-  });
-
-  // Create the session through BetterAuth's internal adapter so the row it
-  // writes matches what `auth.api.getSession` expects (hashed token in DB,
-  // plaintext token inside the signed cookie). Signing the cookie manually
-  // below with makeSignature produces the exact `<token>.<signature>` shape
-  // BetterAuth validates on every request.
-  const ctx = await auth.$context;
-  const session = await ctx.internalAdapter.createSession(user.id);
-  if (!session) {
-    return c.json(
-      {
-        error: {
-          type: "internal_error",
-          code: "session_create_failed",
-          message: "failed to create dev session",
-        },
-      },
-      500,
-    );
-  }
-
-  const signed = `${session.token}.${await makeSignature(session.token, ctx.secret)}`;
-  const cookieConfig = ctx.authCookies.sessionToken;
-  const cookieFlags = [
-    `${cookieConfig.name}=${encodeURIComponent(signed)}`,
-    `Path=${cookieConfig.attributes.path ?? "/"}`,
-    `Max-Age=${cookieConfig.attributes.maxAge ?? 24 * 60 * 60}`,
-  ];
-  if (cookieConfig.attributes.httpOnly ?? true) cookieFlags.push("HttpOnly");
-  const sameSite = cookieConfig.attributes.sameSite ?? "Lax";
-  cookieFlags.push(
-    `SameSite=${sameSite.charAt(0).toUpperCase()}${sameSite.slice(1)}`,
-  );
-  if (cookieConfig.attributes.secure) cookieFlags.push("Secure");
-  c.header("Set-Cookie", cookieFlags.join("; "));
-
-  logger.warn(
-    { userId: user.id, email: DEV_EMAIL, sessionId: session.id },
-    "LOCAL_DEV_BYPASS_AUTH issued a session — development only",
-  );
-  const redirectTo = c.req.query("redirect") ?? "/";
-  return c.redirect(redirectTo, 302);
-});
 
 // ---------- /api/auth/* catch-all (BetterAuth) ----------
 app.all("/auth/*", async (c) => {
