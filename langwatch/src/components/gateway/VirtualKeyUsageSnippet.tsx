@@ -44,6 +44,14 @@ type Language = "python" | "typescript" | "bash";
  * the post-create secret-reveal dialog + the VK detail page so the
  * copy-secret → first-request path has no dead ends.
  */
+// Snippets default to the bare model name (`gpt-5-mini`) — matches
+// the OpenAI-SDK drop-in replacement story that's the primary value
+// prop for the gateway. `provider/model` form is still accepted at
+// dispatch time as the explicit disambiguator for multi-provider VKs
+// (see ai-gateway/model-aliases docs) but isn't what we want a new
+// user to copy-paste, because single-provider VKs would forward the
+// prefix upstream and get 4xx. Closes @ariana #63/#64/#66, @rchaves
+// hands-on dogfood finding.
 export function VirtualKeyUsageSnippet({
   secret,
   gatewayBaseUrl,
@@ -57,7 +65,7 @@ export function VirtualKeyUsageSnippet({
   -H "Authorization: Bearer ${credential}" \\
   -H "Content-Type: application/json" \\
   -d '{
-    "model": "openai/gpt-5-mini",
+    "model": "gpt-5-mini",
     "messages": [{"role": "user", "content": "Hello"}]
   }'`;
 
@@ -69,7 +77,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="openai/gpt-5-mini",
+    model="gpt-5-mini",
     messages=[{"role": "user", "content": "Hello"}],
 )
 print(response.choices[0].message.content)`;
@@ -82,7 +90,7 @@ const client = new OpenAI({
 });
 
 const response = await client.chat.completions.create({
-  model: "openai/gpt-5-mini",
+  model: "gpt-5-mini",
   messages: [{ role: "user", content: "Hello" }],
 });
 console.log(response.choices[0].message.content);`;
