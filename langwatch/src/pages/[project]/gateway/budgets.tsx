@@ -20,6 +20,7 @@ import { BudgetCreateDrawer } from "~/components/gateway/BudgetCreateDrawer";
 import { BudgetEditDrawer } from "~/components/gateway/BudgetEditDrawer";
 import { ConfirmDialog } from "~/components/gateway/ConfirmDialog";
 import { GatewayLayout } from "~/components/gateway/GatewayLayout";
+import { Link } from "~/components/ui/link";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { Menu } from "~/components/ui/menu";
 import { toaster } from "~/components/ui/toaster";
@@ -140,7 +141,12 @@ function BudgetsPage() {
                     <Table.Row key={b.id}>
                       <Table.Cell>
                         <VStack align="start" gap={0}>
-                          <Text fontWeight="medium">{b.name}</Text>
+                          <Link
+                            href={`/${project?.slug}/gateway/budgets/${b.id}`}
+                            color="orange.600"
+                          >
+                            <Text fontWeight="medium">{b.name}</Text>
+                          </Link>
                           {b.description && (
                             <Text fontSize="xs" color="fg.muted">
                               {b.description}
