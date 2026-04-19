@@ -121,8 +121,11 @@ Findings surfaced during the dogfood round, all closed in-session:
 ## Outstanding for v1.1 (post-GA)
 
 - `specs/ai-gateway/advanced-routing.feature` — weighted / canary / sticky-session / composable routing (competitive gap vs Portkey).
-- Semantic caching.
+- Semantic caching (`specs/ai-gateway/semantic-caching.feature` spec already drafted).
 - Per-org `/changes` scoping (waiting on JWT-derived org_id).
+- **ClickHouse replication of `GatewayBudgetLedger`** — stream debits from Postgres (authoritative writer, idempotent via `(budgetId, gatewayRequestId)`) to a ClickHouse `gateway_debits` table via the existing event-sourcing pipeline. Shifts `/gateway/usage` OLAP reads off Postgres and makes per-VK/per-day/per-model aggregations constant-time at scale. Budget precheck stays on Postgres for strong consistency. Rationale: at 5k RPS sustained the PG ledger grows ~432M rows/day; CH is the structurally-correct store for time-series aggregation reads.
+- **Unify `GatewayAuditLog` into the platform's global `AuditLog` table** — one audit surface at `/settings/audit-log` filtered by resource type rather than two distinct ledgers. Needs schema change + write-path update in 3 services (VK / budget / provider) + one-shot backfill of existing rows.
+- **Global `Gateway Settings` page** — fleet-level overrides (default cache policy, default fail-open posture, default fallback chain template) that apply across every VK in a project, not per-VK config. Punted from v1 scope since "per-VK beats global" is our current stance; re-evaluate if operators ask for org-wide defaults.
 
 ## Contributors (parallel ralph-loop agents)
 
