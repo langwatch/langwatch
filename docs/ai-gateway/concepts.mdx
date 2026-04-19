@@ -85,6 +85,25 @@ Ordered list of provider credentials (not models) to try on failure. Triggered b
 
 For streaming: if the primary fails **before the first chunk**, fallback is transparent. Once chunks have started flowing, the stream stays on the original provider — otherwise the client would see a Frankenstein stream.
 
+## Provider binding
+
+A **Provider binding** (`GatewayProviderCredential`) is the gateway-level layer between a **ModelProvider** (where the actual API key lives) and a **virtual key** (where the caller sees the binding). The binding carries gateway-specific settings that don't belong on the underlying credential:
+
+- **Slot name** — the logical tag a VK references in its fallback chain (`primary`, `fallback-1`, `eu-region`, `canary`).
+- **Rate limits** — per-binding RPM + RPD caps that apply BEFORE upstream provider limits.
+- **Fallback priority** — global ordering across all bindings in a project.
+
+One ModelProvider can back many bindings (e.g. the same OpenAI credential under `primary` + `canary` slots, each with different rate limits). Bindings live at the project scope; the underlying ModelProvider may live at org / team / project scope (see [Provider Bindings → Scope & access](/ai-gateway/provider-bindings#scope--access)).
+
+## Cache rule
+
+A **Cache rule** (`GatewayCacheRule`) is an org-scoped operator override that changes cache behaviour without touching client code. Rules are evaluated in priority order (highest-first); the first match wins. Each rule has:
+
+- **Matchers** (ANDed within a rule): `vk_id`, `vk_tags`, `vk_prefix`, `principal_id`, `model`, `request_metadata`.
+- **Action**: `force` / `respect` / `disable`, with optional `ttl_seconds` and `action_metadata`.
+
+Precedence, from highest to lowest: per-request `X-LangWatch-Cache` header → matching rule → VK default `config.cache.mode`. Rules compile into the VK bundle at `/changes-refresh` time so the hot path stays at the ~700 ns target.
+
 ## Caching passthrough
 
 By default the gateway forwards Anthropic `cache_control` blocks, OpenAI cached-prompt markers, and Gemini implicit caches **byte-identically**. This is load-bearing — prompt caching saves up to 90% on input tokens, and the moment the gateway starts reformatting payloads you lose it.
