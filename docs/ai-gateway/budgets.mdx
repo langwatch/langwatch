@@ -114,14 +114,22 @@ Cache reads / writes are priced **separately** per provider — Anthropic cache 
 
 ## Viewing budget spend (UI)
 
-The **/gateway/budgets** list shows every budget with a utilization bar + hard cap + remaining. Clicking a row opens **/gateway/budgets/[id]** (Lane B iter 18.2, `f85319cc7`) — a detail page mirroring the VK detail page's layout:
+The **/gateway/budgets** list shows every budget with a utilization bar + hard cap + remaining. Iter 66+69 polish:
 
+- **Spent/Limit column** carries a colored progress bar AND a matching %-badge (🟢 green ≤ 50%, 🟠 orange 50-80%, 🔴 red ≥ 80%/100%) — scanning "which budgets are hot" is a one-glance read, not a mental-math exercise.
+- **Window column** wraps `hour` / `day` / `week` / `month` / `total` in a subtle gray identifier badge matching the rest of the product.
+- **Resets column** shows a humanised relative time ("in 3 days" / "in 11 hours" / "in 15 minutes") with a hover Tooltip for the exact UTC timestamp. TOTAL-window budgets render a muted `never`.
+- **Scope column** resolves the raw scope id into the target's human name + link (iter 69 `a105b0104`): `organization acme-demo`, `team platform`, `virtual_key prod-openai` with a link to the VK detail page, `principal user@example.com`. Resolution is batched in a single findMany per scope type so the column adds no per-row DB cost.
+
+Clicking a row opens **/gateway/budgets/[id]** (Lane B iter 18.2, `f85319cc7`) — a detail page mirroring the VK detail page's layout:
+
+- **Header action bar**: **Audit history** (deep-links into `/gateway/audit?targetKind=budget&targetId=<budget_id>` pre-filtered to this budget's events, iter 68 `061dcc22f`; stays visible on archived budgets so forensic investigations can start from the archived state, iter 69 `1e64e140f`), **Edit**, **Archive**.
 - **Utilization header**: hard cap, spent, remaining, `on_breach` mode.
 - **Identity**: name, description, window, timezone, created/updated timestamps.
-- **Resolved scope target**: if `scope.kind = VIRTUAL_KEY`, links to the VK detail page. Similar resolution for `ORGANIZATION` / `TEAM` / `PROJECT` / `PRINCIPAL` — each scope kind surfaces the human name of the target rather than just an id.
-- **Recent 20 debits**: each row shows timestamp, amount, originating VK (deep-linked to the VK detail page), and the `gateway_request_id` for trace search.
+- **Resolved scope target**: same resolution as the list Scope column, plus a full-width link card to the target resource.
+- **Recent 20 debits**: each row shows When (humanised relative + hover-for-exact, iter 67 `4ee9f23ee`), Amount (smart-decimals — shows `$0.0183` not `$0.02`), Model, originating VK (deep-linked to the VK detail page), and the `gateway_request_id` for trace search.
 
-Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys" (Lane B iter 18.1, `3cb7a401a`). The sparkline is gated on ≥ 2 data buckets so the 24 h preset doesn't render a single-point chart.
+Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys" (Lane B iter 18.1, `3cb7a401a`). The sparkline is gated on ≥ 2 data buckets so the 24 h preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page (iter 68 `1bc0c334f`) for drill-down.
 
 Programmatic equivalent:
 
