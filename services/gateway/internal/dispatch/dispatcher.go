@@ -734,9 +734,18 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	// the bare name differs from the request's model string.
 	body = rewriteRequestModel(body, parsed.Model, resolved.Model)
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrModel, resolved.Model)
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIRequestModel, resolved.Model)
+	gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAISystem, string(resolved.Provider))
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrProvider, string(resolved.Provider))
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrModelSource, string(resolved.Source))
 	gwotel.AddBoolAttr(r.Context(), gwotel.AttrStreaming, parsed.Stream)
+	// Payload capture: stamp the request messages as
+	// gen_ai.input.messages so the trace pipeline hoists them into
+	// the trace's Input column. ADR-017 v1 scope — gated only by
+	// payload length (see capacity clamp in AddStringAttr-callers).
+	if len(parsed.Messages) > 0 {
+		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIInputMessages, string(parsed.Messages))
+	}
 
 	// Budget precheck against cached snapshot. This is intentionally
 	// permissive when snapshots drift (stale spent_usd from concurrent
@@ -818,6 +827,12 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	gwotel.AddFloatAttr(r.Context(), gwotel.AttrCostUSD, cost)
 	gwotel.AddInt64Attr(r.Context(), gwotel.AttrDurationMS, time.Since(t0).Milliseconds())
 	gwotel.AddStringAttr(r.Context(), gwotel.AttrStatus, "success")
+	if outMsgs := extractOutputMessages(resp); outMsgs != "" {
+		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIOutputMessages, outMsgs)
+	}
+	if resp != nil && resp.Model != "" {
+		gwotel.AddStringAttr(r.Context(), gwotel.AttrGenAIResponseModel, resp.Model)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("X-LangWatch-Provider", string(resolved.Provider))
@@ -1060,6 +1075,49 @@ func extractUsage(resp *bfschemas.BifrostChatResponse) (in, out, cr, cw int, cos
 		cw = d.CachedWriteTokens
 	}
 	return
+}
+
+// extractOutputMessages marshals response choices into the
+// gen_ai.output.messages attribute payload. Returns "" when nothing
+// was captured (no choices / marshal failure) so the caller skips
+// stamping rather than emitting noise.
+//
+// Shape is compatible with the LangWatch canonicaliser's
+// chat_messages extraction (see genAi.ts extractor rules §214-223):
+// each entry is a JSON object with {role, content}.
+func extractOutputMessages(resp *bfschemas.BifrostChatResponse) string {
+	if resp == nil || len(resp.Choices) == 0 {
+		return ""
+	}
+	type outMsg struct {
+		Role         string `json:"role"`
+		Content      string `json:"content,omitempty"`
+		FinishReason string `json:"finish_reason,omitempty"`
+	}
+	msgs := make([]outMsg, 0, len(resp.Choices))
+	for _, ch := range resp.Choices {
+		if ch.ChatNonStreamResponseChoice == nil || ch.ChatNonStreamResponseChoice.Message == nil {
+			continue
+		}
+		m := ch.ChatNonStreamResponseChoice.Message
+		content := ""
+		if m.Content != nil && m.Content.ContentStr != nil {
+			content = *m.Content.ContentStr
+		}
+		finish := ""
+		if ch.FinishReason != nil {
+			finish = *ch.FinishReason
+		}
+		msgs = append(msgs, outMsg{Role: string(m.Role), Content: content, FinishReason: finish})
+	}
+	if len(msgs) == 0 {
+		return ""
+	}
+	b, err := json.Marshal(msgs)
+	if err != nil {
+		return ""
+	}
+	return string(b)
 }
 
 // extractChunkDeltaText pulls the incremental text fragment from a
