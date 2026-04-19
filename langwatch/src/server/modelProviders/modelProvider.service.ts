@@ -23,6 +23,14 @@ export type UpdateModelProviderInput = {
   customEmbeddingsModels?: CustomModelsInput | null;
   extraHeaders?: { key: string; value: string }[] | null;
   defaultModel?: string;
+  /**
+   * Principal-style scope. When omitted, creates default to
+   * scopeType='PROJECT' / scopeId=projectId for backward compat;
+   * updates leave the existing row's scope untouched. Callers that
+   * want to create a team/org-scoped row set both fields.
+   */
+  scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId?: string;
 };
 
 export type DeleteModelProviderInput = {
@@ -174,6 +182,8 @@ export class ModelProviderService {
             customModels: customModels ?? undefined,
             customEmbeddingsModels: customEmbeddingsModels ?? undefined,
             extraHeaders: extraHeaders ?? [],
+            scopeType: input.scopeType,
+            scopeId: input.scopeId,
           },
           validatedKeys,
           customKeysProvided,
@@ -458,6 +468,8 @@ export class ModelProviderService {
       customModels?: CustomModelsInput;
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
+      scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+      scopeId?: string;
     },
     validatedKeys: Record<string, unknown> | null,
     customKeysProvided: boolean,
@@ -471,6 +483,8 @@ export class ModelProviderService {
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
         extraHeaders: data.extraHeaders,
+        scopeType: data.scopeType,
+        scopeId: data.scopeId,
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
       },
