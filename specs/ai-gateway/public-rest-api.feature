@@ -93,6 +93,88 @@ Feature: Public REST API — /api/gateway/v1/*
       | POST   | /api/gateway/v1/budgets                       | gatewayBudgets:create      |
       | PATCH  | /api/gateway/v1/budgets/:id                   | gatewayBudgets:update      |
       | DELETE | /api/gateway/v1/budgets/:id                   | gatewayBudgets:delete      |
+      | GET    | /api/gateway/v1/cache-rules                   | gatewayCacheRules:view     |
+      | POST   | /api/gateway/v1/cache-rules                   | gatewayCacheRules:create   |
+      | GET    | /api/gateway/v1/cache-rules/:id               | gatewayCacheRules:view     |
+      | PATCH  | /api/gateway/v1/cache-rules/:id               | gatewayCacheRules:update   |
+      | DELETE | /api/gateway/v1/cache-rules/:id               | gatewayCacheRules:delete   |
+
+  # ============================================================================
+  # Cache rules (Lane B iter 41 — 547f96bdd)
+  # ============================================================================
+
+  @integration @rest @cache-rules
+  Scenario: List cache rules returns priority DESC and excludes archived
+    Given cache rules in the org:
+      | name      | priority | enabled | archived |
+      | high-pri  | 200      | true    | false    |
+      | low-pri   | 100      | true    | false    |
+      | archived  | 150      | true    | true     |
+    When I send `GET /api/gateway/v1/cache-rules`
+    Then the response status is 200
+    And the body.data array has length 2 (archived excluded)
+    And the rows are ordered by priority DESC: high-pri, low-pri
+
+  @integration @rest @cache-rules
+  Scenario: Create a cache rule returns 201 with created row (matches budgets pattern)
+    When I send `POST /api/gateway/v1/cache-rules` with body:
+      """
+      {
+        "name": "prod-force-cache",
+        "priority": 500,
+        "matchers": { "vk_tags": ["env=prod"], "model": "gpt-5-mini" },
+        "action":   { "mode": "force", "ttl": 300 }
+      }
+      """
+    Then the response status is 201
+    And body.id has prefix "gcr_"
+    And body.mode_enum = "FORCE"
+    # mode_enum is upper-case on wire for Prometheus label filtering convenience;
+    # action.mode remains lowercase (matches Kind enum in cacheoverride package).
+    And body.archived_at is null
+    And a GatewayChangeEvent (CACHE_RULE_CREATED) was emitted
+
+  @integration @rest @cache-rules
+  Scenario: PATCH replaces matchers/action when provided (NOT field-merged)
+    Given an existing rule with matchers {vk_tags: ["env=prod"], model: "gpt-5-mini"}
+    When I send `PATCH /api/gateway/v1/cache-rules/:id` with body:
+      """
+      { "matchers": { "model": "claude-haiku-*" } }
+      """
+    Then the response status is 200
+    And body.matchers equals exactly {"model": "claude-haiku-*"}
+    # The vk_tags field was NOT kept — PATCH on matchers/action is REPLACE semantics.
+    # Name, description, priority, enabled are field-level patches (merge).
+
+  @integration @rest @cache-rules
+  Scenario: DELETE is a soft archive and returns the archived row (not 204)
+    Given an existing rule "rule_xxx"
+    When I send `DELETE /api/gateway/v1/cache-rules/rule_xxx`
+    Then the response status is 200
+    And body.archived_at is a non-null ISO-8601 timestamp
+    And a GatewayChangeEvent (CACHE_RULE_DELETED) was emitted
+    # CLI scripts can confirm the archivedAt from the response without a re-GET.
+
+  @integration @rest @cache-rules
+  Scenario: GET /:id returns 404 for archived rules
+    Given rule "rule_archived" was deleted 1 hour ago
+    When I send `GET /api/gateway/v1/cache-rules/rule_archived`
+    Then the response status is 404
+    And error.type = "not_found"
+
+  @integration @rest @cache-rules
+  Scenario: PAT without gatewayCacheRules:create cannot POST
+    Given a PAT "lwp_ro" with only gatewayCacheRules:view
+    When they send `POST /api/gateway/v1/cache-rules` with PAT "lwp_ro"
+    Then the response status is 403 permission_denied
+    And error.code references "gatewayCacheRules:create"
+
+  @integration @rest @cache-rules
+  Scenario: OpenAPI schema tags all cache-rules routes under "Cache Rules"
+    Given the OpenAPI spec at /api/gateway/v1/openapi.json
+    When I inspect paths for /cache-rules and /cache-rules/{id}
+    Then every operation has tag "Cache Rules"
+    And every operation has a `security` requirement naming the Bearer token
 
   # ============================================================================
   # Virtual keys
