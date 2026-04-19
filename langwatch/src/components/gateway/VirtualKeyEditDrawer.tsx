@@ -23,6 +23,8 @@ import { api } from "~/utils/api";
 
 type BlockedPattern = { deny: string[]; allow: string[] | null };
 
+type GuardrailRef = { id: string; evaluator: string };
+
 type VirtualKeyDetail = {
   id: string;
   projectId: string;
@@ -45,7 +47,37 @@ type VirtualKeyDetail = {
       urls?: BlockedPattern;
       models?: BlockedPattern;
     };
+    guardrails?: {
+      pre?: GuardrailRef[];
+      post?: GuardrailRef[];
+      streamChunk?: GuardrailRef[];
+      requestFailOpen?: boolean;
+      responseFailOpen?: boolean;
+    };
   };
+};
+
+type GuardrailDirection = "pre" | "post" | "streamChunk";
+
+const GUARDRAIL_DIRECTION_META: Record<
+  GuardrailDirection,
+  { label: string; description: string }
+> = {
+  pre: {
+    label: "Request (pre)",
+    description:
+      "Runs on inbound request body. Block → 403 guardrail_blocked before any provider call. Fail-closed by default (503 guardrail_upstream_unavailable); toggle fail-open below to allow on evaluator timeout.",
+  },
+  post: {
+    label: "Response (post)",
+    description:
+      "Runs on assistant text before the client sees it. Block → 403 + zero-cost debit. Modify → in-place redaction. Fail-closed by default.",
+  },
+  streamChunk: {
+    label: "Stream chunk",
+    description:
+      "Runs per visible delta on SSE responses (role-only/tool-call/usage frames skip). Block → terminal SSE event:error with code=stream_chunk_blocked. Timeout/error always fail-open per contract (50ms budget).",
+  },
 };
 
 type Dimension = "tools" | "mcp" | "urls" | "models";
@@ -113,6 +145,11 @@ export function VirtualKeyEditDrawer({
     urls: { deny: "", allow: "" },
     models: { deny: "", allow: "" },
   });
+  const [guardrails, setGuardrails] = useState<
+    Record<GuardrailDirection, GuardrailRef[]>
+  >({ pre: [], post: [], streamChunk: [] });
+  const [requestFailOpen, setRequestFailOpen] = useState(false);
+  const [responseFailOpen, setResponseFailOpen] = useState(false);
 
   useEffect(() => {
     if (!vk) return;
@@ -149,6 +186,14 @@ export function VirtualKeyEditDrawer({
         allow: (bp.models?.allow ?? []).join("\n"),
       },
     });
+    const gr = vk.config.guardrails ?? {};
+    setGuardrails({
+      pre: gr.pre ?? [],
+      post: gr.post ?? [],
+      streamChunk: gr.streamChunk ?? [],
+    });
+    setRequestFailOpen(gr.requestFailOpen ?? false);
+    setResponseFailOpen(gr.responseFailOpen ?? false);
   }, [vk]);
 
   const parseLines = (value: string): string[] =>
@@ -178,6 +223,30 @@ export function VirtualKeyEditDrawer({
     { projectId },
     { enabled: !!vk && !!projectId },
   );
+  const monitorsQuery = api.monitors.getAllForProject.useQuery(
+    { projectId },
+    { enabled: !!vk && !!projectId },
+  );
+  const availableMonitors = useMemo(() => {
+    return (monitorsQuery.data ?? [])
+      .filter((m: any) => m.enabled && m.executionMode === "AS_GUARDRAIL")
+      .map((m: any) => ({ id: m.id, evaluator: m.checkType, name: m.name }));
+  }, [monitorsQuery.data]);
+  const toggleGuardrail = (
+    direction: GuardrailDirection,
+    monitor: { id: string; evaluator: string },
+  ) => {
+    setGuardrails((prev) => {
+      const existing = prev[direction];
+      const present = existing.some((g) => g.id === monitor.id);
+      return {
+        ...prev,
+        [direction]: present
+          ? existing.filter((g) => g.id !== monitor.id)
+          : [...existing, { id: monitor.id, evaluator: monitor.evaluator }],
+      };
+    });
+  };
   const updateMutation = api.virtualKeys.update.useMutation({
     onSuccess: async () => {
       await utils.virtualKeys.list.invalidate({ projectId });
@@ -255,6 +324,13 @@ export function VirtualKeyEditDrawer({
             rpd: rpd ? Number.parseInt(rpd, 10) : null,
           },
           blockedPatterns: buildBlockedPatterns(),
+          guardrails: {
+            pre: guardrails.pre,
+            post: guardrails.post,
+            streamChunk: guardrails.streamChunk,
+            requestFailOpen,
+            responseFailOpen,
+          },
         },
       });
       onSaved();
@@ -588,11 +664,111 @@ export function VirtualKeyEditDrawer({
               </Box>
             ))}
 
+            <Separator />
+            <Text fontSize="sm" fontWeight="semibold">
+              Guardrails
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Attach project-level guardrail monitors (marked "as guardrail"
+              in Evaluations) to run on each direction. Fan-out is parallel
+              with first-block short-circuit.
+            </Text>
+            {availableMonitors.length === 0 ? (
+              <Text fontSize="sm" color="fg.muted">
+                No guardrail monitors configured. Create one in{" "}
+                <strong>Evaluations</strong> with execution mode{" "}
+                <Code fontSize="xs">AS_GUARDRAIL</Code> to attach it here.
+              </Text>
+            ) : (
+              (["pre", "post", "streamChunk"] as GuardrailDirection[]).map(
+                (direction) => (
+                  <Box key={direction}>
+                    <Text fontSize="sm" fontWeight="medium" mb={1}>
+                      {GUARDRAIL_DIRECTION_META[direction].label}
+                    </Text>
+                    <Text fontSize="xs" color="fg.muted" mb={2}>
+                      {GUARDRAIL_DIRECTION_META[direction].description}
+                    </Text>
+                    <VStack align="stretch" gap={1}>
+                      {availableMonitors.map((monitor) => {
+                        const selected = guardrails[direction].some(
+                          (g) => g.id === monitor.id,
+                        );
+                        return (
+                          <HStack
+                            key={monitor.id}
+                            border="1px solid"
+                            borderColor={
+                              selected ? "orange.400" : "border.subtle"
+                            }
+                            borderRadius="md"
+                            paddingX={3}
+                            paddingY={2}
+                            cursor="pointer"
+                            onClick={() => toggleGuardrail(direction, monitor)}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={selected}
+                              readOnly
+                            />
+                            <VStack align="start" gap={0}>
+                              <Text fontSize="sm" fontWeight="medium">
+                                {monitor.name}
+                              </Text>
+                              <Text fontSize="xs" color="fg.muted">
+                                <Code fontSize="2xs">{monitor.evaluator}</Code>
+                              </Text>
+                            </VStack>
+                          </HStack>
+                        );
+                      })}
+                    </VStack>
+                  </Box>
+                ),
+              )
+            )}
+            <HStack gap={4} align="flex-start">
+              <Field.Root flex={1}>
+                <HStack>
+                  <input
+                    type="checkbox"
+                    id="vk-request-fail-open"
+                    checked={requestFailOpen}
+                    onChange={(e) => setRequestFailOpen(e.target.checked)}
+                  />
+                  <label htmlFor="vk-request-fail-open">
+                    <Text fontSize="sm">Allow request on evaluator error</Text>
+                  </label>
+                </HStack>
+                <Field.HelperText>
+                  Default: block. Enable to treat evaluator timeout/upstream
+                  error as allow-with-warn-log on the pre direction.
+                </Field.HelperText>
+              </Field.Root>
+              <Field.Root flex={1}>
+                <HStack>
+                  <input
+                    type="checkbox"
+                    id="vk-response-fail-open"
+                    checked={responseFailOpen}
+                    onChange={(e) => setResponseFailOpen(e.target.checked)}
+                  />
+                  <label htmlFor="vk-response-fail-open">
+                    <Text fontSize="sm">Allow response on evaluator error</Text>
+                  </label>
+                </HStack>
+                <Field.HelperText>
+                  Same semantic for the post direction. stream_chunk is always
+                  fail-open per contract (50ms budget).
+                </Field.HelperText>
+              </Field.Root>
+            </HStack>
+
             <Box paddingTop={2}>
               <Text fontSize="xs" color="fg.muted">
-                Advanced controls (guardrails, fallback triggers, principal
-                binding) are editable via the REST/CLI until a dedicated tab
-                lands.
+                Advanced controls (fallback triggers, principal binding) are
+                editable via the REST/CLI until a dedicated tab lands.
               </Text>
             </Box>
           </VStack>
