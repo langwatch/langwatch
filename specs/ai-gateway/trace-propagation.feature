@@ -41,23 +41,53 @@ Feature: Gateway trace propagation (W3C + LangWatch)
     When the provider returns a successful response
     Then the span has attribute "langwatch.model" = "gpt-5-mini"
     And the span has attribute "langwatch.provider" = "openai"
-    And the span has attribute "langwatch.usage.input_tokens" set to the provider-reported count
-    And the span has attribute "langwatch.usage.output_tokens" set to the provider-reported count
+    And the span has attribute "gen_ai.usage.input_tokens" set to the provider-reported count
+    And the span has attribute "gen_ai.usage.output_tokens" set to the provider-reported count
     And the span has attribute "langwatch.status" = "success"
 
-  Scenario: the router sends spans to a per-project OTLP endpoint
-    Given the gateway has OTLP endpoints configured per project:
-      | project_id | endpoint                                |
-      | proj_01    | https://otlp-a.example/v1/traces         |
-      | proj_02    | https://otlp-b.example/v1/traces         |
-    When the gateway finishes 3 spans tagged proj_01 and 2 spans tagged proj_02
-    Then 3 spans are exported to "https://otlp-a.example/v1/traces"
-    And 2 spans are exported to "https://otlp-b.example/v1/traces"
+  Scenario: cache-token breakdown on cache-hit responses (iters 40+41)
+    Given the request resolves to Anthropic and the request carries cache_control markers
+    When the provider returns a response reporting cache_read_input_tokens=1500 + cache_creation_input_tokens=0
+    Then the span has attribute "gen_ai.usage.cache_read.input_tokens" = 1500
+    And the span has attribute "gen_ai.usage.cache_creation.input_tokens" = 0
+    And the LangWatch ingest pipeline maps these onto the trace's cache_read_input_tokens / cache_creation_input_tokens fields (otel.traces.ts:951-967 + span.mapper.ts:284-288)
+    And the trace UI renders the cached-vs-fresh token split
 
-  Scenario: spans without a project_id fall back to the default endpoint
-    Given the gateway has a default OTLP endpoint configured
+  Scenario: OpenAI cache-hit reports via cached_tokens field
+    Given the request resolves to OpenAI gpt-5-mini
+    When the provider returns a response with usage.prompt_tokens_details.cached_tokens=800
+    Then Bifrost normalises that to PromptTokensDetails.CachedReadTokens=800
+    And the span has attribute "gen_ai.usage.cache_read.input_tokens" = 800
+    And cache_creation_input_tokens is unset (OpenAI has no write-to-cache dimension)
+
+  Scenario: responses with no cache usage have cache-token attrs at zero or unset
+    Given a response with no cache markers
+    When the span is finalised
+    Then "gen_ai.usage.cache_read.input_tokens" is 0 OR unset
+    And "gen_ai.usage.cache_creation.input_tokens" is 0 OR unset
+    And the span is still valid (never fails to export due to missing cache attrs)
+
+  Scenario: messages API (/v1/messages) also emits cache-token attrs (iter 41 bonus fix)
+    Given a request to /v1/messages that hits Anthropic cache
+    When the gateway records the span
+    Then the span has attribute "gen_ai.usage.cache_read.input_tokens" set to the Anthropic-reported count
+    And the same attribute naming contract holds as on /v1/chat/completions (no divergence between the two endpoints)
+
+  Scenario: per-tenant attribution happens at the ingest layer, not at export
+    Given the gateway has a SINGLE OTLP endpoint configured (GATEWAY_OTEL_DEFAULT_ENDPOINT)
+    When the gateway finishes 3 spans tagged "langwatch.project_id"=proj_01 and 2 spans tagged proj_02
+    Then all 5 spans are exported to the SAME endpoint
+    And LangWatch ingest reads "langwatch.project_id" on each span and files the trace under the owning project
+    And tenant A cannot see tenant B's traces in the LangWatch UI (project-scoped view enforces isolation)
+    # Note: pre-iter-25 the gateway had per-project OTLP routing via a customer-facing
+    # observability_endpoint override. That surface was removed since we sell observability
+    # and the attribution-at-ingest architecture is simpler + equally tenant-isolated.
+
+  Scenario: spans without a project_id fall back to the default LangWatch workspace
+    Given the gateway has GATEWAY_OTEL_DEFAULT_ENDPOINT configured
     When the gateway finishes a span that has no "langwatch.project_id" attribute
     Then the span is exported to the default endpoint
+    And ingest logs a warning (missing project_id on a production span is anomalous)
 
   Scenario: streaming requests still emit a single gateway span
     When the client calls POST /v1/chat/completions with "stream": true
