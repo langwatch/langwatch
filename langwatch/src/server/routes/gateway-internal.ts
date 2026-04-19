@@ -318,11 +318,15 @@ app.post("/resolve-key", async (c) => {
  */
 app.get("/config/:vk_id", async (c) => {
   const vkId = c.req.param("vk_id");
-  const vk = await prisma.virtualKey.findUnique({
+  // Two-step fetch avoids Prisma's `include` generating a nested
+  // findMany on GatewayProviderCredential that the multitenancy
+  // middleware rejects (no projectId in scope yet — VK IS what
+  // teaches us projectId). Step 1 uses the narrow findUnique
+  // exemption; step 2 scopes by the projectId we just learned.
+  const vkRow = await prisma.virtualKey.findUnique({
     where: { id: vkId },
-    include: { providerCredentials: { orderBy: { priority: "asc" } } },
   });
-  if (!vk) {
+  if (!vkRow) {
     return c.json(
       {
         error: {
@@ -334,6 +338,11 @@ app.get("/config/:vk_id", async (c) => {
       404,
     );
   }
+  const providerCredentials = await prisma.virtualKeyProviderCredential.findMany({
+    where: { virtualKeyId: vkRow.id },
+    orderBy: { priority: "asc" },
+  });
+  const vk = { ...vkRow, providerCredentials };
 
   const ifNoneMatch = c.req.header("If-None-Match");
   const currentRevision = vk.revision.toString();

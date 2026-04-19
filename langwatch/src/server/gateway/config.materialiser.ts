@@ -194,8 +194,13 @@ export class GatewayConfigMaterialiser {
     vk: VirtualKeyWithChain,
   ): Promise<ProviderRow[]> {
     if (vk.providerCredentials.length === 0) return [];
+    // projectId is threaded through so the multitenancy middleware's
+    // guard is satisfied without adding GatewayProviderCredential to
+    // EXEMPT_MODELS. The VK we were handed was already tenancy-checked
+    // upstream, so we narrow the projectId to vk.projectId explicitly.
     const rows = await this.prisma.gatewayProviderCredential.findMany({
       where: {
+        projectId: vk.projectId,
         id: { in: vk.providerCredentials.map((p) => p.providerCredentialId) },
       },
       include: { modelProvider: true },
