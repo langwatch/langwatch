@@ -94,6 +94,7 @@ export function FieldsFilters({
 	const filterKeys: FilterField[] = [
 		"traces.origin",
 		"metadata.prompt_ids",
+		"spans.type",
 		"spans.model",
 		"metadata.labels",
 		"evaluations.passed",
