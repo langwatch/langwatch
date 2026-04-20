@@ -4,6 +4,7 @@ import { checkApiKey } from "../utils/apiKey";
 import {
   createLangWatchApiClient,
 } from "@/internal/api/client";
+import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export const statusCommand = async (options?: { format?: string }): Promise<void> => {
@@ -18,7 +19,7 @@ export const statusCommand = async (options?: { format?: string }): Promise<void
 
   async function fetchCount(url: string): Promise<{ data: unknown; error?: unknown; status?: number }> {
     const response = await fetch(`${endpoint}${url}`, {
-      headers: { "X-Auth-Token": apiKey },
+      headers: buildAuthHeaders({ apiKey }),
     });
     if (!response.ok) {
       let body: unknown;

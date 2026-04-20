@@ -3,6 +3,7 @@ import ora from "ora";
 import { SuitesApiService } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const runSuiteCommand = async (
   id: string,
@@ -85,7 +86,7 @@ export const runSuiteCommand = async (
           `${endpoint}/api/scenario-events?batchRunId=${encodeURIComponent(result.batchRunId)}`,
           {
             method: "GET",
-            headers: { "X-Auth-Token": apiKey },
+            headers: buildAuthHeaders({ apiKey }),
           },
         );
 

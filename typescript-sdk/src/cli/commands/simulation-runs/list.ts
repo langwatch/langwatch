@@ -4,6 +4,7 @@ import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { formatRelativeTime } from "../../utils/formatting";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const listSimulationRunsCommand = async (options: {
   scenarioSetId?: string;
@@ -30,7 +31,7 @@ export const listSimulationRunsCommand = async (options: {
       `${endpoint}/api/simulation-runs?${params.toString()}`,
       {
         method: "GET",
-        headers: { "X-Auth-Token": apiKey },
+        headers: buildAuthHeaders({ apiKey }),
       },
     );
 

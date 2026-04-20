@@ -4,6 +4,7 @@ import fs from "fs";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const exportTracesCommand = async (options: {
   startDate?: string;
@@ -40,7 +41,7 @@ export const exportTracesCommand = async (options: {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Auth-Token": apiKey,
+        ...buildAuthHeaders({ apiKey }),
       },
       body: JSON.stringify({
         query: options.query,

@@ -2,6 +2,7 @@ import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const deleteTriggerCommand = async (
   id: string,
@@ -17,7 +18,7 @@ export const deleteTriggerCommand = async (
   try {
     const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
       method: "DELETE",
-      headers: { "X-Auth-Token": apiKey },
+      headers: buildAuthHeaders({ apiKey }),
     });
 
     if (!response.ok) {

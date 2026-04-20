@@ -3,6 +3,7 @@ import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const getMonitorCommand = async (
   id: string,
@@ -18,7 +19,7 @@ export const getMonitorCommand = async (
 
   try {
     const response = await fetch(`${endpoint}/api/monitors/${id}`, {
-      headers: { "X-Auth-Token": apiKey },
+      headers: buildAuthHeaders({ apiKey }),
     });
 
     if (!response.ok) {

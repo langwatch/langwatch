@@ -3,6 +3,7 @@ import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const createGraphCommand = async (
   name: string,
@@ -32,7 +33,7 @@ export const createGraphCommand = async (
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Auth-Token": apiKey,
+        ...buildAuthHeaders({ apiKey }),
       },
       body: JSON.stringify({
         name,

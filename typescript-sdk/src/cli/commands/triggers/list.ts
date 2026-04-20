@@ -4,6 +4,7 @@ import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const listTriggersCommand = async (options?: { format?: string }): Promise<void> => {
   checkApiKey();
@@ -15,7 +16,7 @@ export const listTriggersCommand = async (options?: { format?: string }): Promis
 
   try {
     const response = await fetch(`${endpoint}/api/triggers`, {
-      headers: { "X-Auth-Token": apiKey },
+      headers: buildAuthHeaders({ apiKey }),
     });
 
     if (!response.ok) {

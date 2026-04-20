@@ -1,4 +1,5 @@
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
+import { buildAuthHeaders } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 export interface MonitorResponse {
@@ -69,7 +70,7 @@ export class MonitorsApiService {
     const response = await fetch(`${this.endpoint}${path}`, {
       ...options,
       headers: {
-        "X-Auth-Token": this.apiKey,
+        ...buildAuthHeaders({ apiKey: this.apiKey }),
         "Content-Type": "application/json",
         ...options?.headers,
       },
