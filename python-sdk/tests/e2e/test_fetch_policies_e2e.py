@@ -44,20 +44,25 @@ def working_directory(path):
 CLI_EXECUTABLE = ["npx", "langwatch@latest"]
 
 
-def run_cli(command, cwd=None):
-    """Run a CLI command and return the result."""
-    try:
-        result = subprocess.run(
-            command, cwd=cwd, capture_output=True, text=True, check=True, timeout=60
-        )
-        return result.stdout
-    except subprocess.TimeoutExpired as e:
-        pytest.skip(f"CLI command timed out after {e.timeout}s: {' '.join(command)}")
-    except subprocess.CalledProcessError as e:
-        print(f"CLI command failed: {e}")
-        print(f"stdout: {e.stdout}")
-        print(f"stderr: {e.stderr}")
-        raise
+def run_cli(command, cwd=None, retries=2):
+    """Run a CLI command and return the result, retrying on timeout."""
+    last_err = None
+    for attempt in range(1 + retries):
+        try:
+            result = subprocess.run(
+                command, cwd=cwd, capture_output=True, text=True, check=True, timeout=60
+            )
+            return result.stdout
+        except subprocess.TimeoutExpired as e:
+            last_err = e
+            if attempt < retries:
+                time.sleep(2 ** attempt)
+        except subprocess.CalledProcessError as e:
+            print(f"CLI command failed: {e}")
+            print(f"stdout: {e.stdout}")
+            print(f"stderr: {e.stderr}")
+            raise
+    raise last_err
 
 
 @pytest.fixture

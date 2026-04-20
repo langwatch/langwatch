@@ -83,7 +83,7 @@ def _poll_run_results(
     experiment_slug: str,
     run_id: str,
     expected_items: int,
-    timeout: float = 60.0,
+    timeout: float = 120.0,
     interval: float = 2.0,
     require_cost: bool = False,
 ) -> dict:
@@ -99,7 +99,7 @@ def _poll_run_results(
     last_error: Exception | None = None
     while time.time() < deadline:
         try:
-            with httpx.Client(timeout=15) as client:
+            with httpx.Client(timeout=30) as client:
                 response = client.get(url, headers={"X-Auth-Token": api_key})
             if response.is_success:
                 last_body = response.json()
@@ -112,16 +112,6 @@ def _poll_run_results(
             # the deadline expires.
             last_error = exc
         time.sleep(interval)
-    # If the last error was a transient network issue (ReadTimeout, connection
-    # error), skip the test instead of hard-failing — the test logic itself is
-    # fine, it's the live endpoint that's slow/unreachable.
-    if last_error and any(
-        indicator in type(last_error).__name__ or indicator in str(last_error)
-        for indicator in ["Timeout", "ReadTimeout", "Connection", "ConnectError"]
-    ):
-        pytest.skip(
-            f"Skipping due to transient network issue polling {url}: {last_error!r}"
-        )
     raise AssertionError(
         f"Timed out after {timeout}s waiting for {expected_items} items "
         f"(saw {len(last_body.get('dataset', []))}) at {url}"
