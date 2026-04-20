@@ -50,8 +50,52 @@ function extractVariablesFromDSL({ dsl }: { dsl: WorkflowDSL }): {
 }
 
 /**
+ * Identifiers used by the blank template's entry output and end input.
+ * When the workflow still has these exact placeholder fields, the user has not
+ * yet designed their workflow, so auto-compute should be skipped.
+ */
+const BLANK_TEMPLATE_INPUT = "question";
+const BLANK_TEMPLATE_OUTPUT = "output";
+
+/**
+ * Returns true when the DSL still matches the blank-template placeholders
+ * exactly — i.e. the user has not customised their workflow yet.
+ */
+function isBlankTemplateDSL({
+  inputs,
+  outputs,
+}: {
+  inputs: Array<{ identifier: string }>;
+  outputs: Array<{ identifier: string }>;
+}): boolean {
+  return (
+    inputs.length === 1 &&
+    inputs[0]!.identifier === BLANK_TEMPLATE_INPUT &&
+    outputs.length === 1 &&
+    outputs[0]!.identifier === BLANK_TEMPLATE_OUTPUT
+  );
+}
+
+/**
+ * Returns true when the agent's existing scenarioMappings contain at least one
+ * key that no longer exists as a workflow input identifier (stale mapping).
+ */
+function hasStaleMappings({
+  existingMappings,
+  inputs,
+}: {
+  existingMappings: Record<string, unknown>;
+  inputs: Array<{ identifier: string }>;
+}): boolean {
+  const inputIdentifiers = new Set(inputs.map((i) => i.identifier));
+  return Object.keys(existingMappings).some((key) => !inputIdentifiers.has(key));
+}
+
+/**
  * Auto-computes and persists scenarioMappings for all workflow-linked agents that
- * have no mappings configured.
+ * have no mappings configured, or whose existing mappings reference stale fields.
+ *
+ * Skips agents whose workflow still matches the blank-template placeholders.
  *
  * Wrapped in try/catch so that any failure is logged and does not block the
  * calling workflow save.
@@ -81,6 +125,9 @@ export async function autoComputeAgentMappings({
 
     const { inputs, outputs } = extractVariablesFromDSL({ dsl });
 
+    // Skip auto-compute for blank-template placeholder workflows
+    if (isBlankTemplateDSL({ inputs, outputs })) return;
+
     const mappings = computeBestMatchMappings({ inputs });
     const scenarioOutputField =
       outputs[0]?.identifier !== undefined ? outputs[0].identifier : undefined;
@@ -91,15 +138,20 @@ export async function autoComputeAgentMappings({
           ? (agent.config as Record<string, unknown>)
           : {};
 
-      // Only update agents that have no scenarioMappings configured
       const existingMappings = config["scenarioMappings"];
-      if (
+      const hasExistingMappings =
         existingMappings !== undefined &&
         existingMappings !== null &&
         typeof existingMappings === "object" &&
-        Object.keys(existingMappings).length > 0
-      ) {
-        continue;
+        Object.keys(existingMappings).length > 0;
+
+      if (hasExistingMappings) {
+        // Re-compute only when existing mappings reference fields that no longer exist
+        const stale = hasStaleMappings({
+          existingMappings: existingMappings as Record<string, unknown>,
+          inputs,
+        });
+        if (!stale) continue;
       }
 
       // Skip if there are no mappings to apply

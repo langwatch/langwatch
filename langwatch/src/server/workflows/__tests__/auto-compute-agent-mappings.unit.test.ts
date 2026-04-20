@@ -206,6 +206,89 @@ describe("autoComputeAgentMappings", () => {
     });
   });
 
+  describe("when the workflow still has blank-template placeholder fields", () => {
+    it("skips auto-compute and leaves scenarioMappings empty", async () => {
+      // Blank template: entry outputs "question", end inputs "output"
+      const dsl = buildDSL({ inputs: ["question"], output: "output" });
+      const { prisma } = buildPrismaMock({
+        agents: [{ id: "agent-1", config: { type: "workflow" } }],
+      });
+
+      await autoComputeAgentMappings({
+        prisma,
+        workflowId: "wf-1",
+        projectId: "proj-1",
+        dsl,
+      });
+
+      expect(prisma.agent.update).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when existing scenarioMappings reference stale fields", () => {
+    it("re-computes mappings against the current workflow inputs", async () => {
+      // Workflow now has "prompt" — but agent still maps "old_query"
+      const dsl = buildDSL({ inputs: ["prompt"], output: "response" });
+      const staleExistingMappings = {
+        old_query: { type: "source", sourceId: "scenario", path: ["input"] },
+      };
+      const { prisma, updatedConfigs } = buildPrismaMock({
+        agents: [
+          {
+            id: "agent-1",
+            config: {
+              type: "workflow",
+              scenarioMappings: staleExistingMappings,
+            },
+          },
+        ],
+      });
+
+      await autoComputeAgentMappings({
+        prisma,
+        workflowId: "wf-1",
+        projectId: "proj-1",
+        dsl,
+      });
+
+      expect(prisma.agent.update).toHaveBeenCalled();
+      const config = updatedConfigs["agent-1"];
+      expect(config).toBeDefined();
+      const mappings = config!["scenarioMappings"] as Record<string, unknown>;
+      // Stale key must be gone
+      expect(mappings["old_query"]).toBeUndefined();
+      // New field "prompt" must be present
+      expect(mappings["prompt"]).toBeDefined();
+    });
+
+    it("preserves non-stale mappings (does not re-compute when all keys are current)", async () => {
+      const dsl = buildDSL({ inputs: ["prompt"], output: "response" });
+      const currentMappings = {
+        prompt: { type: "source", sourceId: "scenario", path: ["input"] },
+      };
+      const { prisma } = buildPrismaMock({
+        agents: [
+          {
+            id: "agent-1",
+            config: {
+              type: "workflow",
+              scenarioMappings: currentMappings,
+            },
+          },
+        ],
+      });
+
+      await autoComputeAgentMappings({
+        prisma,
+        workflowId: "wf-1",
+        projectId: "proj-1",
+        dsl,
+      });
+
+      expect(prisma.agent.update).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when no agents are linked to the workflow", () => {
     it("does not attempt any updates", async () => {
       const dsl = buildDSL({ inputs: ["query"], output: "response" });
