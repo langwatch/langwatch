@@ -23,9 +23,26 @@ make dev-scenarios    # + workers (includes scenarios) + bullboard + ai-server +
 make dev-full         # Everything including opensearch
 make quickstart       # Interactive profile chooser
 make down             # Stop all services
+make gateway-dev      # Start the Go AI Gateway data plane on :5563
 ```
 
 See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
+
+### AI Gateway (Go, services/gateway/)
+
+The gateway is a separate Go service (not in `compose.dev.yml`) that terminates
+virtual-key traffic, fans out to providers via Bifrost, and reports usage back to
+the control plane. Run it alongside `pnpm dev` / `make dev`:
+
+```bash
+make gateway-dev      # cd services/gateway && make run-dev
+```
+
+Requires `langwatch/.env` with `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET`,
+and `LW_VIRTUAL_KEY_PEPPER` set — see the "AI GATEWAY" block at the bottom of
+`langwatch/.env.example`. Generate each with `openssl rand -hex 32`. The three
+secrets must be set together; partial config fails boot. Set
+`FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_gateway_menu_enabled` to unhide the UI.
 
 ## Commands
 
