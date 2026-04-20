@@ -15,6 +15,8 @@ import type { ExtraHeader } from "./useExtraHeaders";
 /** Snapshot of all form state needed at submission time. */
 export type FormSnapshot = {
   provider: MaybeStoredModelProvider;
+  /** Human-readable label the user typed (or the humanized default). */
+  name: string;
   projectId: string | undefined;
   isUsingEnvVars: boolean | undefined;
   customKeys: Record<string, string>;
@@ -121,6 +123,7 @@ export function useProviderFormSubmit({
       projectDefaultModel,
       projectTopicClusteringModel,
       projectEmbeddingsModel,
+      name,
       scopes,
       scopeType,
       scopeId,
@@ -188,10 +191,12 @@ export function useProviderFormSubmit({
         .filter((h) => h.key?.trim())
         .map(({ key, value }) => ({ key, value }));
 
+      const trimmedName = (name ?? "").trim();
       await updateMutation.mutateAsync({
         id: provider.id,
         projectId: projectId ?? "",
         provider: provider.provider,
+        name: trimmedName === "" ? undefined : trimmedName,
         enabled: true,
         customKeys: customKeysToSend,
         customModels,

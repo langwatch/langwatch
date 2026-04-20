@@ -30,6 +30,7 @@ function buildState(
   overrides: Partial<UseModelProviderFormState> = {},
 ): UseModelProviderFormState {
   return {
+    name: "OpenAI",
     useApiGateway: false,
     customKeys: {},
     displayKeys: {},
@@ -54,6 +55,7 @@ function buildActions(
 ): UseModelProviderFormActions {
   return {
     setEnabled: vi.fn(),
+    setName: vi.fn(),
     setScopes: vi.fn(),
     setScopeType: vi.fn(),
     setUseApiGateway: vi.fn(),

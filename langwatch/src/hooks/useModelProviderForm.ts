@@ -1,6 +1,20 @@
 import { useCallback, useEffect, useState } from "react";
 import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
-import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
+import {
+  modelProviders as modelProvidersRegistry,
+  type MaybeStoredModelProvider,
+} from "../server/modelProviders/registry";
+
+// Mirrors the server's deriveDefaultName. Kept here so the drawer can
+// pre-fill the input on open without an extra tRPC round trip.
+function humanizeProviderName(providerKey: string): string {
+  const def =
+    modelProvidersRegistry[providerKey as keyof typeof modelProvidersRegistry];
+  if (def?.name) return def.name;
+  return providerKey
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 import { useCredentialKeys } from "./useCredentialKeys";
 import { useCustomModels } from "./useCustomModels";
 import { useDefaultProviderSelection } from "./useDefaultProviderSelection";
@@ -47,6 +61,13 @@ export type UseModelProviderFormParams = {
 };
 
 export type UseModelProviderFormState = {
+  /**
+   * User-facing name. Defaults to the humanized provider string
+   * ("openai" → "OpenAI"); operators override it when they run
+   * multiple instances of the same provider at different scopes
+   * so the list and model-selector groups stay distinguishable.
+   */
+  name: string;
   useApiGateway: boolean;
   customKeys: Record<string, string>;
   displayKeys: Record<string, any>;
@@ -75,6 +96,7 @@ export type UseModelProviderFormState = {
 
 export type UseModelProviderFormActions = {
   setEnabled: (enabled: boolean) => Promise<void>;
+  setName: (name: string) => void;
   setScopes: (scopes: ScopeSelection[]) => void;
   setScopeType: (scope: ModelProviderScopeType) => void;
   setUseApiGateway: (use: boolean) => void;
@@ -113,6 +135,14 @@ export function useModelProviderForm(
     onSuccess,
     onError,
   } = params;
+
+  // Name state — editing an existing row shows the stored name, new
+  // rows pre-fill with the humanized provider default so the input
+  // never looks empty.
+  const initialName =
+    (provider as { name?: string }).name ??
+    humanizeProviderName(provider.provider);
+  const [name, setName] = useState<string>(initialName);
 
   // Scope state — defaults to the stored provider's scope set when
   // editing. For brand-new providers we open at the widest scope the
@@ -200,6 +230,7 @@ export function useModelProviderForm(
       projectTopicClusteringModel:
         defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
+      name,
       scopes,
       scopeType,
       scopeId,
@@ -218,6 +249,7 @@ export function useModelProviderForm(
       defaultProviderHook.projectDefaultModel,
       defaultProviderHook.projectTopicClusteringModel,
       defaultProviderHook.projectEmbeddingsModel,
+      name,
       scopes,
       scopeType,
       scopeId,
@@ -254,6 +286,10 @@ export function useModelProviderForm(
     customModelsHook.reset(provider);
     defaultProviderHook.reset(provider, project, enabledProvidersCount);
     formSubmitHook.reset();
+    setName(
+      (provider as { name?: string }).name ??
+        humanizeProviderName(provider.provider),
+    );
   }, [
     provider.provider,
     provider.id,
@@ -283,6 +319,7 @@ export function useModelProviderForm(
       projectTopicClusteringModel:
         defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
+      name,
       scopes,
       scopeType,
       isSaving: formSubmitHook.isSaving,
@@ -290,6 +327,7 @@ export function useModelProviderForm(
     },
     {
       setEnabled: formSubmitHook.setEnabled,
+      setName,
       setScopes,
       setScopeType,
       setUseApiGateway,
