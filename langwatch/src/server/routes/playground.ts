@@ -19,6 +19,7 @@ import {
 } from "~/server/api/routers/modelProviders.utils";
 import { getServerAuthSession } from "~/server/auth";
 import { prisma } from "~/server/db";
+import { trackProductAction } from "~/server/telemetry/productAction";
 import type { NextRequestShim as any } from "./types";
 
 const errorCache: Record<string, any> = {};
@@ -54,6 +55,23 @@ app.post("/playground", async (c) => {
   }
 
   const { messages } = await c.req.json();
+
+  if (session.user?.id) {
+    void trackProductAction({
+      action: "playground_run",
+      projectId,
+      organizationId: async () => {
+        const t = await prisma.project.findUnique({
+          where: { id: projectId },
+          select: { team: { select: { organizationId: true } } },
+        });
+        return t?.team.organizationId;
+      },
+      userId: session.user.id,
+      surface: "web",
+      route: "/api/playground",
+    });
+  }
 
   const model = c.req.header("x-model");
   if (!model) {

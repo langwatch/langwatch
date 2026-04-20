@@ -15,6 +15,7 @@ import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { PromptService } from "~/server/prompt-config";
 import { NotFoundError } from "~/server/prompt-config/errors";
 import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
+import { trackProductAction } from "~/server/telemetry/productAction";
 import { checkProjectPermission, hasProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
@@ -333,7 +334,22 @@ export const promptsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       try {
         const service = new PromptService(ctx.prisma);
-        return await service.getPromptByIdOrHandle(input);
+        const prompt = await service.getPromptByIdOrHandle(input);
+        void trackProductAction({
+          action: "prompt_fetched",
+          projectId: input.projectId,
+          organizationId: async () => {
+            const t = await ctx.prisma.project.findUnique({
+              where: { id: input.projectId },
+              select: { team: { select: { organizationId: true } } },
+            });
+            return t?.team.organizationId;
+          },
+          userId: ctx.session.user.id,
+          surface: "web",
+          route: "prompts.getByIdOrHandle",
+        });
+        return prompt;
       } catch (error) {
         if (error instanceof TagValidationError) {
           throw new TRPCError({

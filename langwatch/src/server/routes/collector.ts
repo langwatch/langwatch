@@ -27,6 +27,10 @@ import {
   spanValidatorSchema,
 } from "../tracer/types.generated";
 import { CollectorSpanUtils } from "../traces/collectorSpan.utils";
+import {
+  readClientContext,
+  trackProductAction,
+} from "../telemetry/productAction";
 import { createLogger } from "../../utils/logger/server";
 
 const logger = createLogger("langwatch.collector");
@@ -102,6 +106,14 @@ app.post(
       { projectId: project.id },
       "collector request being processed",
     );
+
+    void trackProductAction({
+      action: "trace_ingested",
+      projectId: project.id,
+      organizationId: project.team.organizationId,
+      route: "/api/collector",
+      ...readClientContext((name) => c.req.header(name)),
+    });
 
     try {
       const limitResult = await getApp().usage.checkLimit({
