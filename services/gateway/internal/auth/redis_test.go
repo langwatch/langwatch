@@ -97,6 +97,7 @@ func TestL2TTLHonorsMinimum(t *testing.T) {
 	// caller can actually read it back.
 	b := &Bundle{
 		JWTClaims:    JWTClaims{VirtualKeyID: "vk_01"},
+		Config:       &Config{VirtualKeyID: "vk_01"},
 		JWTExpiresAt: time.Now().Add(1 * time.Second),
 	}
 	if err := c.writeL2(context.Background(), "short", b); err != nil {

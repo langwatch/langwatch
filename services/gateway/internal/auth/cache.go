@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -112,12 +113,31 @@ func (c *Cache) Resolve(ctx context.Context, rawKey string) (*Bundle, error) {
 		if b.NeedsRefresh(c.jwtRefreshThreshold) {
 			go c.refreshInBackground(rawKey)
 		}
-		return b, nil
+		if b.Config != nil {
+			return b, nil
+		}
+		// Self-heal: a prior resolve cached this bundle without config
+		// (e.g. transient FetchConfig failure). Re-fetch now so one slow
+		// request recovers rather than every request 400-ing for the
+		// entire JWT lifetime.
+		if cfg, _, err := c.rv.FetchConfig(ctx, b.JWTClaims.VirtualKeyID, 0); err == nil && cfg != nil {
+			b.Config = cfg
+			c.l1.Add(h, b)
+			c.notifyBundleResolved(b)
+			return b, nil
+		}
+		// Still failing — evict the broken entry so the cold path below
+		// does a full re-resolve.
+		c.l1.Remove(h)
 	}
 	if c.l2 != nil {
 		if b, err := c.readL2(ctx, h); err == nil && b != nil && !b.Expired() {
-			c.l1.Add(h, b)
-			return b, nil
+			if b.Config != nil {
+				c.l1.Add(h, b)
+				return b, nil
+			}
+			// Poisoned L2 entry — clean up and fall through to cold resolve.
+			_ = c.l2.Del(ctx, l2Prefix+h).Err()
 		}
 	}
 	b, err := c.rv.ResolveKey(ctx, rawKey)
@@ -135,7 +155,11 @@ func (c *Cache) Resolve(ctx context.Context, rawKey string) (*Bundle, error) {
 		if cfgErr != nil {
 			c.logger.Warn("eager_config_fetch_failed",
 				"vk_id", b.JWTClaims.VirtualKeyID, "err", cfgErr.Error())
-		} else if cfg != nil {
+			// Don't cache a Config-less bundle — the next request
+			// should retry instead of being stuck for the JWT lifetime.
+			return nil, fmt.Errorf("config unavailable for vk %s: %w", b.JWTClaims.VirtualKeyID, cfgErr)
+		}
+		if cfg != nil {
 			b.Config = cfg
 		}
 	}
@@ -300,12 +324,29 @@ func (c *Cache) refreshInBackground(rawKey string) {
 		return
 	}
 	h := keyHash(rawKey)
+	// ResolveKey returns Config=nil — fetch config eagerly so we don't
+	// clobber a previously good cached bundle with a Config-less one.
+	if b.Config == nil {
+		cfg, _, cfgErr := c.rv.FetchConfig(ctx, b.JWTClaims.VirtualKeyID, 0)
+		if cfgErr != nil {
+			c.logger.Warn("background_config_fetch_failed",
+				"vk_id", b.JWTClaims.VirtualKeyID, "err", cfgErr.Error())
+			// Carry forward the previous bundle's config so a transient
+			// fetch failure doesn't regress a working cache entry.
+			if old, ok := c.l1.Peek(h); ok && old.Config != nil {
+				b.Config = old.Config
+			}
+		} else if cfg != nil {
+			b.Config = cfg
+		}
+	}
 	c.l1.Add(h, b)
 	if c.l2 != nil {
 		_ = c.writeL2(ctx, h, b)
 	}
 	c.trackRevision(b.JWTClaims.OrganizationID, b.JWTClaims.Revision)
 	c.ensureOrgPoller(b.JWTClaims.OrganizationID)
+	c.notifyBundleResolved(b)
 }
 
 // trackRevision bumps the per-org cursor AND the global maxRev (the
@@ -369,7 +410,7 @@ func (c *Cache) readL2(ctx context.Context, h string) (*Bundle, error) {
 }
 
 func (c *Cache) writeL2(ctx context.Context, h string, b *Bundle) error {
-	if c.l2 == nil || b == nil {
+	if c.l2 == nil || b == nil || b.Config == nil {
 		return nil
 	}
 	ttl := time.Until(b.JWTExpiresAt)
