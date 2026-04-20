@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -55,16 +56,11 @@ func TestGuardedStream_CloseIsIdempotent(t *testing.T) {
 func TestGuardedStream_ExplicitCloseTriggersOnClose(t *testing.T) {
 	inner := &fakeIterator{chunks: [][]byte{[]byte("a"), []byte("b")}}
 
-	debitCalled := false
-	budget := &mockBudget{
-		precheckFn: func(_ context.Context, _ *domain.Bundle) (BudgetVerdict, error) {
-			return BudgetAllow, nil
-		},
-	}
-	budget.debitCalls = 0
+	var debitCalls atomic.Int32
+	atomicBudget := &atomicMockBudget{calls: &debitCalls}
 
 	application := New(
-		WithBudget(budget),
+		WithBudget(atomicBudget),
 		WithLogger(zap.NewNop()),
 	)
 	bundle := testBundle()
@@ -81,8 +77,21 @@ func TestGuardedStream_ExplicitCloseTriggersOnClose(t *testing.T) {
 	// Verify inner was closed
 	assert.GreaterOrEqual(t, inner.closeCalls, 1)
 
-	// Budget.Debit fires asynchronously via forkedcontext — wait briefly
-	time.Sleep(50 * time.Millisecond)
-	_ = debitCalled
-	assert.Equal(t, 1, budget.debitCalls)
+	// Budget.Debit fires asynchronously via forkedcontext — wait for it
+	assert.Eventually(t, func() bool {
+		return debitCalls.Load() == 1
+	}, time.Second, 5*time.Millisecond)
+}
+
+// atomicMockBudget uses atomic counters to avoid data races with async onClose.
+type atomicMockBudget struct {
+	calls *atomic.Int32
+}
+
+func (m *atomicMockBudget) Precheck(_ context.Context, _ *domain.Bundle) (BudgetVerdict, error) {
+	return BudgetAllow, nil
+}
+
+func (m *atomicMockBudget) Debit(_ context.Context, _ *domain.Bundle, _ domain.Usage) {
+	m.calls.Add(1)
 }
