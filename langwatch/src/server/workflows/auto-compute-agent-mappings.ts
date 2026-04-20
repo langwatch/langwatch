@@ -5,7 +5,7 @@
  * so that the workflow save is never blocked.
  */
 
-import type { PrismaClient } from "@prisma/client";
+import type { PrismaClient, Prisma } from "@prisma/client";
 import type { Edge, Node } from "@xyflow/react";
 import { computeBestMatchMappings } from "../scenarios/execution/resolve-field-mappings";
 import { getInputsOutputs } from "../../optimization_studio/utils/nodeUtils";
@@ -167,7 +167,7 @@ export async function autoComputeAgentMappings({
 
       await prisma.agent.update({
         where: { id: agent.id, projectId },
-        data: { config: updatedConfig },
+        data: { config: updatedConfig as Prisma.InputJsonValue },
       });
     }
   } catch (error) {
