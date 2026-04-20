@@ -14,7 +14,6 @@ from typing import Any, Callable, List
 import pytest
 
 import langwatch
-from langwatch.generated.langwatch_rest_api_client.errors import UnexpectedStatus
 
 logger = logging.getLogger(__name__)
 
@@ -23,9 +22,14 @@ def _delete_prompt_with_narrow_handling(prompt_id: str, context: str) -> None:
     """
     Delete a single prompt, distinguishing 404 (already gone) from real errors.
 
-    - ``UnexpectedStatus`` with status_code 404 → debug log, continue
-    - ``UnexpectedStatus`` with any other status_code → warning log, continue
-    - Any other exception (network, etc.) → warning log, continue
+    ``langwatch.prompts.delete`` routes 404 responses through
+    ``unwrap_response``, which raises ``ValueError("Prompt not found: ...")``
+    (see ``langwatch.prompts.errors``).  We key off that message to treat
+    already-gone prompts as a debug-level no-op.
+
+    - ``ValueError`` whose message starts with "Prompt not found" → debug log
+    - Any other ``ValueError`` (e.g. 400) → warning log, continue
+    - Any other exception (network, 5xx, etc.) → warning log, continue
 
     Never raises — callers iterate lists and must clean up all remaining ids.
     """
@@ -36,8 +40,8 @@ def _delete_prompt_with_narrow_handling(prompt_id: str, context: str) -> None:
             context,
             extra={"prompt_id": prompt_id},
         )
-    except UnexpectedStatus as exc:
-        if exc.status_code == 404:
+    except ValueError as exc:
+        if str(exc).startswith("Prompt not found"):
             logger.debug(
                 "%s: prompt already gone (404), skipping",
                 context,
@@ -45,10 +49,10 @@ def _delete_prompt_with_narrow_handling(prompt_id: str, context: str) -> None:
             )
         else:
             logger.warning(
-                "%s: failed to delete prompt (HTTP %s), continuing cleanup",
+                "%s: failed to delete prompt (ValueError: %s), continuing cleanup",
                 context,
-                exc.status_code,
-                extra={"prompt_id": prompt_id, "status_code": exc.status_code},
+                exc,
+                extra={"prompt_id": prompt_id},
             )
     except Exception as exc:
         logger.warning(
