@@ -1,4 +1,5 @@
-import { Button, Field, HStack, VStack } from "@chakra-ui/react";
+import { Box, Button, Field, HStack, Input, VStack } from "@chakra-ui/react";
+import { SmallLabel } from "../SmallLabel";
 import { useCallback, useMemo, useState } from "react";
 import { z } from "zod";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -211,6 +212,27 @@ export const EditModelProviderForm = ({
   return (
     <VStack gap={4} align="start" width="full">
       <VStack align="start" width="full" gap={4}>
+        <Field.Root width="full" required>
+          <SmallLabel>
+            Name
+            <Field.RequiredIndicator />
+          </SmallLabel>
+          <Box width="full">
+            <Input
+              value={state.name}
+              onChange={(e) => actions.setName(e.target.value)}
+              placeholder={provider.provider}
+              width="full"
+              maxLength={128}
+            />
+          </Box>
+          <Field.HelperText>
+            Distinguish multiple instances (e.g. "OpenAI – EU prod" vs
+            "OpenAI – Dev"). Shown in the provider list and model
+            selectors.
+          </Field.HelperText>
+        </Field.Root>
+
         {isLlmProvider && provider.provider === "azure" && (
           <Field.Root>
             <Switch

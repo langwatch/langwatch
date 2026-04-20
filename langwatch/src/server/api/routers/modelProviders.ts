@@ -63,6 +63,13 @@ export const modelProviderRouter = createTRPCRouter({
         id: z.string().optional(),
         projectId: z.string(),
         provider: z.string(),
+        // Human-readable label shown in the settings list and the model
+        // selector group headers. Defaults to the humanized provider name
+        // (e.g. "openai" → "OpenAI") when omitted. Iter 109 added the
+        // column; now exposing it on the write path so operators can
+        // distinguish multiple same-provider instances at different
+        // scopes.
+        name: z.string().trim().min(1).max(128).optional(),
         enabled: z.boolean(),
         customKeys: z.object({}).passthrough().optional().nullable(),
         customModels: customModelUpdateInputSchema.optional().nullable(),
@@ -98,6 +105,7 @@ export const modelProviderRouter = createTRPCRouter({
           id: input.id,
           projectId: input.projectId,
           provider: input.provider,
+          name: input.name,
           enabled: input.enabled,
           customKeys: input.customKeys as
             | Record<string, unknown>
