@@ -81,13 +81,14 @@ Move an issue to a new status on the board.
 
 1. Parse the issue number and target status from arguments
 2. Map status name (case-insensitive) to option ID:
-   - `backlog` → `f75ad846`
-   - `blocked` → `848ceeaf`
-   - `ready` → `61e4505c`
-   - `in-progress` / `progress` → `47fc9ee4`
-   - `in-review` / `review` → `df73e18b`
-   - `done` → `98236657`
-   - `released` → `18f5115c`
+   - `backlog` → `14fed42e`
+   - `blocked` → `131e7d86`
+   - `ready` → `12261fbf`
+   - `in-progress` / `progress` → `3264b20e`
+   - `in-review` / `review` → `90b57b27`
+   - `done` → `2b388473`
+   - `released` → `7717b7ed`
+   - `stale` → `9fefdc9d`
 3. Find the project item ID by paging through items and matching the issue number
 4. Update the status field
 5. Confirm: `Moved #123 to In progress`
@@ -164,7 +165,7 @@ for page in range(1, 9):
     move <#number> <status>  Move an issue to a new status
     assign <#number>         Assign issue to you and add to board
 
-  Statuses: backlog, blocked, ready, in-progress, in-review, done, released
+  Statuses: backlog, blocked, ready, in-progress, in-review, done, released, stale
   ```
 - If `gh auth status` fails, tell the user to run `gh auth login`
 - If a project API call fails, show the error and suggest `gh auth refresh -s project`
@@ -181,12 +182,13 @@ PROJECT_ID = "PVT_kwDOCL9uOs4BH69J"
 STATUS_FIELD_ID = "PVTSSF_lADOCL9uOs4BH69Jzg4iLlU"
 
 STATUS_OPTIONS = {
-    "Backlog": "f75ad846",
-    "Blocked": "848ceeaf",
-    "Ready": "61e4505c",
-    "In progress": "47fc9ee4",
-    "In review": "df73e18b",
-    "Done": "98236657",
-    "Released": "18f5115c",
+    "Backlog": "14fed42e",
+    "Blocked": "131e7d86",
+    "Ready": "12261fbf",
+    "In progress": "3264b20e",
+    "In review": "90b57b27",
+    "Done": "2b388473",
+    "Released": "7717b7ed",
+    "Stale": "9fefdc9d",
 }
 ```
