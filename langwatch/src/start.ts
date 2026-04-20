@@ -7,6 +7,7 @@ import { initializeWebApp } from "./server/app-layer/presets";
 import { getWorkerMetricsPort } from "./server/background/config";
 import { createMcpHandler } from "./mcp/handler";
 import { shutdownPostHog } from "./server/posthog";
+import { verifyRedisReady } from "./server/redis";
 import { createLogger } from "./utils/logger/server";
 
 // Hono — unified API router
@@ -56,6 +57,49 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // Initialize the app-layer (services, repositories, event sourcing, etc.)
   // This was previously done by Next.js instrumentation hook.
   initializeWebApp();
+
+  // Fail fast if Redis is unreachable — better-auth uses it as secondary
+  // session store, and without it every request ends in a "Redirecting to
+  // Sign in…" loop with no actionable error for the developer.
+  await verifyRedisReady();
+
+  // Surface missing AI Gateway secrets up-front. The three secrets
+  // (virtual-key pepper, gateway↔control-plane HMAC, gateway JWT signing
+  // key) must be set together. Partial config is a latent bug — the gateway
+  // endpoints will return 503 auth_upstream_unavailable on first request,
+  // minutes after startup, and a reviewer chasing a "why does my VK not
+  // work" report would have to dig through logs. Either all set or all
+  // unset; fail boot on partial.
+  const gatewayFlagForced = (process.env.FEATURE_FLAG_FORCE_ENABLE ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .includes("release_ui_ai_gateway_menu_enabled");
+  const gwSecrets = {
+    LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
+    LW_GATEWAY_INTERNAL_SECRET: process.env.LW_GATEWAY_INTERNAL_SECRET,
+    LW_GATEWAY_JWT_SECRET: process.env.LW_GATEWAY_JWT_SECRET,
+  };
+  const gwSet = Object.entries(gwSecrets).filter(([, v]) => !!v);
+  const gwMissing = Object.entries(gwSecrets)
+    .filter(([, v]) => !v)
+    .map(([k]) => k);
+  if (gwSet.length > 0 && gwMissing.length > 0) {
+    logger.error(
+      { missing: gwMissing },
+      `AI Gateway secrets partially configured. Missing: ${gwMissing.join(", ")}.\n` +
+        `  Either set ALL three secrets (see langwatch/.env.example) or UNSET them all.\n` +
+        `  Generate each value with: openssl rand -hex 32`,
+    );
+    process.exit(1);
+  }
+  if (gatewayFlagForced && gwMissing.length === 3) {
+    logger.warn(
+      { missing: gwMissing },
+      "AI Gateway menu forced on via FEATURE_FLAG_FORCE_ENABLE, but no " +
+        "gateway secrets are set. The UI will render but /api/gateway-internal/* " +
+        "will return 503. See langwatch/.env.example for the required block.",
+    );
+  }
 
   // Dev: API server on PORT+1000 (default 6560).
   //      Vite dev server runs separately on PORT (default 5560) and proxies /api/* here.

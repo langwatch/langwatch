@@ -1,6 +1,7 @@
 import { setEnvironment } from "@langwatch/ksuid";
 import dotenv from "dotenv";
 import { WorkersRestart } from "./server/background/errors";
+import { verifyRedisReady } from "./server/redis";
 import { createLogger } from "./utils/logger/server";
 
 dotenv.config();
@@ -15,18 +16,22 @@ const logger = createLogger("langwatch:workers");
 
 logger.info("starting");
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-require("./server/background/worker")
-  .start(void 0, 15 * 60 * 1000)
-  .catch((error: Error) => {
-    if (error instanceof WorkersRestart) {
-      logger.info({ error }, "worker restart");
-      process.exit(0);
-    }
+// Fail fast if Redis isn't reachable — BullMQ would otherwise reconnect
+// forever and jobs silently pile up in queues we can't even read.
+void verifyRedisReady().then(() => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  require("./server/background/worker")
+    .start(void 0, 15 * 60 * 1000)
+    .catch((error: Error) => {
+      if (error instanceof WorkersRestart) {
+        logger.info({ error }, "worker restart");
+        process.exit(0);
+      }
 
-    logger.error({ error }, "error running worker");
-    process.exit(1);
-  });
+      logger.error({ error }, "error running worker");
+      process.exit(1);
+    });
+});
 
 // Global error handlers for uncaught exceptions and unhandled promise rejections
 process.on("uncaughtException", (err) => {
