@@ -2,7 +2,6 @@ package langwatch
 
 import (
 	"context"
-	"os"
 	"testing"
 
 	"github.com/langwatch/langwatch/sdk-go/internal/testutil"
@@ -105,17 +104,8 @@ func TestFilteringExporter_MultipleFilters(t *testing.T) {
 }
 
 func TestResolveConfig_EnvironmentVariables(t *testing.T) {
-	// Save original values
-	originalAPIKey := os.Getenv("LANGWATCH_API_KEY")
-	originalEndpoint := os.Getenv("LANGWATCH_ENDPOINT")
-	defer func() {
-		os.Setenv("LANGWATCH_API_KEY", originalAPIKey)
-		os.Setenv("LANGWATCH_ENDPOINT", originalEndpoint)
-	}()
-
-	// Set test values
-	os.Setenv("LANGWATCH_API_KEY", "test-api-key")
-	os.Setenv("LANGWATCH_ENDPOINT", "https://custom.langwatch.ai")
+	t.Setenv("LANGWATCH_API_KEY", "test-api-key")
+	t.Setenv("LANGWATCH_ENDPOINT", "https://custom.langwatch.ai")
 
 	cfg := resolveConfig()
 
@@ -124,14 +114,7 @@ func TestResolveConfig_EnvironmentVariables(t *testing.T) {
 }
 
 func TestResolveConfig_DefaultEndpoint(t *testing.T) {
-	// Save original values
-	originalEndpoint := os.Getenv("LANGWATCH_ENDPOINT")
-	defer func() {
-		os.Setenv("LANGWATCH_ENDPOINT", originalEndpoint)
-	}()
-
-	// Clear endpoint
-	os.Unsetenv("LANGWATCH_ENDPOINT")
+	t.Setenv("LANGWATCH_ENDPOINT", "")
 
 	cfg := resolveConfig()
 
@@ -139,19 +122,9 @@ func TestResolveConfig_DefaultEndpoint(t *testing.T) {
 }
 
 func TestResolveConfig_OptionsOverrideEnv(t *testing.T) {
-	// Save original values
-	originalAPIKey := os.Getenv("LANGWATCH_API_KEY")
-	originalEndpoint := os.Getenv("LANGWATCH_ENDPOINT")
-	defer func() {
-		os.Setenv("LANGWATCH_API_KEY", originalAPIKey)
-		os.Setenv("LANGWATCH_ENDPOINT", originalEndpoint)
-	}()
+	t.Setenv("LANGWATCH_API_KEY", "env-key")
+	t.Setenv("LANGWATCH_ENDPOINT", "https://env.langwatch.ai")
 
-	// Set environment values
-	os.Setenv("LANGWATCH_API_KEY", "env-key")
-	os.Setenv("LANGWATCH_ENDPOINT", "https://env.langwatch.ai")
-
-	// Options should override
 	cfg := resolveConfig(
 		WithAPIKey("option-key"),
 		WithEndpoint("https://option.langwatch.ai"),

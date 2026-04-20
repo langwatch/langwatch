@@ -2,9 +2,7 @@ name: gateway-ci
 
 # Gateway-specific CI gate. Runs on any PR or main push that touches
 # the Go service source, go module, Dockerfile, Helm chart, or this
-# workflow itself. Keeps the main build-and-push-artifacts pipeline
-# focused on container publish while we keep a fast feedback loop on
-# gateway changes (~60s target).
+# workflow itself.
 
 on:
   push:
@@ -35,7 +33,12 @@ jobs:
         with:
           filters: |
             gateway:
-              - 'services/gateway/**'
+              - 'services/aigateway/**'
+              - 'pkg/**'
+              - 'cmd/**'
+              - 'go.mod'
+              - 'go.sum'
+              - 'Dockerfile.go_service'
               - '.github/workflows/gateway-ci.yaml'
             chart:
               - 'charts/gateway/**'
@@ -46,35 +49,26 @@ jobs:
     if: ${{ needs.changes.outputs.gateway == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    defaults:
-      run:
-        working-directory: services/gateway
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Setup Go
         uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
         with:
-          go-version-file: services/gateway/go.mod
-          cache-dependency-path: services/gateway/go.sum
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
 
       - name: go mod verify
         run: go mod verify
 
       - name: go vet
-        run: go vet ./...
+        run: go vet ./services/aigateway/... ./pkg/... ./cmd/...
 
       - name: go build
-        run: go build ./...
+        run: go build ./cmd/...
 
       - name: go test
-        run: go test -count=1 -race ./...
-
-      - name: go test (benchmarks compile check)
-        # Don't run the benchmarks (too noisy for CI) — just verify
-        # they still compile so a regression in hot-path primitives
-        # breaks the build instead of silently rotting.
-        run: go test -bench=. -benchtime=1x -run=^$ ./internal/auth/ ./internal/circuit/ ./internal/budget/ ./internal/fallback/
+        run: go test -count=1 -race ./services/aigateway/... ./pkg/...
 
   helm:
     needs: changes
@@ -110,11 +104,6 @@ jobs:
             echo "NetworkPolicy should NOT render by default"; exit 1
           fi
 
-      # Umbrella chart integration: ensure charts/langwatch/ lists the
-      # gateway as a dependency (iter 43 wire-in) and that
-      # `helm install langwatch` lifts the gateway pod alongside the
-      # main app. Regression guard: someone removing the dep entry
-      # from Chart.yaml MUST break this job, not a prod incident.
       - name: helm dependency update (umbrella)
         working-directory: charts/langwatch
         run: helm dependency update
@@ -126,15 +115,10 @@ jobs:
 
       - name: Assert gateway subchart renders under the umbrella
         run: |
-          # The gateway alias emits resources labelled
-          # app.kubernetes.io/name: gateway — the umbrella MUST include
-          # them when gateway.chartManaged defaults to true.
           if ! grep -q "app.kubernetes.io/name: gateway" /tmp/umbrella.yaml; then
             echo "umbrella chart did NOT include the gateway subchart — dependency broken?"
             exit 1
           fi
-          # The release-name-prefixed Service must point at the gateway
-          # container port (5563) — catches iter 44's port drift class.
           if ! grep -q "targetPort: 5563" /tmp/umbrella.yaml; then
             echo "gateway Service targetPort !=5563 under the umbrella"
             exit 1
@@ -153,11 +137,6 @@ jobs:
           fi
 
   docker:
-    # Builds the gateway image on every PR (no push — sanity-check that
-    # the Dockerfile + module graph produce a valid image). On push to
-    # main, also pushes to ghcr.io/<owner>/ai-gateway tagged with the
-    # commit SHA + `latest`, giving operators a reproducible image
-    # coordinate for helm install.
     needs: changes
     if: ${{ needs.changes.outputs.gateway == 'true' }}
     runs-on: ubuntu-latest
@@ -166,10 +145,6 @@ jobs:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
 
       - name: Set up QEMU
-        # Required for cross-building linux/arm64 on ubuntu-latest
-        # (amd64 runner). ~2s overhead on boot; build-push-action
-        # runs the Go cross-compile per platform so the resulting
-        # manifest carries both linux/amd64 + linux/arm64.
         uses: docker/setup-qemu-action@49b3bc8e6bdd4a60e6116a5414239cba5943d3cf # v3
         with:
           platforms: arm64
@@ -177,8 +152,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@c47758b77c9736f4b2ef4073d4d51994fabfe349 # v3
         with:
-          # Enables --mount=type=cache in the Dockerfile for the Go
-          # build cache; without buildx the gateway build is ~2× slower.
           driver-opts: image=moby/buildkit:buildx-stable-1
 
       - name: Login to GHCR
@@ -197,17 +170,10 @@ jobs:
           echo "sha_tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
 
       - name: Build gateway image
-        # On PR: build only, no push (no secret needed, no registry
-        # write). On push to main: build AND push to GHCR.
-        # Multi-arch: linux/amd64 + linux/arm64 — prod EKS runs on
-        # Graviton (aarch64) per Lane A iter 44 smoke discovery
-        # (amd64-only image hit `exec format error` on pod start).
-        # On PRs we skip arm64 build to keep feedback fast; main push
-        # builds both platforms into a single manifest.
         uses: docker/build-push-action@4f58ea79222b3b9dc2c8bbdd6debcef730109a75 # v6
         with:
-          context: services/gateway
-          file: services/gateway/Dockerfile
+          context: .
+          file: Dockerfile.go_service
           push: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           platforms: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           build-args: |
