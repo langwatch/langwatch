@@ -42,7 +42,6 @@ vi.mock("../actions/addToDataset", () => ({
 
 vi.mock("../utils", () => ({
   addTriggersSent: vi.fn(),
-  getLatestUpdatedAt: vi.fn(() => 1234567890),
   triggerSentForMany: vi.fn(() => []),
   updateAlert: vi.fn(),
 }));
@@ -51,12 +50,7 @@ import { handleAddToAnnotationQueue } from "../actions/addToAnnotationQueue";
 import { handleAddToDataset } from "../actions/addToDataset";
 import { handleSendEmail } from "../actions/sendEmail";
 import { handleSendSlackMessage } from "../actions/sendSlackMessage";
-import {
-  addTriggersSent,
-  getLatestUpdatedAt,
-  triggerSentForMany,
-  updateAlert,
-} from "../utils";
+import { addTriggersSent, triggerSentForMany, updateAlert } from "../utils";
 
 describe("processTraceBasedTrigger", () => {
   const mockProjects: Project[] = [
@@ -108,7 +102,7 @@ describe("processTraceBasedTrigger", () => {
 
       expect(result).toEqual({
         triggerId: "trigger-1",
-        updatedAt: 1234567890,
+        updatedAt: 2000,
         status: "triggered",
         totalFound: 2,
       });
@@ -181,11 +175,7 @@ describe("processTraceBasedTrigger", () => {
 
       await processTraceBasedTrigger(trigger, mockProjects);
 
-      expect(updateAlert).toHaveBeenCalledWith(
-        "trigger-1",
-        1234567890,
-        "project-1",
-      );
+      expect(updateAlert).toHaveBeenCalledWith("trigger-1", 1000, "project-1");
     });
   });
 
