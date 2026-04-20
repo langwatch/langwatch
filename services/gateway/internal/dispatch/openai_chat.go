@@ -230,3 +230,53 @@ func rewriteRequestModel(body []byte, current, target string) []byte {
 	}
 	return out
 }
+
+// ensureStreamOptionsIncludeUsage injects `stream_options: {include_usage: true}`
+// into an OpenAI-shape streaming request body when the caller didn't already
+// set it. OpenAI (and Azure OpenAI) only emit `usage` on the final chunk of
+// a stream when this option is present — without it the gateway would debit
+// zero tokens on every streaming call. Anthropic, Gemini, Vertex, and
+// Bedrock emit usage in their native stream deltas, so this is a no-op
+// there (and `stream_options` isn't part of their wire format anyway).
+//
+// Preserves any caller-supplied `include_usage: false` — if a client opted
+// out explicitly we respect that. Returns body unchanged on any decode error.
+func ensureStreamOptionsIncludeUsage(body []byte, provider bfschemas.ModelProvider) []byte {
+	if provider != bfschemas.OpenAI && provider != bfschemas.Azure {
+		return body
+	}
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(body, &obj); err != nil {
+		return body
+	}
+	if existing, ok := obj["stream_options"]; ok {
+		var opts map[string]json.RawMessage
+		if err := json.Unmarshal(existing, &opts); err != nil {
+			return body
+		}
+		if _, set := opts["include_usage"]; set {
+			return body
+		}
+		trueBytes, err := json.Marshal(true)
+		if err != nil {
+			return body
+		}
+		opts["include_usage"] = trueBytes
+		patched, err := json.Marshal(opts)
+		if err != nil {
+			return body
+		}
+		obj["stream_options"] = patched
+	} else {
+		patched, err := json.Marshal(map[string]bool{"include_usage": true})
+		if err != nil {
+			return body
+		}
+		obj["stream_options"] = patched
+	}
+	out, err := json.Marshal(obj)
+	if err != nil {
+		return body
+	}
+	return out
+}

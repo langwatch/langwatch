@@ -114,3 +114,70 @@ func TestParseOpenAIChatBodyMissingModel(t *testing.T) {
 		t.Error("expected error on missing model")
 	}
 }
+
+func TestEnsureStreamOptionsIncludeUsageInjectsOnOpenAI(t *testing.T) {
+	body := []byte(`{"model":"gpt-5-mini","messages":[{"role":"user","content":"hi"}],"stream":true}`)
+	out := ensureStreamOptionsIncludeUsage(body, bfschemas.OpenAI)
+	var got map[string]json.RawMessage
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	raw, ok := got["stream_options"]
+	if !ok {
+		t.Fatal("stream_options not added")
+	}
+	var opts map[string]bool
+	if err := json.Unmarshal(raw, &opts); err != nil {
+		t.Fatalf("decode opts: %v", err)
+	}
+	if !opts["include_usage"] {
+		t.Errorf("include_usage not true: %+v", opts)
+	}
+}
+
+func TestEnsureStreamOptionsIncludeUsagePreservesCallerOptOut(t *testing.T) {
+	body := []byte(`{"model":"gpt-5-mini","stream":true,"stream_options":{"include_usage":false}}`)
+	out := ensureStreamOptionsIncludeUsage(body, bfschemas.OpenAI)
+	if string(out) != string(body) {
+		t.Errorf("caller opt-out not preserved: %s", string(out))
+	}
+}
+
+func TestEnsureStreamOptionsIncludeUsagePreservesSiblingOption(t *testing.T) {
+	body := []byte(`{"model":"gpt-5-mini","stream":true,"stream_options":{"other_flag":true}}`)
+	out := ensureStreamOptionsIncludeUsage(body, bfschemas.OpenAI)
+	var got map[string]json.RawMessage
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	var opts map[string]any
+	if err := json.Unmarshal(got["stream_options"], &opts); err != nil {
+		t.Fatalf("decode opts: %v", err)
+	}
+	if opts["other_flag"] != true {
+		t.Errorf("sibling option lost: %+v", opts)
+	}
+	if opts["include_usage"] != true {
+		t.Errorf("include_usage not added alongside sibling: %+v", opts)
+	}
+}
+
+func TestEnsureStreamOptionsIncludeUsageNoopOnAnthropic(t *testing.T) {
+	body := []byte(`{"model":"claude-haiku","stream":true}`)
+	out := ensureStreamOptionsIncludeUsage(body, bfschemas.Anthropic)
+	if string(out) != string(body) {
+		t.Errorf("anthropic should be no-op, got: %s", string(out))
+	}
+}
+
+func TestEnsureStreamOptionsIncludeUsageNoopOnAzure(t *testing.T) {
+	body := []byte(`{"model":"gpt-4o","stream":true}`)
+	out := ensureStreamOptionsIncludeUsage(body, bfschemas.Azure)
+	var got map[string]json.RawMessage
+	if err := json.Unmarshal(out, &got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if _, ok := got["stream_options"]; !ok {
+		t.Error("azure (OpenAI-shape) should get stream_options injected")
+	}
+}
