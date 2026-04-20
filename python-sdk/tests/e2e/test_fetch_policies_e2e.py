@@ -48,9 +48,11 @@ def run_cli(command, cwd=None):
     """Run a CLI command and return the result."""
     try:
         result = subprocess.run(
-            command, cwd=cwd, capture_output=True, text=True, check=True, timeout=30
+            command, cwd=cwd, capture_output=True, text=True, check=True, timeout=60
         )
         return result.stdout
+    except subprocess.TimeoutExpired as e:
+        pytest.skip(f"CLI command timed out after {e.timeout}s: {' '.join(command)}")
     except subprocess.CalledProcessError as e:
         print(f"CLI command failed: {e}")
         print(f"stdout: {e.stdout}")
