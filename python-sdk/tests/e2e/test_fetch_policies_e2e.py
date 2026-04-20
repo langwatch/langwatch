@@ -46,7 +46,7 @@ CLI_EXECUTABLE = ["npx", "langwatch@latest"]
 
 def run_cli(command, cwd=None, retries=2):
     """Run a CLI command and return the result, retrying on timeout."""
-    last_err = None
+    last_err: subprocess.TimeoutExpired | None = None
     for attempt in range(1 + retries):
         try:
             result = subprocess.run(
@@ -62,6 +62,7 @@ def run_cli(command, cwd=None, retries=2):
             print(f"stdout: {e.stdout}")
             print(f"stderr: {e.stderr}")
             raise
+    assert last_err is not None  # always set after exhausting timeout retries
     raise last_err
 
 
