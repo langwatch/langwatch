@@ -24,6 +24,7 @@ import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { fireWorkflowCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
 
 export const workflowRouter = createTRPCRouter({
   create: protectedProcedure
@@ -1331,6 +1332,13 @@ export const saveOrCommitWorkflowVersion = async ({
         ? updatedVersion.id
         : latestVersion?.id,
     },
+  });
+
+  void autoComputeAgentMappings({
+    prisma: ctx.prisma,
+    workflowId: input.workflowId,
+    projectId: input.projectId,
+    dsl: input.dsl,
   });
 
   return updatedVersion;
