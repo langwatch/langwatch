@@ -4,10 +4,14 @@ import (
 	"crypto/hmac"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 )
+
+// ErrEmptySecret is returned when NewSigner is called with an empty secret.
+var ErrEmptySecret = errors.New("signer: secret must not be empty")
 
 // Signer signs outbound HTTP requests with the HMAC scheme shared
 // with the control plane. Reusable by budget, guardrails, etc.
@@ -16,16 +20,18 @@ type Signer struct {
 	nodeID string
 }
 
-// NewSigner creates an HMAC request signer.
-func NewSigner(secret, nodeID string) *Signer {
-	return &Signer{secret: []byte(secret), nodeID: nodeID}
+// NewSigner creates an HMAC request signer. Returns an error if the
+// secret is empty — unsigned requests to the control plane would be
+// a security misconfiguration (fail closed).
+func NewSigner(secret, nodeID string) (*Signer, error) {
+	if secret == "" {
+		return nil, ErrEmptySecret
+	}
+	return &Signer{secret: []byte(secret), nodeID: nodeID}, nil
 }
 
-// Sign adds HMAC signature headers to a request. No-op if secret is empty.
+// Sign adds HMAC signature headers to a request.
 func (s *Signer) Sign(req *http.Request, body []byte) {
-	if len(s.secret) == 0 {
-		return
-	}
 	ts := fmt.Sprintf("%d", time.Now().Unix())
 	mac := hmac.New(sha256.New, s.secret)
 	mac.Write([]byte(ts))

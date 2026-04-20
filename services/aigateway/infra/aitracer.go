@@ -2,6 +2,8 @@ package infra
 
 import (
 	"context"
+	"errors"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -144,18 +146,40 @@ func NewProjectRegistry() *ProjectRegistry {
 	return &ProjectRegistry{m: make(map[string]projectEntry)}
 }
 
+// ErrInvalidEndpoint is returned when an OTLP endpoint has a disallowed scheme.
+var ErrInvalidEndpoint = errors.New("otlp endpoint must use http or https scheme")
+
 // Set records an endpoint for a project. Empty endpoint clears the entry.
-func (r *ProjectRegistry) Set(projectID, endpoint string, headers map[string]string) {
+// Returns an error if the endpoint scheme is not http/https.
+func (r *ProjectRegistry) Set(projectID, endpoint string, headers map[string]string) error {
 	if projectID == "" {
-		return
+		return nil
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	if endpoint == "" {
 		delete(r.m, projectID)
-		return
+		return nil
+	}
+	if err := validateEndpointScheme(endpoint); err != nil {
+		return err
 	}
 	r.m[projectID] = projectEntry{endpoint: endpoint, headers: headers}
+	return nil
+}
+
+// validateEndpointScheme ensures only http/https endpoints are accepted.
+func validateEndpointScheme(endpoint string) error {
+	u, err := url.Parse(endpoint)
+	if err != nil {
+		return ErrInvalidEndpoint
+	}
+	switch u.Scheme {
+	case "http", "https":
+		return nil
+	default:
+		return ErrInvalidEndpoint
+	}
 }
 
 // Lookup returns the endpoint for a project.

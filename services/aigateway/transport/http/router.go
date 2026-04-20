@@ -53,9 +53,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	}
 
 	r.Route("/v1", func(v1 chi.Router) {
-		if deps.App != nil && deps.App.Auth() != nil {
-			v1.Use(AuthMiddleware(deps.App.Auth()))
-		}
+		v1.Use(AuthMiddleware(deps.App.Auth()))
 		v1.Post("/chat/completions", dispatchHandler(deps, domain.RequestTypeChat))
 		v1.Post("/messages", dispatchHandler(deps, domain.RequestTypeMessages))
 		v1.Post("/embeddings", dispatchHandler(deps, domain.RequestTypeEmbeddings))
@@ -65,7 +63,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	return r
 }
 
-// dispatchHandler reads the body, builds a domain.Request, and dispatches.
+// dispatchHandler reads the body and delegates to app.Handle.
 func dispatchHandler(deps RouterDeps, reqType domain.RequestType) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bundle := BundleFromContext(r.Context())
@@ -80,37 +78,22 @@ func dispatchHandler(deps RouterDeps, reqType domain.RequestType) http.HandlerFu
 			return
 		}
 
-		model, streaming := peekModelAndStream(body)
-		req := &domain.Request{
-			Type:      reqType,
-			Model:     model,
-			Body:      body,
-			Streaming: streaming,
-		}
-
-		if streaming {
-			result, dispatchErr := deps.App.DispatchStream(r.Context(), bundle, req)
-			if dispatchErr != nil {
-				herr.WriteHTTP(w, dispatchErr)
-				return
-			}
-			setMetaHeaders(w, result.Meta)
-			writeSSE(r.Context(), w, result.Iterator)
-			return
-		}
-
-		result, dispatchErr := deps.App.Dispatch(r.Context(), bundle, req)
-		if dispatchErr != nil {
-			herr.WriteHTTP(w, dispatchErr)
+		result, handleErr := deps.App.Handle(r.Context(), bundle, reqType, body)
+		if handleErr != nil {
+			herr.WriteHTTP(w, handleErr)
 			return
 		}
 
 		setMetaHeaders(w, result.Meta)
-		w.Header().Set("Content-Type", "application/json")
-		if result.Response.StatusCode > 0 {
-			w.WriteHeader(result.Response.StatusCode)
+		if result.Streaming {
+			writeSSE(r.Context(), w, result.Iterator)
+		} else {
+			w.Header().Set("Content-Type", "application/json")
+			if result.Response.StatusCode > 0 {
+				w.WriteHeader(result.Response.StatusCode)
+			}
+			_, _ = w.Write(result.Response.Body)
 		}
-		_, _ = w.Write(result.Response.Body)
 	}
 }
 
@@ -217,13 +200,3 @@ func registerErrorStatuses() {
 	herr.RegisterStatus(domain.ErrInternal, http.StatusInternalServerError)
 }
 
-// --- Body peeking ---
-
-func peekModelAndStream(body []byte) (model string, streaming bool) {
-	var peek struct {
-		Model  string `json:"model"`
-		Stream bool   `json:"stream"`
-	}
-	_ = json.Unmarshal(body, &peek)
-	return peek.Model, peek.Stream
-}

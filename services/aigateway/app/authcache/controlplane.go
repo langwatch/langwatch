@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 
 	"github.com/langwatch/langwatch/pkg/herr"
@@ -84,7 +85,7 @@ func (cp *ControlPlaneClient) ResolveKey(ctx context.Context, rawKey string) (*d
 
 // FetchConfig retrieves the VK's full config from the control plane.
 func (cp *ControlPlaneClient) FetchConfig(ctx context.Context, vkID string) (domain.BundleConfig, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", cp.baseURL+"/api/internal/gateway/config/"+vkID, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", cp.baseURL+"/api/internal/gateway/config/"+url.PathEscape(vkID), nil)
 	if err != nil {
 		return domain.BundleConfig{}, err
 	}

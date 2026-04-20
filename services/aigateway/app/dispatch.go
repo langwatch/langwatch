@@ -14,16 +14,15 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// DispatchResult carries the response plus transport-layer metadata.
-type DispatchResult struct {
+// HandleResult is the unified result from Handle — the single entry point
+// for transport. Streaming indicates which field to read.
+type HandleResult struct {
+	Meta      DispatchMeta
+	Streaming bool
+	// Set when !Streaming
 	Response *domain.Response
-	Meta     DispatchMeta
-}
-
-// StreamResult carries the iterator plus transport-layer metadata.
-type StreamResult struct {
+	// Set when Streaming
 	Iterator domain.StreamIterator
-	Meta     DispatchMeta
 }
 
 // DispatchMeta holds metadata accumulated during dispatch for response headers.
@@ -34,8 +33,46 @@ type DispatchMeta struct {
 	CacheMode        string
 }
 
-// Dispatch handles a non-streaming request.
-func (a *App) Dispatch(ctx context.Context, bundle *domain.Bundle, req *domain.Request) (*DispatchResult, error) {
+// Handle is the single entry point for transport. It parses the body,
+// determines streaming vs non-streaming, and dispatches accordingly.
+func (a *App) Handle(ctx context.Context, bundle *domain.Bundle, reqType domain.RequestType, body []byte) (*HandleResult, error) {
+	model, streaming := peekModelAndStream(body)
+	req := &domain.Request{
+		Type:      reqType,
+		Model:     model,
+		Body:      body,
+		Streaming: streaming,
+	}
+
+	if streaming {
+		result, err := a.dispatchStream(ctx, bundle, req)
+		if err != nil {
+			return nil, err
+		}
+		return &HandleResult{Meta: result.Meta, Streaming: true, Iterator: result.Iterator}, nil
+	}
+
+	result, err := a.dispatch(ctx, bundle, req)
+	if err != nil {
+		return nil, err
+	}
+	return &HandleResult{Meta: result.Meta, Response: result.Response}, nil
+}
+
+// dispatchResult carries the response plus metadata (internal).
+type dispatchResult struct {
+	Response *domain.Response
+	Meta     DispatchMeta
+}
+
+// streamResult carries the iterator plus metadata (internal).
+type streamResult struct {
+	Iterator domain.StreamIterator
+	Meta     DispatchMeta
+}
+
+// dispatch handles a non-streaming request.
+func (a *App) dispatch(ctx context.Context, bundle *domain.Bundle, req *domain.Request) (*dispatchResult, error) {
 	meta, err := a.preDispatch(ctx, bundle, req)
 	if err != nil {
 		return nil, err
@@ -57,11 +94,11 @@ func (a *App) Dispatch(ctx context.Context, bundle *domain.Bundle, req *domain.R
 	}
 
 	a.recordCompletion(ctx, bundle, req, resp.Usage, time.Since(start), false)
-	return &DispatchResult{Response: resp, Meta: meta}, nil
+	return &dispatchResult{Response: resp, Meta: meta}, nil
 }
 
-// DispatchStream handles a streaming request.
-func (a *App) DispatchStream(ctx context.Context, bundle *domain.Bundle, req *domain.Request) (*StreamResult, error) {
+// dispatchStream handles a streaming request.
+func (a *App) dispatchStream(ctx context.Context, bundle *domain.Bundle, req *domain.Request) (*streamResult, error) {
 	meta, err := a.preDispatch(ctx, bundle, req)
 	if err != nil {
 		return nil, err
@@ -78,7 +115,7 @@ func (a *App) DispatchStream(ctx context.Context, bundle *domain.Bundle, req *do
 	}
 
 	wrapped := newGuardedStream(iter, a, bundle, req)
-	return &StreamResult{Iterator: wrapped, Meta: meta}, nil
+	return &streamResult{Iterator: wrapped, Meta: meta}, nil
 }
 
 // --- Pre/post dispatch ---
@@ -234,4 +271,13 @@ func rewriteModel(body []byte, model string) []byte {
 		return body
 	}
 	return out
+}
+
+func peekModelAndStream(body []byte) (model string, streaming bool) {
+	var peek struct {
+		Model  string `json:"model"`
+		Stream bool   `json:"stream"`
+	}
+	_ = json.Unmarshal(body, &peek)
+	return peek.Model, peek.Stream
 }

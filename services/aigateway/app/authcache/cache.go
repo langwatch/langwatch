@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -70,7 +71,10 @@ func New(opts Options) (*Cache, error) {
 		return nil, err
 	}
 
-	signer := NewSigner(opts.InternalSecret, opts.NodeID)
+	signer, err := NewSigner(opts.InternalSecret, opts.NodeID)
+	if err != nil {
+		return nil, fmt.Errorf("auth cache: %w", err)
+	}
 	verifier := NewJWTVerifier(opts.JWTSecret, opts.JWTSecretPrevious)
 	cp := NewControlPlaneClient(opts.BaseURL, signer, verifier, &http.Client{Timeout: 2 * time.Second})
 

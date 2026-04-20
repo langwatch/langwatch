@@ -116,11 +116,13 @@ func Run(ctx context.Context) error {
 		OnResolved: func(b *domain.Bundle) {
 			// Populate per-project OTLP routing
 			if b.ProjectID != "" && b.Config.ProjectOTLPToken != "" && cfg.OTel.DefaultExportEndpoint != "" {
-				projectRegistry.Set(
+				if err := projectRegistry.Set(
 					b.ProjectID,
 					cfg.OTel.DefaultExportEndpoint,
 					map[string]string{"X-Auth-Token": b.Config.ProjectOTLPToken},
-				)
+				); err != nil {
+					logger.Warn("otlp_endpoint_rejected", zap.String("project_id", b.ProjectID), zap.Error(err))
+				}
 			}
 		},
 	})

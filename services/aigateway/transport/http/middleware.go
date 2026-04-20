@@ -13,9 +13,17 @@ import (
 type bundleCtxKey struct{}
 
 // AuthMiddleware resolves bearer tokens and attaches the bundle to context.
+// If resolver is nil, all requests are rejected (fail closed).
 func AuthMiddleware(resolver app.AuthResolver) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if resolver == nil {
+				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInternal, herr.M{
+					"reason": "auth not configured",
+				}))
+				return
+			}
+
 			token := extractToken(r)
 			if token == "" {
 				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInvalidAPIKey, herr.M{

@@ -140,12 +140,8 @@ func testBundle(creds ...domain.Credential) *domain.Bundle {
 	}
 }
 
-func testRequest() *domain.Request {
-	return &domain.Request{
-		Type:  domain.RequestTypeChat,
-		Model: "gpt-4",
-		Body:  []byte(`{"model":"gpt-4","messages":[{"role":"user","content":"hi"}]}`),
-	}
+func testBody() []byte {
+	return []byte(`{"model":"gpt-4","messages":[{"role":"user","content":"hi"}]}`)
 }
 
 func successResponse() *domain.Response {
@@ -170,7 +166,7 @@ func TestDispatch_HappyPath(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	result, err := application.Dispatch(context.Background(), testBundle(), testRequest())
+	result, err := application.Handle(context.Background(), testBundle(), domain.RequestTypeChat, testBody())
 	require.NoError(t, err)
 	assert.Equal(t, successResponse().Body, result.Response.Body)
 	assert.NotEmpty(t, result.Meta.GatewayRequestID)
@@ -194,7 +190,7 @@ func TestDispatch_RateLimitBlocked(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.Dispatch(context.Background(), testBundle(), testRequest())
+	_, err := application.Handle(context.Background(), testBundle(), domain.RequestTypeChat, testBody())
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrRateLimited))
 }
@@ -217,7 +213,7 @@ func TestDispatch_BudgetBlocked(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.Dispatch(context.Background(), testBundle(), testRequest())
+	_, err := application.Handle(context.Background(), testBundle(), domain.RequestTypeChat, testBody())
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrBudgetExceeded))
 }
@@ -240,7 +236,7 @@ func TestDispatch_BudgetWarn(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	result, err := application.Dispatch(context.Background(), testBundle(), testRequest())
+	result, err := application.Handle(context.Background(), testBundle(), domain.RequestTypeChat, testBody())
 	require.NoError(t, err)
 	assert.Contains(t, result.Meta.BudgetWarnings, "near_limit")
 }
@@ -266,7 +262,7 @@ func TestDispatch_GuardrailPreBlocked(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.Dispatch(context.Background(), bundle, testRequest())
+	_, err := application.Handle(context.Background(), bundle, domain.RequestTypeChat, testBody())
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrGuardrailBlocked))
 }
@@ -292,7 +288,7 @@ func TestDispatch_GuardrailPostBlocked(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.Dispatch(context.Background(), bundle, testRequest())
+	_, err := application.Handle(context.Background(), bundle, domain.RequestTypeChat, testBody())
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrGuardrailBlocked))
 }
@@ -320,7 +316,7 @@ func TestDispatch_BlockedPattern(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.Dispatch(context.Background(), bundle, testRequest())
+	_, err := application.Handle(context.Background(), bundle, domain.RequestTypeChat, testBody())
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrBlockedPattern))
 }
@@ -349,7 +345,7 @@ func TestDispatch_ModelResolution(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	result, err := application.Dispatch(context.Background(), testBundle(), testRequest())
+	result, err := application.Handle(context.Background(), testBundle(), domain.RequestTypeChat, testBody())
 	require.NoError(t, err)
 	assert.NotNil(t, result.Response)
 
@@ -385,7 +381,7 @@ func TestDispatch_FallbackOnProviderError(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	result, err := application.Dispatch(context.Background(), bundle, testRequest())
+	result, err := application.Handle(context.Background(), bundle, domain.RequestTypeChat, testBody())
 	require.NoError(t, err)
 	assert.Equal(t, 2, callCount)
 	assert.Equal(t, 1, result.Meta.FallbackCount)
@@ -405,7 +401,7 @@ func TestDispatch_DebitsCostAfterSuccess(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.Dispatch(context.Background(), testBundle(), testRequest())
+	_, err := application.Handle(context.Background(), testBundle(), domain.RequestTypeChat, testBody())
 	require.NoError(t, err)
 	assert.Equal(t, 1, budget.debitCalls)
 }
@@ -426,7 +422,7 @@ func TestDispatch_EmitsTraceAfterSuccess(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.Dispatch(context.Background(), testBundle(), testRequest())
+	_, err := application.Handle(context.Background(), testBundle(), domain.RequestTypeChat, testBody())
 	require.NoError(t, err)
 	assert.Equal(t, 1, traces.emitCalls)
 	assert.Equal(t, "proj-test", traces.lastParams.ProjectID)
@@ -445,7 +441,7 @@ func TestDispatch_NilDependenciesAreSkipped(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	result, err := application.Dispatch(context.Background(), testBundle(), testRequest())
+	result, err := application.Handle(context.Background(), testBundle(), domain.RequestTypeChat, testBody())
 	require.NoError(t, err)
 	assert.NotNil(t, result.Response)
 	assert.NotEmpty(t, result.Meta.GatewayRequestID)

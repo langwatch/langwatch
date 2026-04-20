@@ -8,8 +8,21 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewSigner_RequiresSecret(t *testing.T) {
+	_, err := NewSigner("", "node-1")
+	require.ErrorIs(t, err, ErrEmptySecret)
+}
+
+func TestNewSigner_AcceptsNonEmptySecret(t *testing.T) {
+	s, err := NewSigner("my-secret", "node-42")
+	require.NoError(t, err)
+	assert.NotNil(t, s)
+}
+
 func TestSign_SetsHeaders(t *testing.T) {
-	s := NewSigner("my-secret", "node-42")
+	s, err := NewSigner("my-secret", "node-42")
+	require.NoError(t, err)
+
 	req, err := http.NewRequest("POST", "http://localhost/api", nil)
 	require.NoError(t, err)
 
@@ -21,20 +34,10 @@ func TestSign_SetsHeaders(t *testing.T) {
 	assert.Equal(t, "node-42", req.Header.Get("X-Gateway-Node-ID"), "node ID header should be set")
 }
 
-func TestSign_EmptySecret(t *testing.T) {
-	s := NewSigner("", "node-1")
-	req, err := http.NewRequest("POST", "http://localhost/api", nil)
+func TestSign_DeterministicMAC(t *testing.T) {
+	s, err := NewSigner("deterministic-secret", "node-1")
 	require.NoError(t, err)
 
-	s.Sign(req, []byte(`{"model":"gpt-4"}`))
-
-	assert.Empty(t, req.Header.Get("X-Gateway-Timestamp"), "no headers should be set with empty secret")
-	assert.Empty(t, req.Header.Get("X-Gateway-Signature"), "no headers should be set with empty secret")
-	assert.Empty(t, req.Header.Get("X-Gateway-Node-ID"), "no headers should be set with empty secret")
-}
-
-func TestSign_DeterministicMAC(t *testing.T) {
-	s := NewSigner("deterministic-secret", "node-1")
 	body := []byte(`{"model":"gpt-4","messages":[]}`)
 
 	// Sign twice with the same body
