@@ -493,14 +493,14 @@ Feature: Customer.io nurturing integration
     Given no existing attribution in sessionStorage
     And the URL contains "?ref=website"
     When the attribution capture hook mounts
-    Then sessionStorage key "lw_attrib.ref" equals "website"
+    Then sessionStorage key "lw_attrib.leadSource" equals "website"
 
   @unit
   Scenario: Attribution hook does not overwrite existing first-touch values
-    Given sessionStorage "lw_attrib.ref" is already "original"
+    Given sessionStorage "lw_attrib.leadSource" is already "original"
     And the URL contains "?ref=later"
     When the attribution capture hook mounts
-    Then sessionStorage key "lw_attrib.ref" remains "original"
+    Then sessionStorage key "lw_attrib.leadSource" remains "original"
 
   @unit
   Scenario: Attribution hook captures full utm tuple when present in URL

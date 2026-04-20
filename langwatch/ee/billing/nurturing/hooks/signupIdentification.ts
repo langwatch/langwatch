@@ -95,7 +95,7 @@ export function fireSignupNurturingCalls({
     .trackEvent({
       userId,
       event: "signed_up",
-      properties: pickDefined({ ...(signUpData ?? {}) }),
+      properties: pickDefined(signUpData ?? {}),
     })
     .catch(captureException);
 }

@@ -7,8 +7,8 @@ import {
 
 /**
  * Strips query and fragment from a referrer URL so we never forward
- * sensitive path/query/hash data (e.g. tokens in redirect URLs) to
- * Customer.io. Returns null when the referrer isn't a parseable URL.
+ * sensitive query params or hash data to Customer.io.
+ * Returns null when the referrer isn't a parseable URL.
  */
 function sanitizeReferrer(referrer: string): string | null {
   try {

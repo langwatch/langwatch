@@ -96,6 +96,20 @@ describe("useAttributionCapture()", () => {
       });
     });
 
+    describe("when document.referrer contains query params and hash", () => {
+      beforeEach(() => {
+        setReferrer("https://example.com/page?token=secret#section");
+      });
+
+      it("strips query and hash before storing", () => {
+        renderHook(() => useAttributionCapture());
+
+        expect(window.sessionStorage.getItem("lw_attrib.referrer")).toBe(
+          "https://example.com/page",
+        );
+      });
+    });
+
     describe("when the URL contains an empty ref param", () => {
       beforeEach(() => {
         setUrl("?ref=");
