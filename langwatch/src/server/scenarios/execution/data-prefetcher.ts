@@ -14,6 +14,7 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
+import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 import {
@@ -461,7 +462,7 @@ async function fetchWorkflowAgentData(
 
   const { inputs, outputs } = extractWorkflowIO(latest.dsl);
 
-  return {
+  const data: WorkflowAgentData = {
     type: "workflow",
     agentId: agent.id,
     workflowId: latest.workflowId,
@@ -471,6 +472,10 @@ async function fetchWorkflowAgentData(
     scenarioMappings: config.scenarioMappings,
     scenarioOutputField: config.scenarioOutputField,
   };
+
+  validateWorkflowAgentMappings(data);
+
+  return data;
 }
 
 /**
