@@ -69,6 +69,6 @@ list inside the script.
 
 Run locally:
 
-```
+```bash
 cd langwatch && pnpm check:feature-parity
 ```
