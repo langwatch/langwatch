@@ -1,7 +1,11 @@
-import type { Attribution } from "../../../../src/hooks/attribution";
+import type { z } from "zod";
+
 import { getApp } from "../../../../src/server/app-layer/app";
+import type { signUpDataSchema } from "../../../../src/server/api/routers/onboarding/schemas/sign-up-data.schema";
 import { captureException } from "../../../../src/utils/posthogErrorCapture";
 import type { CioPersonTraits } from "../types";
+
+type SignUpData = z.infer<typeof signUpDataSchema>;
 
 /**
  * Returns a new object with null, undefined, and empty-string values
@@ -42,16 +46,7 @@ export function fireSignupNurturingCalls({
   name: string | null | undefined;
   organizationId: string;
   organizationName: string;
-  signUpData?:
-    | (Partial<Attribution> & {
-        yourRole?: string | null;
-        companySize?: string | null;
-        usage?: string | null;
-        solution?: string | null;
-        featureUsage?: string | null;
-        howDidYouHearAboutUs?: string | null;
-      })
-    | null;
+  signUpData?: SignUpData | null;
 }): void {
   const nurturing = getApp().nurturing;
   if (!nurturing) return;
@@ -100,7 +95,7 @@ export function fireSignupNurturingCalls({
     .trackEvent({
       userId,
       event: "signed_up",
-      properties: { ...(signUpData ?? {}) },
+      properties: pickDefined({ ...(signUpData ?? {}) }),
     })
     .catch(captureException);
 }

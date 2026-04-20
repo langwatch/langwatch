@@ -535,4 +535,4 @@ Feature: Customer.io nurturing integration
   Scenario: Signup without attribution omits those fields from Customer.io traits
     Given a user completes onboarding with no attribution data
     When the onboarding flow completes
-    Then the user traits sent to Customer.io do not include lead_source, utm_source, utm_medium, utm_term, utm_content, or referrer keys
+    Then the user traits sent to Customer.io do not include lead_source, utm_source, utm_medium, utm_campaign, utm_term, utm_content, or referrer keys

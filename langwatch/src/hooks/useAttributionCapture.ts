@@ -6,6 +6,22 @@ import {
 } from "./attribution";
 
 /**
+ * Strips query and fragment from a referrer URL so we never forward
+ * sensitive path/query/hash data (e.g. tokens in redirect URLs) to
+ * Customer.io. Returns null when the referrer isn't a parseable URL.
+ */
+function sanitizeReferrer(referrer: string): string | null {
+  try {
+    const url = new URL(referrer);
+    url.search = "";
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Captures first-touch attribution on mount.
  *
  * Writes `?ref=` + utm_* URL params and `document.referrer` into
@@ -30,8 +46,11 @@ export function useAttributionCapture(): void {
       if (value) setAttributionIfAbsent(field, value);
     }
 
-    if (document.referrer) {
-      setAttributionIfAbsent("referrer", document.referrer);
+    const referrer = document.referrer
+      ? sanitizeReferrer(document.referrer)
+      : null;
+    if (referrer) {
+      setAttributionIfAbsent("referrer", referrer);
     }
   }, []);
 }
