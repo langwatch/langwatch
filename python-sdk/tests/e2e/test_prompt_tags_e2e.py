@@ -54,7 +54,7 @@ class TestPromptTagsE2E:
         LocalPromptLoader._cached_project_root = None
         LocalPromptLoader._warned_no_prompts_path = False
 
-    def test_assign_tag_then_fetch_by_tag(self):
+    def test_assign_tag_then_fetch_by_tag(self, prompt_factory):
         """
         GIVEN a prompt with a version on the server
         WHEN I assign the "production" tag to that version
@@ -63,32 +63,26 @@ class TestPromptTagsE2E:
         """
         handle = f"e2e-tag-assign-{uuid4().hex[:8]}"
 
-        created = langwatch.prompts.create(
+        created = prompt_factory(
             handle=handle,
             prompt="Hello from tag assignment e2e test",
         )
 
-        try:
-            # Assign "production" tag to the created version
-            langwatch.prompts.tags.assign(
-                handle,
-                tag="production",
-                version_id=created.version_id,
-            )
+        # Assign "production" tag to the created version
+        langwatch.prompts.tags.assign(
+            handle,
+            tag="production",
+            version_id=created.version_id,
+        )
 
-            # Fetch by tag
-            fetched = langwatch.prompts.get(handle, tag="production")
+        # Fetch by tag
+        fetched = langwatch.prompts.get(handle, tag="production")
 
-            assert fetched is not None
-            assert fetched.handle == handle
-            assert fetched.version_id == created.version_id
-        finally:
-            try:
-                langwatch.prompts.delete(created.id)
-            except Exception as e:
-                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+        assert fetched is not None
+        assert fetched.handle == handle
+        assert fetched.version_id == created.version_id
 
-    def test_fetch_without_tag_returns_latest(self):
+    def test_fetch_without_tag_returns_latest(self, prompt_factory):
         """
         GIVEN a prompt with two versions, where "production" is assigned to v1
         WHEN I fetch without a tag
@@ -96,40 +90,34 @@ class TestPromptTagsE2E:
         """
         handle = f"e2e-tag-latest-{uuid4().hex[:8]}"
 
-        created = langwatch.prompts.create(
+        created = prompt_factory(
             handle=handle,
             prompt="Version 1 content",
         )
 
-        try:
-            # Assign production to v1
-            langwatch.prompts.tags.assign(
-                handle,
-                tag="production",
-                version_id=created.version_id,
-            )
+        # Assign production to v1
+        langwatch.prompts.tags.assign(
+            handle,
+            tag="production",
+            version_id=created.version_id,
+        )
 
-            # Update to create v2
-            updated = langwatch.prompts.update(
-                handle,
-                scope="PROJECT",
-                commit_message="Create v2 for tag test",
-                prompt="Version 2 content",
-            )
+        # Update to create v2
+        updated = langwatch.prompts.update(
+            handle,
+            scope="PROJECT",
+            commit_message="Create v2 for tag test",
+            prompt="Version 2 content",
+        )
 
-            # Fetch without tag -- expect latest (v2)
-            fetched = langwatch.prompts.get(handle)
+        # Fetch without tag -- expect latest (v2)
+        fetched = langwatch.prompts.get(handle)
 
-            assert fetched is not None
-            assert fetched.version_id == updated.version_id
-            assert fetched.version_id != created.version_id
-        finally:
-            try:
-                langwatch.prompts.delete(created.id)
-            except Exception as e:
-                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+        assert fetched is not None
+        assert fetched.version_id == updated.version_id
+        assert fetched.version_id != created.version_id
 
-    def test_create_prompt_with_tags(self):
+    def test_create_prompt_with_tags(self, prompt_factory):
         """
         GIVEN a new prompt
         WHEN I create it with tags=["production"]
@@ -138,26 +126,20 @@ class TestPromptTagsE2E:
         """
         handle = f"e2e-create-tags-{uuid4().hex[:8]}"
 
-        created = langwatch.prompts.create(
+        created = prompt_factory(
             handle=handle,
             prompt="Created with production tag",
             tags=["production"],
         )
 
-        try:
-            # Fetch by tag to verify assignment
-            fetched = langwatch.prompts.get(handle, tag="production")
+        # Fetch by tag to verify assignment
+        fetched = langwatch.prompts.get(handle, tag="production")
 
-            assert fetched is not None
-            assert fetched.handle == handle
-            assert fetched.version_id == created.version_id
-        finally:
-            try:
-                langwatch.prompts.delete(created.id)
-            except Exception as e:
-                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+        assert fetched is not None
+        assert fetched.handle == handle
+        assert fetched.version_id == created.version_id
 
-    def test_update_prompt_with_tags(self):
+    def test_update_prompt_with_tags(self, prompt_factory):
         """
         GIVEN an existing prompt
         WHEN I update it with tags=["staging"]
@@ -165,33 +147,27 @@ class TestPromptTagsE2E:
         """
         handle = f"e2e-update-tags-{uuid4().hex[:8]}"
 
-        created = langwatch.prompts.create(
+        prompt_factory(
             handle=handle,
             prompt="Original content",
         )
 
-        try:
-            updated = langwatch.prompts.update(
-                handle,
-                scope="PROJECT",
-                commit_message="Update with staging tag",
-                prompt="Updated with staging tag",
-                tags=["staging"],
-            )
+        updated = langwatch.prompts.update(
+            handle,
+            scope="PROJECT",
+            commit_message="Update with staging tag",
+            prompt="Updated with staging tag",
+            tags=["staging"],
+        )
 
-            # Fetch by staging tag
-            fetched = langwatch.prompts.get(handle, tag="staging")
+        # Fetch by staging tag
+        fetched = langwatch.prompts.get(handle, tag="staging")
 
-            assert fetched is not None
-            assert fetched.handle == handle
-            assert fetched.version_id == updated.version_id
-        finally:
-            try:
-                langwatch.prompts.delete(created.id)
-            except Exception as e:
-                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+        assert fetched is not None
+        assert fetched.handle == handle
+        assert fetched.version_id == updated.version_id
 
-    def test_fetch_by_explicit_version_number(self):
+    def test_fetch_by_explicit_version_number(self, prompt_factory):
         """
         GIVEN a prompt with two versions
         WHEN I fetch with version_number=1
@@ -199,32 +175,26 @@ class TestPromptTagsE2E:
         """
         handle = f"e2e-version-{uuid4().hex[:8]}"
 
-        created = langwatch.prompts.create(
+        created = prompt_factory(
             handle=handle,
             prompt="Version 1",
         )
 
-        try:
-            langwatch.prompts.update(
-                handle,
-                scope="PROJECT",
-                commit_message="Create v2",
-                prompt="Version 2",
-            )
+        langwatch.prompts.update(
+            handle,
+            scope="PROJECT",
+            commit_message="Create v2",
+            prompt="Version 2",
+        )
 
-            # Fetch v1 explicitly
-            fetched = langwatch.prompts.get(handle, version_number=1)
+        # Fetch v1 explicitly
+        fetched = langwatch.prompts.get(handle, version_number=1)
 
-            assert fetched is not None
-            assert fetched.version == 1
-            assert fetched.version_id == created.version_id
-        finally:
-            try:
-                langwatch.prompts.delete(created.id)
-            except Exception as e:
-                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+        assert fetched is not None
+        assert fetched.version == 1
+        assert fetched.version_id == created.version_id
 
-    def test_shorthand_version_passes_through_as_id(self):
+    def test_shorthand_version_passes_through_as_id(self, prompt_factory):
         """
         GIVEN a prompt with two versions
         WHEN SDK calls get("handle:1")
@@ -232,32 +202,26 @@ class TestPromptTagsE2E:
         """
         handle = f"e2e-shorthand-ver-{uuid4().hex[:8]}"
 
-        created = langwatch.prompts.create(
+        created = prompt_factory(
             handle=handle,
             prompt="Version 1",
         )
 
-        try:
-            langwatch.prompts.update(
-                handle,
-                scope="PROJECT",
-                commit_message="Create v2",
-                prompt="Version 2",
-            )
+        langwatch.prompts.update(
+            handle,
+            scope="PROJECT",
+            commit_message="Create v2",
+            prompt="Version 2",
+        )
 
-            # Use version shorthand - SDK passes "handle:1" to the API
-            fetched = langwatch.prompts.get(f"{handle}:1")
+        # Use version shorthand - SDK passes "handle:1" to the API
+        fetched = langwatch.prompts.get(f"{handle}:1")
 
-            assert fetched is not None
-            assert fetched.version == 1
-            assert fetched.version_id == created.version_id
-        finally:
-            try:
-                langwatch.prompts.delete(created.id)
-            except Exception as e:
-                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+        assert fetched is not None
+        assert fetched.version == 1
+        assert fetched.version_id == created.version_id
 
-    def test_create_prompt_with_multiple_tags(self):
+    def test_create_prompt_with_multiple_tags(self, prompt_factory):
         """
         GIVEN a new prompt
         WHEN I create it with tags=["production", "staging"]
@@ -265,30 +229,24 @@ class TestPromptTagsE2E:
         """
         handle = f"e2e-multi-tags-{uuid4().hex[:8]}"
 
-        created = langwatch.prompts.create(
+        created = prompt_factory(
             handle=handle,
             prompt="Created with multiple tags",
             tags=["production", "staging"],
         )
 
-        try:
-            fetched_prod = langwatch.prompts.get(handle, tag="production")
-            fetched_staging = langwatch.prompts.get(handle, tag="staging")
+        fetched_prod = langwatch.prompts.get(handle, tag="production")
+        fetched_staging = langwatch.prompts.get(handle, tag="staging")
 
-            assert fetched_prod is not None
-            assert fetched_prod.handle == handle
-            assert fetched_prod.version_id == created.version_id
+        assert fetched_prod is not None
+        assert fetched_prod.handle == handle
+        assert fetched_prod.version_id == created.version_id
 
-            assert fetched_staging is not None
-            assert fetched_staging.handle == handle
-            assert fetched_staging.version_id == created.version_id
-        finally:
-            try:
-                langwatch.prompts.delete(created.id)
-            except Exception as e:
-                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+        assert fetched_staging is not None
+        assert fetched_staging.handle == handle
+        assert fetched_staging.version_id == created.version_id
 
-    def test_assign_custom_tag_then_fetch_by_tag(self):
+    def test_assign_custom_tag_then_fetch_by_tag(self, prompt_factory):
         """
         GIVEN a prompt with a version on the server
         WHEN I assign tag="canary" to that version
@@ -297,30 +255,24 @@ class TestPromptTagsE2E:
         """
         handle = f"e2e-custom-tag-{uuid4().hex[:8]}"
 
-        created = langwatch.prompts.create(
+        created = prompt_factory(
             handle=handle,
             prompt="Hello from custom tag e2e test",
         )
 
-        try:
-            langwatch.prompts.tags.assign(
-                handle,
-                tag="canary",
-                version_id=created.version_id,
-            )
+        langwatch.prompts.tags.assign(
+            handle,
+            tag="canary",
+            version_id=created.version_id,
+        )
 
-            fetched = langwatch.prompts.get(handle, tag="canary")
+        fetched = langwatch.prompts.get(handle, tag="canary")
 
-            assert fetched is not None
-            assert fetched.handle == handle
-            assert fetched.version_id == created.version_id
-        finally:
-            try:
-                langwatch.prompts.delete(created.id)
-            except Exception as e:
-                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+        assert fetched is not None
+        assert fetched.handle == handle
+        assert fetched.version_id == created.version_id
 
-    def test_shorthand_syntax_with_custom_tag(self):
+    def test_shorthand_syntax_with_custom_tag(self, prompt_factory):
         """
         GIVEN a prompt with tag="canary" assigned
         WHEN SDK calls get("handle:canary")
@@ -328,28 +280,22 @@ class TestPromptTagsE2E:
         """
         handle = f"e2e-shorthand-canary-{uuid4().hex[:8]}"
 
-        created = langwatch.prompts.create(
+        created = prompt_factory(
             handle=handle,
             prompt="Shorthand custom tag test",
         )
 
-        try:
-            langwatch.prompts.tags.assign(
-                handle,
-                tag="canary",
-                version_id=created.version_id,
-            )
+        langwatch.prompts.tags.assign(
+            handle,
+            tag="canary",
+            version_id=created.version_id,
+        )
 
-            fetched = langwatch.prompts.get(f"{handle}:canary")
+        fetched = langwatch.prompts.get(f"{handle}:canary")
 
-            assert fetched is not None
-            assert fetched.handle == handle
-            assert fetched.version_id == created.version_id
-        finally:
-            try:
-                langwatch.prompts.delete(created.id)
-            except Exception as e:
-                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+        assert fetched is not None
+        assert fetched.handle == handle
+        assert fetched.version_id == created.version_id
 
     def test_create_list_delete_tag_round_trip(self):
         """
@@ -401,7 +347,7 @@ class TestPromptTagsE2E:
             except Exception as e:
                 logger.warning("Failed to delete tag %s: %s", tag_b, e)
 
-    def test_delete_tag_cascades_to_assignments(self):
+    def test_delete_tag_cascades_to_assignments(self, prompt_factory):
         """
         GIVEN a prompt with a custom tag assigned
         WHEN I delete the tag
@@ -412,7 +358,7 @@ class TestPromptTagsE2E:
         handle = f"e2e-cascade-prompt-{uuid4().hex[:8]}"
 
         langwatch.prompts.tags.create(tag_name)
-        created = langwatch.prompts.create(handle=handle, prompt="Cascade test")
+        created = prompt_factory(handle=handle, prompt="Cascade test")
 
         try:
             langwatch.prompts.tags.assign(
@@ -432,15 +378,11 @@ class TestPromptTagsE2E:
             assert fetched.handle == handle
         finally:
             try:
-                langwatch.prompts.delete(created.id)
-            except Exception as e:
-                logger.warning("Failed to delete prompt %s: %s", created.id, e)
-            try:
                 langwatch.prompts.tags.delete(tag_name)
             except Exception:
                 pass
 
-    def test_shorthand_syntax_passes_through_as_id(self):
+    def test_shorthand_syntax_passes_through_as_id(self, prompt_factory):
         """
         GIVEN a prompt with a tag assigned via explicit assign
         WHEN SDK calls get("handle:production")
@@ -449,27 +391,21 @@ class TestPromptTagsE2E:
         """
         handle = f"e2e-shorthand-{uuid4().hex[:8]}"
 
-        created = langwatch.prompts.create(
+        created = prompt_factory(
             handle=handle,
             prompt="Shorthand test",
         )
 
-        try:
-            # Assign tag explicitly first (create-with-tags may have timing issues)
-            langwatch.prompts.tags.assign(
-                handle,
-                tag="production",
-                version_id=created.version_id,
-            )
+        # Assign tag explicitly first (create-with-tags may have timing issues)
+        langwatch.prompts.tags.assign(
+            handle,
+            tag="production",
+            version_id=created.version_id,
+        )
 
-            # Use the shorthand syntax - the SDK passes it through to the API
-            fetched = langwatch.prompts.get(f"{handle}:production")
+        # Use the shorthand syntax - the SDK passes it through to the API
+        fetched = langwatch.prompts.get(f"{handle}:production")
 
-            assert fetched is not None
-            assert fetched.handle == handle
-            assert fetched.version_id == created.version_id
-        finally:
-            try:
-                langwatch.prompts.delete(created.id)
-            except Exception as e:
-                logger.warning("Failed to delete prompt %s: %s", created.id, e)
+        assert fetched is not None
+        assert fetched.handle == handle
+        assert fetched.version_id == created.version_id
