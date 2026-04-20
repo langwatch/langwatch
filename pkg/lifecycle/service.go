@@ -97,6 +97,7 @@ func (l *listenSvc) Start(ctx context.Context) error {
 	}
 	l.fatalCh = make(chan error, 1)
 	go func() {
+		defer close(l.fatalCh)
 		if err := l.srv.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 			l.fatalCh <- err
 		}

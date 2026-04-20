@@ -37,8 +37,7 @@ func (g *guardedStreamIterator) Next(ctx context.Context) bool {
 		return false
 	}
 	if !g.inner.Next(ctx) {
-		g.closed = true
-		g.onClose()
+		g.close()
 		return false
 	}
 
@@ -46,8 +45,7 @@ func (g *guardedStreamIterator) Next(ctx context.Context) bool {
 	if g.app.guardrails != nil && len(g.bundle.Config.Guardrails) > 0 {
 		verdict, err := g.app.guardrails.EvaluateChunk(ctx, g.bundle, g.req, g.inner.Chunk())
 		if err == nil && verdict.Action == GuardrailBlock {
-			g.closed = true
-			g.onClose()
+			g.close()
 			return false
 		}
 	}
@@ -60,10 +58,24 @@ func (g *guardedStreamIterator) Next(ctx context.Context) bool {
 	return true
 }
 
-func (g *guardedStreamIterator) Chunk() []byte       { return g.inner.Chunk() }
-func (g *guardedStreamIterator) Usage() domain.Usage  { return g.usage }
-func (g *guardedStreamIterator) Err() error           { return g.inner.Err() }
-func (g *guardedStreamIterator) Close() error         { return g.inner.Close() }
+func (g *guardedStreamIterator) Chunk() []byte      { return g.inner.Chunk() }
+func (g *guardedStreamIterator) Usage() domain.Usage { return g.usage }
+func (g *guardedStreamIterator) Err() error          { return g.inner.Err() }
+
+// Close is idempotent — ensures inner stream is closed and onClose fires exactly once.
+func (g *guardedStreamIterator) Close() error {
+	g.close()
+	return g.inner.Close()
+}
+
+func (g *guardedStreamIterator) close() {
+	if g.closed {
+		return
+	}
+	g.closed = true
+	_ = g.inner.Close()
+	g.onClose()
+}
 
 func (g *guardedStreamIterator) onClose() {
 	ctx := g.lastCtx

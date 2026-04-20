@@ -52,11 +52,15 @@ func New(opts Options) *Client {
 	if opts.Timeouts.StreamChunk == 0 {
 		opts.Timeouts.StreamChunk = 50 * time.Millisecond
 	}
+	logger := opts.Logger
+	if logger == nil {
+		logger = zap.NewNop()
+	}
 	return &Client{
 		endpoint: opts.ControlPlaneBaseURL + "/api/internal/gateway/guardrail/check",
 		sign:     opts.Sign,
 		client:   &http.Client{},
-		logger:   opts.Logger,
+		logger:   logger,
 		timeouts: opts.Timeouts,
 	}
 }

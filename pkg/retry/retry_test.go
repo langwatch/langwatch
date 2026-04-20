@@ -164,6 +164,33 @@ func TestWalk_BreakerSkipsSlot(t *testing.T) {
 	assert.Equal(t, "b", circuitEvent.SlotID)
 }
 
+func TestWalk_CircuitOpenDoesNotConsumeAttempts(t *testing.T) {
+	b := newMockBreaker()
+	b.blocked["a"] = true
+	b.blocked["b"] = true
+
+	chain := []string{"a", "b", "c", "d"}
+	calls := 0
+	attempt := func(_ context.Context, _ string) (string, error) {
+		calls++
+		return "", errRetryable
+	}
+
+	// MaxAttempts=1 but first two slots are circuit-open — they should NOT
+	// consume the budget. Only slot "c" should actually be attempted.
+	_, events, err := Walk(context.Background(), Options{MaxAttempts: 1, Breaker: b}, chain, attempt, retryableClassifier)
+
+	require.Error(t, err)
+	assert.Equal(t, 1, calls, "only 1 real attempt should be made")
+
+	// Events: circuit_open(a), circuit_open(b), retryable(c), chain_exhausted(d)
+	var reasons []Reason
+	for _, e := range events {
+		reasons = append(reasons, e.Reason)
+	}
+	assert.Equal(t, []Reason{ReasonCircuitOpen, ReasonCircuitOpen, ReasonRetryable5xx, ReasonChainExhausted}, reasons)
+}
+
 func TestWalk_EmptyChain(t *testing.T) {
 	attempt := func(_ context.Context, slot string) (string, error) {
 		return fmt.Sprintf("result-slot:%s", slot), nil

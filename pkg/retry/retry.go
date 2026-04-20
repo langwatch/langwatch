@@ -80,12 +80,9 @@ func Walk[R any](ctx context.Context, opts Options, chain []string, try Attempt[
 
 	var events []Event
 	var firstErr error
+	attempts := 0
 
 	for i, slotID := range chain {
-		if opts.MaxAttempts > 0 && i >= opts.MaxAttempts {
-			events = append(events, Event{Slot: i, SlotID: slotID, Reason: ReasonChainExhausted})
-			break
-		}
 		if err := ctx.Err(); err != nil {
 			events = append(events, Event{Slot: i, SlotID: slotID, Reason: ReasonContextDone, Err: err})
 			return zero, events, err
@@ -94,6 +91,11 @@ func Walk[R any](ctx context.Context, opts Options, chain []string, try Attempt[
 			events = append(events, Event{Slot: i, SlotID: slotID, Reason: ReasonCircuitOpen})
 			continue
 		}
+		if opts.MaxAttempts > 0 && attempts >= opts.MaxAttempts {
+			events = append(events, Event{Slot: i, SlotID: slotID, Reason: ReasonChainExhausted})
+			break
+		}
+		attempts++
 
 		attemptCtx := ctx
 		var cancel context.CancelFunc

@@ -41,10 +41,13 @@ type ErrorBody struct {
 // WriteHTTP writes an error as a JSON response. If the error is a herr.E,
 // uses its code as the type and looks up the HTTP status. Otherwise writes
 // a generic 500 with code "unknown".
+//
+// The message exposed to clients is derived from Meta["reason"] or
+// Meta["message"] to avoid leaking internal error chains and stack traces.
 func WriteHTTP(w http.ResponseWriter, err error) {
 	var e E
 	if !errors.As(err, &e) {
-		e = E{Code: "unknown", Meta: M{"error": err.Error()}}
+		e = E{Code: "unknown"}
 	}
 
 	status := http.StatusInternalServerError
@@ -57,7 +60,19 @@ func WriteHTTP(w http.ResponseWriter, err error) {
 	_ = json.NewEncoder(w).Encode(ErrorResponse{
 		Error: ErrorBody{
 			Type:    string(e.Code),
-			Message: e.Error(),
+			Message: clientMessage(e),
 		},
 	})
+}
+
+// clientMessage returns a safe message for HTTP clients — only exposes
+// explicit reason/message metadata, never internal error chains.
+func clientMessage(e E) string {
+	if msg, ok := e.Meta["message"].(string); ok && msg != "" {
+		return msg
+	}
+	if reason, ok := e.Meta["reason"].(string); ok && reason != "" {
+		return reason
+	}
+	return string(e.Code)
 }
