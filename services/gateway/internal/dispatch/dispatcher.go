@@ -800,6 +800,13 @@ func (d *Dispatcher) ServeChatCompletions(w http.ResponseWriter, r *http.Request
 	}
 
 	if parsed.Stream {
+		// OpenAI-shape providers only emit `usage` on the final stream
+		// chunk when the request carries `stream_options: {include_usage:
+		// true}`. Inject it on the caller's behalf (post-guardrail, so
+		// any Modify rewrite can't drop it back) — otherwise every
+		// streaming request would debit zero tokens. Anthropic / Gemini
+		// / Vertex / Bedrock emit usage natively and are no-oped.
+		modifiedBody = ensureStreamOptionsIncludeUsage(modifiedBody, resolved.Provider)
 		d.serveChatStream(w, r, b, modifiedBody, resolved, grq)
 		return
 	}
