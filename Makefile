@@ -1,6 +1,6 @@
 .PHONY: start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart worktree
-.PHONY: dev-up dev-down dev-logs setup-hooks
+.PHONY: dev-up dev-down dev-logs setup-hooks gateway-dev
 
 # =============================================================================
 # DOCKER DEV ENVIRONMENT (compose.dev.yml)
@@ -13,6 +13,14 @@ COMPOSE = docker compose -f compose.dev.yml
 # Install git hooks (idempotent, runs automatically before dev targets)
 setup-hooks:
 	@git config core.hooksPath .githooks 2>/dev/null || true
+
+# Start the Go AI Gateway data plane (services/gateway on :5563).
+# Separate process from the Next.js app — the gateway deliberately stays
+# outside compose.dev.yml so host-side `pnpm dev` iteration isn't blocked
+# by Go recompiles. Requires langwatch/.env with LW_GATEWAY_INTERNAL_SECRET
+# and LW_GATEWAY_JWT_SECRET set (see langwatch/.env.example for the block).
+gateway-dev:
+	$(MAKE) -C services/gateway run-dev
 
 # Minimal: postgres + redis + clickhouse + app
 dev:
