@@ -543,9 +543,9 @@ export const DashboardLayout = ({
                     title={`${session.user.name} (${session.user.email})`}
                   >
                     {!isLiteMember && (
-                      <Menu.Item value="setup" asChild>
-                        <Link href={`/${project?.slug}/setup`}>
-                          API Key & Setup
+                      <Menu.Item value="api-keys" asChild>
+                        <Link href="/settings/api-keys">
+                          API Keys
                         </Link>
                       </Menu.Item>
                     )}

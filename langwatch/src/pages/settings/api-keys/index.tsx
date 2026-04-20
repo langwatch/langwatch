@@ -1,4 +1,4 @@
-import { Badge, Heading, Tabs, Text, VStack } from "@chakra-ui/react";
+import { Heading, Tabs, Text, VStack } from "@chakra-ui/react";
 import SettingsLayout from "../../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { PersonalAccessTokensSection } from "./PersonalAccessTokensSection";
@@ -34,14 +34,10 @@ export default function ApiKeysPage() {
             </Tabs.Trigger>
             <Tabs.Trigger
               value="project"
-              gap={2}
               color="fg.muted"
               _selected={{ color: "fg", fontWeight: "semibold" }}
             >
               Project API Key
-              <Badge size="sm" colorPalette="yellow" variant="outline">
-                Legacy
-              </Badge>
             </Tabs.Trigger>
           </Tabs.List>
           <Tabs.Content value="pats" paddingTop={6}>
