@@ -114,3 +114,45 @@ if (!isBuildOrNoRedis) {
   // During build time or missing env, disable connection
   connection = undefined;
 }
+
+/**
+ * Block server boot until Redis answers a PING, or exit loudly on timeout.
+ *
+ * When Redis is down (forgot to start compose, wrong REDIS_URL, host port
+ * not published) the auth layer swallows the error and the user sees an
+ * endless "Redirecting to Sign in..." loop — ten minutes of head-scratching
+ * per new contributor. Surfacing the error here converts that into an
+ * obvious boot-time failure the developer can action immediately.
+ *
+ * No-ops in build/test modes where {@link isBuildOrNoRedis} is true.
+ */
+export async function verifyRedisReady(timeoutMs = 3000): Promise<void> {
+  if (isBuildOrNoRedis || !connection) return;
+  const target =
+    env.REDIS_CLUSTER_ENDPOINTS ??
+    env.REDIS_URL ??
+    "(unset)";
+  try {
+    await Promise.race([
+      connection.ping(),
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`PING timeout after ${timeoutMs}ms`)),
+          timeoutMs,
+        ),
+      ),
+    ]);
+    logger.info({ target }, "redis ready");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error(
+      { error, target },
+      `redis unreachable at boot — ${message}\n` +
+        `  REDIS_URL / REDIS_CLUSTER_ENDPOINTS points at: ${target}\n` +
+        `  Hybrid dev? 'pnpm dev' on host + docker redis needs the host port published (6379).\n` +
+        `  Full-compose dev? Run 'make dev' instead of 'pnpm dev'.`,
+    );
+    // Don't throw in build phase — some tools import start.ts at build time.
+    process.exit(1);
+  }
+}
