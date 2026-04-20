@@ -35,6 +35,7 @@ function makeCommand(overrides: Partial<ComputeRunMetricsCommandData> = {}): {
 function makeTraceSummary(overrides: Partial<TraceSummaryData> = {}): TraceSummaryData {
   return {
     traceId: "trace-1",
+    traceName: "",
     spanCount: 3,
     totalDurationMs: 4000,
     computedIOSchemaVersion: "2025-12-18",

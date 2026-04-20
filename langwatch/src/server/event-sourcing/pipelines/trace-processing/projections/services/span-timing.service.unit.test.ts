@@ -39,6 +39,7 @@ function makeState(
 ): TraceSummaryData {
   return {
     traceId: "trace-1",
+    traceName: "",
     spanCount: 0,
     totalDurationMs: 0,
     computedIOSchemaVersion: "2025-12-18",

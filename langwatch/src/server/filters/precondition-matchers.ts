@@ -82,6 +82,7 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   "traces.origin": (data) => data.origin ?? null,
   "traces.error": (data) =>
     data.hasError != null ? (data.hasError ? "true" : "false") : "false",
+  "traces.name": null, // TraceName is a ClickHouse-only analytics dimension, not available at trace arrival time
 
   // Metadata fields
   "metadata.user_id": (data) => data.userId,
@@ -169,6 +170,7 @@ export const PRECONDITION_ALLOWED_RULES: Record<
   // Trace fields
   "traces.origin": ENUM_RULES,
   "traces.error": BOOLEAN_RULES,
+  "traces.name": EMPTY_RULES, // analytics-only, not usable as precondition
 
   // Metadata fields
   "metadata.user_id": TEXT_RULES,
