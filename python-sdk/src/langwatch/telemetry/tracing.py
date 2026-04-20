@@ -6,6 +6,7 @@ import httpx
 import threading
 from deprecated import deprecated
 from langwatch.attributes import AttributeKey
+from langwatch.utils.auth import build_auth_headers
 from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import (
     SerializableWithStringFallback,
@@ -303,7 +304,7 @@ class LangWatchTrace:
         with httpx.Client() as client:
             response = client.post(
                 f"{endpoint}/api/trace/{trace_id}/share",
-                headers={"X-Auth-Token": get_api_key()},
+                headers=build_auth_headers(get_api_key()),
                 timeout=15,
             )
             better_raise_for_status(response)
@@ -320,7 +321,7 @@ class LangWatchTrace:
         with httpx.Client() as client:
             response = client.post(
                 f"{endpoint}/api/trace/{trace_id}/unshare",
-                headers={"X-Auth-Token": get_api_key()},
+                headers=build_auth_headers(get_api_key()),
                 timeout=15,
             )
             better_raise_for_status(response)

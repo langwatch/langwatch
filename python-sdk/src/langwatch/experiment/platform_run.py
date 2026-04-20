@@ -14,6 +14,7 @@ import httpx
 
 import langwatch
 from langwatch.state import get_api_key, get_endpoint
+from langwatch.utils.auth import build_auth_headers
 
 
 def _replace_url_domain(url: str, new_base: str) -> str:
@@ -329,7 +330,7 @@ def _start_run(slug: str, endpoint: str, api_key: str) -> dict:
     with httpx.Client(timeout=60) as client:
         response = client.post(
             f"{endpoint}/api/evaluations/v3/{slug}/run",
-            headers={"X-Auth-Token": api_key},
+            headers=build_auth_headers(api_key),
         )
 
     if response.status_code == 404:
@@ -351,7 +352,7 @@ def _get_run_status(run_id: str, endpoint: str, api_key: str) -> dict:
     with httpx.Client(timeout=60) as client:
         response = client.get(
             f"{endpoint}/api/evaluations/v3/runs/{run_id}",
-            headers={"X-Auth-Token": api_key},
+            headers=build_auth_headers(api_key),
         )
 
     if response.status_code == 404:
