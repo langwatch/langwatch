@@ -6,9 +6,18 @@ Feature: AI Gateway — Budgets
   Budgets are hierarchical. A single request is checked against every budget that
   applies (its org, its team, its project, its virtual key, its principal). Any
   budget in breach blocks the request when its on_breach is "block", or lets it
-  through with a warning header when its on_breach is "warn". Spend is debited
-  asynchronously after a response using provider-computed token counts, using an
-  outbox keyed by gateway_request_id for at-least-once idempotency.
+  through with a warning header when its on_breach is "warn".
+
+  Spend is derived from traces. The gateway emits one OTel span per request
+  carrying gen_ai.usage.* + langwatch.virtual_key_id + langwatch.gateway_request_id.
+  The trace-processing pipeline enriches the span with cost (pricing catalog ×
+  tokens), and a dedicated reactor writes one row per applicable budget to
+  gateway_budget_ledger_events in ClickHouse. An AggregatingMergeTree
+  materialised view (gateway_budget_scope_totals) rolls up spend per (scope,
+  scope_id, window, period_start). /budget/check reads from the materialised
+  view using sumMerge. There is no separate debit endpoint — the OTel trace
+  itself IS the debit signal. Idempotency is guaranteed by the ReplacingMergeTree
+  ORDER BY (TenantId, BudgetId, GatewayRequestId).
 
   Background:
     Given organization "acme" exists with team "platform" and project "gateway-demo"
@@ -79,34 +88,47 @@ Feature: AI Gateway — Budgets
     Then the request is blocked because vk-block breaches, even though project is only warn
 
   # ============================================================================
-  # Ledger — idempotent async debit from the outbox
+  # Ledger — trace-driven fold in ClickHouse
   # ============================================================================
 
   @integration
-  Scenario: POST /internal/gateway/budget-debit is idempotent
-    Given a gateway_request_id "grq_01H..." is unseen
-    When the gateway posts a debit { gateway_request_id: "grq_01H...", amount_usd: 0.42, tokens: {...} }
-    Then the ledger records one entry and returns { spent_usd, remaining_usd } per applicable scope
-    When the gateway retries the same gateway_request_id later
-    Then the ledger does NOT double-count
-    And the response returns the same { spent_usd, remaining_usd } as the first call
+  Scenario: Gateway trace lands one row per applicable budget in ClickHouse
+    Given a gateway request is completed with gateway_request_id "grq_01H..."
+    And the emitted span carries langwatch.virtual_key_id, gen_ai.usage.input_tokens,
+      gen_ai.usage.output_tokens, and a resolved gen_ai.request.model
+    And the project has three applicable budgets: org-monthly, team-monthly, project-daily
+    When the trace lands in ClickHouse and the gatewayBudgetSync reactor runs
+    Then gateway_budget_ledger_events has three rows keyed by
+      (TenantId, BudgetId, GatewayRequestId)
+    And each row's AmountUSD equals the enriched cost for the span
+    And gateway_budget_scope_totals reflects the increment under the matching PeriodStart
 
   @integration
-  Scenario: Outbox retries at-least-once when LangWatch is briefly unreachable
-    Given the LangWatch app is unreachable for 30 seconds during a gateway request
-    When the gateway buffers the debit in its outbox
-    And LangWatch becomes reachable again
-    Then the buffered debit is POSTed to /internal/gateway/budget-debit
-    And the ledger records the spend (idempotent by gateway_request_id)
+  Scenario: Trace replay does not double-count spend (idempotency by gateway_request_id)
+    Given a trace with gateway_request_id "grq_01H..." has already produced a debit row
+    When the same trace is re-ingested (OTel replay, retry, or dev replay tooling)
+    Then gateway_budget_ledger_events collapses the duplicate via ReplacingMergeTree
+    And gateway_budget_scope_totals does NOT double-count the spend
 
   @integration
-  Scenario: Cost attribution uses provider-reported tokens, not estimates
+  Scenario: Cost attribution uses provider-reported tokens × pricing catalog
     Given a gateway request completes with provider-reported usage
       { prompt_tokens: 1000, completion_tokens: 500 }
-    And the gateway has the current cost-per-token for the resolved model
-    When the ledger entry is computed
-    Then the debit amount_usd is derived from actual tokens × unit cost
-    And the estimate is discarded
+    And the control plane's pricing catalog has per-token costs for the resolved model
+    When the span is enriched and the reactor writes to gateway_budget_ledger_events
+    Then AmountUSD is derived from provider tokens × unit cost
+    And the gateway's pre-request cost estimate is used only for pre-flight
+      budget-check gating, never for the ledger
+
+  @integration
+  Scenario: /budget/check reads from the CH materialised view
+    Given project "gateway-demo" has a monthly budget with limit $100
+    And 42.00 USD of spend has been attributed to this project this month via traces
+    When the gateway calls POST /api/internal/gateway/budget/check
+    Then the response is derived from sumMerge(SpendUSD) on gateway_budget_scope_totals
+      bounded to the current month's PeriodStart
+    And the response returns { spent_usd: "42.00", remaining_usd: "58.00" }
+    And no Postgres gatewayBudgetLedger row is read
 
   # ============================================================================
   # Window resets

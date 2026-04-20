@@ -336,34 +336,35 @@ Consumers can read EITHER the `decision`/`warnings`/`block_reason`/`blocked_by` 
 
 Timeout and fail-open: gateway uses a 200 ms deadline on this call. On timeout or 5xx, the gateway falls back to its tier-1 cached decision (allow-through if cache said allow). Configurable via `LW_GATEWAY_BUDGET_LIVE_TIMEOUT_MS`.
 
-### 4.5 `POST /api/internal/gateway/budget/debit`
+### 4.5 Budget debit — derived from traces (no dedicated endpoint)
 
-Post-response async debit. Idempotent by `gateway_request_id` (24h dedup window). Implemented as an **outbox pattern on the LangWatch control-plane side**: the endpoint writes the debit request into a `BudgetLedger` row inside a transaction that also updates `spent_usd` counters per scope. Gateway POSTs fire-and-forget with at-least-once retry; LangWatch dedupes by `gateway_request_id`.
+There is no `POST /api/internal/gateway/budget/debit`. Spend is derived from
+the OTel trace the gateway already emits for every request. The flow:
 
-Request:
-```json
-{
-  "gateway_request_id": "grq_01HZ...",
-  "vk_id": "vk_01HZ...",
-  "actual_cost_usd": 0.00087,
-  "tokens": { "input": 412, "output": 128, "cache_read": 300, "cache_write": 112 },
-  "model": "gpt-5-mini",
-  "provider_slot": "primary",
-  "duration_ms": 1243,
-  "status": "success | provider_error | blocked_by_guardrail | cancelled"
-}
-```
+1. Gateway emits one span per request, carrying `langwatch.virtual_key_id`,
+   `langwatch.gateway_request_id`, `gen_ai.request.model`, `gen_ai.usage.input_tokens`,
+   `gen_ai.usage.output_tokens`, `gen_ai.usage.cache_read.input_tokens`,
+   `gen_ai.usage.cache_creation.input_tokens`, and `langwatch.status`.
+2. The trace-processing pipeline's `OtlpSpanCostEnrichmentService` computes
+   cost from the pricing catalog (matching on `gen_ai.request.model` +
+   per-project custom costs) and stamps it onto the span.
+3. The `gatewayBudgetSync` reactor reads the enriched span, resolves the
+   applicable budgets (VK, project, team, org, principal scopes), and
+   writes one row per applicable budget to the ClickHouse table
+   `gateway_budget_ledger_events`, keyed by `(TenantId, BudgetId, GatewayRequestId)`.
+4. A `gateway_budget_scope_totals_mv` AggregatingMergeTree materialised view
+   aggregates `sumState(AmountUSD)` per `(scope, scope_id, window, period_start)`.
+5. `/budget/check` reads `finalizeAggregation(sumMerge(SpendUSD))` against the
+   materialised view, window-bounded by the current `PeriodStart`.
 
-Response:
-```json
-{
-  "deduped": false,
-  "budgets": [
-    { "scope": "virtual_key", "remaining_usd": 20.87, "spent_usd": 4.13 },
-    { "scope": "project",     "remaining_usd": 562.44, "spent_usd": 437.56 }
-  ]
-}
-```
+Idempotency is structural: ReplacingMergeTree's ORDER BY
+`(TenantId, BudgetId, GatewayRequestId)` collapses any re-ingestion of the
+same trace (OTel replay, retry, manual backfill). No separate dedup table
+or 24h window is required.
+
+The Postgres `GatewayBudgetLedger` table is deprecated — the schema remains
+for rollback safety but no code writes to it. `GatewayBudget` (the budget
+*definition*) stays authoritative for limits/windows/on_breach.
 
 ### 4.6 `POST /api/internal/gateway/guardrail/check`
 
@@ -569,9 +570,9 @@ Scoping rules follow the existing project/team/org hierarchy already in LangWatc
 Each lane's feature file elaborates the contract with testable scenarios. Keep these in sync:
 
 - `specs/ai-gateway/virtual-keys.feature` — VK CRUD, show-once-secret, peppered HMAC-SHA256 hashing (§2), provider-creds linking, fallback chain, rotation/revoke, RBAC, attribution, internal endpoints (resolve-key JWT + config/:vk_id ETag + /changes long-poll).
-- `specs/ai-gateway/budgets.feature` — hierarchical scopes (org/team/project/vk/principal), windows (min→total), `on_breach: block|warn`, idempotent debit outbox, timezone-aware resets.
+- `specs/ai-gateway/budgets.feature` — hierarchical scopes (org/team/project/vk/principal), windows (min→total), `on_breach: block|warn`, trace-driven ClickHouse fold (idempotent by `gateway_request_id`), timezone-aware resets.
 - `specs/ai-gateway/gateway-provider-settings.feature` — `GatewayProviderCredential` binding over existing `ModelProvider` rows; gateway-only settings (rate limits, rotation policy, gateway-only extraHeaders) that must not leak into the legacy litellm path.
-- `specs/ai-gateway/epic.feature` — cross-cutting E2E scenarios (end-to-end request through gateway → fallback → budget debit → per-tenant OTel emit).
+- `specs/ai-gateway/epic.feature` — cross-cutting E2E scenarios (end-to-end request through gateway → fallback → OTel trace → trace-driven budget fold → per-tenant OTel emit).
 - `specs/ai-gateway/` (pending, Lane A): `gateway-service.feature`, `health-checks.feature`, `auth-cache.feature`, `provider-routing.feature`, `caching-passthrough.feature`, `fallback.feature`, `streaming.feature`, `guardrails.feature`.
 
 When a spec and this contract disagree, **the contract wins** and the spec is amended (after consensus in #langwatch-ai-gateway).
