@@ -79,6 +79,8 @@ LangWatch SCIM 2.0 supports the following user operations:
 | ------------------------------------ | ------------------------------- |
 | `/api/scim/v2/Users`                 | `GET`, `POST`                   |
 | `/api/scim/v2/Users/{id}`            | `GET`, `PUT`, `PATCH`, `DELETE` |
+| `/api/scim/v2/Groups`                | `GET`, `POST`                   |
+| `/api/scim/v2/Groups/{id}`           | `GET`, `PUT`, `PATCH`, `DELETE` |
 | `/api/scim/v2/ServiceProviderConfig` | `GET`                           |
 | `/api/scim/v2/ResourceTypes`         | `GET`                           |
 | `/api/scim/v2/Schemas`               | `GET`                           |
@@ -105,20 +107,25 @@ When your identity provider provisions a user:
 - If the user **already exists** (same email) but is not in your organization, they are added as a **Member**
 - If the user **already exists** and is deactivated, their account is reactivated
 
-New users provisioned via SCIM are assigned the **Member** role by default. You can adjust roles manually in LangWatch after provisioning using [RBAC](/platform/rbac).
+New users provisioned via SCIM are assigned the **Member** role by default. You can adjust roles manually in LangWatch after provisioning using [RBAC](/platform/rbac), or use [SCIM Groups](/platform/scim-groups) to automatically assign roles based on group membership.
 
 ### Deprovisioning (Delete/Deactivate)
 
-When your identity provider removes or deactivates a user:
+When your identity provider sends a **DELETE** for a user:
 
-- The user's account is **deactivated** in LangWatch
+- Their org membership and all role bindings are **removed**
+- Their account is **deactivated** — they can no longer sign in
 - Their data (traces, annotations, datasets) is **preserved**
-- They can no longer sign in
+- A second DELETE returns `404 Not Found` — the operation is idempotent
+
+When your identity provider **suspends** a user (`PATCH active: false`):
+
+- Their account is **deactivated** — they can no longer sign in
+- Their org membership and role bindings are **preserved**
+- Re-activating (`active: true`) immediately restores access
 
 <Info>
-  LangWatch performs a soft delete on SCIM user removal — user data is retained
-  for audit and compliance purposes. Organization admins can permanently remove
-  users if needed.
+  Use `active: false` for temporary suspension and DELETE for permanent offboarding. DELETE removes all memberships and role bindings — re-provisioning the user starts from scratch.
 </Info>
 
 ---

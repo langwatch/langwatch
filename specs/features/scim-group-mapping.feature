@@ -1,7 +1,7 @@
 Feature: SCIM Group Mapping
   As an organization admin
-  I want to map Entra ID groups pushed via SCIM to LangWatch teams and roles
-  So that I can control access and permissions based on my identity provider's group structure
+  I want SCIM-provisioned groups to be stored as Groups in LangWatch and assigned RoleBindings
+  So that identity-provider group membership automatically grants scoped access
 
   Background:
     Given an organization on the ENTERPRISE plan
@@ -10,150 +10,122 @@ Feature: SCIM Group Mapping
   # --- SCIM group ingestion ---
 
   @integration
-  Scenario: Entra pushes a new group via SCIM and it is stored as an unmapped mapping
-    Given no ScimGroupMapping exists for external group "abc-123"
+  Scenario: Entra pushes a new group via SCIM
+    Given no Group exists for external group "abc-123"
     When Entra pushes a SCIM POST /Groups with externalId "abc-123" and displayName "clienta-dev-ro"
-    Then a ScimGroupMapping record is created with externalGroupId "abc-123" and externalGroupName "clienta-dev-ro"
-    And the mapping has no teamId or role assigned
+    Then a Group record is created with scimSource "scim", externalId "abc-123", and name "clienta-dev-ro"
+    And the group has no RoleBindings assigned
 
   @integration
-  Scenario: Entra pushes a group that already exists as a mapping
-    Given a ScimGroupMapping exists for external group "abc-123"
+  Scenario: Entra pushes a group that already exists
+    Given a Group already exists for external group "abc-123"
     When Entra pushes a SCIM POST /Groups with externalId "abc-123"
     Then the request returns a 409 conflict error
 
   @integration
-  Scenario: Entra pushes members for an unmapped group
-    Given a ScimGroupMapping exists for external group "abc-123" with no team mapping
-    When Entra pushes a SCIM PATCH adding user "user-1" to group "abc-123"
-    Then the SCIM request returns a success response
-    And no TeamUser records are created
-    And no ScimGroupMembership records are created
-
-  @integration
-  Scenario: Entra pushes members for a mapped group
-    Given a ScimGroupMapping exists for external group "abc-123" mapped to team "team-dev" with role VIEWER
+  Scenario: Entra pushes members for a group with no RoleBindings
+    Given a Group exists for external group "abc-123" with no RoleBindings
     And user "user-1" is a member of the organization
     When Entra pushes a SCIM PATCH adding user "user-1" to group "abc-123"
-    Then user "user-1" is added to team "team-dev" with role VIEWER
-    And a ScimGroupMembership record links user "user-1" to mapping "abc-123"
+    Then the SCIM request returns a success response
+    And a GroupMembership record is created linking user "user-1" to the group
+    And no access is granted until a RoleBinding is assigned to the group
 
   @integration
-  Scenario: Entra removes a member from a mapped group
-    Given a ScimGroupMapping exists for external group "abc-123" mapped to team "team-dev" with role VIEWER
-    And user "user-1" has a ScimGroupMembership for mapping "abc-123" only
+  Scenario: Entra pushes members for a group that has a RoleBinding
+    Given a Group exists for external group "abc-123" with a RoleBinding: VIEWER on team "client-a"
+    And user "user-1" is a member of the organization
+    When Entra pushes a SCIM PATCH adding user "user-1" to group "abc-123"
+    Then a GroupMembership record is created linking user "user-1" to the group
+    And user "user-1" inherits the group's VIEWER binding on team "client-a" via the RBAC resolver
+
+  @integration
+  Scenario: Entra removes a member from a group
+    Given a Group exists for external group "abc-123" with a RoleBinding: VIEWER on team "client-a"
+    And user "user-1" has a GroupMembership for the group
     When Entra pushes a SCIM PATCH removing user "user-1" from group "abc-123"
-    Then user "user-1" is removed from team "team-dev"
-    And the ScimGroupMembership record is deleted
+    Then the GroupMembership record for user "user-1" is deleted
+    And user "user-1" no longer inherits access from the group
 
   @integration
-  Scenario: Entra replaces full member list on a mapped group
-    Given a ScimGroupMapping exists for external group "abc-123" mapped to team "team-dev" with role MEMBER
-    And team "team-dev" has members "user-1" and "user-2" via mapping "abc-123"
+  Scenario: Entra replaces full member list on a group
+    Given a Group exists for external group "abc-123"
+    And the group has GroupMembership records for "user-1" and "user-2"
     When Entra pushes a SCIM PUT replacing group "abc-123" members with "user-2" and "user-3"
-    Then user "user-1" is removed from team "team-dev"
-    And user "user-3" is added to team "team-dev" with role MEMBER
-    And ScimGroupMembership records are updated accordingly
+    Then the GroupMembership for "user-1" is removed
+    Then a GroupMembership for "user-3" is created
+    And "user-2" retains their GroupMembership
 
   @integration
   Scenario: Entra deletes a SCIM group
-    Given a ScimGroupMapping exists for external group "abc-123" mapped to team "team-dev"
-    And user "user-1" has ScimGroupMembership for mapping "abc-123" only
+    Given a Group exists for external group "abc-123" with a RoleBinding on team "client-a"
+    And users "user-1" and "user-2" have GroupMembership records for the group
     When Entra pushes a SCIM DELETE for group "abc-123"
-    Then the ScimGroupMapping for "abc-123" is removed
-    And all ScimGroupMembership records for "abc-123" are removed
-    And user "user-1" is removed from team "team-dev"
+    Then the Group record for "abc-123" is removed
+    And all GroupMembership records for the group are removed
+    And all RoleBindings on the group are removed
+
+  # --- Group binding management (admin API) ---
 
   @integration
-  Scenario: Deleting a SCIM group preserves members who belong via other mappings
-    Given a ScimGroupMapping "abc-123" maps to team "team-dev" with role VIEWER
-    And a ScimGroupMapping "def-456" also maps to team "team-dev" with role ADMIN
-    And user "user-1" has ScimGroupMembership for both mappings
-    When Entra pushes a SCIM DELETE for group "abc-123"
-    Then user "user-1" remains in team "team-dev"
-    And user "user-1" retains role ADMIN from mapping "def-456"
-    And ScimGroupMembership for "abc-123" is removed but "def-456" remains
-
-  # --- Mapping CRUD API ---
+  Scenario: Admin lists all SCIM groups
+    Given three groups with scimSource "scim" have been pushed by Entra
+    When the admin requests the list of groups
+    Then all three groups are returned with their names and member counts
 
   @integration
-  Scenario: Admin lists unmapped SCIM groups
-    Given three SCIM groups have been pushed by Entra
-    And one of them has been mapped to a team
-    When the admin requests the list of unmapped groups
-    Then two unmapped groups are returned with their display names
+  Scenario: Admin adds a RoleBinding to a SCIM group
+    Given a Group exists for external group "abc-123" with no RoleBindings
+    When the admin adds a RoleBinding: MEMBER at scope team "client-a" to the group
+    Then the RoleBinding is saved linking the group to team "client-a" with role MEMBER
+    And all current GroupMembership members inherit MEMBER access on team "client-a"
 
   @integration
-  Scenario: Admin lists all SCIM group mappings
-    Given three SCIM groups have been pushed by Entra with various mapping states
-    When the admin requests all mappings
-    Then all three mappings are returned with their mapping status
+  Scenario: Admin removes a RoleBinding from a SCIM group
+    Given a Group exists for external group "abc-123" with a RoleBinding: MEMBER on team "client-a"
+    When the admin removes the RoleBinding
+    Then the RoleBinding is deleted
+    And group members no longer have access to team "client-a" via this group
 
   @integration
-  Scenario: Admin creates a mapping for an unmapped group to an existing team
-    Given an unmapped ScimGroupMapping for group "clienta-dev-rw"
-    And a team "team-dev" exists
-    When the admin maps group "clienta-dev-rw" to team "team-dev" with role MEMBER
-    Then the mapping is saved with the specified team and role
-    # Members will arrive on Entra's next sync cycle
+  Scenario: Admin deletes a SCIM group
+    Given a Group exists for external group "abc-123" with members and RoleBindings
+    When the admin deletes the group
+    Then the Group record is removed
+    And all GroupMembership and RoleBinding records for the group are removed
 
   @integration
-  Scenario: Admin creates a mapping with a new team created inline
-    Given an unmapped ScimGroupMapping for group "clienta-staging-admin"
-    And a project "Project A" exists but no team "team-staging"
-    When the admin maps group "clienta-staging-admin" with new team "team-staging" under project "Project A", role ADMIN
-    Then team "team-staging" is created under project "Project A"
-    And the mapping points to the newly created team
-
-  @integration
-  Scenario: Admin updates an existing mapping to change the role
-    Given a ScimGroupMapping for group "clienta-dev-ro" mapped to team "team-dev" with role VIEWER
-    And team "team-dev" has two members via this mapping with role VIEWER
-    When the admin updates the mapping to role MEMBER
-    Then the mapping role is updated to MEMBER
-    And both team members' roles are re-synced to MEMBER
-
-  @integration
-  Scenario: Admin deletes a mapping
-    Given a ScimGroupMapping for group "clienta-dev-ro" mapped to team "team-dev"
-    When the admin deletes the mapping
-    Then the mapping is removed
-    And members who were only in team "team-dev" via this mapping are removed
-
-  @integration
-  Scenario: Non-enterprise org cannot access mapping endpoints
+  Scenario: Non-enterprise org cannot access group management endpoints
     Given the organization plan is not ENTERPRISE
-    When the admin attempts to list SCIM group mappings
+    When the admin attempts to list groups
     Then the request is rejected with FORBIDDEN
 
   @integration
-  Scenario: Non-admin user cannot manage mappings
+  Scenario: Non-admin user cannot manage group bindings
     Given a user with MEMBER role in the organization
-    When the user attempts to create a SCIM group mapping
+    When the user attempts to add a RoleBinding to a group
     Then the request is rejected with FORBIDDEN
 
   # --- Role conflict resolution ---
   # Built-in roles have a clear hierarchy: ADMIN > MEMBER > VIEWER
-  # Custom roles in mappings: user gets role = CUSTOM with the custom role's permissions
-  # Mixed conflict (built-in + custom targeting same team): built-in hierarchy applies,
-  # CUSTOM is treated as equivalent to MEMBER for hierarchy comparison
+  # Users in multiple groups inherit the highest role at each scope
 
   @unit
   Scenario: User with multiple roles resolves to the most permissive
-    Given a user has roles [VIEWER, MEMBER] from different group mappings
+    Given a user has roles [VIEWER, MEMBER] from different group bindings at the same scope
     When the effective role is resolved
     Then the result is MEMBER
 
   @unit
   Scenario: Role hierarchy resolves ADMIN as most permissive
-    Given a user has roles [MEMBER, ADMIN] from different group mappings
+    Given a user has roles [MEMBER, ADMIN] from different group bindings
     When the effective role is resolved
     Then the result is ADMIN
 
   @unit
-  Scenario: Removing a role recalculates to remaining most permissive
-    Given a user has roles [VIEWER, MEMBER] from different group mappings
-    When the MEMBER role mapping is removed
+  Scenario: Removing a binding recalculates to remaining most permissive
+    Given a user has roles [VIEWER, MEMBER] from two group bindings
+    When the MEMBER binding is removed
     Then the effective role recalculates to VIEWER
 
   @unit
@@ -163,77 +135,57 @@ Feature: SCIM Group Mapping
     And MEMBER is more permissive than VIEWER
 
   @integration
-  Scenario: Custom role is available in mapping role dropdown
+  Scenario: Custom role is available when assigning a binding to a group
     Given the organization has a custom role "Auditor" with permissions
-    When the admin opens the role dropdown for a SCIM group mapping
+    When the admin opens the role dropdown to assign a binding to a group
     Then "Auditor" appears alongside ADMIN, MEMBER, and VIEWER
 
-  # --- User deprovisioning interaction ---
+  # --- User deprovisioning ---
 
   @integration
-  Scenario: Deprovisioned user's SCIM group memberships are cleaned up
-    Given user "user-1" has ScimGroupMembership for mappings "abc-123" and "def-456"
-    And both mappings target team "team-dev"
+  Scenario: Deprovisioned user's org membership and role bindings are cleaned up
+    Given user "user-1" is a member of the organization
+    And user "user-1" has GroupMembership records for groups "abc-123" and "def-456"
+    And user "user-1" has direct RoleBindings in the organization
     When Entra pushes a SCIM DELETE for user "user-1"
     Then user "user-1" is deactivated
-    And all ScimGroupMembership records for user "user-1" are removed
-    And user "user-1" is removed from team "team-dev"
+    And all direct RoleBinding records for user "user-1" are removed
+    And user "user-1"'s organization membership is removed
 
   # --- SCIM Settings UI ---
 
   @integration
-  Scenario: Admin views SCIM groups table with mapping status
+  Scenario: Admin views SCIM groups table
     Given SCIM groups "clienta-dev-ro", "clienta-dev-rw", and "clienta-dev-admin" have been pushed
-    And "clienta-dev-rw" is mapped to team "team-dev" with role MEMBER
+    And "clienta-dev-rw" has a RoleBinding: MEMBER on team "client-a"
     When the admin visits the SCIM settings page
     Then a table shows all three groups
-    And "clienta-dev-rw" shows as mapped with its team, project, and role
-    And the other two groups show as unmapped
+    And "clienta-dev-rw" shows its binding with scope and role
+    And the other two groups show no bindings
 
   @integration
-  Scenario: Admin maps a group using the UI dropdowns
-    Given an unmapped SCIM group "clienta-dev-ro" appears in the settings table
-    And team "team-dev" exists
-    When the admin selects team "team-dev" and role VIEWER for group "clienta-dev-ro"
-    And saves the mapping
-    Then the group shows as mapped in the table
-
-  @integration
-  Scenario: Admin sees member count per mapping
-    Given a SCIM group "clienta-dev-rw" mapped to team "team-dev"
-    And the mapping has 5 ScimGroupMembership records
+  Scenario: Admin sees member count per group
+    Given a SCIM group "clienta-dev-rw" has 5 GroupMembership records
     When the admin views the SCIM settings page
-    Then the mapping row shows a member count of 5
+    Then the group row shows a member count of 5
 
   @integration
-  Scenario: Team dropdown shows all teams grouped by project
-    Given projects "Project A" and "Project B" exist
-    And "Project A" has teams "team-dev" and "team-staging"
-    And "Project B" has team "team-prod"
-    When the admin opens the team dropdown in the mapping form
-    Then teams are shown grouped by project
-    And a "Create new team" option is available
+  Scenario: Admin assigns a RoleBinding to a group via the settings UI
+    Given a SCIM group "clienta-dev-ro" appears in the settings table with no bindings
+    When the admin selects a scope and role for the group and saves
+    Then the RoleBinding is created and the group row reflects the new binding
+
+  # --- Permission inheritance ---
 
   @integration
-  Scenario: Create new team option in the team dropdown
-    Given an unmapped SCIM group in the settings table
-    And project "Project A" exists
-    When the admin selects "Create new team" under "Project A" and enters "new-team"
-    Then the new team is created under "Project A" when the mapping is saved
-
-  # --- No changes to SCIM user provisioning or core RBAC ---
-  # SCIM-provisioned users remain OrganizationUserRole.MEMBER (unchanged)
-  # Team role from group mapping controls project access via standard RBAC
-
-  @integration
-  Scenario: Mapped team members are resolved through standard RBAC
-    Given a user added to a team via SCIM group mapping with role VIEWER
-    When the user accesses a project linked to that team
-    Then permission resolution uses the standard resolveProjectPermission path
+  Scenario: Group member's access is resolved through standard RBAC
+    Given a user is a GroupMembership member of a group with a RoleBinding: VIEWER on team "client-a"
+    When the platform resolves the user's role on a project in team "client-a"
+    Then permission resolution uses the standard RoleBinding resolver
     And no SCIM-specific permission logic is invoked
 
   @integration
-  Scenario: Org admin override still applies for SCIM-managed team members
-    Given an organization admin who is also in a SCIM group mapped with role VIEWER
-    When the admin accesses any team
-    Then the org ADMIN override grants full access regardless of the SCIM mapping role
+  Scenario: Org admin override applies for SCIM-managed group members
+    Given an organization admin who is also a GroupMembership member of a group with VIEWER binding
+    When the admin accesses any resource in the organization
+    Then the org ADMIN override grants full access regardless of the group binding role
