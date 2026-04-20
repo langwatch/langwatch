@@ -1,6 +1,7 @@
 import {
   OrganizationUserRole,
   RoleBindingScopeType,
+  TeamUserRole,
 } from "@prisma/client";
 import { RoleService } from "~/server/role/role.service";
 import { TRPCError } from "@trpc/server";
