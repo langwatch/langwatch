@@ -93,7 +93,7 @@
     "@hookform/resolvers": "^5.2.2",
     "@langwatch/ksuid": "^2.0.2",
     "@langwatch/mcp-server": "workspace:*",
-    "@langwatch/scenario": "file:vendor/langwatch-scenario-0.4.8.tgz",
+    "@langwatch/scenario": "file:vendor/langwatch-scenario-0.4.10.tgz",
     "@microlink/react-json-view": "^1.31.18",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@modelcontextprotocol/sdk": "^1.29.0",
