@@ -700,6 +700,28 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
+  // TraceName is a ClickHouse-only filter — ES is deprecated. This noop entry
+  // satisfies the Record<FilterField, FilterDefinition> type constraint.
+  "traces.name": {
+    name: "Trace Name",
+    urlKey: "trace_name",
+    query: (values) => ({
+      terms: { "metadata.trace_name": values },
+    }),
+    listMatch: {
+      aggregation: () => ({
+        unique_values: {
+          terms: { field: "metadata.trace_name", size: 10_000, order: { _key: "asc" as const } },
+        },
+      }),
+      extract: (result: Record<string, any>) =>
+        result.unique_values?.buckets?.map((bucket: any) => ({
+          field: bucket.key,
+          label: bucket.key,
+          count: bucket.doc_count,
+        })) ?? [],
+    },
+  },
   "spans.type": {
     name: "Span Type",
     urlKey: "span_type",

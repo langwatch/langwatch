@@ -93,6 +93,7 @@ export function FieldsFilters({
 }) {
 	const filterKeys: FilterField[] = [
 		"traces.origin",
+		"traces.name",
 		"metadata.prompt_ids",
 		"spans.type",
 		"spans.model",

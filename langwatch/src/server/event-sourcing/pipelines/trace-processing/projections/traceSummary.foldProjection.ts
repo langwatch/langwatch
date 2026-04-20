@@ -109,6 +109,22 @@ export function applySpanToSummary({
     span,
   });
 
+  // Trace name: use the root span's name. When multiple root spans exist,
+  // the one with the earliest start time wins (deterministic tie-breaking).
+  const isRootSpan = span.parentSpanId === null;
+  const spanStartMs = span.startTimeUnixMs;
+  let traceName = state.traceName;
+  let rootSpanStartTimeMs = state.rootSpanStartTimeMs;
+  if (isRootSpan) {
+    if (
+      traceName === "" ||
+      (rootSpanStartTimeMs !== undefined && spanStartMs < rootSpanStartTimeMs)
+    ) {
+      traceName = span.name;
+      rootSpanStartTimeMs = spanStartMs;
+    }
+  }
+
   return {
     ...state,
     traceId: state.traceId || span.traceId,
@@ -117,6 +133,8 @@ export function applySpanToSummary({
     occurredAt: timing.occurredAt,
     totalDurationMs: timing.totalDurationMs,
     models,
+    traceName,
+    rootSpanStartTimeMs,
     ...tokens,
     ...status,
     computedInput: io.computedInput,
@@ -189,6 +207,8 @@ export class TraceSummaryFoldProjection
       topicId: null,
       subTopicId: null,
       annotationIds: [],
+      traceName: "",
+      rootSpanStartTimeMs: undefined,
       attributes: {},
       scenarioRoleCosts: {},
       scenarioRoleLatencies: {},
