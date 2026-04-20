@@ -89,7 +89,8 @@ function parseFeature(absPath: string): Scenario[] {
     if (trimmed.startsWith("#") || trimmed === "") continue;
 
     if (trimmed.startsWith("@")) {
-      pendingTags = trimmed.split(/\s+/).filter((t) => t.startsWith("@"));
+      const lineTags = trimmed.split(/\s+/).filter((t) => t.startsWith("@"));
+      pendingTags = pendingTags.concat(lineTags);
       continue;
     }
 
@@ -225,14 +226,16 @@ function indexByTitle(bindings: CollectedBinding[]): Map<string, BindingRef[]> {
   return byTitle;
 }
 
-function buildReport(watched: WatchedFeature): Report {
+function buildReport(
+  watched: WatchedFeature,
+  allKnownTitles: Set<string>,
+): Report {
   const absFeature = resolve(REPO_ROOT, watched.featurePath);
   const allScenarios = parseFeature(absFeature);
   const scenarios = allScenarios.filter((s) =>
     s.tags.some((t) => BOUND_TAGS.has(t))
   );
 
-  const knownTitles = new Set(allScenarios.map((s) => s.title));
   const collected = collectAllBindings(watched.testRoots);
   const bindings = indexByTitle(collected);
 
@@ -244,7 +247,7 @@ function buildReport(watched: WatchedFeature): Report {
   });
 
   const unknownAnnotations = collected
-    .filter((b) => !knownTitles.has(b.title))
+    .filter((b) => !allKnownTitles.has(b.title))
     .map((b) => ({ title: b.title, ref: b.ref }));
 
   return {
@@ -295,7 +298,14 @@ function main(): void {
   const args = process.argv.slice(2);
   const asJson = args.includes("--json");
 
-  const reports = WATCHED.map(buildReport);
+  const allKnownTitles = new Set<string>();
+  for (const w of WATCHED) {
+    for (const s of parseFeature(resolve(REPO_ROOT, w.featurePath))) {
+      allKnownTitles.add(s.title);
+    }
+  }
+
+  const reports = WATCHED.map((w) => buildReport(w, allKnownTitles));
 
   if (asJson) {
     console.log(JSON.stringify(reports, null, 2));
