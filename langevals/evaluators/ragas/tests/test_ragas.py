@@ -125,6 +125,29 @@ def test_response_relevancy():
     assert result.details
 
 
+@pytest.mark.skipif(
+    not os.environ.get("AZURE_OPENAI_API_KEY"),
+    reason="AZURE_OPENAI_API_KEY not set",
+)
+def test_response_relevancy_with_azure_embeddings():
+    evaluator = RagasResponseRelevancyEvaluator(
+        settings=RagasResponseRelevancySettings(
+            model="azure/gpt-4o-mini",
+            embeddings_model="azure/text-embedding-ada-002",
+        )
+    )
+
+    result = evaluator.evaluate(
+        RagasResponseRelevancyEntry(
+            input="What is the capital of France?",
+            output="The capital of France is Paris.",
+        )
+    )
+
+    assert result.status == "processed"
+    assert result.score and result.score > 0.5
+
+
 def test_factual_correctness():
     evaluator = RagasFactualCorrectnessEvaluator(
         settings=RagasFactualCorrectnessSettings()
