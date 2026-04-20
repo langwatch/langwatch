@@ -15,6 +15,7 @@ import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import type { TypedAgent } from "../../server/agents/agent.repository";
+import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
 import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
 import { TagList } from "../ui/TagList";
 import { Drawer } from "../ui/drawer";
@@ -233,6 +234,41 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
         return;
       }
+
+      // Gate: workflow agents require valid scenario mappings before running.
+      if (target.type === "workflow") {
+        try {
+          const agent = await utils.agents.getById.fetch({
+            id: target.id,
+            projectId: project.id,
+          });
+          if (agent) {
+            const config = agent.config as CustomComponentConfig;
+            const mappings = config.scenarioMappings ?? {};
+            const hasMappings = Object.keys(mappings).length > 0;
+            // Check that at least one mapping wires to a required scenario field
+            // (input or messages). We don't have workflow outputs here, so we
+            // can't fully validate — the server-side pre-run check covers that.
+            const hasRequiredInput = hasMappings && Object.values(mappings).some(
+              (m) => m.type === "source" && (m.path[0] === "input" || m.path[0] === "messages"),
+            );
+            if (!hasRequiredInput) {
+              toaster.create({
+                title: "Configure scenario mappings",
+                description:
+                  "Set up how this workflow agent maps scenario inputs and outputs before running.",
+                type: "warning",
+                meta: { closable: true },
+              });
+              openDrawer("agentWorkflowEditor", { agentId: target.id });
+              return;
+            }
+          }
+        } catch {
+          // If agent fetch fails, allow the run to proceed — server will validate.
+        }
+      }
+
       try {
         await form.handleSubmit(async (data) => {
           const savedScenario = await handleSave(data);
@@ -261,7 +297,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
       }
     },
-    [handleSave, project?.id, project?.slug, persistTarget, runScenario, formInstance, onClose, router],
+    [handleSave, project?.id, project?.slug, persistTarget, runScenario, formInstance, onClose, router, utils, openDrawer],
   );
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;
