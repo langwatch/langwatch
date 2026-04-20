@@ -23,6 +23,7 @@ import { Prisma as PrismaNs } from "@prisma/client";
 import { createLogger } from "~/utils/logger/server";
 
 import { prisma } from "~/server/db";
+import { getMatchingLLMModelCost } from "~/server/background/workers/collector/cost";
 import {
   GatewayBudgetRepository,
   type DebitLineItem,
@@ -607,11 +608,44 @@ app.post("/budget/debit", async (c) => {
   }
 
   const status = normaliseDebitStatus(body.status);
-  const amount = new PrismaNs.Decimal(
+  // Gateway intentionally sends actual_cost_usd=0 ("control-plane recomputes
+  // from tokens using its pricing catalog" — dispatcher.go:1187). Recompute
+  // here from the pricing catalog so budgets actually update. If the wire
+  // value is non-zero we trust it (blocked_by_guardrail sends 0 and
+  // shouldn't be recomputed from tokens since there was no provider call).
+  const wireAmount =
     typeof body.actual_cost_usd === "number"
       ? body.actual_cost_usd
-      : (body.actual_cost_usd ?? 0),
-  );
+      : typeof body.actual_cost_usd === "string"
+        ? Number.parseFloat(body.actual_cost_usd) || 0
+        : 0;
+
+  let computedAmount = wireAmount;
+  if (wireAmount === 0 && status === "SUCCESS" && body.model) {
+    const pricing = await getMatchingLLMModelCost(project.id, body.model);
+    if (pricing) {
+      // Deduct cache-read tokens from input at 50% discount — mirrors how
+      // analytics/cost-enrichment computes spend on traces. Anthropic +
+      // Bedrock charge cache-write at ~125%; pricing catalog already
+      // blended that into the published inputCostPerToken.
+      const inputTokens = body.tokens?.input ?? 0;
+      const outputTokens = body.tokens?.output ?? 0;
+      const cacheReadTokens = body.tokens?.cache_read ?? 0;
+      const billableInput = Math.max(0, inputTokens - cacheReadTokens);
+      const inputCost =
+        (pricing.inputCostPerToken ?? 0) * billableInput +
+        (pricing.inputCostPerToken ?? 0) * 0.5 * cacheReadTokens;
+      const outputCost = (pricing.outputCostPerToken ?? 0) * outputTokens;
+      computedAmount = inputCost + outputCost;
+    } else {
+      logger.warn(
+        { model: body.model, projectId: project.id },
+        "no pricing catalog match for model — debit stored at 0 USD",
+      );
+    }
+  }
+
+  const amount = new PrismaNs.Decimal(computedAmount);
   const repo = new GatewayBudgetRepository(prisma);
 
   const lines: DebitLineItem[] = await prisma.$transaction(async (tx) => {
