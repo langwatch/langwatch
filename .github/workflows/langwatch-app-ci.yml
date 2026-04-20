@@ -24,6 +24,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
+      feature-parity: ${{ steps.detect.outputs.feature-parity }}
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - uses: ./.github/actions/detect-changes
@@ -35,6 +36,10 @@ jobs:
               - '.github/workflows/langwatch-app-ci.yml'
               - '.github/.release-please-manifest.json'
               - '.github/scripts/**'
+            feature-parity:
+              - 'langwatch/**'
+              - 'specs/**'
+              - '.github/workflows/langwatch-app-ci.yml'
 
   typecheck:
     needs: changes
@@ -360,7 +365,7 @@ jobs:
 
   feature-parity:
     needs: changes
-    if: needs.changes.outputs.relevant == 'true'
+    if: needs.changes.outputs.feature-parity == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
