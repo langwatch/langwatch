@@ -6,6 +6,8 @@ Provides:
   cleanup in teardown, even when the test body raises (issue #3164).
 - _session_prompt_registry: session-scoped safety-net that deletes any prompts
   created by this session that were not cleaned up by their per-test teardown.
+- tag_factory: function-scoped fixture that creates prompt tags and deletes
+  them on teardown (issue #3108).
 """
 
 import logging
@@ -61,6 +63,50 @@ def _delete_prompt_with_narrow_handling(prompt_id: str, context: str) -> None:
             type(exc).__name__,
             exc,
             extra={"prompt_id": prompt_id},
+        )
+
+
+def _delete_tag_with_narrow_handling(name: str, context: str) -> None:
+    """
+    Delete a single tag, distinguishing 404 (already gone) from real errors.
+
+    ``langwatch.prompts.tags.delete`` routes 404 responses through the same
+    ``unwrap_response`` helper as prompts, which raises
+    ``ValueError("Prompt not found: ...")`` regardless of the resource type
+    (see ``langwatch.prompts.errors``).  Tag teardown routinely encounters
+    this when a test deletes the tag itself as part of the assertion
+    (e.g. ``test_delete_tag_cascades_to_assignments``).
+
+    Never raises — callers iterate lists and must clean up all remaining names.
+    """
+    try:
+        langwatch.prompts.tags.delete(name)
+        logger.info(
+            "%s: deleted tag on teardown",
+            context,
+            extra={"tag_name": name},
+        )
+    except ValueError as exc:
+        if str(exc).startswith("Prompt not found"):
+            logger.debug(
+                "%s: tag already gone (404), skipping",
+                context,
+                extra={"tag_name": name},
+            )
+        else:
+            logger.warning(
+                "%s: failed to delete tag (ValueError: %s), continuing cleanup",
+                context,
+                exc,
+                extra={"tag_name": name},
+            )
+    except Exception as exc:  # noqa: BLE001 - teardown must never raise.
+        logger.warning(
+            "%s: failed to delete tag (%s: %s), continuing cleanup",
+            context,
+            type(exc).__name__,
+            exc,
+            extra={"tag_name": name},
         )
 
 
@@ -137,3 +183,25 @@ def prompt_factory(_session_prompt_registry: List[str]) -> Callable[..., Any]:
             _session_prompt_registry.remove(prompt_id)
         except ValueError:
             pass  # already removed or never added (shouldn't happen)
+
+
+@pytest.fixture
+def tag_factory() -> Callable[[str], Any]:
+    """
+    Function-scoped factory fixture for creating prompt tags with guaranteed cleanup.
+
+    Returns a callable that accepts a tag ``name`` and creates it via
+    ``langwatch.prompts.tags.create(name)``.  Every tag created through the
+    factory is deleted during fixture teardown, even when the test body raises.
+    """
+    tracked_names: List[str] = []
+
+    def _create(name: str) -> Any:
+        tag = langwatch.prompts.tags.create(name)
+        tracked_names.append(name)
+        return tag
+
+    yield _create
+
+    for name in tracked_names:
+        _delete_tag_with_narrow_handling(name, "tag_factory")

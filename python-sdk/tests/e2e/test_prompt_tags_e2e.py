@@ -347,7 +347,7 @@ class TestPromptTagsE2E:
             except Exception as e:
                 logger.warning("Failed to delete tag %s: %s", tag_b, e)
 
-    def test_delete_tag_cascades_to_assignments(self, prompt_factory):
+    def test_delete_tag_cascades_to_assignments(self, prompt_factory, tag_factory):
         """
         GIVEN a prompt with a custom tag assigned
         WHEN I delete the tag
@@ -357,30 +357,24 @@ class TestPromptTagsE2E:
         tag_name = f"e2e-cascade-tag-{uuid4().hex[:8]}"
         handle = f"e2e-cascade-prompt-{uuid4().hex[:8]}"
 
-        langwatch.prompts.tags.create(tag_name)
+        tag_factory(tag_name)
         created = prompt_factory(handle=handle, prompt="Cascade test")
 
-        try:
-            langwatch.prompts.tags.assign(
-                handle,
-                tag=tag_name,
-                version_id=created.version_id,
-            )
+        langwatch.prompts.tags.assign(
+            handle,
+            tag=tag_name,
+            version_id=created.version_id,
+        )
 
-            langwatch.prompts.tags.delete(tag_name)
+        langwatch.prompts.tags.delete(tag_name)
 
-            tags_after = langwatch.prompts.tags.list()
-            tag_names_after = [t["name"] for t in tags_after]
-            assert tag_name not in tag_names_after
+        tags_after = langwatch.prompts.tags.list()
+        tag_names_after = [t["name"] for t in tags_after]
+        assert tag_name not in tag_names_after
 
-            fetched = langwatch.prompts.get(handle)
-            assert fetched is not None
-            assert fetched.handle == handle
-        finally:
-            try:
-                langwatch.prompts.tags.delete(tag_name)
-            except Exception:
-                pass
+        fetched = langwatch.prompts.get(handle)
+        assert fetched is not None
+        assert fetched.handle == handle
 
     def test_shorthand_syntax_passes_through_as_id(self, prompt_factory):
         """
