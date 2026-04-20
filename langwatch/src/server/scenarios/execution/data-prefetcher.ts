@@ -638,7 +638,13 @@ async function hydrateLlmParameters({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const normalizedBase = normalizeToSnakeCase(rawBaseValue as any);
 
-      return { ...p, value: { ...normalizedBase, litellm_params: litellmParams } };
+      // Guarantee top-level `model` — partial existingValue (e.g. only `temperature`) would
+      // otherwise pass through without one, diverging from addEnvs.ts which derives model via
+      // LLMConfig contract. Downstream NLP reads value.model directly.
+      return {
+        ...p,
+        value: { ...normalizedBase, model, litellm_params: litellmParams },
+      };
     });
 
     return { ...n, data: { ...data, parameters: hydratedParams } };

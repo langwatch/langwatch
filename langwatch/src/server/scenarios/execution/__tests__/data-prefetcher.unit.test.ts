@@ -1047,5 +1047,69 @@ describe("prefetchScenarioData", () => {
       });
     });
 
+    describe("when the llm parameter value is a partial object without a top-level model key", () => {
+      // Regression: existingValue like { temperature: 0.7 } (no `model` field) must still
+      // produce an emitted value with a top-level `model`, matching addEnvs.ts behaviour.
+      // Downstream NLP reads value.model directly; missing it causes runtime failure.
+      it("guarantees a top-level model key in the emitted llm value", async () => {
+        const prepareFn = vi.fn().mockResolvedValue({
+          success: true as const,
+          params: { model: DEFAULT_MODEL, api_key: "sk-partial" },
+        });
+
+        const partialValueDsl = {
+          workflow_id: "wf_1",
+          nodes: [
+            {
+              id: "llm_call",
+              type: "signature",
+              data: {
+                name: "LLM Call",
+                parameters: [
+                  {
+                    identifier: "llm",
+                    type: "llm",
+                    value: { temperature: 0.7 },
+                  },
+                ],
+              },
+            },
+          ],
+          edges: [],
+        };
+
+        const deps = createMockDeps({
+          agentFetcher: {
+            findById: vi.fn().mockResolvedValue(workflowAgent),
+          },
+          workflowVersionFetcher: {
+            getLatestDsl: vi.fn().mockResolvedValue({
+              workflowId: "wf_1",
+              dsl: partialValueDsl,
+            }),
+          },
+          modelParamsProvider: {
+            prepare: prepareFn,
+          },
+        });
+
+        const result = await prefetchScenarioData(defaultContext, workflowTarget, deps);
+
+        expect(result.success).toBe(true);
+        if (result.success && result.data.adapterData.type === "workflow") {
+          const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
+          const signatureNode = nodes.find(
+            (n) => (n as { type?: unknown }).type === "signature",
+          ) as Record<string, unknown> | undefined;
+          const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as Array<Record<string, unknown>> | undefined;
+          const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
+          const value = llmParam?.value as Record<string, unknown> | undefined;
+
+          expect(value?.model).toBe(DEFAULT_MODEL);
+          expect(value?.temperature).toBe(0.7);
+        }
+      });
+    });
+
 });
 });
