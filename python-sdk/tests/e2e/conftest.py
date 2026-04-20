@@ -66,6 +66,50 @@ def _delete_prompt_with_narrow_handling(prompt_id: str, context: str) -> None:
         )
 
 
+def _delete_tag_with_narrow_handling(name: str, context: str) -> None:
+    """
+    Delete a single tag, distinguishing 404 (already gone) from real errors.
+
+    ``langwatch.prompts.tags.delete`` routes 404 responses through the same
+    ``unwrap_response`` helper as prompts, which raises
+    ``ValueError("Prompt not found: ...")`` regardless of the resource type
+    (see ``langwatch.prompts.errors``).  Tag teardown routinely encounters
+    this when a test deletes the tag itself as part of the assertion
+    (e.g. ``test_delete_tag_cascades_to_assignments``).
+
+    Never raises — callers iterate lists and must clean up all remaining names.
+    """
+    try:
+        langwatch.prompts.tags.delete(name)
+        logger.info(
+            "%s: deleted tag on teardown",
+            context,
+            extra={"tag_name": name},
+        )
+    except ValueError as exc:
+        if str(exc).startswith("Prompt not found"):
+            logger.debug(
+                "%s: tag already gone (404), skipping",
+                context,
+                extra={"tag_name": name},
+            )
+        else:
+            logger.warning(
+                "%s: failed to delete tag (ValueError: %s), continuing cleanup",
+                context,
+                exc,
+                extra={"tag_name": name},
+            )
+    except Exception as exc:  # noqa: BLE001 - teardown must never raise.
+        logger.warning(
+            "%s: failed to delete tag (%s: %s), continuing cleanup",
+            context,
+            type(exc).__name__,
+            exc,
+            extra={"tag_name": name},
+        )
+
+
 @pytest.fixture(scope="session")
 def _session_prompt_registry() -> List[str]:
     """
@@ -160,7 +204,4 @@ def tag_factory() -> Callable[[str], Any]:
     yield _create
 
     for name in tracked_names:
-        try:
-            langwatch.prompts.tags.delete(name)
-        except Exception as exc:
-            logger.warning("Failed to delete tag %s during teardown: %s", name, exc)
+        _delete_tag_with_narrow_handling(name, "tag_factory")
