@@ -29,6 +29,9 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 					return next(ctx, call)
 				}
 
+				if err := call.MaterializeBody(); err != nil {
+					return nil, err
+				}
 				verdict, err := pre(ctx, call.Bundle, call.Request)
 				if err != nil {
 					logger.Warn("guardrail_pre_error", zap.Error(err))

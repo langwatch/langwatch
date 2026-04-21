@@ -19,6 +19,9 @@ func Cache(evaluate EvaluateCacheFunc) Interceptor {
 		decision := evaluate(ctx, call.Bundle.Config.CacheRules, call.Request.Model)
 		if decision != nil {
 			call.Meta.CacheMode = string(decision.Action)
+			if err := call.MaterializeBody(); err != nil {
+				return err
+			}
 			call.Request.Body = applyCacheControl(call.Request.Body, decision.Action, call.Request.Type)
 		}
 		return nil

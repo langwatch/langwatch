@@ -15,6 +15,9 @@ func Policy(check PolicyCheckFunc) Interceptor {
 		if len(call.Bundle.Config.PolicyRules) == 0 {
 			return nil
 		}
+		if err := call.MaterializeBody(); err != nil {
+			return err
+		}
 		return check(ctx, call.Bundle.Config.PolicyRules, call.Request.Body)
 	})
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -66,8 +67,6 @@ func NewRouter(deps RouterDeps) http.Handler {
 	return r
 }
 
-// --- Typed dispatch handlers ---
-
 var (
 	bodyPool = sync.Pool{
 		New: func() any {
@@ -84,14 +83,16 @@ func chatHandler(deps RouterDeps) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		body, release, ok := readBody(w, r)
+
+		peek, body, release, ok := readAndPeekBody(w, r)
 		if !ok {
 			return
 		}
 		defer release()
 
-		if app.PeekStream(body) {
-			result, err := deps.App.HandleChatStream(r.Context(), bundle, body)
+		model := app.PeekModel(peek)
+		if app.PeekStream(peek) {
+			result, err := deps.App.HandleChatStream(r.Context(), bundle, body, model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -99,7 +100,7 @@ func chatHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, err := deps.App.HandleChat(r.Context(), bundle, body)
+			result, err := deps.App.HandleChat(r.Context(), bundle, body, model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -116,14 +117,16 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		body, release, ok := readBody(w, r)
+
+		peek, body, release, ok := readAndPeekBody(w, r)
 		if !ok {
 			return
 		}
 		defer release()
 
-		if app.PeekStream(body) {
-			result, err := deps.App.HandleMessagesStream(r.Context(), bundle, body)
+		model := app.PeekModel(peek)
+		if app.PeekStream(peek) {
+			result, err := deps.App.HandleMessagesStream(r.Context(), bundle, body, model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -131,7 +134,7 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 			setMetaHeaders(w, result.Meta)
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
-			result, err := deps.App.HandleMessages(r.Context(), bundle, body)
+			result, err := deps.App.HandleMessages(r.Context(), bundle, body, model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
@@ -148,13 +151,14 @@ func embeddingsHandler(deps RouterDeps) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		body, release, ok := readBody(w, r)
+
+		peek, body, release, ok := readAndPeekBody(w, r)
 		if !ok {
 			return
 		}
 		defer release()
 
-		result, err := deps.App.HandleEmbeddings(r.Context(), bundle, body)
+		result, err := deps.App.HandleEmbeddings(r.Context(), bundle, body, app.PeekModel(peek))
 		if err != nil {
 			writeError(deps.Logger, w, r.Context(), err)
 			return
@@ -185,8 +189,6 @@ func modelsHandler(deps RouterDeps) http.HandlerFunc {
 	}
 }
 
-// --- Request helpers ---
-
 func requireBundle(w http.ResponseWriter, r *http.Request, logger *zap.Logger) (*domain.Bundle, bool) {
 	bundle := BundleFromContext(r.Context())
 	if bundle == nil {
@@ -197,26 +199,51 @@ func requireBundle(w http.ResponseWriter, r *http.Request, logger *zap.Logger) (
 	return bundle, true
 }
 
-func readBody(w http.ResponseWriter, r *http.Request) ([]byte, func(), bool) {
+func readAndPeekBody(w http.ResponseWriter, r *http.Request) ([]byte, io.Reader, func(), bool) {
+	// Limit to 2MB to prevent OOM
+	r.Body = http.MaxBytesReader(w, r.Body, 2*1024*1024)
+
 	buf := bodyPool.Get().(*bytes.Buffer)
-	_, err := buf.ReadFrom(r.Body)
-	if err != nil {
-		buf.Reset()
-		bodyPool.Put(buf)
-		herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{"message": "failed to read request body"}))
-		return nil, func() {}, false
+	// Peek up to 512 bytes
+	peeked := make([]byte, 512)
+	n, _ := io.ReadFull(r.Body, peeked)
+	peeked = peeked[:n]
+
+	body := io.MultiReader(bytes.NewReader(peeked), r.Body)
+
+	// Since we need to materialize for bifrost anyway, we still use the pool
+	// but we only fill it if/when MaterializeBody is called in the pipeline.
+	// For now, to keep it simple and satisfy the "staged approach", we pass
+	// a reader that will fill the pooled buffer when read.
+
+	var once sync.Once
+	materializedBody := &lazyPooledBody{
+		reader: body,
+		buf:    buf,
+		release: func() {
+			once.Do(func() {
+				buf.Reset()
+				bodyPool.Put(buf)
+			})
+		},
 	}
 
-	body := buf.Bytes()
-	release := func() {
-		buf.Reset()
-		bodyPool.Put(buf)
-	}
-
-	return body, release, true
+	return peeked, materializedBody, materializedBody.release, true
 }
 
-// --- Response writers ---
+type lazyPooledBody struct {
+	reader io.Reader
+	buf    *bytes.Buffer
+	release func()
+}
+
+func (l *lazyPooledBody) Read(p []byte) (n int, err error) {
+	n, err = l.reader.Read(p)
+	if n > 0 {
+		l.buf.Write(p[:n])
+	}
+	return n, err
+}
 
 func writeJSONResponse(w http.ResponseWriter, resp *domain.Response) {
 	w.Header().Set("Content-Type", "application/json")
@@ -244,8 +271,6 @@ func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
 		h.Add("Traceparent", meta.CustomerTraceparent)
 	}
 }
-
-// --- SSE streaming ---
 
 // Pre-allocated SSE framing bytes — three w.Write calls instead of one
 // fmt.Fprintf avoids allocating a format buffer per chunk.
@@ -311,8 +336,6 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 	logger.Error("unhandled error", zap.Error(err))
 	herr.WriteHTTP(w, herr.New(ctx, domain.ErrInternal, nil))
 }
-
-// --- Error mapping ---
 
 var errorsRegistered bool
 

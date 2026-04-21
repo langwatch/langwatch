@@ -21,6 +21,9 @@ func ModelResolve(resolve ResolveModelFunc) Interceptor {
 		}
 		call.Request.Resolved = resolved
 		if call.Request.Model != resolved.ModelID {
+			if err := call.MaterializeBody(); err != nil {
+				return err
+			}
 			call.Request.Body = rewriteModel(call.Request.Body, resolved.ModelID)
 		}
 		return nil

@@ -25,7 +25,6 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 				spanCtx, tp := begin(ctx, call.Bundle.ProjectID, call.Request.Type)
 				call.Meta.CustomerTraceparent = tp
 
-				start := time.Now()
 				resp, err := next(spanCtx, call)
 				if err != nil {
 					return nil, err
@@ -36,8 +35,6 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 						Model:       call.Request.Resolved.ModelID,
 						ProviderID:  call.Request.Resolved.ProviderID,
 						Usage:       resp.Usage,
-						DurationMS:  time.Since(start).Milliseconds(),
-						Streaming:   false,
 						RequestType: call.Request.Type,
 					})
 				}
@@ -49,7 +46,6 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 				spanCtx, tp := begin(ctx, call.Bundle.ProjectID, call.Request.Type)
 				call.Meta.CustomerTraceparent = tp
 
-				start := time.Now()
 				iter, err := next(spanCtx, call)
 				if err != nil {
 					return nil, err
@@ -58,11 +54,10 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 					return iter, nil
 				}
 				return &traceStreamWrapper{
-					inner:   iter,
-					end:     end,
-					bundle:  call.Bundle,
-					req:     call.Request,
-					started: start,
+					inner:  iter,
+					end:    end,
+					bundle: call.Bundle,
+					req:    call.Request,
 				}, nil
 			}
 		},
@@ -75,7 +70,6 @@ type traceStreamWrapper struct {
 	end       EndSpanFunc
 	bundle    *domain.Bundle
 	req       *domain.Request
-	started   time.Time
 	lastCtx   context.Context
 	closeOnce sync.Once
 }
@@ -110,8 +104,6 @@ func (w *traceStreamWrapper) onClose() {
 				Model:       w.req.Resolved.ModelID,
 				ProviderID:  w.req.Resolved.ProviderID,
 				Usage:       w.inner.Usage(),
-				DurationMS:  time.Since(w.started).Milliseconds(),
-				Streaming:   true,
 				RequestType: w.req.Type,
 			})
 			return nil
