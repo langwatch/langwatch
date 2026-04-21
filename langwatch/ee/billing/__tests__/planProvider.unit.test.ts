@@ -156,7 +156,7 @@ describe("createSaaSPlanProvider", () => {
             maxMembers: null,
             maxProjects: null,
             maxMessagesPerMonth: null,
-            };
+          };
 
           const db = createMockDb({
             findFirstResult: subscription,

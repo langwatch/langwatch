@@ -191,7 +191,7 @@ describe("mapUsageToLimits", () => {
       agentsCount: 0,
       experimentsCount: 0,
       currentMonthMessagesCount: 0,
-      };
+    };
 
     const result = mapUsageToLimits(zeroUsage, basePlan);
 
@@ -222,7 +222,7 @@ describe("mapUsageToLimits", () => {
       maxCustomGraphs: 3,
       maxAutomations: 3,
       maxMessagesPerMonth: 1000,
-        canPublish: false,
+      canPublish: false,
       prices: { USD: 0, EUR: 0 },
     };
 
@@ -255,7 +255,7 @@ describe("mapUsageToLimits", () => {
       maxCustomGraphs: 100,
       maxAutomations: 50,
       maxMessagesPerMonth: 10000,
-        canPublish: true,
+      canPublish: true,
       prices: { USD: 0, EUR: 0 },
     };
 
@@ -278,7 +278,7 @@ describe("mapUsageToLimits", () => {
       agentsCount: 7,
       experimentsCount: 10,
       currentMonthMessagesCount: 1500,
-      };
+    };
 
     const result = mapUsageToLimits(overLimitUsage, basePlan);
 

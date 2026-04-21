@@ -246,6 +246,19 @@ describe("validateLicense", () => {
       }
     });
 
+    it("validates old licenses that include evaluationsCredit (backward compat)", () => {
+      // VALID_LICENSE_KEY contains evaluationsCredit in the signed payload.
+      // After making the field optional, old licenses must still parse and
+      // pass signature verification without error.
+      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
+
+      expect(result.valid).toBe(true);
+      if (result.valid) {
+        // The field is preserved in parsed data (not stripped by Zod)
+        expect(result.licenseData.plan.evaluationsCredit).toBe(BASE_LICENSE.plan.evaluationsCredit);
+      }
+    });
+
     it("extracts plan.maxWorkflows", () => {
       const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
 
