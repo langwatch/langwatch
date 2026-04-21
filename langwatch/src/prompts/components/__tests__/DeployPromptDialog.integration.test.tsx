@@ -197,7 +197,10 @@ afterEach(() => {
   cleanup();
 });
 
-// TODO(#3022): pre-existing worker-hang (vitest pool timeout) unmasked by #3001 — re-enable after fix
+// TODO(#3022): vitest hangs during module resolution for this jsdom component test
+// when run via the integration runner (testcontainers globalSetup + heavy import tree).
+// The test code itself is correct — the hang is a tooling/infrastructure issue.
+// Re-enable once vitest module resolution is optimized or test is restructured.
 describe.skip("Feature: Deploy Prompt Dialog", () => {
   describe("<DeployPromptDialog/>", () => {
     describe("when the dialog is open", () => {

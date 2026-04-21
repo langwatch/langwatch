@@ -212,6 +212,17 @@ export const PRECONDITION_ALLOWED_RULES: Record<
 // Helpers
 // ---------------------------------------------------------------------------
 
+/**
+ * Applies business-layer defaults to trace data before precondition evaluation.
+ * Mirrors the ClickHouse read-boundary normalization (filter-conditions.ts)
+ * and the deferred origin stamping (traceSummary.foldProjection.ts).
+ */
+export function normalizePreconditionTraceData(
+  data: PreconditionTraceData,
+): PreconditionTraceData {
+  return { ...data, origin: data.origin ?? "application" };
+}
+
 /** Labels for precondition-only fields not in the filter registry */
 const EXTRA_FIELD_LABELS: Partial<Record<PreconditionField, string>> = {
   input: "Input",
