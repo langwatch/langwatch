@@ -1,6 +1,7 @@
 import {
   OrganizationUserRole,
   PIIRedactionLevel,
+  Prisma,
   type Project,
   ProjectSensitiveDataVisibilityLevel,
   TeamUserRole,
@@ -10,6 +11,20 @@ import type { NextApiRequest, NextApiResponse } from "~/types/next-stubs";
 import { createMocks, type RequestMethod } from "node-mocks-http";
 import { prisma } from "../server/db";
 import { ENTERPRISE_LICENSE_KEY } from "../../ee/licensing/__tests__/fixtures/testLicenses";
+
+async function ignoreUniqueViolation<T>(promise: Promise<T>): Promise<T | null> {
+  try {
+    return await promise;
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return null;
+    }
+    throw error;
+  }
+}
 
 export async function getTestUser() {
   // Upsert everything: concurrent test files in the same shard race on findUnique + create.
@@ -56,30 +71,28 @@ export async function getTestUser() {
     },
   });
 
-  await prisma.teamUser.upsert({
-    where: { userId_teamId: { userId: user.id, teamId: team.id } },
-    update: {},
-    create: {
-      userId: user.id,
-      teamId: team.id,
-      role: TeamUserRole.MEMBER,
-    },
-  });
+  // Use create + swallow P2002 for composite-unique memberships: Prisma upsert
+  // isn't atomic, so concurrent callers can still race on userId_teamId /
+  // userId_organizationId. Ignoring only the unique-violation preserves real errors.
+  await ignoreUniqueViolation(
+    prisma.teamUser.create({
+      data: {
+        userId: user.id,
+        teamId: team.id,
+        role: TeamUserRole.MEMBER,
+      },
+    }),
+  );
 
-  await prisma.organizationUser.upsert({
-    where: {
-      userId_organizationId: {
+  await ignoreUniqueViolation(
+    prisma.organizationUser.create({
+      data: {
         userId: user.id,
         organizationId: organization.id,
+        role: OrganizationUserRole.MEMBER,
       },
-    },
-    update: {},
-    create: {
-      userId: user.id,
-      organizationId: organization.id,
-      role: OrganizationUserRole.MEMBER,
-    },
-  });
+    }),
+  );
 
   return user;
 }
