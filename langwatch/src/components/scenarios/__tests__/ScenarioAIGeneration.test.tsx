@@ -150,6 +150,28 @@ describe("when no model providers are configured", () => {
 
     expect(screen.getByText("Model Provider Required")).toBeInTheDocument();
   });
+
+  it("renders a Configure model provider button linking to /settings/model-providers in a new tab", () => {
+    render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+    // The Card contains both an inline link and a primary button (asChild <a>).
+    // Both have the same name; assert at least one link with the correct attributes exists.
+    const links = screen.getAllByRole("link", { name: "Configure model provider" });
+    expect(links.length).toBeGreaterThanOrEqual(1);
+    const primaryLink = links[links.length - 1]!; // button is rendered after the inline link
+    expect(primaryLink).toHaveAttribute("href", "/settings/model-providers");
+    expect(primaryLink).toHaveAttribute("target", "_blank");
+    expect(primaryLink).toHaveAttribute("rel", expect.stringContaining("noopener"));
+    expect(primaryLink).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
+  });
+
+  it("keeps the inline explanatory text alongside the button", () => {
+    render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+    expect(
+      screen.getByText(/Scenarios require a model provider to run/i),
+    ).toBeInTheDocument();
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

@@ -231,6 +231,16 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
                   Configure model provider
                 </Link>
               </Text>
+
+              <Button colorPalette="blue" asChild size="sm">
+                <a
+                  href="/settings/model-providers"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Configure model provider
+                </a>
+              </Button>
             </VStack>
           </Card.Body>
         </Card.Root>
