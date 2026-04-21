@@ -107,6 +107,14 @@ vi.mock("~/utils/api", () => ({
         useQuery: vi.fn(() => ({ data: undefined })),
       },
     },
+    licenseEnforcement: {
+      checkLimit: {
+        useQuery: vi.fn(() => ({ data: { allowed: true, current: 0, max: 3, limitType: "experiments" } })),
+      },
+      reportLimitBlocked: {
+        useMutation: vi.fn(() => ({ mutate: vi.fn() })),
+      },
+    },
     useContext: vi.fn(() => ({
       suites: {
         getAll: { invalidate: vi.fn() },
