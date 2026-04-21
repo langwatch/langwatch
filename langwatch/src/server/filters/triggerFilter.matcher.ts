@@ -135,26 +135,30 @@ function matchField(
     return matchSimpleArray(traceData, field, filterValue);
   }
 
-  // Nested object: iterate keys
+  // Nested object: OR across keys (matches ClickHouse filter generation)
+  let hasActionableCondition = false;
+
   for (const [key, subValue] of Object.entries(filterValue)) {
     if (Array.isArray(subValue)) {
       // Record<string, string[]> — resolve with key
       if (subValue.length === 0) continue;
-      if (!matchSimpleArray(traceData, field, subValue, key)) {
-        return false;
+      hasActionableCondition = true;
+      if (matchSimpleArray(traceData, field, subValue, key)) {
+        return true;
       }
     } else if (typeof subValue === "object" && subValue !== null) {
       // Record<string, Record<string, string[]>> — resolve with key + subkey
       for (const [subkey, values] of Object.entries(subValue)) {
         if (!Array.isArray(values) || values.length === 0) continue;
-        if (!matchSimpleArray(traceData, field, values, key, subkey)) {
-          return false;
+        hasActionableCondition = true;
+        if (matchSimpleArray(traceData, field, values, key, subkey)) {
+          return true;
         }
       }
     }
   }
 
-  return true;
+  return !hasActionableCondition;
 }
 
 /**
