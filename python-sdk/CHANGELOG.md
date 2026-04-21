@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.22.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.21.0...python-sdk@v0.22.0) (2026-04-21)
+
+
+### Features
+
+* **auth:** fine-grained personal access tokens ([#3212](https://github.com/langwatch/langwatch/issues/3212)) ([#3213](https://github.com/langwatch/langwatch/issues/3213)) ([bb7a6ee](https://github.com/langwatch/langwatch/commit/bb7a6ee422e6442dafaafa0848cce1869f980d16))
+
+
+### Bug Fixes
+
+* unskip platform experiment e2e and telemetry context tests ([#3083](https://github.com/langwatch/langwatch/issues/3083)) ([ac2640a](https://github.com/langwatch/langwatch/commit/ac2640af2ca94648708657c01b859612b48854ea))
+
 ## [0.21.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.20.0...python-sdk@v0.21.0) (2026-04-18)
 
 
