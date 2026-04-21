@@ -34,7 +34,7 @@ The gateway adds a third option: **allow every CLI, centrally governed.**
 
 - **Cost.** Each engineer's CLI spend debits the org → team → project → principal budgets you've set.
 - **Visibility.** Every CLI call shows up in LangWatch traces, scoped to the project the VK belongs to.
-- **Policy.** `blocked_patterns` can deny shell-exec tools or untrusted MCPs at the gateway level, even if the CLI would otherwise enable them.
+- **Policy.** `policy_rules` can deny shell-exec tools or untrusted MCPs at the gateway level, even if the CLI would otherwise enable them.
 - **Portability.** An engineer on Claude Code and a co-worker on Codex hit the same gateway with different VKs but the same budget — you don't need to pick a winner.
 - **Revocation.** Rotate or revoke a VK and the CLI stops working globally within 60 seconds. No more "which laptops still have the old key?"
 
@@ -44,7 +44,7 @@ A workable pattern used by several early customers:
 
 - One personal-access VK per engineer (`{engineer}-cli`) bound to the engineer's principal.
 - Attach a `principal`-scoped monthly budget (e.g. `$200/month` for engineers, `$1000/month` for staff+). `on_breach: block`.
-- `blocked_patterns.tools.deny`: `^shell\\.exec$`, `^filesystem\\.write$` (or your org's list).
+- `policy_rules.tools.deny`: `^shell\\.exec$`, `^filesystem\\.write$` (or your org's list).
 - Fallback chain: Anthropic → OpenAI → Azure OpenAI. CLI autoswitches on outage.
 - `cache.mode: respect` so Anthropic prompt caching keeps saving 90%.
 

@@ -1,7 +1,6 @@
 package stacktrace
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -15,7 +14,7 @@ func TestGetCallerFrames(t *testing.T) {
 	// The first frame should be this test function.
 	assert.Contains(t, frames[0].Function, "TestGetCallerFrames")
 	assert.NotEmpty(t, frames[0].File)
-	assert.Greater(t, frames[0].Line, 0)
+	assert.Positive(t, frames[0].Line)
 }
 
 func TestFrame_String(t *testing.T) {
@@ -39,10 +38,10 @@ func TestFormatFrames(t *testing.T) {
 
 	out := FormatFrames(frames)
 
-	assert.True(t, strings.Contains(out, "funcA"))
-	assert.True(t, strings.Contains(out, "funcB"))
-	assert.True(t, strings.Contains(out, "a.go:1"))
-	assert.True(t, strings.Contains(out, "b.go:2"))
+	assert.Contains(t, out, "funcA")
+	assert.Contains(t, out, "funcB")
+	assert.Contains(t, out, "a.go:1")
+	assert.Contains(t, out, "b.go:2")
 }
 
 func TestMergeStacks_EmptyWrapped(t *testing.T) {

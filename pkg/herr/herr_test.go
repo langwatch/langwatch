@@ -38,13 +38,13 @@ func TestE_Error_IncludesCodeAndMeta(t *testing.T) {
 func TestE_Is_MatchesSameCode(t *testing.T) {
 	e := New(context.Background(), codeNotFound, nil, errors.New("gone"))
 
-	assert.True(t, errors.Is(e, codeNotFound))
+	assert.ErrorIs(t, e, codeNotFound)
 }
 
 func TestE_Is_DifferentCode(t *testing.T) {
 	e := New(context.Background(), codeNotFound, nil, errors.New("gone"))
 
-	assert.False(t, errors.Is(e, codeInternal))
+	assert.NotErrorIs(t, e, codeInternal)
 }
 
 func TestE_Unwrap(t *testing.T) {
@@ -73,6 +73,6 @@ func TestCode_Error(t *testing.T) {
 
 func TestNew_PanicsWithNilReason(t *testing.T) {
 	assert.Panics(t, func() {
-		New(context.Background(), codeNotFound, nil, nil)
+		_ = New(context.Background(), codeNotFound, nil, nil)
 	})
 }

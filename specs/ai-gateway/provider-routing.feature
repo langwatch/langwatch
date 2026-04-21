@@ -3,8 +3,8 @@ Feature: Model → provider routing via VK config
   specific provider credential via (a) VK model_aliases, (b) explicit
   `provider/model` form, or (c) single-provider default.
 
-  See contract.md §3 (routing), §4.2 (config shape), §11b (blocked
-  patterns).
+  See contract.md §3 (routing), §4.2 (config shape), §11b (policy
+  rules).
 
   Background:
     Given a VK with provider slots ["pc_openai_primary", "pc_anthropic_backup"]
@@ -44,11 +44,11 @@ Feature: Model → provider routing via VK config
       And the error envelope type is "model_not_allowed"
       And no upstream provider is called
 
-  Rule: Blocked-patterns enforcement at pre-dispatch
+  Rule: Policy-rules enforcement at pre-dispatch
 
     @integration
     Scenario: deny-listed tool name returns tool_not_allowed before dispatch
-      Given the VK blocked_patterns.tools.deny includes "^shell\\."
+      Given the VK policy_rules.tools.deny includes "^shell\\."
       When I POST /v1/chat/completions with tools [{"function": {"name": "shell.exec"}}]
       Then the response status is 403
       And the error envelope type is "tool_not_allowed"
@@ -56,12 +56,12 @@ Feature: Model → provider routing via VK config
 
     @integration
     Scenario: MCP allow-list excludes unknown MCP
-      Given the VK blocked_patterns.mcp.allow includes "^mcp-safe-.*$"
+      Given the VK policy_rules.mcp.allow includes "^mcp-safe-.*$"
       And the request declares mcp_servers: [{"name": "mcp-safe-search"}, {"name": "mcp-unverified-x"}]
       When I POST /v1/chat/completions
       Then the response status is 403
       And the error envelope type is "tool_not_allowed"
-      And policies_triggered includes "blocked_mcp"
+      And policies_triggered includes "policy_violation_mcp"
 
   Rule: Provider credentials are resolved from pc_* references, not duplicated
 

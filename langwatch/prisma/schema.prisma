@@ -1539,7 +1539,7 @@ model VirtualKey {
     // Config blob. Mirrors the shape of `GET /internal/gateway/config/:vk_id`.
     // Stored as a single JSON blob so the control-plane can version it and
     // return it to the gateway without reassembling from many tables. Fields:
-    //   model_aliases, models_allowed, cache, guardrails, blocked_patterns,
+    //   model_aliases, models_allowed, cache, guardrails, policy_rules,
     //   rate_limits, fallback (non-chain scalars). The chain itself is
     //   materialised in VirtualKeyProviderCredential for FK integrity.
     config                   Json                           @default("{}")

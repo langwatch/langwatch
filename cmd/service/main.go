@@ -54,8 +54,9 @@ func run(args []string) int {
 	}
 
 	ctx = contexts.SetServiceInfo(ctx, contexts.ServiceInfo{
-		Service: cmd,
-		Version: Version,
+		Service:     cmd,
+		Version:     Version,
+		Environment: os.Getenv("ENVIRONMENT"),
 	})
 
 	if err := fn(ctx, args); err != nil {

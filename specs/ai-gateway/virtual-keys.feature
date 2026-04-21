@@ -7,7 +7,7 @@ Feature: AI Gateway — Virtual Keys
   A virtual key (VK) is a LangWatch-issued credential (format `lw_vk_{live|test}_<26-char-ulid>`,
   40 chars total — see specs/ai-gateway/_shared/contract.md §2) that the Gateway service resolves to:
   an owning project/team/org, a principal for attribution, a set of provider credentials with a
-  fallback chain, model aliases, cache policy, guardrail policy, blocked patterns, and budgets.
+  fallback chain, model aliases, cache policy, guardrail policy, policy rules, and budgets.
   The secret half is displayed exactly once at creation and stored as a
   peppered HMAC-SHA256 hash (see contract.md §2 for why HMAC-SHA256 over argon2id:
   ULID body is already brute-force-infeasible at 130 bits, argon2id would add
@@ -75,8 +75,8 @@ Feature: AI Gateway — Virtual Keys
   # creation surface with a read-only preview of advanced settings.
   #
   # The create drawer only exposes name/description/environment/provider
-  # chain; every other capability (cache control, guardrails, blocked
-  # patterns, rate limits) is editable post-create via the edit drawer.
+  # chain; every other capability (cache control, guardrails, policy
+  # rules, rate limits) is editable post-create via the edit drawer.
   # Showing defaults in the create drawer avoids doubling the surface
   # while still advertising what the gateway offers.
   # ============================================================================
@@ -89,7 +89,7 @@ Feature: AI Gateway — Virtual Keys
       | capability        | default     |
       | Cache control     | respect     |
       | Guardrails        | none        |
-      | Blocked patterns  | none        |
+      | Policy rules      | none        |
       | Rate limits       | unlimited   |
     And each row has a short description of the capability
     And no inputs are shown for these capabilities in the create drawer
@@ -309,7 +309,7 @@ Feature: AI Gateway — Virtual Keys
     When the gateway calls the same endpoint with "If-None-Match: 41"
     Then the response is 200 with the full config payload
     And the payload includes providers, fallback_chain, model_aliases, cache,
-      guardrails, blocked_patterns, budgets, rate_limits, and a new revision
+      guardrails, policy_rules, budgets, rate_limits, and a new revision
 
   @integration
   Scenario: GET /internal/gateway/changes?since=N long-polls for mutations

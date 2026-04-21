@@ -13,7 +13,7 @@
 - **20+ providers, drop-in OpenAI/Anthropic/Bedrock/Vertex/Azure compatibility.** This is exactly the leverage we buy by embedding `bifrost/core`.
 - **4-level hierarchy in governance:** virtual-key → team → customer → organisation. Ours is slightly different (org → team → project → virtual-key → principal) because LangWatch's existing hierarchy has `project` as the primary scope boundary for multitenancy; we map `customer` → `project`. No new primitives.
 - **Plugin architecture.** `LLMPlugin` interface with `PreLLMHook` / `PostLLMHook` / streaming chunk hook is the foundation our guardrail system runs on. We call `guardrail-check` over HTTP rather than using their dynamic `.so` plugin loader (we're already in Go, no need for the .so machinery).
-- **MCP gateway (tool discovery, approval controls, OAuth).** Confirms "gateway that speaks MCP" is a valid product direction. Our MCP handling is narrower for v1: regex-based `blocked_patterns.mcp` allow/deny at the gateway. Full MCP orchestration (approval workflow, OAuth, custom hosting) is post-v1.
+- **MCP gateway (tool discovery, approval controls, OAuth).** Confirms "gateway that speaks MCP" is a valid product direction. Our MCP handling is narrower for v1: regex-based `policy_rules.mcp` allow/deny at the gateway. Full MCP orchestration (approval workflow, OAuth, custom hosting) is post-v1.
 - **Observability via Prometheus + OpenTelemetry.** We copy this shape 1:1. `/metrics` for Prometheus, OTLP exporter with `langwatch.project_id` routing.
 - **Enterprise features: adaptive load balancing, HA clustering, IdP integration, RBAC, audit logs, VPC deployments.** LangWatch already has SSO/SCIM/RBAC/audit. VPC deployment = our helm chart. Adaptive load balancing = our fallback chain + circuit breaker. HA clustering = horizontal scale + shared Redis L2 auth cache.
 
@@ -89,7 +89,7 @@ Nexos publishes a clean per-CLI integration guide page (we only saw Codex). We s
 | Virtual keys with budgets | ✅ built-in | ✅ plugin | ✅ | ✅ |
 | Hierarchical scopes (org/team/project/VK/principal) | ✅ 5-level | ✅ 4-level | partial | partial |
 | Inline guardrails (pre/post/stream_chunk) | ✅ | ❌ OSS / ✅ Enterprise | partial | unknown |
-| Blocked patterns (tools/MCP/URL regex) | ✅ | partial | ❌ | ❌ |
+| Policy rules (tools/MCP/URL regex) | ✅ | partial | ❌ | ❌ |
 | Per-tenant OTel routing | ✅ | ✅ plugin | ❌ | ❌ |
 | Anthropic `cache_control` byte-identical passthrough | ✅ with integration test | partial | partial | unknown |
 | Fallback chain with 400-error exclusion | ✅ documented | partial | ✅ | partial |
@@ -112,7 +112,7 @@ Nexos publishes a clean per-CLI integration guide page (we only saw Codex). We s
 ## 5. Open research questions for future iterations
 
 - [ ] How does Portkey's **conditional routing** (policy-based) look at the config level? Worth a future feature if we see demand.
-- [ ] Does Bifrost's **MCP autonomous agent mode** have anything reusable for our `blocked_patterns.mcp` enforcement, or is it unrelated? Read their MCP docs deeply.
+- [ ] Does Bifrost's **MCP autonomous agent mode** have anything reusable for our `policy_rules.mcp` enforcement, or is it unrelated? Read their MCP docs deeply.
 - [ ] Does anyone in the category solve **per-region provider routing for data residency** cleanly? Open question in our contract §12.
 - [ ] **Canary / A-B routing** (Portkey) — is a percentage-routed VK config worth the complexity in v1.x? Tracking as a post-v1 candidate.
 - [ ] **Semantic cache** — when does it pay off vs Anthropic's own 5-min ephemeral cache? Benchmark this before shipping.

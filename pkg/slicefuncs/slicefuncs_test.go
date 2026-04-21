@@ -18,12 +18,12 @@ func TestMap_Empty(t *testing.T) {
 	result := Map([]int{}, strconv.Itoa)
 
 	assert.Equal(t, []string{}, result)
-	assert.Len(t, result, 0)
+	assert.Empty(t, result)
 }
 
 func TestMap_Nil(t *testing.T) {
 	result := Map(nil, strconv.Itoa)
 
 	assert.NotNil(t, result, "nil input should return empty slice, not nil")
-	assert.Len(t, result, 0)
+	assert.Empty(t, result)
 }

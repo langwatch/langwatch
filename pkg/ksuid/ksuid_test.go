@@ -57,7 +57,7 @@ func TestID_String_NoResource(t *testing.T) {
 	s := id.String()
 	// No resource = no prefix, just base62
 	assert.NotEmpty(t, s)
-	assert.False(t, strings.Contains(s, "_"))
+	assert.NotContains(t, s, "_")
 }
 
 func TestGenerate_SequentialIDsAreSortable(t *testing.T) {

@@ -23,19 +23,19 @@ make dev-scenarios    # + workers (includes scenarios) + bullboard + ai-server +
 make dev-full         # Everything including opensearch
 make quickstart       # Interactive profile chooser
 make down             # Stop all services
-make gateway-dev      # Start the Go AI Gateway data plane on :5563
+make service svc=aigateway  # Start the Go AI Gateway data plane on :5563
 ```
 
 See `dev/docs/adr/004-docker-dev-environment.md` for architecture decisions.
 
-### AI Gateway (Go, services/gateway/)
+### AI Gateway (Go, services/aigateway/)
 
 The gateway is a separate Go service (not in `compose.dev.yml`) that terminates
 virtual-key traffic, fans out to providers via Bifrost, and reports usage back to
 the control plane. Run it alongside `pnpm dev` / `make dev`:
 
 ```bash
-make gateway-dev      # cd services/gateway && make run-dev
+make service svc=aigateway
 ```
 
 Requires `langwatch/.env` with `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET`,

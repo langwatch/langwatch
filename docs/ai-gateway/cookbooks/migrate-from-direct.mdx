@@ -4,7 +4,7 @@ description: Move from app → OpenAI/Anthropic to app → LangWatch Gateway →
 sidebarTitle: Migrate from direct
 ---
 
-You're already calling OpenAI, Anthropic, Bedrock, etc. from your application. You want to add governance — budgets, fallback, blocked-tool patterns, per-engineer attribution — without rewriting everything. This cookbook shows the minimum-effort migration.
+You're already calling OpenAI, Anthropic, Bedrock, etc. from your application. You want to add governance — budgets, fallback, policy-rule patterns, per-engineer attribution — without rewriting everything. This cookbook shows the minimum-effort migration.
 
 ## Before
 
@@ -147,7 +147,7 @@ When OpenAI throws a 503, the gateway re-dispatches the same prompt to Claude Ha
 
 ```json
 {
-  "blocked_patterns": {
+  "policy_rules": {
     "tools": { "deny": ["^shell\\.exec$", "^filesystem\\.write$"], "allow": null }
   }
 }

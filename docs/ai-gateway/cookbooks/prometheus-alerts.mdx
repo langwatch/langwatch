@@ -187,7 +187,7 @@ groups:
           summary: "> 10 req/s blocked by policy reason={{ $labels.reason }}"
           description: |
             Legit block storm (a customer's runtime is trying a banned tool
-            repeatedly) or a regression in the blocked_patterns config.
+            repeatedly) or a regression in the policy_rules config.
             Check LangWatch traces filtered on
             attr.langwatch.policy.blocked != "".
 ```

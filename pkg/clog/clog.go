@@ -2,8 +2,11 @@ package clog
 
 import (
 	"context"
+	"fmt"
 
+	"github.com/thessem/zap-prettyconsole"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 
 	"github.com/langwatch/langwatch/pkg/contexts"
 )
@@ -31,19 +34,13 @@ func With(ctx context.Context, fields ...zap.Field) context.Context {
 
 // New creates a configured zap logger for a service.
 func New(cfg Config) *zap.Logger {
-	var zapCfg zap.Config
-	if cfg.Debug {
-		zapCfg = zap.NewDevelopmentConfig()
-	} else {
-		zapCfg = zap.NewProductionConfig()
+	if cfg.Format == "pretty" {
+		logger := prettyconsole.NewLogger(cfg.zapLevel())
+		return logger
 	}
 
-	if cfg.Level != "" {
-		var level zap.AtomicLevel
-		if err := level.UnmarshalText([]byte(cfg.Level)); err == nil {
-			zapCfg.Level = level
-		}
-	}
+	zapCfg := zap.NewProductionConfig()
+	zapCfg.Level = zap.NewAtomicLevelAt(cfg.zapLevel())
 
 	logger, _ := zapCfg.Build()
 	return logger
@@ -51,8 +48,35 @@ func New(cfg Config) *zap.Logger {
 
 // Config controls logging setup.
 type Config struct {
-	Debug bool
-	Level string // "debug", "info", "warn", "error"
+	Level  string `env:"LEVEL"`  // "debug", "info", "warn", "error"
+	Format string `env:"FORMAT"` // "json" (default), "pretty"
+}
+
+// Validate checks that config values are recognised.
+func (c Config) Validate() error {
+	switch c.Format {
+	case "", "json", "pretty":
+	default:
+		return fmt.Errorf("clog: unknown LOG_FORMAT %q (want json or pretty)", c.Format)
+	}
+
+	if c.Level != "" {
+		var lvl zap.AtomicLevel
+		if err := lvl.UnmarshalText([]byte(c.Level)); err != nil {
+			return fmt.Errorf("clog: unknown LOG_LEVEL %q: %w", c.Level, err)
+		}
+	}
+
+	return nil
+}
+
+func (c Config) zapLevel() zapcore.Level {
+	if c.Level == "" {
+		return zapcore.InfoLevel
+	}
+	var lvl zapcore.Level
+	_ = lvl.UnmarshalText([]byte(c.Level))
+	return lvl
 }
 
 // ForService returns a logger tagged with service info from context.

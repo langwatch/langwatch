@@ -35,9 +35,9 @@ type closerSvc struct {
 	stopFn func(ctx context.Context) error
 }
 
-func (c *closerSvc) String() string                  { return c.name }
-func (c *closerSvc) Start(context.Context) error     { return nil }
-func (c *closerSvc) Stop(ctx context.Context) error  { return c.stopFn(ctx) }
+func (c *closerSvc) String() string                 { return c.name }
+func (c *closerSvc) Start(context.Context) error    { return nil }
+func (c *closerSvc) Stop(ctx context.Context) error { return c.stopFn(ctx) }
 
 // Worker creates a Service from a fire-and-forget start and a synchronous stop.
 // The start function receives the group's cancellable context.
@@ -90,7 +90,7 @@ func (l *listenSvc) String() string { return l.name }
 
 func (l *listenSvc) Start(ctx context.Context) error {
 	// Detach so in-flight requests keep context values (logger, tracing)
-	// but aren't cancelled when the group's context is cancelled during shutdown.
+	// but aren't canceled when the group's context is canceled during shutdown.
 	// Requests finish naturally, bounded by Shutdown's graceful timeout.
 	l.srv.BaseContext = func(_ net.Listener) context.Context {
 		return context.WithoutCancel(ctx)

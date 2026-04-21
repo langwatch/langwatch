@@ -24,7 +24,7 @@ Key properties:
 - **Each end-user has their own VK.** One per customer, or per seat — your call.
 - **You set per-customer budgets.** Enforced at the gateway. When a customer hits their cap, the gateway returns `402 budget_exceeded`. Your code doesn't need to track spend.
 - **All audit + trace data lands in your LangWatch project.** End-users never see LangWatch.
-- **End-users can't escape your policy.** Blocked patterns, model allowlists, cache rules all attach to the VK.
+- **End-users can't escape your policy.** Policy rules, model allowlists, cache rules all attach to the VK.
 
 ## Step 1 — Model the tenancy
 
@@ -76,7 +76,7 @@ export async function provisionCustomer(customerId: string) {
     config: {
       models_allowed: ["gpt-5-mini", "gpt-5", "claude-haiku-4-5-20251001"],
       cache: { mode: "respect" },
-      blocked_patterns: {
+      policy_rules: {
         tools: { deny: ["^shell\\.", "^filesystem\\.write"], allow: null },
       },
     },
@@ -146,7 +146,7 @@ The gateway:
 
 - Authenticates the VK.
 - Checks the customer's budget.
-- Applies your `models_allowed` and `blocked_patterns`.
+- Applies your `models_allowed` and `policy_rules`.
 - Dispatches to OpenAI using **your** provider credential.
 - Meters the cost against the customer's budget.
 - Emits a LangWatch trace into your project, tagged with `principal_user_id = customerId`.

@@ -188,17 +188,17 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
     And the per-chunk guardrail latency is under 50ms
 
   # ============================================================================
-  # E7 — Blocked patterns (tools/MCP/URLs)
+  # E7 — Policy rules (tools/MCP/URLs)
   # ============================================================================
 
   @integration @epic
   Scenario: Requesting a denied tool returns tool_not_allowed
-    Given the VK "prod-key" has blocked_patterns.tools.deny = ["^shell\\..*"]
+    Given the VK "prod-key" has policy_rules.tools.deny = ["^shell\\..*"]
     When I POST /v1/chat/completions with tools: [{name: "shell.exec"}]
     Then the gateway returns 403
     And the error envelope type is "tool_not_allowed"
     And the message contains the blocked tool name
-    And the trace records "langwatch.policy.blocked=tools:shell.exec"
+    And the trace records "langwatch.policy.violation=tools:shell.exec"
 
   # ============================================================================
   # E8 — Per-tenant OTel routing

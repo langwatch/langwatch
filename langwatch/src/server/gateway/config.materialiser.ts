@@ -83,7 +83,7 @@ export type GatewayConfigPayload = {
     request_fail_open: boolean;
     response_fail_open: boolean;
   };
-  blocked_patterns: {
+  policy_rules: {
     tools: { deny: string[]; allow: string[] | null };
     mcp: { deny: string[]; allow: string[] | null };
     urls: { deny: string[]; allow: string[] | null };
@@ -99,9 +99,8 @@ export type GatewayConfigPayload = {
     scope: "organization" | "team" | "project" | "virtual_key" | "principal";
     scope_id: string;
     window: string;
-    limit_usd: string; // Decimal rendered as string for JSON fidelity
-    spent_usd: string;
-    remaining_usd: string;
+    limit_micro_usd: number; // microdollars (1/1_000_000 USD)
+    spent_micro_usd: number;
     /**
      * Unix seconds (number). Must match the Go gateway's BudgetSpec.
      * ResetsAt (int64) — previously emitted as ISO 8601 string here,
@@ -185,11 +184,11 @@ export class GatewayConfigMaterialiser {
         request_fail_open: config.guardrails.requestFailOpen,
         response_fail_open: config.guardrails.responseFailOpen,
       },
-      blocked_patterns: {
-        tools: config.blockedPatterns.tools,
-        mcp: config.blockedPatterns.mcp,
-        urls: config.blockedPatterns.urls,
-        models: config.blockedPatterns.models,
+      policy_rules: {
+        tools: config.policyRules.tools,
+        mcp: config.policyRules.mcp,
+        urls: config.policyRules.urls,
+        models: config.policyRules.models,
       },
       rate_limits: {
         rpm: config.rateLimits.rpm,
@@ -201,9 +200,8 @@ export class GatewayConfigMaterialiser {
         scope: scopeToWire(b.scopeType),
         scope_id: b.scopeId,
         window: b.window.toLowerCase(),
-        limit_usd: b.limitUsd.toString(),
-        spent_usd: b.spentUsd.toString(),
-        remaining_usd: subtract(b.limitUsd.toString(), b.spentUsd.toString()),
+        limit_micro_usd: decimalToMicroUSD(b.limitUsd),
+        spent_micro_usd: decimalToMicroUSD(b.spentUsd),
         resets_at: Math.floor(b.resetsAt.getTime() / 1000),
         on_breach: b.onBreach === "BLOCK" ? "block" : "warn",
       })),
@@ -436,10 +434,6 @@ function cacheRuleToWire(rule: GatewayCacheRule): CacheRuleWire {
   };
 }
 
-function subtract(a: string, b: string): string {
-  // Strings are Prisma.Decimal renderings — parse-safe for money math here
-  // because we keep 6 decimals and values stay well under Number.MAX_SAFE.
-  const x = Number.parseFloat(a);
-  const y = Number.parseFloat(b);
-  return (x - y).toFixed(6);
+function decimalToMicroUSD(d: { toNumber(): number }): number {
+  return Math.round(d.toNumber() * 1_000_000);
 }

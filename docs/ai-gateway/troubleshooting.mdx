@@ -45,9 +45,9 @@ curl -s -H "Authorization: Bearer $LANGWATCH_VK" \
   https://gateway.langwatch.ai/v1/models | jq -r '.data[].id' | sort
 ```
 
-If the model's not in the list, it's either (a) blocked by `models_allowed` on the VK, (b) blocked by `blocked_patterns.models` (regex policy — different from the static allowlist), or (c) not exposed by any of the VK's provider bindings.
+If the model's not in the list, it's either (a) blocked by `models_allowed` on the VK, (b) blocked by `policy_rules.models` (regex policy — different from the static allowlist), or (c) not exposed by any of the VK's provider bindings.
 
-**Fix:** `langwatch virtual-keys update <id> --config-json '{"models_allowed": null}'` to remove the allowlist, or add the model to it. For the regex policy, edit `blocked_patterns.models.deny` / `.allow` — see [Blocked Patterns → Models dimension vs models_allowed](/ai-gateway/blocked-patterns#models-dimension-vs-models_allowed) for when to use which. Or attach a provider credential that actually serves the model.
+**Fix:** `langwatch virtual-keys update <id> --config-json '{"models_allowed": null}'` to remove the allowlist, or add the model to it. For the regex policy, edit `policy_rules.models.deny` / `.allow` — see [Policy Rules → Models dimension vs models_allowed](/ai-gateway/policy-rules#models-dimension-vs-models_allowed) for when to use which. Or attach a provider credential that actually serves the model.
 
 ## `402 budget_exceeded`
 
@@ -114,9 +114,9 @@ concluding the limiter itself is broken.
 
 **Fix:**
 - Intended policy — agent must not have this tool. Stop using it.
-- Policy added in error — edit `blocked_patterns.tools.deny` on the VK.
+- Policy added in error — edit `policy_rules.tools.deny` on the VK.
 
-See [Blocked Patterns](/ai-gateway/blocked-patterns) for the regex syntax reference.
+See [Policy Rules](/ai-gateway/policy-rules) for the regex syntax reference.
 
 ## `503 service_unavailable` / `504 upstream_timeout`
 
@@ -383,19 +383,19 @@ langwatch virtual-keys get <vk_id> --format json | \
 
 See [Guardrails → fail-open vs fail-closed](/ai-gateway/guardrails#fail-open-vs-fail-closed).
 
-## `503 service_unavailable` — blocked_patterns compile failure
+## `503 service_unavailable` — policy_rules compile failure
 
 **Symptoms:**
 - All requests through one VK return 503 with `type=service_unavailable`.
-- Gateway WARN log line `blocked_patterns_compile_failed` (dispatcher.go:253) — names the dimension (`tools`, `mcp`, `urls`, `models`) and the broken pattern.
-- Follow-up WARN line `blocked_patterns_broken` on every subsequent request until the policy is fixed.
+- Gateway WARN log line `policy_rules_compile_failed` (dispatcher.go:253) — names the dimension (`tools`, `mcp`, `urls`, `models`) and the broken pattern.
+- Follow-up WARN line `policy_rules_broken` on every subsequent request until the policy is fixed.
 
-**Root cause:** one of the RE2 patterns on the VK's `blocked_patterns` failed to compile. The gateway fails **closed** on invalid regex (iter 14) — silent bypass is not an option, because an invalid-regex rule would effectively disable an intended block.
+**Root cause:** one of the RE2 patterns on the VK's `policy_rules` failed to compile. The gateway fails **closed** on invalid regex (iter 14) — silent bypass is not an option, because an invalid-regex rule would effectively disable an intended block.
 
 **Diagnose:**
 
 ```bash
-langwatch virtual-keys get <vk_id> --format json | jq '.config.blocked_patterns'
+langwatch virtual-keys get <vk_id> --format json | jq '.config.policy_rules'
 ```
 
 Look for patterns with common regex mistakes:
@@ -412,7 +412,7 @@ import ("fmt"; "os"; "regexp")
 func main() { _, err := regexp.Compile(os.Args[1]); if err != nil { fmt.Println(err); os.Exit(1) }; fmt.Println("ok") }' '<your_pattern>'
 ```
 
-See [Blocked Patterns → RE2 syntax](/ai-gateway/blocked-patterns).
+See [Policy Rules → RE2 syntax](/ai-gateway/policy-rules).
 
 ## See also
 

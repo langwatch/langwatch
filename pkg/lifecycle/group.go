@@ -82,7 +82,7 @@ func (g *Group) Run(ctx context.Context) error {
 		g.logger.Info("lifecycle_start", zap.Stringer("service", svc))
 		if err := svc.Start(ctx); err != nil {
 			cancel()
-			g.stopN(context.Background(), started)
+			_ = g.stopN(context.Background(), started)
 			return fmt.Errorf("start %s: %w", svc, err)
 		}
 		started++

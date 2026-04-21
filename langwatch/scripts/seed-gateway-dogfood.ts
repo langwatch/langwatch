@@ -8,7 +8,7 @@
  *   - ModelProviders (OpenAI + Anthropic) bound to an existing project
  *   - GatewayProviderCredentials (rate limits, rotation policy set)
  *   - 2 Virtual Keys with different configs:
- *       prod-openai   → rate limits, blocked_patterns on tools + URLs
+ *       prod-openai   → rate limits, policy_rules on tools + URLs
  *       prod-claude   → guardrails attached (if any AS_GUARDRAIL monitors
  *                       exist in the project), different fallback chain
  *   - 3 Budgets at different scopes (org monthly / project daily / VK)
@@ -95,7 +95,7 @@ async function main() {
     `✓ provider bindings: openai(${openaiBinding.id}) + anthropic(${anthropicBinding.id})`,
   );
 
-  // VK #1: prod-openai — blocked_patterns + rate limits + tags
+  // VK #1: prod-openai — policy_rules + rate limits + tags
   const prodOpenaiSecret = await upsertVirtualKey({
     project,
     name: "prod-openai",
@@ -106,7 +106,7 @@ async function main() {
     config: {
       ...defaultVirtualKeyConfig(),
       rateLimits: { rpm: 500, tpm: null, rpd: 50_000 },
-      blockedPatterns: {
+      policyRules: {
         tools: { deny: ["^shell\\..*"], allow: null },
         mcp: { deny: [], allow: null },
         urls: { deny: ["evil\\.com", "ransomware"], allow: null },

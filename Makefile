@@ -1,6 +1,6 @@
 .PHONY: start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart worktree
-.PHONY: dev-up dev-down dev-logs setup-hooks gateway-dev
+.PHONY: dev-up dev-down dev-logs setup-hooks service
 
 # =============================================================================
 # DOCKER DEV ENVIRONMENT (compose.dev.yml)
@@ -14,13 +14,19 @@ COMPOSE = docker compose -f compose.dev.yml
 setup-hooks:
 	@git config core.hooksPath .githooks 2>/dev/null || true
 
-# Start the Go AI Gateway data plane (services/gateway on :5563).
-# Separate process from the Next.js app — the gateway deliberately stays
-# outside compose.dev.yml so host-side `pnpm dev` iteration isn't blocked
-# by Go recompiles. Requires langwatch/.env with LW_GATEWAY_INTERNAL_SECRET
-# and LW_GATEWAY_JWT_SECRET set (see langwatch/.env.example for the block).
-gateway-dev:
-	$(MAKE) -C services/gateway run-dev
+# Run a Go service via the mono-binary.
+# Usage: make service svc=aigateway
+#
+# Only env vars prefixed SVC_<SVC>_* are forwarded (prefix stripped).
+# e.g. SVC_AIGATEWAY_LW_GATEWAY_INTERNAL_SECRET → LW_GATEWAY_INTERNAL_SECRET
+DEV_ENV_FILE ?= langwatch/.env
+service:
+	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
+	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed langwatch/.env first" && exit 1)
+	@SVC_PREFIX="SVC_$$(echo $(svc) | tr '[:lower:]' '[:upper:]')_"; \
+		env -i PATH="$$PATH" HOME="$$HOME" \
+		$$(grep "^$${SVC_PREFIX}" $(DEV_ENV_FILE) | sed "s/^$${SVC_PREFIX}//") \
+		LOG_FORMAT=pretty go run ./cmd/service $(svc)
 
 # Minimal: postgres + redis + clickhouse + app
 dev:

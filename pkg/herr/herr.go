@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
+
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/langwatch/langwatch/pkg/stacktrace"
-	"go.opentelemetry.io/otel/trace"
 )
 
 var _ interface {
@@ -28,12 +30,12 @@ type Herrer interface {
 
 // E is a structured error with code, metadata, stack trace, and OTel context.
 type E struct {
-	Code    Code                `json:"code"`
-	Meta    M                   `json:"meta"`
-	TraceID trace.TraceID       `json:"trace_id"`
-	SpanID  trace.SpanID        `json:"span_id"`
-	Stack   []stacktrace.Frame  `json:"stack"`
-	Reasons []error             `json:"reasons"`
+	Code    Code               `json:"code"`
+	Meta    M                  `json:"meta"`
+	TraceID trace.TraceID      `json:"trace_id"`
+	SpanID  trace.SpanID       `json:"span_id"`
+	Stack   []stacktrace.Frame `json:"stack"`
+	Reasons []error            `json:"reasons"`
 }
 
 // M is error metadata.
@@ -84,14 +86,15 @@ func (e E) String() string {
 }
 
 func (e E) Error() string {
-	str := string(e.Code)
+	var str strings.Builder
+	str.WriteString(string(e.Code))
 	if len(e.Meta) > 0 {
-		str += fmt.Sprintf(" (%v)", e.Meta)
+		fmt.Fprintf(&str, " (%v)", e.Meta)
 	}
 	for _, reason := range e.Reasons {
-		str += fmt.Sprintf("\n- %v", reason)
+		fmt.Fprintf(&str, "\n- %v", reason)
 	}
-	return str
+	return str.String()
 }
 
 func (e E) Is(err error) bool {

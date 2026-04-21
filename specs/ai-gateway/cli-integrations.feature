@@ -123,8 +123,8 @@ Feature: AI Gateway — Coding CLI integrations
     And a trace is recorded in project "gateway-demo" with "langwatch.client.name" inferred from User-Agent
 
   @integration @cli @cursor @agent
-  Scenario: Cursor Agent respects blocked_patterns.tools policy
-    Given VK "cli-key" has blocked_patterns.tools.deny = ["^exec$"]
+  Scenario: Cursor Agent respects policy_rules.tools policy
+    Given VK "cli-key" has policy_rules.tools.deny = ["^exec$"]
     When Cursor Agent attempts to call tool "exec" during a session
     Then the gateway returns 403 with type "tool_not_allowed"
     And Cursor Agent surfaces the error to the user

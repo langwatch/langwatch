@@ -5,9 +5,9 @@ package ksuid
 //
 // Format: prod_gtwyreq_00<base62> or staging_gtwyreq_00<base62>
 const (
-	ResourceGatewayRequest     = "gtwyreq"       // HTTP request hitting the AI gateway
-	ResourceGatewayTrace       = "gtwytrace"     // gateway operational OTel trace
-	ResourceAICompletionTrace  = "aicomptrace"   // customer-facing AI completion trace span
-	ResourceBudgetDebit        = "budgetdebit"   // budget spend debit event in outbox
-	ResourceAuthCacheEntry     = "authcache"     // resolved VK auth bundle cache entry
+	ResourceGatewayRequest    = "gtwyreq"     // HTTP request hitting the AI gateway
+	ResourceGatewayTrace      = "gtwytrace"   // gateway operational OTel trace
+	ResourceAICompletionTrace = "aicomptrace" // customer-facing AI completion trace span
+	ResourceBudgetDebit       = "budgetdebit" // budget spend debit event in outbox
+	ResourceAuthCacheEntry    = "authcache"   // resolved VK auth bundle cache entry
 )

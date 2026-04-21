@@ -542,14 +542,14 @@ app.post("/budget/check", async (c) => {
  * gateway POSTs fire-and-forget with at-least-once retry keyed by
  * `gateway_request_id` (24h dedup window).
  *
- * Request:  { gateway_request_id, vk_id, actual_cost_usd, tokens, model, ... }
+ * Request:  { gateway_request_id, vk_id, actual_cost_micro_usd, tokens, model, ... }
  * Response: { deduped, budgets: [{scope, remaining_usd, spent_usd}, ...] }
  */
 app.post("/budget/debit", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as {
     gateway_request_id?: string;
     vk_id?: string;
-    actual_cost_usd?: number | string;
+    actual_cost_micro_usd?: number | string;
     tokens?: {
       input?: number;
       output?: number;
@@ -608,17 +608,16 @@ app.post("/budget/debit", async (c) => {
   }
 
   const status = normaliseDebitStatus(body.status);
-  // Gateway intentionally sends actual_cost_usd=0 ("control-plane recomputes
-  // from tokens using its pricing catalog" — dispatcher.go:1187). Recompute
-  // here from the pricing catalog so budgets actually update. If the wire
-  // value is non-zero we trust it (blocked_by_guardrail sends 0 and
-  // shouldn't be recomputed from tokens since there was no provider call).
-  const wireAmount =
-    typeof body.actual_cost_usd === "number"
-      ? body.actual_cost_usd
-      : typeof body.actual_cost_usd === "string"
-        ? Number.parseFloat(body.actual_cost_usd) || 0
+  // Gateway sends actual_cost_micro_usd (microdollars, 1/1_000_000 USD).
+  // Typically 0 — control-plane recomputes from tokens × pricing catalog.
+  // Non-zero is trusted (blocked_by_guardrail sends 0; no provider call).
+  const wireMicroUSD =
+    typeof body.actual_cost_micro_usd === "number"
+      ? body.actual_cost_micro_usd
+      : typeof body.actual_cost_micro_usd === "string"
+        ? Number.parseInt(body.actual_cost_micro_usd, 10) || 0
         : 0;
+  const wireAmount = wireMicroUSD / 1_000_000;
 
   let computedAmount = wireAmount;
   if (wireAmount === 0 && status === "SUCCESS" && body.model) {

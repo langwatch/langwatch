@@ -22,7 +22,7 @@ type Usage struct {
 	PromptTokens     int
 	CompletionTokens int
 	TotalTokens      int
-	CostUSD          float64
+	CostMicroUSD     int64 // cost in microdollars (1/1_000_000 USD)
 }
 
 // StreamIterator provides pull-based iteration over streaming response chunks.

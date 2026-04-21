@@ -4,7 +4,7 @@ description: Route the opencode terminal agent through the LangWatch AI Gateway.
 sidebarTitle: opencode
 ---
 
-[opencode](https://opencode.ai) is an OSS terminal coding agent with pluggable providers. Because it supports any OpenAI-compatible or Anthropic-compatible endpoint, you can point it at the LangWatch AI Gateway and pick up budgets, guardrails, blocked-pattern filters, and trace propagation without changing the agent itself.
+[opencode](https://opencode.ai) is an OSS terminal coding agent with pluggable providers. Because it supports any OpenAI-compatible or Anthropic-compatible endpoint, you can point it at the LangWatch AI Gateway and pick up budgets, guardrails, policy-rule filters, and trace propagation without changing the agent itself.
 
 ## Setup
 
@@ -104,7 +104,7 @@ Pair with a `principal` budget on the hackday VK: window `day`, limit `$20`, `on
 
 ### Block dangerous shell tools
 
-VK `blocked_patterns.tools: ["bash", "shell", "exec"]`. opencode requests a tool with that name → `403 tool_not_allowed` before it ever leaves the gateway. See [Blocked Patterns](/ai-gateway/blocked-patterns).
+VK `policy_rules.tools: ["bash", "shell", "exec"]`. opencode requests a tool with that name → `403 tool_not_allowed` before it ever leaves the gateway. See [Policy Rules](/ai-gateway/policy-rules).
 
 ## Troubleshooting
 

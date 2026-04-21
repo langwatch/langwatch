@@ -9,8 +9,8 @@ type Model struct {
 
 // ResolvedModel is the result of model resolution from a request.
 type ResolvedModel struct {
-	ModelID    string     // the canonical model ID sent to the provider
-	ProviderID ProviderID // which provider serves this model
+	ModelID    string      // the canonical model ID sent to the provider
+	ProviderID ProviderID  // which provider serves this model
 	Source     ModelSource // how the model was resolved
 }
 

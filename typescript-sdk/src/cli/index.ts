@@ -711,7 +711,7 @@ virtualKeysCmd
   .option("--description <desc>", "New description")
   .option("--clear-description", "Clear the description")
   .option("--provider <id...>", "Replace the bound provider credential ids (repeatable; supplies the full set)")
-  .option("--config-json <json>", "Inline partial config JSON (model_aliases/cache/fallback/rate_limits/blocked_patterns). Merges with existing config")
+  .option("--config-json <json>", "Inline partial config JSON (model_aliases/cache/fallback/rate_limits/policy_rules). Merges with existing config")
   .option("--config-file <path>", "Read partial config JSON from a file")
   .option("-f, --format <format>", "Output format: text (default) or json", "text")
   .action(async (id: string, options: {

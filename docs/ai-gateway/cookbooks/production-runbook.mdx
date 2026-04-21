@@ -99,7 +99,7 @@ go tool pprof http://localhost:6060/debug/pprof/heap
 
 **What to look for:**
 
-- `internal/auth.(*Cache).Put` holding more than ~1 MB per cached bundle — unusual, a bundle should be ≤ 50 KB. Oversized `blocked_patterns.urls.allow` with thousands of entries can trigger this.
+- `internal/auth.(*Cache).Put` holding more than ~1 MB per cached bundle — unusual, a bundle should be ≤ 50 KB. Oversized `policy_rules.urls.allow` with thousands of entries can trigger this.
 - `internal/dispatch` buffered responses — if streaming responses are being accumulated instead of flushed per-chunk, every request consumes full response size. Check for `bufio.NewWriter` wrapping a streaming writer anywhere.
 - Outbox shelving (`LW_GATEWAY_BUDGET_DEBIT_SHELF_BYTES`) — a long control-plane outage can push debits to disk. Check the outbox directory size.
 

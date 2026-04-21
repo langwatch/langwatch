@@ -62,7 +62,7 @@ Every request from that Aider session shares a trace id; the gateway nests its s
 
 Aider uses a tool-based interface for applying diffs. If you want to route Aider through a read-only VK (for demo purposes):
 
-- VK `blocked_patterns.tools`: `["shell", "run"]`.
+- VK `policy_rules.tools`: `["shell", "run"]`.
 
 Aider's `/run` command returns `403 tool_not_allowed` and the agent surfaces the error.
 

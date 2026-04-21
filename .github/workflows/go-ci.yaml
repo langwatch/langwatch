@@ -1,0 +1,92 @@
+name: go-ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: go-ci-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      go: ${{ github.event_name == 'workflow_dispatch' || steps.filter.outputs.go }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        if: github.event_name != 'workflow_dispatch'
+        id: filter
+        with:
+          filters: |
+            go:
+              - 'services/aigateway/**'
+              - 'pkg/**'
+              - 'cmd/**'
+              - 'go.mod'
+              - 'go.sum'
+              - '.golangci.yml'
+              - '.github/workflows/go-ci.yaml'
+
+  build:
+    needs: changes
+    if: ${{ needs.changes.outputs.go == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: go mod verify
+      - run: go build ./cmd/...
+
+  test:
+    needs: changes
+    if: ${{ needs.changes.outputs.go == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: go test -count=1 -race ./services/aigateway/... ./pkg/...
+
+  lint:
+    needs: changes
+    if: ${{ needs.changes.outputs.go == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: golangci/golangci-lint-action@4afd733a84b2f1a21f7c2e8d1cda72e8a18e4cad # v6
+        with:
+          version: v2.1.6
+          args: ./services/aigateway/... ./pkg/... ./cmd/...
+
+  vet:
+    needs: changes
+    if: ${{ needs.changes.outputs.go == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: go vet ./services/aigateway/... ./pkg/... ./cmd/...

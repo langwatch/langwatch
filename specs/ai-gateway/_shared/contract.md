@@ -237,7 +237,7 @@ Returns the warm-cache config (fat, not on hot path). Supports conditional `If-N
     "post": [{"id": "guard_01HZ...", "evaluator": "evaluators/hallucination-check-def34"}],
     "stream_chunk": []
   },
-  "blocked_patterns": {
+  "policy_rules": {
     /* RE2 regex deny/allow enforced right after auth + rate-limit, before
        body-parse / guardrails / budget / bifrost. Broken regex → request
        rejected with 503 service_unavailable (fail-closed, never silent-bypass).
@@ -424,14 +424,14 @@ All errors OpenAI-compatible:
 |---|---|---|
 | `invalid_api_key` | 401 | Unknown, malformed, or non-existent VK |
 | `virtual_key_revoked` | 403 | VK exists but is revoked |
-| `model_not_allowed` | 403 | VK has `models_allowed` glob allowlist and requested model is not in it, **or** matched `blocked_patterns.models` deny regex (or fell outside its allow regex); also when no alias/explicit form resolves to a configured provider |
+| `model_not_allowed` | 403 | VK has `models_allowed` glob allowlist and requested model is not in it, **or** matched `policy_rules.models` deny regex (or fell outside its allow regex); also when no alias/explicit form resolves to a configured provider |
 | `permission_denied` | 403 | Principal lacks RBAC permission for endpoint |
 | `budget_exceeded` | 402 | Any hard-cap budget scope is over limit |
 | `rate_limit_exceeded` | 429 | VK / project / org rate limit hit |
 | `guardrail_blocked` | 403 | Pre- or post-call guardrail returned `block` (post-block also records a zero-cost `blocked_by_guardrail` debit) |
 | `guardrail_upstream_unavailable` | 503 | Guardrail evaluator service unreachable/errored; VK is fail-closed by default. Opt into fail-open per direction via `guardrails.{request,response}_fail_open: true` |
-| `tool_not_allowed` | 403 | Requested tool/MCP matches VK `blocked_patterns.tools` or `blocked_patterns.mcp` (deny-wins, RE2) |
-| `url_not_allowed` | 403 | Any `http(s)://` URL extracted from the request body matches VK `blocked_patterns.urls` deny (or falls outside a non-null `allow`) — extraction is permissive: user messages / tool args / system prompts / anywhere |
+| `tool_not_allowed` | 403 | Requested tool/MCP matches VK `policy_rules.tools` or `policy_rules.mcp` (deny-wins, RE2) |
+| `url_not_allowed` | 403 | Any `http(s)://` URL extracted from the request body matches VK `policy_rules.urls` deny (or falls outside a non-null `allow`) — extraction is permissive: user messages / tool args / system prompts / anywhere |
 | `cache_override_invalid` | 400 | `X-LangWatch-Cache` header malformed or unknown mode |
 | `cache_override_not_implemented` | 400 | `X-LangWatch-Cache` named a valid-but-v1.1 mode (`force` / `ttl=NNN`). v1 ships `respect` + `disable` only. |
 | `provider_error` | 502 | Upstream provider returned error after fallback exhaustion |
@@ -464,7 +464,7 @@ All errors OpenAI-compatible:
 3. Default `respect`.
 
 - `respect` (v1) — pass through upstream cache controls as-is (byte-for-byte passthrough).
-- `disable` (v1) — recursively JSON-walk the body and drop every `cache_control` object at any nesting depth (`messages[].content[]`, `system[]`, `tools[]` on Anthropic); disable gateway semantic cache; force cold call. Applied **before** blocked-pattern enforcement so policy evaluation runs on the post-strip body and is deterministic regardless of caller's caching choice.
+- `disable` (v1) — recursively JSON-walk the body and drop every `cache_control` object at any nesting depth (`messages[].content[]`, `system[]`, `tools[]` on Anthropic); disable gateway semantic cache; force cold call. Applied **before** policy-rule enforcement so policy evaluation runs on the post-strip body and is deterministic regardless of caller's caching choice.
 - `force` / `ttl=NNN` — **deferred to v1.1**. Valid syntax is accepted by the parser but currently rejected with `400 cache_override_not_implemented`. Provider-specific body mutation (where to inject cache_control, how to respect TTL) ships alongside gateway-side semantic caching.
 
 **Observability:** `X-LangWatch-Cache` response header reports outcome. Token counts in OTel trace use OpenTelemetry GenAI semconv: `gen_ai.usage.cache_read.input_tokens` and `gen_ai.usage.cache_creation.input_tokens` are set separately so trace UI can show cache economics. Proprietary `langwatch.usage.cache_*_tokens` attrs were dropped in Lane A iter 42 per "OTEL semconv all the way".
@@ -590,15 +590,15 @@ LangWatch already stores `ModelProvider` rows (OPENAI_API_KEY etc) for evaluator
 
 ---
 
-## 11b. Blocked-patterns enforcement
+## 11b. Policy-rules enforcement
 
 Evaluated at the gateway **before** dispatch to the upstream provider. Each pattern set has `deny` (regex allowlist of what to reject) and `allow` (regex, if non-null behaves as an allowlist — only listed patterns pass).
 
-- **`tools`** — checked against every `tools[].function.name` in the request (OpenAI format) and every `tools[].name` (Anthropic format). First match in `deny` → 403 `tool_not_allowed` with `policies_triggered: ["blocked_tools"]`. If `allow` is non-null, any tool name not matching an `allow` entry is blocked.
+- **`tools`** — checked against every `tools[].function.name` in the request (OpenAI format) and every `tools[].name` (Anthropic format). First match in `deny` → 403 `tool_not_allowed` with `policies_triggered: ["policy_violation_tools"]`. If `allow` is non-null, any tool name not matching an `allow` entry is blocked.
 - **`mcp`** — checked against the `mcp_servers[].name` and `mcp_servers[].url` if the request declares MCP servers. Same allow/deny semantics.
 - **`urls`** — checked against any URL found inside tool-call arguments that look like outbound HTTP (heuristic: field name matches `/url|endpoint|uri/i`). Primarily advisory; hard enforcement requires egress proxy and is post-MVP.
 
-OTel trace records each block with span attribute `langwatch.policy.blocked=<kind>:<pattern>`.
+OTel trace records each block with span attribute `langwatch.policy.violation=<kind>:<pattern>`.
 
 ---
 

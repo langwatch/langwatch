@@ -24,7 +24,7 @@ import { api } from "~/utils/api";
 import { FieldInfoTooltip } from "./FieldInfoTooltip";
 import { validateModelAliasesAgainstBoundProviders } from "./virtualKeyAliasValidation";
 
-type BlockedPattern = { deny: string[]; allow: string[] | null };
+type PolicyRuleDimension = { deny: string[]; allow: string[] | null };
 
 type GuardrailRef = { id: string; evaluator: string };
 
@@ -44,11 +44,11 @@ type VirtualKeyDetail = {
       tpm: number | null;
       rpd: number | null;
     };
-    blockedPatterns?: {
-      tools?: BlockedPattern;
-      mcp?: BlockedPattern;
-      urls?: BlockedPattern;
-      models?: BlockedPattern;
+    policyRules?: {
+      tools?: PolicyRuleDimension;
+      mcp?: PolicyRuleDimension;
+      urls?: PolicyRuleDimension;
+      models?: PolicyRuleDimension;
     };
     guardrails?: {
       pre?: GuardrailRef[];
@@ -176,7 +176,7 @@ export function VirtualKeyEditDrawer({
     setRpm(vk.config.rateLimits?.rpm?.toString() ?? "");
     setTpm(vk.config.rateLimits?.tpm?.toString() ?? "");
     setRpd(vk.config.rateLimits?.rpd?.toString() ?? "");
-    const bp = vk.config.blockedPatterns ?? {};
+    const bp = vk.config.policyRules ?? {};
     setBlocked({
       tools: {
         deny: (bp.tools?.deny ?? []).join("\n"),
@@ -211,7 +211,7 @@ export function VirtualKeyEditDrawer({
       .map((line) => line.trim())
       .filter((line) => line.length > 0);
 
-  const buildBlockedPatterns = () => {
+  const buildPolicyRules = () => {
     const result: Record<
       Dimension,
       { deny: string[]; allow: string[] | null }
@@ -353,7 +353,7 @@ export function VirtualKeyEditDrawer({
             tpm: tpm ? Number.parseInt(tpm, 10) : null,
             rpd: rpd ? Number.parseInt(rpd, 10) : null,
           },
-          blockedPatterns: buildBlockedPatterns(),
+          policyRules: buildPolicyRules(),
           guardrails: {
             pre: guardrails.pre,
             post: guardrails.post,
@@ -681,11 +681,11 @@ export function VirtualKeyEditDrawer({
             <Separator />
             <HStack>
               <Text fontSize="sm" fontWeight="semibold">
-                Blocked patterns
+                Policy rules
               </Text>
               <FieldInfoTooltip
                 description="RE2 regex deny/allow lists across 4 dimensions: tools, MCP servers, URLs, models. Enforced pre-dispatch (zero provider cost). Deny wins."
-                docHref="/ai-gateway/blocked-patterns"
+                docHref="/ai-gateway/policy-rules"
               />
             </HStack>
             <Text fontSize="xs" color="fg.muted">

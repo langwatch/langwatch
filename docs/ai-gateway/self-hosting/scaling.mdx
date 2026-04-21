@@ -136,7 +136,7 @@ Operational invariants (Lane A iter 15, `6ebeecf`):
 
 - **TTL floor: 30 s** — a bundle about to JWT-expire doesn't land in L2 with near-zero TTL and vanish between write and first read.
 - **Poison-pill isolation** — if a new gateway version can't decode an old entry (field schema drift, corrupt bytes), the decode error is logged, the key is `DEL`'d, and the request resolves as a miss. One bad row can't block a whole tenant.
-- **Compiled regexes are process-local** — `blocked_patterns` RE2 ASTs are `json:"-"` and recompiled on the receiving pod on first use. L2 ships the pattern strings only, which keeps JSON payloads small and avoids cross-pod binary-compat concerns.
+- **Compiled regexes are process-local** — `policy_rules` RE2 ASTs are `json:"-"` and recompiled on the receiving pod on first use. L2 ships the pattern strings only, which keeps JSON payloads small and avoids cross-pod binary-compat concerns.
 
 **Use L2 when**:
 - Autoscaling frequently adds/removes replicas (high churn) — this is the primary reason.

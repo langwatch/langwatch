@@ -89,12 +89,12 @@ Feature: Caching passthrough (Anthropic cache_control + gateway semantic cache)
       And the envelope message names the rejected mode
 
     @integration
-    Scenario: cache-override runs before blocked-pattern enforcement
-      Given a VK with blocked_patterns.models.deny = ["^claude-haiku-4-5$"]
+    Scenario: cache-override runs before policy-rule enforcement
+      Given a VK with policy_rules.models.deny = ["^claude-haiku-4-5$"]
       And a request that also sets X-LangWatch-Cache: disable
       When the request is dispatched
       Then the cache_control blocks are stripped FIRST
-      And the blocked-pattern check evaluates the post-strip body
+      And the policy-rule check evaluates the post-strip body
       And the response is 403 model_not_allowed (not 400 cache_*)
       # Deterministic policy evaluation independent of caller's caching choice.
 

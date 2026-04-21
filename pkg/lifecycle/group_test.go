@@ -229,7 +229,7 @@ type fatalSvc struct {
 	fatalCh chan error
 }
 
-func (f *fatalSvc) String() string                  { return f.name }
-func (f *fatalSvc) Start(context.Context) error     { return nil }
-func (f *fatalSvc) Stop(context.Context) error      { return nil }
-func (f *fatalSvc) Fatal() <-chan error              { return f.fatalCh }
+func (f *fatalSvc) String() string              { return f.name }
+func (f *fatalSvc) Start(context.Context) error { return nil }
+func (f *fatalSvc) Stop(context.Context) error  { return nil }
+func (f *fatalSvc) Fatal() <-chan error         { return f.fatalCh }

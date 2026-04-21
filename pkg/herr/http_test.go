@@ -12,44 +12,71 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestWriteHTTP_UsesMetaReasonNotInternalError(t *testing.T) {
-	RegisterStatus("test_error", http.StatusBadRequest)
+func TestWriteHTTP_ExposesMetaTraceAndReasons(t *testing.T) {
+	RegisterStatus("chain_exhausted", http.StatusBadGateway)
+	RegisterStatus("provider_error", http.StatusBadGateway)
 
-	// Create an error with a wrapped reason that contains internal details
-	inner := errors.New("postgres: connection refused at 10.0.2.15:5432")
-	e := New(context.Background(), "test_error", M{"reason": "service unavailable"}, inner)
+	providerErr := New(context.Background(), "provider_error", M{"message": "server error", "status": 503})
+	e := New(context.Background(), "chain_exhausted", M{"message": "all providers failed"}, providerErr)
 
 	rec := httptest.NewRecorder()
 	WriteHTTP(rec, e)
 
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, http.StatusBadGateway, rec.Code)
 
 	var resp ErrorResponse
 	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
 
-	// Client-facing message should be the safe "reason", not the internal error chain
-	assert.Equal(t, "service unavailable", resp.Error.Message)
-	assert.NotContains(t, resp.Error.Message, "postgres")
-	assert.NotContains(t, resp.Error.Message, "10.0.2.15")
+	assert.Equal(t, "chain_exhausted", resp.Error.Type)
+	assert.Equal(t, "all providers failed", resp.Error.Message)
+
+	require.Len(t, resp.Error.Reasons, 1)
+	assert.Equal(t, "provider_error", resp.Error.Reasons[0].Type)
+	assert.Equal(t, "server error", resp.Error.Reasons[0].Message)
+	assert.InDelta(t, float64(503), resp.Error.Reasons[0].Meta["status"], 0)
 }
 
-func TestWriteHTTP_FallsBackToMetaMessage(t *testing.T) {
-	RegisterStatus("blocked", http.StatusForbidden)
+func TestWriteHTTP_NonHerrReasonsBecomUnknown(t *testing.T) {
+	RegisterStatus("test_err", http.StatusBadRequest)
 
-	e := New(context.Background(), "blocked", M{"message": "content policy violation"})
+	inner := errors.New("postgres: connection refused at 10.0.2.15:5432")
+	e := New(context.Background(), "test_err", nil, inner)
 
 	rec := httptest.NewRecorder()
 	WriteHTTP(rec, e)
 
 	var resp ErrorResponse
 	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
+
+	require.Len(t, resp.Error.Reasons, 1)
+	assert.Equal(t, "unknown", resp.Error.Reasons[0].Type)
+	assert.Equal(t, "unknown", resp.Error.Reasons[0].Message)
+	assert.NotContains(t, rec.Body.String(), "postgres")
+	assert.NotContains(t, rec.Body.String(), "10.0.2.15")
+}
+
+func TestWriteHTTP_MetaMessagePromoted(t *testing.T) {
+	RegisterStatus("blocked", http.StatusForbidden)
+
+	e := New(context.Background(), "blocked", M{"message": "content policy violation", "policy": "pii"})
+
+	rec := httptest.NewRecorder()
+	WriteHTTP(rec, e)
+
+	var resp ErrorResponse
+	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
+
 	assert.Equal(t, "content policy violation", resp.Error.Message)
+	assert.Equal(t, "pii", resp.Error.Meta["policy"])
+	// "message" should not appear in Meta (promoted to top-level)
+	_, hasMessage := resp.Error.Meta["message"]
+	assert.False(t, hasMessage)
 }
 
 func TestWriteHTTP_FallsBackToCode(t *testing.T) {
 	RegisterStatus("unknown_thing", http.StatusInternalServerError)
 
-	e := New(context.Background(), "unknown_thing", nil, errors.New("secret internal detail"))
+	e := New(context.Background(), "unknown_thing", nil)
 
 	rec := httptest.NewRecorder()
 	WriteHTTP(rec, e)
@@ -57,9 +84,9 @@ func TestWriteHTTP_FallsBackToCode(t *testing.T) {
 	var resp ErrorResponse
 	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
 
-	// No meta reason/message → falls back to code name, not internal error
 	assert.Equal(t, "unknown_thing", resp.Error.Message)
-	assert.NotContains(t, resp.Error.Message, "secret internal detail")
+	assert.Nil(t, resp.Error.Meta)
+	assert.Empty(t, resp.Error.Reasons)
 }
 
 func TestWriteHTTP_NonHerrError(t *testing.T) {
@@ -71,6 +98,6 @@ func TestWriteHTTP_NonHerrError(t *testing.T) {
 	var resp ErrorResponse
 	require.NoError(t, json.NewDecoder(rec.Body).Decode(&resp))
 	assert.Equal(t, "unknown", resp.Error.Type)
-	// Should NOT leak the raw error message
 	assert.Equal(t, "unknown", resp.Error.Message)
+	assert.NotContains(t, rec.Body.String(), "192.168.1.1")
 }

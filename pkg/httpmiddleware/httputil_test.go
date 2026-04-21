@@ -25,7 +25,7 @@ func TestRequestID_Generated(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	respID := rec.Header().Get("X-Request-Id")
 	assert.NotEmpty(t, respID, "response should have X-Request-Id header")
-	assert.True(t, len(respID) > 4, "generated ID should be longer than prefix")
+	assert.Greater(t, len(respID), 4, "generated ID should be longer than prefix")
 }
 
 func TestRequestID_FromClient(t *testing.T) {

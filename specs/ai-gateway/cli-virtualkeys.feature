@@ -124,7 +124,7 @@ Feature: langwatch CLI — virtual-keys subcommands
   Scenario: Get a VK's config
     Given I know the id of VK "prod-key"
     When I run `langwatch virtual-keys get prod-key`
-    Then stdout shows: prefix, env, status, created_at, providers (ordered), fallback conditions, model_aliases, budgets, guardrails, blocked_patterns, last_used_at, principal
+    Then stdout shows: prefix, env, status, created_at, providers (ordered), fallback conditions, model_aliases, budgets, guardrails, policy_rules, last_used_at, principal
 
   # ============================================================================
   # Errors

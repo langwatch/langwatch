@@ -42,19 +42,19 @@ type BreakerChecker interface {
 
 // Event describes one attempt in the chain.
 type Event struct {
-	Slot       int
-	SlotID     string
-	Reason     Reason
-	Duration   time.Duration
-	Err        error
+	Slot     int
+	SlotID   string
+	Reason   Reason
+	Duration time.Duration
+	Err      error
 }
 
 // Options configures the retry engine.
 type Options struct {
-	Triggers          map[Reason]bool  // reasons that trigger retry (default: 5xx, rate_limit, timeout, network)
-	MaxAttempts       int              // 0 = walk full chain
-	Breaker           BreakerChecker   // optional circuit breaker
-	PerAttemptTimeout time.Duration    // 0 = inherit parent ctx
+	Triggers          map[Reason]bool // reasons that trigger retry (default: 5xx, rate_limit, timeout, network)
+	MaxAttempts       int             // 0 = walk full chain
+	Breaker           BreakerChecker  // optional circuit breaker
+	PerAttemptTimeout time.Duration   // 0 = inherit parent ctx
 }
 
 func (o *Options) withDefaults() {

@@ -207,9 +207,8 @@ describe("GatewayConfigMaterialiser", () => {
         id: "b_01",
         scope: "project",
         window: "month",
-        limit_usd: "1000.000000",
-        spent_usd: "125.500000",
-        remaining_usd: "874.500000",
+        limit_micro_usd: 1000000000,
+        spent_micro_usd: 125500000,
         on_breach: "block",
       });
     });

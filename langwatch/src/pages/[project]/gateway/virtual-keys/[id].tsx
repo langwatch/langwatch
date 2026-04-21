@@ -347,7 +347,7 @@ type VkConfig = {
   modelsAllowed?: string[] | null;
   cache?: { mode?: "respect" | "force" | "disable"; ttlS?: number };
   rateLimits?: { rpm?: number | null; tpm?: number | null; rpd?: number | null };
-  blockedPatterns?: {
+  policyRules?: {
     tools?: { deny?: string[]; allow?: string[] | null };
     mcp?: { deny?: string[]; allow?: string[] | null };
     urls?: { deny?: string[]; allow?: string[] | null };
@@ -689,7 +689,7 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
 
   const blockedCount = (["tools", "mcp", "urls", "models"] as const).reduce(
     (sum, dim) => {
-      const bp = config.blockedPatterns?.[dim];
+      const bp = config.policyRules?.[dim];
       return sum + (bp?.deny?.length ?? 0);
     },
     0,
@@ -760,7 +760,7 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
           </VStack>
         )}
       </DetailRow>
-      <DetailRow label="Blocked patterns">
+      <DetailRow label="Policy rules">
         {blockedCount === 0 ? (
           <Text fontSize="sm" color="fg.muted">
             —
@@ -768,7 +768,7 @@ function ConfigurationSection({ config }: { config: VkConfig | null }) {
         ) : (
           <VStack align="start" gap={1}>
             {(["tools", "mcp", "urls", "models"] as const).map((dim) => {
-              const deny = config.blockedPatterns?.[dim]?.deny ?? [];
+              const deny = config.policyRules?.[dim]?.deny ?? [];
               if (deny.length === 0) return null;
               return (
                 <HStack key={dim} gap={1} flexWrap="wrap" fontSize="xs">

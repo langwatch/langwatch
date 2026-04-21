@@ -23,9 +23,9 @@ func newMockBreaker() *mockBreaker {
 	}
 }
 
-func (m *mockBreaker) Allow(id string) bool        { return !m.blocked[id] }
-func (m *mockBreaker) RecordSuccess(id string)      { m.recorded[id] = "success" }
-func (m *mockBreaker) RecordFailure(id string)      { m.recorded[id] = "failure" }
+func (m *mockBreaker) Allow(id string) bool    { return !m.blocked[id] }
+func (m *mockBreaker) RecordSuccess(id string) { m.recorded[id] = "success" }
+func (m *mockBreaker) RecordFailure(id string) { m.recorded[id] = "failure" }
 
 var errRetryable = errors.New("retryable error")
 var errFatal = errors.New("fatal error")
@@ -94,7 +94,7 @@ func TestWalk_NonRetryableStops(t *testing.T) {
 	_, events, err := Walk(context.Background(), Options{}, chain, attempt, retryableClassifier)
 
 	require.Error(t, err)
-	assert.ErrorIs(t, err, errFatal)
+	require.ErrorIs(t, err, errFatal)
 	require.Len(t, events, 1, "should stop after first non-retryable error")
 	assert.Equal(t, ReasonNonRetryable, events[0].Reason)
 }

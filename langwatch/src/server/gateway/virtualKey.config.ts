@@ -26,7 +26,7 @@ export const guardrailRefSchema = z.object({
   evaluator: z.string(),
 });
 
-export const blockedPatternsSchema = z.object({
+export const policyRuleDimensionSchema = z.object({
   deny: z.array(z.string()).default([]),
   allow: z.array(z.string()).nullable().default(null),
 });
@@ -70,15 +70,15 @@ export const virtualKeyConfigSchema = z.object({
       requestFailOpen: false,
       responseFailOpen: false,
     }),
-  blockedPatterns: z
+  policyRules: z
     .object({
-      tools: blockedPatternsSchema.default({ deny: [], allow: null }),
-      mcp: blockedPatternsSchema.default({ deny: [], allow: null }),
-      urls: blockedPatternsSchema.default({ deny: [], allow: null }),
+      tools: policyRuleDimensionSchema.default({ deny: [], allow: null }),
+      mcp: policyRuleDimensionSchema.default({ deny: [], allow: null }),
+      urls: policyRuleDimensionSchema.default({ deny: [], allow: null }),
       // §5 models dimension — RE2 regex policy distinct from
       // `modelsAllowed` glob allowlist. Enforced by @sergey iter 8
-      // (internal/blocked) before provider dispatch.
-      models: blockedPatternsSchema.default({ deny: [], allow: null }),
+      // (internal/policy) before provider dispatch.
+      models: policyRuleDimensionSchema.default({ deny: [], allow: null }),
     })
     .default({
       tools: { deny: [], allow: null },

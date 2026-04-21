@@ -38,8 +38,8 @@ type BundleConfig struct {
 	// Guardrails lists active guardrail policy IDs.
 	Guardrails []string
 
-	// BlockedPatterns lists regex deny/allow rules.
-	BlockedPatterns []BlockedPattern
+	// PolicyRules lists regex deny/allow rules.
+	PolicyRules []PolicyRule
 
 	// CacheRules lists priority-ordered cache control rules.
 	CacheRules []CacheRule
@@ -68,40 +68,40 @@ type RateLimits struct {
 
 // BudgetConfig holds spending controls.
 type BudgetConfig struct {
-	Scopes  []BudgetScope
+	Scopes []BudgetScope
 }
 
-// BudgetScope is a single budget limit with its current spend.
+// BudgetScope is a single budget limit with its current spend (microdollars).
 type BudgetScope struct {
-	Scope    string  `json:"scope"`
-	Window   string  `json:"window"`
-	LimitUSD float64 `json:"limit_usd"`
-	SpentUSD float64 `json:"spent_usd"`
-	OnBreach string  `json:"on_breach"` // "block" or "warn"
+	Scope         string `json:"scope"`
+	Window        string `json:"window"`
+	LimitMicroUSD int64  `json:"limit_micro_usd"`
+	SpentMicroUSD int64  `json:"spent_micro_usd"`
+	OnBreach      string `json:"on_breach"` // "block" or "warn"
 }
 
-// BlockedPattern is a regex-based deny/allow rule.
-type BlockedPattern struct {
+// PolicyRule is a regex-based deny/allow rule.
+type PolicyRule struct {
 	Pattern string
-	Type    BlockedPatternType
-	Target  BlockedPatternTarget
+	Type    PolicyRuleType
+	Target  PolicyRuleTarget
 }
 
-// BlockedPatternType is deny or allow.
-type BlockedPatternType string
+// PolicyRuleType is deny or allow.
+type PolicyRuleType string
 
 const (
-	BlockedDeny  BlockedPatternType = "deny"
-	BlockedAllow BlockedPatternType = "allow"
+	PolicyDeny  PolicyRuleType = "deny"
+	PolicyAllow PolicyRuleType = "allow"
 )
 
-// BlockedPatternTarget specifies what the pattern matches against.
-type BlockedPatternTarget string
+// PolicyRuleTarget specifies what the pattern matches against.
+type PolicyRuleTarget string
 
 const (
-	BlockedTargetTool BlockedPatternTarget = "tool"
-	BlockedTargetMCP  BlockedPatternTarget = "mcp"
-	BlockedTargetURL  BlockedPatternTarget = "url"
+	PolicyTargetTool PolicyRuleTarget = "tool"
+	PolicyTargetMCP  PolicyRuleTarget = "mcp"
+	PolicyTargetURL  PolicyRuleTarget = "url"
 )
 
 // CacheRule is a priority-ordered cache control rule.
