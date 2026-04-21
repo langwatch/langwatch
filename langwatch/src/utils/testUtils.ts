@@ -1,6 +1,7 @@
 import {
   OrganizationUserRole,
   PIIRedactionLevel,
+  Prisma,
   type Project,
   ProjectSensitiveDataVisibilityLevel,
   TeamUserRole,
@@ -11,25 +12,30 @@ import { createMocks, type RequestMethod } from "node-mocks-http";
 import { prisma } from "../server/db";
 import { ENTERPRISE_LICENSE_KEY } from "../../ee/licensing/__tests__/fixtures/testLicenses";
 
+async function ignoreUniqueViolation<T>(promise: Promise<T>): Promise<T | null> {
+  try {
+    return await promise;
+  } catch (error) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return null;
+    }
+    throw error;
+  }
+}
+
 export async function getTestUser() {
-  // Ensure a user exists
-  let user = await prisma.user.findUnique({
-    where: {
+  const user = await prisma.user.upsert({
+    where: { email: "test-user@example.com" },
+    update: {},
+    create: {
+      name: "Test User",
       email: "test-user@example.com",
     },
   });
-  if (!user) {
-    user = await prisma.user.create({
-      data: {
-        name: "Test User",
-        email: "test-user@example.com",
-      },
-    });
-  }
 
-  // Ensure an organization exists with an enterprise license.
-  // The license allows integration tests to create many resources without hitting FREE tier limits.
-  // Uses upsert to always ensure the license is set correctly.
   const organization = await prisma.organization.upsert({
     where: { slug: "test-organization" },
     update: { license: ENTERPRISE_LICENSE_KEY },
@@ -40,79 +46,49 @@ export async function getTestUser() {
     },
   });
 
-  // Ensure a team exists
-  let team = await prisma.team.findUnique({
-    where: {
+  const team = await prisma.team.upsert({
+    where: { slug: "test-team", organizationId: organization.id },
+    update: {},
+    create: {
+      name: "Test Team",
       slug: "test-team",
       organizationId: organization.id,
     },
   });
-  if (!team) {
-    team = await prisma.team.create({
-      data: {
-        name: "Test Team",
-        slug: "test-team",
-        organizationId: organization.id,
-      },
-    });
-  }
 
-  // Ensure a project with "test-project-id" exists
-  const projectExists = await prisma.project.findUnique({
-    where: {
+  await prisma.project.upsert({
+    where: { id: "test-project-id" },
+    update: {},
+    create: {
       id: "test-project-id",
+      name: "Test Project",
+      slug: "test-project",
+      apiKey: "test-api-key",
+      teamId: team.id,
+      language: "en",
+      framework: "test-framework",
     },
   });
-  if (!projectExists) {
-    await prisma.project.create({
-      data: {
-        id: "test-project-id",
-        name: "Test Project",
-        slug: "test-project",
-        apiKey: "test-api-key",
-        teamId: team.id,
-        language: "en",
-        framework: "test-framework",
-      },
-    });
-  }
 
-  // Ensure the user is a member of the team
-  const teamUserExists = await prisma.teamUser.findUnique({
-    where: {
-      userId_teamId: {
-        userId: user.id,
-        teamId: team.id,
-      },
-    },
-  });
-  if (!teamUserExists) {
-    await prisma.teamUser.create({
+  await ignoreUniqueViolation(
+    prisma.teamUser.create({
       data: {
         userId: user.id,
         teamId: team.id,
         role: TeamUserRole.MEMBER,
       },
-    });
-  }
-  // Ensure the user is a member of the organization
-  const orgUserExists = await prisma.organizationUser.findUnique({
-    where: {
-      userId_organizationId: {
-        userId: user.id,
-        organizationId: organization.id,
-      },
-    },
-  });
-  if (!orgUserExists) {
-    await prisma.organizationUser.create({
+    }),
+  );
+
+  await ignoreUniqueViolation(
+    prisma.organizationUser.create({
       data: {
         userId: user.id,
         organizationId: organization.id,
         role: OrganizationUserRole.MEMBER,
       },
-    });
-  }
+    }),
+  );
 
   return user;
 }
