@@ -288,7 +288,7 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
       await waitFor(() => {
         expect(mocks.mockOpenDrawer).toHaveBeenCalledWith(
           "agentWorkflowEditor",
-          { agentId: "workflow-agent-1" },
+          { urlParams: { agentId: "workflow-agent-1" } },
         );
       });
 
@@ -312,18 +312,16 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
     });
   });
 
-  describe("when target is a workflow agent with incomplete mappings", () => {
+  describe("when target is a workflow agent with no input-field mapping", () => {
     beforeEach(() => {
-      // Agent has mappings, but they're incomplete — "input" and "messages" missing
-      // isScenarioMappingValid checks: at least one of input/messages mapped,
-      // and output mapped. Here we have no source mappings at all that cover input/messages.
+      // Agent has scenarioMappings but none wire a source path to the
+      // scenario "input" or "messages" field — fails hasScenarioInputMapping.
       mocks.mockAgentsGetByIdFetch.mockResolvedValue({
         id: "workflow-agent-2",
         type: "workflow",
-        name: "Incomplete Mapping Agent",
+        name: "No Input Mapping Agent",
         config: {
           workflow_id: "wf-456",
-          // mappings exist but don't cover "input" or "messages"
           scenarioMappings: {
             someOtherField: {
               type: "value",
@@ -343,7 +341,7 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
       await waitFor(() => {
         expect(mocks.mockOpenDrawer).toHaveBeenCalledWith(
           "agentWorkflowEditor",
-          { agentId: "workflow-agent-2" },
+          { urlParams: { agentId: "workflow-agent-2" } },
         );
       });
 

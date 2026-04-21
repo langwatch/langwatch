@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { autoComputeAgentMappings } from "../auto-compute-agent-mappings";
 import type { PrismaClient } from "@prisma/client";
 
@@ -336,6 +336,60 @@ describe("autoComputeAgentMappings", () => {
         sourceId: "scenario",
         path: ["custom", "user_picked"],
       });
+    });
+  });
+
+  describe("when the workflow has no end outputs at all", () => {
+    it("clears a stale scenarioOutputField rather than leaving it pointing to a removed output", async () => {
+      // Build a DSL whose end node has no inputs — i.e. no outputs.
+      const dsl = {
+        nodes: [
+          {
+            id: "end",
+            type: "end",
+            position: { x: 0, y: 0 },
+            data: { name: "End", inputs: [] as Array<unknown> },
+          },
+        ],
+        edges: [
+          {
+            id: "e-entry-0",
+            source: "entry",
+            sourceHandle: "outputs.query",
+            target: "llm_call",
+            targetHandle: "inputs.query",
+            type: "default",
+          },
+        ],
+      };
+      const { prisma, updatedConfigs } = buildPrismaMock({
+        agents: [
+          {
+            id: "agent-1",
+            config: {
+              type: "workflow",
+              scenarioMappings: {
+                query: { type: "source", sourceId: "scenario", path: ["input"] },
+              },
+              scenarioOutputField: "response",
+            },
+          },
+        ],
+      });
+
+      await autoComputeAgentMappings({
+        prisma,
+        workflowId: "wf-1",
+        projectId: "proj-1",
+        dsl,
+      });
+
+      expect(prisma.agent.update).toHaveBeenCalled();
+      const config = updatedConfigs["agent-1"];
+      expect(config).toBeDefined();
+      // Stale scenarioOutputField must be removed, not left pointing at
+      // a non-existent output field.
+      expect(config!["scenarioOutputField"]).toBeUndefined();
     });
   });
 

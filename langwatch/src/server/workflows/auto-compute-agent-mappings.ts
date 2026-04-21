@@ -176,13 +176,31 @@ export async function autoComputeAgentMappings({
         scenarioOutputField !== undefined &&
         (outputFieldIsStale ||
           (!hasExistingMappings && existingOutputField === undefined));
+      // If the stored output field is stale AND there is no replacement
+      // (workflow has no outputs), strip the stale field so the adapter does
+      // not try to read a non-existent identifier at run time.
+      const shouldRemoveOutputField =
+        outputFieldIsStale && scenarioOutputField === undefined;
 
-      if (!mappingsChanged && !needsInitialMappings && !shouldUpdateOutputField) {
+      if (
+        !mappingsChanged &&
+        !needsInitialMappings &&
+        !shouldUpdateOutputField &&
+        !shouldRemoveOutputField
+      ) {
         continue;
       }
 
+      const baseConfig = shouldRemoveOutputField
+        ? Object.fromEntries(
+            Object.entries(config).filter(
+              ([key]) => key !== "scenarioOutputField",
+            ),
+          )
+        : config;
+
       const updatedConfig: Record<string, unknown> = {
-        ...config,
+        ...baseConfig,
         ...((mappingsChanged || needsInitialMappings)
           ? { scenarioMappings: nextMappings }
           : {}),

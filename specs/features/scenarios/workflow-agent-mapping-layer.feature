@@ -58,9 +58,9 @@ Feature: Workflow agent input/output mapping layer
     And the user can configure the mappings before running
 
   @integration
-  Scenario: Opens mapping drawer when workflow agent has incomplete mappings
+  Scenario: Opens mapping drawer when workflow agent has no input-field mapping
     Given a workflow agent selected as the scenario target
-    And the agent has scenarioMappings that do not cover all required fields
+    And the agent has scenarioMappings but none wire a source to scenario "input" or "messages"
     When the user clicks Save & Run
     Then the AgentWorkflowEditorDrawer opens instead of starting the run
 
@@ -140,7 +140,7 @@ Feature: Workflow agent input/output mapping layer
 # AC 1: "Auto-compute mappings on workflow save" → Scenario: Re-computes mappings when existing mappings reference stale fields
 # AC 1: "Auto-compute mappings on workflow save" → Scenario: Auto-compute does not block the workflow save on failure
 # AC 2: "Mapping drawer gate at Save & Run" → Scenario: Opens mapping drawer when running a scenario with an unmapped workflow agent
-# AC 2: "Mapping drawer gate at Save & Run" → Scenario: Opens mapping drawer when workflow agent has incomplete mappings
+# AC 2: "Mapping drawer gate at Save & Run" → Scenario: Opens mapping drawer when workflow agent has no input-field mapping
 # AC 2: "Mapping drawer gate at Save & Run" → Scenario: Scenario runs successfully after user configures mappings via drawer
 # AC 3: "Pre-run validation for multi-input workflows" → Scenario: Returns actionable error for multi-input workflow agent without mappings
 # AC 3: "Pre-run validation for multi-input workflows" → Scenario: Allows single-input workflow agent to run without explicit mappings

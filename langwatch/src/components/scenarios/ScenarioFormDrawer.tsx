@@ -257,7 +257,9 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
                 type: "warning",
                 meta: { closable: true },
               });
-              openDrawer("agentWorkflowEditor", { agentId: target.id });
+              openDrawer("agentWorkflowEditor", {
+                urlParams: { agentId: target.id },
+              });
               return;
             }
           }
