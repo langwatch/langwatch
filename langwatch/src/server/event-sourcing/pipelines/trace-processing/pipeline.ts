@@ -30,6 +30,7 @@ export interface TraceProcessingPipelineDeps {
   projectMetadataReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   simulationMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   experimentMetricsSyncReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
+  alertTriggerReactor: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
   spanStorageBroadcastReactor: ReactorDefinition<TraceProcessingEvent>;
   customerIoTraceSyncReactor?: ReactorDefinition<TraceProcessingEvent, TraceSummaryData>;
 }
@@ -64,6 +65,7 @@ export function createTraceProcessingPipeline(deps: TraceProcessingPipelineDeps)
     .withReactor("traceSummary", "projectMetadata", deps.projectMetadataReactor)
     .withReactor("traceSummary", "simulationMetricsSync", deps.simulationMetricsSyncReactor)
     .withReactor("traceSummary", "experimentMetricsSync", deps.experimentMetricsSyncReactor)
+    .withReactor("traceSummary", "alertTrigger", deps.alertTriggerReactor)
     .withReactor("spanStorage", "spanStorageBroadcast", deps.spanStorageBroadcastReactor);
 
   if (deps.customerIoTraceSyncReactor) {

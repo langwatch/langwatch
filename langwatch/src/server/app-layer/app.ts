@@ -18,6 +18,7 @@ export class App {
   readonly simulations: AppDependencies["simulations"] & AppCommands["simulations"];
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
   readonly experiments: AppDependencies["experiments"];
+  readonly triggers: AppDependencies["triggers"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
   readonly tokenizer: AppDependencies["tokenizer"];
@@ -45,6 +46,7 @@ export class App {
   constructor(deps: AppDependencies) {
     this.config = deps.config;
     this.experiments = deps.experiments;
+    this.triggers = deps.triggers;
     this.organizations = deps.organizations;
     this.projects = deps.projects;
     this.tokenizer = deps.tokenizer;
