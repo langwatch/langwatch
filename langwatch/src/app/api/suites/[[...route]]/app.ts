@@ -10,6 +10,7 @@ import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
   authMiddleware,
+  resourceLimitMiddleware,
 } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
@@ -205,6 +206,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Suite ───────────────────────────────────────────
   .post(
     "/",
+    resourceLimitMiddleware("experiments"),
     describeRoute({
       description: "Create a new suite (run plan)",
       responses: {

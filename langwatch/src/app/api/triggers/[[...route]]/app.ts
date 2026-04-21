@@ -11,6 +11,7 @@ import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
   authMiddleware,
+  resourceLimitMiddleware,
 } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
@@ -186,6 +187,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Trigger ─────────────────────────────────────────
   .post(
     "/",
+    resourceLimitMiddleware("automations"),
     describeRoute({
       description: "Create a new trigger (automation)",
       responses: {
