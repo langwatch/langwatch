@@ -64,8 +64,13 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({ id: z.string() }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
-      await enforceLicenseLimit(ctx, input.projectId, "experiments");
       const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
+      // Validate source suite exists before checking limits — avoids masking NOT_FOUND with a limit error
+      const source = await service.getById(input);
+      if (!source) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Suite not found" });
+      }
+      await enforceLicenseLimit(ctx, input.projectId, "experiments");
       try {
         return await service.duplicate(input);
       } catch (error) {
