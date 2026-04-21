@@ -141,9 +141,9 @@ export const personalAccessTokenRouter = createTRPCRouter({
 
       return pats.map((pat) => ({
         id: pat.id,
+        lookupId: pat.lookupId,
         name: pat.name,
         description: pat.description,
-        lookupId: pat.lookupId,
         createdAt: pat.createdAt,
         expiresAt: pat.expiresAt,
         lastUsedAt: pat.lastUsedAt,

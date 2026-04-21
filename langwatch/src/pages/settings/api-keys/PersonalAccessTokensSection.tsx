@@ -12,6 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { Key, Plus, Trash2 } from "lucide-react";
+import { PageLayout } from "../../../components/ui/layouts/PageLayout";
 import { useMemo, useState } from "react";
 import { toaster } from "../../../components/ui/toaster";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
@@ -57,16 +58,7 @@ export function PersonalAccessTokensSection({
   const [patToRevoke, setPatToRevoke] = useState<string | null>(null);
 
   const handleCreate = (input: CreatePatInput) => {
-    // Mirror the caller's own RoleBindings onto the PAT. A future
-    // "Advanced" UI will let users narrow this down per-scope/role.
-    const bindings = (myBindings.data ?? []).map((b) => ({
-      role: b.role,
-      customRoleId: b.customRoleId,
-      scopeType: b.scopeType,
-      scopeId: b.scopeId,
-    }));
-
-    if (bindings.length === 0) {
+    if (input.bindings.length === 0) {
       toaster.create({
         title: "No permissions to grant",
         description:
@@ -86,7 +78,7 @@ export function PersonalAccessTokensSection({
           ? input.description.trim()
           : undefined,
         expiresAt: input.expiresAt,
-        bindings,
+        bindings: input.bindings,
       },
       {
         onSuccess: (result) => {
@@ -147,10 +139,10 @@ export function PersonalAccessTokensSection({
             Shown once at creation. Copy it immediately.
           </Text>
           <Spacer />
-          <Button size="sm" onClick={onCreateOpen}>
+          <PageLayout.HeaderButton onClick={onCreateOpen}>
             <Plus size={16} />
             Create Token
-          </Button>
+          </PageLayout.HeaderButton>
         </HStack>
 
         <Card.Root width="full" overflow="hidden">
@@ -159,7 +151,8 @@ export function PersonalAccessTokensSection({
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Token</Table.ColumnHeader>
+<<<<<<< HEAD
+                  <Table.ColumnHeader>Secret Key</Table.ColumnHeader>
                   <Table.ColumnHeader>Permissions</Table.ColumnHeader>
                   <Table.ColumnHeader>Expires</Table.ColumnHeader>
                   <Table.ColumnHeader>Created</Table.ColumnHeader>
@@ -195,8 +188,12 @@ export function PersonalAccessTokensSection({
                       </HStack>
                     </Table.Cell>
                     <Table.Cell>
-                      <Text fontSize="xs" fontFamily="mono" color="fg.muted">
-                        pat-lw-{pat.lookupId.slice(0, 4)}...
+                      <Text
+                        fontSize="xs"
+                        fontFamily="monospace"
+                        color="fg.muted"
+                      >
+                        pat-lw-...{pat.lookupId.slice(-4)}
                       </Text>
                     </Table.Cell>
                     <Table.Cell>
