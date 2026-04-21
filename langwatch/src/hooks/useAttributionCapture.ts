@@ -3,7 +3,7 @@ import {
   URL_PARAM_TO_FIELD,
   setAttributionIfAbsent,
   type AttributionField,
-} from "./attribution";
+} from "~/utils/attribution";
 
 /**
  * Strips query and fragment from a referrer URL so we never forward

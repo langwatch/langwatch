@@ -3,7 +3,7 @@
  */
 import { renderHook } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { readAttribution } from "../attribution";
+import { readAttribution } from "../../utils/attribution";
 import { useAttributionCapture } from "../useAttributionCapture";
 
 function setUrl(search: string) {

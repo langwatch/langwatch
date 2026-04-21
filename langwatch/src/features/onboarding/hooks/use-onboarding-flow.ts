@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { readAttribution } from "~/hooks/attribution";
+import { readAttribution } from "~/utils/attribution";
 import { getOnboardingFlowConfig } from "../constants/onboarding-flow";
 import {
   type CompanySize,

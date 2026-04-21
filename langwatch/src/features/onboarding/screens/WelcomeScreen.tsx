@@ -6,7 +6,7 @@ import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { toaster } from "~/components/ui/toaster";
-import { pickAttribution } from "~/hooks/attribution";
+import { pickAttribution } from "~/utils/attribution";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 import { trackEventOnce } from "~/utils/tracking";

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { Attribution } from "~/utils/attribution";
 
 /**
  * Input schema for organization signup data
@@ -25,3 +26,14 @@ export const signUpDataSchema = z.object({
   utmContent: z.string().optional().nullable(),
   referrer: z.string().optional().nullable(),
 });
+
+// Compile-time guard: if Attribution gains a field not in signUpDataSchema,
+// `_MissingFields` resolves to the missing key(s) and the assignment fails.
+type _MissingFields = Exclude<
+  keyof Attribution,
+  keyof z.infer<typeof signUpDataSchema>
+>;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _assertAttributionCovered: _MissingFields extends never
+  ? true
+  : _MissingFields = true;

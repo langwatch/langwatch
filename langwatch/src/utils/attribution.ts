@@ -43,6 +43,7 @@ export const URL_PARAM_TO_FIELD = {
 } as const satisfies Record<string, AttributionField>;
 
 const STORAGE_PREFIX = "lw_attrib.";
+let storageWarned = false;
 
 function storageKey(field: AttributionField): string {
   return STORAGE_PREFIX + field;
@@ -73,7 +74,12 @@ export function setAttributionIfAbsent(
     if (window.sessionStorage.getItem(key) !== null) return;
     window.sessionStorage.setItem(key, value);
   } catch {
-    // sessionStorage may be unavailable (private browsing, disabled) — ignore.
+    if (!storageWarned) {
+      storageWarned = true;
+      console.warn(
+        "[attribution] sessionStorage unavailable — attribution will not be captured this session",
+      );
+    }
   }
 }
 

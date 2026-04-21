@@ -1,4 +1,4 @@
-import type { Attribution } from "~/hooks/attribution";
+import type { Attribution } from "~/utils/attribution";
 
 export enum OnboardingScreenIndex {
   ORGANIZATION = 0,
