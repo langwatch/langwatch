@@ -254,7 +254,7 @@ describe("validateLicense", () => {
 
       expect(result.valid).toBe(true);
       if (result.valid) {
-        // The field is preserved in parsed data (not stripped by Zod)
+        // The field is declared as optional on the schema, so Zod preserves its value on parse.
         expect(result.licenseData.plan.evaluationsCredit).toBe(BASE_LICENSE.plan.evaluationsCredit);
       }
     });
