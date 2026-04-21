@@ -26,6 +26,21 @@ const UNSUPPORTED_FIELDS: ReadonlySet<string> = new Set([
   "events.event_details.value",
 ]);
 
+/** Event filter fields that require events data to be populated. */
+const EVENT_FIELDS: ReadonlySet<string> = new Set([
+  "events.event_type",
+  "events.metrics.key",
+  "events.event_details.key",
+]);
+
+/**
+ * Returns true if the given filters include any event-based fields that
+ * require events data to be populated on PreconditionTraceData.
+ */
+export function hasEventFilters(filters: TriggerFilters): boolean {
+  return Object.keys(filters).some((field) => EVENT_FIELDS.has(field));
+}
+
 /**
  * Splits trigger filters into trace-time-available and evaluation-time-available groups.
  */
@@ -52,6 +67,28 @@ export function classifyTriggerFilters(filters: TriggerFilters): {
     traceFilters,
     evaluationFilters,
     hasEvaluationFilters: Object.keys(evaluationFilters).length > 0,
+  };
+}
+
+/**
+ * Populates the events field on PreconditionTraceData from Trace events.
+ * Call this when event filter fields are present and a full trace has been fetched.
+ */
+export function populateEventsOnTraceData(
+  traceData: PreconditionTraceData,
+  traceEvents: Array<{
+    event_type: string;
+    metrics: Record<string, number>;
+    event_details: Record<string, string>;
+  }>,
+): PreconditionTraceData {
+  return {
+    ...traceData,
+    events: traceEvents.map((e) => ({
+      event_type: e.event_type,
+      metrics: Object.entries(e.metrics).map(([key, value]) => ({ key, value })),
+      event_details: Object.entries(e.event_details).map(([key, value]) => ({ key, value })),
+    })),
   };
 }
 
