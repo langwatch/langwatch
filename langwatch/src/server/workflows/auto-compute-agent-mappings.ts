@@ -77,21 +77,6 @@ function isBlankTemplateDSL({
 }
 
 /**
- * Returns true when the agent's existing scenarioMappings contain at least one
- * key that no longer exists as a workflow input identifier (stale mapping).
- */
-function hasStaleMappings({
-  existingMappings,
-  inputs,
-}: {
-  existingMappings: Record<string, unknown>;
-  inputs: Array<{ identifier: string }>;
-}): boolean {
-  const inputIdentifiers = new Set(inputs.map((i) => i.identifier));
-  return Object.keys(existingMappings).some((key) => !inputIdentifiers.has(key));
-}
-
-/**
  * Auto-computes and persists scenarioMappings for all workflow-linked agents that
  * have no mappings configured, or whose existing mappings reference stale fields.
  *
@@ -132,6 +117,9 @@ export async function autoComputeAgentMappings({
     const scenarioOutputField =
       outputs[0]?.identifier !== undefined ? outputs[0].identifier : undefined;
 
+    const inputIdentifiers = new Set(inputs.map((i) => i.identifier));
+    const outputIdentifiers = new Set(outputs.map((o) => o.identifier));
+
     for (const agent of agents) {
       const config =
         typeof agent.config === "object" && agent.config !== null
@@ -139,30 +127,59 @@ export async function autoComputeAgentMappings({
           : {};
 
       const existingMappings = config["scenarioMappings"];
-      const hasExistingMappings =
-        existingMappings !== undefined &&
+      const currentMappings =
         existingMappings !== null &&
         typeof existingMappings === "object" &&
-        Object.keys(existingMappings).length > 0;
+        !Array.isArray(existingMappings)
+          ? (existingMappings as Record<string, unknown>)
+          : {};
+      const hasExistingMappings = Object.keys(currentMappings).length > 0;
 
-      if (hasExistingMappings) {
-        // Re-compute only when existing mappings reference fields that no longer exist
-        const stale = hasStaleMappings({
-          existingMappings: existingMappings as Record<string, unknown>,
-          inputs,
-        });
-        if (!stale) continue;
+      // Preserve mappings whose keys are still valid workflow inputs; drop stale ones.
+      const preservedMappings = Object.fromEntries(
+        Object.entries(currentMappings).filter(([key]) =>
+          inputIdentifiers.has(key),
+        ),
+      );
+
+      // Fill in auto-computed best-match defaults only for inputs the user has
+      // not already mapped. This avoids clobbering user-configured mappings
+      // when another input becomes stale.
+      const nextMappings: Record<string, unknown> = {
+        ...mappings,
+        ...preservedMappings,
+      };
+
+      const mappingsChanged =
+        hasExistingMappings &&
+        JSON.stringify(nextMappings) !== JSON.stringify(currentMappings);
+      const needsInitialMappings =
+        !hasExistingMappings && Object.keys(nextMappings).length > 0;
+
+      // Evaluate output-field staleness independently from input mappings.
+      // Only repair when the existing value is a string that points to a field
+      // that no longer exists. Initialize on first auto-compute (no existing
+      // mappings + new output available). Don't clobber an intentionally-unset
+      // field on agents that already have mappings configured.
+      const existingOutputField = config["scenarioOutputField"];
+      const outputFieldIsStale =
+        typeof existingOutputField === "string" &&
+        !outputIdentifiers.has(existingOutputField);
+      const shouldUpdateOutputField =
+        scenarioOutputField !== undefined &&
+        (outputFieldIsStale ||
+          (!hasExistingMappings && existingOutputField === undefined));
+
+      if (!mappingsChanged && !needsInitialMappings && !shouldUpdateOutputField) {
+        continue;
       }
-
-      // Skip if there are no mappings to apply
-      if (Object.keys(mappings).length === 0) continue;
 
       const updatedConfig: Record<string, unknown> = {
         ...config,
-        scenarioMappings: mappings,
-        ...(scenarioOutputField !== undefined
-          ? { scenarioOutputField }
+        ...((mappingsChanged || needsInitialMappings)
+          ? { scenarioMappings: nextMappings }
           : {}),
+        ...(shouldUpdateOutputField ? { scenarioOutputField } : {}),
       };
 
       await prisma.agent.update({
