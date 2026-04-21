@@ -25,6 +25,7 @@ import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
 import { TriggerService } from "./triggers/trigger.service";
 import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
+import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
 import { ExperimentService } from "../experiments/experiment.service";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
@@ -548,7 +549,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     experiments: ExperimentService.create(testPrisma),
-    triggers: new TriggerService(new PrismaTriggerRepository(testPrisma)),
+    triggers: new TriggerService(new NullTriggerRepository()),
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: { runs: SuiteRunService.create({ resolveClickHouseClient: null, startSuiteRun: noop, queueSimulationRun: noop }) },
     organizations: nullOrganizations,

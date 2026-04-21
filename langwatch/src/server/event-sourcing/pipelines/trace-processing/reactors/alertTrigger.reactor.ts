@@ -105,10 +105,11 @@ export function createAlertTriggerReactor(
           }
 
           // Dedup: check if already sent for this trace
-          const alreadySent = await deps.triggers.hasSentForTrace(
-            trigger.id,
+          const alreadySent = await deps.triggers.hasSentForTrace({
+            triggerId: trigger.id,
             traceId,
-          );
+            projectId: tenantId,
+          });
           if (alreadySent) continue;
 
           await dispatchAction({
@@ -180,6 +181,7 @@ async function dispatchAction({
 
   const triggerData = buildTriggerData(traceId, tenantId, foldState);
   const params = trigger.actionParams as ActionParams;
+  let dispatched = true;
 
   switch (trigger.action) {
     case TriggerAction.SEND_EMAIL:
@@ -214,7 +216,7 @@ async function dispatchAction({
       break;
 
     case TriggerAction.ADD_TO_DATASET:
-      await addTraceToDataset({
+      dispatched = await addTraceToDataset({
         deps,
         trigger,
         traceId,
@@ -223,6 +225,8 @@ async function dispatchAction({
       });
       break;
   }
+
+  if (!dispatched) return;
 
   // Record TriggerSent for dedup
   await deps.triggers.recordSent({
@@ -268,13 +272,13 @@ async function addTraceToDataset({
   traceId: string;
   tenantId: string;
   params: ActionParams;
-}): Promise<void> {
+}): Promise<boolean> {
   if (!params.datasetId || !params.datasetMapping) {
     logger.warn(
       { tenantId, triggerId: trigger.id },
       "ADD_TO_DATASET trigger missing datasetId or datasetMapping",
     );
-    return;
+    return false;
   }
 
   const trace = await deps.traceById(tenantId, traceId);
@@ -284,7 +288,7 @@ async function addTraceToDataset({
       { tenantId, traceId, triggerId: trigger.id },
       "Trace not found for ADD_TO_DATASET action",
     );
-    return;
+    return false;
   }
 
   const { mapping, expansions: expansionsArray } = params.datasetMapping;
@@ -325,4 +329,6 @@ async function addTraceToDataset({
     projectId: tenantId,
     datasetRecords: entries,
   });
+
+  return true;
 }

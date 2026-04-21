@@ -201,6 +201,25 @@ describe("matchesTriggerFilters", () => {
       expect(matchesTriggerFilters(data, filters)).toBe(true);
     });
   });
+
+  describe("when filters contain unsupported fields", () => {
+    it("skips metadata.key (key-selector) without failing", () => {
+      const data = makeTraceData({ origin: "application" });
+      const filters: TriggerFilters = {
+        "traces.origin": ["application"],
+        "metadata.key": ["some_key"],
+      };
+      expect(matchesTriggerFilters(data, filters)).toBe(true);
+    });
+
+    it("skips events.metrics.value (numeric-only) without failing", () => {
+      const data = makeTraceData();
+      const filters: TriggerFilters = {
+        "events.metrics.value": { click: { count: ["5"] } },
+      };
+      expect(matchesTriggerFilters(data, filters)).toBe(true);
+    });
+  });
 });
 
 describe("classifyTriggerFilters", () => {
