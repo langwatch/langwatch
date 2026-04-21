@@ -409,7 +409,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
 function DefaultModelErrorBanner({ children }: { children: React.ReactNode }) {
   return (
-    <HStack
+    <VStack
       gap={2}
       padding={2}
       bg="orange.50"
@@ -418,8 +418,19 @@ function DefaultModelErrorBanner({ children }: { children: React.ReactNode }) {
       color="orange.700"
       align="flex-start"
     >
-      <Icon as={AlertTriangle} boxSize={3} flexShrink={0} mt="1px" />
-      <Text>{children}</Text>
-    </HStack>
+      <HStack gap={2} align="flex-start">
+        <Icon as={AlertTriangle} boxSize={3} flexShrink={0} mt="1px" />
+        <Text>{children}</Text>
+      </HStack>
+      <Button colorPalette="blue" asChild size="sm">
+        <a
+          href="/settings/model-providers"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Configure default model
+        </a>
+      </Button>
+    </VStack>
   );
 }

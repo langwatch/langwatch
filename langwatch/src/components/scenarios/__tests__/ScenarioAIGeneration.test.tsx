@@ -237,7 +237,19 @@ describe("given azure is the only enabled provider and project.defaultModel is n
 
       fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
 
-      expect(screen.getByText(/default model/i)).toBeInTheDocument();
+      expect(screen.getByText(/no default model set/i)).toBeInTheDocument();
+    });
+
+    it("renders a Configure default model button linking to /settings/model-providers in a new tab", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+
+      const link = screen.getByRole("link", { name: /configure default model/i });
+      expect(link).toHaveAttribute("href", "/settings/model-providers");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+      expect(link).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
     });
   });
 });
@@ -270,6 +282,18 @@ describe("given azure is the only enabled provider and project.defaultModel is o
       fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
 
       expect(screen.getByText(/provider.*disabled|disabled.*provider/i)).toBeInTheDocument();
+    });
+
+    it("renders a Configure default model button linking to /settings/model-providers in a new tab", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+
+      const link = screen.getByRole("link", { name: /configure default model/i });
+      expect(link).toHaveAttribute("href", "/settings/model-providers");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+      expect(link).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
     });
   });
 });
