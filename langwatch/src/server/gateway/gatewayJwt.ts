@@ -42,13 +42,13 @@ export function signGatewayJwt(claims: GatewayJwtClaims): {
 } {
   const secret = getSecret();
   const expiresAt = Math.floor(Date.now() / 1000) + TTL_SECONDS;
-  const token = jwt.sign(claims, secret, {
+  const signedJwt = jwt.sign(claims, secret, {
     algorithm: "HS256",
     issuer: ISSUER,
     audience: AUDIENCE,
     expiresIn: TTL_SECONDS,
   });
-  return { jwt: token, expiresAt };
+  return { jwt: signedJwt, expiresAt };
 }
 
 export function verifyGatewayJwt(token: string): GatewayJwtClaims {

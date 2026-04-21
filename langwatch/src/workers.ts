@@ -1,10 +1,8 @@
+import "dotenv/config";
 import { setEnvironment } from "@langwatch/ksuid";
-import dotenv from "dotenv";
 import { WorkersRestart } from "./server/background/errors";
 import { verifyRedisReady } from "./server/redis";
 import { createLogger } from "./utils/logger/server";
-
-dotenv.config();
 setEnvironment(process.env.ENVIRONMENT ?? "local");
 
 const { initializeWorkerApp } = require("./server/app-layer/presets") as {

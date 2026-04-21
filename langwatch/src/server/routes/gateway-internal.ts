@@ -293,7 +293,7 @@ app.post("/resolve-key", async (c) => {
     );
   }
 
-  const { jwt: token } = signGatewayJwt({
+  const { jwt } = signGatewayJwt({
     vk_id: vk.id,
     project_id: project.id,
     team_id: project.teamId,
@@ -306,7 +306,7 @@ app.post("/resolve-key", async (c) => {
   void service.touchUsage(vk.id).catch(() => {});
 
   return c.json({
-    jwt: token,
+    jwt,
     revision: vk.revision.toString(),
     key_id: vk.id,
     display_prefix: vk.displayPrefix,
