@@ -55,16 +55,7 @@ export function PersonalAccessTokensSection({
   const [patToRevoke, setPatToRevoke] = useState<string | null>(null);
 
   const handleCreate = (input: CreatePatInput) => {
-    // Mirror the caller's own RoleBindings onto the PAT. A future
-    // "Advanced" UI will let users narrow this down per-scope/role.
-    const bindings = (myBindings.data ?? []).map((b) => ({
-      role: b.role,
-      customRoleId: b.customRoleId,
-      scopeType: b.scopeType,
-      scopeId: b.scopeId,
-    }));
-
-    if (bindings.length === 0) {
+    if (input.bindings.length === 0) {
       toaster.create({
         title: "No permissions to grant",
         description:
@@ -84,7 +75,7 @@ export function PersonalAccessTokensSection({
           ? input.description.trim()
           : undefined,
         expiresAt: input.expiresAt,
-        bindings,
+        bindings: input.bindings,
       },
       {
         onSuccess: (result) => {
@@ -142,10 +133,10 @@ export function PersonalAccessTokensSection({
         <HStack width="full">
           <Text fontSize="sm" color="fg.muted">
             User-scoped tokens that authenticate API requests on your behalf.
-            Shown once at creation — copy it immediately.
+            Shown once at creation. Copy it immediately.
           </Text>
           <Spacer />
-          <Button size="sm" onClick={onCreateOpen}>
+          <Button variant="outline" size="sm" onClick={onCreateOpen}>
             <Plus size={16} />
             Create Token
           </Button>
@@ -157,6 +148,7 @@ export function PersonalAccessTokensSection({
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Secret Key</Table.ColumnHeader>
                   <Table.ColumnHeader>Permissions</Table.ColumnHeader>
                   <Table.ColumnHeader>Expires</Table.ColumnHeader>
                   <Table.ColumnHeader>Created</Table.ColumnHeader>
@@ -167,7 +159,7 @@ export function PersonalAccessTokensSection({
               <Table.Body>
                 {activePats.length === 0 && (
                   <Table.Row>
-                    <Table.Cell colSpan={6}>
+                    <Table.Cell colSpan={7}>
                       <Text color="fg.muted" textAlign="center" paddingY={4}>
                         No active tokens. Create one to get started.
                       </Text>
@@ -190,6 +182,15 @@ export function PersonalAccessTokensSection({
                           )}
                         </VStack>
                       </HStack>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text
+                        fontSize="xs"
+                        fontFamily="monospace"
+                        color="fg.muted"
+                      >
+                        pat-lw-...{pat.lookupId.slice(-4)}
+                      </Text>
                     </Table.Cell>
                     <Table.Cell>
                       <Text fontSize="sm" color="fg.muted">

@@ -34,7 +34,7 @@ export function TokenCreatedDialog({
         <Dialog.CloseTrigger />
         <Dialog.Body paddingBottom={6}>
           <VStack gap={5} align="stretch">
-            <Text color="orange.500" fontWeight="600">
+            <Text color="red.500" fontWeight="600">
               Copy this token now. You won&apos;t be able to see it again.
             </Text>
             {newToken && (
@@ -66,6 +66,7 @@ export function TokenCreatedDialog({
                 ])}
                 copyToastTitle=".env copied to clipboard"
                 ariaLabel="Copy .env contents"
+                defaultRevealed
               />
             )}
 
@@ -82,7 +83,7 @@ export function TokenCreatedDialog({
 
             <VStack gap={2} align="stretch" width="full">
               <Text fontWeight="600" fontSize="sm">
-                Option 1 — Bearer token
+                Option 1: Bearer token
               </Text>
               <Text fontSize="sm" color="fg.muted">
                 Use the <code>Authorization</code> header plus{" "}
@@ -101,12 +102,13 @@ export function TokenCreatedDialog({
                 }`}
                 copyToastTitle="Bearer headers copied"
                 ariaLabel="Copy Bearer headers"
+                defaultRevealed
               />
             </VStack>
 
             <VStack gap={2} align="stretch" width="full">
               <Text fontWeight="600" fontSize="sm">
-                Option 2 — Basic Auth (SDK clients)
+                Option 2: Basic Auth (SDK clients)
               </Text>
               <Text fontSize="sm" color="fg.muted">
                 Encode the project ID and token as{" "}
@@ -133,6 +135,7 @@ export function TokenCreatedDialog({
                 }
                 copyToastTitle="Basic Auth header copied"
                 ariaLabel="Copy Basic Auth header"
+                defaultRevealed
               />
             </VStack>
           </VStack>
