@@ -9,7 +9,9 @@ Feature: Trace Name Filter and Group-By
   topics and origin.
 
   When multiple root spans exist for a trace, the one with the earliest
-  start time wins (deterministic tie-breaking).
+  start time wins (deterministic tie-breaking within a single fold session).
+  After a checkpoint reload, the first root span processed wins since
+  rootSpanStartTimeMs is internal bookkeeping not persisted to ClickHouse.
 
   ES registry: TraceName is ClickHouse-only. The ES filter registry entry
   is a noop — Elasticsearch is deprecated and no longer used for analytics.

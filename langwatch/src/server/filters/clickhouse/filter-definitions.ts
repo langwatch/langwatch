@@ -323,16 +323,16 @@ export const clickHouseFilters: Record<
       const { sql: scopeSql } = buildScopeConditions(params);
       return `
         SELECT
-          TraceName as field,
-          TraceName as label,
+          ts.TraceName as field,
+          ts.TraceName as label,
           count() as count
         FROM trace_summaries ts
         WHERE ${buildTraceSummariesConditions(params)}
           AND ts.TraceName != ''
           ${buildQueryFilter("ts.TraceName", params)}
           ${scopeSql}
-        GROUP BY TraceName
-        ORDER BY TraceName ASC
+        GROUP BY ts.TraceName
+        ORDER BY ts.TraceName ASC
         LIMIT 10000
       `;
     },
