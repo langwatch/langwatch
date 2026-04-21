@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -14,8 +15,6 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
-
-// --- Mock implementations ---
 
 type mockProvider struct {
 	dispatchFn func(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error)
@@ -122,8 +121,6 @@ func (m *mockTraces) EndSpan(_ context.Context, params domain.AITraceParams) {
 	m.lastParams = params
 }
 
-// --- Helpers ---
-
 func testBundle(creds ...domain.Credential) *domain.Bundle {
 	if len(creds) == 0 {
 		creds = []domain.Credential{
@@ -153,8 +150,6 @@ func successResponse() *domain.Response {
 	}
 }
 
-// --- Tests ---
-
 func TestHandleChat_HappyPath(t *testing.T) {
 	provider := &mockProvider{
 		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
@@ -167,7 +162,7 @@ func TestHandleChat_HappyPath(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	result, err := application.HandleChat(context.Background(), testBundle(), testBody())
+	result, err := application.HandleChat(context.Background(), testBundle(), bytes.NewReader(testBody()), "gpt-4")
 	require.NoError(t, err)
 	assert.Equal(t, successResponse().Body, result.Response.Body)
 	assert.NotEmpty(t, result.Meta.GatewayRequestID)
@@ -191,7 +186,7 @@ func TestHandleChat_RateLimitBlocked(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.HandleChat(context.Background(), testBundle(), testBody())
+	_, err := application.HandleChat(context.Background(), testBundle(), bytes.NewReader(testBody()), "gpt-4")
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrRateLimited))
 }
@@ -214,7 +209,7 @@ func TestHandleChat_BudgetBlocked(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.HandleChat(context.Background(), testBundle(), testBody())
+	_, err := application.HandleChat(context.Background(), testBundle(), bytes.NewReader(testBody()), "gpt-4")
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrBudgetExceeded))
 }
@@ -237,7 +232,7 @@ func TestHandleChat_BudgetWarn(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	result, err := application.HandleChat(context.Background(), testBundle(), testBody())
+	result, err := application.HandleChat(context.Background(), testBundle(), bytes.NewReader(testBody()), "gpt-4")
 	require.NoError(t, err)
 	assert.Contains(t, result.Meta.BudgetWarnings, "near_limit")
 }
@@ -266,7 +261,7 @@ func TestHandleChat_GuardrailPreBlocked(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.HandleChat(context.Background(), bundle, testBody())
+	_, err := application.HandleChat(context.Background(), bundle, bytes.NewReader(testBody()), "gpt-4")
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrGuardrailBlocked))
 }
@@ -295,7 +290,7 @@ func TestHandleChat_GuardrailPostBlocked(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.HandleChat(context.Background(), bundle, testBody())
+	_, err := application.HandleChat(context.Background(), bundle, bytes.NewReader(testBody()), "gpt-4")
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrGuardrailBlocked))
 }
@@ -323,7 +318,7 @@ func TestHandleChat_PolicyViolation(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.HandleChat(context.Background(), bundle, testBody())
+	_, err := application.HandleChat(context.Background(), bundle, bytes.NewReader(testBody()), "gpt-4")
 	require.Error(t, err)
 	assert.True(t, herr.IsCode(err, domain.ErrPolicyViolation))
 }
@@ -352,11 +347,10 @@ func TestHandleChat_ModelResolution(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	result, err := application.HandleChat(context.Background(), testBundle(), testBody())
+	result, err := application.HandleChat(context.Background(), testBundle(), bytes.NewReader(testBody()), "gpt-4")
 	require.NoError(t, err)
 	assert.NotNil(t, result.Response)
 
-	// Verify the body was rewritten with the resolved model name.
 	var parsed map[string]json.RawMessage
 	require.NoError(t, json.Unmarshal(capturedBody, &parsed))
 	var rewrittenModel string
@@ -380,7 +374,6 @@ func TestHandleChat_FallbackOnProviderError(t *testing.T) {
 		domain.Credential{ID: "cred-1", ProviderID: domain.ProviderOpenAI, APIKey: "sk-1"},
 		domain.Credential{ID: "cred-2", ProviderID: domain.ProviderOpenAI, APIKey: "sk-2"},
 	)
-	// MaxAttempts must allow both credentials to be tried.
 	bundle.Config.Fallback.MaxAttempts = 2
 
 	application := New(
@@ -388,7 +381,7 @@ func TestHandleChat_FallbackOnProviderError(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	result, err := application.HandleChat(context.Background(), bundle, testBody())
+	result, err := application.HandleChat(context.Background(), bundle, bytes.NewReader(testBody()), "gpt-4")
 	require.NoError(t, err)
 	assert.Equal(t, 2, callCount)
 	assert.Equal(t, 1, result.Meta.FallbackCount)
@@ -408,7 +401,7 @@ func TestHandleChat_DebitsCostAfterSuccess(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.HandleChat(context.Background(), testBundle(), testBody())
+	_, err := application.HandleChat(context.Background(), testBundle(), bytes.NewReader(testBody()), "gpt-4")
 	require.NoError(t, err)
 	assert.Equal(t, 1, budget.debitCalls)
 }
@@ -419,7 +412,7 @@ func TestHandleChat_EmitsTraceAfterSuccess(t *testing.T) {
 			return successResponse(), nil
 		},
 	}
-	models := &mockModels{} // default: returns resolved model so traces fire
+	models := &mockModels{}
 	traces := &mockTraces{}
 
 	application := New(
@@ -429,7 +422,7 @@ func TestHandleChat_EmitsTraceAfterSuccess(t *testing.T) {
 		WithLogger(zap.NewNop()),
 	)
 
-	_, err := application.HandleChat(context.Background(), testBundle(), testBody())
+	_, err := application.HandleChat(context.Background(), testBundle(), bytes.NewReader(testBody()), "gpt-4")
 	require.NoError(t, err)
 	assert.Equal(t, 1, traces.beginCalls)
 	assert.Equal(t, 1, traces.endCalls)
@@ -443,19 +436,16 @@ func TestHandleChat_NilDependenciesAreSkipped(t *testing.T) {
 		},
 	}
 
-	// Create app with ONLY a provider -- all other deps are nil.
 	application := New(
 		WithProviders(provider),
 		WithLogger(zap.NewNop()),
 	)
 
-	result, err := application.HandleChat(context.Background(), testBundle(), testBody())
+	result, err := application.HandleChat(context.Background(), testBundle(), bytes.NewReader(testBody()), "gpt-4")
 	require.NoError(t, err)
 	assert.NotNil(t, result.Response)
 	assert.NotEmpty(t, result.Meta.GatewayRequestID)
 }
-
-// --- Chain tests ---
 
 func TestChainSync_OrderIsPreserved(t *testing.T) {
 	var order []string
@@ -477,7 +467,7 @@ func TestChainSync_OrderIsPreserved(t *testing.T) {
 	}
 
 	p := pipeline.Build(interceptors, terminal, nil)
-	_, err := p.Sync(context.Background(), &pipeline.Call{Meta: &pipeline.Meta{}})
+	_, err := p.Sync(context.Background(), &domain.Bundle{}, &domain.Request{})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"first", "second", "terminal"}, order)
 }
@@ -497,7 +487,7 @@ func TestChainSync_EarlyReject(t *testing.T) {
 	}
 
 	p := pipeline.Build(interceptors, terminal, nil)
-	_, err := p.Sync(context.Background(), &pipeline.Call{Meta: &pipeline.Meta{}})
+	_, err := p.Sync(context.Background(), &domain.Bundle{}, &domain.Request{})
 	require.Error(t, err)
 	assert.False(t, terminalCalled)
 }

@@ -1,5 +1,7 @@
 package domain
 
+import "io"
+
 // Request is the provider-agnostic representation of an inbound API request.
 type Request struct {
 	// Type distinguishes the endpoint shape.
@@ -11,12 +13,12 @@ type Request struct {
 	// Resolved is populated after model resolution.
 	Resolved *ResolvedModel
 
-	// Body is the raw request body bytes (provider-specific format).
-	// Providers parse this according to their wire format.
+	// Body is the materialized request body bytes. If nil, call MaterializeBody()
+	// to read from BodyReader.
 	Body []byte
 
-	// Streaming indicates the client requested a streaming response.
-	Streaming bool
+	// BodyReader is the original request stream (or MultiReader with peeked bytes).
+	BodyReader io.Reader
 
 	// Metadata carries provider-agnostic extracted data for policy evaluation
 	// (tool names, MCP identifiers, system instructions, etc.).

@@ -36,7 +36,5 @@ type AITraceParams struct {
 	Model       string
 	ProviderID  ProviderID
 	Usage       Usage
-	DurationMS  int64
-	Streaming   bool
 	RequestType RequestType
 }
