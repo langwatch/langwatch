@@ -116,6 +116,10 @@ def patch_litellm():
                 if replaced_key.isupper():
                     continue
                 kwargs[replaced_key] = convert_param_type(replaced_key, value)
+
+        if "extra_headers" in kwargs and isinstance(kwargs["extra_headers"], str):
+            kwargs["extra_headers"] = json.loads(kwargs["extra_headers"])
+
         return _original_embedding(*args, **kwargs)
 
     litellm.embedding = patched_embedding
