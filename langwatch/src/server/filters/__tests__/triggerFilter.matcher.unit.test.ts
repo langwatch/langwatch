@@ -138,6 +138,22 @@ describe("matchesTriggerFilters", () => {
       };
       expect(matchesTriggerFilters(data, filters)).toBe(false);
     });
+
+    it("uses OR semantics across multiple keys (matches if any key matches)", () => {
+      const data = makeTraceData({ customMetadata: { env: "staging", region: "eu" } });
+      const filters: TriggerFilters = {
+        "metadata.value": { env: ["production"], region: ["eu"] },
+      };
+      expect(matchesTriggerFilters(data, filters)).toBe(true);
+    });
+
+    it("does not match when no keys match (OR of all false)", () => {
+      const data = makeTraceData({ customMetadata: { env: "staging", region: "us" } });
+      const filters: TriggerFilters = {
+        "metadata.value": { env: ["production"], region: ["eu"] },
+      };
+      expect(matchesTriggerFilters(data, filters)).toBe(false);
+    });
   });
 
   describe("when filtering by topics.topics", () => {
