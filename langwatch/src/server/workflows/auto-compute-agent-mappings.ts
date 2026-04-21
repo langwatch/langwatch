@@ -70,9 +70,9 @@ function isBlankTemplateDSL({
 }): boolean {
   return (
     inputs.length === 1 &&
-    inputs[0]!.identifier === BLANK_TEMPLATE_INPUT &&
+    inputs[0]?.identifier === BLANK_TEMPLATE_INPUT &&
     outputs.length === 1 &&
-    outputs[0]!.identifier === BLANK_TEMPLATE_OUTPUT
+    outputs[0]?.identifier === BLANK_TEMPLATE_OUTPUT
   );
 }
 
@@ -150,9 +150,16 @@ export async function autoComputeAgentMappings({
         ...preservedMappings,
       };
 
+      // "Changed" means the set of keys differs from current, OR the source
+      // of any preserved key changed. Since preservedMappings is a subset of
+      // currentMappings (same entries, just filtered), we only need to detect
+      // key-set differences between nextMappings and currentMappings.
+      const currentKeys = Object.keys(currentMappings);
+      const nextKeys = Object.keys(nextMappings);
       const mappingsChanged =
         hasExistingMappings &&
-        JSON.stringify(nextMappings) !== JSON.stringify(currentMappings);
+        (currentKeys.length !== nextKeys.length ||
+          currentKeys.some((k) => !(k in nextMappings)));
       const needsInitialMappings =
         !hasExistingMappings && Object.keys(nextMappings).length > 0;
 

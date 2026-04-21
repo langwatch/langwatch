@@ -9,7 +9,7 @@ Feature: Workflow agent input/output mapping layer
 
   # --- Layer 1: Auto-compute on workflow save ---
 
-  @integration
+  @unit
   Scenario: Auto-computes mappings when workflow with conventional inputs is saved
     Given a workflow agent linked to the scenario
     And the agent has no scenarioMappings configured

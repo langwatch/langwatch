@@ -17,6 +17,7 @@ import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import type { TypedAgent } from "../../server/agents/agent.repository";
 import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
 import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
+import { hasScenarioInputMapping } from "../suites/ScenarioInputMappingSection";
 import { TagList } from "../ui/TagList";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
@@ -245,14 +246,10 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
           if (agent) {
             const config = agent.config as CustomComponentConfig;
             const mappings = config.scenarioMappings ?? {};
-            const hasMappings = Object.keys(mappings).length > 0;
-            // Check that at least one mapping wires to a required scenario field
-            // (input or messages). We don't have workflow outputs here, so we
-            // can't fully validate — the server-side pre-run check covers that.
-            const hasRequiredInput = hasMappings && Object.values(mappings).some(
-              (m) => m.type === "source" && (m.path[0] === "input" || m.path[0] === "messages"),
-            );
-            if (!hasRequiredInput) {
+            // We don't have workflow outputs here — server-side pre-run check
+            // covers output validation. Share the input half of the rule with
+            // the editor drawer via hasScenarioInputMapping.
+            if (!hasScenarioInputMapping(mappings)) {
               toaster.create({
                 title: "Configure scenario mappings",
                 description:
