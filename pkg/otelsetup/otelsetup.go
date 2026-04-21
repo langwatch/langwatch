@@ -25,8 +25,8 @@ import (
 // the context's ServiceInfo when available.
 type Options struct {
 	NodeID        string
-	TraceEndpoint string            // OTLP HTTP endpoint (empty = noop)
-	TraceHeaders  map[string]string // auth headers for the collector
+	OTLPEndpoint string            // OTLP HTTP endpoint (empty = noop)
+	OTLPHeaders  map[string]string // auth headers for the collector
 	BatchTimeout  time.Duration
 	MaxQueueSize  int
 	// SampleRatio controls the fraction of traces sampled (0.0–1.0).
@@ -64,15 +64,15 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 	)
 	otelapi.SetTextMapPropagator(prop)
 
-	if opts.TraceEndpoint == "" {
+	if opts.OTLPEndpoint == "" {
 		return &Provider{}, nil
 	}
 
 	exporterOpts := []otlptracehttp.Option{
-		otlptracehttp.WithEndpointURL(opts.TraceEndpoint),
+		otlptracehttp.WithEndpointURL(opts.OTLPEndpoint),
 	}
-	if len(opts.TraceHeaders) > 0 {
-		exporterOpts = append(exporterOpts, otlptracehttp.WithHeaders(opts.TraceHeaders))
+	if len(opts.OTLPHeaders) > 0 {
+		exporterOpts = append(exporterOpts, otlptracehttp.WithHeaders(opts.OTLPHeaders))
 	}
 	exp, err := otlptracehttp.New(ctx, exporterOpts...)
 	if err != nil {
