@@ -26,6 +26,9 @@ type ClientOptions struct {
 	HTTPClient        *http.Client
 	Logger            *zap.Logger
 	GuardrailTimeouts GuardrailTimeouts
+	// UserAgent is the value sent in the User-Agent header on every outbound
+	// request to the control plane. Typically "langwatch-aigateway/<version>".
+	UserAgent string
 }
 
 // GuardrailTimeouts configures per-direction budgets for guardrail evaluation.
@@ -39,6 +42,7 @@ type GuardrailTimeouts struct {
 // guardrail evaluation, and budget debit.
 type Client struct {
 	baseURL           string
+	userAgent string
 	sign              func(req *http.Request, body []byte)
 	verifier          *jwtverify.JWTVerifier
 	client            *http.Client
@@ -65,6 +69,7 @@ func NewClient(opts ClientOptions) *Client {
 	}
 	return &Client{
 		baseURL:           opts.BaseURL,
+		userAgent:         opts.UserAgent,
 		sign:              opts.Sign,
 		verifier:          opts.Verifier,
 		client:            opts.HTTPClient,
@@ -82,6 +87,7 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	c.setCommonHeaders(req)
 	c.sign(req, payload)
 
 	resp, err := c.client.Do(req)
@@ -122,6 +128,7 @@ func (c *Client) FetchConfig(ctx context.Context, vkID string) (domain.BundleCon
 	if err != nil {
 		return domain.BundleConfig{}, err
 	}
+	c.setCommonHeaders(req)
 	c.sign(req, nil)
 
 	resp, err := c.client.Do(req)
@@ -178,6 +185,13 @@ func claimsToBundle(c *Claims) *domain.Bundle {
 	}
 }
 
+// setCommonHeaders stamps headers shared by every outbound control-plane request.
+func (c *Client) setCommonHeaders(req *http.Request) {
+	if c.userAgent != "" {
+		req.Header.Set("User-Agent", c.userAgent)
+	}
+}
+
 // signedPost is a helper for POST requests to the control plane.
 func (c *Client) signedPost(ctx context.Context, path string, body []byte) (*http.Response, error) {
 	endpoint, _ := url.JoinPath(c.baseURL, path)
@@ -186,6 +200,7 @@ func (c *Client) signedPost(ctx context.Context, path string, body []byte) (*htt
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/json")
+	c.setCommonHeaders(req)
 	c.sign(req, body)
 	return c.client.Do(req)
 }

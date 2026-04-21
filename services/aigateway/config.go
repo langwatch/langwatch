@@ -31,6 +31,11 @@ type OTelConfig struct {
 
 	DefaultExportEndpoint string `env:"DEFAULT_EXPORT_ENDPOINT"`
 	DefaultAuthToken      string `env:"DEFAULT_AUTH_TOKEN"`
+
+	// SampleRatio controls the fraction of traces sampled (0.0–1.0).
+	// Defaults to 1.0 (100%) for local, 0.1 (10%) otherwise.
+	// Set OTEL_SAMPLE_RATIO in the environment to override.
+	SampleRatio float64 `env:"SAMPLE_RATIO"`
 }
 
 func defaultConfig() Config {
@@ -43,6 +48,9 @@ func defaultConfig() Config {
 		ControlPlane: ControlPlaneConfig{
 			BaseURL: "http://localhost:5560",
 		},
+		OTel: OTelConfig{
+			SampleRatio: 1.0, // overridden to 0.1 for non-local in LoadConfig
+		},
 	}
 }
 
@@ -52,8 +60,13 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Hydrate(&cfg); err != nil {
 		return Config{}, err
 	}
+	// Apply environment-aware sample ratio default when not explicitly set.
+	if cfg.OTel.SampleRatio == 1.0 && cfg.Environment != "local" {
+		cfg.OTel.SampleRatio = 0.1
+	}
 	if err := config.Validate(ctx, cfg); err != nil {
 		return Config{}, err
 	}
 	return cfg, nil
 }
+

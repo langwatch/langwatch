@@ -5,6 +5,7 @@ import "github.com/langwatch/langwatch/services/aigateway/domain"
 // configWire matches the JSON shape returned by GET /api/internal/gateway/config/:vk_id.
 type configWire struct {
 	ProjectOTLPToken string              `json:"project_otlp_token"`
+	Providers        []providerSlotWire  `json:"providers"`
 	Fallback         fallbackWire        `json:"fallback"`
 	ModelAliases     map[string]string   `json:"model_aliases"`
 	ModelsAllowed    []string            `json:"models_allowed"`
@@ -13,6 +14,12 @@ type configWire struct {
 	PolicyRules      policyRulesWire     `json:"policy_rules"`
 	Budgets          []budgetWire        `json:"budgets"`
 	CacheRules       []cacheRuleWire     `json:"cache_rules"`
+}
+
+type providerSlotWire struct {
+	ID          string                 `json:"id"`
+	Type        string                 `json:"type"`
+	Credentials map[string]interface{} `json:"credentials"`
 }
 
 type fallbackWire struct {
@@ -82,7 +89,13 @@ type cacheActionWire struct {
 }
 
 func (w *configWire) toDomain() domain.BundleConfig {
+	creds := make([]domain.Credential, 0, len(w.Providers))
+	for _, p := range w.Providers {
+		creds = append(creds, providerSlotToCredential(p))
+	}
+
 	cfg := domain.BundleConfig{
+		Credentials:      creds,
 		ProjectOTLPToken: w.ProjectOTLPToken,
 		AllowedModels:    w.ModelsAllowed,
 		Fallback: domain.FallbackConfig{
@@ -182,4 +195,66 @@ func buildCacheRules(wires []cacheRuleWire) []domain.CacheRule {
 		}
 	}
 	return rules
+}
+
+func providerSlotToCredential(p providerSlotWire) domain.Credential {
+	cred := domain.Credential{
+		ID:         p.ID,
+		ProviderID: normalizeProviderType(p.Type),
+	}
+
+	getString := func(key string) string {
+		if v, ok := p.Credentials[key]; ok {
+			if s, ok := v.(string); ok {
+				return s
+			}
+		}
+		return ""
+	}
+
+	switch cred.ProviderID {
+	case domain.ProviderAzure:
+		cred.APIKey = getString("api_key")
+		cred.Extra = map[string]string{
+			"endpoint":    getString("endpoint"),
+			"api_version": getString("api_version"),
+		}
+	case domain.ProviderBedrock:
+		cred.Extra = map[string]string{
+			"access_key":    getString("access_key"),
+			"secret_key":    getString("secret_key"),
+			"session_token": getString("session_token"),
+			"region":        getString("region"),
+		}
+	case domain.ProviderVertex:
+		cred.Extra = map[string]string{
+			"project_id":       getString("project_id"),
+			"project_number":   getString("project_number"),
+			"region":           getString("region"),
+			"auth_credentials": getString("auth_credentials"),
+		}
+	default:
+		cred.APIKey = getString("api_key")
+	}
+
+	return cred
+}
+
+func normalizeProviderType(t string) domain.ProviderID {
+	switch t {
+	case "azure":
+		return domain.ProviderAzure
+	case "bedrock", "aws_bedrock":
+		return domain.ProviderBedrock
+	case "vertex", "vertex_ai", "google_vertex":
+		return domain.ProviderVertex
+	case "gemini", "google_gemini":
+		return domain.ProviderGemini
+	case "anthropic":
+		return domain.ProviderAnthropic
+	case "openai":
+		return domain.ProviderOpenAI
+	default:
+		return domain.ProviderID(t)
+	}
 }

@@ -99,11 +99,12 @@ func PeekStream(body []byte) bool {
 // --- Core dispatch (terminal handlers for the pipeline) ---
 
 func (a *App) coreDispatch(ctx context.Context, call *pipeline.Call) (*domain.Response, error) {
-	resp, events, err := retry.Walk(ctx, retryOpts(call.Bundle), credentialIDs(call.Bundle.Credentials),
+	resp, el, err := retry.Walk(ctx, retryOpts(call.Bundle), credentialIDs(call.Bundle.Credentials),
 		func(ctx context.Context, slotID string) (*domain.Response, error) {
 			return a.providers.Dispatch(ctx, call.Request, findCredential(call.Bundle.Credentials, slotID))
 		}, classifyProviderError)
-	call.Meta.FallbackCount = countFallbacks(events)
+	call.Meta.FallbackCount = countFallbacks(el)
+	el.Release()
 	if err != nil {
 		return nil, err
 	}
@@ -111,11 +112,12 @@ func (a *App) coreDispatch(ctx context.Context, call *pipeline.Call) (*domain.Re
 }
 
 func (a *App) coreDispatchStream(ctx context.Context, call *pipeline.Call) (domain.StreamIterator, error) {
-	iter, events, err := retry.Walk(ctx, retryOpts(call.Bundle), credentialIDs(call.Bundle.Credentials),
+	iter, el, err := retry.Walk(ctx, retryOpts(call.Bundle), credentialIDs(call.Bundle.Credentials),
 		func(ctx context.Context, slotID string) (domain.StreamIterator, error) {
 			return a.providers.DispatchStream(ctx, call.Request, findCredential(call.Bundle.Credentials, slotID))
 		}, classifyProviderError)
-	call.Meta.FallbackCount = countFallbacks(events)
+	call.Meta.FallbackCount = countFallbacks(el)
+	el.Release()
 	if err != nil {
 		return nil, err
 	}
@@ -169,9 +171,9 @@ func classifyProviderError(err error) retry.Reason {
 	}
 }
 
-func countFallbacks(events []retry.Event) int {
+func countFallbacks(el *retry.EventLog) int {
 	n := 0
-	for _, e := range events {
+	for _, e := range el.Events() {
 		if e.Reason == retry.ReasonFallback {
 			n++
 		}

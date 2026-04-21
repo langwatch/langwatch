@@ -124,6 +124,7 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 	// Eagerly fetch config
 	if config, cfgErr := s.configFetcher.FetchConfig(ctx, bundle.VirtualKeyID); cfgErr == nil {
 		bundle.Config = config
+		bundle.Credentials = config.Credentials
 	} else {
 		s.logger.Warn("config_fetch_failed", zap.String("vk_id", bundle.VirtualKeyID), zap.Error(cfgErr))
 	}

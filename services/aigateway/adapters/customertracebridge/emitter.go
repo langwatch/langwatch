@@ -64,12 +64,15 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 	}
 
 	// Empty resource — customers see instrumentation scope only.
+	// AlwaysSample: the gateway never drops customer spans regardless of
+	// the gateway's own sample ratio setting.
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithResource(resource.Empty()),
 		sdktrace.WithBatcher(router,
 			sdktrace.WithBatchTimeout(batchTimeout),
 			sdktrace.WithMaxQueueSize(queueSize),
 		),
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 
 	return &Emitter{

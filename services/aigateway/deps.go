@@ -10,6 +10,8 @@ import (
 	"github.com/oklog/ulid/v2"
 	"go.uber.org/zap"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/health"
@@ -59,6 +61,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		NodeID:        nodeID,
 		TraceEndpoint: cfg.OTel.GatewayEndpoint,
 		TraceHeaders:  tokenHeaders(cfg.OTel.GatewayAuthToken),
+		SampleRatio:   cfg.OTel.SampleRatio,
 	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("otel init: %w", err)
@@ -82,12 +85,29 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		jwtverify.WithIssuer("langwatch-control-plane"),
 		jwtverify.WithAudience("langwatch-gateway"),
 	)
+	svcInfo := contexts.MustGetServiceInfo(ctx)
+	userAgent := fmt.Sprintf("langwatch-%s/%s", svcInfo.Service, svcInfo.Version)
+
 	cpClient := controlplane.NewClient(controlplane.ClientOptions{
-		BaseURL:    cfg.ControlPlane.BaseURL,
-		Sign:       signer.Sign,
-		Verifier:   verifier,
-		HTTPClient: &http.Client{Timeout: 10 * time.Second},
-		Logger:     logger,
+		BaseURL:   cfg.ControlPlane.BaseURL,
+		Sign:      signer.Sign,
+		Verifier:  verifier,
+		UserAgent: userAgent,
+		// Custom transport: OTel instrumentation wraps the pooled inner
+		// transport so every control-plane RPC gets a span automatically.
+		// The inner transport keeps connections warm to avoid TCP/TLS
+		// handshake cost on auth-miss bursts.
+		HTTPClient: &http.Client{
+			Timeout: 10 * time.Second,
+			Transport: otelhttp.NewTransport(&http.Transport{
+				MaxIdleConnsPerHost: 100,
+				IdleConnTimeout:     90 * time.Second,
+				ForceAttemptHTTP2:   true,
+			}, otelhttp.WithSpanNameFormatter(func(_ string, r *http.Request) string {
+				return "controlplane " + r.Method + " " + r.URL.Path
+			})),
+		},
+		Logger: logger,
 	})
 
 	authSvc, err := authresolver.New(authresolver.Options{

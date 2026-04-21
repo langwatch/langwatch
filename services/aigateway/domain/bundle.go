@@ -20,6 +20,10 @@ type Bundle struct {
 
 // BundleConfig holds the policy knobs configured per virtual key.
 type BundleConfig struct {
+	// Credentials is the ordered fallback chain of provider credentials.
+	// Populated from the config endpoint so they travel with policy config.
+	Credentials []Credential
+
 	// ModelAliases maps friendly names to canonical provider/model pairs.
 	ModelAliases map[string]ModelAlias
 

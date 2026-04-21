@@ -222,6 +222,16 @@ func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
 
 // --- SSE streaming ---
 
+// Pre-allocated SSE framing bytes — three w.Write calls instead of one
+// fmt.Fprintf avoids allocating a format buffer per chunk.
+var (
+	sseDataPrefix  = []byte("data: ")
+	sseDoubleNL    = []byte("\n\n")
+	sseErrorPrefix = []byte("event: error\ndata: ")
+	sseWarnPrefix  = []byte("event: warning\ndata: ")
+	sseDone        = []byte("data: [DONE]\n\n")
+)
+
 func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIterator) {
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -232,28 +242,32 @@ func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIter
 
 	for iter.Next(ctx) {
 		chunk := iter.Chunk()
-		_, _ = fmt.Fprintf(w, "data: %s\n\n", chunk)
+		_, _ = w.Write(sseDataPrefix)
+		_, _ = w.Write(chunk)
+		_, _ = w.Write(sseDoubleNL)
 		if flusher != nil {
 			flusher.Flush()
 		}
 	}
 
 	if err := iter.Err(); err != nil {
-		// Terminal SSE error event — client knows stream ended due to error
 		errJSON, _ := json.Marshal(map[string]string{"error": err.Error()})
-		_, _ = fmt.Fprintf(w, "event: error\ndata: %s\n\n", errJSON)
+		_, _ = w.Write(sseErrorPrefix)
+		_, _ = w.Write(errJSON)
+		_, _ = w.Write(sseDoubleNL)
 		if flusher != nil {
 			flusher.Flush()
 		}
 	}
 
-	// Emit usage warning as an SSE event (headers cannot be set after WriteHeader).
 	if iter.Usage().TotalTokens == 0 {
 		warnJSON, _ := json.Marshal(map[string]string{"warning": "provider_did_not_report_usage_on_stream"})
-		_, _ = fmt.Fprintf(w, "event: warning\ndata: %s\n\n", warnJSON)
+		_, _ = w.Write(sseWarnPrefix)
+		_, _ = w.Write(warnJSON)
+		_, _ = w.Write(sseDoubleNL)
 	}
 
-	_, _ = fmt.Fprint(w, "data: [DONE]\n\n")
+	_, _ = w.Write(sseDone)
 	if flusher != nil {
 		flusher.Flush()
 	}
