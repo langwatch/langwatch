@@ -27,7 +27,6 @@ async function ignoreUniqueViolation<T>(promise: Promise<T>): Promise<T | null> 
 }
 
 export async function getTestUser() {
-  // Upsert everything: concurrent test files in the same shard race on findUnique + create.
   const user = await prisma.user.upsert({
     where: { email: "test-user@example.com" },
     update: {},
@@ -71,9 +70,6 @@ export async function getTestUser() {
     },
   });
 
-  // Use create + swallow P2002 for composite-unique memberships: Prisma upsert
-  // isn't atomic, so concurrent callers can still race on userId_teamId /
-  // userId_organizationId. Ignoring only the unique-violation preserves real errors.
   await ignoreUniqueViolation(
     prisma.teamUser.create({
       data: {
