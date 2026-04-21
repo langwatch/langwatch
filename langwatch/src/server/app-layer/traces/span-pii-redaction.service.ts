@@ -460,7 +460,8 @@ export class OtlpSpanPiiRedactionService {
     for (const attr of attributes) {
       if (
         attr.value.stringValue !== undefined &&
-        attr.value.stringValue !== null
+        attr.value.stringValue !== null &&
+        attr.value.stringValue.length > 0
       ) {
         if (
           totalLength + attr.value.stringValue.length >
