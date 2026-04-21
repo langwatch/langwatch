@@ -28,12 +28,10 @@ export const signUpDataSchema = z.object({
 });
 
 // Compile-time guard: if Attribution gains a field not in signUpDataSchema,
-// `_MissingFields` resolves to the missing key(s) and the assignment fails.
-type _MissingFields = Exclude<
-  keyof Attribution,
-  keyof z.infer<typeof signUpDataSchema>
->;
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _assertAttributionCovered: _MissingFields extends never
+// this type resolves to the missing key(s) instead of `true` and the
+// conditional type in the interface below produces a type error.
+type _AssertAttributionCovered = [
+  Exclude<keyof Attribution, keyof z.infer<typeof signUpDataSchema>>,
+] extends [never]
   ? true
-  : _MissingFields = true;
+  : { error: "Attribution has fields missing from signUpDataSchema" };
