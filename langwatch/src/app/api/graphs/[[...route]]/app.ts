@@ -11,6 +11,7 @@ import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
   authMiddleware,
+  resourceLimitMiddleware,
 } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
@@ -158,6 +159,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Graph ───────────────────────────────────────────
   .post(
     "/",
+    resourceLimitMiddleware("customGraphs"),
     describeRoute({
       description: "Create a custom graph on a dashboard",
       responses: {

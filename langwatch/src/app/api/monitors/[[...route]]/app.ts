@@ -10,6 +10,7 @@ import {
   type AuthMiddlewareVariables,
   authMiddleware,
   handleError,
+  resourceLimitMiddleware,
 } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
 import { tracerMiddleware } from "../../middleware/tracer";
@@ -206,6 +207,7 @@ export const app = new Hono<{ Variables: Variables }>()
   // ── Create Monitor ──────────────────────────────────────────
   .post(
     "/",
+    resourceLimitMiddleware("onlineEvaluations"),
     describeRoute({
       description: "Create a new online evaluation monitor",
       responses: {
