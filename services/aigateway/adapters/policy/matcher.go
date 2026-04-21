@@ -4,10 +4,11 @@ package policy
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
 	"sync"
+
+	"github.com/bytedance/sonic"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
@@ -136,7 +137,7 @@ func extractToolNames(body []byte) []string {
 			} `json:"function"`
 		} `json:"tools"`
 	}
-	if err := json.Unmarshal(body, &env); err != nil {
+	if err := sonic.Unmarshal(body, &env); err != nil {
 		return nil
 	}
 	out := make([]string, 0, len(env.Tools))
@@ -158,7 +159,7 @@ func extractMCPNames(body []byte) []string {
 		MCPs       []mcpEntry `json:"mcps"`
 		MCPServers []mcpEntry `json:"mcp_servers"`
 	}
-	if err := json.Unmarshal(body, &env); err != nil {
+	if err := sonic.Unmarshal(body, &env); err != nil {
 		return nil
 	}
 	all := append(append([]mcpEntry{}, env.MCP...), env.MCPs...)
@@ -184,10 +185,10 @@ type mcpEntry struct {
 
 func (m *mcpEntry) UnmarshalJSON(b []byte) error {
 	if len(b) > 0 && b[0] == '"' {
-		return json.Unmarshal(b, &m.Raw)
+		return sonic.Unmarshal(b, &m.Raw)
 	}
 	type alias mcpEntry
-	return json.Unmarshal(b, (*alias)(m))
+	return sonic.Unmarshal(b, (*alias)(m))
 }
 
 // extractURLs scans the body for http:// and https:// URLs regardless of position.

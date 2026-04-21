@@ -2,9 +2,11 @@ package app
 
 import (
 	"context"
-	"encoding/json"
+
+	"github.com/tidwall/gjson"
 
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/pkg/httpmiddleware"
 	"github.com/langwatch/langwatch/pkg/ksuid"
 	"github.com/langwatch/langwatch/pkg/retry"
 	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
@@ -89,11 +91,7 @@ func (a *App) HandleEmbeddings(ctx context.Context, bundle *domain.Bundle, body 
 // PeekStream checks the "stream" field in a JSON request body.
 // Exported for use by the transport layer.
 func PeekStream(body []byte) bool {
-	var peek struct {
-		Stream bool `json:"stream"`
-	}
-	_ = json.Unmarshal(body, &peek)
-	return peek.Stream
+	return gjson.GetBytes(body, "stream").Bool()
 }
 
 // --- Core dispatch (terminal handlers for the pipeline) ---
@@ -127,10 +125,14 @@ func (a *App) coreDispatchStream(ctx context.Context, call *pipeline.Call) (doma
 // --- Helpers ---
 
 func newCall(ctx context.Context, bundle *domain.Bundle, reqType domain.RequestType, body []byte, streaming bool) *pipeline.Call {
+	id := httpmiddleware.GetRequestID(ctx)
+	if id == "" {
+		id = ksuid.Generate(ctx, ksuid.ResourceGatewayRequest).String()
+	}
 	return &pipeline.Call{
 		Bundle:  bundle,
 		Request: &domain.Request{Type: reqType, Model: peekModel(body), Body: body, Streaming: streaming},
-		Meta:    &pipeline.Meta{GatewayRequestID: ksuid.Generate(ctx, ksuid.ResourceGatewayRequest).String()},
+		Meta:    &pipeline.Meta{GatewayRequestID: id},
 	}
 }
 
@@ -182,9 +184,5 @@ func countFallbacks(el *retry.EventLog) int {
 }
 
 func peekModel(body []byte) string {
-	var peek struct {
-		Model string `json:"model"`
-	}
-	_ = json.Unmarshal(body, &peek)
-	return peek.Model
+	return gjson.GetBytes(body, "model").String()
 }

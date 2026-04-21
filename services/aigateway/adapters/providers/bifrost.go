@@ -6,11 +6,11 @@ package providers
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
+	"github.com/bytedance/sonic"
 	bifrost "github.com/maximhq/bifrost/core"
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"go.uber.org/zap"
@@ -75,7 +75,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		return nil, classifyBifrostError(ctx, berr)
 	}
 
-	body, _ := json.Marshal(resp)
+	body, _ := sonic.Marshal(resp)
 	return &domain.Response{
 		Body:       body,
 		StatusCode: http.StatusOK,
@@ -304,7 +304,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			return false
 		}
 		if chunk.BifrostChatResponse != nil {
-			data, _ := json.Marshal(chunk.BifrostChatResponse)
+			data, _ := sonic.Marshal(chunk.BifrostChatResponse)
 			it.current = data
 			if chunk.BifrostChatResponse.Usage != nil {
 				u := chunk.BifrostChatResponse.Usage

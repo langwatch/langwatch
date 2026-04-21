@@ -2,15 +2,16 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 
+	"github.com/bytedance/sonic"
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
@@ -67,16 +68,27 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 // --- Typed dispatch handlers ---
 
+var (
+	bodyPool = sync.Pool{
+		New: func() any {
+			b := new(bytes.Buffer)
+			b.Grow(32 * 1024)
+			return b
+		},
+	}
+)
+
 func chatHandler(deps RouterDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bundle, ok := requireBundle(w, r, deps.Logger)
 		if !ok {
 			return
 		}
-		body, ok := readBody(w, r)
+		body, release, ok := readBody(w, r)
 		if !ok {
 			return
 		}
+		defer release()
 
 		if app.PeekStream(body) {
 			result, err := deps.App.HandleChatStream(r.Context(), bundle, body)
@@ -104,10 +116,11 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		body, ok := readBody(w, r)
+		body, release, ok := readBody(w, r)
 		if !ok {
 			return
 		}
+		defer release()
 
 		if app.PeekStream(body) {
 			result, err := deps.App.HandleMessagesStream(r.Context(), bundle, body)
@@ -135,10 +148,11 @@ func embeddingsHandler(deps RouterDeps) http.HandlerFunc {
 		if !ok {
 			return
 		}
-		body, ok := readBody(w, r)
+		body, release, ok := readBody(w, r)
 		if !ok {
 			return
 		}
+		defer release()
 
 		result, err := deps.App.HandleEmbeddings(r.Context(), bundle, body)
 		if err != nil {
@@ -164,7 +178,7 @@ func modelsHandler(deps RouterDeps) http.HandlerFunc {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{
+		_ = sonic.ConfigDefault.NewEncoder(w).Encode(map[string]any{
 			"object": "list",
 			"data":   models,
 		})
@@ -183,13 +197,23 @@ func requireBundle(w http.ResponseWriter, r *http.Request, logger *zap.Logger) (
 	return bundle, true
 }
 
-func readBody(w http.ResponseWriter, r *http.Request) ([]byte, bool) {
-	body, err := io.ReadAll(r.Body)
+func readBody(w http.ResponseWriter, r *http.Request) ([]byte, func(), bool) {
+	buf := bodyPool.Get().(*bytes.Buffer)
+	_, err := buf.ReadFrom(r.Body)
 	if err != nil {
+		buf.Reset()
+		bodyPool.Put(buf)
 		herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{"message": "failed to read request body"}))
-		return nil, false
+		return nil, func() {}, false
 	}
-	return body, true
+
+	body := buf.Bytes()
+	release := func() {
+		buf.Reset()
+		bodyPool.Put(buf)
+	}
+
+	return body, release, true
 }
 
 // --- Response writers ---
@@ -203,20 +227,21 @@ func writeJSONResponse(w http.ResponseWriter, resp *domain.Response) {
 }
 
 func setMetaHeaders(w http.ResponseWriter, meta app.DispatchMeta) {
+	h := w.Header()
 	if meta.GatewayRequestID != "" {
-		w.Header().Set("X-LangWatch-Gateway-Request-Id", meta.GatewayRequestID)
+		h.Add("X-LangWatch-Gateway-Request-Id", meta.GatewayRequestID)
 	}
 	if meta.FallbackCount > 0 {
-		w.Header().Set("X-LangWatch-Fallback-Count", strconv.Itoa(meta.FallbackCount))
+		h.Add("X-LangWatch-Fallback-Count", strconv.Itoa(meta.FallbackCount))
 	}
 	if len(meta.BudgetWarnings) > 0 {
-		w.Header().Set("X-LangWatch-Budget-Warning", strings.Join(meta.BudgetWarnings, ","))
+		h.Add("X-LangWatch-Budget-Warning", strings.Join(meta.BudgetWarnings, ","))
 	}
 	if meta.CacheMode != "" {
-		w.Header().Set("X-LangWatch-Cache-Mode", meta.CacheMode)
+		h.Add("X-LangWatch-Cache-Mode", meta.CacheMode)
 	}
 	if meta.CustomerTraceparent != "" {
-		w.Header().Set("Traceparent", meta.CustomerTraceparent)
+		h.Add("Traceparent", meta.CustomerTraceparent)
 	}
 }
 
@@ -251,7 +276,7 @@ func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIter
 	}
 
 	if err := iter.Err(); err != nil {
-		errJSON, _ := json.Marshal(map[string]string{"error": err.Error()})
+		errJSON, _ := sonic.Marshal(map[string]string{"error": err.Error()})
 		_, _ = w.Write(sseErrorPrefix)
 		_, _ = w.Write(errJSON)
 		_, _ = w.Write(sseDoubleNL)
@@ -261,7 +286,7 @@ func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIter
 	}
 
 	if iter.Usage().TotalTokens == 0 {
-		warnJSON, _ := json.Marshal(map[string]string{"warning": "provider_did_not_report_usage_on_stream"})
+		warnJSON, _ := sonic.Marshal(map[string]string{"warning": "provider_did_not_report_usage_on_stream"})
 		_, _ = w.Write(sseWarnPrefix)
 		_, _ = w.Write(warnJSON)
 		_, _ = w.Write(sseDoubleNL)

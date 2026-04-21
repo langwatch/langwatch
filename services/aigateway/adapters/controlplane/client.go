@@ -53,7 +53,14 @@ type Client struct {
 // NewClient creates a control plane client with the given options.
 func NewClient(opts ClientOptions) *Client {
 	if opts.HTTPClient == nil {
-		opts.HTTPClient = &http.Client{Timeout: 10 * time.Second}
+		opts.HTTPClient = &http.Client{
+			Timeout: 10 * time.Second,
+			Transport: &http.Transport{
+				MaxIdleConnsPerHost: 100,
+				IdleConnTimeout:     90 * time.Second,
+				ForceAttemptHTTP2:   true,
+			},
+		}
 	}
 	if opts.Logger == nil {
 		opts.Logger = zap.NewNop()

@@ -1,7 +1,6 @@
 package controlplane
 
 import (
-	"bytes"
 	"net/http"
 	"testing"
 )
@@ -15,13 +14,11 @@ func BenchmarkSign(b *testing.B) {
 		b.Fatal(err)
 	}
 	body := []byte(`{"key_presented":"lw_vk_live_01HZX0123456789ABCDEFGHIJ","gateway_node_id":"gw-bench"}`)
-	req, _ := http.NewRequest("POST", "http://cp/api/internal/gateway/resolve-key", bytes.NewReader(body))
 
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		req.Header.Del("X-LangWatch-Gateway-Signature")
-		req.Header.Del("X-LangWatch-Gateway-Timestamp")
+		req, _ := http.NewRequest("POST", "http://cp/api/internal/gateway/resolve-key", nil)
 		s.Sign(req, body)
 	}
 }
@@ -33,13 +30,11 @@ func BenchmarkSign_EmptyBody(b *testing.B) {
 	if err != nil {
 		b.Fatal(err)
 	}
-	req, _ := http.NewRequest("GET", "http://cp/api/internal/gateway/config/vk_01", nil)
 
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		req.Header.Del("X-LangWatch-Gateway-Signature")
-		req.Header.Del("X-LangWatch-Gateway-Timestamp")
+		req, _ := http.NewRequest("GET", "http://cp/api/internal/gateway/config/vk_01", nil)
 		s.Sign(req, nil)
 	}
 }

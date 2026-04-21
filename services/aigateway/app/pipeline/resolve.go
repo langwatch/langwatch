@@ -2,7 +2,8 @@ package pipeline
 
 import (
 	"context"
-	"encoding/json"
+
+	"github.com/bytedance/sonic"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -27,13 +28,12 @@ func ModelResolve(resolve ResolveModelFunc) Interceptor {
 }
 
 func rewriteModel(body []byte, model string) []byte {
-	var obj map[string]json.RawMessage
-	if err := json.Unmarshal(body, &obj); err != nil {
+	var obj map[string]any
+	if err := sonic.Unmarshal(body, &obj); err != nil {
 		return body
 	}
-	raw, _ := json.Marshal(model)
-	obj["model"] = raw
-	out, err := json.Marshal(obj)
+	obj["model"] = model
+	out, err := sonic.Marshal(obj)
 	if err != nil {
 		return body
 	}

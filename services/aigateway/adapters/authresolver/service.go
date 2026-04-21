@@ -34,7 +34,7 @@ type ConfigFetcher interface {
 
 // Service is the three-tier auth resolver.
 type Service struct {
-	l1            *lru.Cache[string, *entry]
+	l1            *lru.Cache[[64]byte, *entry]
 	l2            L2Store
 	resolver      KeyResolver
 	configFetcher ConfigFetcher
@@ -74,7 +74,7 @@ func New(opts Options) (*Service, error) {
 		opts.RefreshThreshold = 5 * time.Minute
 	}
 
-	l1, err := lru.New[string, *entry](opts.LRUSize)
+	l1, err := lru.New[[64]byte, *entry](opts.LRUSize)
 	if err != nil {
 		return nil, err
 	}
@@ -109,7 +109,8 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 
 	// L2: optional store
 	if s.l2 != nil {
-		if bundle, err := s.l2.Get(ctx, h); err == nil && bundle != nil {
+		hStr := string(h[:])
+		if bundle, err := s.l2.Get(ctx, hStr); err == nil && bundle != nil {
 			s.storeL1(h, bundle)
 			return bundle, nil
 		}
@@ -131,7 +132,7 @@ func (s *Service) Resolve(ctx context.Context, rawKey string) (*domain.Bundle, e
 
 	s.storeL1(h, bundle)
 	if s.l2 != nil {
-		s.l2.Set(ctx, h, bundle)
+		s.l2.Set(ctx, string(h[:]), bundle)
 	}
 
 	return bundle, nil
@@ -160,7 +161,7 @@ func (s *Service) Stop() {
 
 // --- Internal ---
 
-func (s *Service) storeL1(h string, bundle *domain.Bundle) {
+func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle) {
 	s.l1.Add(h, &entry{bundle: bundle, expiresAt: bundle.ExpiresAt})
 }
 
@@ -190,7 +191,9 @@ func (s *Service) loop(ctx context.Context) {
 	}
 }
 
-func hashKey(raw string) string {
+func hashKey(raw string) [64]byte {
 	sum := sha256.Sum256([]byte(raw))
-	return hex.EncodeToString(sum[:])
+	var dst [64]byte
+	hex.Encode(dst[:], sum[:])
+	return dst
 }
