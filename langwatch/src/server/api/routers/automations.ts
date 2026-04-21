@@ -2,6 +2,7 @@ import { AlertType, TriggerAction } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
+import { getApp } from "~/server/app-layer/app";
 import { enforceLicenseLimit } from "../../license-enforcement";
 import {
   sanitizeTriggerFilters,
@@ -101,7 +102,7 @@ export const automationRouter = createTRPCRouter({
         }
       }
 
-      return ctx.prisma.trigger.create({
+      const trigger = await ctx.prisma.trigger.create({
         data: {
           id: nanoid(),
           name: input.name,
@@ -112,6 +113,10 @@ export const automationRouter = createTRPCRouter({
           lastRunAt: new Date().getTime(),
         },
       });
+
+      getApp().triggers.invalidate(input.projectId);
+
+      return trigger;
     }),
   deleteById: protectedProcedure
     .input(z.object({ projectId: z.string(), triggerId: z.string() }))
@@ -127,6 +132,8 @@ export const automationRouter = createTRPCRouter({
           active: false,
         },
       });
+
+      getApp().triggers.invalidate(input.projectId);
 
       return { success: true };
     }),
@@ -145,7 +152,7 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.trigger.update({
+      const trigger = await ctx.prisma.trigger.update({
         where: { id: input.triggerId, projectId: input.projectId },
         data: {
           message: input.message,
@@ -153,6 +160,10 @@ export const automationRouter = createTRPCRouter({
           name: input.name,
         },
       });
+
+      getApp().triggers.invalidate(input.projectId);
+
+      return trigger;
     }),
   getTriggers: protectedProcedure
     .input(z.object({ projectId: z.string() }))
@@ -222,7 +233,7 @@ export const automationRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
-      return ctx.prisma.trigger.update({
+      const trigger = await ctx.prisma.trigger.update({
         where: {
           id: input.triggerId,
           projectId: input.projectId,
@@ -231,6 +242,10 @@ export const automationRouter = createTRPCRouter({
           active: input.active,
         },
       });
+
+      getApp().triggers.invalidate(input.projectId);
+
+      return trigger;
     }),
   getTriggerById: protectedProcedure
     .input(z.object({ triggerId: z.string(), projectId: z.string() }))
@@ -262,11 +277,15 @@ export const automationRouter = createTRPCRouter({
         });
       }
 
-      return ctx.prisma.trigger.update({
+      const trigger = await ctx.prisma.trigger.update({
         where: { id: input.triggerId, projectId: input.projectId },
         data: {
           filters: JSON.stringify(sanitized),
         },
       });
+
+      getApp().triggers.invalidate(input.projectId);
+
+      return trigger;
     }),
 });

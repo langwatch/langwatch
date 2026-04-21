@@ -30,6 +30,7 @@ import type { ReplayService } from "./ops/replay.service";
 import type { OpsMetricsCollector } from "./ops/metrics-collector";
 import type { UsageService } from "./usage/usage.service";
 import type { ExperimentService } from "../experiments/experiment.service";
+import type { TriggerService } from "./triggers/trigger.service";
 
 export interface OpsDependencies {
   queues: QueueService;
@@ -66,6 +67,7 @@ export interface AppDependencies {
     runs: SuiteRunService;
   };
   experiments: ExperimentService;
+  triggers: TriggerService;
   organizations: OrganizationService;
   projects: ProjectService;
   tokenizer: TokenizerService;

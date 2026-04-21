@@ -7,6 +7,7 @@ import { z } from "zod";
 import { badRequestSchema } from "~/app/api/shared/schemas";
 import { prisma } from "~/server/db";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { getApp } from "~/server/app-layer/app";
 import { createLogger } from "~/utils/logger/server";
 import {
   type AuthMiddlewareVariables,
@@ -222,6 +223,8 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       });
 
+      getApp().triggers.invalidate(project.id);
+
       return c.json({
         ...toTriggerResponse(trigger),
         platformUrl: platformUrl({
@@ -283,6 +286,8 @@ export const app = new Hono<{ Variables: Variables }>()
         data,
       });
 
+      getApp().triggers.invalidate(project.id);
+
       return c.json({
         ...toTriggerResponse(updated),
         platformUrl: platformUrl({
@@ -333,6 +338,8 @@ export const app = new Hono<{ Variables: Variables }>()
         where: { id, projectId: project.id },
         data: { deleted: true, active: false },
       });
+
+      getApp().triggers.invalidate(project.id);
 
       return c.json({ id, deleted: true });
     },

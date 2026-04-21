@@ -1,3 +1,4 @@
+import type { PrismaClient } from "@prisma/client";
 import type { Redis, Cluster } from "ioredis";
 import { createLogger } from "~/utils/logger/server";
 import { queryBillableEventsTotal } from "../../../ee/billing/services/billableEventsQuery";
@@ -13,6 +14,7 @@ import type { EvaluationExecutionService } from "../app-layer/evaluations/evalua
 import type { EvaluationRunService } from "../app-layer/evaluations/evaluation-run.service";
 import type { MonitorService } from "../app-layer/monitors/monitor.service";
 import type { ProjectService } from "../app-layer/projects/project.service";
+import type { TriggerService } from "../app-layer/triggers/trigger.service";
 import type { LogRecordStorageRepository } from "../app-layer/traces/repositories/log-record-storage.repository";
 import type { MetricRecordStorageRepository } from "../app-layer/traces/repositories/metric-record-storage.repository";
 import type { TraceSummaryRepository } from "../app-layer/traces/repositories/trace-summary.repository";
@@ -76,6 +78,7 @@ import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanSt
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createProjectMetadataReactor } from "./pipelines/trace-processing/reactors/projectMetadata.reactor";
+import { createAlertTriggerReactor } from "./pipelines/trace-processing/reactors/alertTrigger.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import {
   createOriginGateReactor,
@@ -155,6 +158,8 @@ export interface PipelineRegistryDeps {
   broadcast: BroadcastService;
   projects: ProjectService;
   monitors: MonitorService;
+  triggers: TriggerService;
+  prisma: PrismaClient;
   traces: {
     summary: TraceSummaryService;
     spans: SpanStorageService;
@@ -266,6 +271,11 @@ export class PipelineRegistry {
       evaluation: evalCommands.executeEvaluation,
     });
 
+    const alertTriggerReactor = createAlertTriggerReactor({
+      triggers: this.deps.triggers,
+      prisma: this.deps.prisma,
+    });
+
     const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({
       reportEvaluation: evalCommands.reportEvaluation,
     });
@@ -323,6 +333,7 @@ export class PipelineRegistry {
         traceSummaryStore,
         originGateReactor,
         evaluationTriggerReactor,
+        alertTriggerReactor,
         customEvaluationSyncReactor,
         traceUpdateBroadcastReactor,
         projectMetadataReactor,
