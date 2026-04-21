@@ -717,6 +717,32 @@ describe("afterSessionCreate", () => {
 
       expect(userUpdate).not.toHaveBeenCalled();
     });
+
+    it("does NOT fire nurturing hooks", async () => {
+      const fireActivityTrackingNurturing = vi.fn();
+      const ensureUserSyncedToCio = vi.fn();
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            _count: { orgMemberships: 1 },
+          }),
+          update: vi.fn(),
+        },
+      });
+
+      await afterSessionCreate({
+        prisma,
+        userId: "user_target",
+        isImpersonationSession: true,
+        fireActivityTrackingNurturing,
+        ensureUserSyncedToCio,
+      });
+
+      await new Promise((r) => setImmediate(r));
+
+      expect(fireActivityTrackingNurturing).not.toHaveBeenCalled();
+      expect(ensureUserSyncedToCio).not.toHaveBeenCalled();
+    });
   });
 
   describe("when the lastLoginAt update fails", () => {

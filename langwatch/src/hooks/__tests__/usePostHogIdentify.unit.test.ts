@@ -4,10 +4,12 @@
  * Unit tests for usePostHogIdentify hook.
  *
  * Verifies:
- * - Calls posthog.identify with userId and email
+ * - Calls posthog.identify with userId, email, and is_admin
  * - Calls posthog.group with organization data
  * - Calls posthog.reset on logout (userId disappears)
  * - Tracks upgrade_modal_shown via Zustand subscribe
+ * - Skips identify and group during impersonation
+ * - Sets is_admin person property based on isAdmin prop
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
@@ -30,6 +32,14 @@ vi.mock("posthog-js", () => ({
   },
 }));
 
+const { mockSetImpersonationState } = vi.hoisted(() => ({
+  mockSetImpersonationState: vi.fn(),
+}));
+
+vi.mock("../usePostHog", () => ({
+  setPostHogImpersonationState: mockSetImpersonationState,
+}));
+
 import { useUpgradeModalStore } from "../../stores/upgradeModalStore";
 import { usePostHogIdentify } from "../usePostHogIdentify";
 
@@ -44,7 +54,7 @@ describe("usePostHogIdentify", () => {
   });
 
   describe("when session has a user", () => {
-    it("identifies user with userId and email", () => {
+    it("identifies user with userId, email, and is_admin false", () => {
       renderHook(() =>
         usePostHogIdentify({
           session: { user: { id: "user-1", email: "test@example.com" } },
@@ -55,6 +65,7 @@ describe("usePostHogIdentify", () => {
 
       expect(mockIdentify).toHaveBeenCalledWith("user-1", {
         email: "test@example.com",
+        is_admin: false,
       });
     });
 
@@ -69,6 +80,7 @@ describe("usePostHogIdentify", () => {
 
       expect(mockIdentify).toHaveBeenCalledWith("user-1", {
         email: undefined,
+        is_admin: false,
       });
     });
   });
@@ -93,7 +105,13 @@ describe("usePostHogIdentify", () => {
         ({
           session,
         }: {
-          session: { user: { id: string; email?: string | null } } | null;
+          session: {
+            user: {
+              id: string;
+              email?: string | null;
+              impersonator?: { id: string } | null;
+            };
+          } | null;
         }) =>
           usePostHogIdentify({
             session,
@@ -104,7 +122,13 @@ describe("usePostHogIdentify", () => {
           initialProps: {
             session: {
               user: { id: "user-1", email: "test@example.com" },
-            } as { user: { id: string; email?: string | null } } | null,
+            } as {
+              user: {
+                id: string;
+                email?: string | null;
+                impersonator?: { id: string } | null;
+              };
+            } | null,
           },
         },
       );
@@ -124,7 +148,13 @@ describe("usePostHogIdentify", () => {
         ({
           session,
         }: {
-          session: { user: { id: string; email?: string | null } } | null;
+          session: {
+            user: {
+              id: string;
+              email?: string | null;
+              impersonator?: { id: string } | null;
+            };
+          } | null;
         }) =>
           usePostHogIdentify({
             session,
@@ -135,13 +165,20 @@ describe("usePostHogIdentify", () => {
           initialProps: {
             session: {
               user: { id: "user-1", email: "a@example.com" },
-            } as { user: { id: string; email?: string | null } } | null,
+            } as {
+              user: {
+                id: string;
+                email?: string | null;
+                impersonator?: { id: string } | null;
+              };
+            } | null,
           },
         },
       );
 
       expect(mockIdentify).toHaveBeenCalledWith("user-1", {
         email: "a@example.com",
+        is_admin: false,
       });
 
       // Switch to different user
@@ -152,6 +189,7 @@ describe("usePostHogIdentify", () => {
       expect(mockReset).toHaveBeenCalledTimes(1);
       expect(mockIdentify).toHaveBeenCalledWith("user-2", {
         email: "b@example.com",
+        is_admin: false,
       });
     });
   });
@@ -212,6 +250,111 @@ describe("usePostHogIdentify", () => {
       );
 
       expect(mockGroup).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when session has impersonator set", () => {
+    it("skips posthog.identify", () => {
+      renderHook(() =>
+        usePostHogIdentify({
+          session: {
+            user: {
+              id: "user-1",
+              email: "test@example.com",
+              impersonator: { id: "admin-1" },
+            },
+          },
+          organization: undefined,
+          planType: undefined,
+        }),
+      );
+
+      expect(mockIdentify).not.toHaveBeenCalled();
+    });
+
+    it("skips posthog.group", () => {
+      renderHook(() =>
+        usePostHogIdentify({
+          session: {
+            user: {
+              id: "user-1",
+              email: "test@example.com",
+              impersonator: { id: "admin-1" },
+            },
+          },
+          organization: { id: "org-1", name: "Acme Corp" },
+          planType: "pro",
+        }),
+      );
+
+      expect(mockGroup).not.toHaveBeenCalled();
+    });
+
+    it("sets impersonation state to true", () => {
+      renderHook(() =>
+        usePostHogIdentify({
+          session: {
+            user: {
+              id: "user-1",
+              impersonator: { id: "admin-1" },
+            },
+          },
+          organization: undefined,
+          planType: undefined,
+        }),
+      );
+
+      expect(mockSetImpersonationState).toHaveBeenCalledWith(true);
+    });
+  });
+
+  describe("when session has no impersonator", () => {
+    it("sets impersonation state to false", () => {
+      renderHook(() =>
+        usePostHogIdentify({
+          session: { user: { id: "user-1" } },
+          organization: undefined,
+          planType: undefined,
+        }),
+      );
+
+      expect(mockSetImpersonationState).toHaveBeenCalledWith(false);
+    });
+  });
+
+  describe("when isAdmin is true", () => {
+    it("includes is_admin true in person properties", () => {
+      renderHook(() =>
+        usePostHogIdentify({
+          session: { user: { id: "user-1", email: "admin@example.com" } },
+          organization: undefined,
+          planType: undefined,
+          isAdmin: true,
+        }),
+      );
+
+      expect(mockIdentify).toHaveBeenCalledWith("user-1", {
+        email: "admin@example.com",
+        is_admin: true,
+      });
+    });
+  });
+
+  describe("when isAdmin is false", () => {
+    it("includes is_admin false in person properties", () => {
+      renderHook(() =>
+        usePostHogIdentify({
+          session: { user: { id: "user-1", email: "user@example.com" } },
+          organization: undefined,
+          planType: undefined,
+          isAdmin: false,
+        }),
+      );
+
+      expect(mockIdentify).toHaveBeenCalledWith("user-1", {
+        email: "user@example.com",
+        is_admin: false,
+      });
     });
   });
 

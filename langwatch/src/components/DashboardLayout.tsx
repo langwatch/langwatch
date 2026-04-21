@@ -325,6 +325,7 @@ export const DashboardLayout = ({
     session: session ?? null,
     organization,
     planType: usage.data?.activePlan?.type,
+    isAdmin: publicEnv.data?.IS_ADMIN,
   });
 
   if (typeof router.query.project === "string" && !isLoading && !project) {

@@ -55,6 +55,7 @@ export function SignedInExtraFooterComponents() {
   useEffect(() => {
     if (!session.data?.user?.email || !organization?.name || hasTracked.current)
       return;
+    if (session.data.user.impersonator) return;
 
     const reo = (window as any).Reo;
     if (!reo?.identify) return;

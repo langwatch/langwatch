@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { env } from "../../../env.mjs";
+import { isAdmin } from "~/../ee/admin/isAdmin";
 import { skipPermissionCheck } from "../rbac";
 import { publicProcedure } from "../trpc";
 
@@ -29,6 +30,7 @@ export const publicEnvRouter = publicProcedure
         !!env.SENDGRID_API_KEY || !!(env.USE_AWS_SES && env.AWS_REGION),
       IS_SAAS: env.IS_SAAS,
       SHOW_OPS_IN_MAIN_SIDEBAR: isOpsSidebarEmail(ctx.session?.user?.email),
+      IS_ADMIN: isAdmin({ email: ctx.session?.user?.email }),
       POSTHOG_KEY: env.POSTHOG_KEY,
       POSTHOG_HOST: env.POSTHOG_HOST,
       HAS_LANGWATCH_NLP_SERVICE:
