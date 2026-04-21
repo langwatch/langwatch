@@ -113,6 +113,37 @@ describe("useRunScenario()", () => {
       });
     });
 
+    it("exposes the settings link via the toaster action slot", async () => {
+      const { result } = renderHook(() =>
+        useRunScenario({
+          projectId: "project-123",
+          projectSlug: "my-project",
+        })
+      );
+
+      await result.current.runScenario({
+        scenarioId: "scenario-123",
+        target: { type: "prompt", id: "prompt-123" },
+      });
+
+      await waitFor(() => {
+        expect(mockToasterCreate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            title: "No model provider configured",
+            action: expect.objectContaining({
+              label: "Configure model providers",
+            }),
+          })
+        );
+      });
+
+      // The toast must NOT pass JSX/anchor as its description
+      const toastCall = mockToasterCreate.mock.calls[0]![0] as {
+        description?: unknown;
+      };
+      expect(typeof toastCall.description).toBe("string");
+    });
+
     it("does not call run mutation", async () => {
       const { result } = renderHook(() =>
         useRunScenario({
