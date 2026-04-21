@@ -4,12 +4,15 @@ import type { NormalizedSpan } from "../../schemas/spans";
 type TraceEvent = NonNullable<TraceSummaryData["events"]>[number];
 
 /**
- * Hoists all span events into the trace summary.
+ * Extracts LangWatch SDK events from span attributes and appends to accumulated events.
  *
- * Every OTel span can carry zero or more events (e.g. exceptions, user
- * feedback, checkpoints). This function appends them all to the
- * accumulated events array so they're available at the trace level
- * without needing to re-read individual spans.
+ * Events are stored as flat span attributes with the `event.` prefix:
+ *   - `event.type` → event name
+ *   - `event.metrics.*` → numeric metrics
+ *   - `event.details.*` → string details
+ *
+ * All `event.*` attributes are preserved in the event's attributes map
+ * for downstream consumers (filter matching, Slack notifications, etc.).
  */
 export function accumulateEvents({
   state,
@@ -18,25 +21,25 @@ export function accumulateEvents({
   state: TraceSummaryData;
   span: NormalizedSpan;
 }): TraceSummaryData["events"] {
-  if (span.events.length === 0) {
+  const eventType = span.spanAttributes["event.type"];
+  if (typeof eventType !== "string" || !eventType) {
     return state.events;
   }
 
-  const newEvents: TraceEvent[] = span.events.map((e) => {
-    const attrs: Record<string, string> = {};
-    for (const [key, value] of Object.entries(e.attributes)) {
-      if (value != null) {
-        attrs[key] = String(value);
-      }
+  const attrs: Record<string, string> = {};
+  for (const [key, value] of Object.entries(span.spanAttributes)) {
+    if (!key.startsWith("event.")) continue;
+    if (value != null) {
+      attrs[key] = String(value);
     }
+  }
 
-    return {
-      spanId: span.spanId,
-      timestamp: e.timeUnixMs,
-      name: e.name,
-      attributes: attrs,
-    };
-  });
+  const event: TraceEvent = {
+    spanId: span.spanId,
+    timestamp: span.startTimeUnixMs,
+    name: eventType,
+    attributes: attrs,
+  };
 
-  return [...(state.events ?? []), ...newEvents];
+  return [...(state.events ?? []), event];
 }

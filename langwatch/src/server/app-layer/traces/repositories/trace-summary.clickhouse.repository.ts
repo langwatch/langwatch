@@ -30,6 +30,10 @@ interface ClickHouseSummaryRecord extends TraceSummaryFieldsBase {
   Version: string;
   Attributes: Record<string, string>;
   HasAnnotation: number | null;
+  ScenarioRoleCosts: Record<string, number>;
+  ScenarioRoleLatencies: Record<string, number>;
+  ScenarioRoleSpans: Record<string, string>;
+  SpanCosts: Record<string, number>;
   "Events.SpanId": string[];
   "Events.Timestamp": string[];
   "Events.Name": string[];
@@ -149,18 +153,64 @@ export class TraceSummaryClickHouseRepository
     const hasHint = options?.occurredAtMs !== undefined;
 
     try {
-      if (hasHint) {
-        const hinted = await this.queryByTraceId(tenantId, traceId, {
-          fromMs: options!.occurredAtMs! - PARTITION_WINDOW_MS,
-          toMs: options!.occurredAtMs! + PARTITION_WINDOW_MS,
-        });
-        if (hinted) return hinted;
-        logger.debug(
-          { tenantId, traceId, occurredAtMs: options!.occurredAtMs },
-          "Trace summary not found in hint window — retrying without partition prune",
-        );
-      }
-      return await this.queryByTraceId(tenantId, traceId);
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
+        query: `
+          SELECT
+            ProjectionId,
+            TenantId,
+            TraceId,
+            Version,
+            Attributes,
+            toUnixTimestamp64Milli(OccurredAt) AS OccurredAt,
+            toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
+            ComputedIOSchemaVersion,
+            ComputedInput,
+            ComputedOutput,
+            TimeToFirstTokenMs,
+            TimeToLastTokenMs,
+            TotalDurationMs,
+            TokensPerSecond,
+            SpanCount,
+            ContainsErrorStatus,
+            ContainsOKStatus,
+            ErrorMessage,
+            Models,
+            TotalCost,
+            TokensEstimated,
+            TotalPromptTokenCount,
+            TotalCompletionTokenCount,
+            OutputFromRootSpan,
+            OutputSpanEndTimeMs,
+            BlockedByGuardrail,
+            TopicId,
+            SubTopicId,
+            AnnotationIds,
+            HasAnnotation,
+            ScenarioRoleCosts,
+            ScenarioRoleLatencies,
+            ScenarioRoleSpans,
+            SpanCosts,
+            \`Events.SpanId\`,
+            \`Events.Timestamp\`,
+            \`Events.Name\`,
+            \`Events.Attributes\`
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+          ORDER BY UpdatedAt DESC
+          LIMIT 1
+        `,
+        query_params: { tenantId, traceId },
+        format: "JSONEachRow",
+      });
+
+      const rows = await result.json<ClickHouseSummaryRecord>();
+      const row = rows[0];
+      if (!row) return null;
+
+      return this.fromClickHouseRecord(row);
     } catch (error) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);

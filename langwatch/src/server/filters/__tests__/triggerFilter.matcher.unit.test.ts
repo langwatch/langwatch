@@ -655,4 +655,58 @@ describe("buildPreconditionTraceDataFromFoldState", () => {
     expect(result.customMetadata).toEqual({ custom_field: "custom_value" });
     expect(result.annotationIds).toEqual(["ann-1"]);
   });
+
+  it("extracts events from hoisted fold state events", () => {
+    const foldState = {
+      traceId: "trace-1",
+      spanCount: 1,
+      totalDurationMs: 100,
+      computedIOSchemaVersion: "1",
+      computedInput: null,
+      computedOutput: null,
+      timeToFirstTokenMs: null,
+      timeToLastTokenMs: null,
+      tokensPerSecond: null,
+      containsErrorStatus: false,
+      containsOKStatus: true,
+      errorMessage: null,
+      models: [],
+      totalCost: null,
+      tokensEstimated: false,
+      totalPromptTokenCount: null,
+      totalCompletionTokenCount: null,
+      outputFromRootSpan: false,
+      outputSpanEndTimeMs: 0,
+      blockedByGuardrail: false,
+      topicId: null,
+      subTopicId: null,
+      annotationIds: [],
+      attributes: { "langwatch.origin": "application" },
+      events: [
+        {
+          spanId: "span-1",
+          timestamp: Date.now(),
+          name: "thumbs_up_down",
+          attributes: {
+            "event.type": "thumbs_up_down",
+            "event.metrics.score": "1",
+            "event.details.page": "/chat",
+          },
+        },
+      ],
+      occurredAt: Date.now(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      lastEventOccurredAt: Date.now(),
+    } as TraceSummaryData;
+
+    const result = buildPreconditionTraceDataFromFoldState(foldState);
+
+    expect(result.events).toHaveLength(1);
+    expect(result.events![0]!.event_type).toBe("thumbs_up_down");
+    expect(result.events![0]!.metrics).toEqual([{ key: "score", value: 1 }]);
+    expect(result.events![0]!.event_details).toEqual([
+      { key: "page", value: "/chat" },
+    ]);
+  });
 });

@@ -26,20 +26,6 @@ const UNSUPPORTED_FIELDS: ReadonlySet<string> = new Set([
   "events.event_details.value",
 ]);
 
-/** Event filter fields that require events data to be populated. */
-const EVENT_FIELDS: ReadonlySet<string> = new Set([
-  "events.event_type",
-  "events.metrics.key",
-  "events.event_details.key",
-]);
-
-/**
- * Returns true if the given filters include any event-based fields that
- * require events data to be populated on PreconditionTraceData.
- */
-export function hasEventFilters(filters: TriggerFilters): boolean {
-  return Object.keys(filters).some((field) => EVENT_FIELDS.has(field));
-}
 
 /**
  * Splits trigger filters into trace-time-available and evaluation-time-available groups.
@@ -71,28 +57,6 @@ export function classifyTriggerFilters(filters: TriggerFilters): {
 }
 
 /**
- * Populates the events field on PreconditionTraceData from Trace events.
- * Call this when event filter fields are present and a full trace has been fetched.
- */
-export function populateEventsOnTraceData(
-  traceData: PreconditionTraceData,
-  traceEvents: Array<{
-    event_type: string;
-    metrics: Record<string, number>;
-    event_details: Record<string, string>;
-  }>,
-): PreconditionTraceData {
-  return {
-    ...traceData,
-    events: traceEvents.map((e) => ({
-      event_type: e.event_type,
-      metrics: Object.entries(e.metrics).map(([key, value]) => ({ key, value })),
-      event_details: Object.entries(e.event_details).map(([key, value]) => ({ key, value })),
-    })),
-  };
-}
-
-/**
  * Converts TraceSummaryData (fold state) into PreconditionTraceData for
  * in-memory filter matching. Extracts structured fields from the flat
  * attributes map, mirroring the logic in evaluationTrigger.reactor.ts.
@@ -117,7 +81,40 @@ export function buildPreconditionTraceDataFromFoldState(
     spanModels: foldState.models.length > 0 ? foldState.models : null,
     customMetadata: extractCustomMetadata(attrs),
     annotationIds: foldState.annotationIds,
+    events: buildPreconditionEvents(foldState.events),
   };
+}
+
+function buildPreconditionEvents(
+  events: TraceSummaryData["events"],
+): PreconditionTraceData["events"] {
+  if (!events || events.length === 0) return null;
+
+  return events.map((e) => {
+    const metrics: Array<{ key: string; value: number }> = [];
+    const eventDetails: Array<{ key: string; value: string }> = [];
+
+    for (const [key, value] of Object.entries(e.attributes)) {
+      if (key.startsWith("event.metrics.")) {
+        const metricKey = key.slice("event.metrics.".length);
+        const num = Number(value);
+        if (metricKey && Number.isFinite(num)) {
+          metrics.push({ key: metricKey, value: num });
+        }
+      } else if (key.startsWith("event.details.")) {
+        const detailKey = key.slice("event.details.".length);
+        if (detailKey) {
+          eventDetails.push({ key: detailKey, value });
+        }
+      }
+    }
+
+    return {
+      event_type: e.name,
+      metrics,
+      event_details: eventDetails,
+    };
+  });
 }
 
 /**
