@@ -84,6 +84,9 @@ const mockRouter = {
   beforePopState: vi.fn(),
 };
 
+// To opt out of this global mock (e.g. when testing the compat layer itself
+// against a real react-router MemoryRouter), see the vi.unmock pattern in
+// src/components/suites/__tests__/RunsFilterUrlSync.integration.test.tsx.
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => mockRouter,
   default: mockRouter,
