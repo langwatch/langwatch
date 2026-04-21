@@ -31,6 +31,28 @@ export class TriggerService {
     return traceOnly;
   }
 
+  async hasSentForTrace(
+    triggerId: string,
+    traceId: string,
+  ): Promise<boolean> {
+    return this.repo.hasSentForTrace(triggerId, traceId);
+  }
+
+  async recordSent(params: {
+    triggerId: string;
+    traceId: string;
+    projectId: string;
+  }): Promise<void> {
+    return this.repo.recordSent(params);
+  }
+
+  async updateLastRunAt(
+    triggerId: string,
+    projectId: string,
+  ): Promise<void> {
+    return this.repo.updateLastRunAt(triggerId, projectId);
+  }
+
   invalidate(projectId: string): void {
     this.cache.delete(projectId);
   }
