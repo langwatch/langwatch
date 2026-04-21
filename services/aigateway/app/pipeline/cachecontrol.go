@@ -1,8 +1,11 @@
 package pipeline
 
 import (
-	"encoding/json"
-	"strings"
+	"bytes"
+	"strconv"
+
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -22,68 +25,62 @@ func applyCacheControl(body []byte, action domain.CacheAction, reqType domain.Re
 	return body
 }
 
-// stripCacheControl removes all "cache_control" keys from a JSON body recursively.
+// stripCacheControl removes all "cache_control" keys from a JSON body using
+// sjson surgical deletion — no full unmarshal/marshal cycle.
 func stripCacheControl(body []byte) []byte {
-	if !strings.Contains(string(body), "cache_control") {
-		return body
-	}
-	var obj any
-	if err := json.Unmarshal(body, &obj); err != nil {
-		return body
-	}
-	stripKeys(obj, "cache_control")
-	out, err := json.Marshal(obj)
-	if err != nil {
-		return body
-	}
-	return out
-}
-
-// injectEphemeral adds cache_control: {type: "ephemeral"} to the last
-// system block and last content block of the last message (Anthropic format).
-func injectEphemeral(body []byte) []byte {
-	var obj map[string]any
-	if err := json.Unmarshal(body, &obj); err != nil {
+	if !bytes.Contains(body, []byte(`"cache_control"`)) {
 		return body
 	}
 
-	ephemeral := map[string]string{"type": "ephemeral"}
+	// Collect paths to delete. We delete object keys (not array elements),
+	// so array indexes remain stable across deletions.
+	var paths []string
 
-	// system[-1]
-	if sys, ok := obj["system"].([]any); ok && len(sys) > 0 {
-		if last, ok := sys[len(sys)-1].(map[string]any); ok {
-			last["cache_control"] = ephemeral
+	gjson.GetBytes(body, "system").ForEach(func(k, v gjson.Result) bool {
+		if v.Get("cache_control").Exists() {
+			paths = append(paths, "system."+k.String()+".cache_control")
 		}
-	}
+		return true
+	})
 
-	// messages[-1].content[-1]
-	if msgs, ok := obj["messages"].([]any); ok && len(msgs) > 0 {
-		if lastMsg, ok := msgs[len(msgs)-1].(map[string]any); ok {
-			if content, ok := lastMsg["content"].([]any); ok && len(content) > 0 {
-				if lastBlock, ok := content[len(content)-1].(map[string]any); ok {
-					lastBlock["cache_control"] = ephemeral
-				}
+	gjson.GetBytes(body, "messages").ForEach(func(k, v gjson.Result) bool {
+		if v.Get("cache_control").Exists() {
+			paths = append(paths, "messages."+k.String()+".cache_control")
+		}
+		v.Get("content").ForEach(func(j, c gjson.Result) bool {
+			if c.Get("cache_control").Exists() {
+				paths = append(paths, "messages."+k.String()+".content."+j.String()+".cache_control")
 			}
-		}
-	}
+			return true
+		})
+		return true
+	})
 
-	out, err := json.Marshal(obj)
-	if err != nil {
-		return body
+	for _, p := range paths {
+		body, _ = sjson.DeleteBytes(body, p)
 	}
-	return out
+	return body
 }
 
-func stripKeys(v any, key string) {
-	switch val := v.(type) {
-	case map[string]any:
-		delete(val, key)
-		for _, child := range val {
-			stripKeys(child, key)
-		}
-	case []any:
-		for _, item := range val {
-			stripKeys(item, key)
+// injectEphemeral adds cache_control: {type: "ephemeral"} to the last system
+// block and last content block of the last message (Anthropic Messages format).
+// Uses sjson surgical set — no full unmarshal/marshal cycle.
+func injectEphemeral(body []byte) []byte {
+	const ephemeral = `{"type":"ephemeral"}`
+
+	if sysLen := gjson.GetBytes(body, "system.#").Int(); sysLen > 0 {
+		path := "system." + strconv.FormatInt(sysLen-1, 10) + ".cache_control"
+		body, _ = sjson.SetRawBytes(body, path, []byte(ephemeral))
+	}
+
+	msgsLen := gjson.GetBytes(body, "messages.#").Int()
+	if msgsLen > 0 {
+		lastMsg := strconv.FormatInt(msgsLen-1, 10)
+		if contentLen := gjson.GetBytes(body, "messages."+lastMsg+".content.#").Int(); contentLen > 0 {
+			path := "messages." + lastMsg + ".content." + strconv.FormatInt(contentLen-1, 10) + ".cache_control"
+			body, _ = sjson.SetRawBytes(body, path, []byte(ephemeral))
 		}
 	}
+
+	return body
 }
