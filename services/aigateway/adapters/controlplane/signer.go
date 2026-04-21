@@ -31,16 +31,23 @@ func NewSigner(secret, nodeID string) (*Signer, error) {
 }
 
 // Sign adds HMAC signature headers to a request.
+//
+// Canonical string matches the control-plane verifier:
+//
+//	METHOD + "\n" + PATH + "\n" + TIMESTAMP + "\n" + hex(sha256(body))
 func (s *Signer) Sign(req *http.Request, body []byte) {
 	ts := fmt.Sprintf("%d", time.Now().Unix())
+
+	bodyHash := sha256.Sum256(body)
+	canonical := fmt.Sprintf("%s\n%s\n%s\n%x", req.Method, req.URL.Path, ts, bodyHash)
+
 	mac := hmac.New(sha256.New, s.secret)
-	mac.Write([]byte(ts))
-	mac.Write(body)
+	mac.Write([]byte(canonical))
 	sig := hex.EncodeToString(mac.Sum(nil))
 
-	req.Header.Set("X-Gateway-Timestamp", ts)
-	req.Header.Set("X-Gateway-Signature", sig)
+	req.Header.Set("X-LangWatch-Gateway-Timestamp", ts)
+	req.Header.Set("X-LangWatch-Gateway-Signature", sig)
 	if s.nodeID != "" {
-		req.Header.Set("X-Gateway-Node-ID", s.nodeID)
+		req.Header.Set("X-LangWatch-Gateway-Node", s.nodeID)
 	}
 }

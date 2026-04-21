@@ -29,9 +29,9 @@ func TestSign_SetsHeaders(t *testing.T) {
 	body := []byte(`{"model":"gpt-4"}`)
 	s.Sign(req, body)
 
-	assert.NotEmpty(t, req.Header.Get("X-Gateway-Timestamp"), "timestamp header should be set")
-	assert.NotEmpty(t, req.Header.Get("X-Gateway-Signature"), "signature header should be set")
-	assert.Equal(t, "node-42", req.Header.Get("X-Gateway-Node-ID"), "node ID header should be set")
+	assert.NotEmpty(t, req.Header.Get("X-LangWatch-Gateway-Timestamp"), "timestamp header should be set")
+	assert.NotEmpty(t, req.Header.Get("X-LangWatch-Gateway-Signature"), "signature header should be set")
+	assert.Equal(t, "node-42", req.Header.Get("X-LangWatch-Gateway-Node"), "node ID header should be set")
 }
 
 func TestSign_DeterministicMAC(t *testing.T) {
@@ -49,10 +49,10 @@ func TestSign_DeterministicMAC(t *testing.T) {
 	require.NoError(t, err)
 	s.Sign(req2, body)
 
-	ts1 := req1.Header.Get("X-Gateway-Timestamp")
-	ts2 := req2.Header.Get("X-Gateway-Timestamp")
-	sig1 := req1.Header.Get("X-Gateway-Signature")
-	sig2 := req2.Header.Get("X-Gateway-Signature")
+	ts1 := req1.Header.Get("X-LangWatch-Gateway-Timestamp")
+	ts2 := req2.Header.Get("X-LangWatch-Gateway-Timestamp")
+	sig1 := req1.Header.Get("X-LangWatch-Gateway-Signature")
+	sig2 := req2.Header.Get("X-LangWatch-Gateway-Signature")
 
 	// If timestamps match (same second), signatures must be identical
 	if ts1 == ts2 {
