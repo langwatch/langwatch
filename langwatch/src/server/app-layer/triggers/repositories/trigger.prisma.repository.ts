@@ -31,12 +31,17 @@ export class PrismaTriggerRepository implements TriggerRepository {
     }));
   }
 
-  async hasSentForTrace(
-    triggerId: string,
-    traceId: string,
-  ): Promise<boolean> {
+  async hasSentForTrace({
+    triggerId,
+    traceId,
+    projectId,
+  }: {
+    triggerId: string;
+    traceId: string;
+    projectId: string;
+  }): Promise<boolean> {
     const record = await this.prisma.triggerSent.findFirst({
-      where: { triggerId, traceId },
+      where: { triggerId, traceId, projectId },
       select: { id: true },
     });
     return record !== null;

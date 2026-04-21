@@ -17,7 +17,11 @@ export interface TriggerRepository {
   findActiveForProject(projectId: string): Promise<TriggerSummary[]>;
 
   /** Returns true if a TriggerSent record exists for this trigger + trace pair. */
-  hasSentForTrace(triggerId: string, traceId: string): Promise<boolean>;
+  hasSentForTrace(params: {
+    triggerId: string;
+    traceId: string;
+    projectId: string;
+  }): Promise<boolean>;
 
   /** Records that a trigger fired for a trace (idempotent — skips duplicates). */
   recordSent(params: {
@@ -35,10 +39,11 @@ export class NullTriggerRepository implements TriggerRepository {
     return [];
   }
 
-  async hasSentForTrace(
-    _triggerId: string,
-    _traceId: string,
-  ): Promise<boolean> {
+  async hasSentForTrace(_params: {
+    triggerId: string;
+    traceId: string;
+    projectId: string;
+  }): Promise<boolean> {
     return false;
   }
 

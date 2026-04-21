@@ -18,6 +18,13 @@ const EVALUATION_FIELDS: ReadonlySet<string> = new Set([
   "evaluations.label",
 ]);
 
+/** Fields that have no in-memory matcher (key-selectors, numeric-only). Skipped during matching. */
+const UNSUPPORTED_FIELDS: ReadonlySet<string> = new Set([
+  "metadata.key",
+  "events.metrics.value",
+  "events.event_details.value",
+]);
+
 /**
  * Splits trigger filters into trace-time-available and evaluation-time-available groups.
  */
@@ -97,6 +104,9 @@ export function matchesTriggerFilters(
 
     // Skip evaluation fields — not available at trace time
     if (EVALUATION_FIELDS.has(field)) return false;
+
+    // Skip fields with no in-memory matcher (key-selectors, numeric-only)
+    if (UNSUPPORTED_FIELDS.has(field)) continue;
 
     if (!matchField(traceData, field, filterValue)) {
       return false;
