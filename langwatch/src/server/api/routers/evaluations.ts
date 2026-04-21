@@ -96,6 +96,7 @@ export const evaluationsRouter = createTRPCRouter({
           userId: ctx.session.user.id,
           event: "evaluation_ran",
           projectId: input.projectId,
+          session: ctx.session,
         });
       }
 

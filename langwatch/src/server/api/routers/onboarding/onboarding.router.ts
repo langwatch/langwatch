@@ -94,14 +94,16 @@ export const onboardingRouter = createTRPCRouter({
           captureException(error);
         }
 
-        fireSignupNurturingCalls({
-          userId: ctx.session.user.id,
-          email: ctx.session.user.email,
-          name: ctx.session.user.name,
-          organizationId: orgResult.organization.id,
-          organizationName: orgResult.organization.name,
-          signUpData: input.signUpData,
-        });
+        if (!ctx.session.user.impersonator) {
+          fireSignupNurturingCalls({
+            userId: ctx.session.user.id,
+            email: ctx.session.user.email,
+            name: ctx.session.user.name,
+            organizationId: orgResult.organization.id,
+            organizationName: orgResult.organization.name,
+            signUpData: input.signUpData,
+          });
+        }
 
         // Return success response with team and project slugs
         return {
@@ -140,10 +142,12 @@ export const onboardingRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const traitValue = mapProductSelectionToIntegrationMethod(input.integrationMethod);
 
-      fireIntegrationMethodNurturing({
-        userId: ctx.session.user.id,
-        integrationMethod: traitValue,
-      });
+      if (!ctx.session.user.impersonator) {
+        fireIntegrationMethodNurturing({
+          userId: ctx.session.user.id,
+          integrationMethod: traitValue,
+        });
+      }
 
       return { success: true };
     }),

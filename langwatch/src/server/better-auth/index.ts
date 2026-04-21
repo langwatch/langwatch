@@ -454,9 +454,14 @@ export const auth = betterAuth({
             session: { userId: session.userId },
           }),
         after: async (session) => {
+          // The `impersonating` field is a JSON string column set by
+          // the admin impersonation endpoint. When present, this session
+          // was created for impersonation — skip lastLoginAt and nurturing.
+          const isImpersonationSession = !!(session as Record<string, unknown>).impersonating;
           await afterSessionCreate({
             prisma,
             userId: session.userId,
+            isImpersonationSession,
             fireActivityTrackingNurturing,
             ensureUserSyncedToCio,
           });

@@ -1,6 +1,7 @@
 import type { z } from "zod";
 
 import { getApp } from "../../../../src/server/app-layer/app";
+import { isAdmin } from "../../../admin/isAdmin";
 import type { signUpDataSchema } from "../../../../src/server/schemas/sign-up-data.schema";
 import { captureException } from "../../../../src/utils/posthogErrorCapture";
 import type { CioPersonTraits } from "../types";
@@ -74,6 +75,7 @@ export function fireSignupNurturingCalls({
     has_prompts: false,
     has_simulations: false,
     has_subscription: false,
+    is_admin: isAdmin({ email }),
     createdAt: new Date().toISOString(),
   };
 

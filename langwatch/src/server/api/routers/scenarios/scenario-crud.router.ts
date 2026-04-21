@@ -47,21 +47,23 @@ export const scenarioCrudRouter = createTRPCRouter({
         lastUpdatedById: ctx.session.user.id,
       });
 
-      trackServerEvent({ userId: ctx.session.user.id, event: "scenario_created", projectId: input.projectId });
+      trackServerEvent({ userId: ctx.session.user.id, event: "scenario_created", projectId: input.projectId, session: ctx.session });
 
-      void ctx.prisma.scenario
-        .count({
-          where: { projectId: input.projectId, archivedAt: null },
-        })
-        .then((count) => {
-          fireScenarioCreatedNurturing({
-            userId: ctx.session.user.id,
-            scenarioCount: count,
-            scenarioId: result.id,
-            projectId: input.projectId,
-          });
-        })
-        .catch(captureException);
+      if (!ctx.session.user.impersonator) {
+        void ctx.prisma.scenario
+          .count({
+            where: { projectId: input.projectId, archivedAt: null },
+          })
+          .then((count) => {
+            fireScenarioCreatedNurturing({
+              userId: ctx.session.user.id,
+              scenarioCount: count,
+              scenarioId: result.id,
+              projectId: input.projectId,
+            });
+          })
+          .catch(captureException);
+      }
 
       logger.info({ projectId: input.projectId, scenarioId: result.id }, "Scenario created");
       return result;

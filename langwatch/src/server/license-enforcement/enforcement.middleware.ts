@@ -87,6 +87,7 @@ export async function enforceLicenseLimit(
           current: error.current,
           max: error.max,
         },
+        session: ctx.session,
       });
       throw new TRPCError({
         code: "FORBIDDEN",
