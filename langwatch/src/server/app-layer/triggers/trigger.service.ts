@@ -31,11 +31,12 @@ export class TriggerService {
     return traceOnly;
   }
 
-  async hasSentForTrace(
-    triggerId: string,
-    traceId: string,
-  ): Promise<boolean> {
-    return this.repo.hasSentForTrace(triggerId, traceId);
+  async hasSentForTrace(params: {
+    triggerId: string;
+    traceId: string;
+    projectId: string;
+  }): Promise<boolean> {
+    return this.repo.hasSentForTrace(params);
   }
 
   async recordSent(params: {
