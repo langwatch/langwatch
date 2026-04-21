@@ -281,7 +281,17 @@ export class PipelineRegistry {
       projects: this.deps.projects,
       traceSummaryStore,
       evaluationRuns: this.deps.evaluations.runs,
-      ...this.buildTraceReactorContext(),
+      traceById: async (projectId, traceId) => {
+        const traceService = TraceService.create(this.deps.prisma);
+        const protections = await getProtectionsForProject(this.deps.prisma, { projectId });
+        return traceService.getById(projectId, traceId, protections);
+      },
+      addToAnnotationQueue: async (params) => {
+        await createOrUpdateQueueItems({ ...params, prisma: this.deps.prisma });
+      },
+      addToDataset: async (params) => {
+        await createManyDatasetRecords(params);
+      },
     });
 
     return this.deps.eventSourcing.register(

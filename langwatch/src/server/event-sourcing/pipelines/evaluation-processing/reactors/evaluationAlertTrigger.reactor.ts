@@ -118,7 +118,7 @@ export function createEvaluationAlertTriggerReactor(
       }
 
       // Load all evaluations for this trace
-      const allEvaluations = await deps.evaluationRuns.findByTraceId(
+      const allEvaluations = await deps.evaluationRuns.getByTraceId(
         tenantId,
         traceId,
       );
@@ -143,13 +143,13 @@ export function createEvaluationAlertTriggerReactor(
             continue;
           }
 
-          // Atomic claim: see alertTrigger.reactor.ts for rationale.
-          const claimed = await deps.triggers.claimSend({
+          // Dedup: check if already sent for this trace
+          const alreadySent = await deps.triggers.hasSentForTrace({
             triggerId: trigger.id,
             traceId,
             projectId: tenantId,
           });
-          if (!claimed) continue;
+          if (alreadySent) continue;
 
           await dispatchTriggerAction({
             deps,

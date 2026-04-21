@@ -1,3 +1,4 @@
+import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type {
   PreconditionTraceData,
@@ -188,6 +189,142 @@ function matchSimpleArray(
   }
 
   return false;
+}
+
+/**
+ * Evaluates evaluation-specific filters against a set of completed evaluations.
+ *
+ * Semantics:
+ * - For evaluator_id filters (string[]): at least one evaluation has a matching evaluatorId
+ * - For keyed filters (Record<string, string[]>): for each key (evaluatorId),
+ *   at least one evaluation with that evaluatorId has a matching value
+ * - For double-keyed filters (evaluations.score): same but with subkey ignored
+ *   (EvaluationRunData has a single score field)
+ * - Across fields: AND (all must pass)
+ */
+export function matchesEvaluationFilters(
+  evaluations: EvaluationRunData[],
+  filters: TriggerFilters,
+): boolean {
+  for (const [field, filterValue] of Object.entries(filters) as [
+    FilterField,
+    TriggerFilterValue,
+  ][]) {
+    if (!filterValue) continue;
+
+    // Only process evaluation fields
+    if (!EVALUATION_FIELDS.has(field)) continue;
+
+    if (!matchEvaluationField(evaluations, field, filterValue)) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+function matchEvaluationField(
+  evaluations: EvaluationRunData[],
+  field: FilterField,
+  filterValue: TriggerFilterValue,
+): boolean {
+  // Simple array filters: evaluations.evaluator_id and variants
+  if (Array.isArray(filterValue)) {
+    if (filterValue.length === 0) return true;
+    return matchEvaluatorIdFilter(evaluations, field, filterValue);
+  }
+
+  // Keyed filters: evaluations.passed, evaluations.state, evaluations.label, evaluations.score
+  for (const [evaluatorId, subValue] of Object.entries(filterValue)) {
+    const evalsForEvaluator = evaluations.filter(
+      (e) => e.evaluatorId === evaluatorId,
+    );
+    if (evalsForEvaluator.length === 0) return false;
+
+    if (Array.isArray(subValue)) {
+      // Record<string, string[]> — e.g., evaluations.passed: { "eval-1": ["true"] }
+      if (subValue.length === 0) continue;
+      if (!matchEvaluationValues(evalsForEvaluator, field, subValue)) {
+        return false;
+      }
+    } else if (typeof subValue === "object" && subValue !== null) {
+      // Record<string, Record<string, string[]>> — evaluations.score: { "eval-1": { "score": ["0.5"] } }
+      for (const [, values] of Object.entries(subValue)) {
+        if (!Array.isArray(values) || values.length === 0) continue;
+        if (!matchEvaluationValues(evalsForEvaluator, field, values)) {
+          return false;
+        }
+      }
+    }
+  }
+
+  return true;
+}
+
+function matchEvaluatorIdFilter(
+  evaluations: EvaluationRunData[],
+  field: FilterField,
+  evaluatorIds: string[],
+): boolean {
+  switch (field) {
+    case "evaluations.evaluator_id":
+      return evaluations.some((e) => evaluatorIds.includes(e.evaluatorId));
+
+    case "evaluations.evaluator_id.guardrails_only":
+      return evaluations.some(
+        (e) => evaluatorIds.includes(e.evaluatorId) && e.isGuardrail,
+      );
+
+    case "evaluations.evaluator_id.has_passed":
+      return evaluations.some(
+        (e) => evaluatorIds.includes(e.evaluatorId) && e.passed !== null,
+      );
+
+    case "evaluations.evaluator_id.has_score":
+      return evaluations.some(
+        (e) => evaluatorIds.includes(e.evaluatorId) && e.score !== null,
+      );
+
+    case "evaluations.evaluator_id.has_label":
+      return evaluations.some(
+        (e) =>
+          evaluatorIds.includes(e.evaluatorId) &&
+          e.label !== null &&
+          e.label !== "",
+      );
+
+    default:
+      return false;
+  }
+}
+
+function matchEvaluationValues(
+  evaluations: EvaluationRunData[],
+  field: FilterField,
+  values: string[],
+): boolean {
+  switch (field) {
+    case "evaluations.passed":
+      return evaluations.some(
+        (e) => e.passed !== null && values.includes(String(e.passed)),
+      );
+
+    case "evaluations.score":
+      return evaluations.some(
+        (e) => e.score !== null && values.includes(String(e.score)),
+      );
+
+    case "evaluations.state":
+      return evaluations.some((e) => values.includes(e.status));
+
+    case "evaluations.label":
+      return evaluations.some(
+        (e) => e.label !== null && values.includes(e.label),
+      );
+
+    default:
+      return false;
+  }
 }
 
 // ---------------------------------------------------------------------------

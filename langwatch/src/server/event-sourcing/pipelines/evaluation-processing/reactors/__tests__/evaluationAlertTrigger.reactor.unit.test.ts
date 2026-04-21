@@ -23,18 +23,6 @@ vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: vi.fn(),
 }));
 
-// Heavy I/O bound dependencies pulled in transitively via dispatchTriggerAction
-// (email render + SES, Slack webhook, dataset row mapping). They throw on any
-// unconfigured env in CI, which would short-circuit dispatch before
-// `updateLastRunAt`. Stub them out so dispatch can complete its bookkeeping.
-vi.mock("~/server/mailer/triggerEmail", () => ({
-  sendTriggerEmail: vi.fn().mockResolvedValue(undefined),
-}));
-
-vi.mock("~/server/triggers/sendSlackWebhook", () => ({
-  sendSlackWebhook: vi.fn().mockResolvedValue(undefined),
-}));
-
 function createEvalFoldState(
   overrides: Partial<EvaluationRunData> = {},
 ): EvaluationRunData {
@@ -55,7 +43,7 @@ function createEvalFoldState(
     errorDetails: null,
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    LastEventOccurredAt: Date.now(),
+    lastEventOccurredAt: Date.now(),
     archivedAt: null,
     scheduledAt: null,
     startedAt: null,
@@ -81,7 +69,7 @@ function createTraceSummary(
     containsErrorStatus: false,
     containsOKStatus: true,
     errorMessage: null,
-    models: ["gpt-5-mini"],
+    models: ["gpt-4"],
     totalCost: 0.01,
     tokensEstimated: false,
     totalPromptTokenCount: 100,
@@ -99,7 +87,7 @@ function createTraceSummary(
     occurredAt: Date.now(),
     createdAt: Date.now(),
     updatedAt: Date.now(),
-    LastEventOccurredAt: Date.now(),
+    lastEventOccurredAt: Date.now(),
     ...overrides,
   } as TraceSummaryData;
 }
@@ -145,7 +133,8 @@ function createDeps(
   return {
     triggers: {
       getActiveTraceTriggersForProject: vi.fn().mockResolvedValue([]),
-      claimSend: vi.fn().mockResolvedValue(true),
+      hasSentForTrace: vi.fn().mockResolvedValue(false),
+      recordSent: vi.fn().mockResolvedValue(undefined),
       updateLastRunAt: vi.fn().mockResolvedValue(undefined),
       invalidate: vi.fn(),
     } as any,
@@ -160,7 +149,7 @@ function createDeps(
       store: vi.fn(),
     },
     evaluationRuns: {
-      findByTraceId: vi.fn().mockResolvedValue([]),
+      getByTraceId: vi.fn().mockResolvedValue([]),
     } as any,
     traceById: vi.fn().mockResolvedValue(undefined),
     addToAnnotationQueue: vi.fn().mockResolvedValue(undefined),
@@ -261,7 +250,7 @@ describe("evaluationAlertTrigger reactor", () => {
       await reactor.handle(event, context);
 
       expect(deps.traceSummaryStore.get).not.toHaveBeenCalled();
-      expect(deps.evaluationRuns.findByTraceId).not.toHaveBeenCalled();
+      expect(deps.evaluationRuns.getByTraceId).not.toHaveBeenCalled();
     });
   });
 
@@ -281,7 +270,7 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+      expect(deps.triggers.recordSent).not.toHaveBeenCalled();
     });
   });
 
@@ -293,7 +282,7 @@ describe("evaluationAlertTrigger reactor", () => {
         },
       });
       (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
+      (deps.evaluationRuns.getByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
 
@@ -307,7 +296,7 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.claimSend).toHaveBeenCalledWith({
+      expect(deps.triggers.recordSent).toHaveBeenCalledWith({
         triggerId: "trigger-1",
         traceId: "trace-1",
         projectId: "tenant-1",
@@ -327,7 +316,7 @@ describe("evaluationAlertTrigger reactor", () => {
         },
       });
       (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
+      (deps.evaluationRuns.getByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: false }),
       ]);
 
@@ -341,7 +330,7 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+      expect(deps.triggers.recordSent).not.toHaveBeenCalled();
     });
   });
 
@@ -354,7 +343,7 @@ describe("evaluationAlertTrigger reactor", () => {
         },
       });
       (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
+      (deps.evaluationRuns.getByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
       // Trace has origin "application", trigger wants "playground"
@@ -374,7 +363,7 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.claimSend).not.toHaveBeenCalled();
+      expect(deps.triggers.recordSent).not.toHaveBeenCalled();
     });
   });
 
@@ -382,8 +371,8 @@ describe("evaluationAlertTrigger reactor", () => {
     it("skips dispatch (dedup)", async () => {
       const trigger = createTrigger();
       (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
-      (deps.triggers.claimSend as any).mockResolvedValue(false);
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
+      (deps.triggers.hasSentForTrace as any).mockResolvedValue(true);
+      (deps.evaluationRuns.getByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
 
@@ -397,9 +386,7 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      // claim attempted but lost the race → no dispatch, no lastRunAt update.
-      expect(deps.triggers.claimSend).toHaveBeenCalled();
-      expect(deps.triggers.updateLastRunAt).not.toHaveBeenCalled();
+      expect(deps.triggers.recordSent).not.toHaveBeenCalled();
     });
   });
 
@@ -407,7 +394,7 @@ describe("evaluationAlertTrigger reactor", () => {
     it("processes reported events the same as completed", async () => {
       const trigger = createTrigger();
       (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
+      (deps.evaluationRuns.getByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
 
@@ -421,8 +408,7 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.claimSend).toHaveBeenCalled();
-      expect(deps.triggers.updateLastRunAt).toHaveBeenCalled();
+      expect(deps.triggers.recordSent).toHaveBeenCalled();
     });
   });
 
@@ -431,12 +417,12 @@ describe("evaluationAlertTrigger reactor", () => {
       const trigger = createTrigger({
         filters: {
           "traces.origin": ["application"],
-          "spans.model": ["gpt-5-mini"],
+          "spans.model": ["gpt-4"],
           "evaluations.passed": { "evaluator-1": ["true"] },
         },
       });
       (deps.triggers.getActiveTraceTriggersForProject as any).mockResolvedValue([trigger]);
-      (deps.evaluationRuns.findByTraceId as any).mockResolvedValue([
+      (deps.evaluationRuns.getByTraceId as any).mockResolvedValue([
         createEvalFoldState({ evaluatorId: "evaluator-1", passed: true }),
       ]);
 
@@ -450,8 +436,7 @@ describe("evaluationAlertTrigger reactor", () => {
 
       await reactor.handle(event, context);
 
-      expect(deps.triggers.claimSend).toHaveBeenCalled();
-      expect(deps.triggers.updateLastRunAt).toHaveBeenCalled();
+      expect(deps.triggers.recordSent).toHaveBeenCalled();
     });
   });
 });
