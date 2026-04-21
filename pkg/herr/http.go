@@ -42,6 +42,11 @@ type ErrorBody struct {
 	Reasons []ErrorBody `json:"reasons,omitempty"`
 }
 
+// ErrorRecorder can store an error for later inspection (e.g. request logging).
+type ErrorRecorder interface {
+	RecordError(err error)
+}
+
 // WriteHTTP writes an error as a JSON response. If the error is a herr.E,
 // uses its code as the type and looks up the HTTP status. Otherwise writes
 // a generic 500 with code "unknown".
@@ -49,6 +54,10 @@ type ErrorBody struct {
 // Exposed: code, message, meta, trace_id, span_id, reasons (herr only).
 // Not exposed: stack traces, non-herr reasons (replaced with "unknown").
 func WriteHTTP(w http.ResponseWriter, err error) {
+	if rec := findErrorRecorder(w); rec != nil {
+		rec.RecordError(err)
+	}
+
 	var e E
 	if !errors.As(err, &e) {
 		e = E{Code: "unknown"}
@@ -62,6 +71,19 @@ func WriteHTTP(w http.ResponseWriter, err error) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(ErrorResponse{Error: toErrorBody(e)})
+}
+
+func findErrorRecorder(w http.ResponseWriter) ErrorRecorder {
+	for {
+		if rec, ok := w.(ErrorRecorder); ok {
+			return rec
+		}
+		unwrapper, ok := w.(interface{ Unwrap() http.ResponseWriter })
+		if !ok {
+			return nil
+		}
+		w = unwrapper.Unwrap()
+	}
 }
 
 func toErrorBody(e E) ErrorBody {

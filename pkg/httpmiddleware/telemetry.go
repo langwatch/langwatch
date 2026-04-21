@@ -1,12 +1,14 @@
 package httpmiddleware
 
 import (
+	"errors"
 	"net/http"
 	"time"
 
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/herr"
 )
 
 // Telemetry is a request lifecycle middleware. It:
@@ -31,11 +33,32 @@ func Telemetry() func(http.Handler) http.Handler {
 			rec := &responseRecorder{ResponseWriter: w, status: 200}
 			next.ServeHTTP(rec, r.WithContext(ctx))
 
-			clog.Get(ctx).Info("request_completed",
+			fields := []zap.Field{
 				zap.Int("status", rec.status),
 				zap.Int("bytes", rec.bytes),
 				zap.Duration("duration", time.Since(start)),
-			)
+			}
+
+			if rec.err != nil {
+				var e herr.E
+				if errors.As(rec.err, &e) {
+					fields = append(fields, zap.String("error_code", string(e.Code)))
+					if len(e.Meta) > 0 {
+						fields = append(fields, zap.Any("error_meta", e.Meta))
+					}
+					if len(e.Reasons) > 0 {
+						reasons := make([]string, len(e.Reasons))
+						for i, r := range e.Reasons {
+							reasons[i] = r.Error()
+						}
+						fields = append(fields, zap.Strings("error_reasons", reasons))
+					}
+				} else {
+					fields = append(fields, zap.NamedError("error", rec.err))
+				}
+			}
+
+			clog.Get(ctx).Info("request_completed", fields...)
 		})
 	}
 }
@@ -44,6 +67,11 @@ type responseRecorder struct {
 	http.ResponseWriter
 	status int
 	bytes  int
+	err    error
+}
+
+func (r *responseRecorder) RecordError(err error) {
+	r.err = err
 }
 
 func (r *responseRecorder) WriteHeader(code int) {
