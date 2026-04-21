@@ -49,7 +49,7 @@ app.post(
   "/collector",
   bodyLimit({ maxSize: 10 * 1024 * 1024 }), // 10MB
   async (c) => {
-    const credentials = extractCredentials(c);
+    const credentials = extractCredentials((name) => c.req.header(name));
 
     if (!credentials) {
       logger.warn(
