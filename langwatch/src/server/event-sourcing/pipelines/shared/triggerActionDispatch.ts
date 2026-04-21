@@ -66,7 +66,7 @@ export async function dispatchTriggerAction({
   }
 
   const triggerData = buildTriggerData(traceId, tenantId, foldState);
-  const params = trigger.actionParams as ActionParams;
+  const params = (trigger.actionParams ?? {}) as ActionParams;
   let dispatched = true;
 
   switch (trigger.action) {
@@ -202,7 +202,7 @@ async function addTraceToDataset({
       ]),
     );
     entries.push({
-      id: `${now}-${i}`,
+      id: `${trigger.id}-${traceId}-${i}`,
       selected: true,
       ...sanitizedEntry,
     });
