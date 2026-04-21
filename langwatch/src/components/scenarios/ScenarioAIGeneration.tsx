@@ -234,6 +234,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
               <Button colorPalette="blue" asChild size="sm">
                 <a
+                  data-testid="scenario-ai-configure-model-provider-button"
                   href="/settings/model-providers"
                   target="_blank"
                   rel="noopener noreferrer"
@@ -424,6 +425,7 @@ function DefaultModelErrorBanner({ children }: { children: React.ReactNode }) {
       </HStack>
       <Button colorPalette="blue" asChild size="sm">
         <a
+          data-testid="scenario-ai-configure-default-model-button"
           href="/settings/model-providers"
           target="_blank"
           rel="noopener noreferrer"

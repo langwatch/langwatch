@@ -729,12 +729,9 @@ describe("<AICreateModal/>", () => {
 
     describe("footer Configure model provider button", () => {
       function getFooterConfigureButton(dialog: HTMLElement) {
-        // Both the inline body link and the footer button have accessible name
-        // "Configure model provider". The footer button is last in DOM order.
-        const links = within(dialog).getAllByRole("link", {
-          name: /configure model provider/i,
-        });
-        return links[links.length - 1]!;
+        return within(dialog).getByTestId(
+          "ai-create-modal-configure-model-provider-button",
+        );
       }
 
       it("shows primary Configure model provider button in footer", () => {
@@ -877,7 +874,9 @@ describe("<AICreateModal/>", () => {
 
       const dialog = getDialogContent();
       expect(
-        within(dialog).queryByRole("link", { name: /configure model provider/i })
+        within(dialog).queryByTestId(
+          "ai-create-modal-configure-model-provider-button",
+        )
       ).not.toBeInTheDocument();
     });
   });

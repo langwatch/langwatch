@@ -154,11 +154,9 @@ describe("when no model providers are configured", () => {
   it("renders a Configure model provider button linking to /settings/model-providers in a new tab", () => {
     render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
 
-    // The Card contains both an inline link and a primary button (asChild <a>).
-    // Both have the same name; assert at least one link with the correct attributes exists.
-    const links = screen.getAllByRole("link", { name: "Configure model provider" });
-    expect(links.length).toBeGreaterThanOrEqual(1);
-    const primaryLink = links[links.length - 1]!; // button is rendered after the inline link
+    const primaryLink = screen.getByTestId(
+      "scenario-ai-configure-model-provider-button",
+    );
     expect(primaryLink).toHaveAttribute("href", "/settings/model-providers");
     expect(primaryLink).toHaveAttribute("target", "_blank");
     expect(primaryLink).toHaveAttribute("rel", expect.stringContaining("noopener"));
@@ -245,7 +243,9 @@ describe("given azure is the only enabled provider and project.defaultModel is n
 
       fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
 
-      const link = screen.getByRole("link", { name: /configure default model/i });
+      const link = screen.getByTestId(
+        "scenario-ai-configure-default-model-button",
+      );
       expect(link).toHaveAttribute("href", "/settings/model-providers");
       expect(link).toHaveAttribute("target", "_blank");
       expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
@@ -289,7 +289,9 @@ describe("given azure is the only enabled provider and project.defaultModel is o
 
       fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
 
-      const link = screen.getByRole("link", { name: /configure default model/i });
+      const link = screen.getByTestId(
+        "scenario-ai-configure-default-model-button",
+      );
       expect(link).toHaveAttribute("href", "/settings/model-providers");
       expect(link).toHaveAttribute("target", "_blank");
       expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
