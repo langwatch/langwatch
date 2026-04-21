@@ -30,7 +30,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 
 	srv := &http.Server{Handler: handler, Addr: cfg.Server.Addr, ReadHeaderTimeout: 10 * time.Second}
 
-	g := lifecycle.New(deps.Logger,
+	g := lifecycle.New(
 		lifecycle.WithGraceful(time.Duration(cfg.Server.GracefulSeconds)*time.Second),
 		lifecycle.WithHealth(deps.Health),
 	)

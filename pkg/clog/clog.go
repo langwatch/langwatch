@@ -33,16 +33,26 @@ func With(ctx context.Context, fields ...zap.Field) context.Context {
 }
 
 // New creates a configured zap logger for a service.
-func New(cfg Config) *zap.Logger {
+// If the context carries ServiceInfo, service/version/env fields are stamped
+// on every log line automatically.
+func New(ctx context.Context, cfg Config) *zap.Logger {
+	var logger *zap.Logger
+
 	if cfg.Format == "pretty" {
-		logger := prettyconsole.NewLogger(cfg.zapLevel())
-		return logger
+		logger = prettyconsole.NewLogger(cfg.zapLevel())
+	} else {
+		zapCfg := zap.NewProductionConfig()
+		zapCfg.Level = zap.NewAtomicLevelAt(cfg.zapLevel())
+		logger, _ = zapCfg.Build()
 	}
 
-	zapCfg := zap.NewProductionConfig()
-	zapCfg.Level = zap.NewAtomicLevelAt(cfg.zapLevel())
-
-	logger, _ := zapCfg.Build()
+	if info := contexts.GetServiceInfo(ctx); info != nil {
+		logger = logger.With(
+			zap.String("service", info.Service),
+			zap.String("version", info.Version),
+			zap.String("env", info.Environment),
+		)
+	}
 	return logger
 }
 
@@ -79,14 +89,3 @@ func (c Config) zapLevel() zapcore.Level {
 	return lvl
 }
 
-// ForService returns a logger tagged with service info from context.
-func ForService(ctx context.Context, logger *zap.Logger) *zap.Logger {
-	if info := contexts.GetServiceInfo(ctx); info != nil {
-		logger = logger.With(
-			zap.String("service", info.Service),
-			zap.String("version", info.Version),
-			zap.String("environment", info.Environment),
-		)
-	}
-	return logger
-}

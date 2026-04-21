@@ -10,6 +10,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/health"
 )
 
@@ -26,11 +27,11 @@ const (
 //  3. Drain delay waits for load balancer to remove the pod
 //  4. Services stopped in reverse registration order
 type Group struct {
-	logger     *zap.Logger
 	health     *health.Registry
 	services   []Service
 	graceful   time.Duration
 	drainDelay time.Duration
+	logger     *zap.Logger // set at Run-time from the context
 }
 
 // Option configures a Group.
@@ -53,9 +54,8 @@ func WithHealth(r *health.Registry) Option {
 }
 
 // New creates a lifecycle Group.
-func New(logger *zap.Logger, opts ...Option) *Group {
+func New(opts ...Option) *Group {
 	g := &Group{
-		logger:     logger,
 		graceful:   defaultGraceful,
 		drainDelay: defaultDrainDelay,
 	}
@@ -73,6 +73,7 @@ func (g *Group) Add(svcs ...Service) {
 // Run starts all services, blocks until a shutdown trigger fires,
 // then orchestrates graceful shutdown.
 func (g *Group) Run(ctx context.Context) error {
+	g.logger = clog.Get(ctx)
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -144,7 +145,7 @@ func (g *Group) stopN(ctx context.Context, n int) error {
 		g.logger.Info("lifecycle_stop", zap.Stringer("service", svc))
 		if err := svc.Stop(ctx); err != nil {
 			g.logger.Warn("lifecycle_stop_error",
-				zap.Stringer("service", svc), zap.Error(err))
+				zap.Stringer("lifecycle_service", svc), zap.Error(err))
 			if first == nil {
 				first = fmt.Errorf("stop %s: %w", svc, err)
 			}

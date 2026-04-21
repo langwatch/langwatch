@@ -9,6 +9,7 @@ import (
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/health"
 )
 
@@ -40,14 +41,14 @@ func (r *recorder) worker(name string) Service {
 	})
 }
 
-func nopLogger() *zap.Logger { return zap.NewNop() }
+func nopCtx() context.Context { return clog.Set(context.Background(), zap.NewNop()) }
 
 func TestGroup_starts_and_stops_in_order(t *testing.T) {
 	rec := &recorder{}
-	g := New(nopLogger(), WithDrainDelay(0))
+	g := New(WithDrainDelay(0))
 	g.Add(rec.worker("a"), rec.worker("b"), rec.worker("c"))
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(nopCtx())
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		cancel()
@@ -83,10 +84,10 @@ func TestGroup_start_failure_stops_already_started(t *testing.T) {
 		stopFn: func(context.Context) error { return nil },
 	}
 
-	g := New(nopLogger(), WithDrainDelay(0))
+	g := New(WithDrainDelay(0))
 	g.Add(rec.worker("a"), fail, rec.worker("c"))
 
-	err := g.Run(context.Background())
+	err := g.Run(nopCtx())
 	if err == nil {
 		t.Fatal("expected error")
 	}
@@ -111,10 +112,10 @@ func TestGroup_marks_health_draining(t *testing.T) {
 	h := health.New("test")
 	h.MarkStarted()
 
-	g := New(nopLogger(), WithDrainDelay(0), WithHealth(h))
+	g := New(WithDrainDelay(0), WithHealth(h))
 	g.Add(Worker("x", func(context.Context) {}, func() {}))
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(nopCtx())
 	go func() {
 		time.Sleep(50 * time.Millisecond)
 		cancel()
@@ -131,10 +132,10 @@ func TestGroup_drain_delay_pauses_before_stop(t *testing.T) {
 	rec := &recorder{}
 	delay := 100 * time.Millisecond
 
-	g := New(nopLogger(), WithDrainDelay(delay))
+	g := New(WithDrainDelay(delay))
 	g.Add(rec.worker("a"))
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(nopCtx())
 
 	start := time.Now()
 	go func() {
@@ -160,7 +161,7 @@ func TestGroup_fatal_error_triggers_shutdown(t *testing.T) {
 		fatalCh: make(chan error, 1),
 	}
 
-	g := New(nopLogger(), WithDrainDelay(0))
+	g := New(WithDrainDelay(0))
 	g.Add(rec.worker("bg"), fatal)
 
 	go func() {
@@ -168,7 +169,7 @@ func TestGroup_fatal_error_triggers_shutdown(t *testing.T) {
 		fatal.fatalCh <- boom
 	}()
 
-	err := g.Run(context.Background())
+	err := g.Run(nopCtx())
 	if !errors.Is(err, boom) {
 		t.Errorf("error = %v, want %v", err, boom)
 	}
@@ -190,10 +191,10 @@ func TestGroup_graceful_timeout_enforced(t *testing.T) {
 		},
 	}
 
-	g := New(nopLogger(), WithGraceful(100*time.Millisecond), WithDrainDelay(0))
+	g := New(WithGraceful(100*time.Millisecond), WithDrainDelay(0))
 	g.Add(slowStop)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(nopCtx())
 	go func() {
 		time.Sleep(10 * time.Millisecond)
 		cancel()

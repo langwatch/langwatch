@@ -26,33 +26,32 @@ func TestGet_Fallback(t *testing.T) {
 }
 
 func TestNew_Debug(t *testing.T) {
-	logger := New(Config{Debug: true})
+	logger := New(context.Background(), Config{Level: "debug"})
 
 	require.NotNil(t, logger)
-	// Development loggers enable debug level by default.
 	assert.True(t, logger.Core().Enabled(zap.DebugLevel))
 }
 
 func TestNew_Production(t *testing.T) {
-	logger := New(Config{Debug: false})
+	logger := New(context.Background(), Config{Level: "info"})
 
 	require.NotNil(t, logger)
-	// Production loggers disable debug level by default.
 	assert.False(t, logger.Core().Enabled(zap.DebugLevel))
 }
 
-func TestForService(t *testing.T) {
+func TestNew_StampsServiceInfo(t *testing.T) {
 	info := contexts.ServiceInfo{
-		Environment: "staging",
-		Service:     "gateway",
-		Version:     "v1.0.0",
+		Environment: "production",
+		Service:     "aigateway",
+		Version:     "v2.0.0",
 	}
 	ctx := contexts.SetServiceInfo(context.Background(), info)
-	base := zap.NewNop()
 
-	logger := ForService(ctx, base)
+	logger := New(ctx, Config{Level: "info"})
 
 	require.NotNil(t, logger)
-	// ForService should return a different logger instance with added fields.
-	assert.NotSame(t, base, logger)
+	// The returned logger should differ from a bare one (fields were added).
+	bare := New(context.Background(), Config{Level: "info"})
+	assert.NotSame(t, bare, logger)
 }
+

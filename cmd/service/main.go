@@ -30,7 +30,7 @@ func main() {
 
 func run(args []string) int {
 	ctx := context.Background()
-	logger := clog.New(clog.Config{Level: "info"})
+	logger := clog.New(ctx, clog.Config{Level: "info"})
 	ctx = clog.Set(ctx, logger)
 	defer clog.HandlePanic(ctx, false)
 

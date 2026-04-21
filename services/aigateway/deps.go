@@ -51,7 +51,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	if err := cfg.Log.Validate(); err != nil {
 		return ctx, nil, err
 	}
-	logger := clog.New(cfg.Log)
+	logger := clog.New(ctx, cfg.Log)
 	ctx = clog.Set(ctx, logger)
 	nodeID := resolveNodeID(ctx)
 
