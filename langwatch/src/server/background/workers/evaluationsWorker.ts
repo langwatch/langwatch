@@ -40,6 +40,8 @@ import {
   prepareEnvKeys,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
+import { resolveMaxTokensCeiling } from "../../modelProviders/resolveMaxTokensCeiling";
+import { clampMaxTokens } from "../../../utils/clampMaxTokens";
 import { prisma } from "../../db";
 import {
   DEFAULT_MAPPINGS,
@@ -597,9 +599,13 @@ export const runEvaluation = async ({
       "seed",
       "reasoning_effort",
     ];
+    const maxTokensCeiling = resolveMaxTokensCeiling(model, modelProvider);
     for (const param of generationParams) {
-      const value = settings?.[param];
+      let value = settings?.[param];
       if (value !== undefined && value !== null) {
+        if (param === "max_tokens" && typeof value === "number") {
+          value = clampMaxTokens(value, maxTokensCeiling);
+        }
         const envKey = embeddings
           ? `X_LITELLM_EMBEDDINGS_${param}`
           : `X_LITELLM_${param}`;

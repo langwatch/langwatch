@@ -3,6 +3,8 @@ import {
   prepareEnvKeys,
   prepareLitellmParams,
 } from "~/server/api/routers/modelProviders.utils";
+import { resolveMaxTokensCeiling } from "~/server/modelProviders/resolveMaxTokensCeiling";
+import { clampMaxTokens } from "~/utils/clampMaxTokens";
 import {
   getAzureSafetyEnvFromProject,
   isAzureEvaluatorType,
@@ -114,9 +116,13 @@ async function setupModelEnv(
     "seed",
     "reasoning_effort",
   ];
+  const maxTokensCeiling = resolveMaxTokensCeiling(model, modelProvider);
   for (const param of generationParams) {
-    const value = settings?.[param];
+    let value = settings?.[param];
     if (value !== undefined && value !== null) {
+      if (param === "max_tokens" && typeof value === "number") {
+        value = clampMaxTokens(value, maxTokensCeiling);
+      }
       const envKey = embeddings
         ? `X_LITELLM_EMBEDDINGS_${param}`
         : `X_LITELLM_${param}`;
