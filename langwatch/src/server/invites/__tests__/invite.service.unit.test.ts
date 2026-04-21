@@ -693,4 +693,44 @@ describe("InviteService", () => {
       });
     });
   });
+
+  describe("applyInvite", () => {
+    describe("when invite status is not PENDING", () => {
+      it("throws for PAYMENT_PENDING invites", async () => {
+        await expect(
+          service.applyInvite({
+            userId: "user-1",
+            invite: {
+              id: "inv-guard-1",
+              status: "PAYMENT_PENDING",
+              organizationId: "org-1",
+              teamIds: "team-1",
+              teamAssignments: null,
+              role: "MEMBER",
+            } as any,
+          })
+        ).rejects.toThrow(
+          "Cannot apply invite inv-guard-1: status is PAYMENT_PENDING, expected PENDING"
+        );
+      });
+
+      it("throws for ACCEPTED invites", async () => {
+        await expect(
+          service.applyInvite({
+            userId: "user-1",
+            invite: {
+              id: "inv-guard-2",
+              status: "ACCEPTED",
+              organizationId: "org-1",
+              teamIds: "team-1",
+              teamAssignments: null,
+              role: "MEMBER",
+            } as any,
+          })
+        ).rejects.toThrow(
+          "Cannot apply invite inv-guard-2: status is ACCEPTED, expected PENDING"
+        );
+      });
+    });
+  });
 });

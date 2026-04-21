@@ -533,6 +533,12 @@ export class InviteService {
     userId: string;
     invite: OrganizationInvite;
   }): Promise<void> {
+    if (invite.status !== "PENDING") {
+      throw new Error(
+        `Cannot apply invite ${invite.id}: status is ${invite.status}, expected PENDING`
+      );
+    }
+
     await this.prisma.organizationUser.createMany({
       data: [
         {
