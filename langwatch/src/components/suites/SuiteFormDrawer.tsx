@@ -32,8 +32,10 @@ import {
   useDrawerParams,
   getFlowCallbacks,
 } from "~/hooks/useDrawer";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
 import { ScenarioFormDrawer } from "../scenarios/ScenarioFormDrawer";
 import { Drawer } from "../ui/drawer";
@@ -109,6 +111,9 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const isEditMode = !!suiteId;
   const title = isEditMode ? "Edit Run Plan" : "New Run Plan";
 
+  // License enforcement for suite creation
+  const { checkAndProceed } = useLicenseEnforcement("experiments");
+
   const suiteForm = useSuiteForm({
     suite: suite ?? null,
     isOpen,
@@ -149,6 +154,8 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
     },
     onError: (err) => {
       saveAndRunRef.current = false;
+      // Skip toast if already handled by global license handler (shows modal instead)
+      if (isHandledByGlobalHandler(err)) return;
       toaster.create({
         title: "Failed to create run plan",
         description: err.message,
@@ -204,10 +211,12 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       if (isEditMode && suite) {
         updateMutation.mutate({ ...payload, id: suite.id });
       } else {
-        createMutation.mutate(payload);
+        checkAndProceed(() => {
+          createMutation.mutate(payload);
+        });
       }
     },
-    [project, isEditMode, suite, createMutation, updateMutation],
+    [project, isEditMode, suite, createMutation, updateMutation, checkAndProceed],
   );
 
   const submitAndRun = useCallback(
@@ -215,7 +224,6 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       if (!project) return;
       const payload = buildMutationPayload(data, project.id);
 
-      saveAndRunRef.current = true;
       const onSuccess = (saved: SimulationSuite) => {
         saveAndRunRef.current = false;
         closeDrawer();
@@ -227,9 +235,13 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       };
 
       if (isEditMode && suite) {
+        saveAndRunRef.current = true;
         updateMutation.mutate({ ...payload, id: suite.id }, { onSuccess });
       } else {
-        createMutation.mutate(payload, { onSuccess });
+        checkAndProceed(() => {
+          saveAndRunRef.current = true;
+          createMutation.mutate(payload, { onSuccess });
+        });
       }
     },
     [
@@ -242,6 +254,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       onRunRequested,
       runMutation,
       idempotencyKey,
+      checkAndProceed,
     ],
   );
 
