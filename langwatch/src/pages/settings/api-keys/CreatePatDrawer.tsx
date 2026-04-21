@@ -2,6 +2,7 @@ import {
   Badge,
   Box,
   Button,
+  createListCollection,
   Heading,
   HStack,
   Input,
@@ -11,8 +12,9 @@ import {
 } from "@chakra-ui/react";
 import { useMemo, useState } from "react";
 import { Drawer } from "../../../components/ui/drawer";
+import { Radio, RadioGroup } from "../../../components/ui/radio";
 import { Select } from "../../../components/ui/select";
-import type { RouterOutputs } from "../../../utils/api";
+import type { RouterInputs, RouterOutputs } from "../../../utils/api";
 import { EXPIRATION_OPTIONS, expirationCollection } from "./utils";
 
 type MyBindingsData = RouterOutputs["personalAccessToken"]["myBindings"];
@@ -21,17 +23,35 @@ type MyBindings = {
   isLoading: boolean;
 };
 
+type RoleBindingInput =
+  RouterInputs["personalAccessToken"]["create"]["bindings"][number];
+
+type PermissionMode = "all" | "readonly" | "restricted";
+
+const STANDARD_ROLES = ["ADMIN", "MEMBER", "VIEWER"] as const;
+
+function rolesAtOrBelow(
+  role: string,
+): Array<{ label: string; value: string }> {
+  const idx = STANDARD_ROLES.indexOf(
+    role as (typeof STANDARD_ROLES)[number],
+  );
+  if (idx === -1) return [];
+  return STANDARD_ROLES.slice(idx).map((r) => ({ label: r, value: r }));
+}
+
 export type CreatePatInput = {
   name: string;
   description: string;
   expiresAt: Date | undefined;
+  bindings: RoleBindingInput[];
 };
 
 /**
  * Drawer form for creating a new PAT. Owns the transient form state
- * (name / description / expiration) and clears it every time it closes so
- * re-opening starts from a blank slate. The parent owns the network call
- * and token-display lifecycle.
+ * (name / description / expiration / permission mode) and clears it every
+ * time it closes so re-opening starts from a blank slate. The parent owns
+ * the network call and token-display lifecycle.
  */
 export function CreatePatDrawer({
   isOpen,
@@ -50,6 +70,12 @@ export function CreatePatDrawer({
   const [description, setDescription] = useState("");
   const [expirationPreset, setExpirationPreset] = useState("");
   const [customDate, setCustomDate] = useState("");
+  const [permissionMode, setPermissionMode] =
+    useState<PermissionMode>("all");
+  const [roleOverrides, setRoleOverrides] = useState<
+    Record<string, string>
+  >({});
+
   const minCustomDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + 1);
@@ -64,6 +90,49 @@ export function CreatePatDrawer({
     setDescription("");
     setExpirationPreset("");
     setCustomDate("");
+    setPermissionMode("all");
+    setRoleOverrides({});
+  };
+
+  const computeBindings = (): CreatePatInput["bindings"] => {
+    const data = myBindings.data;
+    if (!data) return [];
+    switch (permissionMode) {
+      case "all":
+        return data.map((b) => ({
+          role: b.role,
+          customRoleId: b.customRoleId,
+          scopeType: b.scopeType,
+          scopeId: b.scopeId,
+        }));
+      case "readonly":
+        return data.map((b) => ({
+          role: "VIEWER" as const,
+          customRoleId: null,
+          scopeType: b.scopeType,
+          scopeId: b.scopeId,
+        }));
+      case "restricted":
+        return data.map((b) => {
+          const overriddenRole = roleOverrides[b.id] as
+            | RoleBindingInput["role"]
+            | undefined;
+          if (overriddenRole && overriddenRole !== b.role) {
+            return {
+              role: overriddenRole,
+              customRoleId: null,
+              scopeType: b.scopeType,
+              scopeId: b.scopeId,
+            };
+          }
+          return {
+            role: b.role,
+            customRoleId: b.customRoleId,
+            scopeType: b.scopeType,
+            scopeId: b.scopeId,
+          };
+        });
+    }
   };
 
   const handleCreate = () => {
@@ -74,7 +143,12 @@ export function CreatePatDrawer({
       const days = parseInt(expirationPreset, 10);
       expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
     }
-    onCreate({ name, description, expiresAt });
+    onCreate({
+      name,
+      description,
+      expiresAt,
+      bindings: computeBindings(),
+    });
   };
 
   return (
@@ -126,21 +200,50 @@ export function CreatePatDrawer({
               <Text fontWeight="600" fontSize="sm">
                 Access
               </Text>
+              <RadioGroup
+                value={permissionMode}
+                onChange={(e) =>
+                  setPermissionMode(e.target.value as PermissionMode)
+                }
+              >
+                <HStack gap={4}>
+                  <Radio value="all">All permissions</Radio>
+                  <Radio value="readonly">Read only</Radio>
+                  <Radio value="restricted">Restricted</Radio>
+                </HStack>
+              </RadioGroup>
               <Box
                 width="full"
                 padding={3}
                 borderWidth="1px"
                 borderColor="border"
                 borderRadius="md"
-                background="bg.muted"
+                background="bg.subtle"
               >
-                <Text fontSize="sm">
-                  This token will inherit{" "}
-                  <Text as="span" fontWeight="600">
-                    your current permissions
-                  </Text>{" "}
-                  in this organization:
-                </Text>
+                {permissionMode === "all" && (
+                  <Text fontSize="sm">
+                    This token will inherit{" "}
+                    <Text as="span" fontWeight="600">
+                      your current permissions
+                    </Text>{" "}
+                    in this organization:
+                  </Text>
+                )}
+                {permissionMode === "readonly" && (
+                  <Text fontSize="sm">
+                    This token will have{" "}
+                    <Text as="span" fontWeight="600">
+                      read-only access
+                    </Text>{" "}
+                    (Viewer role) at every scope:
+                  </Text>
+                )}
+                {permissionMode === "restricted" && (
+                  <Text fontSize="sm">
+                    Choose a role for each scope, capped by your current
+                    permissions:
+                  </Text>
+                )}
                 {myBindings.isLoading ? (
                   <Text fontSize="xs" color="fg.muted" marginTop={2}>
                     Loading your role bindings…
@@ -158,15 +261,62 @@ export function CreatePatDrawer({
                           : b.scopeType === "TEAM"
                             ? `Team: ${b.scopeName ?? b.scopeId}`
                             : `Project: ${b.scopeName ?? b.scopeId}`;
+
+                      const isCustom = b.role === "CUSTOM";
+                      const availableRoles = rolesAtOrBelow(b.role);
+                      const effectiveRole =
+                        permissionMode === "readonly"
+                          ? "VIEWER"
+                          : permissionMode === "restricted"
+                            ? (roleOverrides[b.id] ?? b.role)
+                            : b.role;
                       const roleLabel =
-                        b.role === "CUSTOM"
-                          ? b.customRoleName ?? "Custom"
-                          : b.role;
+                        isCustom && permissionMode !== "readonly"
+                          ? (b.customRoleName ?? "Custom")
+                          : effectiveRole;
+
+                      const showSelector =
+                        permissionMode === "restricted" &&
+                        !isCustom &&
+                        availableRoles.length > 1;
+
                       return (
                         <HStack key={b.id} gap={2} fontSize="xs">
-                          <Badge size="sm" variant="subtle">
-                            {roleLabel}
-                          </Badge>
+                          {showSelector ? (
+                            <Select.Root
+                              collection={createListCollection({
+                                items: availableRoles,
+                              })}
+                              size="xs"
+                              value={[effectiveRole]}
+                              onValueChange={(details) => {
+                                const val = details.value[0];
+                                if (val)
+                                  setRoleOverrides((prev) => ({
+                                    ...prev,
+                                    [b.id]: val,
+                                  }));
+                              }}
+                            >
+                              <Select.Trigger minWidth="100px">
+                                <Select.ValueText />
+                              </Select.Trigger>
+                              <Select.Content>
+                                {availableRoles.map((opt) => (
+                                  <Select.Item
+                                    key={opt.value}
+                                    item={opt}
+                                  >
+                                    {opt.label}
+                                  </Select.Item>
+                                ))}
+                              </Select.Content>
+                            </Select.Root>
+                          ) : (
+                            <Badge size="sm" variant="subtle">
+                              {roleLabel}
+                            </Badge>
+                          )}
                           <Text color="fg.muted">{scopeLabel}</Text>
                         </HStack>
                       );
@@ -174,7 +324,7 @@ export function CreatePatDrawer({
                   </VStack>
                 )}
                 <Text fontSize="xs" color="fg.muted" marginTop={3}>
-                  Your access acts as a ceiling — if your role is later
+                  Your access acts as a ceiling. If your role is later
                   reduced, the token loses those permissions automatically.
                 </Text>
               </Box>
@@ -220,6 +370,7 @@ export function CreatePatDrawer({
               Cancel
             </Button>
             <Button
+              colorPalette="blue"
               onClick={handleCreate}
               disabled={
                 isCreating ||
