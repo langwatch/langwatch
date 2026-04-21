@@ -68,7 +68,6 @@ export interface ILicenseEnforcementRepository {
   getDashboardCount(organizationId: string): Promise<number>;
   getCustomGraphCount(organizationId: string): Promise<number>;
   getAutomationCount(organizationId: string): Promise<number>;
-  getEvaluationsCreditUsed(organizationId: string): Promise<number>;
   getCurrentMonthCost(organizationId: string): Promise<number>;
   getCurrentMonthCostForProjects(projectIds: string[]): Promise<number>;
 }
@@ -471,20 +470,6 @@ export class LicenseEnforcementRepository
       where: {
         projectId: { in: projectIds },
         deleted: false,
-      },
-    });
-  }
-
-  /**
-   * Counts evaluations credit used for the current month.
-   * Counts BatchEvaluation records created since the start of the month.
-   */
-  async getEvaluationsCreditUsed(organizationId: string): Promise<number> {
-    const startOfMonth = getCurrentMonthStart();
-    return this.prisma.batchEvaluation.count({
-      where: {
-        project: { team: { organizationId } },
-        createdAt: { gte: startOfMonth },
       },
     });
   }

@@ -10,7 +10,6 @@ export interface PlanFormDefaults {
   maxMembersLite?: number;
   maxProjects?: number;
   maxMessagesPerMonth?: number;
-  evaluationsCredit?: number;
   maxWorkflows?: number;
   maxPrompts?: number;
   maxEvaluators?: number;
@@ -30,7 +29,6 @@ export const PLAN_DEFAULTS: Record<PlanType, PlanFormDefaults> = {
     maxMembersLite: PRO_TEMPLATE.maxMembersLite,
     maxProjects: PRO_TEMPLATE.maxProjects,
     maxMessagesPerMonth: PRO_TEMPLATE.maxMessagesPerMonth,
-    evaluationsCredit: PRO_TEMPLATE.evaluationsCredit,
     maxWorkflows: PRO_TEMPLATE.maxWorkflows,
     maxPrompts: PRO_TEMPLATE.maxPrompts,
     maxEvaluators: PRO_TEMPLATE.maxEvaluators,
@@ -44,7 +42,6 @@ export const PLAN_DEFAULTS: Record<PlanType, PlanFormDefaults> = {
     maxMembersLite: ENTERPRISE_TEMPLATE.maxMembersLite,
     maxProjects: ENTERPRISE_TEMPLATE.maxProjects,
     maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-    evaluationsCredit: ENTERPRISE_TEMPLATE.evaluationsCredit,
     maxWorkflows: ENTERPRISE_TEMPLATE.maxWorkflows,
     maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts,
     maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators,

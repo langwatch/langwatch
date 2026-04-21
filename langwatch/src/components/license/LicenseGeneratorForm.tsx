@@ -62,7 +62,6 @@ interface FormData {
   maxTeams: number;
   maxProjects: number;
   maxMessagesPerMonth: number;
-  evaluationsCredit: number;
   maxWorkflows: number;
   maxPrompts: number;
   maxEvaluators: number;
@@ -92,7 +91,6 @@ const defaultFormData: FormData = {
   maxTeams: ENTERPRISE_TEMPLATE.maxTeams ?? 100,
   maxProjects: ENTERPRISE_TEMPLATE.maxProjects,
   maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-  evaluationsCredit: ENTERPRISE_TEMPLATE.evaluationsCredit,
   maxWorkflows: ENTERPRISE_TEMPLATE.maxWorkflows,
   maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts ?? 1000,
   maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators ?? 1000,
@@ -254,7 +252,6 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
           maxTeams: formData.maxTeams,
           maxProjects: formData.maxProjects,
           maxMessagesPerMonth: formData.maxMessagesPerMonth,
-          evaluationsCredit: formData.evaluationsCredit,
           maxWorkflows: formData.maxWorkflows,
           maxPrompts: formData.maxPrompts,
           maxEvaluators: formData.maxEvaluators,
@@ -560,11 +557,6 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
                 label="Max Messages/Month"
                 value={formData.maxMessagesPerMonth}
                 onChange={(value) => handleInputChange("maxMessagesPerMonth", value)}
-              />
-              <NumberField
-                label="Evaluations Credit"
-                value={formData.evaluationsCredit}
-                onChange={(value) => handleInputChange("evaluationsCredit", value)}
               />
               <NumberField
                 label="Max Workflows"

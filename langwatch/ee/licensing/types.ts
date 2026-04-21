@@ -11,7 +11,10 @@ export const LicensePlanLimitsSchema = z.object({
   maxTeams: z.number().optional(),
   maxProjects: z.number(),
   maxMessagesPerMonth: z.number(),
-  evaluationsCredit: z.number(),
+  // evaluationsCredit kept optional for backward compat: old signed licenses
+  // include this field. Stripping it would change the JSON, breaking signature
+  // verification. The field is otherwise unused (never enforced).
+  evaluationsCredit: z.number().optional(),
   maxWorkflows: z.number(),
   // New fields - optional for backward compatibility with existing signed licenses
   maxPrompts: z.number().optional(),
@@ -112,8 +115,6 @@ type LicenseResourceLimits = {
   maxAutomations: number;
   currentMessagesPerMonth: number;
   maxMessagesPerMonth: number;
-  currentEvaluationsCredit: number;
-  maxEvaluationsCredit: number;
 };
 
 type InvalidLicenseStatus = {

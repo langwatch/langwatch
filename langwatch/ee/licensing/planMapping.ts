@@ -16,7 +16,6 @@ export function mapToPlanInfo(licenseData: LicenseData): PlanInfo {
     maxTeams: resolved.maxTeams,
     maxProjects: resolved.maxProjects,
     maxMessagesPerMonth: resolved.maxMessagesPerMonth,
-    evaluationsCredit: resolved.evaluationsCredit,
     maxWorkflows: resolved.maxWorkflows,
     maxPrompts: resolved.maxPrompts,
     maxEvaluators: resolved.maxEvaluators,

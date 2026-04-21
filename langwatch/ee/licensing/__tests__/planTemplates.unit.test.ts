@@ -23,10 +23,6 @@ describe("PRO_TEMPLATE", () => {
     expect(PRO_TEMPLATE.maxMessagesPerMonth).toBe(100000);
   });
 
-  it("has evaluationsCredit of 500", () => {
-    expect(PRO_TEMPLATE.evaluationsCredit).toBe(500);
-  });
-
   it("has maxWorkflows of 50", () => {
     expect(PRO_TEMPLATE.maxWorkflows).toBe(50);
   });
@@ -75,10 +71,6 @@ describe("ENTERPRISE_TEMPLATE", () => {
 
   it("has maxMessagesPerMonth of 10000000", () => {
     expect(ENTERPRISE_TEMPLATE.maxMessagesPerMonth).toBe(10000000);
-  });
-
-  it("has evaluationsCredit of 10000", () => {
-    expect(ENTERPRISE_TEMPLATE.evaluationsCredit).toBe(10000);
   });
 
   it("has maxWorkflows of 1000", () => {
@@ -134,7 +126,6 @@ describe("GROWTH_TEMPLATE", () => {
         "maxTeams",
         "maxProjects",
         "maxMessagesPerMonth",
-        "evaluationsCredit",
         "maxWorkflows",
         "maxPrompts",
         "maxEvaluators",

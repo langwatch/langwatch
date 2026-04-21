@@ -7,7 +7,8 @@ const KNOWN_USAGE_UNITS = ["traces", "events"] as const;
  * ResolvedPlanLimits has all optional fields made required after defaults are applied.
  * This provides compile-time safety that all limits have defined values.
  */
-export type ResolvedPlanLimits = Required<LicensePlanLimits>;
+// TODO: remove the Omit when evaluationsCredit is dropped from LicensePlanLimitsSchema
+export type ResolvedPlanLimits = Required<Omit<LicensePlanLimits, "evaluationsCredit">>;
 
 /**
  * Applies default values to optional fields in LicensePlanLimits.
@@ -31,7 +32,6 @@ export function resolvePlanDefaults(plan: LicensePlanLimits): ResolvedPlanLimits
     maxMembers: plan.maxMembers,
     maxProjects: plan.maxProjects,
     maxMessagesPerMonth: plan.maxMessagesPerMonth,
-    evaluationsCredit: plan.evaluationsCredit,
     maxWorkflows: plan.maxWorkflows,
     canPublish: plan.canPublish,
 

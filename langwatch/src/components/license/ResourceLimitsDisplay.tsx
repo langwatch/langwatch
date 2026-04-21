@@ -18,8 +18,6 @@ export type ResourceKey =
   | "messagesPerMonth"
   | "eventsPerMonth"
   | "tracesPerMonth"
-  | "evaluationsCredit";
-
 /**
  * Display labels for each resource type.
  * Uses LIMIT_TYPE_DISPLAY_LABELS for core limit types, with additional
@@ -37,7 +35,6 @@ export const RESOURCE_LABELS: Record<ResourceKey, string> = {
   // look up a human-readable name for these resource types at runtime.
   eventsPerMonth: "Events / Month",
   tracesPerMonth: "Traces / Month",
-  evaluationsCredit: "Evaluations Credit",
 } as const;
 
 /** Ordered list of resource keys for consistent rendering */
@@ -59,7 +56,6 @@ export interface ResourceLimits {
   agents: { current: number; max: number };
   experiments: { current: number; max: number };
   messagesPerMonth: { current: number; max: number };
-  evaluationsCredit: { current: number; max: number };
 }
 
 /** Input type for license status data with plan and resource counts */
@@ -86,8 +82,6 @@ interface LicenseStatusWithPlan {
   maxExperiments: number;
   currentMessagesPerMonth: number;
   maxMessagesPerMonth: number;
-  currentEvaluationsCredit: number;
-  maxEvaluationsCredit: number;
 }
 
 /** Input type for usage data from the limits.getUsage query */
@@ -103,7 +97,6 @@ interface UsageData {
   agentsCount: number;
   experimentsCount: number;
   currentMonthMessagesCount: number | null;
-  evaluationsCreditUsed: number;
 }
 
 /**
@@ -125,7 +118,6 @@ export function mapLicenseStatusToLimits(
     agents: { current: licenseData.currentAgents, max: licenseData.maxAgents },
     experiments: { current: licenseData.currentExperiments, max: licenseData.maxExperiments },
     messagesPerMonth: { current: licenseData.currentMessagesPerMonth, max: licenseData.maxMessagesPerMonth },
-    evaluationsCredit: { current: licenseData.currentEvaluationsCredit, max: licenseData.maxEvaluationsCredit },
   };
 }
 
@@ -149,7 +141,6 @@ export function mapUsageToLimits(
     agents: { current: usage.agentsCount, max: plan.maxAgents },
     experiments: { current: usage.experimentsCount, max: plan.maxExperiments },
     messagesPerMonth: { current: usage.currentMonthMessagesCount ?? 0, max: plan.maxMessagesPerMonth },
-    evaluationsCredit: { current: usage.evaluationsCreditUsed, max: plan.evaluationsCredit },
   };
 }
 

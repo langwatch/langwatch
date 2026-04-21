@@ -66,7 +66,6 @@ function makeTestPlan(overrides: Record<string, unknown> = {}) {
     maxTeams: 10,
     maxProjects: 20,
     maxMessagesPerMonth: 100000,
-    evaluationsCredit: 500,
     maxWorkflows: 50,
     maxPrompts: 50,
     maxEvaluators: 50,

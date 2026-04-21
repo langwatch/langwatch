@@ -89,8 +89,6 @@ const FREE_TIER_LIMITS = {
   AUTOMATIONS: 3,
   /** ~33 messages per day */
   MESSAGES_PER_MONTH: 1_000,
-  /** Just enough to try the feature */
-  EVALUATIONS_CREDIT: 2,
 } as const;
 
 /**
@@ -113,7 +111,6 @@ export const UNLIMITED_PLAN: PlanInfo = {
   maxTeams: Number.MAX_SAFE_INTEGER,
   maxProjects: Number.MAX_SAFE_INTEGER,
   maxMessagesPerMonth: Number.MAX_SAFE_INTEGER,
-  evaluationsCredit: Number.MAX_SAFE_INTEGER,
   maxWorkflows: Number.MAX_SAFE_INTEGER,
   maxPrompts: Number.MAX_SAFE_INTEGER,
   maxEvaluators: Number.MAX_SAFE_INTEGER,
@@ -145,7 +142,6 @@ export const FREE_PLAN: PlanInfo = {
   overrideAddingLimitations: false,
 
   maxMessagesPerMonth: FREE_TIER_LIMITS.MESSAGES_PER_MONTH,
-  evaluationsCredit: FREE_TIER_LIMITS.EVALUATIONS_CREDIT,
 
   maxMembers: FREE_TIER_LIMITS.MEMBERS,
   maxMembersLite: FREE_TIER_LIMITS.MEMBERS_LITE,

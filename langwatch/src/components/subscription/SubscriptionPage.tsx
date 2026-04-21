@@ -326,7 +326,6 @@ export function SubscriptionPage() {
       maxMessagesPerMonth: plan?.maxMessagesPerMonth ?? 0,
       maxProjects: plan?.maxProjects ?? 0,
       maxMembersLite: plan?.maxMembersLite ?? 0,
-      evaluationsCredit: plan?.evaluationsCredit ?? 0,
     })
     : isEnterprisePlan
       ? ENTERPRISE_PLAN_FEATURES

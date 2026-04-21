@@ -95,13 +95,11 @@ export function buildTieredCapabilities({
   maxMessagesPerMonth,
   maxProjects,
   maxMembersLite,
-  evaluationsCredit,
 }: {
   maxMembers: number;
   maxMessagesPerMonth: number;
   maxProjects: number;
   maxMembersLite: number;
-  evaluationsCredit: number;
 }) {
   const coreUsersText =
     maxMembers > 0
@@ -125,18 +123,10 @@ export function buildTieredCapabilities({
       : maxMembersLite > 0
         ? `Up to ${formatNumber(maxMembersLite)} lite users`
         : "Custom lite user limits";
-  const evalsText =
-    evaluationsCredit >= 9999
-      ? "Unlimited evaluations"
-      : evaluationsCredit > 0
-        ? `${formatNumber(evaluationsCredit)} evaluation credits`
-        : "Custom evaluation limits";
-
   return [
     coreUsersText,
     eventsText,
     projectsText,
     liteUsersText,
-    evalsText,
   ];
 }

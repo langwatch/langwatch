@@ -109,7 +109,6 @@ export interface UsageStats {
   evaluatorsCount: number;
   agentsCount: number;
   experimentsCount: number;
-  evaluationsCreditUsed: number;
   messageLimitInfo: MessageLimitInfo;
   usageUnit: UsageUnit;
 }
@@ -170,7 +169,6 @@ export class UsageStatsService {
       evaluatorsCount,
       agentsCount,
       experimentsCount,
-      evaluationsCreditUsed,
       usageUnit,
     ] = await Promise.all([
       this.repository.getProjectCount(organizationId),
@@ -187,7 +185,6 @@ export class UsageStatsService {
       this.repository.getEvaluatorCount(organizationId),
       this.repository.getAgentCount(organizationId),
       this.repository.getExperimentCount(organizationId),
-      this.repository.getEvaluationsCreditUsed(organizationId),
       this.usageUnitResolver.getResolvedUsageUnit({ organizationId }),
     ]);
 
@@ -213,7 +210,6 @@ export class UsageStatsService {
       evaluatorsCount,
       agentsCount,
       experimentsCount,
-      evaluationsCreditUsed,
       messageLimitInfo,
       usageUnit,
     };

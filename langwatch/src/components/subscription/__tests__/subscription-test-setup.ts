@@ -46,7 +46,6 @@ export const createMockPlan = (overrides: Partial<PlanInfo> = {}): PlanInfo => (
   maxTeams: 1,
   maxProjects: 3,
   maxMessagesPerMonth: 50000,
-  evaluationsCredit: 3,
   maxWorkflows: 3,
   maxPrompts: 3,
   maxEvaluators: 3,
