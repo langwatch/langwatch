@@ -68,6 +68,7 @@ func (c *Checker) Debit(_ context.Context, bundle *domain.Bundle, usage domain.U
 		CostMicroUSD:     usage.CostMicroUSD,
 		PromptTokens:     usage.PromptTokens,
 		CompletionTokens: usage.CompletionTokens,
+		Model:            usage.Model,
 	})
 }
 

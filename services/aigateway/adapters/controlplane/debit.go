@@ -15,7 +15,7 @@ type DebitEvent struct {
 	CostMicroUSD     int64  `json:"actual_cost_micro_usd"`
 	PromptTokens     int    `json:"prompt_tokens"`
 	CompletionTokens int    `json:"completion_tokens"`
-	Model            string `json:"model,omitempty"`
+	Model            string `json:"model"`
 }
 
 // PostDebit sends a single debit event to the control plane.

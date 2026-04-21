@@ -49,7 +49,11 @@ func Budget(precheck BudgetPrecheckFunc, debit BudgetDebitFunc, logger *zap.Logg
 				if err != nil {
 					return nil, err
 				}
-				debit(ctx, call.Bundle, resp.Usage)
+				usage := resp.Usage
+				if usage.Model == "" {
+					usage.Model = call.Request.Model
+				}
+				debit(ctx, call.Bundle, usage)
 				return resp, nil
 			}
 		},
@@ -63,9 +67,10 @@ func Budget(precheck BudgetPrecheckFunc, debit BudgetDebitFunc, logger *zap.Logg
 					return nil, err
 				}
 				return &budgetStreamWrapper{
-					inner:  iter,
-					debit:  debit,
+					inner: iter,
+					debit: debit,
 					bundle: call.Bundle,
+					model: call.Request.Model,
 				}, nil
 			}
 		},
@@ -77,6 +82,7 @@ type budgetStreamWrapper struct {
 	inner     domain.StreamIterator
 	debit     BudgetDebitFunc
 	bundle    *domain.Bundle
+	model     string
 	lastCtx   context.Context
 	closeOnce sync.Once
 }
@@ -106,7 +112,11 @@ func (w *budgetStreamWrapper) onClose() {
 			ctx = context.Background()
 		}
 		forkedcontext.ForkWithTimeout(ctx, 5*time.Second, func(ctx context.Context) error {
-			w.debit(ctx, w.bundle, w.inner.Usage())
+			usage := w.inner.Usage()
+			if usage.Model == "" {
+				usage.Model = w.model
+			}
+			w.debit(ctx, w.bundle, usage)
 			return nil
 		})
 	})
