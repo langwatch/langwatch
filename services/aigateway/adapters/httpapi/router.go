@@ -57,6 +57,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 
 	r.Route("/v1", func(v1 chi.Router) {
 		v1.Use(AuthMiddleware(deps.App.Auth()))
+		v1.Use(CustomerTraceMiddleware())
 		v1.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
 		v1.Post("/chat/completions", chatHandler(deps))
 		v1.Post("/messages", messagesHandler(deps))

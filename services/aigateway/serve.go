@@ -25,7 +25,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		Health:                deps.Health,
 		Version:               info.Version,
 		TraceRegistry:         deps.TraceRegistry,
-		DefaultExportEndpoint: cfg.OTel.DefaultExportEndpoint,
+		DefaultExportEndpoint: cfg.CustomerTraceBridge.BaseURL + "/api/otel",
 	})
 
 	srv := &http.Server{Handler: handler, Addr: cfg.Server.Addr, ReadHeaderTimeout: 10 * time.Second}

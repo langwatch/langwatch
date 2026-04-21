@@ -48,12 +48,6 @@ func AuthMiddleware(resolver app.AuthResolver) func(http.Handler) http.Handler {
 				zap.String("team_id", bundle.TeamID),
 			)
 
-			// Store inbound traceparent before stripping, so trace bridge can
-			// link the customer's trace later.
-			ctx = customertracebridge.WithTraceParent(ctx, r.Header.Get("Traceparent"))
-			r.Header.Del("Traceparent")
-			r.Header.Del("Tracestate")
-
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
@@ -64,7 +58,14 @@ func AuthMiddleware(resolver app.AuthResolver) func(http.Handler) http.Handler {
 func TraceRegistryMiddleware(registry *customertracebridge.Registry, defaultEndpoint string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if bundle := BundleFromContext(r.Context()); bundle != nil && registry != nil {
+			bundle := BundleFromContext(r.Context())
+			if bundle == nil {
+				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInternal, herr.M{
+					"message": "TraceRegistryMiddleware requires auth to run first",
+				}))
+				return
+			}
+			if registry != nil {
 				if err := registry.SetFromBundle(
 					bundle.ProjectID, bundle.Config.ProjectOTLPToken, defaultEndpoint,
 				); err != nil {
@@ -73,6 +74,23 @@ func TraceRegistryMiddleware(registry *customertracebridge.Registry, defaultEndp
 				}
 			}
 			next.ServeHTTP(w, r)
+		})
+	}
+}
+
+// CustomerTraceMiddleware stashes the inbound traceparent for the bridge and
+// starts a fresh gateway-owned trace context for internal spans.
+func CustomerTraceMiddleware() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+
+			// Preserve the customer's traceparent so the bridge can link to it.
+			ctx = customertracebridge.WithTraceParent(ctx, r.Header.Get("Traceparent"))
+			r.Header.Del("Traceparent")
+			r.Header.Del("Tracestate")
+
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
