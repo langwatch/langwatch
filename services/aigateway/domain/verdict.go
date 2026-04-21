@@ -37,4 +37,9 @@ type AITraceParams struct {
 	ProviderID  ProviderID
 	Usage       Usage
 	RequestType RequestType
+
+	// RequestBody and ResponseBody are the raw JSON bodies for input/output
+	// extraction. Either may be nil (e.g. streaming responses).
+	RequestBody  []byte
+	ResponseBody []byte
 }

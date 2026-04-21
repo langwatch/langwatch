@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/tidwall/gjson"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -14,13 +15,16 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 const (
-	attrProjectID  = attribute.Key("langwatch.project_id")
-	attrTotalUsage = attribute.Key("gen_ai.usage.total_tokens")
-	attrCost       = attribute.Key("gen_ai.usage.cost")
+	attrProjectID      = attribute.Key("langwatch.project_id")
+	attrTotalUsage     = attribute.Key("gen_ai.usage.total_tokens")
+	attrCost           = attribute.Key("gen_ai.usage.cost")
+	attrInputMessages  = attribute.Key("gen_ai.input.messages")
+	attrOutputMessages = attribute.Key("gen_ai.output.messages")
 )
 
 // Emitter uses a private (non-global) OTel TracerProvider to construct spans
@@ -68,9 +72,11 @@ func NewEmitter(ctx context.Context, opts EmitterOptions) (*Emitter, error) {
 		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 	)
 
+	svcCtx := contexts.MustGetServiceInfo(ctx)
+
 	return &Emitter{
 		tp:         tp,
-		tracer:     tp.Tracer("langwatch-ai-gateway"),
+		tracer:     tp.Tracer(fmt.Sprintf("langwatch-%s", svcCtx.Service), trace.WithInstrumentationVersion(svcCtx.Version)),
 		propagator: propagation.TraceContext{},
 	}, nil
 }
@@ -117,6 +123,14 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		attrTotalUsage.Int(params.Usage.TotalTokens),
 		attrCost.Int64(params.Usage.CostMicroUSD),
 	)
+
+	if input := extractInputMessages(params.RequestBody, params.RequestType); input != "" {
+		span.SetAttributes(attrInputMessages.String(input))
+	}
+	if output := extractOutputMessages(params.ResponseBody, params.RequestType); output != "" {
+		span.SetAttributes(attrOutputMessages.String(output))
+	}
+
 	span.End()
 }
 
@@ -172,4 +186,52 @@ func parseTraceparent(tp string) (traceID []byte, spanID []byte) {
 		return nil, nil
 	}
 	return tid, sid
+}
+
+// extractInputMessages returns the JSON-encoded messages array from the request body.
+func extractInputMessages(body []byte, _ domain.RequestType) string {
+	if len(body) == 0 {
+		return ""
+	}
+	r := gjson.GetBytes(body, "messages")
+	if !r.Exists() {
+		return ""
+	}
+	return r.Raw
+}
+
+// extractOutputMessages returns the JSON-encoded assistant message(s) from the response body.
+func extractOutputMessages(body []byte, reqType domain.RequestType) string {
+	if len(body) == 0 {
+		return ""
+	}
+	switch reqType {
+	case domain.RequestTypeChat:
+		// OpenAI: choices[].message
+		choices := gjson.GetBytes(body, "choices")
+		if !choices.Exists() {
+			return ""
+		}
+		var msgs []string
+		choices.ForEach(func(_, v gjson.Result) bool {
+			msg := v.Get("message")
+			if msg.Exists() {
+				msgs = append(msgs, msg.Raw)
+			}
+			return true
+		})
+		if len(msgs) == 0 {
+			return ""
+		}
+		return "[" + strings.Join(msgs, ",") + "]"
+	case domain.RequestTypeMessages:
+		// Anthropic: content array is the output, wrap as assistant message
+		content := gjson.GetBytes(body, "content")
+		if !content.Exists() {
+			return ""
+		}
+		return `[{"role":"assistant","content":` + content.Raw + `}]`
+	default:
+		return ""
+	}
 }

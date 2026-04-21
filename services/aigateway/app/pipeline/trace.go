@@ -31,11 +31,13 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 				}
 				if call.Request.Resolved != nil {
 					end(spanCtx, domain.AITraceParams{
-						ProjectID:   call.Bundle.ProjectID,
-						Model:       call.Request.Resolved.ModelID,
-						ProviderID:  call.Request.Resolved.ProviderID,
-						Usage:       resp.Usage,
-						RequestType: call.Request.Type,
+						ProjectID:    call.Bundle.ProjectID,
+						Model:        call.Request.Resolved.ModelID,
+						ProviderID:   call.Request.Resolved.ProviderID,
+						Usage:        resp.Usage,
+						RequestType:  call.Request.Type,
+						RequestBody:  call.Request.Body,
+						ResponseBody: resp.Body,
 					})
 				}
 				return resp, nil
@@ -104,6 +106,7 @@ func (w *traceStreamWrapper) onClose() {
 				ProviderID:  w.req.Resolved.ProviderID,
 				Usage:       w.inner.Usage(),
 				RequestType: w.req.Type,
+				RequestBody: w.req.Body,
 			})
 			return nil
 		})
