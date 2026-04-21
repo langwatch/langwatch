@@ -4,6 +4,7 @@ import { AgentsApiService } from "@/client-sdk/services/agents/agents-api.servic
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const runAgentCommand = async (
   id: string,
@@ -96,7 +97,7 @@ export const runAgentCommand = async (
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Auth-Token": apiKey,
+            ...buildAuthHeaders({ apiKey }),
           },
           body: JSON.stringify(input),
         },

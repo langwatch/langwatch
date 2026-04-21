@@ -1,5 +1,4 @@
 import {
-  Alert,
   Badge,
   Button,
   Card,
@@ -24,7 +23,6 @@ import { Lock } from "react-feather";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { Tooltip } from "~/components/ui/tooltip";
-import { ApiKeyManagementSection } from "../components/settings/ApiKeyManagementSection";
 import { ProjectSelector } from "../components/DashboardLayout";
 import SettingsLayout from "../components/SettingsLayout";
 import {
@@ -183,6 +181,17 @@ function SettingsForm({
                 ) : (
                   <Text>{organization.slug}</Text>
                 )}
+              </HorizontalFormControl>
+              <HorizontalFormControl
+                label="Project ID"
+                helper="Use this ID when authenticating with Personal Access Tokens"
+              >
+                <Input
+                  width="full"
+                  disabled
+                  type="text"
+                  value={project.id}
+                />
               </HorizontalFormControl>
 
               {organization.useCustomS3 && (
@@ -755,8 +764,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               )}
             />
           </HorizontalFormControl>
-
-          <ApiKeyManagementSection project={project} />
 
           {organization?.useCustomS3 && (
             <HorizontalFormControl

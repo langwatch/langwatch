@@ -6,6 +6,7 @@ import {
 } from "@/client-sdk/services/suites";
 import { checkApiKey } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 function parseTarget(targetStr: string): SuiteTarget {
   const colonIndex = targetStr.indexOf(":");
@@ -110,7 +111,7 @@ export const runScenarioCommand = async (
           `${endpoint}/api/scenario-events?batchRunId=${encodeURIComponent(result.batchRunId)}`,
           {
             method: "GET",
-            headers: { "X-Auth-Token": apiKey },
+            headers: buildAuthHeaders({ apiKey }),
           },
         );
 

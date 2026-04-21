@@ -23,6 +23,7 @@ import { DatasetApiError, DatasetNotFoundError, DatasetPlanLimitError } from "./
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { tracer } from "./tracing";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 type DatasetServiceConfig = {
   langwatchApiClient: LangwatchApiClient;
@@ -369,10 +370,7 @@ export class DatasetService {
 
     const response = await fetch(url, {
       method: "POST",
-      headers: {
-        "X-Auth-Token": apiKey,
-        authorization: `Bearer ${apiKey}`,
-      },
+      headers: buildAuthHeaders({ apiKey }),
       body: formData,
     });
 

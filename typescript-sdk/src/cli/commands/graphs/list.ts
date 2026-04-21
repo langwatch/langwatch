@@ -4,6 +4,7 @@ import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const listGraphsCommand = async (options: {
   dashboardId?: string;
@@ -22,7 +23,7 @@ export const listGraphsCommand = async (options: {
     const qs = params.toString() ? `?${params}` : "";
 
     const response = await fetch(`${endpoint}/api/graphs${qs}`, {
-      headers: { "X-Auth-Token": apiKey },
+      headers: buildAuthHeaders({ apiKey }),
     });
 
     if (!response.ok) {

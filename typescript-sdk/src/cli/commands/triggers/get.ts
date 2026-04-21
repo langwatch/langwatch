@@ -3,6 +3,7 @@ import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const getTriggerCommand = async (
   id: string,
@@ -17,7 +18,7 @@ export const getTriggerCommand = async (
 
   try {
     const response = await fetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
-      headers: { "X-Auth-Token": apiKey },
+      headers: buildAuthHeaders({ apiKey }),
     });
 
     if (!response.ok) {

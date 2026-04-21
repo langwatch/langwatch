@@ -43,6 +43,7 @@ import type {
   TargetContext,
 } from "./types";
 import { printSummary } from "./printSummary";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 const DEFAULT_CONCURRENCY = 4;
 const DEBOUNCE_INTERVAL_MS = 1000;
@@ -179,7 +180,7 @@ export class Experiment {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Auth-Token": this.apiKey,
+          ...buildAuthHeaders({ apiKey: this.apiKey }),
         },
         body: JSON.stringify({
           experiment_name: this.name,
@@ -538,7 +539,7 @@ export class Experiment {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "X-Auth-Token": this.apiKey,
+            ...buildAuthHeaders({ apiKey: this.apiKey }),
           },
           body: JSON.stringify({
             trace_id: traceId ?? null,
@@ -1038,7 +1039,7 @@ export class Experiment {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
+        ...buildAuthHeaders({ apiKey: this.apiKey }),
       },
       body: JSON.stringify(body),
     })

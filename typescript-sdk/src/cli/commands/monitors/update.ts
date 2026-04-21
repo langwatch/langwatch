@@ -3,6 +3,7 @@ import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 export const updateMonitorCommand = async (
   id: string,
@@ -41,7 +42,7 @@ export const updateMonitorCommand = async (
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        "X-Auth-Token": apiKey,
+        ...buildAuthHeaders({ apiKey }),
       },
       body: JSON.stringify(body),
     });

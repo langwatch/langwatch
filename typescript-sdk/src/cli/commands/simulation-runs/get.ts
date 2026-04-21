@@ -3,6 +3,7 @@ import ora from "ora";
 import { checkApiKey } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 /**
  * Flattens Anthropic-style content (string OR array of {type:text|tool_use|tool_result|thinking})
@@ -67,7 +68,7 @@ export const getSimulationRunCommand = async (
       `${endpoint}/api/simulation-runs/${encodeURIComponent(runId)}`,
       {
         method: "GET",
-        headers: { "X-Auth-Token": apiKey },
+        headers: buildAuthHeaders({ apiKey }),
       },
     );
 

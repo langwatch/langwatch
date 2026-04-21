@@ -73,7 +73,12 @@ describe("listTriggersCommand()", () => {
 
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("/api/triggers"),
-        expect.objectContaining({ headers: expect.objectContaining({ "X-Auth-Token": "test-key" }) }),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: "Bearer test-key",
+            "x-auth-token": "test-key",
+          }),
+        }),
       );
     });
   });

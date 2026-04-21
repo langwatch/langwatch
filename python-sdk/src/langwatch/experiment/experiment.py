@@ -45,6 +45,7 @@ from langwatch.experiment.platform_run import (
     _print_summary,
 )
 from langwatch.telemetry.tracing import LangWatchTrace
+from langwatch.utils.auth import build_auth_headers
 from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import SerializableWithStringFallback
 
@@ -224,7 +225,7 @@ class Experiment:
         with httpx.Client(timeout=60) as client:
             response = client.post(
                 f"{langwatch.get_endpoint()}/api/experiment/init",
-                headers={"X-Auth-Token": langwatch.get_api_key() or ""},
+                headers=build_auth_headers(langwatch.get_api_key() or ""),
                 json={
                     "experiment_name": self.name,
                     "experiment_slug": self.experiment_slug,
@@ -286,7 +287,7 @@ class Experiment:
         for attempt in range(retries):
             try:
                 with httpx.Client(timeout=30) as client:
-                    response = client.get(url, headers={"X-Auth-Token": api_key})
+                    response = client.get(url, headers=build_auth_headers(api_key))
 
                 if response.status_code == 404:
                     if attempt < retries - 1:
@@ -1044,7 +1045,7 @@ class Experiment:
         response = httpx.post(
             f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
             headers={
-                "Authorization": f"Bearer {api_key}",
+                **build_auth_headers(api_key),
                 "Content-Type": "application/json",
             },
             data=json.dumps(body, cls=SerializableWithStringFallback),  # type: ignore

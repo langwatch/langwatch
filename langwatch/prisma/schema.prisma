@@ -91,6 +91,7 @@ model User {
     promptTagsUpdated       PromptTag[]            @relation("promptTagUpdatedBy")
     groupMemberships        GroupMembership[]
     roleBindings            RoleBinding[]
+    personalAccessTokens    PersonalAccessToken[]
 
 }
 
@@ -206,7 +207,8 @@ model Organization {
     scimTokens    ScimToken[]
     promptTags    PromptTag[]
     groups        Group[]
-    roleBindings  RoleBinding[]
+    roleBindings           RoleBinding[]
+    personalAccessTokens   PersonalAccessToken[]
     // License enforcement fields (COSS-0226)
     license                String?   @db.Text
     licenseExpiresAt       DateTime?
@@ -1289,6 +1291,8 @@ model RoleBinding {
     user           User?                @relation(fields: [userId], references: [id], onDelete: Cascade)
     groupId        String?
     group          Group?               @relation("GroupBindings", fields: [groupId], references: [id], onDelete: Cascade)
+    patId          String?
+    pat            PersonalAccessToken? @relation(fields: [patId], references: [id], onDelete: Restrict)
 
     // Role — built-in named role or custom
     role           TeamUserRole
@@ -1302,13 +1306,37 @@ model RoleBinding {
     createdAt      DateTime             @default(now())
     updatedAt      DateTime             @default(now()) @updatedAt
 
-    // Uniqueness is enforced by four partial unique indexes defined in migrations
-    // (20260410120000_fix_role_binding_unique_custom_role). Prisma does not
-    // support partial indexes natively, so there is no @@unique here.
+    // Uniqueness is enforced by six partial unique indexes defined in migrations:
+    //   • user + group (built-in and custom) — 20260410120000_fix_role_binding_unique_custom_role
+    //   • pat (built-in and custom) — 20260414222341_add_personal_access_tokens
+    // Prisma does not support partial indexes natively, so there is no @@unique here.
     @@index([organizationId])
     @@index([userId])
     @@index([groupId])
+    @@index([patId])
     @@index([scopeType, scopeId])
+}
+
+model PersonalAccessToken {
+    id             String        @id @default(nanoid())
+    name           String
+    description    String?
+    lookupId       String        @unique
+    hashedSecret   String
+    userId         String
+    user           User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+    organizationId String
+    organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+    roleBindings   RoleBinding[]
+    expiresAt      DateTime?
+    lastUsedAt     DateTime?
+    revokedAt      DateTime?
+    createdAt      DateTime      @default(now())
+    updatedAt      DateTime      @default(now()) @updatedAt
+
+    @@index([userId])
+    @@index([organizationId])
+    @@index([lookupId])
 }
 
 model BillingMeterCheckpoint {

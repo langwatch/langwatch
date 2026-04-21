@@ -36,6 +36,7 @@ from langwatch.telemetry.span import LangWatchSpan
 from langwatch.telemetry.context import get_current_span
 from langwatch.state import get_api_key, get_endpoint, get_instance
 from langwatch.attributes import AttributeKey
+from langwatch.utils.auth import build_auth_headers
 from langwatch.utils.exceptions import EvaluatorException, better_raise_for_status
 from pydantic import BaseModel
 
@@ -289,7 +290,7 @@ def _prepare_data(
             "settings": settings,
             "as_guardrail": as_guardrail,
         },
-        "headers": {"X-Auth-Token": get_api_key()},
+        "headers": build_auth_headers(get_api_key()),
     }
 
 
