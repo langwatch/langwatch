@@ -43,8 +43,10 @@ func TestWalk_SuccessOnFirstSlot(t *testing.T) {
 		return "ok-" + slot, nil
 	}
 
-	result, events, err := Walk(context.Background(), Options{}, chain, attempt, retryableClassifier)
+	result, el, err := Walk(context.Background(), Options{}, chain, attempt, retryableClassifier)
+	defer el.Release()
 
+	events := el.Events()
 	require.NoError(t, err)
 	assert.Equal(t, "ok-a", result)
 	require.Len(t, events, 1)
@@ -62,8 +64,10 @@ func TestWalk_FallbackSuccess(t *testing.T) {
 		return "ok-" + slot, nil
 	}
 
-	result, events, err := Walk(context.Background(), Options{}, chain, attempt, retryableClassifier)
+	result, el, err := Walk(context.Background(), Options{}, chain, attempt, retryableClassifier)
+	defer el.Release()
 
+	events := el.Events()
 	require.NoError(t, err)
 	assert.Equal(t, "ok-b", result)
 	assert.Equal(t, 2, calls)
@@ -78,11 +82,12 @@ func TestWalk_ChainExhausted(t *testing.T) {
 		return "", errRetryable
 	}
 
-	_, events, err := Walk(context.Background(), Options{}, chain, attempt, retryableClassifier)
+	_, el, err := Walk(context.Background(), Options{}, chain, attempt, retryableClassifier)
+	defer el.Release()
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "retry chain exhausted")
-	assert.Len(t, events, 3)
+	assert.Len(t, el.Events(), 3)
 }
 
 func TestWalk_NonRetryableStops(t *testing.T) {
@@ -91,8 +96,10 @@ func TestWalk_NonRetryableStops(t *testing.T) {
 		return "", errFatal
 	}
 
-	_, events, err := Walk(context.Background(), Options{}, chain, attempt, retryableClassifier)
+	_, el, err := Walk(context.Background(), Options{}, chain, attempt, retryableClassifier)
+	defer el.Release()
 
+	events := el.Events()
 	require.Error(t, err)
 	require.ErrorIs(t, err, errFatal)
 	require.Len(t, events, 1, "should stop after first non-retryable error")
@@ -107,8 +114,10 @@ func TestWalk_MaxAttempts(t *testing.T) {
 		return "", errRetryable
 	}
 
-	_, events, err := Walk(context.Background(), Options{MaxAttempts: 2}, chain, attempt, retryableClassifier)
+	_, el, err := Walk(context.Background(), Options{MaxAttempts: 2}, chain, attempt, retryableClassifier)
+	defer el.Release()
 
+	events := el.Events()
 	require.Error(t, err)
 	assert.Equal(t, 2, calls)
 	// 2 attempt events + 1 chain_exhausted event
@@ -125,8 +134,10 @@ func TestWalk_ContextCanceled(t *testing.T) {
 		return "should not reach", nil
 	}
 
-	_, events, err := Walk(ctx, Options{}, chain, attempt, retryableClassifier)
+	_, el, err := Walk(ctx, Options{}, chain, attempt, retryableClassifier)
+	defer el.Release()
 
+	events := el.Events()
 	require.Error(t, err)
 	require.Len(t, events, 1)
 	assert.Equal(t, ReasonContextDone, events[0].Reason)
@@ -146,8 +157,10 @@ func TestWalk_BreakerSkipsSlot(t *testing.T) {
 		return "ok-" + slot, nil
 	}
 
-	result, events, err := Walk(context.Background(), Options{Breaker: b}, chain, attempt, retryableClassifier)
+	result, el, err := Walk(context.Background(), Options{Breaker: b}, chain, attempt, retryableClassifier)
+	defer el.Release()
 
+	events := el.Events()
 	require.NoError(t, err)
 	assert.Equal(t, "ok-c", result)
 	assert.Equal(t, []string{"a", "c"}, calls, "should skip slot b")
@@ -178,8 +191,10 @@ func TestWalk_CircuitOpenDoesNotConsumeAttempts(t *testing.T) {
 
 	// MaxAttempts=1 but first two slots are circuit-open — they should NOT
 	// consume the budget. Only slot "c" should actually be attempted.
-	_, events, err := Walk(context.Background(), Options{MaxAttempts: 1, Breaker: b}, chain, attempt, retryableClassifier)
+	_, el, err := Walk(context.Background(), Options{MaxAttempts: 1, Breaker: b}, chain, attempt, retryableClassifier)
+	defer el.Release()
 
+	events := el.Events()
 	require.Error(t, err)
 	assert.Equal(t, 1, calls, "only 1 real attempt should be made")
 
@@ -196,8 +211,10 @@ func TestWalk_EmptyChain(t *testing.T) {
 		return fmt.Sprintf("result-slot:%s", slot), nil
 	}
 
-	result, events, err := Walk(context.Background(), Options{}, nil, attempt, retryableClassifier)
+	result, el, err := Walk(context.Background(), Options{}, nil, attempt, retryableClassifier)
+	defer el.Release()
 
+	events := el.Events()
 	require.NoError(t, err)
 	assert.Equal(t, "result-slot:", result)
 	require.Len(t, events, 1)

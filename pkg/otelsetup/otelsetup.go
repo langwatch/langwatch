@@ -29,6 +29,9 @@ type Options struct {
 	TraceHeaders  map[string]string // auth headers for the collector
 	BatchTimeout  time.Duration
 	MaxQueueSize  int
+	// SampleRatio controls the fraction of traces sampled (0.0–1.0).
+	// 0 means "use default" (AlwaysSample). Set explicitly via config.
+	SampleRatio float64
 }
 
 // Provider holds the configured OTel SDK providers.
@@ -101,13 +104,20 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 		queueSize = 8192
 	}
 
+	var rootSampler sdktrace.Sampler
+	if opts.SampleRatio > 0 && opts.SampleRatio < 1.0 {
+		rootSampler = sdktrace.TraceIDRatioBased(opts.SampleRatio)
+	} else {
+		rootSampler = sdktrace.AlwaysSample()
+	}
+
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithResource(res),
 		sdktrace.WithBatcher(exp,
 			sdktrace.WithBatchTimeout(batchTimeout),
 			sdktrace.WithMaxQueueSize(queueSize),
 		),
-		sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.AlwaysSample())),
+		sdktrace.WithSampler(sdktrace.ParentBased(rootSampler)),
 	)
 	otelapi.SetTracerProvider(tp)
 

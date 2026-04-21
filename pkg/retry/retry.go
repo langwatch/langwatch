@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -49,6 +50,49 @@ type Event struct {
 	Err      error
 }
 
+// EventLog holds a pooled slice of events from a Walk call. The struct wrapper
+// keeps the *EventLog pointer stable through Get/Put — avoids re-allocating a
+// pointer on every Release (which defeats the pool). Call Release when done.
+type EventLog struct {
+	events []Event
+}
+
+// Events returns the recorded events.
+func (el *EventLog) Events() []Event {
+	if el == nil {
+		return nil
+	}
+	return el.events
+}
+
+// Release returns the backing memory to the pool. The EventLog must not be
+// used after calling Release.
+func (el *EventLog) Release() {
+	if el == nil {
+		return
+	}
+	for i := range el.events {
+		el.events[i] = Event{}
+	}
+	el.events = el.events[:0]
+	eventsPool.Put(el)
+}
+
+var eventsPool = sync.Pool{
+	New: func() any {
+		return &EventLog{events: make([]Event, 0, 4)}
+	},
+}
+
+// defaultTriggers is a package-level read-only map so withDefaults() doesn't
+// allocate a new map on every Walk call.
+var defaultTriggers = map[Reason]bool{
+	ReasonRetryable5xx: true,
+	ReasonRateLimit:    true,
+	ReasonTimeout:      true,
+	ReasonNetwork:      true,
+}
+
 // Options configures the retry engine.
 type Options struct {
 	Triggers          map[Reason]bool // reasons that trigger retry (default: 5xx, rate_limit, timeout, network)
@@ -59,18 +103,14 @@ type Options struct {
 
 func (o *Options) withDefaults() {
 	if o.Triggers == nil {
-		o.Triggers = map[Reason]bool{
-			ReasonRetryable5xx: true,
-			ReasonRateLimit:    true,
-			ReasonTimeout:      true,
-			ReasonNetwork:      true,
-		}
+		o.Triggers = defaultTriggers
 	}
 }
 
 // Walk executes the attempt across the chain. Returns the first successful
-// result, all events, or an error if the chain is exhausted.
-func Walk[R any](ctx context.Context, opts Options, chain []string, try Attempt[R], classify Classifier) (R, []Event, error) {
+// result, an EventLog (call Release when done), or an error if the chain is
+// exhausted.
+func Walk[R any](ctx context.Context, opts Options, chain []string, try Attempt[R], classify Classifier) (R, *EventLog, error) {
 	var zero R
 	opts.withDefaults()
 
@@ -78,21 +118,21 @@ func Walk[R any](ctx context.Context, opts Options, chain []string, try Attempt[
 		chain = []string{""}
 	}
 
-	var events []Event
+	el := eventsPool.Get().(*EventLog)
 	var firstErr error
 	attempts := 0
 
 	for i, slotID := range chain {
 		if err := ctx.Err(); err != nil {
-			events = append(events, Event{Slot: i, SlotID: slotID, Reason: ReasonContextDone, Err: err})
-			return zero, events, err
+			el.events = append(el.events, Event{Slot: i, SlotID: slotID, Reason: ReasonContextDone, Err: err})
+			return zero, el, err
 		}
 		if slotID != "" && opts.Breaker != nil && !opts.Breaker.Allow(slotID) {
-			events = append(events, Event{Slot: i, SlotID: slotID, Reason: ReasonCircuitOpen})
+			el.events = append(el.events, Event{Slot: i, SlotID: slotID, Reason: ReasonCircuitOpen})
 			continue
 		}
 		if opts.MaxAttempts > 0 && attempts >= opts.MaxAttempts {
-			events = append(events, Event{Slot: i, SlotID: slotID, Reason: ReasonChainExhausted})
+			el.events = append(el.events, Event{Slot: i, SlotID: slotID, Reason: ReasonChainExhausted})
 			break
 		}
 		attempts++
@@ -116,11 +156,11 @@ func Walk[R any](ctx context.Context, opts Options, chain []string, try Attempt[
 			if i > 0 {
 				reason = ReasonFallback
 			}
-			events = append(events, Event{Slot: i, SlotID: slotID, Reason: reason, Duration: duration})
+			el.events = append(el.events, Event{Slot: i, SlotID: slotID, Reason: reason, Duration: duration})
 			if slotID != "" && opts.Breaker != nil {
 				opts.Breaker.RecordSuccess(slotID)
 			}
-			return result, events, nil
+			return result, el, nil
 		}
 
 		if firstErr == nil {
@@ -131,18 +171,18 @@ func Walk[R any](ctx context.Context, opts Options, chain []string, try Attempt[
 		if classify != nil {
 			reason = classify(err)
 		}
-		events = append(events, Event{Slot: i, SlotID: slotID, Reason: reason, Duration: duration, Err: err})
+		el.events = append(el.events, Event{Slot: i, SlotID: slotID, Reason: reason, Duration: duration, Err: err})
 
 		if slotID != "" && opts.Breaker != nil {
 			opts.Breaker.RecordFailure(slotID)
 		}
 		if !opts.Triggers[reason] {
-			return zero, events, err
+			return zero, el, err
 		}
 	}
 
 	if firstErr == nil {
 		firstErr = errors.New("retry chain exhausted with no attempts")
 	}
-	return zero, events, fmt.Errorf("retry chain exhausted: %w", firstErr)
+	return zero, el, fmt.Errorf("retry chain exhausted: %w", firstErr)
 }
