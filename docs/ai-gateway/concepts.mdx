@@ -129,21 +129,21 @@ LangWatch evaluators invoked inline on gateway traffic. Each VK can attach guard
 
 Guardrails reuse your existing LangWatch evaluators; nothing new to author for the gateway.
 
-## Blocked patterns
+## Policy rules
 
 Per-VK regex allow/deny lists for:
 
 - **Tool calls** — matched against `tools[].function.name` (OpenAI) and `tools[].name` (Anthropic). Denied tools → 403 `tool_not_allowed`.
 - **MCP servers** — matched against declared `mcp_servers[].name` and `.url`. Denied servers → 403 `tool_not_allowed`.
-- **Outbound URLs** — heuristically matched against tool-call arguments that look like URLs. Advisory for v1; hard enforcement requires egress proxy.
+- **Outbound URLs** — heuristically matched against every `http(s)://` URL in the request body. Denied URLs → 403 `url_not_allowed`.
 
-Each block emits a `GatewayAuditLog` row + the `X-LangWatch-Request-Id` response header → trace correlation. (A dedicated `langwatch.policy.blocked` span attribute is tracked as a v1.1 observability follow-up; see [Observability → Per-feature attributes](/ai-gateway/observability#per-feature-attributes-when-applicable) for the full v1 vs v1.1 matrix.)
+Each block emits a `GatewayAuditLog` row + the `X-LangWatch-Request-Id` response header → trace correlation.
 
 ## Traces (per-tenant observability)
 
 Every request emits a LangWatch trace. The clever part: the gateway is a shared multi-tenant service, but each trace is routed to the **owning tenant's project** — tenant A never sees tenant B's traffic.
 
-Attributes always present (source of truth: `services/gateway/internal/otel/attrs.go`):
+Attributes always present (source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`):
 
 - `langwatch.virtual_key_id`, `langwatch.project_id`, `langwatch.team_id`, `langwatch.organization_id`, `langwatch.principal_id`.
 - `langwatch.model`, `langwatch.provider`, `langwatch.model_source`, `langwatch.streaming`.

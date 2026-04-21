@@ -13,18 +13,18 @@ Every request passing through the gateway emits an OTLP trace. The pattern is bo
 1. At auth resolution the gateway knows `vk_id → project_id → team_id → org_id → principal_id`.
 2. Every span in the request's trace is tagged with these as `langwatch.*` attributes.
 3. The bundle returned by `/api/internal/gateway/config/:vk_id` carries `project_id` — the gateway uses it to tag every span on the trace.
-4. The gateway ships all traces to a single endpoint (`GATEWAY_OTEL_DEFAULT_ENDPOINT`, default `https://app.langwatch.ai/otel/v1/traces`).
+4. The gateway ships all traces to a single endpoint (`OTEL_DEFAULT_EXPORT_ENDPOINT`, default `https://app.langwatch.ai/otel/v1/traces`).
 5. LangWatch's ingest pipeline reads `langwatch.project_id` off each span and stores the trace under the owning project — the attribution happens at ingest, not at export.
 
 So the gateway has a single egress path, but attribution is still per-tenant: tenant A's traces file under tenant A's project, tenant B's under tenant B's. There is no customer-facing override — we sell observability, so everything routes to the LangWatch pipeline by design.
 
 ## Self-hosted
 
-On self-hosted deployments, set `GATEWAY_OTEL_DEFAULT_ENDPOINT` to your in-cluster OTel collector (or LangWatch ingestion endpoint for hybrid setups). Attribution works the same way: per-project span attributes are filed at ingest.
+On self-hosted deployments, set `OTEL_DEFAULT_EXPORT_ENDPOINT` to your in-cluster OTel collector (or LangWatch ingestion endpoint for hybrid setups). Attribution works the same way: per-project span attributes are filed at ingest.
 
 ## Attributes on every gateway span
 
-Source of truth: `services/gateway/internal/otel/attrs.go`. The gateway emits these attributes on every span (via the `*chi.Context` helper and the dispatch handlers):
+Source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`. The gateway emits these attributes on every span (via the `*chi.Context` helper and the dispatch handlers):
 
 | Attribute | Meaning |
 |---|---|
@@ -49,9 +49,13 @@ Source of truth: `services/gateway/internal/otel/attrs.go`. The gateway emits th
 ## Per-feature attributes (when applicable)
 
 - `langwatch.cache.rule_id` / `langwatch.cache.rule_priority` / `langwatch.cache.mode_applied` — emitted when a bundle-baked cache-control rule matches and determines the final effective cache mode (post header-vs-rule-vs-default precedence). See [Cache control](/ai-gateway/cache-control#rules-engine).
-- `langwatch.guardrail.verdict` — declared as the canonical aggregate verdict; **not yet wired at the dispatcher hot path in v1** (see [Guardrails → Observability](/ai-gateway/guardrails#observability) for the caveat).
+- `langwatch.guardrail.verdict` — aggregate verdict from pre/post guardrail evaluation.
+- `langwatch.fallback.attempts_count` — total attempts before success (1 = no fallback).
+- `langwatch.fallback.winning_provider` — provider that ultimately served the request.
+- `langwatch.fallback.winning_credential` — credential ID of the winning provider slot.
+- `langwatch.thread_id` — thread/conversation ID when provided via `X-LangWatch-Thread-Id` header.
 
-<Info>The following attributes were originally drafted but are **not emitted in v1** (tracked for v1.1): `langwatch.fallback.attempt` / `.reason`, `langwatch.policy.blocked`, `langwatch.budget.breached_scope` / `.warnings`, `langwatch.stream.*`, `langwatch.client.name`, `langwatch.cache.outcome` / `.forced_injected`. Operators looking for per-feature signals in v1 should use the Prometheus counters documented below — those are the authoritative v1 observability surface. Request-id correlation via the `X-LangWatch-Request-Id` header lets operators join metric spikes back to individual traces.</Info>
+<Info>The following attributes are **not yet emitted** (tracked for v1.1): `langwatch.policy.blocked`, `langwatch.budget.breached_scope` / `.warnings`, `langwatch.stream.*`, `langwatch.client.name`, `langwatch.cache.outcome` / `.forced_injected`. Operators looking for these signals should use the Prometheus counters documented below. Request-id correlation via the `X-LangWatch-Request-Id` header lets operators join metric spikes back to individual traces.</Info>
 
 ## Filtering in the LangWatch UI
 
@@ -82,9 +86,9 @@ Scrape with a `ServiceMonitor` (Prometheus Operator) or standard scrape config �
 
 ## When OTel and metrics disagree
 
-OTel traces are sampled (configurable), metrics are exact counters. If your metrics show 1k requests but the LangWatch UI only has 100 traces for a given window, check the OTel sampling rate — it's set via `$LW_GATEWAY_OTEL_SAMPLE_RATIO` (default `1.0` = 100%).
+OTel traces are sampled (configurable at the collector level), metrics are exact counters. If your metrics show 1k requests but the LangWatch UI only has 100 traces for a given window, check the OTel sampling rate on your collector.
 
-Error requests are always sampled at 100% regardless of the setting, so debugging remains reliable even when bulk sampling is lower.
+The gateway itself exports all spans — sampling is applied downstream at the collector or ingest layer.
 
 ## Debugging a single request
 

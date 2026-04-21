@@ -6,7 +6,7 @@ sidebarTitle: Overview
 
 The **LangWatch AI Gateway** is a single OpenAI- and Anthropic-compatible endpoint that every application, SDK, or coding CLI in your organization can send LLM traffic to. The gateway applies organisation-wide policy, attribution, budget enforcement, caching, guardrails, and fallback in the path of every request — and emits per-tenant OpenTelemetry traces that land in each project's LangWatch workspace.
 
-<Info>**~11 µs of gateway-side overhead at 5k RPS sustained.** Written in Go with fasthttp + sonic + in-process JWT verification. The hot path sits in front of every LLM call — it has to be close to free.</Info>
+<Info>**~11 µs of gateway-side overhead at 5k RPS sustained.** Written in Go with chi + in-process JWT verification. The hot path sits in front of every LLM call — it has to be close to free.</Info>
 
 ## Try it in 30 seconds
 
@@ -109,7 +109,7 @@ The LangWatch AI Gateway replaces every direct provider call with a single call 
 
 The gateway is written in Go and embeds [`github.com/maximhq/bifrost/core`](https://github.com/maximhq/bifrost) as a library for provider-specific dispatch (Azure deployment name quirks, Bedrock regional inference profiles, Vertex OAuth refresh, streaming format divergences across providers). LangWatch owns everything above the dispatch line: auth, policy, budgets, guardrails, per-tenant observability.
 
-**Why a separate Go service?** Sub-millisecond overhead on the hot path matters when the gateway sits in front of every LLM call. Go with fasthttp + sonic + in-process JWT verification gives us ~11 µs gateway-side overhead at 5k RPS sustained. A Python/FastAPI or Node/Hono gateway cannot reach those numbers.
+**Why a separate Go service?** Sub-millisecond overhead on the hot path matters when the gateway sits in front of every LLM call. Go with chi + in-process JWT verification gives us ~11 µs gateway-side overhead at 5k RPS sustained. A Python/FastAPI or Node/Hono gateway cannot reach those numbers.
 
 **Why embed, not fork?** Bifrost's provider dispatch is where hundreds of engineer-hours per provider have been invested (native SDKs for every provider, streaming format normalisation, tool-call delta reassembly, reasoning-token handling). That's the part we consume as a library. The policy / governance / observability layers on top are ours — the product.
 
