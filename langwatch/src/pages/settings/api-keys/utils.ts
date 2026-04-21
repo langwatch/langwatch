@@ -30,6 +30,81 @@ export function formatEnvLines(
     .join("\n");
 }
 
+export const STANDARD_ROLES = ["ADMIN", "MEMBER", "VIEWER"] as const;
+
+/** Returns the list of standard roles at or below the given role in the hierarchy. */
+export function rolesAtOrBelow(
+  role: string,
+): Array<{ label: string; value: string }> {
+  const idx = STANDARD_ROLES.indexOf(
+    role as (typeof STANDARD_ROLES)[number],
+  );
+  if (idx === -1) return [];
+  return STANDARD_ROLES.slice(idx).map((r) => ({ label: r, value: r }));
+}
+
+export type PermissionMode = "all" | "readonly" | "restricted";
+
+/** Computes the effective bindings array based on the selected permission mode. */
+export function computeBindings({
+  data,
+  permissionMode,
+  roleOverrides,
+}: {
+  data:
+    | Array<{
+        id: string;
+        role: string;
+        customRoleId: string | null;
+        scopeType: string;
+        scopeId: string;
+      }>
+    | undefined;
+  permissionMode: PermissionMode;
+  roleOverrides: Record<string, string>;
+}): Array<{
+  role: string;
+  customRoleId: string | null | undefined;
+  scopeType: string;
+  scopeId: string;
+}> {
+  if (!data) return [];
+  switch (permissionMode) {
+    case "all":
+      return data.map((b) => ({
+        role: b.role,
+        customRoleId: b.customRoleId,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+      }));
+    case "readonly":
+      return data.map((b) => ({
+        role: "VIEWER" as const,
+        customRoleId: null,
+        scopeType: b.scopeType,
+        scopeId: b.scopeId,
+      }));
+    case "restricted":
+      return data.map((b) => {
+        const overriddenRole = roleOverrides[b.id];
+        if (overriddenRole && overriddenRole !== b.role) {
+          return {
+            role: overriddenRole,
+            customRoleId: null,
+            scopeType: b.scopeType,
+            scopeId: b.scopeId,
+          };
+        }
+        return {
+          role: b.role,
+          customRoleId: b.customRoleId,
+          scopeType: b.scopeType,
+          scopeId: b.scopeId,
+        };
+      });
+  }
+}
+
 /** One-line summary of a role-binding set for table display. */
 export function roleSummary(
   bindings: Array<{
