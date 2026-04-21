@@ -720,9 +720,64 @@ describe("<AICreateModal/>", () => {
       );
 
       const dialog = getDialogContent();
-      const link = within(dialog).getByRole("link", { name: /model provider/i });
-      expect(link).toBeInTheDocument();
-      expect(link).toHaveAttribute("href", "/settings/model-providers");
+      // Two links match /model provider/i: the inline body link and the footer button.
+      // Assert the inline body link (first in DOM order) still points to the settings page.
+      const links = within(dialog).getAllByRole("link", { name: /model provider/i });
+      expect(links[0]).toBeInTheDocument();
+      expect(links[0]).toHaveAttribute("href", "/settings/model-providers");
+    });
+
+    describe("footer Configure model provider button", () => {
+      function getFooterConfigureButton(dialog: HTMLElement) {
+        // Both the inline body link and the footer button have accessible name
+        // "Configure model provider". The footer button is last in DOM order.
+        const links = within(dialog).getAllByRole("link", {
+          name: /configure model provider/i,
+        });
+        return links[links.length - 1]!;
+      }
+
+      it("shows primary Configure model provider button in footer", () => {
+        render(
+          <AICreateModal
+            open={true}
+            onClose={vi.fn()}
+            title="Create new scenario"
+            exampleTemplates={defaultExampleTemplates}
+            onGenerate={vi.fn()}
+            onSkip={vi.fn()}
+            hasModelProviders={false}
+          />,
+          { wrapper: Wrapper }
+        );
+
+        const dialog = getDialogContent();
+        const button = getFooterConfigureButton(dialog);
+        expect(button).toBeInTheDocument();
+        expect(button).toHaveAttribute("href", "/settings/model-providers");
+        expect(button).toHaveAttribute("target", "_blank");
+      });
+
+      it("footer button uses rel noopener noreferrer", () => {
+        render(
+          <AICreateModal
+            open={true}
+            onClose={vi.fn()}
+            title="Create new scenario"
+            exampleTemplates={defaultExampleTemplates}
+            onGenerate={vi.fn()}
+            onSkip={vi.fn()}
+            hasModelProviders={false}
+          />,
+          { wrapper: Wrapper }
+        );
+
+        const dialog = getDialogContent();
+        const button = getFooterConfigureButton(dialog);
+        const rel = button.getAttribute("rel") ?? "";
+        expect(rel).toContain("noopener");
+        expect(rel).toContain("noreferrer");
+      });
     });
 
   });
@@ -804,6 +859,26 @@ describe("<AICreateModal/>", () => {
       expect(within(dialog).getByText("Customer Support")).toBeInTheDocument();
       expect(within(dialog).getByText("RAG Q&A")).toBeInTheDocument();
       expect(within(dialog).getByText("Tool-calling Agent")).toBeInTheDocument();
+    });
+
+    it("does not show Configure model provider button in footer", () => {
+      render(
+        <AICreateModal
+          open={true}
+          onClose={vi.fn()}
+          title="Create new scenario"
+          exampleTemplates={defaultExampleTemplates}
+          onGenerate={vi.fn()}
+          onSkip={vi.fn()}
+          hasModelProviders={true}
+        />,
+        { wrapper: Wrapper }
+      );
+
+      const dialog = getDialogContent();
+      expect(
+        within(dialog).queryByRole("link", { name: /configure model provider/i })
+      ).not.toBeInTheDocument();
     });
   });
 });
