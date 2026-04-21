@@ -75,7 +75,7 @@ func NewClient(opts ClientOptions) *Client {
 
 // ResolveKey exchanges a raw virtual key for a domain.Bundle.
 func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle, error) {
-	payload, _ := json.Marshal(map[string]string{"key": rawKey})
+	payload, _ := json.Marshal(map[string]string{"key_presented": rawKey})
 	endpoint, _ := url.JoinPath(c.baseURL, "/api/internal/gateway/resolve-key")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
@@ -101,7 +101,7 @@ func (c *Client) ResolveKey(ctx context.Context, rawKey string) (*domain.Bundle,
 	}
 
 	var result struct {
-		Token string `json:"token"`
+		Token string `json:"jwt"`
 	}
 	if err := json.Unmarshal(respBody, &result); err != nil {
 		return nil, herr.New(ctx, domain.ErrAuthUpstream, nil, err)
@@ -135,11 +135,11 @@ func (c *Client) FetchConfig(ctx context.Context, vkID string) (domain.BundleCon
 		return domain.BundleConfig{}, fmt.Errorf("config fetch returned %d", resp.StatusCode)
 	}
 
-	var config domain.BundleConfig
-	if err := json.Unmarshal(body, &config); err != nil {
+	var wire configWire
+	if err := json.Unmarshal(body, &wire); err != nil {
 		return domain.BundleConfig{}, err
 	}
-	return config, nil
+	return wire.toDomain(), nil
 }
 
 // --- Internal helpers ---

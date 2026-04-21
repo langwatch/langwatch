@@ -38,7 +38,7 @@ type guardrailCheckRequest struct {
 	ProjectID    string   `json:"project_id"`
 	Direction    string   `json:"direction"`
 	Content      []byte   `json:"content"`
-	Guardrails   []string `json:"guardrails"`
+	GuardrailIDs []string `json:"guardrail_ids"`
 }
 
 type guardrailCheckResponse struct {
@@ -55,7 +55,7 @@ func (c *Client) evaluateGuardrail(ctx context.Context, bundle *domain.Bundle, d
 		ProjectID:    bundle.ProjectID,
 		Direction:    direction,
 		Content:      content,
-		Guardrails:   bundle.Config.Guardrails,
+		GuardrailIDs: bundle.Config.Guardrails.IDs(direction),
 	})
 	if err != nil {
 		return domain.GuardrailVerdict{Action: domain.GuardrailAllow}, err

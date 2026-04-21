@@ -35,8 +35,8 @@ type BundleConfig struct {
 	// Budget configures spending controls.
 	Budget BudgetConfig
 
-	// Guardrails lists active guardrail policy IDs.
-	Guardrails []string
+	// Guardrails configures per-direction guardrail evaluation.
+	Guardrails GuardrailsConfig
 
 	// PolicyRules lists regex deny/allow rules.
 	PolicyRules []PolicyRule
@@ -58,6 +58,44 @@ type ModelAlias struct {
 type FallbackConfig struct {
 	MaxAttempts int
 	On          []string // trigger codes: "5xx", "timeout", "rate_limit", "network"
+}
+
+// GuardrailsConfig holds per-direction guardrail policies.
+type GuardrailsConfig struct {
+	Pre             []GuardrailEntry
+	Post            []GuardrailEntry
+	StreamChunk     []GuardrailEntry
+	RequestFailOpen bool
+	ResponseFailOpen bool
+}
+
+// GuardrailEntry identifies a single guardrail policy.
+type GuardrailEntry struct {
+	ID        string
+	Evaluator string
+}
+
+// HasAny reports whether any guardrails are configured.
+func (g GuardrailsConfig) HasAny() bool {
+	return len(g.Pre) > 0 || len(g.Post) > 0 || len(g.StreamChunk) > 0
+}
+
+// IDs returns the guardrail IDs for the given direction.
+func (g GuardrailsConfig) IDs(direction string) []string {
+	var entries []GuardrailEntry
+	switch direction {
+	case "request", "pre":
+		entries = g.Pre
+	case "response", "post":
+		entries = g.Post
+	case "stream_chunk":
+		entries = g.StreamChunk
+	}
+	ids := make([]string, len(entries))
+	for i, e := range entries {
+		ids[i] = e.ID
+	}
+	return ids
 }
 
 // RateLimits holds per-VK rate limit configuration.

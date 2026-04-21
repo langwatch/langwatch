@@ -25,7 +25,7 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 		Name: "guardrails",
 		Sync: func(next DispatchFunc) DispatchFunc {
 			return func(ctx context.Context, call *Call) (*domain.Response, error) {
-				if len(call.Bundle.Config.Guardrails) == 0 {
+				if !call.Bundle.Config.Guardrails.HasAny() {
 					return next(ctx, call)
 				}
 
@@ -52,7 +52,7 @@ func Guardrail(pre GuardrailPreFunc, post GuardrailPostFunc, chunk GuardrailChun
 		},
 		Stream: func(next StreamFunc) StreamFunc {
 			return func(ctx context.Context, call *Call) (domain.StreamIterator, error) {
-				if len(call.Bundle.Config.Guardrails) == 0 {
+				if !call.Bundle.Config.Guardrails.HasAny() {
 					return next(ctx, call)
 				}
 

@@ -255,7 +255,10 @@ func TestHandleChat_GuardrailPreBlocked(t *testing.T) {
 	}
 
 	bundle := testBundle()
-	bundle.Config.Guardrails = []string{"policy-1"}
+	bundle.Config.Guardrails = domain.GuardrailsConfig{
+		Pre:  []domain.GuardrailEntry{{ID: "policy-1", Evaluator: "test"}},
+		Post: []domain.GuardrailEntry{{ID: "policy-1", Evaluator: "test"}},
+	}
 
 	application := New(
 		WithProviders(provider),
@@ -281,7 +284,10 @@ func TestHandleChat_GuardrailPostBlocked(t *testing.T) {
 	}
 
 	bundle := testBundle()
-	bundle.Config.Guardrails = []string{"policy-1"}
+	bundle.Config.Guardrails = domain.GuardrailsConfig{
+		Pre:  []domain.GuardrailEntry{{ID: "policy-1", Evaluator: "test"}},
+		Post: []domain.GuardrailEntry{{ID: "policy-1", Evaluator: "test"}},
+	}
 
 	application := New(
 		WithProviders(provider),
