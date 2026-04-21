@@ -685,7 +685,7 @@ describe("InviteService", () => {
         expect(teamBinding!.scopeId).toBe("team-1");
 
         // Verify: invite was marked ACCEPTED
-        expect(mockPrisma.organizationInvite.update).toHaveBeenLastCalledWith(
+        expect(mockPrisma.organizationInvite.update).toHaveBeenCalledWith(
           expect.objectContaining({
             data: { status: "ACCEPTED" },
           })

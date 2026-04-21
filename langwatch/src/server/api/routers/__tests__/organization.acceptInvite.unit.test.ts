@@ -111,6 +111,7 @@ describe("organization.acceptInvite", () => {
       const result = await caller.acceptInvite({ inviteCode: "test-code" });
 
       expect(result.success).toBe(true);
+      expect(transactionMock).toHaveBeenCalledTimes(1);
     });
   });
 

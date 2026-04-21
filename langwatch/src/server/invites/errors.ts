@@ -30,6 +30,15 @@ export class InviteNotFoundError extends Error {
   }
 }
 
+export class InviteNotReadyError extends Error {
+  constructor(inviteId: string, status: string) {
+    super(
+      `Cannot apply invite ${inviteId}: status is ${status}, expected PENDING`
+    );
+    this.name = "InviteNotReadyError";
+  }
+}
+
 export class OrganizationNotFoundError extends Error {
   constructor() {
     super("Organization not found");
