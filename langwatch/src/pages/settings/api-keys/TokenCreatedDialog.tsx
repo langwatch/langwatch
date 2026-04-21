@@ -34,12 +34,13 @@ export function TokenCreatedDialog({
         <Dialog.CloseTrigger />
         <Dialog.Body paddingBottom={6}>
           <VStack gap={5} align="stretch">
-            <Text fontWeight="600">
+            <Text color="red.500" fontWeight="600">
               Copy this token now. You won&apos;t be able to see it again.
             </Text>
             {newToken && (
               <CodeBlock
                 label=".env"
+                defaultRevealed
                 display={formatEnvLines([
                   { key: "LANGWATCH_API_KEY", value: newToken, mask: true },
                   {
