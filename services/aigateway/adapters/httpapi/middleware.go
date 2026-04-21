@@ -42,6 +42,12 @@ func AuthMiddleware(resolver app.AuthResolver) func(http.Handler) http.Handler {
 
 			ctx := context.WithValue(r.Context(), bundleCtxKey{}, bundle)
 
+			// Enrich context logger with identity fields.
+			ctx = clog.With(ctx,
+				zap.String("project_id", bundle.ProjectID),
+				zap.String("team_id", bundle.TeamID),
+			)
+
 			// Store inbound traceparent before stripping, so trace bridge can
 			// link the customer's trace later.
 			ctx = customertracebridge.WithTraceParent(ctx, r.Header.Get("Traceparent"))
@@ -85,7 +91,7 @@ func extractToken(r *http.Request) string {
 			return strings.TrimSpace(a[7:])
 		}
 	}
-	if k := r.Header.Get("x-api-key"); k != "" {
+	if k := r.Header.Get("X-Api-Key"); k != "" {
 		return strings.TrimSpace(k)
 	}
 	return ""
