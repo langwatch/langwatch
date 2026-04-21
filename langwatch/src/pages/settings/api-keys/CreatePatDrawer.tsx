@@ -15,7 +15,13 @@ import { Drawer } from "../../../components/ui/drawer";
 import { Radio, RadioGroup } from "../../../components/ui/radio";
 import { Select } from "../../../components/ui/select";
 import type { RouterInputs, RouterOutputs } from "../../../utils/api";
-import { EXPIRATION_OPTIONS, expirationCollection } from "./utils";
+import {
+  computeBindings,
+  EXPIRATION_OPTIONS,
+  expirationCollection,
+  rolesAtOrBelow,
+  type PermissionMode,
+} from "./utils";
 
 type MyBindingsData = RouterOutputs["personalAccessToken"]["myBindings"];
 type MyBindings = {
@@ -25,20 +31,6 @@ type MyBindings = {
 
 type RoleBindingInput =
   RouterInputs["personalAccessToken"]["create"]["bindings"][number];
-
-type PermissionMode = "all" | "readonly" | "restricted";
-
-const STANDARD_ROLES = ["ADMIN", "MEMBER", "VIEWER"] as const;
-
-function rolesAtOrBelow(
-  role: string,
-): Array<{ label: string; value: string }> {
-  const idx = STANDARD_ROLES.indexOf(
-    role as (typeof STANDARD_ROLES)[number],
-  );
-  if (idx === -1) return [];
-  return STANDARD_ROLES.slice(idx).map((r) => ({ label: r, value: r }));
-}
 
 export type CreatePatInput = {
   name: string;
@@ -85,6 +77,23 @@ export function CreatePatDrawer({
     return `${yyyy}-${mm}-${dd}`;
   }, []);
 
+  const roleCollections = useMemo(() => {
+    const map = new Map<
+      string,
+      ReturnType<typeof createListCollection<{ label: string; value: string }>>
+    >();
+    if (!myBindings.data) return map;
+    for (const b of myBindings.data) {
+      if (!map.has(b.role)) {
+        map.set(
+          b.role,
+          createListCollection({ items: rolesAtOrBelow(b.role) }),
+        );
+      }
+    }
+    return map;
+  }, [myBindings.data]);
+
   const resetForm = () => {
     setName("");
     setDescription("");
@@ -92,47 +101,6 @@ export function CreatePatDrawer({
     setCustomDate("");
     setPermissionMode("all");
     setRoleOverrides({});
-  };
-
-  const computeBindings = (): CreatePatInput["bindings"] => {
-    const data = myBindings.data;
-    if (!data) return [];
-    switch (permissionMode) {
-      case "all":
-        return data.map((b) => ({
-          role: b.role,
-          customRoleId: b.customRoleId,
-          scopeType: b.scopeType,
-          scopeId: b.scopeId,
-        }));
-      case "readonly":
-        return data.map((b) => ({
-          role: "VIEWER" as const,
-          customRoleId: null,
-          scopeType: b.scopeType,
-          scopeId: b.scopeId,
-        }));
-      case "restricted":
-        return data.map((b) => {
-          const overriddenRole = roleOverrides[b.id] as
-            | RoleBindingInput["role"]
-            | undefined;
-          if (overriddenRole && overriddenRole !== b.role) {
-            return {
-              role: overriddenRole,
-              customRoleId: null,
-              scopeType: b.scopeType,
-              scopeId: b.scopeId,
-            };
-          }
-          return {
-            role: b.role,
-            customRoleId: b.customRoleId,
-            scopeType: b.scopeType,
-            scopeId: b.scopeId,
-          };
-        });
-    }
   };
 
   const handleCreate = () => {
@@ -143,12 +111,12 @@ export function CreatePatDrawer({
       const days = parseInt(expirationPreset, 10);
       expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
     }
-    onCreate({
-      name,
-      description,
-      expiresAt,
-      bindings: computeBindings(),
-    });
+    const bindings = computeBindings({
+      data: myBindings.data,
+      permissionMode,
+      roleOverrides,
+    }) as RoleBindingInput[];
+    onCreate({ name, description, expiresAt, bindings });
   };
 
   return (
@@ -263,7 +231,8 @@ export function CreatePatDrawer({
                             : `Project: ${b.scopeName ?? b.scopeId}`;
 
                       const isCustom = b.role === "CUSTOM";
-                      const availableRoles = rolesAtOrBelow(b.role);
+                      const collection = roleCollections.get(b.role);
+                      const availableRoles = collection?.items ?? [];
                       const effectiveRole =
                         permissionMode === "readonly"
                           ? "VIEWER"
@@ -282,11 +251,9 @@ export function CreatePatDrawer({
 
                       return (
                         <HStack key={b.id} gap={2} fontSize="xs">
-                          {showSelector ? (
+                          {showSelector && collection ? (
                             <Select.Root
-                              collection={createListCollection({
-                                items: availableRoles,
-                              })}
+                              collection={collection}
                               size="xs"
                               value={[effectiveRole]}
                               onValueChange={(details) => {
@@ -302,7 +269,7 @@ export function CreatePatDrawer({
                                 <Select.ValueText />
                               </Select.Trigger>
                               <Select.Content>
-                                {availableRoles.map((opt) => (
+                                {rolesAtOrBelow(b.role).map((opt) => (
                                   <Select.Item
                                     key={opt.value}
                                     item={opt}
