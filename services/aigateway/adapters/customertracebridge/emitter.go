@@ -11,23 +11,16 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	semconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-// Span attribute keys for gen_ai semantic conventions.
 const (
-	attrProjectID     = "langwatch.project_id"
-	attrGenAIOp       = "gen_ai.operation.name"
-	attrGenAISystem   = "gen_ai.system"
-	attrGenAIModel    = "gen_ai.request.model"
-	attrGenAIUsageIn  = "gen_ai.usage.input_tokens"
-	attrGenAIUsageOut = "gen_ai.usage.output_tokens"
-	attrGenAITotal    = "gen_ai.usage.total_tokens"
-	attrGenAICost     = "gen_ai.usage.cost"
-	attrDurationMS    = "gen_ai.response.duration_ms"
-	attrStreaming     = "gen_ai.request.streaming"
+	attrProjectID  = attribute.Key("langwatch.project_id")
+	attrTotalUsage = attribute.Key("gen_ai.usage.total_tokens")
+	attrCost       = attribute.Key("gen_ai.usage.cost")
 )
 
 // Emitter uses a private (non-global) OTel TracerProvider to construct spans
@@ -92,8 +85,8 @@ func (e *Emitter) BeginSpan(ctx context.Context, projectID string, reqType domai
 	spanCtx, span := e.tracer.Start(spanCtx, "gen_ai."+string(reqType),
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(
-			attribute.String(attrProjectID, projectID),
-			attribute.String(attrGenAIOp, string(reqType)),
+			attrProjectID.String(projectID),
+			semconv.GenAIOperationNameKey.String(string(reqType)),
 		),
 	)
 
@@ -117,14 +110,12 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 	}
 
 	span.SetAttributes(
-		attribute.String(attrGenAISystem, string(params.ProviderID)),
-		attribute.String(attrGenAIModel, params.Model),
-		attribute.Int(attrGenAIUsageIn, params.Usage.PromptTokens),
-		attribute.Int(attrGenAIUsageOut, params.Usage.CompletionTokens),
-		attribute.Int(attrGenAITotal, params.Usage.TotalTokens),
-		attribute.Int64(attrGenAICost, params.Usage.CostMicroUSD),
-		attribute.Int64(attrDurationMS, params.DurationMS),
-		attribute.Bool(attrStreaming, params.Streaming),
+		semconv.GenAIProviderNameKey.String(string(params.ProviderID)),
+		semconv.GenAIRequestModelKey.String(params.Model),
+		semconv.GenAIUsageInputTokensKey.Int(params.Usage.PromptTokens),
+		semconv.GenAIUsageOutputTokensKey.Int(params.Usage.CompletionTokens),
+		attrTotalUsage.Int(params.Usage.TotalTokens),
+		attrCost.Int64(params.Usage.CostMicroUSD),
 	)
 	span.End()
 }

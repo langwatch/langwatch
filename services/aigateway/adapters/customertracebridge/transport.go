@@ -41,7 +41,7 @@ func newRouterExporter(registry *Registry) *routerExporter {
 func (r *routerExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
 	buckets := make(map[string][]sdktrace.ReadOnlySpan)
 	for _, s := range spans {
-		pid := readAttr(s, attrProjectID)
+		pid := readAttr(s, string(attrProjectID))
 		if pid == "" {
 			continue
 		}
