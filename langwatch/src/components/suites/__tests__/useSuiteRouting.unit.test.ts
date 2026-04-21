@@ -157,7 +157,6 @@ describe("useSuiteRouting()", () => {
       const { result } = renderHook(() => useSuiteRouting());
 
       expect(result.current.selectedSuiteSlug).toBe(ALL_RUNS_ID);
-      mockRouter.asPath = "/my-project/simulations";
     });
   });
 
