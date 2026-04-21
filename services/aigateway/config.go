@@ -13,7 +13,8 @@ type Config struct {
 	Server       config.Server      `env:"SERVER"`
 	Log          clog.Config        `env:"LOG"`
 	ControlPlane ControlPlaneConfig `env:"LW_GATEWAY"`
-	OTel         OTelConfig         `env:"OTEL"`
+	CustomerTraceBridge CustomerTraceBridgeConfig `env:"CUSTOMER_TRACE_BRIDGE"`
+	OTel         config.OTel        `env:"OTEL"`
 }
 
 // ControlPlaneConfig holds control plane connection settings.
@@ -24,19 +25,13 @@ type ControlPlaneConfig struct {
 	JWTSecretPrev  string `env:"JWT_SECRET_PREVIOUS"`
 }
 
-// OTelConfig holds telemetry settings.
-type OTelConfig struct {
-	GatewayEndpoint  string `env:"GATEWAY_ENDPOINT"`
-	GatewayAuthToken string `env:"GATEWAY_AUTH_TOKEN"`
-
-	DefaultExportEndpoint string `env:"DEFAULT_EXPORT_ENDPOINT"`
-	DefaultAuthToken      string `env:"DEFAULT_AUTH_TOKEN"`
-
-	// SampleRatio controls the fraction of traces sampled (0.0–1.0).
-	// Defaults to 1.0 (100%) for local, 0.1 (10%) otherwise.
-	// Set OTEL_SAMPLE_RATIO in the environment to override.
-	SampleRatio float64 `env:"SAMPLE_RATIO"`
+// CustomerTraceBridgeConfig holds customer trace bridge settings.
+type CustomerTraceBridgeConfig struct {
+	// BaseURL is where the customer trace bridge exports spans.
+	// Defaults to ControlPlane.BaseURL if not set.
+	BaseURL string `env:"BASE_URL"`
 }
+
 
 func defaultConfig() Config {
 	return Config{
@@ -48,7 +43,7 @@ func defaultConfig() Config {
 		ControlPlane: ControlPlaneConfig{
 			BaseURL: "http://localhost:5560",
 		},
-		OTel: OTelConfig{
+		OTel: config.OTel{
 			SampleRatio: 1.0, // overridden to 0.1 for non-local in LoadConfig
 		},
 	}
@@ -59,6 +54,9 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	cfg := defaultConfig()
 	if err := config.Hydrate(&cfg); err != nil {
 		return Config{}, err
+	}
+	if cfg.CustomerTraceBridge.BaseURL == "" {
+		cfg.CustomerTraceBridge.BaseURL = cfg.ControlPlane.BaseURL
 	}
 	// Apply environment-aware sample ratio default when not explicitly set.
 	if cfg.OTel.SampleRatio == 1.0 && cfg.Environment != "local" {

@@ -57,12 +57,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	ctx = clog.Set(ctx, logger)
 	nodeID := resolveNodeID(ctx)
 
-	otelProvider, err := otelsetup.New(ctx, otelsetup.Options{
-		NodeID:        nodeID,
-		TraceEndpoint: cfg.OTel.GatewayEndpoint,
-		TraceHeaders:  tokenHeaders(cfg.OTel.GatewayAuthToken),
-		SampleRatio:   cfg.OTel.SampleRatio,
-	})
+	otelProvider, err := cfg.OTel.Configure(ctx, nodeID)
 	if err != nil {
 		return ctx, nil, fmt.Errorf("otel init: %w", err)
 	}
@@ -178,9 +173,3 @@ func resolveNodeID(ctx context.Context) string {
 	return hostname
 }
 
-func tokenHeaders(token string) map[string]string {
-	if token == "" {
-		return nil
-	}
-	return map[string]string{"Authorization": "Bearer " + token}
-}
