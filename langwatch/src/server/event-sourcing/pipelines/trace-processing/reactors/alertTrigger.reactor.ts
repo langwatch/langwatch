@@ -1,7 +1,7 @@
-import type { PrismaClient } from "@prisma/client";
 import { TriggerAction } from "@prisma/client";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
 import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
+import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   buildPreconditionTraceDataFromFoldState,
@@ -10,8 +10,6 @@ import {
 } from "~/server/filters/triggerFilter.matcher";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
 import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
-import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
-import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
 import {
   mapTraceToDatasetEntry,
@@ -19,8 +17,6 @@ import {
   type TraceMapping,
 } from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
-import { TraceService } from "~/server/traces/trace.service";
-import { getProtectionsForProject } from "~/server/api/utils";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 import type {
@@ -33,7 +29,19 @@ const logger = createLogger("langwatch:trace-processing:alert-trigger-reactor");
 
 export interface AlertTriggerReactorDeps {
   triggers: TriggerService;
-  prisma: PrismaClient;
+  projects: ProjectService;
+  traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
+  addToAnnotationQueue: (params: {
+    traceIds: string[];
+    projectId: string;
+    annotators: string[];
+    userId: string;
+  }) => Promise<void>;
+  addToDataset: (params: {
+    datasetId: string;
+    projectId: string;
+    datasetRecords: DatasetRecordEntry[];
+  }) => Promise<void>;
 }
 
 /**
@@ -97,12 +105,10 @@ export function createAlertTriggerReactor(
           }
 
           // Dedup: check if already sent for this trace
-          const alreadySent = await deps.prisma.triggerSent.findUnique({
-            where: {
-              triggerId_traceId: { triggerId: trigger.id, traceId },
-              projectId: tenantId,
-            },
-          });
+          const alreadySent = await deps.triggers.hasSentForTrace(
+            trigger.id,
+            traceId,
+          );
           if (alreadySent) continue;
 
           await dispatchAction({
@@ -165,10 +171,7 @@ async function dispatchAction({
   tenantId: string;
   foldState: TraceSummaryData;
 }): Promise<void> {
-  const project = await deps.prisma.project.findUnique({
-    where: { id: tenantId },
-    select: { slug: true },
-  });
+  const project = await deps.projects.getById(tenantId);
 
   if (!project) {
     logger.warn({ tenantId, triggerId: trigger.id }, "Project not found");
@@ -202,12 +205,11 @@ async function dispatchAction({
       break;
 
     case TriggerAction.ADD_TO_ANNOTATION_QUEUE:
-      await createOrUpdateQueueItems({
+      await deps.addToAnnotationQueue({
         traceIds: [traceId],
         projectId: tenantId,
         annotators: (params.annotators ?? []).map((a) => a.id),
         userId: params.createdByUserId ?? "",
-        prisma: deps.prisma,
       });
       break;
 
@@ -217,26 +219,20 @@ async function dispatchAction({
         trigger,
         traceId,
         tenantId,
-        foldState,
         params,
       });
       break;
   }
 
   // Record TriggerSent for dedup
-  await deps.prisma.triggerSent.create({
-    data: {
-      triggerId: trigger.id,
-      traceId,
-      projectId: tenantId,
-    },
+  await deps.triggers.recordSent({
+    triggerId: trigger.id,
+    traceId,
+    projectId: tenantId,
   });
 
   // Update lastRunAt
-  await deps.prisma.trigger.update({
-    where: { id: trigger.id, projectId: tenantId },
-    data: { lastRunAt: Date.now() },
-  });
+  await deps.triggers.updateLastRunAt(trigger.id, tenantId);
 
   logger.info(
     { tenantId, traceId, triggerId: trigger.id, action: trigger.action },
@@ -265,14 +261,12 @@ async function addTraceToDataset({
   trigger,
   traceId,
   tenantId,
-  foldState,
   params,
 }: {
   deps: AlertTriggerReactorDeps;
   trigger: TriggerSummary;
   traceId: string;
   tenantId: string;
-  foldState: TraceSummaryData;
   params: ActionParams;
 }): Promise<void> {
   if (!params.datasetId || !params.datasetMapping) {
@@ -283,13 +277,7 @@ async function addTraceToDataset({
     return;
   }
 
-  // ADD_TO_DATASET needs the full trace with spans for mapping.
-  const traceService = TraceService.create(deps.prisma);
-  const protections = await getProtectionsForProject(deps.prisma, {
-    projectId: tenantId,
-  });
-
-  const trace = await traceService.getById(tenantId, traceId, protections);
+  const trace = await deps.traceById(tenantId, traceId);
 
   if (!trace) {
     logger.warn(
@@ -332,7 +320,7 @@ async function addTraceToDataset({
     });
   }
 
-  await createManyDatasetRecords({
+  await deps.addToDataset({
     datasetId: params.datasetId,
     projectId: tenantId,
     datasetRecords: entries,
