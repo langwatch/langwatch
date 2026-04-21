@@ -1,4 +1,3 @@
-import type { EvaluationRunData } from "~/server/app-layer/evaluations/types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type {
   PreconditionTraceData,
@@ -18,14 +17,6 @@ const EVALUATION_FIELDS: ReadonlySet<string> = new Set([
   "evaluations.state",
   "evaluations.label",
 ]);
-
-/** Fields that have no in-memory matcher (key-selectors, numeric-only). Skipped during matching. */
-const UNSUPPORTED_FIELDS: ReadonlySet<string> = new Set([
-  "metadata.key",
-  "events.metrics.value",
-  "events.event_details.value",
-]);
-
 
 /**
  * Splits trigger filters into trace-time-available and evaluation-time-available groups.
@@ -81,40 +72,7 @@ export function buildPreconditionTraceDataFromFoldState(
     spanModels: foldState.models.length > 0 ? foldState.models : null,
     customMetadata: extractCustomMetadata(attrs),
     annotationIds: foldState.annotationIds,
-    events: buildPreconditionEvents(foldState.events),
   };
-}
-
-function buildPreconditionEvents(
-  events: TraceSummaryData["events"],
-): PreconditionTraceData["events"] {
-  if (!events || events.length === 0) return null;
-
-  return events.map((e) => {
-    const metrics: Array<{ key: string; value: number }> = [];
-    const eventDetails: Array<{ key: string; value: string }> = [];
-
-    for (const [key, value] of Object.entries(e.attributes)) {
-      if (key.startsWith("event.metrics.")) {
-        const metricKey = key.slice("event.metrics.".length);
-        const num = Number(value);
-        if (metricKey && Number.isFinite(num)) {
-          metrics.push({ key: metricKey, value: num });
-        }
-      } else if (key.startsWith("event.details.")) {
-        const detailKey = key.slice("event.details.".length);
-        if (detailKey) {
-          eventDetails.push({ key: detailKey, value });
-        }
-      }
-    }
-
-    return {
-      event_type: e.name,
-      metrics,
-      event_details: eventDetails,
-    };
-  });
 }
 
 /**
@@ -139,9 +97,6 @@ export function matchesTriggerFilters(
 
     // Skip evaluation fields — not available at trace time
     if (EVALUATION_FIELDS.has(field)) return false;
-
-    // Skip fields with no in-memory matcher (key-selectors, numeric-only)
-    if (UNSUPPORTED_FIELDS.has(field)) continue;
 
     if (!matchField(traceData, field, filterValue)) {
       return false;
@@ -169,30 +124,26 @@ function matchField(
     return matchSimpleArray(traceData, field, filterValue);
   }
 
-  // Nested object: OR across keys (matches ClickHouse filter generation)
-  let hasActionableCondition = false;
-
+  // Nested object: iterate keys
   for (const [key, subValue] of Object.entries(filterValue)) {
     if (Array.isArray(subValue)) {
       // Record<string, string[]> — resolve with key
       if (subValue.length === 0) continue;
-      hasActionableCondition = true;
-      if (matchSimpleArray(traceData, field, subValue, key)) {
-        return true;
+      if (!matchSimpleArray(traceData, field, subValue, key)) {
+        return false;
       }
     } else if (typeof subValue === "object" && subValue !== null) {
       // Record<string, Record<string, string[]>> — resolve with key + subkey
       for (const [subkey, values] of Object.entries(subValue)) {
         if (!Array.isArray(values) || values.length === 0) continue;
-        hasActionableCondition = true;
-        if (matchSimpleArray(traceData, field, values, key, subkey)) {
-          return true;
+        if (!matchSimpleArray(traceData, field, values, key, subkey)) {
+          return false;
         }
       }
     }
   }
 
-  return !hasActionableCondition;
+  return true;
 }
 
 /**
@@ -229,142 +180,6 @@ function matchSimpleArray(
   return false;
 }
 
-/**
- * Evaluates evaluation-specific filters against a set of completed evaluations.
- *
- * Semantics:
- * - For evaluator_id filters (string[]): at least one evaluation has a matching evaluatorId
- * - For keyed filters (Record<string, string[]>): for each key (evaluatorId),
- *   at least one evaluation with that evaluatorId has a matching value
- * - For double-keyed filters (evaluations.score): same but with subkey ignored
- *   (EvaluationRunData has a single score field)
- * - Across fields: AND (all must pass)
- */
-export function matchesEvaluationFilters(
-  evaluations: EvaluationRunData[],
-  filters: TriggerFilters,
-): boolean {
-  for (const [field, filterValue] of Object.entries(filters) as [
-    FilterField,
-    TriggerFilterValue,
-  ][]) {
-    if (!filterValue) continue;
-
-    // Only process evaluation fields
-    if (!EVALUATION_FIELDS.has(field)) continue;
-
-    if (!matchEvaluationField(evaluations, field, filterValue)) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-function matchEvaluationField(
-  evaluations: EvaluationRunData[],
-  field: FilterField,
-  filterValue: TriggerFilterValue,
-): boolean {
-  // Simple array filters: evaluations.evaluator_id and variants
-  if (Array.isArray(filterValue)) {
-    if (filterValue.length === 0) return true;
-    return matchEvaluatorIdFilter(evaluations, field, filterValue);
-  }
-
-  // Keyed filters: evaluations.passed, evaluations.state, evaluations.label, evaluations.score
-  for (const [evaluatorId, subValue] of Object.entries(filterValue)) {
-    const evalsForEvaluator = evaluations.filter(
-      (e) => e.evaluatorId === evaluatorId,
-    );
-    if (evalsForEvaluator.length === 0) return false;
-
-    if (Array.isArray(subValue)) {
-      // Record<string, string[]> — e.g., evaluations.passed: { "eval-1": ["true"] }
-      if (subValue.length === 0) continue;
-      if (!matchEvaluationValues(evalsForEvaluator, field, subValue)) {
-        return false;
-      }
-    } else if (typeof subValue === "object" && subValue !== null) {
-      // Record<string, Record<string, string[]>> — evaluations.score: { "eval-1": { "score": ["0.5"] } }
-      for (const [, values] of Object.entries(subValue)) {
-        if (!Array.isArray(values) || values.length === 0) continue;
-        if (!matchEvaluationValues(evalsForEvaluator, field, values)) {
-          return false;
-        }
-      }
-    }
-  }
-
-  return true;
-}
-
-function matchEvaluatorIdFilter(
-  evaluations: EvaluationRunData[],
-  field: FilterField,
-  evaluatorIds: string[],
-): boolean {
-  switch (field) {
-    case "evaluations.evaluator_id":
-      return evaluations.some((e) => evaluatorIds.includes(e.evaluatorId));
-
-    case "evaluations.evaluator_id.guardrails_only":
-      return evaluations.some(
-        (e) => evaluatorIds.includes(e.evaluatorId) && e.isGuardrail,
-      );
-
-    case "evaluations.evaluator_id.has_passed":
-      return evaluations.some(
-        (e) => evaluatorIds.includes(e.evaluatorId) && e.passed !== null,
-      );
-
-    case "evaluations.evaluator_id.has_score":
-      return evaluations.some(
-        (e) => evaluatorIds.includes(e.evaluatorId) && e.score !== null,
-      );
-
-    case "evaluations.evaluator_id.has_label":
-      return evaluations.some(
-        (e) =>
-          evaluatorIds.includes(e.evaluatorId) &&
-          e.label !== null &&
-          e.label !== "",
-      );
-
-    default:
-      return false;
-  }
-}
-
-function matchEvaluationValues(
-  evaluations: EvaluationRunData[],
-  field: FilterField,
-  values: string[],
-): boolean {
-  switch (field) {
-    case "evaluations.passed":
-      return evaluations.some(
-        (e) => e.passed !== null && values.includes(String(e.passed)),
-      );
-
-    case "evaluations.score":
-      return evaluations.some(
-        (e) => e.score !== null && values.includes(String(e.score)),
-      );
-
-    case "evaluations.state":
-      return evaluations.some((e) => values.includes(e.status));
-
-    case "evaluations.label":
-      return evaluations.some(
-        (e) => e.label !== null && values.includes(e.label),
-      );
-
-    default:
-      return false;
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Helpers (mirrored from evaluationTrigger.reactor.ts)
 // ---------------------------------------------------------------------------
@@ -398,80 +213,18 @@ const RESERVED_KEYS = new Set([
   "metadata.subtopic_id",
 ]);
 
-/**
- * Bare-key prefixes that are standard OTEL/system attributes, not custom metadata.
- * Only used when resolving bare (unprefixed) attribute keys.
- */
-const BARE_KEY_EXCLUDED_PREFIXES = [
-  "service.",
-  "telemetry.",
-  "http.",
-  "rpc.",
-  "db.",
-  "net.",
-  "host.",
-  "os.",
-  "process.",
-  "container.",
-  "k8s.",
-  "cloud.",
-  "faas.",
-  "url.",
-  "server.",
-  "client.",
-  "otel.",
-];
-
-function resolveCustomMetadataKey(key: string): {
-  customKey: string;
-  priority: number;
-} | null {
-  // Priority 3: canonical "metadata.{key}" (from Python SDK canonicalization)
-  if (key.startsWith("metadata.")) {
-    if (RESERVED_KEYS.has(key)) return null;
-    if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) return null;
-    const customKey = key.slice("metadata.".length);
-    return customKey ? { customKey, priority: 3 } : null;
-  }
-
-  // Priority 2: legacy "langwatch.metadata.{key}" (legacy REST collector)
-  if (key.startsWith("langwatch.metadata.")) {
-    const customKey = key.slice("langwatch.metadata.".length);
-    return customKey ? { customKey, priority: 2 } : null;
-  }
-
-  // Skip all other known prefixes
-  if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) return null;
-  if (BARE_KEY_EXCLUDED_PREFIXES.some((p) => key.startsWith(p))) return null;
-
-  // Priority 1: bare OTEL resource attribute (legacy)
-  if (key.length === 0) return null;
-  return { customKey: key, priority: 1 };
-}
-
-/**
- * Extracts custom metadata from fold state attributes.
- * Matches all three legacy key formats consistent with ClickHouse filter generation:
- * - metadata.{key} (canonical, priority 3)
- * - langwatch.metadata.{key} (legacy REST, priority 2)
- * - {key} (bare OTEL attribute, priority 1)
- */
 function extractCustomMetadata(
   attrs: Record<string, string>,
 ): Record<string, string> | null {
   const result: Record<string, string> = {};
-  const priorities: Record<string, number> = {};
-
   for (const [key, value] of Object.entries(attrs)) {
-    const resolved = resolveCustomMetadataKey(key);
-    if (!resolved) continue;
-
-    const currentPriority = priorities[resolved.customKey] ?? 0;
-    if (resolved.priority <= currentPriority) continue;
-
-    priorities[resolved.customKey] = resolved.priority;
-    result[resolved.customKey] = value;
+    if (!key.startsWith("metadata.")) continue;
+    if (RESERVED_KEYS.has(key)) continue;
+    if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) continue;
+    const customKey = key.slice("metadata.".length);
+    if (customKey) {
+      result[customKey] = value;
+    }
   }
-
   return Object.keys(result).length > 0 ? result : null;
 }

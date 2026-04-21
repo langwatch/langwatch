@@ -80,10 +80,6 @@ import { SpanAppendStore } from "./pipelines/trace-processing/projections/spanSt
 import { TraceSummaryStore } from "./pipelines/trace-processing/projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "./pipelines/trace-processing/reactors/customEvaluationSync.reactor";
 import { createProjectMetadataReactor } from "./pipelines/trace-processing/reactors/projectMetadata.reactor";
-import { createOrUpdateQueueItems } from "~/server/api/routers/annotation";
-import { createManyDatasetRecords } from "~/server/api/routers/datasetRecord.utils";
-import { getProtectionsForProject } from "~/server/api/utils";
-import { TraceService } from "~/server/traces/trace.service";
 import { createAlertTriggerReactor } from "./pipelines/trace-processing/reactors/alertTrigger.reactor";
 import { createEvaluationTriggerReactor } from "./pipelines/trace-processing/reactors/evaluationTrigger.reactor";
 import {
@@ -318,8 +314,7 @@ export class PipelineRegistry {
 
     const alertTriggerReactor = createAlertTriggerReactor({
       triggers: this.deps.triggers,
-      projects: this.deps.projects,
-      ...this.buildTraceReactorContext(),
+      prisma: this.deps.prisma,
     });
 
     const customEvaluationSyncReactor = createCustomEvaluationSyncReactor({

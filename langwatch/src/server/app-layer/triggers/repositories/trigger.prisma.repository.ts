@@ -30,35 +30,6 @@ export class PrismaTriggerRepository implements TriggerRepository {
       filters: parseFilters(t.filters),
     }));
   }
-
-  async claimSend({
-    triggerId,
-    traceId,
-    projectId,
-  }: {
-    triggerId: string;
-    traceId: string;
-    projectId: string;
-  }): Promise<boolean> {
-    // Atomic claim: relies on the @@unique([triggerId, traceId]) constraint
-    // on TriggerSent. createMany returns the number of rows actually inserted,
-    // so a concurrent dispatcher loses cleanly with count: 0.
-    const result = await this.prisma.triggerSent.createMany({
-      data: [{ triggerId, traceId, projectId }],
-      skipDuplicates: true,
-    });
-    return result.count === 1;
-  }
-
-  async updateLastRunAt(
-    triggerId: string,
-    projectId: string,
-  ): Promise<void> {
-    await this.prisma.trigger.update({
-      where: { id: triggerId, projectId },
-      data: { lastRunAt: Date.now() },
-    });
-  }
 }
 
 function parseFilters(raw: unknown): TriggerFilters {
