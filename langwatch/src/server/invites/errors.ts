@@ -11,6 +11,9 @@
 export const INVITE_ALREADY_ACCEPTED_MESSAGE =
   "Invite was already accepted" as const;
 
+export const INVITE_NOT_READY_MESSAGE =
+  "Invite is not ready to be accepted" as const;
+
 export class DuplicateInviteError extends Error {
   constructor(email: string) {
     super(`An active invitation for ${email} already exists`);

@@ -28,6 +28,7 @@ import {
 import {
   DuplicateInviteError,
   INVITE_ALREADY_ACCEPTED_MESSAGE,
+  INVITE_NOT_READY_MESSAGE,
   InviteNotFoundError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
@@ -1000,6 +1001,13 @@ export const organizationRouter = createTRPCRouter({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: INVITE_ALREADY_ACCEPTED_MESSAGE,
+        });
+      }
+
+      if (invite.status !== "PENDING") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: INVITE_NOT_READY_MESSAGE,
         });
       }
 
