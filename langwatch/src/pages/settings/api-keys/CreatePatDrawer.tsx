@@ -10,6 +10,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
+import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { Drawer } from "../../../components/ui/drawer";
 import { Radio, RadioGroup } from "../../../components/ui/radio";
@@ -42,9 +43,13 @@ export type CreatePatInput = {
   bindings: BindingInput[];
 };
 
-const ROLE_HIERARCHY: readonly string[] = ["VIEWER", "MEMBER", "ADMIN"];
+export const ROLE_HIERARCHY: readonly string[] = [
+  "VIEWER",
+  "MEMBER",
+  "ADMIN",
+];
 
-function rolesUpTo(ceiling: string): string[] {
+export function rolesUpTo(ceiling: string): string[] {
   const idx = ROLE_HIERARCHY.indexOf(ceiling);
   if (idx === -1) return [ceiling];
   return [...ROLE_HIERARCHY.slice(0, idx + 1)];
@@ -55,6 +60,57 @@ function roleCollection(ceiling: string) {
   return createListCollection({
     items: roles.map((r) => ({ label: r, value: r })),
   });
+}
+
+function toBindingInput(
+  b: MyBindingsData[number],
+  overrides?: { role: Role; customRoleId: string | null | undefined },
+): BindingInput {
+  return {
+    role: overrides?.role ?? b.role,
+    customRoleId: overrides?.customRoleId ?? b.customRoleId,
+    scopeType: b.scopeType,
+    scopeId: b.scopeId,
+  };
+}
+
+function scopeLabel(b: MyBindingsData[number]) {
+  return b.scopeType === "ORGANIZATION"
+    ? "Org-wide"
+    : b.scopeType === "TEAM"
+      ? `Team: ${b.scopeName ?? b.scopeId}`
+      : `Project: ${b.scopeName ?? b.scopeId}`;
+}
+
+function roleLabel(b: MyBindingsData[number]) {
+  return b.role === "CUSTOM" ? (b.customRoleName ?? "Custom") : b.role;
+}
+
+function BindingsList({
+  myBindings,
+  header,
+  children,
+}: {
+  myBindings: MyBindings;
+  header: ReactNode;
+  children: (bindings: MyBindingsData) => ReactNode;
+}) {
+  return (
+    <>
+      {header}
+      {myBindings.isLoading ? (
+        <Text fontSize="xs" color="fg.muted" marginTop={2}>
+          Loading your role bindings…
+        </Text>
+      ) : (myBindings.data?.length ?? 0) === 0 ? (
+        <Text fontSize="xs" color="fg.muted" marginTop={2}>
+          You have no role bindings in this organization yet.
+        </Text>
+      ) : (
+        children(myBindings.data!)
+      )}
+    </>
+  );
 }
 
 /**
@@ -99,29 +155,21 @@ export function CreatePatDrawer({
     if (!myBindings.data) return [];
     switch (permissionLevel) {
       case "all":
-        return myBindings.data.map((b) => ({
-          role: b.role,
-          customRoleId: b.customRoleId,
-          scopeType: b.scopeType,
-          scopeId: b.scopeId,
-        }));
+        return myBindings.data.map((b) => toBindingInput(b));
       case "readOnly":
-        return myBindings.data.map((b) => ({
-          role: "VIEWER",
-          customRoleId: null,
-          scopeType: b.scopeType,
-          scopeId: b.scopeId,
-        }));
+        return myBindings.data.map((b) =>
+          toBindingInput(b, { role: "VIEWER", customRoleId: null }),
+        );
       case "restricted":
-        return myBindings.data.map((b) => ({
-          role: (restrictedRoles[b.id] as Role | undefined) ?? b.role,
-          customRoleId:
-            restrictedRoles[b.id] && restrictedRoles[b.id] !== b.role
-              ? null
-              : b.customRoleId,
-          scopeType: b.scopeType,
-          scopeId: b.scopeId,
-        }));
+        return myBindings.data.map((b) => {
+          const override = restrictedRoles[b.id];
+          return override
+            ? toBindingInput(b, {
+                role: override as Role,
+                customRoleId: override !== b.role ? null : b.customRoleId,
+              })
+            : toBindingInput(b);
+        });
     }
   }, [myBindings.data, permissionLevel, restrictedRoles]);
 
@@ -144,16 +192,6 @@ export function CreatePatDrawer({
     }
     onCreate({ name, description, expiresAt, bindings: effectiveBindings });
   };
-
-  const scopeLabel = (b: MyBindingsData[number]) =>
-    b.scopeType === "ORGANIZATION"
-      ? "Org-wide"
-      : b.scopeType === "TEAM"
-        ? `Team: ${b.scopeName ?? b.scopeId}`
-        : `Project: ${b.scopeName ?? b.scopeId}`;
-
-  const roleLabel = (b: MyBindingsData[number]) =>
-    b.role === "CUSTOM" ? (b.customRoleName ?? "Custom") : b.role;
 
   return (
     <Drawer.Root
@@ -226,25 +264,21 @@ export function CreatePatDrawer({
                 background="bg.subtle"
               >
                 {permissionLevel === "all" && (
-                  <>
-                    <Text fontSize="sm">
-                      This token will inherit{" "}
-                      <Text as="span" fontWeight="600">
-                        your current permissions
-                      </Text>{" "}
-                      in this organization:
-                    </Text>
-                    {myBindings.isLoading ? (
-                      <Text fontSize="xs" color="fg.muted" marginTop={2}>
-                        Loading your role bindings…
+                  <BindingsList
+                    myBindings={myBindings}
+                    header={
+                      <Text fontSize="sm">
+                        This token will inherit{" "}
+                        <Text as="span" fontWeight="600">
+                          your current permissions
+                        </Text>{" "}
+                        in this organization:
                       </Text>
-                    ) : (myBindings.data?.length ?? 0) === 0 ? (
-                      <Text fontSize="xs" color="fg.muted" marginTop={2}>
-                        You have no role bindings in this organization yet.
-                      </Text>
-                    ) : (
+                    }
+                  >
+                    {(bindings) => (
                       <VStack align="stretch" gap={1} marginTop={2}>
-                        {myBindings.data!.map((b) => (
+                        {bindings.map((b) => (
                           <HStack key={b.id} gap={2} fontSize="xs">
                             <Badge size="sm" variant="subtle">
                               {roleLabel(b)}
@@ -254,29 +288,25 @@ export function CreatePatDrawer({
                         ))}
                       </VStack>
                     )}
-                  </>
+                  </BindingsList>
                 )}
 
                 {permissionLevel === "readOnly" && (
-                  <>
-                    <Text fontSize="sm">
-                      This token will have{" "}
-                      <Text as="span" fontWeight="600">
-                        read-only (VIEWER)
-                      </Text>{" "}
-                      access at every scope:
-                    </Text>
-                    {myBindings.isLoading ? (
-                      <Text fontSize="xs" color="fg.muted" marginTop={2}>
-                        Loading your role bindings…
+                  <BindingsList
+                    myBindings={myBindings}
+                    header={
+                      <Text fontSize="sm">
+                        This token will have{" "}
+                        <Text as="span" fontWeight="600">
+                          read-only (VIEWER)
+                        </Text>{" "}
+                        access at every scope:
                       </Text>
-                    ) : (myBindings.data?.length ?? 0) === 0 ? (
-                      <Text fontSize="xs" color="fg.muted" marginTop={2}>
-                        You have no role bindings in this organization yet.
-                      </Text>
-                    ) : (
+                    }
+                  >
+                    {(bindings) => (
                       <VStack align="stretch" gap={1} marginTop={2}>
-                        {myBindings.data!.map((b) => (
+                        {bindings.map((b) => (
                           <HStack key={b.id} gap={2} fontSize="xs">
                             <Badge size="sm" variant="subtle">
                               VIEWER
@@ -286,25 +316,22 @@ export function CreatePatDrawer({
                         ))}
                       </VStack>
                     )}
-                  </>
+                  </BindingsList>
                 )}
 
                 {permissionLevel === "restricted" && (
-                  <>
-                    <Text fontSize="sm">
-                      Choose a role for each scope (capped by your ceiling):
-                    </Text>
-                    {myBindings.isLoading ? (
-                      <Text fontSize="xs" color="fg.muted" marginTop={2}>
-                        Loading your role bindings…
+                  <BindingsList
+                    myBindings={myBindings}
+                    header={
+                      <Text fontSize="sm">
+                        Choose a role for each scope (capped by your
+                        ceiling):
                       </Text>
-                    ) : (myBindings.data?.length ?? 0) === 0 ? (
-                      <Text fontSize="xs" color="fg.muted" marginTop={2}>
-                        You have no role bindings in this organization yet.
-                      </Text>
-                    ) : (
+                    }
+                  >
+                    {(bindings) => (
                       <VStack align="stretch" gap={2} marginTop={2}>
-                        {myBindings.data!.map((b) => {
+                        {bindings.map((b) => {
                           const isCustom = b.role === "CUSTOM";
                           const collection = roleCollection(b.role);
                           const selectedRole =
@@ -355,7 +382,7 @@ export function CreatePatDrawer({
                         })}
                       </VStack>
                     )}
-                  </>
+                  </BindingsList>
                 )}
 
                 <Text fontSize="xs" color="fg.muted" marginTop={3}>
