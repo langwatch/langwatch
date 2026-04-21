@@ -1,6 +1,4 @@
-import { TriggerAction } from "@prisma/client";
 import type { TriggerService } from "~/server/app-layer/triggers/trigger.service";
-import type { TriggerSummary } from "~/server/app-layer/triggers/repositories/trigger.repository";
 import type { ProjectService } from "~/server/app-layer/projects/project.service";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
@@ -8,14 +6,7 @@ import {
   classifyTriggerFilters,
   matchesTriggerFilters,
 } from "~/server/filters/triggerFilter.matcher";
-import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
-import { sendSlackWebhook } from "~/server/triggers/sendSlackWebhook";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
-import {
-  mapTraceToDatasetEntry,
-  TRACE_EXPANSIONS,
-  type TraceMapping,
-} from "~/server/tracer/tracesMapping";
 import type { Trace } from "~/server/tracer/types";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
@@ -24,10 +15,14 @@ import type {
   ReactorDefinition,
 } from "../../../reactors/reactor.types";
 import type { TraceProcessingEvent } from "../schemas/events";
+import {
+  dispatchTriggerAction,
+  type TriggerActionDispatchDeps,
+} from "../../shared/triggerActionDispatch";
 
 const logger = createLogger("langwatch:trace-processing:alert-trigger-reactor");
 
-export interface AlertTriggerReactorDeps {
+export interface AlertTriggerReactorDeps extends TriggerActionDispatchDeps {
   triggers: TriggerService;
   projects: ProjectService;
   traceById: (projectId: string, traceId: string) => Promise<Trace | undefined>;
@@ -93,7 +88,7 @@ export function createAlertTriggerReactor(
           const { traceFilters, hasEvaluationFilters } =
             classifyTriggerFilters(trigger.filters);
 
-          // Skip triggers that require evaluation results (Phase 2)
+          // Skip triggers that require evaluation results (handled by evaluationAlertTrigger)
           if (hasEvaluationFilters) continue;
 
           // Skip if no trace filters match
@@ -112,7 +107,7 @@ export function createAlertTriggerReactor(
           });
           if (alreadySent) continue;
 
-          await dispatchAction({
+          await dispatchTriggerAction({
             deps,
             trigger,
             traceId,
@@ -141,194 +136,4 @@ export function createAlertTriggerReactor(
       }
     },
   };
-}
-
-// ---------------------------------------------------------------------------
-// Action dispatch
-// ---------------------------------------------------------------------------
-
-interface ActionParams {
-  members?: string[] | null;
-  slackWebhook?: string | null;
-  datasetId?: string;
-  datasetMapping?: {
-    mapping: Record<string, { source: string; key: string; subkey: string }>;
-    expansions: string[];
-  };
-  annotators?: { id: string; name: string }[];
-  createdByUserId?: string;
-}
-
-async function dispatchAction({
-  deps,
-  trigger,
-  traceId,
-  tenantId,
-  foldState,
-}: {
-  deps: AlertTriggerReactorDeps;
-  trigger: TriggerSummary;
-  traceId: string;
-  tenantId: string;
-  foldState: TraceSummaryData;
-}): Promise<void> {
-  const project = await deps.projects.getById(tenantId);
-
-  if (!project) {
-    logger.warn({ tenantId, triggerId: trigger.id }, "Project not found");
-    return;
-  }
-
-  const triggerData = buildTriggerData(traceId, tenantId, foldState);
-  const params = trigger.actionParams as ActionParams;
-  let dispatched = true;
-
-  switch (trigger.action) {
-    case TriggerAction.SEND_EMAIL:
-      await sendTriggerEmail({
-        triggerEmails: params.members ?? [],
-        triggerData: [triggerData],
-        triggerName: trigger.name,
-        projectSlug: project.slug,
-        triggerType: trigger.alertType,
-        triggerMessage: trigger.message ?? "",
-      });
-      break;
-
-    case TriggerAction.SEND_SLACK_MESSAGE:
-      await sendSlackWebhook({
-        triggerWebhook: params.slackWebhook ?? "",
-        triggerData: [triggerData],
-        triggerName: trigger.name,
-        projectSlug: project.slug,
-        triggerType: trigger.alertType,
-        triggerMessage: trigger.message ?? "",
-      });
-      break;
-
-    case TriggerAction.ADD_TO_ANNOTATION_QUEUE:
-      await deps.addToAnnotationQueue({
-        traceIds: [traceId],
-        projectId: tenantId,
-        annotators: (params.annotators ?? []).map((a) => a.id),
-        userId: params.createdByUserId ?? "",
-      });
-      break;
-
-    case TriggerAction.ADD_TO_DATASET:
-      dispatched = await addTraceToDataset({
-        deps,
-        trigger,
-        traceId,
-        tenantId,
-        params,
-      });
-      break;
-  }
-
-  if (!dispatched) return;
-
-  // Record TriggerSent for dedup
-  await deps.triggers.recordSent({
-    triggerId: trigger.id,
-    traceId,
-    projectId: tenantId,
-  });
-
-  // Update lastRunAt
-  await deps.triggers.updateLastRunAt(trigger.id, tenantId);
-
-  logger.info(
-    { tenantId, traceId, triggerId: trigger.id, action: trigger.action },
-    "Trigger fired",
-  );
-}
-
-function buildTriggerData(
-  traceId: string,
-  tenantId: string,
-  foldState: TraceSummaryData,
-): { traceId: string; input: string; output: string; projectId: string; fullTrace: Trace } {
-  return {
-    traceId,
-    input: foldState.computedInput ?? "",
-    output: foldState.computedOutput ?? "",
-    projectId: tenantId,
-    // Stub trace — sendTriggerEmail/sendSlackWebhook only use traceId/input/output.
-    // ADD_TO_DATASET fetches the full trace separately.
-    fullTrace: { trace_id: traceId } as Trace,
-  };
-}
-
-async function addTraceToDataset({
-  deps,
-  trigger,
-  traceId,
-  tenantId,
-  params,
-}: {
-  deps: AlertTriggerReactorDeps;
-  trigger: TriggerSummary;
-  traceId: string;
-  tenantId: string;
-  params: ActionParams;
-}): Promise<boolean> {
-  if (!params.datasetId || !params.datasetMapping) {
-    logger.warn(
-      { tenantId, triggerId: trigger.id },
-      "ADD_TO_DATASET trigger missing datasetId or datasetMapping",
-    );
-    return false;
-  }
-
-  const trace = await deps.traceById(tenantId, traceId);
-
-  if (!trace) {
-    logger.warn(
-      { tenantId, traceId, triggerId: trigger.id },
-      "Trace not found for ADD_TO_DATASET action",
-    );
-    return false;
-  }
-
-  const { mapping, expansions: expansionsArray } = params.datasetMapping;
-  const expansions = new Set(
-    expansionsArray.filter(
-      (e): e is keyof typeof TRACE_EXPANSIONS => e in TRACE_EXPANSIONS,
-    ),
-  );
-
-  const entries: DatasetRecordEntry[] = [];
-  const now = Date.now();
-
-  const mappedEntries = mapTraceToDatasetEntry(
-    trace,
-    mapping as TraceMapping,
-    expansions,
-    undefined,
-    undefined,
-  );
-
-  for (let i = 0; i < mappedEntries.length; i++) {
-    const entry = mappedEntries[i]!;
-    const sanitizedEntry = Object.fromEntries(
-      Object.entries(entry).map(([key, value]) => [
-        key,
-        typeof value === "string" ? value.replace(/\u0000/g, "") : value,
-      ]),
-    );
-    entries.push({
-      id: `${now}-${i}`,
-      selected: true,
-      ...sanitizedEntry,
-    });
-  }
-
-  await deps.addToDataset({
-    datasetId: params.datasetId,
-    projectId: tenantId,
-    datasetRecords: entries,
-  });
-
-  return true;
 }

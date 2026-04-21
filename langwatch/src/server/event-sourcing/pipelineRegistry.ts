@@ -67,6 +67,7 @@ import { getAzureSafetyEnvFromProject } from "../app-layer/evaluations/azure-saf
 import { ExecuteEvaluationCommand } from "./pipelines/evaluation-processing/commands/executeEvaluation.command";
 import { EvaluationRunStore } from "./pipelines/evaluation-processing/projections/evaluationRun.store";
 import type { EvaluationEsSyncReactorDeps } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
+import { createEvaluationAlertTriggerReactor } from "./pipelines/evaluation-processing/reactors/evaluationAlertTrigger.reactor";
 import { createEvaluationEsSyncReactor } from "./pipelines/evaluation-processing/reactors/evaluationEsSync.reactor";
 import { createExperimentRunItemAppendStore } from "./pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
 import { createExperimentRunStateFoldStore } from "./pipelines/experiment-run-processing/projections/experimentRunState.store";
@@ -206,8 +207,13 @@ export class PipelineRegistry {
     // See: customerIoDailyUsageSyncReactor, customerIoTraceSyncReactor,
     //      customerIoEvaluationSyncReactor, customerIoSimulationSyncReactor
 
-    const evalPipeline = this.registerEvaluationPipeline();
-    const { pipeline: tracePipeline, traceSummaryStore, simComputeRunMetrics, wireExperimentDeps } = this.registerTracePipeline(evalPipeline);
+    const traceSummaryStore = this.cached<TraceSummaryData>(
+      new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
+      "trace_summaries",
+    );
+
+    const evalPipeline = this.registerEvaluationPipeline({ traceSummaryStore });
+    const { pipeline: tracePipeline, simComputeRunMetrics, wireExperimentDeps } = this.registerTracePipeline({ evalPipeline, traceSummaryStore });
     const suiteRunPipeline = this.registerSuiteRunPipeline();
     const { pipeline: simulationPipeline, scenarioExecutionHandle } = this.registerSimulationPipeline({ suiteRunPipeline, traceSummaryStore, simComputeRunMetrics });
 
@@ -228,7 +234,9 @@ export class PipelineRegistry {
     };
   }
 
-  private registerEvaluationPipeline() {
+  private registerEvaluationPipeline({ traceSummaryStore }: {
+    traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  }) {
     const executeEvaluationCommand = new ExecuteEvaluationCommand({
       monitors: this.deps.monitors,
       spanStorage: this.deps.traces.spans,
@@ -240,6 +248,24 @@ export class PipelineRegistry {
 
     const esSyncReactor = createEvaluationEsSyncReactor(this.deps.esSync);
 
+    const evaluationAlertTriggerReactor = createEvaluationAlertTriggerReactor({
+      triggers: this.deps.triggers,
+      projects: this.deps.projects,
+      traceSummaryStore,
+      evaluationRuns: this.deps.evaluations.runs,
+      traceById: async (projectId, traceId) => {
+        const traceService = TraceService.create(this.deps.prisma);
+        const protections = await getProtectionsForProject(this.deps.prisma, { projectId });
+        return traceService.getById(projectId, traceId, protections);
+      },
+      addToAnnotationQueue: async (params) => {
+        await createOrUpdateQueueItems({ ...params, prisma: this.deps.prisma });
+      },
+      addToDataset: async (params) => {
+        await createManyDatasetRecords(params);
+      },
+    });
+
     return this.deps.eventSourcing.register(
       createEvaluationProcessingPipeline({
         evalRunStore: new EvaluationRunStore(
@@ -247,19 +273,16 @@ export class PipelineRegistry {
         ),
         executeEvaluationCommand,
         esSyncReactor,
+        evaluationAlertTriggerReactor,
       }),
     );
   }
 
-  private registerTracePipeline(
-    evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>,
-  ) {
+  private registerTracePipeline({ evalPipeline, traceSummaryStore }: {
+    evalPipeline: ReturnType<PipelineRegistry["registerEvaluationPipeline"]>;
+    traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
+  }) {
     const evalCommands = mapCommands(evalPipeline.commands);
-
-    const traceSummaryStore = this.cached<TraceSummaryData>(
-      new TraceSummaryStore(this.deps.repositories.traceSummaryFold),
-      "trace_summaries",
-    );
 
     // Deferred dispatchers — resolved after pipeline registration.
     const resolveOrigin = new Deferred<CommandDispatcher<ResolveOriginCommandData>>("resolveOrigin");
