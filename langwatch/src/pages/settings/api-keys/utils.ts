@@ -102,6 +102,10 @@ export function computeBindings({
           scopeId: b.scopeId,
         };
       });
+    default: {
+      const _exhaustive: never = permissionMode;
+      return _exhaustive;
+    }
   }
 }
 
