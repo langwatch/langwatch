@@ -17,4 +17,11 @@ export class EvaluationRunService {
     if (!result) throw new EvaluationNotFoundError(evaluationId);
     return result;
   }
+
+  async getByTraceId(
+    tenantId: string,
+    traceId: string,
+  ): Promise<EvaluationRunData[]> {
+    return this.repository.findByTraceId(tenantId, traceId);
+  }
 }

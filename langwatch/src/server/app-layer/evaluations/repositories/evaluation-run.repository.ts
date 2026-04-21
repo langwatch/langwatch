@@ -7,6 +7,10 @@ export interface EvaluationRunRepository {
     tenantId: string,
     evaluationId: string,
   ): Promise<EvaluationRunData | null>;
+  findByTraceId(
+    tenantId: string,
+    traceId: string,
+  ): Promise<EvaluationRunData[]>;
 }
 
 export class NullEvaluationRunRepository implements EvaluationRunRepository {
@@ -17,5 +21,12 @@ export class NullEvaluationRunRepository implements EvaluationRunRepository {
     _evaluationId: string,
   ): Promise<EvaluationRunData | null> {
     return null;
+  }
+
+  async findByTraceId(
+    _tenantId: string,
+    _traceId: string,
+  ): Promise<EvaluationRunData[]> {
+    return [];
   }
 }
