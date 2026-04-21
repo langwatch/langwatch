@@ -3,10 +3,13 @@ package gatewaytracer
 import (
 	"net/http"
 
+	"go.uber.org/zap"
 	otelapi "go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/langwatch/langwatch/pkg/clog"
 )
 
 // Middleware creates a chi middleware that wraps each request in a gateway span.
@@ -38,6 +41,12 @@ func Middleware(spanNamer func(*http.Request) string) func(http.Handler) http.Ha
 			if sc.IsValid() {
 				w.Header().Set(HeaderTraceID, sc.TraceID().String())
 				w.Header().Set(HeaderSpanID, sc.SpanID().String())
+
+				// Stamp trace/span on the context logger for all downstream logs.
+				ctx = clog.With(ctx,
+					zap.String("trace_id", sc.TraceID().String()),
+					zap.String("span_id", sc.SpanID().String()),
+				)
 			}
 
 			rec := &statusRecorder{ResponseWriter: w, status: 200}
@@ -79,6 +88,10 @@ type statusRecorder struct {
 func (r *statusRecorder) WriteHeader(code int) {
 	r.status = code
 	r.ResponseWriter.WriteHeader(code)
+}
+
+func (r *statusRecorder) Unwrap() http.ResponseWriter {
+	return r.ResponseWriter
 }
 
 func (r *statusRecorder) Flush() {
