@@ -65,7 +65,11 @@ export async function dispatchTriggerAction({
     return;
   }
 
-  const triggerData = buildTriggerData(traceId, tenantId, foldState);
+  // Fetch full trace once — used by Slack (events), email (events), and ADD_TO_DATASET (mapping).
+  // Best-effort: if trace not found, actions that only need input/output still work with a stub.
+  const fullTrace = await deps.traceById(tenantId, traceId) ?? { trace_id: traceId } as Trace;
+
+  const triggerData = buildTriggerData(traceId, tenantId, foldState, fullTrace);
   const params = (trigger.actionParams ?? {}) as ActionParams;
   let dispatched = true;
 
@@ -108,6 +112,7 @@ export async function dispatchTriggerAction({
         traceId,
         tenantId,
         params,
+        fullTrace,
       });
       break;
   }
@@ -132,15 +137,14 @@ function buildTriggerData(
   traceId: string,
   tenantId: string,
   foldState: TraceSummaryData,
+  fullTrace: Trace,
 ): { traceId: string; input: string; output: string; projectId: string; fullTrace: Trace } {
   return {
     traceId,
     input: foldState.computedInput ?? "",
     output: foldState.computedOutput ?? "",
     projectId: tenantId,
-    // Stub trace — sendTriggerEmail/sendSlackWebhook only use traceId/input/output.
-    // ADD_TO_DATASET fetches the full trace separately.
-    fullTrace: { trace_id: traceId } as Trace,
+    fullTrace,
   };
 }
 
@@ -150,12 +154,14 @@ async function addTraceToDataset({
   traceId,
   tenantId,
   params,
+  fullTrace,
 }: {
   deps: TriggerActionDispatchDeps;
   trigger: TriggerSummary;
   traceId: string;
   tenantId: string;
   params: ActionParams;
+  fullTrace: Trace;
 }): Promise<boolean> {
   if (!params.datasetId || !params.datasetMapping) {
     logger.warn(
@@ -165,15 +171,16 @@ async function addTraceToDataset({
     return false;
   }
 
-  const trace = await deps.traceById(tenantId, traceId);
-
-  if (!trace) {
+  // Full trace was already fetched by dispatchTriggerAction; check it has spans
+  if (!fullTrace.spans || fullTrace.spans.length === 0) {
     logger.warn(
       { tenantId, traceId, triggerId: trigger.id },
-      "Trace not found for ADD_TO_DATASET action",
+      "Trace not found or has no spans for ADD_TO_DATASET action",
     );
     return false;
   }
+
+  const trace = fullTrace;
 
   const { mapping, expansions: expansionsArray } = params.datasetMapping;
   const expansions = new Set(

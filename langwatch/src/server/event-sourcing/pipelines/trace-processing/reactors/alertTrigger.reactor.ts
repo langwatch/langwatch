@@ -4,7 +4,9 @@ import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import {
   buildPreconditionTraceDataFromFoldState,
   classifyTriggerFilters,
+  hasEventFilters,
   matchesTriggerFilters,
+  populateEventsOnTraceData,
 } from "~/server/filters/triggerFilter.matcher";
 import type { DatasetRecordEntry } from "~/server/datasets/types";
 import type { Trace } from "~/server/tracer/types";
@@ -81,7 +83,20 @@ export function createAlertTriggerReactor(
       );
       if (triggers.length === 0) return;
 
-      const traceData = buildPreconditionTraceDataFromFoldState(foldState);
+      let traceData = buildPreconditionTraceDataFromFoldState(foldState);
+
+      // Check if any trigger needs event data — if so, fetch once
+      const needsEvents = triggers.some((t) => {
+        const { hasEvaluationFilters: hasEval } = classifyTriggerFilters(t.filters);
+        return !hasEval && hasEventFilters(t.filters);
+      });
+
+      if (needsEvents) {
+        const fullTrace = await deps.traceById(tenantId, traceId);
+        if (fullTrace?.events && fullTrace.events.length > 0) {
+          traceData = populateEventsOnTraceData(traceData, fullTrace.events);
+        }
+      }
 
       for (const trigger of triggers) {
         try {
