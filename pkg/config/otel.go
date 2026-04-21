@@ -17,9 +17,13 @@ type OTel struct {
 // Configure initializes the OTel provider from the config, parsing headers and
 // returning a Provider whose Shutdown method flushes pending telemetry.
 func (o *OTel) Configure(ctx context.Context, nodeID string) (*otelsetup.Provider, error) {
+	endpoint := o.OTLPEndpoint
+	if endpoint != "" && !strings.HasSuffix(endpoint, "/v1/traces") {
+		endpoint = strings.TrimRight(endpoint, "/") + "/v1/traces"
+	}
 	return otelsetup.New(ctx, otelsetup.Options{
 		NodeID:       nodeID,
-		OTLPEndpoint: o.OTLPEndpoint,
+		OTLPEndpoint: endpoint,
 		OTLPHeaders:  parseHeaders(o.OTLPHeaders),
 		SampleRatio:  o.SampleRatio,
 	})
