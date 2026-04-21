@@ -193,7 +193,7 @@ export function PersonalAccessTokensSection({
                         fontFamily="monospace"
                         color="fg.muted"
                       >
-                        pat-lw-...{pat.lookupId.slice(-4)}
+                        pat-lw-...{pat.lookupIdSuffix}
                       </Text>
                     </Table.Cell>
                     <Table.Cell>
