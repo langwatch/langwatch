@@ -72,10 +72,14 @@ export const processTraceBasedTrigger = async (
   let scrollId: string | undefined;
 
   do {
+    // Triggers forward the full captured input/output to Slack/email/dataset,
+    // so we need the untruncated payload here. The default list path
+    // truncates ComputedInput/ComputedOutput at the CH layer to keep the
+    // web pods' heap bounded.
     const result = await traceService.getAllTracesForProject(
       input,
       protections,
-      { scrollId },
+      { scrollId, includeFullContent: true },
     );
     scrollId = result.scrollId ?? undefined;
 
