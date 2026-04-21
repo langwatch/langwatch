@@ -149,6 +149,18 @@ describe("useSuiteRouting()", () => {
     });
   });
 
+  describe("given /simulations with a query string (no path segments)", () => {
+    it("falls back to all-runs instead of treating the query as an external set", () => {
+      mockRouter.query = { project: "my-project", pendingBatch: "scenariobatch_xxx" };
+      mockRouter.asPath = "/my-project/simulations/?pendingBatch=scenariobatch_xxx";
+
+      const { result } = renderHook(() => useSuiteRouting());
+
+      expect(result.current.selectedSuiteSlug).toBe(ALL_RUNS_ID);
+      mockRouter.asPath = "/my-project/simulations";
+    });
+  });
+
   describe("when router is not ready", () => {
     it("returns null", () => {
       mockRouter.isReady = false;

@@ -109,7 +109,10 @@ export function deriveFromPath({
 }): { selectedSuiteSlug: string | typeof ALL_RUNS_ID | null; highlightBatchId: string | null } {
   if (!isReady) return { selectedSuiteSlug: null, highlightBatchId: null };
 
-  const segments = Array.isArray(path) ? path : path ? [path] : [];
+  const rawSegments = Array.isArray(path) ? path : path ? [path] : [];
+  // Drop segments that are actually query strings leaking in from the URL
+  // (e.g. when a redirect fires before the catch-all has stripped "?foo=bar").
+  const segments = rawSegments.filter((s) => s && !s.startsWith("?") && !s.includes("="));
 
   // [] → All Runs
   if (segments.length === 0) {
@@ -133,7 +136,8 @@ export function deriveFromPath({
 
 /** Extract path segments from asPath (e.g., "/project/simulations/run-plans/slug" → ["run-plans", "slug"]) */
 function extractPathFromAsPath(asPath: string): string[] | undefined {
-  const match = asPath.match(/\/simulations(?:\/(.+?))?(?:\?|$)/);
+  const pathOnly = asPath.split("?")[0]?.split("#")[0] ?? "";
+  const match = pathOnly.match(/\/simulations\/(.+?)\/?$/);
   if (!match?.[1]) return undefined;
-  return match[1].split("/");
+  return match[1].split("/").filter(Boolean);
 }
