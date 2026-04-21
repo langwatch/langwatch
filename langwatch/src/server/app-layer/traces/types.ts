@@ -84,6 +84,13 @@ export const traceSummaryDataSchema = z.object({
   traceName: z.string(),
   /** Start time of the root span that set traceName, used for deterministic tie-breaking when multiple root spans exist. Internal bookkeeping. */
   rootSpanStartTimeMs: z.number().optional(),
+  /** LangWatch SDK events hoisted from spans during fold projection. */
+  events: z.array(z.object({
+    spanId: z.string(),
+    timestamp: z.number(),
+    name: z.string(),
+    attributes: z.record(z.string(), z.string()),
+  })).optional(),
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),

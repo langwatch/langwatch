@@ -41,6 +41,7 @@ import {
   TraceAttributeAccumulationService,
   TraceIOAccumulationService,
   ScenarioRoleCostService,
+  accumulateEvents,
   shouldOverrideOutput,
   extractIOFromLogRecord,
   OUTPUT_SOURCE,
@@ -129,6 +130,8 @@ export function applySpanToSummary({
     }
   }
 
+  const events = accumulateEvents({ state, span });
+
   return {
     ...state,
     traceId: state.traceId || span.traceId,
@@ -148,6 +151,7 @@ export function applySpanToSummary({
     blockedByGuardrail: io.blockedByGuardrail,
     attributes,
     ...roleAccumulation,
+    events,
   };
 }
 
@@ -214,6 +218,7 @@ export class TraceSummaryFoldProjection
       traceName: "",
       rootSpanStartTimeMs: undefined,
       attributes: {},
+      events: [],
       scenarioRoleCosts: {},
       scenarioRoleLatencies: {},
       scenarioRoleSpans: {},

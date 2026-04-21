@@ -13,10 +13,15 @@ const logger = createLogger(
   "langwatch:app-layer:traces:trace-summary-repository",
 );
 
-type ClickHouseSummaryWriteRecord = WithDateWrites<
-  ClickHouseSummaryRecord,
-  "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
->;
+type ClickHouseSummaryWriteRecord = Omit<
+  WithDateWrites<
+    ClickHouseSummaryRecord,
+    "OccurredAt" | "CreatedAt" | "UpdatedAt" | "LastEventOccurredAt"
+  >,
+  "Events.Timestamp"
+> & {
+  "Events.Timestamp": Date[];
+};
 
 interface ClickHouseSummaryRecord {
   ProjectionId: string;
@@ -55,6 +60,10 @@ interface ClickHouseSummaryRecord {
   TraceName: string;
   ScenarioRoleSpans: Record<string, string>;
   SpanCosts: Record<string, number>;
+  "Events.SpanId": string[];
+  "Events.Timestamp": string[];
+  "Events.Name": string[];
+  "Events.Attributes": Record<string, string>[];
   LastEventOccurredAt: number;
 }
 
@@ -219,7 +228,11 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             t.ScenarioRoleLatencies AS ScenarioRoleLatencies,
             t.TraceName AS TraceName,
             t.ScenarioRoleSpans AS ScenarioRoleSpans,
-            t.SpanCosts AS SpanCosts
+            t.SpanCosts AS SpanCosts,
+            t.\`Events.SpanId\` AS \`Events.SpanId\`,
+            t.\`Events.Timestamp\` AS \`Events.Timestamp\`,
+            t.\`Events.Name\` AS \`Events.Name\`,
+            t.\`Events.Attributes\` AS \`Events.Attributes\`
           FROM ${TABLE_NAME} AS t
           WHERE t.TenantId = {tenantId:String}
             AND t.TraceId = {traceId:String}
@@ -285,6 +298,12 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       scenarioRoleLatencies: record.ScenarioRoleLatencies ?? {},
       scenarioRoleSpans: record.ScenarioRoleSpans ?? {},
       spanCosts: record.SpanCosts ?? {},
+      events: (record["Events.SpanId"] ?? []).map((spanId, i) => ({
+        spanId,
+        timestamp: new Date(record["Events.Timestamp"]![i]!).getTime(),
+        name: record["Events.Name"]![i]!,
+        attributes: record["Events.Attributes"]![i] ?? {},
+      })),
       occurredAt: record.OccurredAt,
       createdAt: record.CreatedAt,
       updatedAt: record.UpdatedAt,
@@ -336,6 +355,10 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       ScenarioRoleLatencies: data.scenarioRoleLatencies ?? {},
       ScenarioRoleSpans: data.scenarioRoleSpans ?? {},
       SpanCosts: data.spanCosts ?? {},
+      "Events.SpanId": (data.events ?? []).map((e) => e.spanId),
+      "Events.Timestamp": (data.events ?? []).map((e) => new Date(e.timestamp)),
+      "Events.Name": (data.events ?? []).map((e) => e.name),
+      "Events.Attributes": (data.events ?? []).map((e) => e.attributes),
     };
   }
 }
