@@ -111,15 +111,40 @@ Feature: Workflow agent input/output mapping layer
     Then the ScenarioInputMappingSection is displayed
     And the user can view and modify the scenarioMappings
 
+  # --- Layer 5: Agents list edit routing ---
+
+  @integration
+  Scenario: Editing a workflow agent from the agents list opens the editor populated with existing data
+    Given an existing workflow agent with a saved workflow and configured scenarioMappings
+    And the user is on the /[project]/agents page
+    When the user clicks edit on the workflow agent card
+    Then AgentWorkflowEditorDrawer opens with the agent id
+    And the drawer is populated with the agent's name, linked workflow, and scenarioMappings
+    And WorkflowSelectorDrawer is not opened
+
+  @unit
+  Scenario Outline: Agents page routes each agent type to its matching editor drawer
+    Given the /[project]/agents page edit handler
+    When the user edits a "<type>" agent
+    Then the drawer name resolved for editing is "<drawer>"
+
+    Examples:
+      | type     | drawer              |
+      | code     | agentCodeEditor     |
+      | http     | agentHttpEditor     |
+      | workflow | agentWorkflowEditor |
+
 # --- AC Coverage Map ---
 # AC 1: "Auto-compute mappings on workflow save" → Scenario: Auto-computes mappings when workflow with conventional inputs is saved
 # AC 1: "Auto-compute mappings on workflow save" → Scenario: Skips auto-compute when workflow still has blank-template placeholder fields
 # AC 1: "Auto-compute mappings on workflow save" → Scenario: Re-computes mappings when existing mappings reference stale fields
 # AC 1: "Auto-compute mappings on workflow save" → Scenario: Auto-compute does not block the workflow save on failure
-# AC 2: "Auto-open mapping drawer on target selection" → Scenario: Opens mapping drawer when running a scenario with an unmapped workflow agent
-# AC 2: "Auto-open mapping drawer on target selection" → Scenario: Opens mapping drawer when workflow agent has incomplete mappings
-# AC 2: "Auto-open mapping drawer on target selection" → Scenario: Scenario runs successfully after user configures mappings via drawer
-# AC 3: "Pre-run validation for incomplete mappings" → Scenario: Returns actionable error for multi-input workflow agent without mappings
-# AC 3: "Pre-run validation for incomplete mappings" → Scenario: Allows single-input workflow agent to run without explicit mappings
+# AC 2: "Mapping drawer gate at Save & Run" → Scenario: Opens mapping drawer when running a scenario with an unmapped workflow agent
+# AC 2: "Mapping drawer gate at Save & Run" → Scenario: Opens mapping drawer when workflow agent has incomplete mappings
+# AC 2: "Mapping drawer gate at Save & Run" → Scenario: Scenario runs successfully after user configures mappings via drawer
+# AC 3: "Pre-run validation for multi-input workflows" → Scenario: Returns actionable error for multi-input workflow agent without mappings
+# AC 3: "Pre-run validation for multi-input workflows" → Scenario: Allows single-input workflow agent to run without explicit mappings
 # AC 4: "No change to the current create flow" → Scenario: Create flow navigates directly to workflow studio without mapping panel
 # AC 5: "Existing edit path unchanged" → Scenario: Edit flow continues to show mapping panel as before
+# AC 6: "Edit from agents list opens the edit drawer, not the create drawer" → Scenario: Editing a workflow agent from the agents list opens the editor populated with existing data
+# AC 6: "Edit from agents list opens the edit drawer, not the create drawer" → Scenario: Agents list routes each agent type to its matching editor drawer
