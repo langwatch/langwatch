@@ -171,9 +171,10 @@ export function CreatePatDrawer({
               </Text>
               <RadioGroup
                 value={permissionMode}
-                onChange={(e) =>
-                  setPermissionMode(e.target.value as PermissionMode)
-                }
+                onValueChange={(e) => {
+                  const value = e.value as PermissionMode;
+                  setPermissionMode(value);
+                }}
               >
                 <HStack gap={4}>
                   <Radio value="all">All permissions</Radio>
