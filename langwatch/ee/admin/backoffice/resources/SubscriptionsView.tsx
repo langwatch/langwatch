@@ -52,7 +52,6 @@ interface AdminSubscription {
   maxEvaluators: number | null;
   maxExperiments: number | null;
   maxOnlineEvaluations: number | null;
-  evaluationsCredit: number | null;
   maxMessagesPerMonth: number | null;
   maxRetentionDays: number | null;
   maxDatasets: number | null;
@@ -98,8 +97,6 @@ const LIMIT_FIELDS: Array<{
     label: "Max online evaluations",
     group: "Evaluation",
   },
-  { key: "evaluationsCredit", label: "Evaluations credit", group: "Evaluation" },
-
   {
     key: "maxMessagesPerMonth",
     label: "Max traces per month",
@@ -253,7 +250,6 @@ type LimitKey =
   | "maxEvaluators"
   | "maxExperiments"
   | "maxOnlineEvaluations"
-  | "evaluationsCredit"
   | "maxMessagesPerMonth"
   | "maxRetentionDays"
   | "maxDatasets"

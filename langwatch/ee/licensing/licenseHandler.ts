@@ -219,7 +219,6 @@ export class LicenseHandler {
       currentCustomGraphs,
       currentAutomations,
       currentMessagesPerMonth,
-      currentEvaluationsCredit,
     ] = await Promise.all([
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),
@@ -237,7 +236,6 @@ export class LicenseHandler {
       this.repository.getCustomGraphCount(organizationId),
       this.repository.getAutomationCount(organizationId),
       messagesCountPromise,
-      this.repository.getEvaluationsCreditUsed(organizationId),
     ]);
 
     return {
@@ -273,8 +271,6 @@ export class LicenseHandler {
       maxAutomations: resolved.maxAutomations,
       currentMessagesPerMonth,
       maxMessagesPerMonth: resolved.maxMessagesPerMonth,
-      currentEvaluationsCredit,
-      maxEvaluationsCredit: resolved.evaluationsCredit,
     };
   }
 

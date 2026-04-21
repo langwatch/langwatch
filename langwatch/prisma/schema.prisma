@@ -1192,7 +1192,6 @@ model Subscription {
     maxMembers            Int?
     maxProjects           Int?
     maxMessagesPerMonth   Int?
-    evaluationsCredit     Int?
     maxWorkflows          Int?
     maxRetentionDays      Int?
     maxMembersLite        Int?

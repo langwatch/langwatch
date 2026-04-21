@@ -655,52 +655,6 @@ describe("LicenseEnforcementRepository", () => {
     });
   });
 
-  describe("getEvaluationsCreditUsed", () => {
-    it("queries batch evaluations with date filter for current month", async () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date("2024-01-15T12:00:00.000Z"));
-
-      mockPrisma.batchEvaluation.count.mockResolvedValue(50);
-
-      const result = await repository.getEvaluationsCreditUsed(organizationId);
-
-      expect(mockPrisma.batchEvaluation.count).toHaveBeenCalledWith({
-        where: {
-          project: { team: { organizationId } },
-          createdAt: { gte: expect.any(Date) },
-        },
-      });
-      expect(result).toBe(50);
-
-      vi.useRealTimers();
-    });
-
-    it("returns zero when no evaluations this month", async () => {
-      mockPrisma.batchEvaluation.count.mockResolvedValue(0);
-
-      const result = await repository.getEvaluationsCreditUsed(organizationId);
-
-      expect(result).toBe(0);
-    });
-
-    it("uses start of current month for date filter", async () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date("2024-03-20T15:30:00.000Z"));
-
-      await repository.getEvaluationsCreditUsed(organizationId);
-
-      const call = mockPrisma.batchEvaluation.count.mock.calls[0]?.[0];
-      const dateFilter = call?.where?.createdAt?.gte as Date;
-
-      // Should be start of March 2024
-      expect(dateFilter.getFullYear()).toBe(2024);
-      expect(dateFilter.getMonth()).toBe(2); // March (0-indexed)
-      expect(dateFilter.getDate()).toBe(1);
-
-      vi.useRealTimers();
-    });
-  });
-
   describe("query structure validation", () => {
     it("workflow query excludes archived workflows", async () => {
       await repository.getWorkflowCount(organizationId);

@@ -58,7 +58,6 @@ describe("mapToPlanInfo", () => {
     expect(result.maxMembers).toBe(5);
     expect(result.maxProjects).toBe(10);
     expect(result.maxMessagesPerMonth).toBe(50000);
-    expect(result.evaluationsCredit).toBe(100);
     expect(result.maxWorkflows).toBe(25);
     expect(result.maxPrompts).toBe(30);
     expect(result.maxEvaluators).toBe(35);

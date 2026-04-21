@@ -42,7 +42,6 @@ describe("LicenseEnforcementService", () => {
     maxDashboards: 5,
     maxCustomGraphs: 10,
     maxAutomations: 5,
-    evaluationsCredit: 100,
     canPublish: true,
     prices: { USD: 0, EUR: 0 },
   };
@@ -64,7 +63,6 @@ describe("LicenseEnforcementService", () => {
       getTeamCount: vi.fn().mockResolvedValue(0),
       getMemberCount: vi.fn().mockResolvedValue(0),
       getMembersLiteCount: vi.fn().mockResolvedValue(0),
-      getEvaluationsCreditUsed: vi.fn().mockResolvedValue(0),
       getCurrentMonthCost: vi.fn().mockResolvedValue(0),
       getCurrentMonthCostForProjects: vi.fn().mockResolvedValue(0),
     };

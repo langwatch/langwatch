@@ -246,15 +246,6 @@ describe("validateLicense", () => {
       }
     });
 
-    it("extracts plan.evaluationsCredit", () => {
-      const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
-
-      expect(result.valid).toBe(true);
-      if (result.valid) {
-        expect(result.licenseData.plan.evaluationsCredit).toBe(BASE_LICENSE.plan.evaluationsCredit);
-      }
-    });
-
     it("extracts plan.maxWorkflows", () => {
       const result = validateLicense(VALID_LICENSE_KEY, TEST_PUBLIC_KEY);
 
