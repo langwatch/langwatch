@@ -54,10 +54,11 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 					return iter, nil
 				}
 				return &traceStreamWrapper{
-					inner:  iter,
-					end:    end,
-					bundle: call.Bundle,
-					req:    call.Request,
+					inner:   iter,
+					end:     end,
+					bundle:  call.Bundle,
+					req:     call.Request,
+					spanCtx: spanCtx,
 				}, nil
 			}
 		},
@@ -70,12 +71,11 @@ type traceStreamWrapper struct {
 	end       EndSpanFunc
 	bundle    *domain.Bundle
 	req       *domain.Request
-	lastCtx   context.Context
+	spanCtx   context.Context
 	closeOnce sync.Once
 }
 
 func (w *traceStreamWrapper) Next(ctx context.Context) bool {
-	w.lastCtx = ctx
 	if !w.inner.Next(ctx) {
 		w.onClose()
 		return false
@@ -94,11 +94,10 @@ func (w *traceStreamWrapper) Close() error {
 
 func (w *traceStreamWrapper) onClose() {
 	w.closeOnce.Do(func() {
-		ctx := w.lastCtx
-		if ctx == nil {
-			ctx = context.Background()
-		}
-		forkedcontext.ForkWithTimeout(ctx, 5*time.Second, func(ctx context.Context) error {
+		// Use spanCtx (not the caller's Next ctx) because the active span is
+		// stored there by BeginSpan — the transport's request context doesn't
+		// carry it.
+		forkedcontext.ForkWithTimeout(w.spanCtx, 5*time.Second, func(ctx context.Context) error {
 			w.end(ctx, domain.AITraceParams{
 				ProjectID:   w.bundle.ProjectID,
 				Model:       w.req.Resolved.ModelID,
