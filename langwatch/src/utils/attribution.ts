@@ -7,15 +7,19 @@
  * mutation, Customer.io identify/track).
  *
  * Pure module — no React. The mount-time write effect lives in
- * `useAttributionCapture.ts`, which imports from here.
+ * `~/hooks/useAttributionCapture.ts`, which imports from here.
  */
+
+import { captureException } from "~/utils/posthogErrorCapture";
+
+let storageErrorReported = false;
 
 /**
  * Canonical list of attribution fields. Single source of truth — add a
  * field here plus one line in `URL_PARAM_TO_FIELD` below if it's
  * URL-sourced, and everything downstream (types, readers, pickers) follows.
  */
-const ATTRIBUTION_FIELDS = [
+export const ATTRIBUTION_FIELDS = [
   "leadSource",
   "utmSource",
   "utmMedium",
@@ -48,11 +52,21 @@ function storageKey(field: AttributionField): string {
   return STORAGE_PREFIX + field;
 }
 
+function reportStorageError(error: unknown): void {
+  if (storageErrorReported) return;
+  storageErrorReported = true;
+  captureException(error, {
+    tags: { module: "attribution" },
+    level: "warning",
+  });
+}
+
 function safeGet(field: AttributionField): string | null {
   if (typeof window === "undefined") return null;
   try {
     return window.sessionStorage.getItem(storageKey(field));
-  } catch {
+  } catch (error) {
+    reportStorageError(error);
     return null;
   }
 }
@@ -72,8 +86,8 @@ export function setAttributionIfAbsent(
     const key = storageKey(field);
     if (window.sessionStorage.getItem(key) !== null) return;
     window.sessionStorage.setItem(key, value);
-  } catch {
-    // sessionStorage may be unavailable (private browsing, disabled) — ignore.
+  } catch (error) {
+    reportStorageError(error);
   }
 }
 
@@ -82,20 +96,6 @@ export function readAttribution(): Attribution {
   const result = {} as Attribution;
   for (const field of ATTRIBUTION_FIELDS) {
     result[field] = safeGet(field);
-  }
-  return result;
-}
-
-/**
- * Projects any object containing attribution fields onto the `Attribution`
- * shape. Missing fields become null. Useful for extracting the attribution
- * subset from a larger form object without repeating the field list at
- * every call site.
- */
-export function pickAttribution(source: Partial<Attribution>): Attribution {
-  const result = {} as Attribution;
-  for (const field of ATTRIBUTION_FIELDS) {
-    result[field] = source[field] ?? null;
   }
   return result;
 }
