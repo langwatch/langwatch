@@ -129,8 +129,10 @@ def test_response_relevancy():
     not (
         os.environ.get("AZURE_OPENAI_API_KEY")
         and os.environ.get("AZURE_OPENAI_ENDPOINT")
+        and os.environ.get("AZURE_DEPLOYMENT_NAME")
+        and os.environ.get("AZURE_EMBEDDINGS_DEPLOYMENT_NAME")
     ),
-    reason="Azure OpenAI credentials not set",
+    reason="Azure OpenAI credentials or deployment names not set",
 )
 def test_response_relevancy_with_azure_embeddings():
     evaluator = RagasResponseRelevancyEvaluator(
