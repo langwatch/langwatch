@@ -20,4 +20,12 @@ describe("getAgentEditorDrawer", () => {
       expect(getAgentEditorDrawer("workflow")).toBe("agentWorkflowEditor");
     });
   });
+
+  describe("when editing a signature agent", () => {
+    it("throws because signature agents have no editor drawer", () => {
+      expect(() => getAgentEditorDrawer("signature")).toThrow(
+        /signature agents have no editor drawer/,
+      );
+    });
+  });
 });

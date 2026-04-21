@@ -1,4 +1,4 @@
-import type { AgentType } from "~/components/agents/AgentTypeSelectorDrawer";
+import type { AgentType } from "~/server/agents/agent.repository";
 
 type AgentEditorDrawerName =
   | "agentCodeEditor"
@@ -15,6 +15,10 @@ export function getAgentEditorDrawer(
       return "agentHttpEditor";
     case "workflow":
       return "agentWorkflowEditor";
+    case "signature":
+      throw new Error(
+        `Unhandled agent type: ${type} — signature agents have no editor drawer`,
+      );
     default: {
       const _exhaustive: never = type;
       throw new Error(`Unhandled agent type: ${_exhaustive as string}`);
