@@ -205,8 +205,8 @@ export function NotFoundScene() {
       smoothMouse.current.x += (mouse.current.x - smoothMouse.current.x) * 0.06;
       smoothMouse.current.y += (mouse.current.y - smoothMouse.current.y) * 0.06;
 
-      const textDx = smoothMouse.current.x * 10;
-      const textDy = smoothMouse.current.y * 5;
+      const textDx = smoothMouse.current.x * 3;
+      const textDy = smoothMouse.current.y * 1.5;
       if (redTextRef.current) {
         redTextRef.current.style.transform = `translate(${-2 - textDx}px, ${-1 - textDy}px)`;
       }
