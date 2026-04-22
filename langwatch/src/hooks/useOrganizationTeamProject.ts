@@ -258,11 +258,14 @@ export const useOrganizationTeamProject = (
       typeof router.query.project == "string" &&
       finalProject.slug !== router.query.project
     ) {
-      const returnTo = router.query.return_to;
-      const returnToParam = returnTo
-        ? `?return_to=${encodeURIComponent(returnTo as string)}`
+      // Preserve the sub-path so /bad-slug/messages → /good-slug/messages
+      const [pathPart, queryPart] = router.asPath.split("?");
+      const oldPrefix = `/${router.query.project as string}`;
+      const subPath = pathPart?.startsWith(oldPrefix)
+        ? pathPart.slice(oldPrefix.length)
         : "";
-      void router.push(`/${finalProject.slug}${returnToParam}`);
+      const search = queryPart ? `?${queryPart}` : "";
+      void router.push(`/${finalProject.slug}${subPath}${search}`);
     }
   }, [
     isDemo,
