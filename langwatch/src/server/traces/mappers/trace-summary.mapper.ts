@@ -157,16 +157,27 @@ const OUTPUT_FIELD_NAMES = [
 ] as const;
 
 /**
+ * Maximum recursion depth for state-object text extraction. Real-world payloads
+ * are shallow (~3-5 levels); 32 is generous while still protecting against
+ * pathological / adversarial deeply-nested JSON.
+ */
+const MAX_STATE_OBJECT_RECURSION_DEPTH = 32;
+
+/**
  * Extracts text from a state object by looking for common field names.
  *
  * @param obj - The state object to extract from
  * @param fieldNames - Array of field names to try (in priority order)
+ * @param depth - Internal recursion counter; callers should leave at default
  * @returns The extracted text, or null if not found
  */
 function extractTextFromStateObject(
   obj: Record<string, unknown>,
   fieldNames: readonly string[],
+  depth = 0,
 ): string | null {
+  if (depth >= MAX_STATE_OBJECT_RECURSION_DEPTH) return null;
+
   for (const field of fieldNames) {
     const value = obj[field];
     if (typeof value === "string" && value.trim().length > 0) {
@@ -184,6 +195,7 @@ function extractTextFromStateObject(
       return extractTextFromStateObject(
         only as Record<string, unknown>,
         fieldNames,
+        depth + 1,
       );
     }
   }

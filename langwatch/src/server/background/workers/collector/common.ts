@@ -193,7 +193,7 @@ export const typedValueToText = (
     // We skip empty matches so a JSON like `{ content: "", data: {...real payload...} }` falls
     // through to the next key (or to `firstAndOnlyKey`/`stringified`) instead of short-circuiting
     // to "" — which previously produced empty trace outputs in the list and dataset views.
-    const hasMeaningfulValue = (value: any): boolean => {
+    const hasNonEmptyValue = (value: any): boolean => {
       if (value === undefined || value === null) return false;
       if (typeof value === "string") return value.length > 0;
       if (Array.isArray(value)) return value.length > 0;
@@ -203,62 +203,62 @@ export const typedValueToText = (
 
     const specialKeysMapping = (json: any): string | undefined => {
       // TODO: test those
-      if (hasMeaningfulValue(json.text)) {
+      if (hasNonEmptyValue(json.text)) {
         return json.text;
       }
-      if (hasMeaningfulValue(json.input)) {
+      if (hasNonEmptyValue(json.input)) {
         return json.input;
       }
-      if (hasMeaningfulValue(json.question)) {
+      if (hasNonEmptyValue(json.question)) {
         return json.question;
       }
-      if (hasMeaningfulValue(json.user_query)) {
+      if (hasNonEmptyValue(json.user_query)) {
         return json.user_query;
       }
-      if (hasMeaningfulValue(json.query)) {
+      if (hasNonEmptyValue(json.query)) {
         return json.query;
       }
-      if (hasMeaningfulValue(json.message) && typeof json.message === "string") {
+      if (hasNonEmptyValue(json.message) && typeof json.message === "string") {
         return json.message;
       }
       // Langflow
-      if (hasMeaningfulValue(json.input_value)) {
+      if (hasNonEmptyValue(json.input_value)) {
         return json.input_value;
       }
       // TODO: test this happens for finding outputs
-      if (hasMeaningfulValue(json.output)) {
+      if (hasNonEmptyValue(json.output)) {
         return json.output;
       }
 
-      if (hasMeaningfulValue(json.answer)) {
+      if (hasNonEmptyValue(json.answer)) {
         return json.answer;
       }
 
       // Chainlit
-      if (hasMeaningfulValue(json.content)) {
+      if (hasNonEmptyValue(json.content)) {
         return json.content;
       }
 
       // Haystack
-      if (hasMeaningfulValue(json.prompt)) {
+      if (hasNonEmptyValue(json.prompt)) {
         return json.prompt;
       }
 
       // Langgraph on Flowise
       if (
         json.messages?.length > 0 &&
-        hasMeaningfulValue(
+        hasNonEmptyValue(
           json.messages?.[json.messages?.length - 1]?.content,
         )
       ) {
         return json.messages[json.messages?.length - 1].content;
       }
-      if (hasMeaningfulValue(json.return_values?.output)) {
+      if (hasNonEmptyValue(json.return_values?.output)) {
         return json.return_values.output;
       }
 
       // LangChain
-      // NOTE: we intentionally keep the old `!== undefined` check (not hasMeaningfulValue)
+      // NOTE: we intentionally keep the old `!== undefined` check (not hasNonEmptyValue)
       // for the `inputs`/`outputs` wrapper paths. `RunnableSequence` legitimately produces
       // `{ inputs: { input: "" } }` and the caller (getFirstInputAsText) relies on the
       // returned "" to trigger a fallback to the next span in the sequence.

@@ -171,7 +171,7 @@ describe("TraceIOExtractionService", () => {
       });
     });
 
-    describe("when langwatch.input wraps the real payload in a single unknown key", () => {
+    describe("when langwatch.output wraps the real payload in a single unknown key", () => {
       it("recurses through the wrapper and extracts the inner content", () => {
         const span = createTestSpan({
           spanAttributes: {

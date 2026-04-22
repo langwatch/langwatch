@@ -353,13 +353,25 @@ const COMMON_TEXT_KEYS = [
 ] as const;
 
 /**
+ * Maximum recursion depth for plain-JSON text extraction. Guards against
+ * pathological nesting (accidental or adversarial) — real-world payloads
+ * rarely exceed a depth of ~4-5, so 32 is generous and still safe.
+ */
+const MAX_PLAIN_JSON_RECURSION_DEPTH = 32;
+
+/**
  * Extracts a human-readable text representation from a plain JSON object
  * that is NOT message-shaped (no role/content structure).
  *
  * Handles common wrapper patterns like `{ input: "hello" }` or
  * `{ question: "what is 2+2?" }` that are used by various frameworks.
  */
-function extractTextFromPlainJson(obj: Record<string, unknown>): string | null {
+function extractTextFromPlainJson(
+  obj: Record<string, unknown>,
+  depth = 0,
+): string | null {
+  if (depth >= MAX_PLAIN_JSON_RECURSION_DEPTH) return null;
+
   for (const key of COMMON_TEXT_KEYS) {
     const val = obj[key];
     if (val === undefined) continue;
@@ -367,7 +379,10 @@ function extractTextFromPlainJson(obj: Record<string, unknown>): string | null {
     if (typeof val === "number" || typeof val === "boolean") return String(val);
     // Nested object with a known key (e.g. { inputs: { input: "hello" } })
     if (val && typeof val === "object" && !Array.isArray(val)) {
-      const nested = extractTextFromPlainJson(val as Record<string, unknown>);
+      const nested = extractTextFromPlainJson(
+        val as Record<string, unknown>,
+        depth + 1,
+      );
       if (nested) return nested;
     }
   }
@@ -375,7 +390,10 @@ function extractTextFromPlainJson(obj: Record<string, unknown>): string | null {
   // LangChain: { inputs: { input: ... } } / { outputs: { output: ... } }
   const wrapper = obj.inputs ?? obj.outputs;
   if (wrapper && typeof wrapper === "object" && !Array.isArray(wrapper)) {
-    const nested = extractTextFromPlainJson(wrapper as Record<string, unknown>);
+    const nested = extractTextFromPlainJson(
+      wrapper as Record<string, unknown>,
+      depth + 1,
+    );
     if (nested) return nested;
   }
 
@@ -387,7 +405,10 @@ function extractTextFromPlainJson(obj: Record<string, unknown>): string | null {
   if (entries.length === 1) {
     const [, only] = entries[0]!;
     if (only && typeof only === "object" && !Array.isArray(only)) {
-      const nested = extractTextFromPlainJson(only as Record<string, unknown>);
+      const nested = extractTextFromPlainJson(
+        only as Record<string, unknown>,
+        depth + 1,
+      );
       if (nested) return nested;
     }
   }
@@ -402,7 +423,7 @@ function extractTextFromPlainJson(obj: Record<string, unknown>): string | null {
  * strictly better than storing `NULL` (which renders as `<empty>` in the UI).
  */
 function stringifyForText(value: unknown): string | null {
-  if (value === undefined || value === null) return null;
+  if (value == null) return null;
   if (typeof value === "string") return value.length > 0 ? value : null;
   if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
