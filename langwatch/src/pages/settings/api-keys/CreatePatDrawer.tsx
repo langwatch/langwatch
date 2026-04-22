@@ -242,7 +242,7 @@ export function CreatePatDrawer({
                     You have no role bindings in this organization yet.
                   </Text>
                 ) : (
-                  <VStack align="stretch" gap={1} marginTop={2}>
+                  <VStack align="stretch" gap={2} marginTop={2}>
                     {myBindings.data!.map((b) => {
                       const scopeLabel =
                         b.scopeType === "ORGANIZATION"
@@ -273,16 +273,18 @@ export function CreatePatDrawer({
                       return (
                         <HStack
                           key={b.id}
-                          gap={2}
-                          fontSize="xs"
-                          justify="space-between"
+                          gap={3}
+                          fontSize="sm"
                           width="full"
+                          align="center"
                         >
-                          <Text color="fg.muted">{scopeLabel}</Text>
+                          <Text color="fg" flex="1">
+                            {scopeLabel}
+                          </Text>
                           {showSelector && collection ? (
                             <Select.Root
                               collection={collection}
-                              size="xs"
+                              size="sm"
                               value={[effectiveRole]}
                               onValueChange={(details) => {
                                 const val = details.value[0];
@@ -292,9 +294,10 @@ export function CreatePatDrawer({
                                     [b.id]: val,
                                   }));
                               }}
+                              width="140px"
                             >
                               <Select.Trigger
-                                minWidth="100px"
+                                width="140px"
                                 aria-label={`Role for ${scopeLabel}`}
                               >
                                 <Select.ValueText />
