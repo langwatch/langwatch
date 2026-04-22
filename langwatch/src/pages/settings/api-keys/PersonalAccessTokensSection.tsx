@@ -10,6 +10,7 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
+import { Popover } from "../../../components/ui/popover";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { Key, Plus, Trash2 } from "lucide-react";
 import { PageLayout } from "../../../components/ui/layouts/PageLayout";
@@ -194,9 +195,56 @@ export function PersonalAccessTokensSection({
                       </Text>
                     </Table.Cell>
                     <Table.Cell>
-                      <Text fontSize="sm" color="fg.muted">
-                        {roleSummary(pat.roleBindings)}
-                      </Text>
+                      {pat.roleBindings.length <= 1 ? (
+                        <Text fontSize="sm" color="fg.muted">
+                          {roleSummary(pat.roleBindings)}
+                        </Text>
+                      ) : (
+                        <Popover.Root>
+                          <Popover.Trigger asChild>
+                            <Button
+                              variant="plain"
+                              size="xs"
+                              padding={0}
+                              height="auto"
+                              fontWeight="normal"
+                              color="fg.muted"
+                              fontSize="sm"
+                              cursor="pointer"
+                              _hover={{ textDecoration: "underline" }}
+                            >
+                              {roleSummary(pat.roleBindings)}
+                            </Button>
+                          </Popover.Trigger>
+                          <Popover.Content width="280px">
+                            <Popover.Header>
+                              <Text fontWeight="600" fontSize="sm">
+                                Permissions
+                              </Text>
+                            </Popover.Header>
+                            <Popover.Body>
+                              <VStack align="stretch" gap={1}>
+                                {pat.roleBindings.map((rb) => {
+                                  const scope =
+                                    rb.scopeType === "ORGANIZATION"
+                                      ? "Org-wide"
+                                      : rb.scopeType === "TEAM"
+                                        ? "Team"
+                                        : "Project";
+                                  return (
+                                    <HStack key={rb.id} gap={2} fontSize="xs">
+                                      <Badge size="sm" variant="subtle">
+                                        {rb.role}
+                                      </Badge>
+                                      <Text color="fg.muted">{scope}</Text>
+                                    </HStack>
+                                  );
+                                })}
+                              </VStack>
+                            </Popover.Body>
+                          </Popover.Content>
+                        </Popover.Root>
+                      )}
                     </Table.Cell>
                     <Table.Cell>
                       {pat.expiresAt ? (
