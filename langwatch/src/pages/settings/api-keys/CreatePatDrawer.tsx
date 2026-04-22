@@ -10,7 +10,7 @@ import {
   Textarea,
   VStack,
 } from "@chakra-ui/react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Drawer } from "../../../components/ui/drawer";
 import { Radio, RadioGroup } from "../../../components/ui/radio";
 import { Select } from "../../../components/ui/select";
@@ -104,6 +104,14 @@ export function CreatePatDrawer({
     setPermissionMode("all");
     setRoleOverrides({});
   };
+
+  // Reset form whenever the drawer opens — catches cases where
+  // onOpenChange doesn't fire on programmatic open-prop changes
+  // (e.g. when the token dialog hides/shows the drawer via !newToken).
+  useEffect(() => {
+    if (isOpen) resetForm();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
 
   const handleCreate = () => {
     let expiresAt: Date | undefined;
