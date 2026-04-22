@@ -259,13 +259,12 @@ export const useOrganizationTeamProject = (
       finalProject.slug !== router.query.project
     ) {
       // Preserve the sub-path so /bad-slug/messages → /good-slug/messages
-      const [pathPart, queryPart] = router.asPath.split("?");
+      const url = new URL(router.asPath, window.location.origin);
       const oldPrefix = `/${router.query.project as string}`;
-      const subPath = pathPart?.startsWith(oldPrefix)
-        ? pathPart.slice(oldPrefix.length)
+      const subPath = url.pathname.startsWith(oldPrefix)
+        ? url.pathname.slice(oldPrefix.length)
         : "";
-      const search = queryPart ? `?${queryPart}` : "";
-      void router.push(`/${finalProject.slug}${subPath}${search}`);
+      void router.push(`/${finalProject.slug}${subPath}${url.search}`);
     }
   }, [
     isDemo,

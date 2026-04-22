@@ -24,6 +24,8 @@ export function PageErrorFallback({
   const [copied, setCopied] = useState(false);
   const message = error instanceof Error ? error.message : String(error);
   const stack = error instanceof Error ? error.stack : undefined;
+  const isDev = process.env.NODE_ENV === "development";
+
   useEffect(() => {
     captureException(error, {
       tags: { source: "error-boundary" },
@@ -52,58 +54,64 @@ export function PageErrorFallback({
           </Text>
         </VStack>
 
-        <Box
-          width="full"
-          borderRadius="lg"
-          border="1px solid"
-          borderColor="border"
-          overflow="hidden"
-        >
-          <HStack
-            paddingX={4}
-            paddingY={2.5}
-            bg="bg.subtle"
-            borderBottom="1px solid"
+        {isDev ? (
+          <Box
+            width="full"
+            borderRadius="lg"
+            border="1px solid"
             borderColor="border"
-            justify="space-between"
+            overflow="hidden"
           >
-            <Text textStyle="xs" fontWeight="medium" color="fg.muted">
-              Error details
-            </Text>
-            <Button
-              size="2xs"
-              variant="ghost"
-              color="fg.muted"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(stack ?? message);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                } catch {
-                  // Clipboard API unavailable or denied
-                }
-              }}
+            <HStack
+              paddingX={4}
+              paddingY={2.5}
+              bg="bg.subtle"
+              borderBottom="1px solid"
+              borderColor="border"
+              justify="space-between"
             >
-              {copied ? <Check size={12} /> : <Copy size={12} />}
-              {copied ? "Copied" : "Copy"}
-            </Button>
-          </HStack>
-          <Code
-            display="block"
-            paddingX={4}
-            paddingY={3}
-            maxHeight="180px"
-            overflow="auto"
-            textStyle="xs"
-            whiteSpace="pre-wrap"
-            wordBreak="break-word"
-            bg="bg.panel"
-            color="red.400"
-            borderRadius={0}
-          >
-            {stack ?? message}
-          </Code>
-        </Box>
+              <Text textStyle="xs" fontWeight="medium" color="fg.muted">
+                Error details
+              </Text>
+              <Button
+                size="2xs"
+                variant="ghost"
+                color="fg.muted"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(stack ?? message);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  } catch {
+                    // Clipboard API unavailable or denied
+                  }
+                }}
+              >
+                {copied ? <Check size={12} /> : <Copy size={12} />}
+                {copied ? "Copied" : "Copy"}
+              </Button>
+            </HStack>
+            <Code
+              display="block"
+              paddingX={4}
+              paddingY={3}
+              maxHeight="180px"
+              overflow="auto"
+              textStyle="xs"
+              whiteSpace="pre-wrap"
+              wordBreak="break-word"
+              bg="bg.panel"
+              color="red.400"
+              borderRadius={0}
+            >
+              {stack ?? message}
+            </Code>
+          </Box>
+        ) : (
+          <Text textStyle="sm" color="fg.muted" textAlign="center">
+            Error reference has been logged automatically.
+          </Text>
+        )}
 
         <HStack gap={3}>
           <Button size="sm" variant="outline" onClick={resetErrorBoundary}>
