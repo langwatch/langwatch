@@ -310,6 +310,7 @@ app.post("/dataset/evaluate", async (c) => {
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
+  const { markUsed } = auth;
   // dataset/evaluate needs the full team relation for downstream queries.
   const project = await prisma.project.findUnique({
     where: { id: auth.project.id },
@@ -469,6 +470,7 @@ app.post("/dataset/evaluate", async (c) => {
     },
   });
 
+  markUsed();
   return c.json(result);
 });
 

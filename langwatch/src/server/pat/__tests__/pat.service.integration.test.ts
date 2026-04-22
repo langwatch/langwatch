@@ -665,6 +665,65 @@ describe.skipIf(isTestcontainersOnly)("PatService integration", () => {
       }).catch(() => {});
       await prisma.user.delete({ where: { id: isolatedUser.id } }).catch(() => {});
     });
+
+    it("excludes revoked tokens from the list", async () => {
+      const isolatedUser = await prisma.user.create({
+        data: {
+          name: "Revoke List User",
+          email: `revoke-list-${ns}@example.com`,
+        },
+      });
+      await prisma.organizationUser.create({
+        data: {
+          userId: isolatedUser.id,
+          organizationId,
+          role: OrganizationUserRole.MEMBER,
+        },
+      });
+
+      const active = await service.create({
+        name: `active-${nanoid(6)}`,
+        userId: isolatedUser.id,
+        organizationId,
+        bindings: [
+          {
+            role: TeamUserRole.MEMBER,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: organizationId,
+          },
+        ],
+      });
+      const toRevoke = await service.create({
+        name: `revoked-${nanoid(6)}`,
+        userId: isolatedUser.id,
+        organizationId,
+        bindings: [
+          {
+            role: TeamUserRole.MEMBER,
+            scopeType: RoleBindingScopeType.ORGANIZATION,
+            scopeId: organizationId,
+          },
+        ],
+      });
+
+      await service.revoke({
+        id: toRevoke.pat.id,
+        userId: isolatedUser.id,
+      });
+
+      const tokens = await service.list({
+        userId: isolatedUser.id,
+        organizationId,
+      });
+
+      expect(tokens.map((t) => t.id)).toEqual([active.pat.id]);
+      expect(tokens.find((t) => t.id === toRevoke.pat.id)).toBeUndefined();
+
+      await prisma.organizationUser.deleteMany({
+        where: { userId: isolatedUser.id },
+      }).catch(() => {});
+      await prisma.user.delete({ where: { id: isolatedUser.id } }).catch(() => {});
+    });
   });
 
   describe("markUsed", () => {

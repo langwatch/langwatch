@@ -13,7 +13,7 @@ import {
 import { Tooltip } from "../../../components/ui/tooltip";
 import { Key, Plus, Trash2 } from "lucide-react";
 import { PageLayout } from "../../../components/ui/layouts/PageLayout";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { toaster } from "../../../components/ui/toaster";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
@@ -78,7 +78,8 @@ export function PersonalAccessTokensSection({
           ? input.description.trim()
           : undefined,
         expiresAt: input.expiresAt,
-        bindings: input.bindings,
+        // Zod validates enum values at runtime; types widen through computeBindings
+        bindings: input.bindings as Parameters<typeof createMutation.mutate>[0]["bindings"],
       },
       {
         onSuccess: (result) => {
@@ -125,10 +126,7 @@ export function PersonalAccessTokensSection({
     );
   };
 
-  const activePats = useMemo(
-    () => pats.data?.filter((p) => !p.revokedAt) ?? [],
-    [pats.data],
-  );
+  const activePats = pats.data ?? [];
 
   return (
     <>
