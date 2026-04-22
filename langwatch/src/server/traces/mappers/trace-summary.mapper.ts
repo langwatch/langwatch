@@ -173,6 +173,21 @@ function extractTextFromStateObject(
       return value;
     }
   }
+
+  // Single-key wrapper fallback (e.g. `{ data: { content: "..." } }`,
+  // `{ result: { answer: "..." } }`). Recurse into the inner object so the
+  // fixed field-name loop above gets a chance against the unwrapped payload.
+  const entries = Object.entries(obj);
+  if (entries.length === 1) {
+    const [, only] = entries[0]!;
+    if (only && typeof only === "object" && !Array.isArray(only)) {
+      return extractTextFromStateObject(
+        only as Record<string, unknown>,
+        fieldNames,
+      );
+    }
+  }
+
   return null;
 }
 

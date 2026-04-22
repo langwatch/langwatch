@@ -190,15 +190,28 @@ export class TraceIOExtractionService {
       }
     }
 
-    // Priority 2: LangWatch attribute
+    // Priority 2: LangWatch attribute.
+    // If heuristic text extraction fails (e.g. the payload uses an unknown wrapper
+    // key like `{data: {...}}`), fall back to a stringified representation so the
+    // downstream `ComputedOutput` column is non-null and the trace list/dataset
+    // mapping show the raw payload instead of `<empty>`. The detail view always
+    // rendered this correctly because it reads the stored span attribute directly,
+    // but the computed column needs a plain-text form to be searchable/previewable.
     const langwatchValue = attrs[keys.langwatch];
     if (langwatchValue !== undefined && langwatchValue !== null) {
-      const text =
-        typeof langwatchValue === "string"
-          ? langwatchValue
-          : messagesToText(langwatchValue, type);
-      if (text) {
-        return { raw: langwatchValue, text, source: "langwatch" };
+      if (typeof langwatchValue === "string") {
+        if (langwatchValue.length > 0) {
+          return { raw: langwatchValue, text: langwatchValue, source: "langwatch" };
+        }
+      } else {
+        const heuristicText = messagesToText(langwatchValue, type);
+        if (heuristicText) {
+          return { raw: langwatchValue, text: heuristicText, source: "langwatch" };
+        }
+        const fallbackText = stringifyForText(langwatchValue);
+        if (fallbackText) {
+          return { raw: langwatchValue, text: fallbackText, source: "langwatch" };
+        }
       }
     }
 
@@ -350,7 +363,7 @@ function extractTextFromPlainJson(obj: Record<string, unknown>): string | null {
   for (const key of COMMON_TEXT_KEYS) {
     const val = obj[key];
     if (val === undefined) continue;
-    if (typeof val === "string") return val;
+    if (typeof val === "string" && val.length > 0) return val;
     if (typeof val === "number" || typeof val === "boolean") return String(val);
     // Nested object with a known key (e.g. { inputs: { input: "hello" } })
     if (val && typeof val === "object" && !Array.isArray(val)) {
@@ -366,7 +379,40 @@ function extractTextFromPlainJson(obj: Record<string, unknown>): string | null {
     if (nested) return nested;
   }
 
+  // Single-key wrapper fallback: many frameworks emit the real payload under an
+  // arbitrary wrapper key like `{ data: {...} }`, `{ result: {...} }`,
+  // `{ response: {...} }`. Recurse into the inner object so the COMMON_TEXT_KEYS
+  // loop above gets a chance to find `content`/`answer`/`text`/... inside.
+  const entries = Object.entries(obj);
+  if (entries.length === 1) {
+    const [, only] = entries[0]!;
+    if (only && typeof only === "object" && !Array.isArray(only)) {
+      const nested = extractTextFromPlainJson(only as Record<string, unknown>);
+      if (nested) return nested;
+    }
+  }
+
   return null;
+}
+
+/**
+ * Produces a short-enough, non-empty text representation of an already-parsed
+ * JSON-serializable value. Used as the last-resort fallback when heuristic text
+ * extraction fails — storing `JSON.stringify(value)` in `ComputedOutput` is
+ * strictly better than storing `NULL` (which renders as `<empty>` in the UI).
+ */
+function stringifyForText(value: unknown): string | null {
+  if (value === undefined || value === null) return null;
+  if (typeof value === "string") return value.length > 0 ? value : null;
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  try {
+    const s = JSON.stringify(value);
+    return s && s !== "{}" && s !== "[]" ? s : null;
+  } catch {
+    return null;
+  }
 }
 
 function messagesToText(

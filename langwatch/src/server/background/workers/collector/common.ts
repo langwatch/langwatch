@@ -106,28 +106,31 @@ export const getLastOutputAsText = (spans: Span[]): string => {
   }
 
   // If the top-level node has no output, then for getting the best text that represents the output,
-  // we try to find the last span to finish, this is likely the one that came up with the final answer
+  // we try to find the last span to finish, this is likely the one that came up with the final answer.
+  // Walk the finish-ordered list and return the first span whose output actually renders to non-empty
+  // text — the latest-finishing span may have an output whose type or shape collapses to "" (e.g. an
+  // unhandled type, a `list` with unstructured items, or a json whose "special key" is itself empty),
+  // in which case we fall back to the next candidate instead of showing an empty trace output.
   const spansInFinishOrderDesc = spans
     .toSorted((a, b) => b.timestamps.finished_at - a.timestamps.finished_at)
     .filter(nonEmptySpan);
 
-  const outputs = spansInFinishOrderDesc[0]?.output;
-  if (!outputs) {
-    const topmostSpan = flattenSpanTree(
-      organizeSpansIntoTree(spans),
-      "outside-in",
-    ).filter((span) => !span.parent_id)[0];
-    if (topmostSpan?.params?.http?.status_code) {
-      return topmostSpan.params.http.status_code.toString();
+  for (const span of spansInFinishOrderDesc) {
+    if (!span.output) continue;
+    const text = typedValueToText(span.output, true);
+    if (text) {
+      return text;
     }
-    return "";
-  }
-  const firstOutput = outputs;
-  if (!firstOutput) {
-    return "";
   }
 
-  return typedValueToText(firstOutput, true);
+  const topmostSpan = flattenSpanTree(
+    organizeSpansIntoTree(spans),
+    "outside-in",
+  ).filter((span) => !span.parent_id)[0];
+  if (topmostSpan?.params?.http?.status_code) {
+    return topmostSpan.params.http.status_code.toString();
+  }
+  return "";
 };
 
 /**
@@ -186,61 +189,79 @@ export const typedValueToText = (
         .join("");
     }
   } else if (typed.type == "json") {
+    // A candidate value is "meaningful" when it's defined and not an empty string/array/object.
+    // We skip empty matches so a JSON like `{ content: "", data: {...real payload...} }` falls
+    // through to the next key (or to `firstAndOnlyKey`/`stringified`) instead of short-circuiting
+    // to "" — which previously produced empty trace outputs in the list and dataset views.
+    const hasMeaningfulValue = (value: any): boolean => {
+      if (value === undefined || value === null) return false;
+      if (typeof value === "string") return value.length > 0;
+      if (Array.isArray(value)) return value.length > 0;
+      if (typeof value === "object") return Object.keys(value).length > 0;
+      return true;
+    };
+
     const specialKeysMapping = (json: any): string | undefined => {
       // TODO: test those
-      if (json.text !== undefined) {
+      if (hasMeaningfulValue(json.text)) {
         return json.text;
       }
-      if (json.input !== undefined) {
+      if (hasMeaningfulValue(json.input)) {
         return json.input;
       }
-      if (json.question !== undefined) {
+      if (hasMeaningfulValue(json.question)) {
         return json.question;
       }
-      if (json.user_query !== undefined) {
+      if (hasMeaningfulValue(json.user_query)) {
         return json.user_query;
       }
-      if (json.query !== undefined) {
-        return json.user_query;
+      if (hasMeaningfulValue(json.query)) {
+        return json.query;
       }
-      if (json.message !== undefined && typeof json.message === "string") {
+      if (hasMeaningfulValue(json.message) && typeof json.message === "string") {
         return json.message;
       }
       // Langflow
-      if (json.input_value !== undefined) {
+      if (hasMeaningfulValue(json.input_value)) {
         return json.input_value;
       }
       // TODO: test this happens for finding outputs
-      if (json.output !== undefined) {
+      if (hasMeaningfulValue(json.output)) {
         return json.output;
       }
 
-      if (json.answer !== undefined) {
+      if (hasMeaningfulValue(json.answer)) {
         return json.answer;
       }
 
       // Chainlit
-      if (json.content !== undefined) {
+      if (hasMeaningfulValue(json.content)) {
         return json.content;
       }
 
       // Haystack
-      if (json.prompt !== undefined) {
+      if (hasMeaningfulValue(json.prompt)) {
         return json.prompt;
       }
 
       // Langgraph on Flowise
       if (
         json.messages?.length > 0 &&
-        json.messages?.[json.messages?.length - 1]?.content !== undefined
+        hasMeaningfulValue(
+          json.messages?.[json.messages?.length - 1]?.content,
+        )
       ) {
         return json.messages[json.messages?.length - 1].content;
       }
-      if (json.return_values?.output !== undefined) {
+      if (hasMeaningfulValue(json.return_values?.output)) {
         return json.return_values.output;
       }
 
       // LangChain
+      // NOTE: we intentionally keep the old `!== undefined` check (not hasMeaningfulValue)
+      // for the `inputs`/`outputs` wrapper paths. `RunnableSequence` legitimately produces
+      // `{ inputs: { input: "" } }` and the caller (getFirstInputAsText) relies on the
+      // returned "" to trigger a fallback to the next span in the sequence.
       if (typeof json.inputs === "object" && json.inputs.input !== undefined) {
         return json.inputs.input;
       }

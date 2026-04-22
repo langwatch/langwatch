@@ -1484,4 +1484,89 @@ describe("typedValueToText()", () => {
       expect(result).toBe("");
     });
   });
+
+  describe("when a top-level special key exists but its value is empty", () => {
+    it("does not short-circuit to empty — returns the stringified payload instead", () => {
+      const result = typedValueToText({
+        type: "json",
+        value: {
+          content: "",
+          formatName: "standard",
+          formattedProperties: "x",
+        },
+      });
+
+      expect(result).not.toBe("");
+      expect(result).toContain("standard");
+    });
+
+    it("drills into a single-key wrapper even when a sibling-less empty key exists", () => {
+      // This is the user's scenario: {data: {content: "..."}} renders as the real content
+      const result = typedValueToText({
+        type: "json",
+        value: {
+          data: {
+            content: "COMPANY_ANALYSIS",
+            formatName: "standard",
+          },
+        },
+      });
+
+      expect(result).toBe("COMPANY_ANALYSIS");
+    });
+
+    it("fixes the `query` → `user_query` typo by returning json.query when set", () => {
+      const result = typedValueToText({
+        type: "json",
+        value: { query: "what is the weather?" },
+      });
+
+      expect(result).toBe("what is the weather?");
+    });
+  });
+});
+
+describe("getLastOutputAsText — multi-span fallback", () => {
+  const base = {
+    trace_id: "t",
+    type: "span" as const,
+    name: "s",
+  };
+
+  it("falls back to an earlier span when the last-finishing span renders as empty", () => {
+    const spans = [
+      {
+        ...base,
+        span_id: "a",
+        parent_id: null,
+        timestamps: { started_at: 100, finished_at: 200 },
+        input: { type: "text" as const, value: "in" },
+        output: {
+          type: "json" as const,
+          value: {
+            data: {
+              content: "COMPANY_ANALYSIS",
+              formatName: "standard",
+            },
+          },
+        },
+      },
+      // A later-finishing span whose output renders to "" under the current heuristics
+      // (nested list of primitives with no structured SpanInputOutput items).
+      {
+        ...base,
+        span_id: "b",
+        parent_id: null,
+        timestamps: { started_at: 150, finished_at: 300 },
+        input: { type: "text" as const, value: "in2" },
+        output: {
+          type: "list" as const,
+          value: ["plain", 1] as any,
+        },
+      },
+    ];
+
+    const output = getLastOutputAsText(spans as any);
+    expect(output).toBe("COMPANY_ANALYSIS");
+  });
 });

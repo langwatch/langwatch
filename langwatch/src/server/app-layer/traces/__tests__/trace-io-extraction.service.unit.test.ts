@@ -150,7 +150,7 @@ describe("TraceIOExtractionService", () => {
     });
 
     describe("when langwatch.input is a JSON object with no recognized keys", () => {
-      it("returns null", () => {
+      it("falls back to a stringified representation (better than <empty>)", () => {
         const span = createTestSpan({
           spanAttributes: {
             "langwatch.input": { foo: "bar", baz: 123 },
@@ -159,7 +159,32 @@ describe("TraceIOExtractionService", () => {
 
         const result = service.extractRichIOFromSpan(span, "input");
 
-        expect(result).toBeNull();
+        expect(result).not.toBeNull();
+        expect(result!.source).toBe("langwatch");
+        // Raw is preserved unchanged for downstream consumers.
+        expect(result!.raw).toEqual({ foo: "bar", baz: 123 });
+        // Text is the stringified payload so ComputedInput/Output are searchable
+        // and the trace list shows something instead of `<empty>`.
+        expect(typeof result!.text).toBe("string");
+        expect(result!.text.length).toBeGreaterThan(0);
+        expect(JSON.parse(result!.text)).toEqual({ foo: "bar", baz: 123 });
+      });
+    });
+
+    describe("when langwatch.input wraps the real payload in a single unknown key", () => {
+      it("recurses through the wrapper and extracts the inner content", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.output": {
+              data: { content: "COMPANY_ANALYSIS", formatName: "standard" },
+            },
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "output");
+
+        expect(result).not.toBeNull();
+        expect(result!.text).toBe("COMPANY_ANALYSIS");
       });
     });
 
@@ -190,6 +215,86 @@ describe("TraceIOExtractionService", () => {
 
         expect(result).not.toBeNull();
         expect(result!.text).toBe("Tell me about AI");
+      });
+    });
+
+    describe("when langwatch.output is deeply nested under multiple wrapper keys", () => {
+      it("recurses through every single-key wrapper to find the content", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.output": {
+              outer: { middle: { inner: { content: "found at depth 4" } } },
+            },
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "output");
+
+        expect(result).not.toBeNull();
+        expect(result!.text).toBe("found at depth 4");
+      });
+    });
+
+    describe("when langwatch.output is a wrapper whose value is a non-empty primitive", () => {
+      // {result: "answer"} is intentionally NOT recursed into — the heuristic
+      // only walks objects. Falls through to the stringify fallback so the user
+      // still sees something instead of `<empty>`.
+      it("falls back to stringified representation rather than guessing", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.output": { customWrapper: "the actual answer" },
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "output");
+
+        expect(result).not.toBeNull();
+        expect(result!.text).toBe('{"customWrapper":"the actual answer"}');
+      });
+    });
+
+    describe("when langwatch.output is an object with a circular reference", () => {
+      it("does not crash — returns null since stringification is not possible", () => {
+        const obj: Record<string, unknown> = { name: "loop" };
+        obj.self = obj;
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.output": obj,
+          },
+        });
+
+        // Should not throw — the try/catch around JSON.stringify handles it.
+        const result = service.extractRichIOFromSpan(span, "output");
+
+        // No content found and stringification failed → fall through to null,
+        // mirroring the previous behavior for genuinely unrenderable payloads.
+        expect(result).toBeNull();
+      });
+    });
+
+    describe("when langwatch.output is an empty object or empty array", () => {
+      it("returns null for an empty object — nothing meaningful to render", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.output": {},
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "output");
+
+        expect(result).toBeNull();
+      });
+
+      it("returns null for an empty array", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.output": [],
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "output");
+
+        expect(result).toBeNull();
       });
     });
   });
