@@ -428,7 +428,6 @@ const routes: RouteObject[] = [
   { path: "/settings/*", Component: NotFoundPage },
   { path: "/share/*", Component: NotFoundPage },
   { path: "/ops/*", Component: NotFoundPage },
-  { path: "/admin/*", Component: NotFoundPage },
   { path: "/dev/*", Component: NotFoundPage },
 
   // Unknown sub-path under a project — renders inside DashboardLayout so the

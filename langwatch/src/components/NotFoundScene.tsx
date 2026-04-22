@@ -8,8 +8,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { ArrowLeft, Home, Settings } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useColorModeValue } from "~/components/ui/color-mode";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useColorMode, useColorModeValue } from "~/components/ui/color-mode";
 import { SimpleSlider } from "~/components/ui/slider";
 import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useRouter } from "~/utils/compat/next-router";
@@ -65,6 +65,7 @@ function ParamSlider({
 
 export function NotFoundScene() {
   const router = useRouter();
+  const { colorMode } = useColorMode();
   const isDevMode = process.env.NODE_ENV === "development";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -91,23 +92,25 @@ export function NotFoundScene() {
     setParams((p) => ({ ...p, [key]: value }));
   };
 
-  const gridBaseColor: [number, number, number] = useColorModeValue(
-    [40, 90, 190],
-    [80, 160, 255],
+  const colors = useMemo<CanvasColors>(
+    () =>
+      colorMode === "dark"
+        ? {
+            gridBaseColor: [80, 160, 255],
+            particleBaseColor: [140, 180, 255],
+            aberrationRed: [255, 50, 100],
+            aberrationBlue: [50, 120, 255],
+            alphaScale: 1,
+          }
+        : {
+            gridBaseColor: [40, 90, 190],
+            particleBaseColor: [60, 110, 180],
+            aberrationRed: [180, 60, 80],
+            aberrationBlue: [60, 90, 190],
+            alphaScale: 1,
+          },
+    [colorMode],
   );
-  const particleBaseColor: [number, number, number] = useColorModeValue(
-    [60, 110, 180],
-    [140, 180, 255],
-  );
-  const aberrationRed: [number, number, number] = useColorModeValue(
-    [180, 60, 80],
-    [255, 50, 100],
-  );
-  const aberrationBlue: [number, number, number] = useColorModeValue(
-    [60, 90, 190],
-    [50, 120, 255],
-  );
-  const alphaScale = useColorModeValue(1, 1);
   const textRedColor = useColorModeValue("red.600/70", "red.400/60");
   const textBlueColor = useColorModeValue("blue.600/70", "blue.400/60");
   const textBaseOpacity = useColorModeValue(0.14, 0.08);
@@ -129,14 +132,6 @@ export function NotFoundScene() {
     if (!ctx) return;
 
     container.addEventListener("mousemove", onMove);
-
-    const colors: CanvasColors = {
-      gridBaseColor,
-      particleBaseColor,
-      aberrationRed,
-      aberrationBlue,
-      alphaScale,
-    };
 
     const render = rendererRef.current;
 
@@ -241,7 +236,7 @@ export function NotFoundScene() {
       document.removeEventListener("visibilitychange", onVisibilityChange);
       observer.disconnect();
     };
-  }, [onMove, gridBaseColor, particleBaseColor, aberrationRed, aberrationBlue, alphaScale, prefersReducedMotion]);
+  }, [onMove, colors, prefersReducedMotion]);
 
   return (
     <Center
@@ -388,9 +383,11 @@ export function NotFoundScene() {
                 variant="outline"
                 onClick={() => {
                   console.log("Grid params:", params);
-                  navigator.clipboard.writeText(
-                    JSON.stringify(params, null, 2),
-                  );
+                  void navigator.clipboard
+                    .writeText(JSON.stringify(params, null, 2))
+                    .catch((error: unknown) => {
+                      console.warn("Copy failed:", error);
+                    });
                 }}
               >
                 Copy Params
