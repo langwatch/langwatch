@@ -14,7 +14,7 @@ import { useMemo, useState } from "react";
 import { Drawer } from "../../../components/ui/drawer";
 import { Radio, RadioGroup } from "../../../components/ui/radio";
 import { Select } from "../../../components/ui/select";
-import type { RouterInputs, RouterOutputs } from "../../../utils/api";
+import type { RouterOutputs } from "../../../utils/api";
 import {
   computeBindings,
   EXPIRATION_OPTIONS,
@@ -29,14 +29,16 @@ type MyBindings = {
   isLoading: boolean;
 };
 
-type RoleBindingInput =
-  RouterInputs["personalAccessToken"]["create"]["bindings"][number];
-
 export type CreatePatInput = {
   name: string;
   description: string;
   expiresAt: Date | undefined;
-  bindings: RoleBindingInput[];
+  bindings: Array<{
+    role: string;
+    customRoleId: string | null | undefined;
+    scopeType: string;
+    scopeId: string;
+  }>;
 };
 
 /**
@@ -115,7 +117,7 @@ export function CreatePatDrawer({
       data: myBindings.data,
       permissionMode,
       roleOverrides,
-    }) as RoleBindingInput[];
+    });
     onCreate({ name, description, expiresAt, bindings });
     resetForm();
   };

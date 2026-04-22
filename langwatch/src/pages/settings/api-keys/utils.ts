@@ -45,29 +45,31 @@ export function rolesAtOrBelow(
 
 export type PermissionMode = "all" | "readonly" | "restricted";
 
+type BindingInput = {
+  id: string;
+  role: string;
+  customRoleId: string | null;
+  scopeType: string;
+  scopeId: string;
+};
+
+type BindingOutput = {
+  role: string;
+  customRoleId: string | null | undefined;
+  scopeType: string;
+  scopeId: string;
+};
+
 /** Computes the effective bindings array based on the selected permission mode. */
 export function computeBindings({
   data,
   permissionMode,
   roleOverrides,
 }: {
-  data:
-    | Array<{
-        id: string;
-        role: string;
-        customRoleId: string | null;
-        scopeType: string;
-        scopeId: string;
-      }>
-    | undefined;
+  data: BindingInput[] | undefined;
   permissionMode: PermissionMode;
   roleOverrides: Record<string, string>;
-}): Array<{
-  role: string;
-  customRoleId: string | null | undefined;
-  scopeType: string;
-  scopeId: string;
-}> {
+}): BindingOutput[] {
   if (!data) return [];
   switch (permissionMode) {
     case "all":

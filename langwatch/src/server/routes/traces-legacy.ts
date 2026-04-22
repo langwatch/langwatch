@@ -222,7 +222,7 @@ app.post("/trace/search", async (c) => {
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   let body: Record<string, any>;
   try {
@@ -298,6 +298,7 @@ app.post("/trace/search", async (c) => {
     traces = enrichedTraces;
   }
 
+  markUsed();
   return c.json({
     traces,
     pagination: {
@@ -313,7 +314,7 @@ app.get("/thread/:id", async (c) => {
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   const threadId = c.req.param("id");
   const protections = await getProtectionsForProject(prisma, {
@@ -326,5 +327,6 @@ app.get("/thread/:id", async (c) => {
     protections,
   );
 
+  markUsed();
   return c.json({ traces });
 });
