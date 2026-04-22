@@ -45,9 +45,12 @@ export function impersonationBeforeSend(
   // separately and should continue during impersonation for debugging.
   if (event.event === "$snapshot") return event;
 
+  // Allow exception events through — error capture must remain active
+  // during impersonation so admins can debug issues.
+  if (event.event === "$exception") return event;
+
   // Drop all other capture events (autocapture, pageviews, custom events).
-  // Feature flags (/decide endpoint) and error capture are not routed through
-  // before_send — they use separate code paths in posthog-js.
+  // Feature flags use the /decide endpoint, not the capture path.
   return null;
 }
 

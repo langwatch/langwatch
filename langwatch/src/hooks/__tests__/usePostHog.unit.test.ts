@@ -65,6 +65,11 @@ describe("impersonationBeforeSend", () => {
       const event = { event: "$snapshot", properties: {} };
       expect(impersonationBeforeSend(event)).toBe(event);
     });
+
+    it("allows $exception events through (error capture)", () => {
+      const event = { event: "$exception", properties: {} };
+      expect(impersonationBeforeSend(event)).toBe(event);
+    });
   });
 });
 
