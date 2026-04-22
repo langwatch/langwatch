@@ -598,6 +598,179 @@ describe("matchesEvaluationFilters", () => {
 });
 
 describe("buildPreconditionTraceDataFromFoldState", () => {
+  it("extracts custom metadata from langwatch.metadata.* legacy keys", () => {
+    const foldState = {
+      traceId: "trace-1",
+      spanCount: 1,
+      totalDurationMs: 100,
+      computedIOSchemaVersion: "1",
+      computedInput: null,
+      computedOutput: null,
+      timeToFirstTokenMs: null,
+      timeToLastTokenMs: null,
+      tokensPerSecond: null,
+      containsErrorStatus: false,
+      containsOKStatus: true,
+      errorMessage: null,
+      models: [],
+      totalCost: null,
+      tokensEstimated: false,
+      totalPromptTokenCount: null,
+      totalCompletionTokenCount: null,
+      outputFromRootSpan: false,
+      outputSpanEndTimeMs: 0,
+      blockedByGuardrail: false,
+      topicId: null,
+      subTopicId: null,
+      annotationIds: [],
+      attributes: {
+        "langwatch.origin": "application",
+        "langwatch.metadata.env": "production",
+        "langwatch.metadata.region": "eu-west-1",
+      },
+      occurredAt: Date.now(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      lastEventOccurredAt: Date.now(),
+    } as TraceSummaryData;
+
+    const result = buildPreconditionTraceDataFromFoldState(foldState);
+
+    expect(result.customMetadata).toEqual({
+      env: "production",
+      region: "eu-west-1",
+    });
+  });
+
+  it("extracts custom metadata from bare OTEL resource attributes", () => {
+    const foldState = {
+      traceId: "trace-1",
+      spanCount: 1,
+      totalDurationMs: 100,
+      computedIOSchemaVersion: "1",
+      computedInput: null,
+      computedOutput: null,
+      timeToFirstTokenMs: null,
+      timeToLastTokenMs: null,
+      tokensPerSecond: null,
+      containsErrorStatus: false,
+      containsOKStatus: true,
+      errorMessage: null,
+      models: [],
+      totalCost: null,
+      tokensEstimated: false,
+      totalPromptTokenCount: null,
+      totalCompletionTokenCount: null,
+      outputFromRootSpan: false,
+      outputSpanEndTimeMs: 0,
+      blockedByGuardrail: false,
+      topicId: null,
+      subTopicId: null,
+      annotationIds: [],
+      attributes: {
+        "langwatch.origin": "application",
+        env: "staging",
+        region: "us-east-1",
+      },
+      occurredAt: Date.now(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      lastEventOccurredAt: Date.now(),
+    } as TraceSummaryData;
+
+    const result = buildPreconditionTraceDataFromFoldState(foldState);
+
+    expect(result.customMetadata).toEqual({
+      env: "staging",
+      region: "us-east-1",
+    });
+  });
+
+  it("prefers canonical metadata.* over langwatch.metadata.* and bare keys", () => {
+    const foldState = {
+      traceId: "trace-1",
+      spanCount: 1,
+      totalDurationMs: 100,
+      computedIOSchemaVersion: "1",
+      computedInput: null,
+      computedOutput: null,
+      timeToFirstTokenMs: null,
+      timeToLastTokenMs: null,
+      tokensPerSecond: null,
+      containsErrorStatus: false,
+      containsOKStatus: true,
+      errorMessage: null,
+      models: [],
+      totalCost: null,
+      tokensEstimated: false,
+      totalPromptTokenCount: null,
+      totalCompletionTokenCount: null,
+      outputFromRootSpan: false,
+      outputSpanEndTimeMs: 0,
+      blockedByGuardrail: false,
+      topicId: null,
+      subTopicId: null,
+      annotationIds: [],
+      attributes: {
+        "langwatch.origin": "application",
+        env: "bare-value",
+        "langwatch.metadata.env": "legacy-value",
+        "metadata.env": "canonical-value",
+      },
+      occurredAt: Date.now(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      lastEventOccurredAt: Date.now(),
+    } as TraceSummaryData;
+
+    const result = buildPreconditionTraceDataFromFoldState(foldState);
+
+    expect(result.customMetadata).toEqual({ env: "canonical-value" });
+  });
+
+  it("excludes standard OTEL bare-key prefixes from custom metadata", () => {
+    const foldState = {
+      traceId: "trace-1",
+      spanCount: 1,
+      totalDurationMs: 100,
+      computedIOSchemaVersion: "1",
+      computedInput: null,
+      computedOutput: null,
+      timeToFirstTokenMs: null,
+      timeToLastTokenMs: null,
+      tokensPerSecond: null,
+      containsErrorStatus: false,
+      containsOKStatus: true,
+      errorMessage: null,
+      models: [],
+      totalCost: null,
+      tokensEstimated: false,
+      totalPromptTokenCount: null,
+      totalCompletionTokenCount: null,
+      outputFromRootSpan: false,
+      outputSpanEndTimeMs: 0,
+      blockedByGuardrail: false,
+      topicId: null,
+      subTopicId: null,
+      annotationIds: [],
+      attributes: {
+        "langwatch.origin": "application",
+        "service.name": "my-app",
+        "http.method": "GET",
+        "telemetry.sdk.name": "opentelemetry",
+        custom_field: "included",
+      },
+      occurredAt: Date.now(),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+      lastEventOccurredAt: Date.now(),
+    } as TraceSummaryData;
+
+    const result = buildPreconditionTraceDataFromFoldState(foldState);
+
+    expect(result.customMetadata).toEqual({ custom_field: "included" });
+  });
+
   it("extracts fields from fold state attributes", () => {
     const foldState = {
       traceId: "trace-1",
