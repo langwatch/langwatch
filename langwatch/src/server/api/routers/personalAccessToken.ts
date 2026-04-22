@@ -139,6 +139,43 @@ export const personalAccessTokenRouter = createTRPCRouter({
         organizationId: input.organizationId,
       });
 
+      // Resolve human-readable scope names for all bindings across all PATs
+      const allBindings = pats.flatMap((p) => p.roleBindings);
+      const teamIds = new Set<string>();
+      const projectIds = new Set<string>();
+      const customRoleIds = new Set<string>();
+      for (const b of allBindings) {
+        if (b.scopeType === RoleBindingScopeType.TEAM) teamIds.add(b.scopeId);
+        else if (b.scopeType === RoleBindingScopeType.PROJECT)
+          projectIds.add(b.scopeId);
+        if (b.customRoleId) customRoleIds.add(b.customRoleId);
+      }
+
+      const [teams, projects, customRoles] = await Promise.all([
+        teamIds.size
+          ? ctx.prisma.team.findMany({
+              where: { id: { in: [...teamIds] } },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([]),
+        projectIds.size
+          ? ctx.prisma.project.findMany({
+              where: { id: { in: [...projectIds] } },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([]),
+        customRoleIds.size
+          ? ctx.prisma.customRole.findMany({
+              where: { id: { in: [...customRoleIds] } },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([]),
+      ]);
+
+      const teamName = new Map(teams.map((t) => [t.id, t.name]));
+      const projectName = new Map(projects.map((p) => [p.id, p.name]));
+      const customRoleName = new Map(customRoles.map((r) => [r.id, r.name]));
+
       return pats.map((pat) => ({
         id: pat.id,
         lookupIdSuffix: pat.lookupId.slice(-4),
@@ -152,8 +189,19 @@ export const personalAccessTokenRouter = createTRPCRouter({
           id: rb.id,
           role: rb.role,
           customRoleId: rb.customRoleId,
+          customRoleName: rb.customRoleId
+            ? customRoleName.get(rb.customRoleId) ?? null
+            : null,
           scopeType: rb.scopeType,
           scopeId: rb.scopeId,
+          scopeName:
+            rb.scopeType === RoleBindingScopeType.ORGANIZATION
+              ? input.organizationId === rb.scopeId
+                ? null // org name already known client-side
+                : null
+              : rb.scopeType === RoleBindingScopeType.TEAM
+                ? teamName.get(rb.scopeId) ?? null
+                : projectName.get(rb.scopeId) ?? null,
         })),
       }));
     }),
