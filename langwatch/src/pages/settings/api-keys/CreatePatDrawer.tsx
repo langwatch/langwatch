@@ -19,6 +19,7 @@ import {
   computeBindings,
   EXPIRATION_OPTIONS,
   expirationCollection,
+  ROLE_LABELS,
   rolesAtOrBelow,
   type PermissionMode,
 } from "./utils";
@@ -262,7 +263,7 @@ export function CreatePatDrawer({
                       const roleLabel =
                         isCustom && permissionMode !== "readonly"
                           ? (b.customRoleName ?? "Custom")
-                          : effectiveRole;
+                          : (ROLE_LABELS[effectiveRole] ?? effectiveRole);
 
                       const showSelector =
                         permissionMode === "restricted" &&
@@ -270,7 +271,14 @@ export function CreatePatDrawer({
                         availableRoles.length > 1;
 
                       return (
-                        <HStack key={b.id} gap={2} fontSize="xs">
+                        <HStack
+                          key={b.id}
+                          gap={2}
+                          fontSize="xs"
+                          justify="space-between"
+                          width="full"
+                        >
+                          <Text color="fg.muted">{scopeLabel}</Text>
                           {showSelector && collection ? (
                             <Select.Root
                               collection={collection}
@@ -285,7 +293,10 @@ export function CreatePatDrawer({
                                   }));
                               }}
                             >
-                              <Select.Trigger minWidth="100px" aria-label={`Role for ${scopeLabel}`}>
+                              <Select.Trigger
+                                minWidth="100px"
+                                aria-label={`Role for ${scopeLabel}`}
+                              >
                                 <Select.ValueText />
                               </Select.Trigger>
                               <Select.Content>
@@ -304,7 +315,6 @@ export function CreatePatDrawer({
                               {roleLabel}
                             </Badge>
                           )}
-                          <Text color="fg.muted">{scopeLabel}</Text>
                         </HStack>
                       );
                     })}
