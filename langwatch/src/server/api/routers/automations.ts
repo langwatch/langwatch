@@ -114,7 +114,7 @@ export const automationRouter = createTRPCRouter({
         },
       });
 
-      getApp().triggers.invalidate(input.projectId);
+      await getApp().triggers.invalidate(input.projectId);
 
       return trigger;
     }),
@@ -133,7 +133,7 @@ export const automationRouter = createTRPCRouter({
         },
       });
 
-      getApp().triggers.invalidate(input.projectId);
+      await getApp().triggers.invalidate(input.projectId);
 
       return { success: true };
     }),
@@ -161,7 +161,7 @@ export const automationRouter = createTRPCRouter({
         },
       });
 
-      getApp().triggers.invalidate(input.projectId);
+      await getApp().triggers.invalidate(input.projectId);
 
       return trigger;
     }),
@@ -243,7 +243,7 @@ export const automationRouter = createTRPCRouter({
         },
       });
 
-      getApp().triggers.invalidate(input.projectId);
+      await getApp().triggers.invalidate(input.projectId);
 
       return trigger;
     }),
@@ -284,7 +284,7 @@ export const automationRouter = createTRPCRouter({
         },
       });
 
-      getApp().triggers.invalidate(input.projectId);
+      await getApp().triggers.invalidate(input.projectId);
 
       return trigger;
     }),

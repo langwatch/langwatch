@@ -1,32 +1,29 @@
+import { TtlCache } from "~/server/utils/ttlCache";
 import type {
   TriggerRepository,
   TriggerSummary,
 } from "./repositories/trigger.repository";
 
 export class TriggerService {
-  private readonly cache = new Map<
-    string,
-    { triggers: TriggerSummary[]; expiresAt: number }
-  >();
   private static readonly TTL_MS = 60_000;
+
+  private readonly cache = new TtlCache<TriggerSummary[]>(
+    TriggerService.TTL_MS,
+    "triggers:",
+  );
 
   constructor(private readonly repo: TriggerRepository) {}
 
   async getActiveTraceTriggersForProject(
     projectId: string,
   ): Promise<TriggerSummary[]> {
-    const cached = this.cache.get(projectId);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.triggers;
-    }
+    const cached = await this.cache.get(projectId);
+    if (cached) return cached;
 
     const all = await this.repo.findActiveForProject(projectId);
     const traceOnly = all.filter((t) => !t.customGraphId);
 
-    this.cache.set(projectId, {
-      triggers: traceOnly,
-      expiresAt: Date.now() + TriggerService.TTL_MS,
-    });
+    await this.cache.set(projectId, traceOnly);
 
     return traceOnly;
   }
@@ -54,7 +51,7 @@ export class TriggerService {
     return this.repo.updateLastRunAt(triggerId, projectId);
   }
 
-  invalidate(projectId: string): void {
-    this.cache.delete(projectId);
+  async invalidate(projectId: string): Promise<void> {
+    await this.cache.delete(projectId);
   }
 }
