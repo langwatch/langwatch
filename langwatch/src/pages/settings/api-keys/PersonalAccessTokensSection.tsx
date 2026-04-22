@@ -201,8 +201,7 @@ export function PersonalAccessTokensSection({
                               : rb.scopeType === "TEAM"
                                 ? "👥"
                                 : "📁";
-                          const scopeName =
-                            rb.scopeName ?? rb.scopeId.slice(0, 8) + "…";
+                          const scopeName = rb.scopeName ?? rb.scopeId;
                           const badgeColor =
                             rb.role === "ADMIN"
                               ? "red"
