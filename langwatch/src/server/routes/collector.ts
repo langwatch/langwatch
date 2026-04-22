@@ -58,8 +58,8 @@ app.post(
 
       return c.json(
         {
-          message:
-            "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
+          error: "Unauthorized",
+          message: "Invalid credentials",
         },
         401,
       );
@@ -95,7 +95,7 @@ app.post(
         "collector request is not authenticated, invalid auth token",
       );
 
-      return c.json({ message: "Invalid auth token." }, 401);
+      return c.json({ error: "Unauthorized", message: "Invalid credentials" }, 401);
     }
 
     // Enforce PAT ceiling (legacy tokens bypass). `traces:create` gates write
