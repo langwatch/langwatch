@@ -278,7 +278,7 @@ export function CreatePatDrawer({
                           width="full"
                           align="center"
                         >
-                          <Text color="fg" flex="1">
+                          <Text color="fg" flex="1" fontWeight="500">
                             {scopeLabel}
                           </Text>
                           {showSelector && collection ? (
