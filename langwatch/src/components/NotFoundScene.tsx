@@ -11,6 +11,7 @@ import { ArrowLeft, Home, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useColorModeValue } from "~/components/ui/color-mode";
 import { SimpleSlider } from "~/components/ui/slider";
+import { useReducedMotion } from "~/hooks/useReducedMotion";
 import { useRouter } from "~/utils/compat/next-router";
 import {
   createNotFoundRenderer,
@@ -79,6 +80,10 @@ export function NotFoundScene() {
   const paramsRef = useRef(params);
   paramsRef.current = params;
 
+  const prefersReducedMotion = useReducedMotion();
+  const isVisible = useRef(true);
+  const isTabActive = useRef(true);
+
   const updateParam = <K extends keyof GridParams>(
     key: K,
     value: GridParams[K],
@@ -135,7 +140,7 @@ export function NotFoundScene() {
 
     const render = rendererRef.current;
 
-    const loop = (timestamp: number) => {
+    const sizeCanvas = () => {
       const rect = container.getBoundingClientRect();
       const dpr = Math.min(window.devicePixelRatio || 1, MAX_CANVAS_DPR);
       const w = rect.width;
@@ -147,6 +152,55 @@ export function NotFoundScene() {
         canvas.style.width = `${w}px`;
         canvas.style.height = `${h}px`;
       }
+
+      return { w, h, dpr };
+    };
+
+    // Reduced motion: render a single static frame, no animation loop
+    if (prefersReducedMotion) {
+      const { w, h, dpr } = sizeCanvas();
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      render({
+        ctx,
+        width: w,
+        height: h,
+        timestamp: 0,
+        params: paramsRef.current,
+        colors,
+        smoothMouse: { x: 0, y: 0 },
+      });
+      return () => {
+        container.removeEventListener("mousemove", onMove);
+      };
+    }
+
+    // Pause when tab is hidden
+    const onVisibilityChange = () => {
+      isTabActive.current = !document.hidden;
+      if (!document.hidden && raf.current === 0) {
+        raf.current = requestAnimationFrame(loop);
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+
+    // Pause when scrolled out of view
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisible.current = entry?.isIntersecting ?? true;
+        if (entry?.isIntersecting && raf.current === 0) {
+          raf.current = requestAnimationFrame(loop);
+        }
+      },
+      { threshold: 0 },
+    );
+    observer.observe(container);
+
+    const loop = (timestamp: number) => {
+      raf.current = 0;
+
+      if (!isVisible.current || !isTabActive.current) return;
+
+      const { w, h, dpr } = sizeCanvas();
 
       smoothMouse.current.x += (mouse.current.x - smoothMouse.current.x) * 0.06;
       smoothMouse.current.y += (mouse.current.y - smoothMouse.current.y) * 0.06;
@@ -179,9 +233,12 @@ export function NotFoundScene() {
 
     return () => {
       cancelAnimationFrame(raf.current);
+      raf.current = 0;
       container.removeEventListener("mousemove", onMove);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      observer.disconnect();
     };
-  }, [onMove, gridBaseColor, particleBaseColor, aberrationRed, aberrationBlue, alphaScale]);
+  }, [onMove, gridBaseColor, particleBaseColor, aberrationRed, aberrationBlue, alphaScale, prefersReducedMotion]);
 
   return (
     <Center
@@ -370,7 +427,7 @@ export function NotFoundScene() {
             lineHeight={1}
             letterSpacing="-0.04em"
             color={textRedColor}
-            animation="glitch-1 3s steps(1) infinite"
+            animation={prefersReducedMotion ? "none" : "glitch-1 3s steps(1) infinite"}
             willChange="transform"
             style={{ transform: "translate(-2px, -1px)" }}
           >
@@ -386,7 +443,7 @@ export function NotFoundScene() {
             lineHeight={1}
             letterSpacing="-0.04em"
             color={textBlueColor}
-            animation="glitch-2 2.5s steps(1) infinite"
+            animation={prefersReducedMotion ? "none" : "glitch-2 2.5s steps(1) infinite"}
             willChange="transform"
             style={{ transform: "translate(2px, 1px)" }}
           >
@@ -396,7 +453,7 @@ export function NotFoundScene() {
 
         <VStack
           gap={2}
-          animation="drift 4s ease-in-out infinite, text-glitch 6s steps(1) infinite"
+          animation={prefersReducedMotion ? "none" : "drift 4s ease-in-out infinite, text-glitch 6s steps(1) infinite"}
         >
           <Text
             textStyle="lg"
