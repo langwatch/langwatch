@@ -219,7 +219,11 @@ export function PersonalAccessTokensSection({
                     <Table.Cell>
                       {pat.lastUsedAt ? (
                         <Tooltip content={new Date(pat.lastUsedAt).toISOString()}>
-                          <Text cursor="default">
+                          <Text
+                            cursor="help"
+                            tabIndex={0}
+                            aria-label={`Last used at ${new Date(pat.lastUsedAt).toISOString()}`}
+                          >
                             {formatTimeAgo(new Date(pat.lastUsedAt).getTime())}
                           </Text>
                         </Tooltip>

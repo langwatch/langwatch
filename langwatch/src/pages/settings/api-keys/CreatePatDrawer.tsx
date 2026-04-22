@@ -180,6 +180,7 @@ export function CreatePatDrawer({
                 Access
               </Text>
               <RadioGroup
+                aria-label="Permission mode"
                 value={permissionMode}
                 onValueChange={(e) => {
                   const value = e.value as PermissionMode;
@@ -277,7 +278,7 @@ export function CreatePatDrawer({
                                   }));
                               }}
                             >
-                              <Select.Trigger minWidth="100px">
+                              <Select.Trigger minWidth="100px" aria-label={`Role for ${scopeLabel}`}>
                                 <Select.ValueText />
                               </Select.Trigger>
                               <Select.Content>
