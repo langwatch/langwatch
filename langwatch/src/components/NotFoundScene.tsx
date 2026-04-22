@@ -116,8 +116,8 @@ export function NotFoundScene() {
     const el = containerRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    mouse.current.x = (e.clientX - r.left) / r.width - 0.5;
-    mouse.current.y = (e.clientY - r.top) / r.height - 0.5;
+    mouse.current.x = Math.max(-0.5, Math.min(0.5, (e.clientX - r.left) / r.width - 0.5));
+    mouse.current.y = Math.max(-0.5, Math.min(0.5, (e.clientY - r.top) / r.height - 0.5));
   }, []);
 
   useEffect(() => {
