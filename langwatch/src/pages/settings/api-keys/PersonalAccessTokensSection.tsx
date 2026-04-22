@@ -216,7 +216,7 @@ export function PersonalAccessTokensSection({
                               {roleSummary(pat.roleBindings)}
                             </Button>
                           </Popover.Trigger>
-                          <Popover.Content width="280px">
+                          <Popover.Content width="320px">
                             <Popover.Header>
                               <Text fontWeight="600" fontSize="sm">
                                 Permissions
@@ -225,18 +225,33 @@ export function PersonalAccessTokensSection({
                             <Popover.Body>
                               <VStack align="stretch" gap={1}>
                                 {pat.roleBindings.map((rb) => {
-                                  const scope =
+                                  const scopeIcon =
                                     rb.scopeType === "ORGANIZATION"
-                                      ? "Org-wide"
+                                      ? "🏢"
                                       : rb.scopeType === "TEAM"
-                                        ? "Team"
-                                        : "Project";
+                                        ? "👥"
+                                        : "📁";
+                                  const scopeName =
+                                    rb.scopeName ??
+                                    rb.scopeId.slice(0, 8) + "…";
+                                  const roleBadgeColor =
+                                    rb.role === "ADMIN"
+                                      ? "red"
+                                      : rb.role === "MEMBER"
+                                        ? "blue"
+                                        : "gray";
                                   return (
-                                    <HStack key={rb.id} gap={2} fontSize="xs">
-                                      <Badge size="sm" variant="subtle">
-                                        {rb.role}
+                                    <HStack key={rb.id} gap={1} fontSize="xs">
+                                      <Badge
+                                        colorPalette={roleBadgeColor}
+                                        size="sm"
+                                      >
+                                        {rb.customRoleName ?? rb.role}
                                       </Badge>
-                                      <Text color="fg.muted">{scope}</Text>
+                                      <Text color="fg.muted">on</Text>
+                                      <Badge colorPalette="purple" size="sm">
+                                        {scopeIcon} {scopeName}
+                                      </Badge>
                                     </HStack>
                                   );
                                 })}
