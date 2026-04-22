@@ -10,7 +10,7 @@ import type { LicenseData } from "../../licensing/types";
  * All required numeric limit fields on PlanInfo.
  * Used to verify both SaaS and license plans populate every field.
  */
-const NUMERIC_LIMIT_FIELDS: (keyof PlanInfo)[] = [
+const NUMERIC_LIMIT_FIELDS = [
   "maxMembers",
   "maxMembersLite",
   "maxTeams",
@@ -28,7 +28,7 @@ const NUMERIC_LIMIT_FIELDS: (keyof PlanInfo)[] = [
   "maxDashboards",
   "maxCustomGraphs",
   "maxAutomations",
-];
+] as const satisfies readonly (keyof PlanInfo)[];
 
 describe("PLAN_LIMITS", () => {
   describe("when checking critical plan-specific fields", () => {

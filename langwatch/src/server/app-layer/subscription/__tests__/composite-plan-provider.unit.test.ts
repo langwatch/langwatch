@@ -153,7 +153,7 @@ describe("createCompositePlanProvider", () => {
       expect(plan.overrideAddingLimitations).toBe(false);
     });
 
-    it("is false for regular user without impersonator", async () => {
+    it("is false for regular user without impersonator on SaaS plan", async () => {
       const provider = createCompositePlanProvider({
         licensePlanProvider: mockLicense,
         saasPlanProvider: mockSaas,
@@ -164,10 +164,11 @@ describe("createCompositePlanProvider", () => {
         user: { id: "u1", email: "user@example.com" },
       });
 
+      expect(plan.planSource).toBe("subscription");
       expect(plan.overrideAddingLimitations).toBe(false);
     });
 
-    it("is true when impersonated by admin", async () => {
+    it("is true when impersonated by admin on SaaS plan", async () => {
       const provider = createCompositePlanProvider({
         licensePlanProvider: mockLicense,
         saasPlanProvider: mockSaas,
@@ -182,6 +183,7 @@ describe("createCompositePlanProvider", () => {
         },
       });
 
+      expect(plan.planSource).toBe("subscription");
       expect(plan.overrideAddingLimitations).toBe(true);
     });
 
@@ -222,6 +224,7 @@ describe("createCompositePlanProvider", () => {
       });
 
       // License plan selected (ENTERPRISE), but override recomputed from context
+      expect(plan.planSource).toBe("license");
       expect(plan.type).toBe("ENTERPRISE");
       expect(plan.overrideAddingLimitations).toBe(true);
     });
@@ -254,54 +257,11 @@ describe("createCompositePlanProvider", () => {
     });
   });
 
-  describe("when license expires", () => {
-    it("falls through to SaaS subscription", async () => {
-      // License expired → returns FREE_PLAN (free=true)
-      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(FREE_PLAN);
-      // SaaS has active subscription
-      vi.mocked(mockSaas.getActivePlan).mockResolvedValue(SAAS_PRO_PLAN);
-
-      const provider = createCompositePlanProvider({
-        licensePlanProvider: mockLicense,
-        saasPlanProvider: mockSaas,
-      });
-
-      const plan = await provider.getActivePlan({
-        organizationId: "org-1",
-      });
-
-      expect(plan.planSource).toBe("subscription");
-      expect(plan.type).toBe("PRO");
-      expect(plan.maxMessagesPerMonth).toBe(50_000);
-    });
-
-    it("falls to FREE when no subscription exists either", async () => {
-      // License expired → FREE_PLAN
-      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(FREE_PLAN);
-      // No SaaS subscription → also FREE
-      vi.mocked(mockSaas.getActivePlan).mockResolvedValue({
-        ...FREE_PLAN,
-        planSource: "free",
-      });
-
-      const provider = createCompositePlanProvider({
-        licensePlanProvider: mockLicense,
-        saasPlanProvider: mockSaas,
-      });
-
-      const plan = await provider.getActivePlan({
-        organizationId: "org-1",
-      });
-
-      expect(plan.planSource).toBe("free");
-      expect(plan.type).toBe("FREE");
-      expect(plan.free).toBe(true);
-    });
-  });
-
-  describe("when neither license nor subscription exists", () => {
-    it("returns FREE plan", async () => {
-      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(FREE_PLAN);
+  // License expiry is handled inside LicensePlanProvider — these scenarios
+  // verify that the composite provider correctly falls through when the
+  // license provider returns FREE_PLAN (the result of expiry or absence).
+  describe("when license provider returns FREE (expired or absent)", () => {
+    it("falls to FREE when SaaS also returns FREE", async () => {
       vi.mocked(mockSaas.getActivePlan).mockResolvedValue({
         ...FREE_PLAN,
         planSource: "free",
@@ -352,84 +312,6 @@ describe("createCompositePlanProvider", () => {
       expect(plan.maxMembers).toBe(10);
       expect(plan.maxMessagesPerMonth).toBe(10_000);
       expect(mockSaas.getActivePlan).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("overrideAddingLimitations across plan sources", () => {
-    it("is false for non-impersonated user on license plan", async () => {
-      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(
-        ENTERPRISE_LICENSE_PLAN,
-      );
-
-      const provider = createCompositePlanProvider({
-        licensePlanProvider: mockLicense,
-        saasPlanProvider: mockSaas,
-      });
-
-      const plan = await provider.getActivePlan({
-        organizationId: "org-1",
-        user: { id: "u1", email: "user@example.com" },
-      });
-
-      expect(plan.planSource).toBe("license");
-      expect(plan.overrideAddingLimitations).toBe(false);
-    });
-
-    it("is true for admin-impersonated user on license plan", async () => {
-      vi.mocked(mockLicense.getActivePlan).mockResolvedValue(
-        ENTERPRISE_LICENSE_PLAN,
-      );
-
-      const provider = createCompositePlanProvider({
-        licensePlanProvider: mockLicense,
-        saasPlanProvider: mockSaas,
-      });
-
-      const plan = await provider.getActivePlan({
-        organizationId: "org-1",
-        user: {
-          id: "u1",
-          email: "user@example.com",
-          impersonator: { email: "admin@langwatch.ai" },
-        },
-      });
-
-      expect(plan.planSource).toBe("license");
-      expect(plan.overrideAddingLimitations).toBe(true);
-    });
-
-    it("is false for non-impersonated user on SaaS plan", async () => {
-      const provider = createCompositePlanProvider({
-        licensePlanProvider: mockLicense,
-        saasPlanProvider: mockSaas,
-      });
-
-      const plan = await provider.getActivePlan({
-        organizationId: "org-1",
-        user: { id: "u1", email: "user@example.com" },
-      });
-
-      expect(plan.planSource).toBe("subscription");
-      expect(plan.overrideAddingLimitations).toBe(false);
-    });
-
-    it("is true for admin-impersonated user on SaaS plan", async () => {
-      const provider = createCompositePlanProvider({
-        licensePlanProvider: mockLicense,
-        saasPlanProvider: mockSaas,
-      });
-
-      const plan = await provider.getActivePlan({
-        organizationId: "org-1",
-        user: {
-          id: "u1",
-          email: "user@example.com",
-          impersonator: { email: "admin@langwatch.ai" },
-        },
-      });
-
-      expect(plan.planSource).toBe("subscription");
-      expect(plan.overrideAddingLimitations).toBe(true);
     });
   });
 
