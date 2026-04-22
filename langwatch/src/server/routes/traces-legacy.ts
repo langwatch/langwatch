@@ -84,7 +84,7 @@ app.get("/trace/:id", async (c) => {
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const traceId = c.req.param("id");
@@ -119,6 +119,8 @@ app.get("/trace/:id", async (c) => {
       protections,
     );
     const evaluations = evaluationsMap[traceId] ?? [];
+
+    markUsed();
 
     if (format === "digest") {
       return c.json({
@@ -156,7 +158,7 @@ app.post("/trace/:id/share", async (c) => {
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   const traceId = c.req.param("id");
 
@@ -166,6 +168,7 @@ app.post("/trace/:id/share", async (c) => {
     resourceId: traceId,
   });
 
+  markUsed();
   return c.json({ status: "success", path: `/share/${share.id}` });
 });
 
@@ -175,7 +178,7 @@ app.post("/trace/:id/unshare", async (c) => {
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   const traceId = c.req.param("id");
 
@@ -185,6 +188,7 @@ app.post("/trace/:id/unshare", async (c) => {
     resourceId: traceId,
   });
 
+  markUsed();
   return c.json({ status: "success" });
 });
 

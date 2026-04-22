@@ -75,6 +75,7 @@ export function CreatePatDrawer({
       expiresAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
     }
     onCreate({ name, description, expiresAt });
+    resetForm();
   };
 
   return (
@@ -132,7 +133,7 @@ export function CreatePatDrawer({
                 borderWidth="1px"
                 borderColor="border"
                 borderRadius="md"
-                background="bg.muted"
+                background="bg.subtle"
               >
                 <Text fontSize="sm">
                   This token will inherit{" "}
@@ -174,7 +175,7 @@ export function CreatePatDrawer({
                   </VStack>
                 )}
                 <Text fontSize="xs" color="fg.muted" marginTop={3}>
-                  Your access acts as a ceiling — if your role is later
+                  Your access acts as a ceiling. If your role is later
                   reduced, the token loses those permissions automatically.
                 </Text>
               </Box>
@@ -220,6 +221,7 @@ export function CreatePatDrawer({
               Cancel
             </Button>
             <Button
+              colorPalette="blue"
               onClick={handleCreate}
               disabled={
                 isCreating ||

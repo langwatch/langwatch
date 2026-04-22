@@ -73,21 +73,15 @@ app.get("/annotations", async (c) => {
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const annotations = await prisma.annotation.findMany({
       where: { projectId: project.id },
     });
 
-    if (!annotations || annotations.length === 0) {
-      return c.json(
-        { status: "error", message: "No annotations found." },
-        404,
-      );
-    }
-
-    return c.json({ data: annotations });
+    markUsed();
+    return c.json({ data: annotations ?? [] });
   } catch (e) {
     logger.error(
       { error: e, projectId: project.id },
@@ -109,7 +103,7 @@ app.get("/annotations/:id", async (c) => {
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const annotationId = c.req.param("id");
@@ -122,6 +116,7 @@ app.get("/annotations/:id", async (c) => {
         404,
       );
     }
+    markUsed();
     return c.json({ data: annotation });
   } catch (e) {
     logger.error(
@@ -143,13 +138,14 @@ app.delete("/annotations/:id", async (c) => {
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const annotationId = c.req.param("id");
     await prisma.annotation.delete({
       where: { id: annotationId, projectId: project.id },
     });
+    markUsed();
     return c.json({ status: "success", message: "Annotation deleted." });
   } catch (e) {
     logger.error(
@@ -171,7 +167,7 @@ app.patch("/annotations/:id", async (c) => {
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const body = await c.req.json();
@@ -210,6 +206,7 @@ app.patch("/annotations/:id", async (c) => {
       },
     });
 
+    markUsed();
     return c.json({ data: patchAnnotation });
   } catch (e) {
     logger.error(
@@ -232,7 +229,7 @@ app.get("/annotations/trace/:trace", async (c) => {
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const trace = c.req.param("trace");
@@ -240,14 +237,8 @@ app.get("/annotations/trace/:trace", async (c) => {
       where: { traceId: trace, projectId: project.id },
     });
 
-    if (!annotationsByTrace || annotationsByTrace.length === 0) {
-      return c.json(
-        { status: "error", message: "No annotations found." },
-        404,
-      );
-    }
-
-    return c.json({ data: annotationsByTrace });
+    markUsed();
+    return c.json({ data: annotationsByTrace ?? [] });
   } catch (e) {
     logger.error(
       { error: e, trace: c.req.param("trace"), projectId: project.id },
@@ -268,7 +259,7 @@ app.post("/annotations/trace/:trace", async (c) => {
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   try {
     const body = await c.req.json();
@@ -318,6 +309,7 @@ app.post("/annotations/trace/:trace", async (c) => {
       },
     });
 
+    markUsed();
     return c.json({ data: addAnnotation });
   } catch (e) {
     logger.error(

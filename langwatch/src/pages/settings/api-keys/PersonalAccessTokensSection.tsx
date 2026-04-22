@@ -10,12 +10,14 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
+import { Tooltip } from "../../../components/ui/tooltip";
 import { Key, Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toaster } from "../../../components/ui/toaster";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
 import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import { api } from "../../../utils/api";
+import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 import { CreatePatDrawer, type CreatePatInput } from "./CreatePatDrawer";
 import { RevokeConfirmDialog } from "./RevokeConfirmDialog";
 import { TokenCreatedDialog } from "./TokenCreatedDialog";
@@ -142,7 +144,7 @@ export function PersonalAccessTokensSection({
         <HStack width="full">
           <Text fontSize="sm" color="fg.muted">
             User-scoped tokens that authenticate API requests on your behalf.
-            Shown once at creation — copy it immediately.
+            Shown once at creation. Copy it immediately.
           </Text>
           <Spacer />
           <Button size="sm" onClick={onCreateOpen}>
@@ -157,6 +159,7 @@ export function PersonalAccessTokensSection({
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
+                  <Table.ColumnHeader>Token</Table.ColumnHeader>
                   <Table.ColumnHeader>Permissions</Table.ColumnHeader>
                   <Table.ColumnHeader>Expires</Table.ColumnHeader>
                   <Table.ColumnHeader>Created</Table.ColumnHeader>
@@ -167,7 +170,7 @@ export function PersonalAccessTokensSection({
               <Table.Body>
                 {activePats.length === 0 && (
                   <Table.Row>
-                    <Table.Cell colSpan={6}>
+                    <Table.Cell colSpan={7}>
                       <Text color="fg.muted" textAlign="center" paddingY={4}>
                         No active tokens. Create one to get started.
                       </Text>
@@ -190,6 +193,11 @@ export function PersonalAccessTokensSection({
                           )}
                         </VStack>
                       </HStack>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Text fontSize="xs" fontFamily="mono" color="fg.muted">
+                        pat-lw-{pat.lookupId.slice(0, 4)}...
+                      </Text>
                     </Table.Cell>
                     <Table.Cell>
                       <Text fontSize="sm" color="fg.muted">
@@ -216,7 +224,11 @@ export function PersonalAccessTokensSection({
                     </Table.Cell>
                     <Table.Cell>
                       {pat.lastUsedAt ? (
-                        new Date(pat.lastUsedAt).toLocaleDateString()
+                        <Tooltip content={new Date(pat.lastUsedAt).toISOString()}>
+                          <Text cursor="default">
+                            {formatTimeAgo(new Date(pat.lastUsedAt).getTime())}
+                          </Text>
+                        </Tooltip>
                       ) : (
                         <Badge size="sm" colorPalette="gray">
                           Never
