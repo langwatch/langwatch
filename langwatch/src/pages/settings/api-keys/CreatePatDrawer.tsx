@@ -314,9 +314,15 @@ export function CreatePatDrawer({
                               </Select.Content>
                             </Select.Root>
                           ) : (
-                            <Badge size="sm" variant="subtle">
+                            <Text
+                              color="fg.muted"
+                              fontWeight="500"
+                              width="140px"
+                              textAlign="right"
+                              flexShrink={0}
+                            >
                               {roleLabel}
-                            </Badge>
+                            </Text>
                           )}
                         </HStack>
                       );
