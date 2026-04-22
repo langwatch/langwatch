@@ -398,18 +398,80 @@ const RESERVED_KEYS = new Set([
   "metadata.subtopic_id",
 ]);
 
+/**
+ * Bare-key prefixes that are standard OTEL/system attributes, not custom metadata.
+ * Only used when resolving bare (unprefixed) attribute keys.
+ */
+const BARE_KEY_EXCLUDED_PREFIXES = [
+  "service.",
+  "telemetry.",
+  "http.",
+  "rpc.",
+  "db.",
+  "net.",
+  "host.",
+  "os.",
+  "process.",
+  "container.",
+  "k8s.",
+  "cloud.",
+  "faas.",
+  "url.",
+  "server.",
+  "client.",
+  "otel.",
+];
+
+function resolveCustomMetadataKey(key: string): {
+  customKey: string;
+  priority: number;
+} | null {
+  // Priority 3: canonical "metadata.{key}" (from Python SDK canonicalization)
+  if (key.startsWith("metadata.")) {
+    if (RESERVED_KEYS.has(key)) return null;
+    if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) return null;
+    const customKey = key.slice("metadata.".length);
+    return customKey ? { customKey, priority: 3 } : null;
+  }
+
+  // Priority 2: legacy "langwatch.metadata.{key}" (legacy REST collector)
+  if (key.startsWith("langwatch.metadata.")) {
+    const customKey = key.slice("langwatch.metadata.".length);
+    return customKey ? { customKey, priority: 2 } : null;
+  }
+
+  // Skip all other known prefixes
+  if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) return null;
+  if (BARE_KEY_EXCLUDED_PREFIXES.some((p) => key.startsWith(p))) return null;
+
+  // Priority 1: bare OTEL resource attribute (legacy)
+  if (key.length === 0) return null;
+  return { customKey: key, priority: 1 };
+}
+
+/**
+ * Extracts custom metadata from fold state attributes.
+ * Matches all three legacy key formats consistent with ClickHouse filter generation:
+ * - metadata.{key} (canonical, priority 3)
+ * - langwatch.metadata.{key} (legacy REST, priority 2)
+ * - {key} (bare OTEL attribute, priority 1)
+ */
 function extractCustomMetadata(
   attrs: Record<string, string>,
 ): Record<string, string> | null {
   const result: Record<string, string> = {};
+  const priorities: Record<string, number> = {};
+
   for (const [key, value] of Object.entries(attrs)) {
-    if (!key.startsWith("metadata.")) continue;
-    if (RESERVED_KEYS.has(key)) continue;
-    if (RESERVED_PREFIXES.some((p) => key.startsWith(p))) continue;
-    const customKey = key.slice("metadata.".length);
-    if (customKey) {
-      result[customKey] = value;
-    }
+    const resolved = resolveCustomMetadataKey(key);
+    if (!resolved) continue;
+
+    const currentPriority = priorities[resolved.customKey] ?? 0;
+    if (resolved.priority <= currentPriority) continue;
+
+    priorities[resolved.customKey] = resolved.priority;
+    result[resolved.customKey] = value;
   }
+
   return Object.keys(result).length > 0 ? result : null;
 }
