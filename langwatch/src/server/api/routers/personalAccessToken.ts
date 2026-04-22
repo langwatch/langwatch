@@ -141,17 +141,27 @@ export const personalAccessTokenRouter = createTRPCRouter({
 
       // Resolve human-readable scope names for all bindings across all PATs
       const allBindings = pats.flatMap((p) => p.roleBindings);
+      const orgIds = new Set<string>();
       const teamIds = new Set<string>();
       const projectIds = new Set<string>();
       const customRoleIds = new Set<string>();
       for (const b of allBindings) {
-        if (b.scopeType === RoleBindingScopeType.TEAM) teamIds.add(b.scopeId);
+        if (b.scopeType === RoleBindingScopeType.ORGANIZATION)
+          orgIds.add(b.scopeId);
+        else if (b.scopeType === RoleBindingScopeType.TEAM)
+          teamIds.add(b.scopeId);
         else if (b.scopeType === RoleBindingScopeType.PROJECT)
           projectIds.add(b.scopeId);
         if (b.customRoleId) customRoleIds.add(b.customRoleId);
       }
 
-      const [teams, projects, customRoles] = await Promise.all([
+      const [orgs, teams, projects, customRoles] = await Promise.all([
+        orgIds.size
+          ? ctx.prisma.organization.findMany({
+              where: { id: { in: [...orgIds] } },
+              select: { id: true, name: true },
+            })
+          : Promise.resolve([]),
         teamIds.size
           ? ctx.prisma.team.findMany({
               where: { id: { in: [...teamIds] } },
@@ -172,6 +182,7 @@ export const personalAccessTokenRouter = createTRPCRouter({
           : Promise.resolve([]),
       ]);
 
+      const orgName = new Map(orgs.map((o) => [o.id, o.name]));
       const teamName = new Map(teams.map((t) => [t.id, t.name]));
       const projectName = new Map(projects.map((p) => [p.id, p.name]));
       const customRoleName = new Map(customRoles.map((r) => [r.id, r.name]));
@@ -196,9 +207,7 @@ export const personalAccessTokenRouter = createTRPCRouter({
           scopeId: rb.scopeId,
           scopeName:
             rb.scopeType === RoleBindingScopeType.ORGANIZATION
-              ? input.organizationId === rb.scopeId
-                ? null // org name already known client-side
-                : null
+              ? orgName.get(rb.scopeId) ?? null
               : rb.scopeType === RoleBindingScopeType.TEAM
                 ? teamName.get(rb.scopeId) ?? null
                 : projectName.get(rb.scopeId) ?? null,
