@@ -148,10 +148,7 @@ export function createNotFoundRenderer() {
       return [projectPoint(x1, y1, z1), projectPoint(x2, y2, z2)];
     };
 
-    const abStr =
-      p.aberration +
-      Math.abs(smoothMouse.x) * p.aberration * 2 +
-      Math.abs(smoothMouse.y) * p.aberration * 1.5;
+    const abStr = p.aberration;
 
     const getDepthFade = (y1: number, y2: number) => {
       const avgY = (y1 + y2) * 0.5;
@@ -369,10 +366,13 @@ export function createNotFoundRenderer() {
     for (const line of lineSegments) {
       const shimmer = Math.sin(time * 1.3 + line.id * 0.08) * 0.5 + 0.5;
       const ab = abStr * line.aberrationDepth * (0.7 + shimmer * 0.3);
-      const mouseChromaX = smoothMouse.x * (2 + line.depthFade * 7);
-      const mouseChromaY = smoothMouse.y * (1 + line.depthFade * 4);
-      const splitX = ab + mouseChromaX;
-      const splitY = ab * 0.5 + mouseChromaY;
+      // Mouse steers the split direction; idle drift keeps it alive at center
+      const driftX = Math.sin(time * 0.4) * 0.15;
+      const driftY = Math.cos(time * 0.3) * 0.1;
+      const dirX = smoothMouse.x * 2 + driftX;
+      const dirY = smoothMouse.y * 1.5 + driftY;
+      const splitX = ab * dirX;
+      const splitY = ab * dirY;
       const nearGlow = Math.max(0, line.nearBoost - 1);
       ctx.lineWidth = 1.05 + Math.min(0.55, nearGlow * 0.12);
 
