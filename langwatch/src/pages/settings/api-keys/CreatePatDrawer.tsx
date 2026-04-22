@@ -273,7 +273,7 @@ export function CreatePatDrawer({
                                 <Select.ValueText />
                               </Select.Trigger>
                               <Select.Content>
-                                {rolesAtOrBelow(b.role).map((opt) => (
+                                {(collection?.items ?? []).map((opt) => (
                                   <Select.Item
                                     key={opt.value}
                                     item={opt}
