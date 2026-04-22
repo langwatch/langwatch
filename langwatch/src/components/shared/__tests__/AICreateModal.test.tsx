@@ -720,11 +720,16 @@ describe("<AICreateModal/>", () => {
       );
 
       const dialog = getDialogContent();
-      // Two links match /model provider/i: the inline body link and the footer button.
-      // Assert the inline body link (first in DOM order) still points to the settings page.
+      // Filter out the footer CTA by its test id so we assert the inline body
+      // link regardless of DOM order.
       const links = within(dialog).getAllByRole("link", { name: /model provider/i });
-      expect(links[0]).toBeInTheDocument();
-      expect(links[0]).toHaveAttribute("href", "/settings/model-providers");
+      const inlineLinks = links.filter(
+        (link) =>
+          link.getAttribute("data-testid") !==
+          "ai-create-modal-configure-model-provider-button",
+      );
+      expect(inlineLinks).toHaveLength(1);
+      expect(inlineLinks[0]).toHaveAttribute("href", "/settings/model-providers");
     });
 
     describe("footer Configure model provider button", () => {
@@ -751,6 +756,7 @@ describe("<AICreateModal/>", () => {
         const dialog = getDialogContent();
         const button = getFooterConfigureButton(dialog);
         expect(button).toBeInTheDocument();
+        expect(button).toHaveAccessibleName("Configure model provider");
         expect(button).toHaveAttribute("href", "/settings/model-providers");
         expect(button).toHaveAttribute("target", "_blank");
       });

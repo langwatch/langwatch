@@ -114,6 +114,10 @@ describe("useRunScenario()", () => {
     });
 
     it("exposes the settings link via the toaster action slot", async () => {
+      const openSpy = vi
+        .spyOn(window, "open")
+        .mockImplementation(() => null);
+
       const { result } = renderHook(() =>
         useRunScenario({
           projectId: "project-123",
@@ -137,11 +141,22 @@ describe("useRunScenario()", () => {
         );
       });
 
-      // The toast must NOT pass JSX/anchor as its description
       const toastCall = mockToasterCreate.mock.calls[0]![0] as {
         description?: unknown;
+        action?: { onClick: () => void };
       };
+      // Description must be a plain string, not JSX/anchor.
       expect(typeof toastCall.description).toBe("string");
+
+      // Invoking the action opens the provider settings in a new tab.
+      toastCall.action?.onClick();
+      expect(openSpy).toHaveBeenCalledWith(
+        "/settings/model-providers",
+        "_blank",
+        "noopener,noreferrer",
+      );
+
+      openSpy.mockRestore();
     });
 
     it("does not call run mutation", async () => {

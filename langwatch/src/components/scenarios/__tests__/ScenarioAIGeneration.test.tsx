@@ -157,6 +157,7 @@ describe("when no model providers are configured", () => {
     const primaryLink = screen.getByTestId(
       "scenario-ai-configure-model-provider-button",
     );
+    expect(primaryLink).toHaveAccessibleName("Configure model provider");
     expect(primaryLink).toHaveAttribute("href", "/settings/model-providers");
     expect(primaryLink).toHaveAttribute("target", "_blank");
     expect(primaryLink).toHaveAttribute("rel", expect.stringContaining("noopener"));
@@ -246,6 +247,7 @@ describe("given azure is the only enabled provider and project.defaultModel is n
       const link = screen.getByTestId(
         "scenario-ai-configure-default-model-button",
       );
+      expect(link).toHaveAccessibleName("Configure default model");
       expect(link).toHaveAttribute("href", "/settings/model-providers");
       expect(link).toHaveAttribute("target", "_blank");
       expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
@@ -292,6 +294,7 @@ describe("given azure is the only enabled provider and project.defaultModel is o
       const link = screen.getByTestId(
         "scenario-ai-configure-default-model-button",
       );
+      expect(link).toHaveAccessibleName("Configure default model");
       expect(link).toHaveAttribute("href", "/settings/model-providers");
       expect(link).toHaveAttribute("target", "_blank");
       expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));

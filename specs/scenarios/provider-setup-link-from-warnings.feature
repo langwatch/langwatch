@@ -47,7 +47,8 @@ Feature: Provider setup links from "provider not set up" warnings in Scenario su
     Given I am on the scenario editor
     And I have no enabled model providers
     Then the sidebar card still explains that a model provider must be configured
-    And the primary "Configure model provider" button is visible in or replacing the inline link
+    And the inline "Configure model provider" link remains available in the explanatory text
+    And the primary "Configure model provider" button is visible alongside it
 
   # ============================================================================
   # Surface 3: Sidebar default-model banners (no-default / stale-default)
