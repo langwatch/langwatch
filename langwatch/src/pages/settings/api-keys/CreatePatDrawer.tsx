@@ -6,13 +6,13 @@ import {
   Heading,
   HStack,
   Input,
+  SegmentGroup,
   Text,
   Textarea,
   VStack,
 } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import { Drawer } from "../../../components/ui/drawer";
-import { Radio, RadioGroup } from "../../../components/ui/radio";
 import { Select } from "../../../components/ui/select";
 import type { RouterOutputs } from "../../../utils/api";
 import {
@@ -179,20 +179,27 @@ export function CreatePatDrawer({
               <Text fontWeight="600" fontSize="sm">
                 Access
               </Text>
-              <RadioGroup
-                aria-label="Permission mode"
+              <SegmentGroup.Root
+                size="sm"
                 value={permissionMode}
                 onValueChange={(e) => {
-                  const value = e.value as PermissionMode;
-                  setPermissionMode(value);
+                  setPermissionMode(e.value as PermissionMode);
                 }}
               >
-                <HStack gap={4}>
-                  <Radio value="all">All permissions</Radio>
-                  <Radio value="readonly">Read only</Radio>
-                  <Radio value="restricted">Restricted</Radio>
-                </HStack>
-              </RadioGroup>
+                <SegmentGroup.Indicator />
+                <SegmentGroup.Item value="all">
+                  <SegmentGroup.ItemText>All</SegmentGroup.ItemText>
+                  <SegmentGroup.ItemHiddenInput />
+                </SegmentGroup.Item>
+                <SegmentGroup.Item value="restricted">
+                  <SegmentGroup.ItemText>Restricted</SegmentGroup.ItemText>
+                  <SegmentGroup.ItemHiddenInput />
+                </SegmentGroup.Item>
+                <SegmentGroup.Item value="readonly">
+                  <SegmentGroup.ItemText>Read only</SegmentGroup.ItemText>
+                  <SegmentGroup.ItemHiddenInput />
+                </SegmentGroup.Item>
+              </SegmentGroup.Root>
               <Box
                 width="full"
                 padding={3}
