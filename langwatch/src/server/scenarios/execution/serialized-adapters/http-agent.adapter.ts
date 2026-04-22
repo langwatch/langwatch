@@ -8,17 +8,15 @@
 import type { AgentInput } from "@langwatch/scenario";
 import { AgentAdapter, AgentRole } from "@langwatch/scenario";
 import { JSONPath } from "jsonpath-plus";
-import { Liquid } from "liquidjs";
 import { ssrfSafeFetch } from "~/utils/ssrfProtection";
 import { applyAuthentication } from "../../adapters/auth.strategies";
-import { resolveFieldMappings } from "../resolve-field-mappings";
+import {
+  buildTemplateContext,
+  renderBodyTemplate,
+  renderUrlTemplate,
+} from "../http-template-engine";
 import { injectTraceContextHeaders } from "../trace-context-headers";
 import type { HttpAgentData } from "../types";
-
-// Shared Liquid engine instance for template interpolation
-const liquid = new Liquid();
-
-const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
 
 /**
  * Serialized HTTP agent adapter that uses pre-fetched configuration.
@@ -42,9 +40,14 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
   }
 
   async call(input: AgentInput): Promise<string> {
+    const templateContext = buildTemplateContext({
+      input,
+      scenarioMappings: this.config.scenarioMappings,
+    });
+    const url = this.buildUrl(templateContext);
     const headers = this.buildRequestHeaders();
-    const body = this.buildRequestBody(input);
-    const responseData = await this.executeHttpRequest(headers, body);
+    const body = this.buildRequestBody(input, templateContext);
+    const responseData = await this.executeHttpRequest(url, headers, body);
     return this.extractResponseContent(responseData);
   }
 
@@ -68,12 +71,17 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     return headers;
   }
 
+  private buildUrl(context: Record<string, unknown>): string {
+    return renderUrlTemplate({ template: this.config.url, context });
+  }
+
   private async executeHttpRequest(
+    url: string,
     headers: Record<string, string>,
     body: string,
   ): Promise<unknown> {
     const method = this.config.method.toUpperCase();
-    const response = await ssrfSafeFetch(this.config.url, {
+    const response = await ssrfSafeFetch(url, {
       method,
       headers,
       body: method !== "GET" ? body : undefined,
@@ -110,29 +118,17 @@ export class SerializedHttpAgentAdapter extends AgentAdapter {
     return typeof value === "string" ? value : JSON.stringify(value);
   }
 
-  private buildRequestBody(input: AgentInput): string {
+  private buildRequestBody(
+    input: AgentInput,
+    context: Record<string, unknown>,
+  ): string {
     if (!this.config.bodyTemplate) {
       return JSON.stringify({ messages: input.messages });
     }
 
-    // Build base template context for Liquid (legacy defaults)
-    const lastUserMessage = input.messages.findLast((m) => m.role === "user");
-    const baseContext = {
-      messages: JSON.stringify(input.messages),
-      threadId: input.threadId ?? DEFAULT_SCENARIO_THREAD_ID,
-      input:
-        typeof lastUserMessage?.content === "string"
-          ? lastUserMessage.content
-          : JSON.stringify(lastUserMessage?.content ?? ""),
-    };
-
-    // Merge resolved scenarioMappings into the template context (overrides defaults)
-    const mappedValues = this.config.scenarioMappings
-      ? resolveFieldMappings({ fieldMappings: this.config.scenarioMappings, agentInput: input })
-      : {};
-
-    const templateContext = { ...baseContext, ...mappedValues };
-
-    return liquid.parseAndRenderSync(this.config.bodyTemplate, templateContext);
+    return renderBodyTemplate({
+      template: this.config.bodyTemplate,
+      context,
+    });
   }
 }

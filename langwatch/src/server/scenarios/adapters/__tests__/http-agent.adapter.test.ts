@@ -337,7 +337,7 @@ describe("HttpAgentAdapter", () => {
       expect(body.input).toBe("User question");
     });
 
-    it("leaves {{input}} unreplaced when messages array is empty", async () => {
+    it("renders {{input}} as empty string when messages array is empty", async () => {
       const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
       const mockFetch = vi.mocked(ssrfSafeFetch);
       mockFetch.mockResolvedValue(
@@ -359,11 +359,11 @@ describe("HttpAgentAdapter", () => {
       await adapter.call(createAgentInput([]));
 
       const callArgs = mockFetch.mock.calls[0];
-      const body = callArgs?.[1]?.body as string;
-      expect(body).toBe('{"input": "{{input}}"}');
+      const body = JSON.parse(callArgs?.[1]?.body as string);
+      expect(body.input).toBe("");
     });
 
-    it("leaves {{input}} unreplaced when no user messages exist", async () => {
+    it("renders {{input}} as empty string when no user messages exist", async () => {
       const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
       const mockFetch = vi.mocked(ssrfSafeFetch);
       mockFetch.mockResolvedValue(
@@ -390,8 +390,8 @@ describe("HttpAgentAdapter", () => {
       );
 
       const callArgs = mockFetch.mock.calls[0];
-      const body = callArgs?.[1]?.body as string;
-      expect(body).toBe('{"input": "{{input}}"}');
+      const body = JSON.parse(callArgs?.[1]?.body as string);
+      expect(body.input).toBe("");
     });
 
     it("stringifies non-string content for {{input}}", async () => {
@@ -748,6 +748,274 @@ describe("HttpAgentAdapter", () => {
       });
 
       expect(adapter.getTraceId()).toBeUndefined();
+    });
+  });
+
+  describe("URL template interpolation", () => {
+    const setupMockFetch = async () => {
+      const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+      const mockFetch = vi.mocked(ssrfSafeFetch);
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ result: "ok" }), {
+          headers: { "content-type": "application/json" },
+        }),
+      );
+      return mockFetch;
+    };
+
+    it("renders {{threadId}} in url via Liquid", async () => {
+      const mockFetch = await setupMockFetch();
+      const agent = createHttpAgent({
+        url: "https://api.example.com/conversations/{{threadId}}/messages",
+      });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: createMockAgentRepository(agent),
+      });
+
+      await adapter.call(
+        createAgentInput([{ role: "user", content: "Hello" }], {
+          threadId: "thread-abc-123",
+        }),
+      );
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://api.example.com/conversations/thread-abc-123/messages",
+        expect.any(Object),
+      );
+    });
+
+    it("URL-encodes interpolated values by default", async () => {
+      const mockFetch = await setupMockFetch();
+      const agent = createHttpAgent({
+        url: "https://api.example.com/search/{{input}}",
+      });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: createMockAgentRepository(agent),
+      });
+
+      await adapter.call(
+        createAgentInput([
+          { role: "user", content: "hello world & friends?" },
+        ]),
+      );
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://api.example.com/search/hello%20world%20%26%20friends%3F",
+        expect.any(Object),
+      );
+    });
+
+    it("preserves url literals (slashes) around interpolated values", async () => {
+      const mockFetch = await setupMockFetch();
+      const agent = createHttpAgent({
+        url: "https://api.example.com/conversations/{{threadId}}/messages",
+      });
+      const adapter = new HttpAgentAdapter({
+        agentId: "agent-123",
+        projectId: "project-123",
+        agentRepository: createMockAgentRepository(agent),
+      });
+
+      await adapter.call(
+        createAgentInput([{ role: "user", content: "Hello" }], {
+          threadId: "abc",
+        }),
+      );
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        "https://api.example.com/conversations/abc/messages",
+        expect.any(Object),
+      );
+    });
+
+    describe("when using `| raw` escape hatch", () => {
+      it("skips URL-encoding for raw-filtered references only", async () => {
+        const mockFetch = await setupMockFetch();
+        const agent = createHttpAgent({
+          url: "https://api.example.com/{{threadId | raw}}/s/{{input}}",
+        });
+        const adapter = new HttpAgentAdapter({
+          agentId: "agent-123",
+          projectId: "project-123",
+          agentRepository: createMockAgentRepository(agent),
+        });
+
+        await adapter.call(
+          createAgentInput([{ role: "user", content: "with space" }], {
+            threadId: "path/with/slashes",
+          }),
+        );
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          "https://api.example.com/path/with/slashes/s/with%20space",
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe("when url has no interpolation placeholders", () => {
+      it("passes url through unchanged", async () => {
+        const mockFetch = await setupMockFetch();
+        const agent = createHttpAgent({
+          url: "https://api.example.com/chat",
+        });
+        const adapter = new HttpAgentAdapter({
+          agentId: "agent-123",
+          projectId: "project-123",
+          agentRepository: createMockAgentRepository(agent),
+        });
+
+        await adapter.call(
+          createAgentInput([{ role: "user", content: "Hello" }]),
+        );
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          "https://api.example.com/chat",
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe("when url contains Liquid conditional", () => {
+      it("renders if-branch when condition is truthy", async () => {
+        const mockFetch = await setupMockFetch();
+        const agent = createHttpAgent({
+          url: "https://api.example.com{% if conversationId %}/chat/{{conversationId}}/message{% else %}/chat/start{% endif %}",
+          scenarioMappings: {
+            conversationId: { type: "value", value: "conv-42" },
+          },
+        });
+        const adapter = new HttpAgentAdapter({
+          agentId: "agent-123",
+          projectId: "project-123",
+          agentRepository: createMockAgentRepository(agent),
+        });
+
+        await adapter.call(
+          createAgentInput([{ role: "user", content: "Hi" }]),
+        );
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          "https://api.example.com/chat/conv-42/message",
+          expect.any(Object),
+        );
+      });
+
+      it("renders else-branch when condition is falsy", async () => {
+        const mockFetch = await setupMockFetch();
+        const agent = createHttpAgent({
+          url: "https://api.example.com{% if input.conversationId %}/chat/{{input.conversationId}}/message{% else %}/chat/start{% endif %}",
+        });
+        const adapter = new HttpAgentAdapter({
+          agentId: "agent-123",
+          projectId: "project-123",
+          agentRepository: createMockAgentRepository(agent),
+        });
+
+        await adapter.call(
+          createAgentInput([{ role: "user", content: "Hi" }]),
+        );
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          "https://api.example.com/chat/start",
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe("SSRF regression", () => {
+      const setupSsrfMock = async () => {
+        const { ssrfSafeFetch } = await import("~/utils/ssrfProtection");
+        const mockFetch = vi.mocked(ssrfSafeFetch);
+        mockFetch.mockRejectedValue(new Error("Access to private IP denied"));
+        return mockFetch;
+      };
+
+      it("passes resolved url (not template) to ssrfSafeFetch", async () => {
+        const mockFetch = await setupSsrfMock();
+        const agent = createHttpAgent({
+          url: "https://{{input | raw}}/metadata",
+        });
+        const adapter = new HttpAgentAdapter({
+          agentId: "agent-123",
+          projectId: "project-123",
+          agentRepository: createMockAgentRepository(agent),
+        });
+
+        await expect(
+          adapter.call(
+            createAgentInput([{ role: "user", content: "127.0.0.1" }]),
+          ),
+        ).rejects.toThrow("Access to private IP denied");
+
+        expect(mockFetch).toHaveBeenCalledWith(
+          "https://127.0.0.1/metadata",
+          expect.any(Object),
+        );
+      });
+
+      it.each([
+        ["localhost", "localhost"],
+        ["127.0.0.1", "127.0.0.1"],
+        ["169.254.169.254", "169.254.169.254"],
+      ])(
+        "passes %s-resolved url to ssrfSafeFetch so it can be rejected",
+        async (label, ip) => {
+          const mockFetch = await setupSsrfMock();
+          const agent = createHttpAgent({
+            url: "https://{{input | raw}}/path",
+          });
+          const adapter = new HttpAgentAdapter({
+            agentId: "agent-123",
+            projectId: "project-123",
+            agentRepository: createMockAgentRepository(agent),
+          });
+
+          await expect(
+            adapter.call(createAgentInput([{ role: "user", content: ip }])),
+          ).rejects.toThrow();
+
+          expect(mockFetch).toHaveBeenCalledWith(
+            `https://${ip}/path`,
+            expect.any(Object),
+          );
+          expect(label).toBeTruthy();
+        },
+      );
+    });
+
+    describe("when url template is malformed", () => {
+      it("throws TemplateRenderError with field=url", async () => {
+        await setupMockFetch();
+        const agent = createHttpAgent({
+          url: "https://api.example.com/{% if %}/broken",
+        });
+        const adapter = new HttpAgentAdapter({
+          agentId: "agent-123",
+          projectId: "project-123",
+          agentRepository: createMockAgentRepository(agent),
+        });
+
+        const { TemplateRenderError } = await import(
+          "../../execution/http-template-engine"
+        );
+
+        await expect(
+          adapter.call(
+            createAgentInput([{ role: "user", content: "Hello" }]),
+          ),
+        ).rejects.toThrow(TemplateRenderError);
+
+        await expect(
+          adapter.call(
+            createAgentInput([{ role: "user", content: "Hello" }]),
+          ),
+        ).rejects.toMatchObject({ field: "url" });
+      });
     });
   });
 });
