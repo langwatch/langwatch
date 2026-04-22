@@ -150,24 +150,75 @@ describe("TraceIOExtractionService", () => {
     });
 
     describe("when langwatch.input is a JSON object with no recognized keys", () => {
-      it("falls back to a stringified representation (better than <empty>)", () => {
+      it("returns null from the semantic path — fallback happens in callers", () => {
+        // This is the key invariant: `extractRichIOFromSpan` must NOT return a
+        // non-null result for pure-fallback cases. Otherwise ranking logic
+        // (`extractLastOutput`, `accumulateIO`) would treat a random
+        // `{foo:"bar"}` span as equivalent to a span with a real `content`
+        // match and let the former shadow the latter.
         const span = createTestSpan({
           spanAttributes: {
             "langwatch.input": { foo: "bar", baz: 123 },
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "input");
+        expect(service.extractRichIOFromSpan(span, "input")).toBeNull();
+      });
+
+      it("extractFallbackIOFromSpan returns a stringified representation", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": { foo: "bar", baz: 123 },
+          },
+        });
+
+        const fb = service.extractFallbackIOFromSpan(span, "input");
+
+        expect(fb).not.toBeNull();
+        expect(fb!.source).toBe("langwatch");
+        expect(fb!.raw).toEqual({ foo: "bar", baz: 123 });
+        expect(JSON.parse(fb!.text)).toEqual({ foo: "bar", baz: 123 });
+      });
+
+      it("extractFirstInput falls back to stringified payload when no semantic match exists", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": { foo: "bar", baz: 123 },
+          },
+        });
+
+        const result = service.extractFirstInput([span]);
 
         expect(result).not.toBeNull();
-        expect(result!.source).toBe("langwatch");
-        // Raw is preserved unchanged for downstream consumers.
-        expect(result!.raw).toEqual({ foo: "bar", baz: 123 });
-        // Text is the stringified payload so ComputedInput/Output are searchable
-        // and the trace list shows something instead of `<empty>`.
-        expect(typeof result!.text).toBe("string");
-        expect(result!.text.length).toBeGreaterThan(0);
         expect(JSON.parse(result!.text)).toEqual({ foo: "bar", baz: 123 });
+      });
+    });
+
+    describe("ranking: fallback must never shadow a semantic match on another span", () => {
+      it("extractLastOutput prefers the span with a semantic content match even when another span is fallback-only", () => {
+        // Span A has real content. Span B has an unrecognized shape. Without
+        // the semantic/fallback split, B could shadow A by finishing later.
+        const spanA = createTestSpan({
+          spanId: "a",
+          startTimeUnixMs: 100,
+          endTimeUnixMs: 200,
+          spanAttributes: {
+            "langwatch.output": { content: "the real answer" },
+          },
+        });
+        const spanB = createTestSpan({
+          spanId: "b",
+          startTimeUnixMs: 150,
+          endTimeUnixMs: 300,
+          spanAttributes: {
+            "langwatch.output": { totally: "unknown", shape: true },
+          },
+        });
+
+        const result = service.extractLastOutput([spanA, spanB]);
+
+        expect(result).not.toBeNull();
+        expect(result!.text).toBe("the real answer");
       });
     });
 
@@ -236,20 +287,22 @@ describe("TraceIOExtractionService", () => {
     });
 
     describe("when langwatch.output is a wrapper whose value is a non-empty primitive", () => {
-      // {result: "answer"} is intentionally NOT recursed into — the heuristic
-      // only walks objects. Falls through to the stringify fallback so the user
-      // still sees something instead of `<empty>`.
-      it("falls back to stringified representation rather than guessing", () => {
+      it("semantic path returns null; extractLastOutput falls back to stringified", () => {
         const span = createTestSpan({
           spanAttributes: {
             "langwatch.output": { customWrapper: "the actual answer" },
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "output");
+        // Heuristic can't extract — we don't know which key holds the answer.
+        expect(service.extractRichIOFromSpan(span, "output")).toBeNull();
 
-        expect(result).not.toBeNull();
-        expect(result!.text).toBe('{"customWrapper":"the actual answer"}');
+        // But the caller still gets a stringified fallback rather than null.
+        const lastOutput = service.extractLastOutput([span]);
+        expect(lastOutput).not.toBeNull();
+        expect(lastOutput!.text).toBe(
+          '{"customWrapper":"the actual answer"}',
+        );
       });
     });
 
@@ -264,11 +317,8 @@ describe("TraceIOExtractionService", () => {
         });
 
         // Should not throw — the try/catch around JSON.stringify handles it.
-        const result = service.extractRichIOFromSpan(span, "output");
-
-        // No content found and stringification failed → fall through to null,
-        // mirroring the previous behavior for genuinely unrenderable payloads.
-        expect(result).toBeNull();
+        expect(service.extractRichIOFromSpan(span, "output")).toBeNull();
+        expect(service.extractFallbackIOFromSpan(span, "output")).toBeNull();
       });
     });
 
@@ -280,9 +330,8 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "output");
-
-        expect(result).toBeNull();
+        expect(service.extractRichIOFromSpan(span, "output")).toBeNull();
+        expect(service.extractFallbackIOFromSpan(span, "output")).toBeNull();
       });
 
       it("returns null for an empty array", () => {
@@ -292,9 +341,8 @@ describe("TraceIOExtractionService", () => {
           },
         });
 
-        const result = service.extractRichIOFromSpan(span, "output");
-
-        expect(result).toBeNull();
+        expect(service.extractRichIOFromSpan(span, "output")).toBeNull();
+        expect(service.extractFallbackIOFromSpan(span, "output")).toBeNull();
       });
     });
   });

@@ -59,23 +59,42 @@ export class TraceIOExtractionService {
 
         const firstSpan = spansWithInput[0];
 
-        if (!firstSpan) {
+        if (firstSpan) {
+          const input = this.extractRichIOFromSpan(firstSpan, "input");
           otelSpan.setAttributes({
-            "input.found": false,
-            "fallback.used": true,
+            "input.found": true,
+            "span.type": getSpanType(firstSpan),
+            "input.length": input?.text.length ?? 0,
           });
-          const fallback = this.getHttpFallback(orderedSpans);
-          return fallback ? { raw: fallback, text: fallback, source: "langwatch" as const } : null;
+          return input;
         }
 
-        const input = this.extractRichIOFromSpan(firstSpan, "input");
-        otelSpan.setAttributes({
-          "input.found": true,
-          "span.type": getSpanType(firstSpan),
-          "input.length": input?.text.length ?? 0,
-        });
+        // No semantic match — try stringified-payload fallback against the
+        // topmost span that HAS an input attribute, so `ComputedInput` is
+        // non-null when the trace genuinely carries data. Fallback is
+        // applied only after every semantic candidate has been exhausted,
+        // so it can never shadow a real match.
+        for (const span of orderedSpans) {
+          if (shouldExcludeSpan(span)) continue;
+          const fb = this.extractFallbackIOFromSpan(span, "input");
+          if (fb) {
+            otelSpan.setAttributes({
+              "input.found": true,
+              "input.source": "stringified_fallback",
+              "input.length": fb.text.length,
+            });
+            return fb;
+          }
+        }
 
-        return input;
+        otelSpan.setAttributes({
+          "input.found": false,
+          "fallback.used": true,
+        });
+        const httpFallback = this.getHttpFallback(orderedSpans);
+        return httpFallback
+          ? { raw: httpFallback, text: httpFallback, source: "langwatch" as const }
+          : null;
       },
     );
   }
@@ -133,25 +152,44 @@ export class TraceIOExtractionService {
 
         const lastSpan = sortedByEndTime[0];
 
-        if (!lastSpan) {
+        if (lastSpan) {
+          const output = this.extractRichIOFromSpan(lastSpan, "output");
           otelSpan.setAttributes({
-            "output.found": false,
-            "fallback.used": true,
+            "output.found": true,
+            "span.type": getSpanType(lastSpan),
+            "output.source": "last_finishing",
+            "output.length": output?.text.length ?? 0,
           });
-          const fallback = this.getHttpStatusFallback(tree);
-          return fallback ? { raw: fallback, text: fallback, source: "langwatch" as const } : null;
+          return output;
         }
 
-        const output = this.extractRichIOFromSpan(lastSpan, "output");
+        // No semantic match on any span — try stringified-payload fallback
+        // against the span that finished last. See `extractFirstInput` for
+        // rationale: fallback is never allowed to shadow a semantic match.
+        const allByEndTime = [...spans].sort(
+          (a, b) => b.endTimeUnixMs - a.endTimeUnixMs,
+        );
+        for (const span of allByEndTime) {
+          if (shouldExcludeSpan(span)) continue;
+          const fb = this.extractFallbackIOFromSpan(span, "output");
+          if (fb) {
+            otelSpan.setAttributes({
+              "output.found": true,
+              "output.source": "stringified_fallback",
+              "output.length": fb.text.length,
+            });
+            return fb;
+          }
+        }
 
         otelSpan.setAttributes({
-          "output.found": true,
-          "span.type": getSpanType(lastSpan),
-          "output.source": "last_finishing",
-          "output.length": output?.text.length ?? 0,
+          "output.found": false,
+          "fallback.used": true,
         });
-
-        return output;
+        const httpFallback = this.getHttpStatusFallback(tree);
+        return httpFallback
+          ? { raw: httpFallback, text: httpFallback, source: "langwatch" as const }
+          : null;
       },
     );
   }
@@ -190,13 +228,12 @@ export class TraceIOExtractionService {
       }
     }
 
-    // Priority 2: LangWatch attribute.
-    // If heuristic text extraction fails (e.g. the payload uses an unknown wrapper
-    // key like `{data: {...}}`), fall back to a stringified representation so the
-    // downstream `ComputedOutput` column is non-null and the trace list/dataset
-    // mapping show the raw payload instead of `<empty>`. The detail view always
-    // rendered this correctly because it reads the stored span attribute directly,
-    // but the computed column needs a plain-text form to be searchable/previewable.
+    // Priority 2: LangWatch attribute — semantic matches only.
+    // Returns non-null ONLY when the payload yields a meaningful text
+    // (direct string or heuristic hit on a recognized wrapper key).
+    // If the payload is an unknown shape, callers should fall back to
+    // `extractFallbackIOFromSpan` as a last-resort rather than letting
+    // a stringified mystery object shadow a real match on another span.
     const langwatchValue = attrs[keys.langwatch];
     if (langwatchValue !== undefined && langwatchValue !== null) {
       if (typeof langwatchValue === "string") {
@@ -208,13 +245,39 @@ export class TraceIOExtractionService {
         if (heuristicText) {
           return { raw: langwatchValue, text: heuristicText, source: "langwatch" };
         }
-        const fallbackText = stringifyForText(langwatchValue);
-        if (fallbackText) {
-          return { raw: langwatchValue, text: fallbackText, source: "langwatch" };
-        }
       }
     }
 
+    return null;
+  }
+
+  /**
+   * Last-resort stringified fallback for spans that HAVE a langwatch.input/output
+   * attribute but whose shape defeats every semantic heuristic. Returning a
+   * stringified payload here is strictly better than leaving `ComputedInput` /
+   * `ComputedOutput` NULL (renders as `<empty>` in the UI), but callers must
+   * prefer `extractRichIOFromSpan` so a fallback match never shadows a real
+   * semantic match on another span in the same trace.
+   */
+  extractFallbackIOFromSpan(
+    span: NormalizedSpan,
+    type: "input" | "output",
+  ): ExtractedIO | null {
+    const attrs = span.spanAttributes;
+    const keys = TraceIOExtractionService.IO_ATTR_KEYS[type];
+    const langwatchValue = attrs[keys.langwatch];
+
+    if (langwatchValue === undefined || langwatchValue === null) return null;
+    if (typeof langwatchValue === "string") {
+      return langwatchValue.length > 0
+        ? { raw: langwatchValue, text: langwatchValue, source: "langwatch" }
+        : null;
+    }
+
+    const fallbackText = stringifyForText(langwatchValue);
+    if (fallbackText) {
+      return { raw: langwatchValue, text: fallbackText, source: "langwatch" };
+    }
     return null;
   }
 

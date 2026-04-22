@@ -189,15 +189,25 @@ export const typedValueToText = (
         .join("");
     }
   } else if (typed.type == "json") {
-    // A candidate value is "meaningful" when it's defined and not an empty string/array/object.
-    // We skip empty matches so a JSON like `{ content: "", data: {...real payload...} }` falls
-    // through to the next key (or to `firstAndOnlyKey`/`stringified`) instead of short-circuiting
-    // to "" — which previously produced empty trace outputs in the list and dataset views.
-    const hasNonEmptyValue = (value: any): boolean => {
+    // A candidate value is "meaningful" when it's defined and not an empty
+    // string/array/object — applied RECURSIVELY so a shell like
+    // `{ output: { content: "" } }` is treated as empty at the top-level
+    // special-key check, letting the loop fall through to the next sibling
+    // key (e.g. `answer`). Without recursion, any object with keys short-
+    // circuited specialKeysMapping and the real payload on the next key was
+    // never seen. `seen` guards against circular references.
+    const hasNonEmptyValue = (
+      value: any,
+      seen: WeakSet<object> = new WeakSet(),
+    ): boolean => {
       if (value === undefined || value === null) return false;
       if (typeof value === "string") return value.length > 0;
-      if (Array.isArray(value)) return value.length > 0;
-      if (typeof value === "object") return Object.keys(value).length > 0;
+      if (typeof value === "object") {
+        if (seen.has(value)) return false;
+        seen.add(value);
+        const values = Array.isArray(value) ? value : Object.values(value);
+        return values.some((item) => hasNonEmptyValue(item, seen));
+      }
       return true;
     };
 

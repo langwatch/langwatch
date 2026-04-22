@@ -1523,6 +1523,36 @@ describe("typedValueToText()", () => {
 
       expect(result).toBe("what is the weather?");
     });
+
+    it("recursive hasNonEmptyValue: nested-empty wrapper skips to the next sibling special key", () => {
+      // Regression: before the recursion, `output` being an object with keys
+      // (even nested-empty) short-circuited the loop and `answer` was never
+      // considered. Now `{ content: "" }` is treated as empty, so the loop
+      // continues past `output` and picks up `answer` instead.
+      const result = typedValueToText({
+        type: "json",
+        value: {
+          output: { content: "" },
+          answer: "the real answer",
+        },
+      });
+
+      expect(result).toBe("the real answer");
+    });
+
+    it("recursive hasNonEmptyValue: does not hang / recurse infinitely on circular references", () => {
+      const circular: Record<string, unknown> = { output: {} };
+      (circular.output as Record<string, unknown>).self = circular;
+      (circular as Record<string, unknown>).answer = "still findable";
+
+      // Explicit safety test: the WeakSet cycle guard must prevent infinite
+      // recursion. Specific text output is not asserted — cycles are not
+      // realistic in real JSON payloads (the JSON encoder would have thrown
+      // before we ever saw them), so this is purely a robustness check.
+      expect(() =>
+        typedValueToText({ type: "json", value: circular }),
+      ).not.toThrow();
+    });
   });
 });
 

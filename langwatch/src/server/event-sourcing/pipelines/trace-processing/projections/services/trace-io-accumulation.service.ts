@@ -137,6 +137,16 @@ export class TraceIOAccumulationService {
     if (inputResult && (isRoot || computedInput === null)) {
       const raw = inputResult.raw;
       computedInput = typeof raw === "string" ? raw : JSON.stringify(raw);
+    } else if (!inputResult && computedInput === null) {
+      // Semantic heuristics didn't find anything. Fall back to a stringified
+      // payload so ComputedInput is non-null when the span has real data,
+      // but ONLY if no prior span already contributed a semantic match.
+      const inputFallback =
+        this.traceIOExtractionService.extractFallbackIOFromSpan(span, "input");
+      if (inputFallback) {
+        const raw = inputFallback.raw;
+        computedInput = typeof raw === "string" ? raw : JSON.stringify(raw);
+      }
     }
 
     const outputResult =
@@ -160,6 +170,22 @@ export class TraceIOAccumulationService {
         outputSource = isExplicit
           ? OUTPUT_SOURCE.EXPLICIT
           : OUTPUT_SOURCE.INFERRED;
+      }
+    } else if (computedOutput === null) {
+      // No semantic match on any span so far. A stringified-payload fallback
+      // is strictly better than leaving ComputedOutput NULL. Never runs once a
+      // semantic match has populated computedOutput — so fallback output can
+      // never shadow a real one. Source stays INFERRED, outputFromRootSpan
+      // stays unset so the next semantic root-span match still wins.
+      const outputFallback =
+        this.traceIOExtractionService.extractFallbackIOFromSpan(
+          span,
+          "output",
+        );
+      if (outputFallback) {
+        const raw = outputFallback.raw;
+        computedOutput = typeof raw === "string" ? raw : JSON.stringify(raw);
+        outputSpanEndTimeMs = span.endTimeUnixMs;
       }
     }
 
