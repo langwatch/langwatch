@@ -201,145 +201,116 @@ export function CreatePatDrawer({
                   <SegmentGroup.ItemHiddenInput />
                 </SegmentGroup.Item>
               </SegmentGroup.Root>
-              <Box
-                width="full"
-                padding={3}
-                borderWidth="1px"
-                borderColor="border"
-                borderRadius="md"
-                background="bg.subtle"
-              >
-                {permissionMode === "all" && (
-                  <Text fontSize="sm">
-                    This token will inherit{" "}
-                    <Text as="span" fontWeight="600">
-                      your current permissions
-                    </Text>{" "}
-                    in this organization:
-                  </Text>
-                )}
-                {permissionMode === "readonly" && (
-                  <Text fontSize="sm">
-                    This token will have{" "}
-                    <Text as="span" fontWeight="600">
-                      read-only access
-                    </Text>{" "}
-                    (Viewer role) at every scope:
-                  </Text>
-                )}
-                {permissionMode === "restricted" && (
+              {permissionMode === "restricted" && (
+                <Box
+                  width="full"
+                  padding={3}
+                  borderWidth="1px"
+                  borderColor="border"
+                  borderRadius="md"
+                  background="bg.subtle"
+                >
                   <Text fontSize="sm">
                     Choose a role for each scope, capped by your current
                     permissions:
                   </Text>
-                )}
-                {myBindings.isLoading ? (
-                  <Text fontSize="xs" color="fg.muted" marginTop={2}>
-                    Loading your role bindings…
-                  </Text>
-                ) : (myBindings.data?.length ?? 0) === 0 ? (
-                  <Text fontSize="xs" color="fg.muted" marginTop={2}>
-                    You have no role bindings in this organization yet.
-                  </Text>
-                ) : (
-                  <VStack align="stretch" gap={2} marginTop={2}>
-                    {myBindings.data!.map((b) => {
-                      const scopeLabel =
-                        b.scopeType === "ORGANIZATION"
-                          ? "Org-wide"
-                          : b.scopeType === "TEAM"
-                            ? `Team: ${b.scopeName ?? b.scopeId}`
-                            : `Project: ${b.scopeName ?? b.scopeId}`;
+                  {myBindings.isLoading ? (
+                    <Text fontSize="xs" color="fg.muted" marginTop={2}>
+                      Loading your role bindings…
+                    </Text>
+                  ) : (myBindings.data?.length ?? 0) === 0 ? (
+                    <Text fontSize="xs" color="fg.muted" marginTop={2}>
+                      You have no role bindings in this organization yet.
+                    </Text>
+                  ) : (
+                    <VStack align="stretch" gap={2} marginTop={2}>
+                      {myBindings.data!.map((b) => {
+                        const scopeLabel =
+                          b.scopeType === "ORGANIZATION"
+                            ? "Org-wide"
+                            : b.scopeType === "TEAM"
+                              ? `Team: ${b.scopeName ?? b.scopeId}`
+                              : `Project: ${b.scopeName ?? b.scopeId}`;
 
-                      const isCustom = b.role === "CUSTOM";
-                      const collection = roleCollections.get(b.role);
-                      const availableRoles = collection?.items ?? [];
-                      const effectiveRole =
-                        permissionMode === "readonly"
-                          ? "VIEWER"
-                          : permissionMode === "restricted"
-                            ? (roleOverrides[b.id] ?? b.role)
-                            : b.role;
-                      const roleLabel =
-                        isCustom && permissionMode !== "readonly"
-                          ? (b.customRoleName ?? "Custom")
-                          : (ROLE_LABELS[effectiveRole] ?? effectiveRole);
+                        const isCustom = b.role === "CUSTOM";
+                        const collection = roleCollections.get(b.role);
+                        const effectiveRole =
+                          roleOverrides[b.id] ?? b.role;
+                        const showSelector =
+                          !isCustom &&
+                          (collection?.items ?? []).length > 1;
 
-                      const showSelector =
-                        permissionMode === "restricted" &&
-                        !isCustom &&
-                        availableRoles.length > 1;
-
-                      return (
-                        <HStack
-                          key={b.id}
-                          gap={3}
-                          fontSize="sm"
-                          width="full"
-                          align="center"
-                        >
-                          <Text
-                            color="fg"
-                            flex="1"
-                            fontWeight="500"
-                            lineHeight="32px"
+                        return (
+                          <HStack
+                            key={b.id}
+                            gap={3}
+                            fontSize="sm"
+                            width="full"
+                            align="center"
                           >
-                            {scopeLabel}
-                          </Text>
-                          {showSelector && collection ? (
-                            <Select.Root
-                              collection={collection}
-                              size="sm"
-                              value={[effectiveRole]}
-                              onValueChange={(details) => {
-                                const val = details.value[0];
-                                if (val)
-                                  setRoleOverrides((prev) => ({
-                                    ...prev,
-                                    [b.id]: val,
-                                  }));
-                              }}
-                              width="140px"
-                            >
-                              <Select.Trigger
-                                width="140px"
-                                aria-label={`Role for ${scopeLabel}`}
-                              >
-                                <Select.ValueText />
-                              </Select.Trigger>
-                              <Select.Content>
-                                {(collection?.items ?? []).map((opt) => (
-                                  <Select.Item
-                                    key={opt.value}
-                                    item={opt}
-                                  >
-                                    {opt.label}
-                                  </Select.Item>
-                                ))}
-                              </Select.Content>
-                            </Select.Root>
-                          ) : (
                             <Text
-                              color="fg.muted"
+                              color="fg"
+                              flex="1"
                               fontWeight="500"
-                              width="140px"
-                              textAlign="right"
-                              flexShrink={0}
                               lineHeight="32px"
                             >
-                              {roleLabel}
+                              {scopeLabel}
                             </Text>
-                          )}
-                        </HStack>
-                      );
-                    })}
-                  </VStack>
-                )}
-                <Text fontSize="xs" color="fg.muted" marginTop={3}>
-                  Your access acts as a ceiling. If your role is later
-                  reduced, the token loses those permissions automatically.
-                </Text>
-              </Box>
+                            {showSelector && collection ? (
+                              <Select.Root
+                                collection={collection}
+                                size="sm"
+                                value={[effectiveRole]}
+                                onValueChange={(details) => {
+                                  const val = details.value[0];
+                                  if (val)
+                                    setRoleOverrides((prev) => ({
+                                      ...prev,
+                                      [b.id]: val,
+                                    }));
+                                }}
+                                width="140px"
+                              >
+                                <Select.Trigger
+                                  width="140px"
+                                  aria-label={`Role for ${scopeLabel}`}
+                                >
+                                  <Select.ValueText />
+                                </Select.Trigger>
+                                <Select.Content>
+                                  {(collection?.items ?? []).map((opt) => (
+                                    <Select.Item
+                                      key={opt.value}
+                                      item={opt}
+                                    >
+                                      {opt.label}
+                                    </Select.Item>
+                                  ))}
+                                </Select.Content>
+                              </Select.Root>
+                            ) : (
+                              <Text
+                                color="fg.muted"
+                                fontWeight="500"
+                                width="140px"
+                                textAlign="right"
+                                flexShrink={0}
+                                lineHeight="32px"
+                              >
+                                {ROLE_LABELS[effectiveRole] ?? effectiveRole}
+                              </Text>
+                            )}
+                          </HStack>
+                        );
+                      })}
+                    </VStack>
+                  )}
+                  <Text fontSize="xs" color="fg.muted" marginTop={3}>
+                    Your access acts as a ceiling. If your role is later
+                    reduced, the token loses those permissions automatically.
+                  </Text>
+                </Box>
+              )}
             </VStack>
             <VStack gap={1} align="start" width="full">
               <Text fontWeight="600" fontSize="sm">
