@@ -90,7 +90,7 @@ export class PatRepository {
     organizationId: string;
   }): Promise<PatWithBindings[]> {
     return this.prisma.personalAccessToken.findMany({
-      where: { userId, organizationId },
+      where: { userId, organizationId, revokedAt: null },
       include: {
         roleBindings: {
           include: { customRole: { select: { id: true, name: true } } },

@@ -168,7 +168,7 @@ app.post(
     if ("error" in auth) {
       return c.json({ message: auth.error }, auth.status);
     }
-    const { project } = auth;
+    const { project, markUsed } = auth;
 
     const contentType = c.req.header("content-type");
     if (!contentType || !contentType.includes("application/json")) {
@@ -269,6 +269,7 @@ app.post(
       }
     }
 
+    markUsed();
     return c.json({ message: "ok" });
   },
 );
@@ -606,7 +607,7 @@ async function handleEvaluatorCall(
   if ("error" in auth) {
     return c.json({ message: auth.error }, auth.status);
   }
-  const { project } = auth;
+  const { project, markUsed } = auth;
 
   let body: Record<string, any>;
   try {
@@ -950,6 +951,7 @@ async function handleEvaluatorCall(
             ...(isGuardrail ? { passed: result!.passed ?? true } : {}),
           };
 
+  markUsed();
   return c.json(resultWithoutTraceback);
 }
 

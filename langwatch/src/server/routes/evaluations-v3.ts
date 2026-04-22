@@ -320,7 +320,7 @@ app.post("/:slug/run", async (c) => {
   if ("error" in authResult) {
     return c.json({ error: authResult.error }, { status: authResult.status });
   }
-  const { project } = authResult;
+  const { project, markUsed } = authResult;
 
   const experiment = await prisma.experiment.findFirst({
     where: {
@@ -384,6 +384,8 @@ app.post("/:slug/run", async (c) => {
   );
 
   const totalCells = datasetRows.length * workbenchState.targets.length;
+
+  markUsed();
 
   if (isSSE) {
     return streamSSE(c, async (stream) => {
@@ -500,7 +502,7 @@ app.get("/runs/:runId", async (c) => {
   if ("error" in authResult) {
     return c.json({ error: authResult.error }, { status: authResult.status });
   }
-  const { project } = authResult;
+  const { project, markUsed } = authResult;
 
   const runState = await runStateManager.getRunState(runId);
 
@@ -513,6 +515,7 @@ app.get("/runs/:runId", async (c) => {
   }
 
   logger.debug({ runId, status: runState.status }, "Run status queried");
+  markUsed();
 
   if (runState.status === "running" || runState.status === "pending") {
     return c.json({
@@ -567,7 +570,7 @@ app.get("/runs/:runId/results", async (c) => {
   if ("error" in authResult) {
     return c.json({ error: authResult.error }, { status: authResult.status });
   }
-  const { project } = authResult;
+  const { project, markUsed } = authResult;
 
   // Look up experiment by slug or find the experiment that owns this runId
   const experimentSlug = c.req.query("experimentSlug");
@@ -599,6 +602,7 @@ app.get("/runs/:runId/results", async (c) => {
       runId,
     });
 
+    markUsed();
     return c.json(run);
   } catch (error) {
     logger.error({ error, runId }, "Failed to fetch run results");

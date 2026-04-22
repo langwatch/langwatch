@@ -33,7 +33,7 @@ export function CodeBlock({
   const handleCopy = () => {
     if (!navigator.clipboard) {
       toaster.create({
-        title: "Clipboard not available — copy manually",
+        title: "Clipboard not available, copy manually",
         type: "error",
         duration: 3000,
         meta: { closable: true },
