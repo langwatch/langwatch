@@ -134,7 +134,7 @@ export function CreatePatDrawer({
   return (
     <Drawer.Root
       placement="end"
-      size="md"
+      size="lg"
       open={isOpen}
       onOpenChange={({ open }) => {
         if (!open) {
