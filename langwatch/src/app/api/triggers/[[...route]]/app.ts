@@ -223,7 +223,7 @@ export const app = new Hono<{ Variables: Variables }>()
         },
       });
 
-      getApp().triggers.invalidate(project.id);
+      await getApp().triggers.invalidate(project.id);
 
       return c.json({
         ...toTriggerResponse(trigger),
@@ -286,7 +286,7 @@ export const app = new Hono<{ Variables: Variables }>()
         data,
       });
 
-      getApp().triggers.invalidate(project.id);
+      await getApp().triggers.invalidate(project.id);
 
       return c.json({
         ...toTriggerResponse(updated),
@@ -339,7 +339,7 @@ export const app = new Hono<{ Variables: Variables }>()
         data: { deleted: true, active: false },
       });
 
-      getApp().triggers.invalidate(project.id);
+      await getApp().triggers.invalidate(project.id);
 
       return c.json({ id, deleted: true });
     },
