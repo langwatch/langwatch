@@ -7,28 +7,31 @@ import {
 
 describe("rolesAtOrBelow", () => {
   describe("when given ADMIN", () => {
-    it("returns ADMIN, MEMBER, VIEWER", () => {
+    it("returns Admin, Member, Viewer, None", () => {
       expect(rolesAtOrBelow("ADMIN")).toEqual([
-        { label: "ADMIN", value: "ADMIN" },
-        { label: "MEMBER", value: "MEMBER" },
-        { label: "VIEWER", value: "VIEWER" },
+        { label: "Admin", value: "ADMIN" },
+        { label: "Member", value: "MEMBER" },
+        { label: "Viewer", value: "VIEWER" },
+        { label: "None", value: "NONE" },
       ]);
     });
   });
 
   describe("when given MEMBER", () => {
-    it("returns MEMBER, VIEWER", () => {
+    it("returns Member, Viewer, None", () => {
       expect(rolesAtOrBelow("MEMBER")).toEqual([
-        { label: "MEMBER", value: "MEMBER" },
-        { label: "VIEWER", value: "VIEWER" },
+        { label: "Member", value: "MEMBER" },
+        { label: "Viewer", value: "VIEWER" },
+        { label: "None", value: "NONE" },
       ]);
     });
   });
 
   describe("when given VIEWER", () => {
-    it("returns only VIEWER", () => {
+    it("returns Viewer, None", () => {
       expect(rolesAtOrBelow("VIEWER")).toEqual([
-        { label: "VIEWER", value: "VIEWER" },
+        { label: "Viewer", value: "VIEWER" },
+        { label: "None", value: "NONE" },
       ]);
     });
   });

@@ -32,7 +32,14 @@ export function formatEnvLines(
 
 export const STANDARD_ROLES = ["ADMIN", "MEMBER", "VIEWER"] as const;
 
-/** Returns the list of standard roles at or below the given role in the hierarchy. */
+export const ROLE_LABELS: Record<string, string> = {
+  ADMIN: "Admin",
+  MEMBER: "Member",
+  VIEWER: "Viewer",
+  NONE: "None",
+};
+
+/** Returns the list of standard roles at or below the given role in the hierarchy, plus "None". */
 export function rolesAtOrBelow(
   role: string,
 ): Array<{ label: string; value: string }> {
@@ -40,7 +47,13 @@ export function rolesAtOrBelow(
     role as (typeof STANDARD_ROLES)[number],
   );
   if (idx === -1) return [];
-  return STANDARD_ROLES.slice(idx).map((r) => ({ label: r, value: r }));
+  const roles: Array<{ label: string; value: string }> =
+    STANDARD_ROLES.slice(idx).map((r) => ({
+      label: ROLE_LABELS[r] ?? r,
+      value: r,
+    }));
+  roles.push({ label: "None", value: "NONE" });
+  return roles;
 }
 
 export type PermissionMode = "all" | "readonly" | "restricted";
@@ -87,23 +100,25 @@ export function computeBindings({
         scopeId: b.scopeId,
       }));
     case "restricted":
-      return data.map((b) => {
-        const overriddenRole = roleOverrides[b.id];
-        if (overriddenRole && overriddenRole !== b.role) {
+      return data
+        .filter((b) => (roleOverrides[b.id] ?? b.role) !== "NONE")
+        .map((b) => {
+          const overriddenRole = roleOverrides[b.id];
+          if (overriddenRole && overriddenRole !== b.role) {
+            return {
+              role: overriddenRole,
+              customRoleId: null,
+              scopeType: b.scopeType,
+              scopeId: b.scopeId,
+            };
+          }
           return {
-            role: overriddenRole,
-            customRoleId: null,
+            role: b.role,
+            customRoleId: b.customRoleId,
             scopeType: b.scopeType,
             scopeId: b.scopeId,
           };
-        }
-        return {
-          role: b.role,
-          customRoleId: b.customRoleId,
-          scopeType: b.scopeType,
-          scopeId: b.scopeId,
-        };
-      });
+        });
     default: {
       const _exhaustive: never = permissionMode;
       return _exhaustive;
