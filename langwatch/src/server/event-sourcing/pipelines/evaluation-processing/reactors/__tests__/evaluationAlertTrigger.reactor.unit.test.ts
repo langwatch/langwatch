@@ -69,7 +69,7 @@ function createTraceSummary(
     containsErrorStatus: false,
     containsOKStatus: true,
     errorMessage: null,
-    models: ["gpt-4"],
+    models: ["gpt-5-mini"],
     totalCost: 0.01,
     tokensEstimated: false,
     totalPromptTokenCount: 100,
@@ -417,7 +417,7 @@ describe("evaluationAlertTrigger reactor", () => {
       const trigger = createTrigger({
         filters: {
           "traces.origin": ["application"],
-          "spans.model": ["gpt-4"],
+          "spans.model": ["gpt-5-mini"],
           "evaluations.passed": { "evaluator-1": ["true"] },
         },
       });

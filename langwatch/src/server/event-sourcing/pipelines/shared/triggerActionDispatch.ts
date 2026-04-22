@@ -190,7 +190,6 @@ async function addTraceToDataset({
   );
 
   const entries: DatasetRecordEntry[] = [];
-  const now = Date.now();
 
   const mappedEntries = mapTraceToDatasetEntry(
     trace,
