@@ -80,9 +80,14 @@ const case2_lastSpanEmpty: Payload = {
       parent_id: null,
       type: "span",
       name: "post.callback",
-      // Passes schema (multi-key json, not empty) AND passes nonEmptySpan filter,
-      // but `typedValueToText` short-circuits on `json.content === ""` and returns "".
-      // This is the last-finishing span — in production the trace output ends up empty.
+      // Post-callback span finishes last. Its payload has no "real" content —
+      // just an empty `content` string plus bookkeeping fields. On the
+      // ClickHouse/event-sourcing path this used to store ComputedOutput = NULL
+      // (because `extractRichIOFromSpan` returned null when no key matched and
+      // the raw was a non-string object). With the fix, `stringifyForText`
+      // falls back to `JSON.stringify(raw)` so the field is non-null.
+      // (CodeRabbit suggested using `type: "list", value: ["plain", 1]` instead,
+      // but the REST collector's schema validator rejects primitive list items.)
       output: {
         type: "json",
         value: { content: "", status: "done", extra: "noise" },
