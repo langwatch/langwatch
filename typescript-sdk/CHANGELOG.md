@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.26.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.25.0...typescript-sdk@v0.26.0) (2026-04-22)
+
+
+### Features
+
+* **auth:** fine-grained personal access tokens ([#3212](https://github.com/langwatch/langwatch/issues/3212)) ([#3213](https://github.com/langwatch/langwatch/issues/3213)) ([bb7a6ee](https://github.com/langwatch/langwatch/commit/bb7a6ee422e6442dafaafa0848cce1869f980d16))
+
 ## [0.25.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.24.0...typescript-sdk@v0.25.0) (2026-04-18)
 
 
