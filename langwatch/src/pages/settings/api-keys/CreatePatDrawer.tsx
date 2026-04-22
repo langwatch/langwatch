@@ -278,7 +278,12 @@ export function CreatePatDrawer({
                           width="full"
                           align="center"
                         >
-                          <Text color="fg" flex="1" fontWeight="500">
+                          <Text
+                            color="fg"
+                            flex="1"
+                            fontWeight="500"
+                            lineHeight="32px"
+                          >
                             {scopeLabel}
                           </Text>
                           {showSelector && collection ? (
@@ -320,6 +325,7 @@ export function CreatePatDrawer({
                               width="140px"
                               textAlign="right"
                               flexShrink={0}
+                              lineHeight="32px"
                             >
                               {roleLabel}
                             </Text>
