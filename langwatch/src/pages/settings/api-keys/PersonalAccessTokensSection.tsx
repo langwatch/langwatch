@@ -151,7 +151,6 @@ export function PersonalAccessTokensSection({
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
-<<<<<<< HEAD
                   <Table.ColumnHeader>Secret Key</Table.ColumnHeader>
                   <Table.ColumnHeader>Permissions</Table.ColumnHeader>
                   <Table.ColumnHeader>Expires</Table.ColumnHeader>
