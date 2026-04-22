@@ -149,7 +149,7 @@ export function PersonalAccessTokensSection({
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Secret Key</Table.ColumnHeader>
-                  <Table.ColumnHeader>Permissions</Table.ColumnHeader>
+                  <Table.ColumnHeader minWidth="280px">Permissions</Table.ColumnHeader>
                   <Table.ColumnHeader>Expires</Table.ColumnHeader>
                   <Table.ColumnHeader>Created</Table.ColumnHeader>
                   <Table.ColumnHeader>Last Used</Table.ColumnHeader>
@@ -210,12 +210,21 @@ export function PersonalAccessTokensSection({
                                 ? "blue"
                                 : "gray";
                           return (
-                            <HStack key={rb.id} gap={1} fontSize="xs">
+                            <HStack
+                              key={rb.id}
+                              gap={1}
+                              fontSize="xs"
+                              flexWrap="nowrap"
+                            >
                               <Badge colorPalette={badgeColor} size="sm">
                                 {rb.customRoleName ?? rb.role}
                               </Badge>
                               <Text color="fg.muted">on</Text>
-                              <Badge colorPalette="purple" size="sm">
+                              <Badge
+                                colorPalette="purple"
+                                size="sm"
+                                whiteSpace="nowrap"
+                              >
                                 {scopeIcon} {scopeName}
                               </Badge>
                             </HStack>
