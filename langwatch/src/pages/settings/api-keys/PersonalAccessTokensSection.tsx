@@ -10,7 +10,6 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
-import { Popover } from "../../../components/ui/popover";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { Key, Plus, Trash2 } from "lucide-react";
 import { PageLayout } from "../../../components/ui/layouts/PageLayout";
@@ -23,7 +22,6 @@ import { formatTimeAgo } from "../../../utils/formatTimeAgo";
 import { CreatePatDrawer, type CreatePatInput } from "./CreatePatDrawer";
 import { RevokeConfirmDialog } from "./RevokeConfirmDialog";
 import { TokenCreatedDialog } from "./TokenCreatedDialog";
-import { roleSummary } from "./utils";
 
 /**
  * Lists a user's active PATs for the current organization and orchestrates
@@ -195,71 +193,35 @@ export function PersonalAccessTokensSection({
                       </Text>
                     </Table.Cell>
                     <Table.Cell>
-                      {pat.roleBindings.length <= 1 ? (
-                        <Text fontSize="sm" color="fg.muted">
-                          {roleSummary(pat.roleBindings)}
-                        </Text>
-                      ) : (
-                        <Popover.Root>
-                          <Popover.Trigger asChild>
-                            <Button
-                              variant="plain"
-                              size="xs"
-                              padding={0}
-                              height="auto"
-                              fontWeight="normal"
-                              color="fg.muted"
-                              fontSize="sm"
-                              cursor="pointer"
-                              _hover={{ textDecoration: "underline" }}
-                            >
-                              {roleSummary(pat.roleBindings)}
-                            </Button>
-                          </Popover.Trigger>
-                          <Popover.Content width="320px">
-                            <Popover.Header>
-                              <Text fontWeight="600" fontSize="sm">
-                                Permissions
-                              </Text>
-                            </Popover.Header>
-                            <Popover.Body>
-                              <VStack align="stretch" gap={1}>
-                                {pat.roleBindings.map((rb) => {
-                                  const scopeIcon =
-                                    rb.scopeType === "ORGANIZATION"
-                                      ? "🏢"
-                                      : rb.scopeType === "TEAM"
-                                        ? "👥"
-                                        : "📁";
-                                  const scopeName =
-                                    rb.scopeName ??
-                                    rb.scopeId.slice(0, 8) + "…";
-                                  const roleBadgeColor =
-                                    rb.role === "ADMIN"
-                                      ? "red"
-                                      : rb.role === "MEMBER"
-                                        ? "blue"
-                                        : "gray";
-                                  return (
-                                    <HStack key={rb.id} gap={1} fontSize="xs">
-                                      <Badge
-                                        colorPalette={roleBadgeColor}
-                                        size="sm"
-                                      >
-                                        {rb.customRoleName ?? rb.role}
-                                      </Badge>
-                                      <Text color="fg.muted">on</Text>
-                                      <Badge colorPalette="purple" size="sm">
-                                        {scopeIcon} {scopeName}
-                                      </Badge>
-                                    </HStack>
-                                  );
-                                })}
-                              </VStack>
-                            </Popover.Body>
-                          </Popover.Content>
-                        </Popover.Root>
-                      )}
+                      <VStack align="start" gap={1}>
+                        {pat.roleBindings.map((rb) => {
+                          const scopeIcon =
+                            rb.scopeType === "ORGANIZATION"
+                              ? "🏢"
+                              : rb.scopeType === "TEAM"
+                                ? "👥"
+                                : "📁";
+                          const scopeName =
+                            rb.scopeName ?? rb.scopeId.slice(0, 8) + "…";
+                          const badgeColor =
+                            rb.role === "ADMIN"
+                              ? "red"
+                              : rb.role === "MEMBER"
+                                ? "blue"
+                                : "gray";
+                          return (
+                            <HStack key={rb.id} gap={1} fontSize="xs">
+                              <Badge colorPalette={badgeColor} size="sm">
+                                {rb.customRoleName ?? rb.role}
+                              </Badge>
+                              <Text color="fg.muted">on</Text>
+                              <Badge colorPalette="purple" size="sm">
+                                {scopeIcon} {scopeName}
+                              </Badge>
+                            </HStack>
+                          );
+                        })}
+                      </VStack>
                     </Table.Cell>
                     <Table.Cell>
                       {pat.expiresAt ? (
