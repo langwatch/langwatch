@@ -345,5 +345,49 @@ describe("TraceIOExtractionService", () => {
         expect(service.extractFallbackIOFromSpan(span, "output")).toBeNull();
       });
     });
+
+    describe("when langwatch.output is a wrapper with only empty leaves", () => {
+      it("returns null for { data: {} } — fallback must not surface useless payloads", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.output": { data: {} },
+          },
+        });
+
+        expect(service.extractFallbackIOFromSpan(span, "output")).toBeNull();
+      });
+
+      it("returns null for { result: [] }", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.output": { result: [] },
+          },
+        });
+
+        expect(service.extractFallbackIOFromSpan(span, "output")).toBeNull();
+      });
+
+      it("returns null for deeply nested empty leaves like { a: { b: '' } }", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.output": { a: { b: "" } },
+          },
+        });
+
+        expect(service.extractFallbackIOFromSpan(span, "output")).toBeNull();
+      });
+
+      it("still surfaces a wrapper that has at least one meaningful leaf", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.output": { data: { nested: "real" } },
+          },
+        });
+
+        const fb = service.extractFallbackIOFromSpan(span, "output");
+        expect(fb).not.toBeNull();
+        expect(fb!.text).toBe('{"data":{"nested":"real"}}');
+      });
+    });
   });
 });

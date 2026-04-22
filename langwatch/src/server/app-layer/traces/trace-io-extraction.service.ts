@@ -480,20 +480,46 @@ function extractTextFromPlainJson(
 }
 
 /**
+ * Recursively checks whether a value carries at least one meaningful leaf
+ * (non-empty string, number, or boolean). Empty strings, null/undefined, empty
+ * arrays/objects, and wrappers whose leaves are all of the above (e.g. `{ data:
+ * {} }`, `{ result: [] }`, `{ a: { b: "" } }`) are treated as empty. Uses a
+ * WeakSet to guard against circular references.
+ */
+function hasMeaningfulLeaf(
+  value: unknown,
+  seen: WeakSet<object> = new WeakSet(),
+): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.length > 0;
+  if (typeof value === "number" || typeof value === "boolean") return true;
+  if (typeof value !== "object") return false;
+  if (seen.has(value as object)) return false;
+  seen.add(value as object);
+  if (Array.isArray(value)) return value.some((v) => hasMeaningfulLeaf(v, seen));
+  return Object.values(value as Record<string, unknown>).some((v) =>
+    hasMeaningfulLeaf(v, seen),
+  );
+}
+
+/**
  * Produces a short-enough, non-empty text representation of an already-parsed
  * JSON-serializable value. Used as the last-resort fallback when heuristic text
  * extraction fails — storing `JSON.stringify(value)` in `ComputedOutput` is
  * strictly better than storing `NULL` (which renders as `<empty>` in the UI).
+ *
+ * Callers guarantee `value` is not null/undefined and not a string (those are
+ * handled earlier via semantic extraction), so only number/boolean/array/object
+ * cases matter here. Wrappers with no meaningful leaf (e.g. `{ data: {} }`) are
+ * rejected so they don't end up as non-null-but-useless computed I/O.
  */
 function stringifyForText(value: unknown): string | null {
-  if (value == null) return null;
-  if (typeof value === "string") return value.length > 0 ? value : null;
   if (typeof value === "number" || typeof value === "boolean") {
     return String(value);
   }
+  if (!hasMeaningfulLeaf(value)) return null;
   try {
-    const s = JSON.stringify(value);
-    return s && s !== "{}" && s !== "[]" ? s : null;
+    return JSON.stringify(value) ?? null;
   } catch {
     return null;
   }
