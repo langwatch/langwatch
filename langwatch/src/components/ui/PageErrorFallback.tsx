@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Box,
   Button,
@@ -11,6 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { AlertTriangle, Copy, Check, RotateCcw, Home } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 export function PageErrorFallback({
   error,
@@ -23,6 +24,12 @@ export function PageErrorFallback({
   const [copied, setCopied] = useState(false);
   const message = error instanceof Error ? error.message : String(error);
   const stack = error instanceof Error ? error.stack : undefined;
+  useEffect(() => {
+    captureException(error, {
+      tags: { source: "error-boundary" },
+      extra: { pathname: window.location.pathname },
+    });
+  }, [error]);
 
   return (
     <Center minHeight="60vh" padding={8}>
@@ -67,11 +74,14 @@ export function PageErrorFallback({
               size="2xs"
               variant="ghost"
               color="fg.muted"
-              onClick={() => {
-                const text = stack ?? message;
-                void navigator.clipboard.writeText(text);
-                setCopied(true);
-                setTimeout(() => setCopied(false), 2000);
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(stack ?? message);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                } catch {
+                  // Clipboard API unavailable or denied
+                }
               }}
             >
               {copied ? <Check size={12} /> : <Copy size={12} />}

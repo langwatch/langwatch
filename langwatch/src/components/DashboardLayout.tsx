@@ -765,7 +765,7 @@ export const DashboardLayout = ({
             <CurrentDrawer />
 
             {userIsPartOfTeam ? (
-              <ErrorBoundary FallbackComponent={PageErrorFallback}>
+              <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[router.pathname]}>
                 {showSavedViews ? (
                   <SavedViewsProvider>
                     {children}

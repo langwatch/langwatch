@@ -146,9 +146,12 @@ export function NotFoundScene() {
       const w = rect.width;
       const h = rect.height;
 
-      if (canvas.width !== w * dpr || canvas.height !== h * dpr) {
-        canvas.width = w * dpr;
-        canvas.height = h * dpr;
+      const pixelWidth = Math.round(w * dpr);
+      const pixelHeight = Math.round(h * dpr);
+
+      if (canvas.width !== pixelWidth || canvas.height !== pixelHeight) {
+        canvas.width = pixelWidth;
+        canvas.height = pixelHeight;
         canvas.style.width = `${w}px`;
         canvas.style.height = `${h}px`;
       }

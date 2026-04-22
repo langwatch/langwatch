@@ -330,8 +330,14 @@ export function createNotFoundRenderer() {
       });
     };
 
-    const gridExtent = p.gridExtent;
-    const step = p.gridStep;
+    const gridExtent =
+      Number.isFinite(p.gridExtent) && p.gridExtent > 0
+        ? p.gridExtent
+        : defaultGridParams.gridExtent;
+    const step =
+      Number.isFinite(p.gridStep) && p.gridStep > 0
+        ? p.gridStep
+        : defaultGridParams.gridStep;
 
     const edgeFade = (dist: number) => {
       if (dist < 0.6) return 1;

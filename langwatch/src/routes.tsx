@@ -420,6 +420,17 @@ const routes: RouteObject[] = [
       ]
     : []),
 
+  // Reserved top-level namespaces — prevent falling into the project catch-all
+  { path: "/auth/*", Component: NotFoundPage },
+  { path: "/invite/*", Component: NotFoundPage },
+  { path: "/mcp/*", Component: NotFoundPage },
+  { path: "/onboarding/*", Component: NotFoundPage },
+  { path: "/settings/*", Component: NotFoundPage },
+  { path: "/share/*", Component: NotFoundPage },
+  { path: "/ops/*", Component: NotFoundPage },
+  { path: "/admin/*", Component: NotFoundPage },
+  { path: "/dev/*", Component: NotFoundPage },
+
   // Unknown sub-path under a project — renders inside DashboardLayout so the
   // project redirect logic in useOrganizationTeamProject kicks in, then shows
   // 404 inside the shell if the project is valid but the path isn't.

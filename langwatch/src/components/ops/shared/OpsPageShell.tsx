@@ -17,7 +17,7 @@ export function OpsPageShell({ children }: { children: React.ReactNode }) {
   if (isLoading || !hasAccess) return null;
 
   return (
-    <ErrorBoundary FallbackComponent={PageErrorFallback}>
+    <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[router.pathname]}>
       {children}
     </ErrorBoundary>
   );
