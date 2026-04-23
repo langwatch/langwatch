@@ -319,6 +319,129 @@ describe("applySpanToSummary I/O logic", () => {
     });
   });
 
+  describe("when fallback output precedes a later semantic match", () => {
+    it("semantic output overrides a stringified fallback regardless of endTime", () => {
+      // First span: no semantic match, fallback stringifies the raw payload.
+      // endTime is LATER (5000) than the semantic span that follows, which
+      // previously allowed `shouldOverrideOutput` to keep the fallback.
+      const fallbackSpan = createTestSpan({
+        id: "fallback-1",
+        spanId: "fallback-1",
+        parentSpanId: "root",
+        endTimeUnixMs: 5000,
+      });
+
+      extractSpy.mockReturnValue(null);
+      const fallbackSpy = vi
+        .spyOn(TraceIOExtractionService.prototype, "extractFallbackIOFromSpan")
+        .mockImplementation(
+          (_span: NormalizedSpan, direction: "input" | "output") => {
+            if (direction === "output")
+              return {
+                raw: { data: { nested: "stuff" } },
+                text: '{"data":{"nested":"stuff"}}',
+                source: "langwatch",
+              };
+            return null;
+          },
+        );
+
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: fallbackSpan,
+      });
+      expect(state.computedOutput).toBe('{"data":{"nested":"stuff"}}');
+      expect(state.attributes["langwatch.reserved.output_is_fallback"]).toBe(
+        "true",
+      );
+
+      // Second span: genuine semantic gen_ai output with EARLIER endTime.
+      const semanticSpan = createTestSpan({
+        id: "semantic-1",
+        spanId: "semantic-1",
+        parentSpanId: "root",
+        endTimeUnixMs: 3000,
+      });
+
+      extractSpy.mockImplementation(
+        (_span: NormalizedSpan, direction: "input" | "output") => {
+          if (direction === "output")
+            return {
+              raw: "real answer",
+              text: "real answer",
+              source: "gen_ai",
+            };
+          return null;
+        },
+      );
+      fallbackSpy.mockReturnValue(null);
+
+      state = applySpanToSummary({ state, span: semanticSpan });
+      expect(state.computedOutput).toBe("real answer");
+      expect(
+        state.attributes["langwatch.reserved.output_is_fallback"],
+      ).toBeUndefined();
+    });
+
+    it("semantic input overrides a stringified fallback input", () => {
+      const fallbackSpan = createTestSpan({
+        id: "fallback-1",
+        spanId: "fallback-1",
+        parentSpanId: "root",
+        endTimeUnixMs: 5000,
+      });
+
+      extractSpy.mockReturnValue(null);
+      const fallbackSpy = vi
+        .spyOn(TraceIOExtractionService.prototype, "extractFallbackIOFromSpan")
+        .mockImplementation(
+          (_span: NormalizedSpan, direction: "input" | "output") => {
+            if (direction === "input")
+              return {
+                raw: { data: { q: "x" } },
+                text: '{"data":{"q":"x"}}',
+                source: "langwatch",
+              };
+            return null;
+          },
+        );
+
+      let state = applySpanToSummary({
+        state: createInitState(),
+        span: fallbackSpan,
+      });
+      expect(state.computedInput).toBe('{"data":{"q":"x"}}');
+      expect(state.attributes["langwatch.reserved.input_is_fallback"]).toBe(
+        "true",
+      );
+
+      const semanticSpan = createTestSpan({
+        id: "semantic-1",
+        spanId: "semantic-1",
+        parentSpanId: "root",
+        endTimeUnixMs: 3000,
+      });
+      extractSpy.mockImplementation(
+        (_span: NormalizedSpan, direction: "input" | "output") => {
+          if (direction === "input")
+            return {
+              raw: "what is 2+2?",
+              text: "what is 2+2?",
+              source: "gen_ai",
+            };
+          return null;
+        },
+      );
+      fallbackSpy.mockReturnValue(null);
+
+      state = applySpanToSummary({ state, span: semanticSpan });
+      expect(state.computedInput).toBe("what is 2+2?");
+      expect(
+        state.attributes["langwatch.reserved.input_is_fallback"],
+      ).toBeUndefined();
+    });
+  });
+
   describe("when Mastra-like trace has model_step and chat spans", () => {
     it("keeps model_step explicit output over later-finishing chat inferred output", () => {
       // model_step 1: explicit output, endTime 34000

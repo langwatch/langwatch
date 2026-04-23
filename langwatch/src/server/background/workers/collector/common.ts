@@ -197,7 +197,7 @@ export const typedValueToText = (
     // circuited specialKeysMapping and the real payload on the next key was
     // never seen. `seen` guards against circular references.
     const hasNonEmptyValue = (
-      value: any,
+      value: unknown,
       seen: WeakSet<object> = new WeakSet(),
     ): boolean => {
       if (value === undefined || value === null) return false;
@@ -205,7 +205,9 @@ export const typedValueToText = (
       if (typeof value === "object") {
         if (seen.has(value)) return false;
         seen.add(value);
-        const values = Array.isArray(value) ? value : Object.values(value);
+        const values = Array.isArray(value)
+          ? value
+          : Object.values(value as Record<string, unknown>);
         return values.some((item) => hasNonEmptyValue(item, seen));
       }
       return true;

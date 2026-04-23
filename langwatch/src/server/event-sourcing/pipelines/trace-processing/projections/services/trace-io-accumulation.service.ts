@@ -94,11 +94,17 @@ export class TraceIOAccumulationService {
     outputSpanEndTimeMs: number;
     outputSource: string;
     blockedByGuardrail: boolean;
+    inputIsFallback: boolean;
+    outputIsFallback: boolean;
   } {
     const spanType = span.spanAttributes[ATTR_KEYS.SPAN_TYPE];
     const currentOutputSource =
       state.attributes["langwatch.reserved.output_source"] ??
       OUTPUT_SOURCE.INFERRED;
+    const currentInputIsFallback =
+      state.attributes["langwatch.reserved.input_is_fallback"] === "true";
+    const currentOutputIsFallback =
+      state.attributes["langwatch.reserved.output_is_fallback"] === "true";
 
     let computedInput = state.computedInput;
     let computedOutput = state.computedOutput;
@@ -106,6 +112,8 @@ export class TraceIOAccumulationService {
     let outputSpanEndTimeMs = state.outputSpanEndTimeMs;
     let outputSource = currentOutputSource;
     let blockedByGuardrail = state.blockedByGuardrail;
+    let inputIsFallback = currentInputIsFallback;
+    let outputIsFallback = currentOutputIsFallback;
 
     if (spanType === "guardrail") {
       const rawOutput = span.spanAttributes[ATTR_KEYS.LANGWATCH_OUTPUT];
@@ -127,6 +135,8 @@ export class TraceIOAccumulationService {
         outputSpanEndTimeMs,
         outputSource,
         blockedByGuardrail,
+        inputIsFallback,
+        outputIsFallback,
       };
     }
 
@@ -134,9 +144,13 @@ export class TraceIOAccumulationService {
 
     const inputResult =
       this.traceIOExtractionService.extractRichIOFromSpan(span, "input");
-    if (inputResult && (isRoot || computedInput === null)) {
+    if (
+      inputResult &&
+      (isRoot || computedInput === null || currentInputIsFallback)
+    ) {
       const raw = inputResult.raw;
       computedInput = typeof raw === "string" ? raw : JSON.stringify(raw);
+      inputIsFallback = false;
     } else if (!inputResult && computedInput === null) {
       // Semantic heuristics didn't find anything. Fall back to a stringified
       // payload so ComputedInput is non-null when the span has real data,
@@ -146,6 +160,7 @@ export class TraceIOAccumulationService {
       if (inputFallback) {
         const raw = inputFallback.raw;
         computedInput = typeof raw === "string" ? raw : JSON.stringify(raw);
+        inputIsFallback = true;
       }
     }
 
@@ -153,7 +168,12 @@ export class TraceIOAccumulationService {
       this.traceIOExtractionService.extractRichIOFromSpan(span, "output");
     if (outputResult) {
       const isExplicit = outputResult.source === "langwatch";
-      if (
+      // Semantic output must always override a prior fallback, regardless of
+      // end-time ordering. The fallback span's endTime can be later than a
+      // real semantic gen_ai span that arrives afterward; without this bypass,
+      // `shouldOverrideOutput`'s endTime comparison would keep the fallback.
+      const shouldOverride =
+        currentOutputIsFallback ||
         shouldOverrideOutput({
           isRoot,
           outputFromRoot: outputFromRootSpan,
@@ -161,8 +181,8 @@ export class TraceIOAccumulationService {
           currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
           endTime: span.endTimeUnixMs,
           currentEndTime: outputSpanEndTimeMs,
-        })
-      ) {
+        });
+      if (shouldOverride) {
         const raw = outputResult.raw;
         computedOutput = typeof raw === "string" ? raw : JSON.stringify(raw);
         outputFromRootSpan = isRoot;
@@ -170,13 +190,14 @@ export class TraceIOAccumulationService {
         outputSource = isExplicit
           ? OUTPUT_SOURCE.EXPLICIT
           : OUTPUT_SOURCE.INFERRED;
+        outputIsFallback = false;
       }
     } else if (computedOutput === null) {
       // No semantic match on any span so far. A stringified-payload fallback
-      // is strictly better than leaving ComputedOutput NULL. Never runs once a
-      // semantic match has populated computedOutput — so fallback output can
-      // never shadow a real one. Source stays INFERRED, outputFromRootSpan
-      // stays unset so the next semantic root-span match still wins.
+      // is strictly better than leaving ComputedOutput NULL. Tracked via
+      // outputIsFallback so a later-arriving semantic match can override it
+      // regardless of span end-time ordering. outputFromRootSpan stays unset
+      // so the next semantic root-span match still wins.
       const outputFallback =
         this.traceIOExtractionService.extractFallbackIOFromSpan(
           span,
@@ -186,6 +207,7 @@ export class TraceIOAccumulationService {
         const raw = outputFallback.raw;
         computedOutput = typeof raw === "string" ? raw : JSON.stringify(raw);
         outputSpanEndTimeMs = span.endTimeUnixMs;
+        outputIsFallback = true;
       }
     }
 
@@ -196,6 +218,8 @@ export class TraceIOAccumulationService {
       outputSpanEndTimeMs,
       outputSource,
       blockedByGuardrail,
+      inputIsFallback,
+      outputIsFallback,
     };
   }
 }

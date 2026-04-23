@@ -105,10 +105,14 @@ export class TraceAttributeAccumulationService {
     state,
     span,
     outputSource,
+    inputIsFallback,
+    outputIsFallback,
   }: {
     state: TraceSummaryData;
     span: NormalizedSpan;
     outputSource: string;
+    inputIsFallback: boolean;
+    outputIsFallback: boolean;
   }): Record<string, string> {
     const spanAttrs = this.extractAttributes(span);
     const merged = { ...spanAttrs, ...state.attributes };
@@ -171,6 +175,16 @@ export class TraceAttributeAccumulationService {
     this.traceOriginService.hoistSource({ state, span, mergedAttributes: merged });
 
     merged["langwatch.reserved.output_source"] = outputSource;
+    if (inputIsFallback) {
+      merged["langwatch.reserved.input_is_fallback"] = "true";
+    } else {
+      delete merged["langwatch.reserved.input_is_fallback"];
+    }
+    if (outputIsFallback) {
+      merged["langwatch.reserved.output_is_fallback"] = "true";
+    } else {
+      delete merged["langwatch.reserved.output_is_fallback"];
+    }
 
     // PII redaction status tracking - accumulate span IDs by severity
     const piiStatus =

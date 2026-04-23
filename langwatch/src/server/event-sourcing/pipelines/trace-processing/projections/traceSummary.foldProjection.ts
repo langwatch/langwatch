@@ -94,6 +94,8 @@ export function applySpanToSummary({
     state,
     span,
     outputSource: io.outputSource,
+    inputIsFallback: io.inputIsFallback,
+    outputIsFallback: io.outputIsFallback,
   });
 
   const newModels = spanCostService.extractModelsFromSpan(span);
@@ -248,15 +250,24 @@ export class TraceSummaryFoldProjection
     const currentOutputSource =
       state.attributes["langwatch.reserved.output_source"] ??
       OUTPUT_SOURCE.INFERRED;
+    const currentInputIsFallback =
+      state.attributes["langwatch.reserved.input_is_fallback"] === "true";
+    const currentOutputIsFallback =
+      state.attributes["langwatch.reserved.output_is_fallback"] === "true";
 
     const logIO = extractIOFromLogRecord(event.data);
 
-    if (logIO.input !== null && computedInput === null) {
+    if (
+      logIO.input !== null &&
+      (computedInput === null || currentInputIsFallback)
+    ) {
       computedInput = logIO.input;
+      delete mergedAttributes["langwatch.reserved.input_is_fallback"];
     }
 
     if (logIO.output !== null) {
-      if (
+      const shouldOverride =
+        currentOutputIsFallback ||
         shouldOverrideOutput({
           isRoot: false,
           outputFromRoot: state.outputFromRootSpan,
@@ -264,12 +275,13 @@ export class TraceSummaryFoldProjection
           currentIsExplicit: currentOutputSource === OUTPUT_SOURCE.EXPLICIT,
           endTime: event.data.timeUnixMs,
           currentEndTime: outputSpanEndTimeMs,
-        })
-      ) {
+        });
+      if (shouldOverride) {
         computedOutput = logIO.output;
         outputSpanEndTimeMs = event.data.timeUnixMs;
         mergedAttributes["langwatch.reserved.output_source"] =
           OUTPUT_SOURCE.INFERRED;
+        delete mergedAttributes["langwatch.reserved.output_is_fallback"];
       }
     }
 
