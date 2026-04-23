@@ -78,14 +78,35 @@ def autoparse_field_value(field: Field, value: Optional[Any]) -> Optional[Any]:
     return value
 
 
+def _coerce_chat_messages_input(value: Any) -> Any:
+    """
+    Convert a chat_messages-typed signature INPUT value into a `dspy.History` instance.
+
+    Signature inputs typed `chat_messages` are annotated as `dspy.History` on the generated
+    signature class (see FIELD_TYPE_TO_DSPY_TYPE). The runtime value arriving from the
+    serialized adapter is typically a list of `{role, content}` dicts (or a JSON-stringified
+    form thereof); coerce it so DSPy's ChatAdapter renders distinct conversation turns
+    instead of collapsing them into one escaped-JSON blob. Applied only on the inputs path
+    (signature parameters retain raw list[dict] shape for prompt-template iteration).
+    """
+    if isinstance(value, dspy.History):
+        return value
+    if isinstance(value, list):
+        return dspy.History(messages=value)
+    if isinstance(value, dict):
+        return dspy.History(messages=[value])
+    return value
+
+
 def autoparse_fields(fields: List[Field], values: Dict[str, Any]) -> Dict[str, Any]:
     parsed_values = {}
     for field in fields:
         if not field.identifier in values:
             continue
-        parsed_values[field.identifier] = autoparse_field_value(
-            field, values[field.identifier]
-        )
+        parsed = autoparse_field_value(field, values[field.identifier])
+        if field.type == FieldType.chat_messages:
+            parsed = _coerce_chat_messages_input(parsed)
+        parsed_values[field.identifier] = parsed
     return parsed_values
 
 
@@ -135,6 +156,8 @@ def with_autoparsing(module: type[T]) -> type[T]:
             return FieldType.list
         elif annotation is dspy.Image:
             return FieldType.image
+        elif annotation is dspy.History:
+            return FieldType.chat_messages
 
         return None  # Default to no type conversion
 
@@ -148,6 +171,14 @@ def with_autoparsing(module: type[T]) -> type[T]:
         except Exception:
             return forward(instance_self, *args, **kwargs)
 
+        def _coerce(field_type, value):
+            parsed = autoparse_field_value(
+                Field(identifier="_", type=field_type), value
+            )
+            if field_type == FieldType.chat_messages:
+                parsed = _coerce_chat_messages_input(parsed)
+            return parsed
+
         # Process positional arguments
         parsed_args = []
         for i, (param_name, param) in enumerate(list(sig.parameters.items())):
@@ -155,8 +186,7 @@ def with_autoparsing(module: type[T]) -> type[T]:
                 if param_name in type_hints:
                     field_type = get_field_type_from_annotation(type_hints[param_name])
                     if field_type is not None:
-                        field = Field(identifier=param_name, type=field_type)
-                        parsed_args.append(autoparse_field_value(field, args[i]))
+                        parsed_args.append(_coerce(field_type, args[i]))
                     else:
                         parsed_args.append(args[i])
                 else:
@@ -168,8 +198,7 @@ def with_autoparsing(module: type[T]) -> type[T]:
             if key in type_hints:
                 field_type = get_field_type_from_annotation(type_hints[key])
                 if field_type is not None:
-                    field = Field(identifier=key, type=field_type)
-                    parsed_kwargs[key] = autoparse_field_value(field, value)
+                    parsed_kwargs[key] = _coerce(field_type, value)
                 else:
                     parsed_kwargs[key] = value
             else:
