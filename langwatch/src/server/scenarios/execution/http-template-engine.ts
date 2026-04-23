@@ -48,13 +48,13 @@ const identity = <T>(v: T): T => v;
  * unless the final filter in the expression is `raw` (registered with
  * `raw: true`, which liquidjs honors by skipping outputEscape).
  */
-export const urlLiquid = new Liquid({
+const urlLiquid = new Liquid({
   outputEscape: (value) => encodeURIComponent(String(value ?? "")),
 });
 urlLiquid.registerFilter("raw", { handler: identity, raw: true });
 
 /** Body template engine. No default encoding — bodies are JSON. */
-export const bodyLiquid = new Liquid();
+const bodyLiquid = new Liquid();
 bodyLiquid.registerFilter("raw", { handler: identity, raw: true });
 
 /**

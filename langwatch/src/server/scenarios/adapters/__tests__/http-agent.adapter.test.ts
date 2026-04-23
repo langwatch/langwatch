@@ -6,6 +6,7 @@ import type {
   AgentRepository,
   TypedAgent,
 } from "../../../agents/agent.repository";
+import { TemplateRenderError } from "../../execution/http-template-engine";
 import { HttpAgentAdapter } from "../http-agent.adapter";
 
 const createAgentInput = (
@@ -999,10 +1000,6 @@ describe("HttpAgentAdapter", () => {
           projectId: "project-123",
           agentRepository: createMockAgentRepository(agent),
         });
-
-        const { TemplateRenderError } = await import(
-          "../../execution/http-template-engine"
-        );
 
         await expect(
           adapter.call(

@@ -4,6 +4,7 @@
 
 import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TemplateRenderError } from "../../http-template-engine";
 import type { HttpAgentData } from "../../types";
 import { SerializedHttpAgentAdapter } from "../http-agent.adapter";
 
@@ -532,10 +533,6 @@ describe("SerializedHttpAgentAdapter", () => {
           url: "https://api.example.com/{% if %}/broken",
         };
         const adapter = new SerializedHttpAgentAdapter(config);
-
-        const { TemplateRenderError } = await import(
-          "../../http-template-engine"
-        );
 
         await expect(adapter.call(defaultInput)).rejects.toThrow(
           TemplateRenderError,

@@ -19,6 +19,19 @@ import { applyAuthentication } from "./auth.strategies";
 
 const logger = createLogger("HttpAgentAdapter");
 
+/**
+ * Extract scheme + host from a URL for logging.
+ * Paths and query strings can contain interpolated PII after URL templating;
+ * the origin is config-level and safe to emit at any log level.
+ */
+function safeOrigin(url: string): string {
+  try {
+    return new URL(url).origin;
+  } catch {
+    return "<unparseable>";
+  }
+}
+
 interface HttpAgentAdapterParams {
   agentId: string;
   projectId: string;
@@ -93,7 +106,12 @@ export class HttpAgentAdapter extends AgentAdapter {
       );
 
       logger.info(
-        { agentId: this.agentId, url, resultLength: result.length },
+        {
+          agentId: this.agentId,
+          origin: safeOrigin(url),
+          urlTemplate: config.url,
+          resultLength: result.length,
+        },
         "HttpAgentAdapter.call completed",
       );
 
@@ -178,7 +196,7 @@ export class HttpAgentAdapter extends AgentAdapter {
     headers: Record<string, string>,
     body: string,
   ): Promise<unknown> {
-    logger.debug({ url, method }, "Making HTTP request");
+    logger.debug({ origin: safeOrigin(url), method }, "Making HTTP request");
 
     const response = await ssrfSafeFetch(url, {
       method,
