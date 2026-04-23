@@ -20,7 +20,12 @@ import json
 
 import pytest
 
+import dspy
 from langwatch_nlp.studio.dspy.template_adapter import TemplateAdapter
+from langwatch_nlp.studio.field_parser import (
+    _coerce_chat_messages_input,
+    autoparse_fields,
+)
 from langwatch_nlp.studio.modules.registry import FIELD_TYPE_TO_DSPY_TYPE
 from langwatch_nlp.studio.parser import (
     materialized_component_class,
@@ -444,6 +449,42 @@ class TestTemplateInterpolation:
         assert any(
             m["role"] == "assistant" and "hi there" in str(m["content"]) for m in result
         )
+
+
+# --- AC 2/4: Input coercion → dspy.History -------------------------------------------------
+
+
+class TestChatMessagesInputCoercion:
+    """AC 2/4 — chat_messages inputs coerce into dspy.History so DSPy renders distinct turns."""
+
+    def test_list_coerces_to_history(self):
+        history = [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "hey"},
+        ]
+        result = _coerce_chat_messages_input(history)
+        assert isinstance(result, dspy.History)
+        assert result.messages == history
+
+    def test_json_stringified_list_coerces_to_history(self):
+        history = [{"role": "user", "content": "hi"}]
+        result = _coerce_chat_messages_input(json.dumps(history))
+        # Strings arrive from the TS adapter; the outer autoparse_field_value parses the JSON,
+        # so _coerce alone doesn't unwrap strings — that's the responsibility of the wrapper
+        # call chain. This test asserts coercion is idempotent for strings (no crash).
+        assert result == json.dumps(history)
+
+    def test_existing_history_passes_through(self):
+        original = dspy.History(messages=[{"role": "user", "content": "x"}])
+        assert _coerce_chat_messages_input(original) is original
+
+    def test_autoparse_fields_coerces_chat_messages_input(self):
+        from langwatch_nlp.studio.types.dsl import Field as DslField
+        history = [{"role": "user", "content": "hi"}]
+        fields = [DslField(identifier="messages", type=FieldType.chat_messages)]
+        result = autoparse_fields(fields, {"messages": json.dumps(history)})
+        assert isinstance(result["messages"], dspy.History)
+        assert result["messages"].messages == history
 
 
 # --- AC 5: Structured error for unmapped types ----------------------------------------------
