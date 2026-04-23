@@ -191,4 +191,64 @@ describe("LangWatchExtractor", () => {
       });
     });
   });
+
+  describe("RAG contexts promotion", () => {
+    describe("when span has langwatch.rag.contexts (canonical key)", () => {
+      it("promotes to canonical output", () => {
+        const contexts = [
+          { document_id: "doc-1", chunk_id: "chunk-1", content: "hello world" },
+        ];
+        const ctx = createExtractorContext({
+          [ATTR_KEYS.LANGWATCH_RAG_CONTEXTS]: contexts,
+        });
+
+        extractor.apply(ctx);
+
+        expect(ctx.setAttr).toHaveBeenCalledWith(
+          ATTR_KEYS.LANGWATCH_RAG_CONTEXTS,
+          contexts,
+        );
+        expect(ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS]).toEqual(contexts);
+      });
+    });
+
+    describe("when span has langwatch.rag_contexts (legacy key)", () => {
+      it("promotes to canonical output", () => {
+        const contexts = [
+          { document_id: "doc-2", chunk_id: "chunk-2", content: "legacy data" },
+        ];
+        const ctx = createExtractorContext({
+          [ATTR_KEYS.LANGWATCH_RAG_CONTEXTS_LEGACY]: contexts,
+        });
+
+        extractor.apply(ctx);
+
+        expect(ctx.setAttr).toHaveBeenCalledWith(
+          ATTR_KEYS.LANGWATCH_RAG_CONTEXTS,
+          contexts,
+        );
+        expect(ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS]).toEqual(contexts);
+      });
+    });
+
+    describe("when span has langwatch.contexts (current TS SDK key)", () => {
+      it("does NOT promote — key is unrecognized by backend", () => {
+        const contexts = [
+          { document_id: "doc-3", chunk_id: "chunk-3", content: "ts sdk data" },
+        ];
+        // This simulates what the current TS SDK sends: "langwatch.contexts"
+        const ctx = createExtractorContext({
+          "langwatch.contexts": JSON.stringify({
+            type: "json",
+            value: contexts,
+          }),
+        });
+
+        extractor.apply(ctx);
+
+        // The bug: this key is NOT recognized, so contexts don't get promoted
+        expect(ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS]).toBeUndefined();
+      });
+    });
+  });
 });
