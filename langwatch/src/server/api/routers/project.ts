@@ -37,6 +37,7 @@ import {
   skipPermissionCheckProjectCreation,
 } from "../rbac";
 import { revokeAllTraceShares } from "./share";
+import { getUserProtectionsForProject } from "../utils";
 
 export const projectRouter = createTRPCRouter({
   publicGetById: publicProcedure
@@ -548,66 +549,18 @@ export const projectRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("project:view"))
-    .query(
-      async ({
-        input,
-        ctx,
-      }: {
-        input: { projectId: string };
-        ctx: { session: Session; prisma: PrismaClient };
-      }) => {
-        const { projectId } = input;
-        const prisma = ctx.prisma;
+    .query(async ({ input, ctx }) => {
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
 
-        const project = await prisma.project.findUnique({
-          where: { id: projectId },
-          select: {
-            capturedInputVisibility: true,
-            capturedOutputVisibility: true,
-          },
-        });
-        if (!project) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Project not found",
-          });
-        }
-
-        const teamsWithAccess = await prisma.teamUser.findMany({
-          where: {
-            userId: ctx.session.user.id,
-            team: {
-              projects: {
-                some: {
-                  id: projectId,
-                },
-              },
-            },
-          },
-          select: {
-            role: true,
-          },
-        });
-
-        const isUserPrivileged = teamsWithAccess.some(
-          (teamUser: { role: TeamUserRole }) =>
-            teamUser.role === TeamUserRole.ADMIN,
-        );
-
-        return {
-          isRedacted: {
-            input: !canAccessSensitiveData(
-              project.capturedInputVisibility,
-              isUserPrivileged,
-            ),
-            output: !canAccessSensitiveData(
-              project.capturedOutputVisibility,
-              isUserPrivileged,
-            ),
-          },
-        };
-      },
-    ),
+      return {
+        isRedacted: {
+          input: !protections.canSeeCapturedInput,
+          output: !protections.canSeeCapturedOutput,
+        },
+      };
+    }),
   archiveById: protectedProcedure
     .input(z.object({ projectId: z.string(), projectToArchiveId: z.string() }))
     .use(checkProjectPermission("project:delete"))
@@ -691,19 +644,4 @@ async function checkCapturedDataVisibilityPermission({
   return next();
 }
 
-const canAccessSensitiveData = (
-  visibility: ProjectSensitiveDataVisibilityLevel,
-  userIsPrivileged: boolean,
-): boolean => {
-  switch (visibility) {
-    case ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL:
-      return false;
-    case ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL:
-      return true;
-    case ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN:
-      return userIsPrivileged;
-    default:
-      console.error("Unexpected visibility level:", visibility);
-      return false; // Default to not showing
-  }
-};
+

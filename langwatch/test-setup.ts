@@ -159,6 +159,26 @@ vi.mock("~/utils/compat/next-dynamic", () => ({
   },
 }));
 
+// Polyfill window.matchMedia for Vitest/JSDOM (not implemented by default).
+// Prevents "TypeError: window.matchMedia is not a function" when components
+// or hooks call matchMedia at module or render time.
+if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
+  Object.defineProperty(window, "matchMedia", {
+    writable: true,
+    value: (query: string): MediaQueryList =>
+      ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        addListener: () => {},
+        removeListener: () => {},
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList,
+  });
+}
+
 // Mock ResizeObserver for tests using floating-ui/popper (Chakra menus, tooltips, etc.)
 globalThis.ResizeObserver = class ResizeObserver {
   // biome-ignore lint/suspicious/noEmptyBlockStatements: intentional no-op for test mock
