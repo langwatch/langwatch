@@ -1,4 +1,19 @@
 import { z } from "zod";
+import {
+  ATTRIBUTION_FIELDS,
+  type AttributionField,
+} from "~/utils/attribution";
+
+const attributionShape = ATTRIBUTION_FIELDS.reduce(
+  (acc, field) => {
+    acc[field] = z.string().optional().nullable();
+    return acc;
+  },
+  {} as Record<
+    AttributionField,
+    z.ZodNullable<z.ZodOptional<z.ZodString>>
+  >,
+);
 
 /**
  * Input schema for organization signup data
@@ -14,14 +29,7 @@ export const signUpDataSchema = z.object({
   otherCompanyType: z.string().optional().nullable(),
   otherProjectType: z.string().optional().nullable(),
   otherHowDidYouHearAboutUs: z.string().optional().nullable(),
-  utmCampaign: z.string().optional().nullable(),
   yourRole: z.string().optional().nullable(),
   featureUsage: z.string().optional().nullable(),
-  // First-touch attribution (from landing URL / document.referrer)
-  leadSource: z.string().optional().nullable(),
-  utmSource: z.string().optional().nullable(),
-  utmMedium: z.string().optional().nullable(),
-  utmTerm: z.string().optional().nullable(),
-  utmContent: z.string().optional().nullable(),
-  referrer: z.string().optional().nullable(),
+  ...attributionShape,
 });
