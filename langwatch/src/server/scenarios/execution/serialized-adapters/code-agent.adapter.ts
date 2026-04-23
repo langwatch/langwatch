@@ -79,6 +79,7 @@ export class SerializedCodeAgentAdapter extends AgentAdapter {
       version: "1.0",
       template_adapter: "default" as const,
       default_llm: null,
+      secrets: this.config.secrets,
       nodes: [
         this.buildEntryNode(inputs),
         this.buildCodeNode(inputs, outputs),

@@ -28,6 +28,7 @@ import { AgentRepository, type TypedAgent } from "../../agents/agent.repository"
 import { prisma } from "../../db";
 import { PromptService, type VersionedPrompt } from "../../prompt-config/prompt.service";
 import { ScenarioService } from "../scenario.service";
+import { decrypt } from "~/utils/encryption";
 import {
   AuthConfigSchema,
   type ChildProcessJobData,
@@ -90,6 +91,16 @@ export interface ProjectFetcher {
   } | null>;
 }
 
+/**
+ * Loads decrypted project secrets (name → plaintext value) for injection into
+ * code and workflow agent DSL payloads. Mirrors the studio's addEnvs behavior
+ * so `secrets.NAME` resolves the same way whether the workflow runs from the
+ * UI or from a scenario worker.
+ */
+export interface ProjectSecretsFetcher {
+  getSecrets(projectId: string): Promise<Record<string, string>>;
+}
+
 /** Reason codes for model params preparation failures */
 export type ModelParamsFailureReason =
   | "invalid_model_format"
@@ -116,6 +127,7 @@ export interface DataPrefetcherDependencies {
   workflowVersionFetcher: WorkflowVersionFetcher;
   projectFetcher: ProjectFetcher;
   modelParamsProvider: ModelParamsProvider;
+  projectSecretsFetcher: ProjectSecretsFetcher;
 }
 
 // ============================================================================
@@ -302,7 +314,12 @@ async function fetchAgentData(
     return fetchPromptConfigData(projectId, target.referenceId, deps.promptFetcher);
   }
   if (target.type === "code") {
-    return fetchCodeAgentData(projectId, target.referenceId, deps.agentFetcher);
+    return fetchCodeAgentData(
+      projectId,
+      target.referenceId,
+      deps.agentFetcher,
+      deps.projectSecretsFetcher,
+    );
   }
   if (target.type === "workflow") {
     return fetchWorkflowAgentData({
@@ -311,6 +328,7 @@ async function fetchAgentData(
       agentFetcher: deps.agentFetcher,
       workflowVersionFetcher: deps.workflowVersionFetcher,
       modelParamsProvider: deps.modelParamsProvider,
+      projectSecretsFetcher: deps.projectSecretsFetcher,
     });
   }
   return fetchHttpAgentData(projectId, target.referenceId, deps.agentFetcher);
@@ -408,6 +426,7 @@ async function fetchCodeAgentData(
   projectId: string,
   agentId: string,
   fetcher: AgentFetcher,
+  projectSecretsFetcher: ProjectSecretsFetcher,
 ): Promise<CodeAgentData | null> {
   const agent = await fetcher.findById({ projectId, id: agentId });
   if (!agent || agent.type !== "code") return null;
@@ -425,6 +444,8 @@ async function fetchCodeAgentData(
     return null;
   }
 
+  const secrets = await projectSecretsFetcher.getSecrets(projectId);
+
   return {
     type: "code",
     agentId: agent.id,
@@ -433,6 +454,7 @@ async function fetchCodeAgentData(
     outputs: config.outputs ?? [],
     scenarioMappings: config.scenarioMappings,
     scenarioOutputField: config.scenarioOutputField,
+    secrets,
   };
 }
 
@@ -459,12 +481,14 @@ async function fetchWorkflowAgentData({
   agentFetcher,
   workflowVersionFetcher,
   modelParamsProvider,
+  projectSecretsFetcher,
 }: {
   projectId: string;
   agentId: string;
   agentFetcher: AgentFetcher;
   workflowVersionFetcher: WorkflowVersionFetcher;
   modelParamsProvider: ModelParamsProvider;
+  projectSecretsFetcher: ProjectSecretsFetcher;
 }): Promise<WorkflowAgentData | HydrationFailure | null> {
   const agent = await agentFetcher.findById({ projectId, id: agentId });
   if (!agent || agent.type !== "workflow") return null;
@@ -499,6 +523,8 @@ async function fetchWorkflowAgentData({
 
   const { inputs, outputs } = extractWorkflowIO(hydrateResult.dsl);
 
+  const secrets = await projectSecretsFetcher.getSecrets(projectId);
+
   const data: WorkflowAgentData = {
     type: "workflow",
     agentId: agent.id,
@@ -508,6 +534,7 @@ async function fetchWorkflowAgentData({
     outputs,
     scenarioMappings: config.scenarioMappings,
     scenarioOutputField: config.scenarioOutputField,
+    secrets,
   };
 
   validateWorkflowAgentMappings(data);
@@ -757,6 +784,29 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
           where: { id: projectId },
           select: { apiKey: true, defaultModel: true },
         }),
+    },
+    projectSecretsFetcher: {
+      getSecrets: async (projectId) => {
+        const rows = await prisma.projectSecret.findMany({
+          where: { projectId },
+          select: { name: true, encryptedValue: true },
+        });
+        const secrets: Record<string, string> = {};
+        for (const row of rows) {
+          try {
+            secrets[row.name] = decrypt(row.encryptedValue);
+          } catch (err) {
+            // Wrap per-secret so a single corrupt row yields a readable error
+            // instead of a raw crypto stack trace surfacing at the caller.
+            throw new Error(
+              `Failed to decrypt project secret "${row.name}": ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+        }
+        return secrets;
+      },
     },
     modelParamsProvider: {
       prepare: async (projectId, model): Promise<ModelParamsResult> => {

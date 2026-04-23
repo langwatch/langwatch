@@ -18,6 +18,7 @@ describe("SerializedCodeAgentAdapter", () => {
     code: 'def execute(input):\n    return f"processed: {input}"',
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
+    secrets: {},
   };
 
   const nlpServiceUrl = "http://localhost:8080";
@@ -79,6 +80,30 @@ describe("SerializedCodeAgentAdapter", () => {
       expect(callBody.type).toBe("execute_flow");
       expect(callBody.payload.workflow.api_key).toBe(apiKey);
       expect(callBody.payload.workflow.template_adapter).toBe("default");
+    });
+
+    describe("when the config has project secrets", () => {
+      it("includes them on the synthesized workflow DSL so `secrets.NAME` resolves", async () => {
+        const adapter = new SerializedCodeAgentAdapter(
+          {
+            ...defaultConfig,
+            secrets: {
+              WORKFLOW_LANGWATCH_API_KEY: "sk-lw-test",
+              OTHER_SECRET: "value-2",
+            },
+          },
+          nlpServiceUrl,
+          apiKey,
+        );
+
+        await adapter.call(defaultInput);
+
+        const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+        expect(callBody.payload.workflow.secrets).toEqual({
+          WORKFLOW_LANGWATCH_API_KEY: "sk-lw-test",
+          OTHER_SECRET: "value-2",
+        });
+      });
     });
 
     it("builds a workflow with entry, code, and end nodes", async () => {
