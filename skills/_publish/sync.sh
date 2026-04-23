@@ -6,7 +6,7 @@ TARGET_DIR="${1:?Usage: sync.sh <path-to-skills-repo>}"
 echo "Syncing skills to $TARGET_DIR..."
 
 # Clean target (except .git and README)
-find "$TARGET_DIR" -maxdepth 1 -type d ! -name '.git' ! -name '.' | while read dir; do
+find "$TARGET_DIR" -mindepth 1 -maxdepth 1 -type d ! -name '.git' | while read dir; do
   rm -rf "$dir"
 done
 
