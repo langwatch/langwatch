@@ -1,6 +1,7 @@
 import {
   type PrismaClient,
   ProjectSensitiveDataVisibilityLevel,
+  RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
 import type { Session } from "~/server/auth";
@@ -90,6 +91,7 @@ export async function getUserProtectionsForProject(
   const project = await ctx.prisma.project.findUniqueOrThrow({
     where: { id: projectId, archivedAt: null },
     select: {
+      teamId: true,
       capturedInputVisibility: true,
       capturedOutputVisibility: true,
     },
@@ -113,27 +115,22 @@ export async function getUserProtectionsForProject(
     };
   }
 
-  // For signed in users, check their team permissions
-  const teamsWithAccess = await ctx.prisma.teamUser.findMany({
+  // For signed in users, check their team permissions via RoleBinding
+  const bindings = await ctx.prisma.roleBinding.findMany({
     where: {
       userId: ctx.session.user.id,
-      team: {
-        projects: {
-          some: {
-            id: projectId,
-          },
-        },
-      },
+      scopeType: RoleBindingScopeType.TEAM,
+      scopeId: project.teamId,
     },
     select: {
       role: true,
     },
   });
 
-  const isAdminInAnyTeam = teamsWithAccess.some(
-    (team) => team.role === TeamUserRole.ADMIN,
+  const isAdminInAnyTeam = bindings.some(
+    (binding) => binding.role === TeamUserRole.ADMIN,
   );
-  const isMemberInAnyTeam = teamsWithAccess.length > 0;
+  const isMemberInAnyTeam = bindings.length > 0;
 
   const obtainVisibilityLevel = (
     visibility: ProjectSensitiveDataVisibilityLevel,

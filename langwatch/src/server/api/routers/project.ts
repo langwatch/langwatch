@@ -562,6 +562,7 @@ export const projectRouter = createTRPCRouter({
         const project = await prisma.project.findUnique({
           where: { id: projectId },
           select: {
+            teamId: true,
             capturedInputVisibility: true,
             capturedOutputVisibility: true,
           },
@@ -573,25 +574,20 @@ export const projectRouter = createTRPCRouter({
           });
         }
 
-        const teamsWithAccess = await prisma.teamUser.findMany({
+        const bindings = await prisma.roleBinding.findMany({
           where: {
             userId: ctx.session.user.id,
-            team: {
-              projects: {
-                some: {
-                  id: projectId,
-                },
-              },
-            },
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: project.teamId,
           },
           select: {
             role: true,
           },
         });
 
-        const isUserPrivileged = teamsWithAccess.some(
-          (teamUser: { role: TeamUserRole }) =>
-            teamUser.role === TeamUserRole.ADMIN,
+        const isUserPrivileged = bindings.some(
+          (binding: { role: TeamUserRole }) =>
+            binding.role === TeamUserRole.ADMIN,
         );
 
         return {
