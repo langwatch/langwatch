@@ -268,6 +268,54 @@ describe("aggregation-builder", () => {
       },
     );
 
+    // @regression: Dashboard widgets `avgCostPerModel` and `avgTokensPerModel`
+    // emit `pipeline: { field: "trace_id", aggregation: "avg" }` on a
+    // trace-level metric (`performance.total_cost`, `performance.completion_tokens`)
+    // with `groupBy: metadata.model`. The arrayJoin CTE path previously only
+    // rewrote pipelines with `aggregation: "sum"`; `"avg"` (and min/max) fell
+    // through and the metric was silently dropped from the outer SELECT — the
+    // query returned 200 OK with no values, and the UI showed "No data".
+    //
+    // For trace-level columns the CTE already deduplicates by (trace_id,
+    // group_key), so the per-trace inner aggregation is identity — sum/avg/min/max
+    // all collapse to the per-trace scalar, and the outer aggregation equals
+    // the direct aggregation over deduped traces.
+    it.each([
+      {
+        metric: "performance.total_cost",
+        pipelineAgg: "avg",
+        outerAggregation: /\bavg\s*\(\s*trace_total_cost\s*\)/,
+      },
+      {
+        metric: "performance.completion_tokens",
+        pipelineAgg: "avg",
+        outerAggregation: /\bavg\s*\(\s*trace_completion_tokens\s*\)/,
+      },
+    ])(
+      "rewrites trace_id pipeline with $pipelineAgg aggregation on $metric in arrayJoin groupBy",
+      ({ metric, pipelineAgg, outerAggregation }) => {
+        const input = {
+          ...baseInput,
+          groupBy: "metadata.model" as const,
+          series: [
+            {
+              metric: metric as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              pipeline: {
+                field: "trace_id" as const,
+                aggregation: pipelineAgg as "avg",
+              },
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("deduped_traces");
+        // Metric must survive to the outer SELECT (not silently dropped)
+        expect(result.sql).toMatch(outerAggregation);
+      },
+    );
+
     // @guard: prevent this class of bug from recurring silently. Any
     // trace-level column referenced via `${ts}.<Column>` in metric-translator
     // MUST be registered in DEDUP_FIELD_MAPPINGS (which is consumed by
