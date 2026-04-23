@@ -20,6 +20,7 @@ import {
   type ProjectFetcher,
   type ModelParamsProvider,
   type WorkflowVersionFetcher,
+  type ProjectSecretsFetcher,
 } from "../data-prefetcher";
 import type { ExecutionContext, TargetConfig, LiteLLMParams } from "../types";
 
@@ -89,6 +90,10 @@ describe("prefetchScenarioData", () => {
       prepare: vi.fn().mockResolvedValue(defaultModelParamsResult),
     };
 
+    const projectSecretsFetcher: ProjectSecretsFetcher = {
+      getSecrets: vi.fn().mockResolvedValue({}),
+    };
+
     return {
       scenarioFetcher,
       promptFetcher,
@@ -96,6 +101,7 @@ describe("prefetchScenarioData", () => {
       workflowVersionFetcher,
       projectFetcher,
       modelParamsProvider,
+      projectSecretsFetcher,
       ...overrides,
     };
   }
@@ -452,6 +458,36 @@ describe("prefetchScenarioData", () => {
             "proj_123",
             "anthropic/claude-3-sonnet",
           );
+        });
+
+        it("includes decrypted project secrets on the prefetched adapter data", async () => {
+          const projectSecretsFetcher: ProjectSecretsFetcher = {
+            getSecrets: vi.fn().mockResolvedValue({
+              WORKFLOW_LANGWATCH_API_KEY: "sk-lw-resolved",
+              OTHER_SECRET: "val2",
+            }),
+          };
+          const deps = createMockDeps({
+            agentFetcher: {
+              findById: vi.fn().mockResolvedValue(codeAgent),
+            },
+            projectSecretsFetcher,
+          });
+
+          const target: TargetConfig = { type: "code", referenceId: "agent_456" };
+          const result = await prefetchScenarioData(defaultContext, target, deps);
+
+          expect(projectSecretsFetcher.getSecrets).toHaveBeenCalledWith("proj_123");
+          expect(result.success).toBe(true);
+          // Assert explicitly before narrowing so a type drift fails loudly
+          // instead of silently skipping the toEqual below.
+          if (!result.success) throw new Error("prefetch should have succeeded");
+          expect(result.data.adapterData.type).toBe("code");
+          if (result.data.adapterData.type !== "code") return;
+          expect(result.data.adapterData.secrets).toEqual({
+            WORKFLOW_LANGWATCH_API_KEY: "sk-lw-resolved",
+            OTHER_SECRET: "val2",
+          });
         });
       });
     });

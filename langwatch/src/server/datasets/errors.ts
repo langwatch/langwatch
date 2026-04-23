@@ -35,12 +35,24 @@ export class MalformedColumnTypesError extends Error {
  */
 export class InvalidColumnError extends Error {
   readonly columnName: string;
+  readonly validColumns: string[];
 
-  constructor(columnName: string, datasetName: string) {
+  constructor({
+    columnName,
+    datasetName,
+    validColumns,
+  }: {
+    columnName: string;
+    datasetName: string;
+    validColumns: string[];
+  }) {
+    const validColumnsList =
+      validColumns.length > 0 ? validColumns.join(", ") : "(none)";
     super(
-      `Column "${columnName}" is not defined in the "${datasetName}" dataset schema`,
+      `Column "${columnName}" is not defined in the "${datasetName}" dataset schema. Valid columns: ${validColumnsList}`,
     );
     this.name = "InvalidColumnError";
     this.columnName = columnName;
+    this.validColumns = validColumns;
   }
 }

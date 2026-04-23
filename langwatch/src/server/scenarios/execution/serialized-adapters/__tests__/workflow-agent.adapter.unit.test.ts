@@ -65,6 +65,7 @@ describe("SerializedWorkflowAgentAdapter", () => {
     workflow: defaultDsl,
     inputs: [{ identifier: "input", type: "str" }],
     outputs: [{ identifier: "output", type: "str" }],
+    secrets: {},
   };
 
   const nlpServiceUrl = "http://localhost:8080";
@@ -136,6 +137,59 @@ describe("SerializedWorkflowAgentAdapter", () => {
       const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
       expect(callBody.type).toBe("execute_flow");
       expect(callBody.payload.workflow.api_key).toBe(apiKey);
+    });
+
+    describe("when the config has project secrets", () => {
+      it("merges them into workflow.secrets so `secrets.NAME` resolves in code nodes", async () => {
+        const adapter = new SerializedWorkflowAgentAdapter(
+          {
+            ...defaultConfig,
+            secrets: {
+              WORKFLOW_LANGWATCH_API_KEY: "sk-lw-test",
+              OTHER_SECRET: "value-2",
+            },
+          },
+          nlpServiceUrl,
+          apiKey,
+        );
+
+        await adapter.call(defaultInput);
+
+        const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+        expect(callBody.payload.workflow.secrets).toEqual({
+          WORKFLOW_LANGWATCH_API_KEY: "sk-lw-test",
+          OTHER_SECRET: "value-2",
+        });
+      });
+
+      it("overrides pre-existing workflow.secrets values with the fresh prefetched ones", async () => {
+        const adapter = new SerializedWorkflowAgentAdapter(
+          {
+            ...defaultConfig,
+            workflow: {
+              ...defaultDsl,
+              secrets: {
+                WORKFLOW_LANGWATCH_API_KEY: "sk-lw-stale",
+                DSL_ONLY: "keep-me",
+              },
+            },
+            secrets: {
+              WORKFLOW_LANGWATCH_API_KEY: "sk-lw-fresh",
+            },
+          },
+          nlpServiceUrl,
+          apiKey,
+        );
+
+        await adapter.call(defaultInput);
+
+        const callBody = JSON.parse(mockFetch.mock.calls[0]![1].body);
+        // Fresh prefetched value wins; unrelated DSL-only entries are kept.
+        expect(callBody.payload.workflow.secrets).toEqual({
+          WORKFLOW_LANGWATCH_API_KEY: "sk-lw-fresh",
+          DSL_ONLY: "keep-me",
+        });
+      });
     });
 
     it("passes the pre-fetched workflow DSL through unchanged", async () => {
