@@ -183,6 +183,12 @@ describe("span.ts", () => {
   });
 
   describe("RAG context methods", () => {
+    it("uses the canonical RAG contexts attribute key", () => {
+      expect(intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS).toBe(
+        "langwatch.rag.contexts"
+      );
+    });
+
     it("should set single RAG context", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
       const ragContext = testData.ragContext();

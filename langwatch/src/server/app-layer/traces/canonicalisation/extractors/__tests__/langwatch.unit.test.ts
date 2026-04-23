@@ -231,12 +231,12 @@ describe("LangWatchExtractor", () => {
       });
     });
 
-    describe("when span has langwatch.contexts (current TS SDK key)", () => {
-      it("does NOT promote — key is unrecognized by backend", () => {
+    describe("when span has langwatch.contexts (old TS SDK key, pre-fix)", () => {
+      it("does NOT promote — legacy/unrecognized key, SDK now emits langwatch.rag.contexts", () => {
         const contexts = [
           { document_id: "doc-3", chunk_id: "chunk-3", content: "ts sdk data" },
         ];
-        // This simulates what the current TS SDK sends: "langwatch.contexts"
+        // Old TS SDK (<=0.26.0) sent "langwatch.contexts" which is not recognized
         const ctx = createExtractorContext({
           "langwatch.contexts": JSON.stringify({
             type: "json",
@@ -246,7 +246,7 @@ describe("LangWatchExtractor", () => {
 
         extractor.apply(ctx);
 
-        // The bug: this key is NOT recognized, so contexts don't get promoted
+        // Intentionally not promoted — SDK now emits the canonical key
         expect(ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS]).toBeUndefined();
       });
     });
