@@ -50,7 +50,7 @@
     "@types/express": "^5.0.6",
     "@types/node": "^16.0.0",
     "@types/yargs": "^17.0.33",
-    "@typescript/native-preview": "7.0.0-dev.20250911.1",
+    "@typescript/native-preview": "7.0.0-dev.20260423.1",
     "ai": "^6.0.0",
     "dotenv": "^17.2.2",
     "esbuild": "^0.25.0",
