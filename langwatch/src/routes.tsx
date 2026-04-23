@@ -2,11 +2,15 @@ import { Suspense, useEffect } from "react";
 import {
   createBrowserRouter,
   Outlet,
+  useLocation,
   useNavigation,
   type RouteObject,
 } from "react-router";
+import { ErrorBoundary } from "react-error-boundary";
 import NProgress from "nprogress";
 import { InnerProviders } from "./AppProviders";
+import { PageErrorFallback } from "./components/ui/PageErrorFallback";
+import { NotFoundPage } from "./pages/not-found";
 
 /**
  * Root layout — wraps all routes.
@@ -15,6 +19,7 @@ import { InnerProviders } from "./AppProviders";
  */
 function RootLayout() {
   const navigation = useNavigation();
+  const location = useLocation();
 
   useEffect(() => {
     NProgress.configure({ showSpinner: false });
@@ -30,9 +35,14 @@ function RootLayout() {
 
   return (
     <InnerProviders>
-      <Suspense>
-        <Outlet />
-      </Suspense>
+      <ErrorBoundary
+        FallbackComponent={PageErrorFallback}
+        resetKeys={[location.pathname]}
+      >
+        <Suspense>
+          <Outlet />
+        </Suspense>
+      </ErrorBoundary>
     </InnerProviders>
   );
 }
@@ -399,6 +409,37 @@ const routes: RouteObject[] = [
     path: "/@project/*",
     ...page(() => import("./pages/@project/[...path]/index")),
   },
+
+  // Dev-only error test page
+  ...(process.env.NODE_ENV === "development"
+    ? [
+        {
+          path: "/dev/error-test",
+          ...page(() => import("./pages/dev/error-test")),
+        },
+      ]
+    : []),
+
+  // Reserved top-level namespaces — prevent falling into the project catch-all
+  { path: "/auth/*", Component: NotFoundPage },
+  { path: "/invite/*", Component: NotFoundPage },
+  { path: "/mcp/*", Component: NotFoundPage },
+  { path: "/onboarding/*", Component: NotFoundPage },
+  { path: "/settings/*", Component: NotFoundPage },
+  { path: "/share/*", Component: NotFoundPage },
+  { path: "/ops/*", Component: NotFoundPage },
+  { path: "/dev/*", Component: NotFoundPage },
+
+  // Unknown sub-path under a project — renders inside DashboardLayout so the
+  // project redirect logic in useOrganizationTeamProject kicks in, then shows
+  // 404 inside the shell if the project is valid but the path isn't.
+  {
+    path: "/:project/*",
+    ...page(() => import("./pages/[project]/not-found")),
+  },
+
+  // 404 catch-all — must be last
+  { path: "*", Component: NotFoundPage },
 ];
 
 export const router = createBrowserRouter([
