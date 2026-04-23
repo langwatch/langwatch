@@ -1177,6 +1177,9 @@ function buildArrayJoinTimeseriesQuery(
   cteSelectExprs.push(
     `${traceColumnWrapper(`${ts}.TotalCompletionTokenCount`)} AS trace_completion_tokens`,
   );
+  cteSelectExprs.push(
+    `${traceColumnWrapper(`${ts}.TokensPerSecond`)} AS trace_tokens_per_second`,
+  );
 
   // When pre-aggregating eval metrics per-trace, emit each eval metric's full
   // expression (without its alias) as a `<alias>__per_trace` column inside the
@@ -2009,6 +2012,7 @@ const DEDUP_FIELD_MAPPINGS: Record<string, string> = {
   TotalDurationMs: "trace_duration_ms",
   TotalPromptTokenCount: "trace_prompt_tokens",
   TotalCompletionTokenCount: "trace_completion_tokens",
+  TokensPerSecond: "trace_tokens_per_second",
 };
 
 /** Aggregation patterns and their transformation logic */

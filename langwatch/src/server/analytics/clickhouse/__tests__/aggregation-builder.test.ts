@@ -208,6 +208,39 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
     });
 
+    // @regression: `performance.tokens_per_second` with an arrayJoin groupBy
+    // (e.g. metadata.model) previously emitted `avg(ts.TokensPerSecond)` in the
+    // outer SELECT, but `ts` is only in scope inside the CTE and `TokensPerSecond`
+    // was never projected. ClickHouse rejected the query with:
+    //   "Unknown expression or function identifier `ts.TokensPerSecond` in scope"
+    // Fix adds `TokensPerSecond` to the CTE projection as `trace_tokens_per_second`
+    // and wires it into DEDUP_FIELD_MAPPINGS so transformMetricForDedup rewrites
+    // the outer reference to the CTE alias.
+    it("routes performance.tokens_per_second through the CTE alias in arrayJoin groupBy path", () => {
+      const input = {
+        ...baseInput,
+        groupBy: "metadata.model" as const,
+        series: [
+          {
+            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
+            aggregation: "avg" as const,
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must route through the arrayJoin CTE path (Models array)
+      expect(result.sql).toContain("arrayJoin");
+      expect(result.sql).toContain("deduped_traces");
+
+      // The CTE must project the column under the expected alias
+      expect(result.sql).toContain("AS trace_tokens_per_second");
+
+      // The outer SELECT must reference the CTE alias, not the raw column
+      expect(result.sql).toContain("avg(trace_tokens_per_second)");
+      expect(result.sql).not.toMatch(/\bavg\s*\(\s*ts\.TokensPerSecond\s*\)/);
+    });
+
     // @regression: Pie charts with arrayJoin groupBy (e.g. metadata.labels) add a
     // pipeline { field: "trace_id", aggregation: "sum" } which sets requiresSubquery.
     // buildArrayJoinTimeseriesQuery previously dropped all subquery metrics, returning
