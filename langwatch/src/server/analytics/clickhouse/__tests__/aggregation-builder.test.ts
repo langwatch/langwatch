@@ -208,37 +208,106 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
     });
 
-    // @regression: `performance.tokens_per_second` with an arrayJoin groupBy
-    // (e.g. metadata.model) previously emitted `avg(ts.TokensPerSecond)` in the
-    // outer SELECT, but `ts` is only in scope inside the CTE and `TokensPerSecond`
-    // was never projected. ClickHouse rejected the query with:
-    //   "Unknown expression or function identifier `ts.TokensPerSecond` in scope"
-    // Fix adds `TokensPerSecond` to the CTE projection as `trace_tokens_per_second`
-    // and wires it into DEDUP_FIELD_MAPPINGS so transformMetricForDedup rewrites
-    // the outer reference to the CTE alias.
-    it("routes performance.tokens_per_second through the CTE alias in arrayJoin groupBy path", () => {
-      const input = {
-        ...baseInput,
-        groupBy: "metadata.model" as const,
-        series: [
-          {
-            metric: "performance.tokens_per_second" as FlattenAnalyticsMetricsEnum,
-            aggregation: "avg" as const,
-          },
-        ],
+    // @regression: Trace-level metrics emitted `avg(ts.<Column>)` in the outer
+    // SELECT when routed through the arrayJoin groupBy path, but `ts` is only
+    // in scope inside the `deduped_traces` CTE. Columns not registered in
+    // `DEDUP_FIELD_MAPPINGS` and not projected into the CTE caused ClickHouse
+    // to reject the query with:
+    //   "Unknown expression or function identifier `ts.<Column>` in scope"
+    //
+    // Audit of `metric-translator.ts` revealed two trace-level columns with
+    // this bug: `TokensPerSecond` and `TimeToFirstTokenMs`. Both have been
+    // projected into the CTE and wired into DEDUP_FIELD_MAPPINGS so
+    // `transformMetricForDedup` rewrites the outer reference to the CTE alias.
+    it.each([
+      {
+        metric: "performance.tokens_per_second",
+        aggregation: "avg",
+        alias: "trace_tokens_per_second",
+        rawColumn: "TokensPerSecond",
+        outerAggregation: /\bavg\s*\(\s*trace_tokens_per_second\s*\)/,
+      },
+      {
+        metric: "performance.first_token",
+        aggregation: "p90",
+        alias: "trace_time_to_first_token_ms",
+        rawColumn: "TimeToFirstTokenMs",
+        outerAggregation: /\bquantileExact\(0\.9\)\s*\(\s*trace_time_to_first_token_ms\s*\)/,
+      },
+    ])(
+      "routes $metric through the CTE alias in arrayJoin groupBy path",
+      ({ metric, aggregation, alias, rawColumn, outerAggregation }) => {
+        const input = {
+          ...baseInput,
+          groupBy: "metadata.model" as const,
+          series: [
+            {
+              metric: metric as FlattenAnalyticsMetricsEnum,
+              aggregation: aggregation as "avg" | "p90",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // Must route through the arrayJoin CTE path (Models array)
+        expect(result.sql).toContain("arrayJoin");
+        expect(result.sql).toContain("deduped_traces");
+
+        // The CTE must project the column under the expected alias. A single
+        // `ts.<Column> AS <alias>` reference inside the CTE is expected and
+        // correct — the bug was only that the outer SELECT also used
+        // `ts.<Column>`, where `ts` is out of scope.
+        expect(result.sql).toContain(`ts.${rawColumn} AS ${alias}`);
+
+        // The outer SELECT must reference the CTE alias, not the raw column.
+        const outerPortion = result.sql.slice(
+          result.sql.indexOf("FROM (") + "FROM (".length,
+        ).split("FROM deduped_traces")[1] ?? "";
+        expect(result.sql).toMatch(outerAggregation);
+        expect(outerPortion).not.toContain(`ts.${rawColumn}`);
+      },
+    );
+
+    // @guard: prevent this class of bug from recurring silently. Any
+    // trace-level column referenced via `${ts}.<Column>` in metric-translator
+    // MUST be registered in DEDUP_FIELD_MAPPINGS (which is consumed by
+    // transformMetricForDedup to rewrite outer references to the CTE alias)
+    // AND projected in the CTE (see aggregation-builder.ts:~1168). Columns
+    // not in this list are handled specially (see allowlist below). If a new
+    // trace-level metric is added and this test fails, either add the column
+    // to DEDUP_FIELD_MAPPINGS + CTE, or extend the allowlist with a reason.
+    it("every ${ts}.<Column> reference in metric-translator is handled", async () => {
+      const fs = await import("node:fs/promises");
+      const path = await import("node:path");
+      const source = await fs.readFile(
+        path.resolve(__dirname, "../metric-translator.ts"),
+        "utf8",
+      );
+      const referenced = new Set(
+        Array.from(source.matchAll(/\$\{ts\}\.([A-Z][a-zA-Z]+)/g)).map(
+          (m) => m[1]!,
+        ),
+      );
+      // Columns handled by special cases in transformMetricForDedup, not by
+      // DEDUP_FIELD_MAPPINGS lookup. Keep this list minimal and documented.
+      const SPECIAL_CASE_ALLOWLIST = new Set([
+        "TraceId", // -> uniqExact(trace_id)
+        "Attributes", // routed through extractReferencedEvaluationColumns / metadata path
+        "OccurredAt", // used only in period/date boundaries, not in outer aggregations
+      ]);
+      const {
+        __testOnly_DEDUP_FIELD_MAPPINGS,
+      } = __testOnly__ as unknown as {
+        __testOnly_DEDUP_FIELD_MAPPINGS?: Record<string, string>;
       };
-      const result = buildTimeseriesQuery(input);
+      const registered = new Set(
+        Object.keys(__testOnly_DEDUP_FIELD_MAPPINGS ?? {}),
+      );
 
-      // Must route through the arrayJoin CTE path (Models array)
-      expect(result.sql).toContain("arrayJoin");
-      expect(result.sql).toContain("deduped_traces");
-
-      // The CTE must project the column under the expected alias
-      expect(result.sql).toContain("AS trace_tokens_per_second");
-
-      // The outer SELECT must reference the CTE alias, not the raw column
-      expect(result.sql).toContain("avg(trace_tokens_per_second)");
-      expect(result.sql).not.toMatch(/\bavg\s*\(\s*ts\.TokensPerSecond\s*\)/);
+      const unhandled = [...referenced].filter(
+        (col) => !registered.has(col) && !SPECIAL_CASE_ALLOWLIST.has(col),
+      );
+      expect(unhandled).toEqual([]);
     });
 
     // @regression: Pie charts with arrayJoin groupBy (e.g. metadata.labels) add a
