@@ -14,7 +14,7 @@
   "dependencies": {
     "@langchain/openai": "^0.6.3",
     "@langchain/core": "^0.3.66",
-    "langchain": "^0.3.30",
+    "langchain": "^1.0.1",
     "@opentelemetry/context-async-hooks": "^2.0.1",
     "@opentelemetry/sdk-node": "^0.203.0",
     "cli-markdown": "^3.5.1",
