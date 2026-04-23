@@ -11,6 +11,7 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import {
   DuplicateInviteError,
   InviteNotFoundError,
+  InviteNotReadyError,
   OrganizationNotFoundError,
 } from "./errors";
 import { LimitExceededError } from "../license-enforcement/errors";
@@ -533,6 +534,10 @@ export class InviteService {
     userId: string;
     invite: OrganizationInvite;
   }): Promise<void> {
+    if (invite.status !== "PENDING") {
+      throw new InviteNotReadyError(invite.id, invite.status);
+    }
+
     await this.prisma.organizationUser.createMany({
       data: [
         {
