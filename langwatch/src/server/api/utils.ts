@@ -127,23 +127,23 @@ export async function getUserProtectionsForProject(
     },
   });
 
-  const isAdminInAnyTeam = bindings.some(
+  const isAdminForTeam = bindings.some(
     (binding) => binding.role === TeamUserRole.ADMIN,
   );
-  const isMemberInAnyTeam = bindings.length > 0;
+  const isMemberOfTeam = bindings.length > 0;
 
   const obtainVisibilityLevel = (
     visibility: ProjectSensitiveDataVisibilityLevel,
   ): boolean => {
     switch (true) {
-      case !isMemberInAnyTeam:
+      case !isMemberOfTeam:
         return false;
       case visibility === ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL:
         return false;
       case visibility === ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL:
         return true;
       case visibility === ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN:
-        return isAdminInAnyTeam;
+        return isAdminForTeam;
       default:
         console.error("Unexpected state for visibility:", visibility);
         return false;

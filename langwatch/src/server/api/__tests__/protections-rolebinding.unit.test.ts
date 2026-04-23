@@ -18,9 +18,6 @@ const mockPrisma = {
   roleBinding: {
     findMany: vi.fn(),
   },
-  teamUser: {
-    findMany: vi.fn(),
-  },
 } as any;
 
 const mockSession = {
@@ -42,13 +39,9 @@ describe("getUserProtectionsForProject", () => {
           ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
       });
 
-      // User has a RoleBinding for the team
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.MEMBER },
       ]);
-
-      // No TeamUser row exists (post-BetterAuth user)
-      mockPrisma.teamUser.findMany.mockResolvedValue([]);
     });
 
     it("grants visibility for VISIBLE_TO_ALL", async () => {
@@ -61,7 +54,7 @@ describe("getUserProtectionsForProject", () => {
       expect(result.canSeeCapturedOutput).toBe(true);
     });
 
-    it("queries roleBinding table, not teamUser", async () => {
+    it("queries roleBinding table with team scope", async () => {
       await getUserProtectionsForProject(
         { prisma: mockPrisma, session: mockSession },
         { projectId: "project-1" },
@@ -91,7 +84,6 @@ describe("getUserProtectionsForProject", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.ADMIN },
       ]);
-      mockPrisma.teamUser.findMany.mockResolvedValue([]);
     });
 
     it("grants visibility for VISIBLE_TO_ADMIN", async () => {
@@ -118,7 +110,6 @@ describe("getUserProtectionsForProject", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.MEMBER },
       ]);
-      mockPrisma.teamUser.findMany.mockResolvedValue([]);
     });
 
     it("denies visibility for non-admin member", async () => {
@@ -132,7 +123,7 @@ describe("getUserProtectionsForProject", () => {
     });
   });
 
-  describe("when user has no RoleBinding and no TeamUser", () => {
+  describe("when user has no RoleBinding", () => {
     beforeEach(() => {
       mockPrisma.project.findUniqueOrThrow.mockResolvedValue({
         teamId: "team-1",
@@ -143,7 +134,6 @@ describe("getUserProtectionsForProject", () => {
       });
 
       mockPrisma.roleBinding.findMany.mockResolvedValue([]);
-      mockPrisma.teamUser.findMany.mockResolvedValue([]);
     });
 
     it("denies visibility even for VISIBLE_TO_ALL", async () => {
@@ -170,7 +160,6 @@ describe("getUserProtectionsForProject", () => {
       mockPrisma.roleBinding.findMany.mockResolvedValue([
         { role: TeamUserRole.ADMIN },
       ]);
-      mockPrisma.teamUser.findMany.mockResolvedValue([]);
     });
 
     it("denies visibility even for admin", async () => {
