@@ -192,5 +192,65 @@ describe("TraceIOExtractionService", () => {
         expect(result!.text).toBe("Tell me about AI");
       });
     });
+
+    describe("when langwatch.input is a JSON-encoded string with 'message' and 'history'", () => {
+      it("parses the JSON and extracts the message field", () => {
+        const payload = {
+          message:
+            "I think you should have some options for me to easily select, like 1, 2, 3",
+          history: [
+            { role: "user", content: "decide my dinner tonight" },
+            { role: "assistant", content: "some long suggestion" },
+          ],
+          thread_id: "c9d826f2-d1d1-4807-a3f8-77a016883b14",
+        };
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": JSON.stringify(payload),
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "input");
+
+        expect(result).not.toBeNull();
+        expect(result!.text).toBe(
+          "I think you should have some options for me to easily select, like 1, 2, 3",
+        );
+        expect(result!.source).toBe("langwatch");
+      });
+    });
+
+    describe("when langwatch.input is a non-JSON string that contains braces", () => {
+      it("returns the raw string without erroring", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.input": "{not really json",
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "input");
+
+        expect(result).not.toBeNull();
+        expect(result!.text).toBe("{not really json");
+      });
+    });
+
+    describe("when langwatch.output is a JSON-encoded string with 'output' key", () => {
+      it("parses the JSON and extracts the output field", () => {
+        const span = createTestSpan({
+          spanAttributes: {
+            "langwatch.output": JSON.stringify({
+              output: "The answer is 42",
+              trace_id: "abc",
+            }),
+          },
+        });
+
+        const result = service.extractRichIOFromSpan(span, "output");
+
+        expect(result).not.toBeNull();
+        expect(result!.text).toBe("The answer is 42");
+      });
+    });
   });
 });

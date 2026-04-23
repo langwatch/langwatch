@@ -3,7 +3,9 @@
 
 import json
 import os
+from uuid import uuid4
 
+import httpx
 import pytest
 
 import langwatch
@@ -69,6 +71,71 @@ def test_metadata_on_root_span():
         root_metadata = trace.root_span._span.attributes.get("metadata")
 
         assert json.loads(root_metadata) == {"a": 1, "b": 3, "c": 4}
+
+
+def test_share_retries_on_transient_timeout(monkeypatch):
+    """share() must retry on httpx.TimeoutException — fixes sdk-python-ci flake."""
+    trace = LangWatchTrace()
+    trace._trace_id = int(uuid4().hex, 16)
+
+    call_count = {"n": 0}
+
+    class _FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def post(self, url, headers=None, timeout=None):
+            call_count["n"] += 1
+            if call_count["n"] < 3:
+                raise httpx.ReadTimeout("read operation timed out")
+            return httpx.Response(
+                200,
+                json={"path": f"/share/fake-{call_count['n']}"},
+                request=httpx.Request("POST", url),
+            )
+
+    monkeypatch.setattr(httpx, "Client", lambda: _FakeClient())
+    # Collapse tenacity's exponential backoff so the test is fast.
+    import time as time_module
+
+    monkeypatch.setattr(time_module, "sleep", lambda *a, **kw: None)
+
+    url = trace.share()
+
+    assert call_count["n"] == 3, "expected 2 retries before success"
+    assert url.endswith("/share/fake-3")
+
+
+def test_share_gives_up_after_max_attempts(monkeypatch):
+    """share() must raise once retries are exhausted — avoids silent hangs."""
+    trace = LangWatchTrace()
+    trace._trace_id = int(uuid4().hex, 16)
+
+    call_count = {"n": 0}
+
+    class _FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def post(self, url, headers=None, timeout=None):
+            call_count["n"] += 1
+            raise httpx.ReadTimeout("read operation timed out")
+
+    monkeypatch.setattr(httpx, "Client", lambda: _FakeClient())
+    import time as time_module
+
+    monkeypatch.setattr(time_module, "sleep", lambda *a, **kw: None)
+
+    with pytest.raises(httpx.ReadTimeout):
+        trace.share()
+
+    assert call_count["n"] == 3, "expected exactly 3 attempts (stop_after_attempt=3)"
 
 
 def test_metadata_not_lost_on_multiple_updates():
