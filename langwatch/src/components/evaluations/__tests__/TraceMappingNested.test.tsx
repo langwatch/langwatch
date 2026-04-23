@@ -43,7 +43,7 @@ const getTraceAvailableSources = (): AvailableSource[] => {
   return [
     {
       id: "trace",
-      name: "Trace",
+      name: "Current Trace",
       type: "dataset",
       fields: Object.entries(TRACE_MAPPINGS).map(([key, config]) => {
         const hasKeys = "keys" in config && typeof config.keys === "function";
@@ -101,7 +101,7 @@ describe("Trace mapping nested fields", () => {
 
       const traceSource = sources[0]!;
       expect(traceSource.id).toBe("trace");
-      expect(traceSource.name).toBe("Trace");
+      expect(traceSource.name).toBe("Current Trace");
 
       // Should have fields for all TRACE_MAPPINGS keys
       const fieldNames = traceSource.fields.map((f) => f.name);

@@ -17,9 +17,9 @@ describe("Feature: Thread variables available in trace-level evaluator input map
   // -------------------------------------------------------------------------
   describe("getTraceAvailableSources()", () => {
     describe("when the evaluator mapping level is 'trace'", () => {
-      it("includes a 'Trace' group with trace-level fields", () => {
+      it("includes a 'Current Trace' group with trace-level fields", () => {
         const sources = getTraceAvailableSources([], []);
-        const traceGroup = sources.find((s) => s.name === "Trace");
+        const traceGroup = sources.find((s) => s.name === "Current Trace");
 
         expect(traceGroup).toBeDefined();
         expect(traceGroup!.id).toBe("trace");
@@ -29,9 +29,9 @@ describe("Feature: Thread variables available in trace-level evaluator input map
         expect(fieldNames).toContain("output");
       });
 
-      it("includes a 'Thread' group with thread-level fields", () => {
+      it("includes a 'Current Thread' group with thread-level fields", () => {
         const sources = getTraceAvailableSources([], []);
-        const threadGroup = sources.find((s) => s.name === "Thread");
+        const threadGroup = sources.find((s) => s.name === "Current Thread");
 
         expect(threadGroup).toBeDefined();
         expect(threadGroup!.id).toBe("thread");
@@ -44,17 +44,17 @@ describe("Feature: Thread variables available in trace-level evaluator input map
   // -------------------------------------------------------------------------
   describe("getThreadAvailableSources()", () => {
     describe("when the evaluator mapping level is 'thread'", () => {
-      it("includes a 'Thread' group with thread-level fields", () => {
+      it("includes a 'Current Thread' group with thread-level fields", () => {
         const sources = getThreadAvailableSources();
-        const threadGroup = sources.find((s) => s.name === "Thread");
+        const threadGroup = sources.find((s) => s.name === "Current Thread");
 
         expect(threadGroup).toBeDefined();
         expect(threadGroup!.id).toBe("thread");
       });
 
-      it("does not include a 'Trace' group", () => {
+      it("does not include a 'Current Trace' group", () => {
         const sources = getThreadAvailableSources();
-        const traceGroup = sources.find((s) => s.name === "Trace");
+        const traceGroup = sources.find((s) => s.name === "Current Trace");
 
         expect(traceGroup).toBeUndefined();
       });
@@ -66,25 +66,25 @@ describe("Feature: Thread variables available in trace-level evaluator input map
   // -------------------------------------------------------------------------
   describe("when the evaluator mapping level is 'trace'", () => {
     describe("when the available sources are computed", () => {
-      it("'Thread' group contains the field 'thread_id'", () => {
+      it("'Current Thread' group contains the field 'thread_id'", () => {
         const sources = getTraceAvailableSources([], []);
-        const threadGroup = sources.find((s) => s.name === "Thread");
+        const threadGroup = sources.find((s) => s.name === "Current Thread");
         const fieldNames = threadGroup!.fields.map((f) => f.name);
 
         expect(fieldNames).toContain("thread_id");
       });
 
-      it("'Thread' group contains the field 'traces'", () => {
+      it("'Current Thread' group contains the field 'traces'", () => {
         const sources = getTraceAvailableSources([], []);
-        const threadGroup = sources.find((s) => s.name === "Thread");
+        const threadGroup = sources.find((s) => s.name === "Current Thread");
         const fieldNames = threadGroup!.fields.map((f) => f.name);
 
         expect(fieldNames).toContain("traces");
       });
 
-      it("'Thread' group contains the field 'formatted_traces'", () => {
+      it("'Current Thread' group contains the field 'formatted_traces'", () => {
         const sources = getTraceAvailableSources([], []);
-        const threadGroup = sources.find((s) => s.name === "Thread");
+        const threadGroup = sources.find((s) => s.name === "Current Thread");
         const fieldNames = threadGroup!.fields.map((f) => f.name);
 
         expect(fieldNames).toContain("formatted_traces");

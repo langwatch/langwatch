@@ -685,19 +685,105 @@ describe("mapTraceToDatasetEntry()", () => {
 });
 
 describe("TRACE_MAPPINGS keys for threads sub-field selection", () => {
-  it("does not include 'threads' as a valid sub-field option for threads mapping", () => {
+  it("does not include thread sources as valid sub-field options", () => {
     // Bug regression: "threads" appeared in its own sub-field multi-select,
     // creating a recursive option that makes no sense.
-    // The sub-field options for threads should exclude "threads" itself.
+    // The sub-field options for threads should exclude thread sources.
     const threadSubFieldOptions = Object.keys(TRACE_MAPPINGS).filter(
-      (key) => key !== "threads",
+      (key) => key !== "threads" && key !== "threads_until_current",
     );
 
-    // Verify "threads" is in the raw keys (proves we're testing the right thing)
+    // Verify thread sources are in the raw keys (proves we're testing the right thing)
     expect(Object.keys(TRACE_MAPPINGS)).toContain("threads");
+    expect(Object.keys(TRACE_MAPPINGS)).toContain("threads_until_current");
 
-    // But the filtered list used for sub-field selection excludes it
+    // But the filtered list used for sub-field selection excludes them
     expect(threadSubFieldOptions).not.toContain("threads");
+    expect(threadSubFieldOptions).not.toContain("threads_until_current");
+  });
+});
+
+describe("threads_until_current mapping", () => {
+  const makeTrace = (
+    traceId: string,
+    threadId: string,
+    startedAt: number,
+    input: string,
+  ) =>
+    ({
+      trace_id: traceId,
+      metadata: { thread_id: threadId },
+      timestamps: { started_at: startedAt },
+      input: { value: input },
+      output: { value: "" },
+      spans: [],
+    }) as any;
+
+  const allTraces = [
+    makeTrace("t1", "thread-A", 1000, "first"),
+    makeTrace("t2", "thread-A", 2000, "second"),
+    makeTrace("t3", "thread-A", 3000, "third"),
+    makeTrace("t4", "thread-B", 1500, "other-thread"),
+  ];
+
+  it("returns only traces up to and including the current trace timestamp", () => {
+    const currentTrace = allTraces[1]!; // t2, timestamp 2000
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(
+      currentTrace,
+      "",
+      "",
+      { allTraces },
+    ) as any[];
+
+    expect(result.map((t: any) => t.trace_id)).toEqual(["t1", "t2"]);
+  });
+
+  it("includes traces with equal timestamps", () => {
+    const currentTrace = allTraces[2]!; // t3, timestamp 3000
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(
+      currentTrace,
+      "",
+      "",
+      { allTraces },
+    ) as any[];
+
+    expect(result.map((t: any) => t.trace_id)).toEqual(["t1", "t2", "t3"]);
+  });
+
+  it("excludes traces from other threads", () => {
+    const currentTrace = allTraces[2]!; // t3, thread-A
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(
+      currentTrace,
+      "",
+      "",
+      { allTraces },
+    ) as any[];
+
+    expect(result.map((t: any) => t.trace_id)).not.toContain("t4");
+  });
+
+  it("extracts selectedFields from filtered traces", () => {
+    const currentTrace = allTraces[1]!; // t2, timestamp 2000
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(
+      currentTrace,
+      "",
+      "",
+      { allTraces, selectedFields: ["input"] },
+    ) as Record<string, unknown>[];
+
+    expect(result).toEqual([{ input: "first" }, { input: "second" }]);
+  });
+
+  it("returns empty array when trace has no thread_id", () => {
+    const noThreadTrace = { ...allTraces[0]!, metadata: {} } as any;
+    const result = TRACE_MAPPINGS.threads_until_current.mapping(
+      noThreadTrace,
+      "",
+      "",
+      { allTraces },
+    );
+
+    expect(result).toEqual([]);
   });
 });
 
