@@ -759,7 +759,7 @@ describe("prefetchScenarioData", () => {
             prepare: vi.fn().mockResolvedValue({
               success: true as const,
               params: {
-                model: "openai/gpt-4",
+                model: "openai/gpt-4o-mini",
                 api_key: hydratedApiKey,
               },
             }),
@@ -858,7 +858,7 @@ describe("prefetchScenarioData", () => {
       it("calls prepare exactly twice for two nodes with different models", async () => {
         const prepareFn = vi.fn().mockResolvedValue({
           success: true as const,
-          params: { model: "openai/gpt-4", api_key: "sk-key-a" },
+          params: { model: "openai/gpt-4o-mini", api_key: "sk-key-a" },
         });
 
         const multiModelDsl = {
@@ -870,7 +870,7 @@ describe("prefetchScenarioData", () => {
               data: {
                 name: "LLM A",
                 parameters: [
-                  { identifier: "llm", type: "llm", value: { model: "openai/gpt-4" } },
+                  { identifier: "llm", type: "llm", value: { model: "openai/gpt-4o-mini" } },
                 ],
               },
             },
@@ -880,7 +880,7 @@ describe("prefetchScenarioData", () => {
               data: {
                 name: "LLM B",
                 parameters: [
-                  { identifier: "llm", type: "llm", value: { model: "anthropic/claude-3" } },
+                  { identifier: "llm", type: "llm", value: { model: "azure/gpt-4o-mini" } },
                 ],
               },
             },
@@ -910,10 +910,10 @@ describe("prefetchScenarioData", () => {
         // so we check the workflow-level prepare calls via the models passed
         const workflowModels = prepareFn.mock.calls
           .map((call) => call[1] as string)
-          .filter((m) => m === "openai/gpt-4" || m === "anthropic/claude-3");
+          .filter((m) => m === "openai/gpt-4o-mini" || m === "azure/gpt-4o-mini");
         expect(workflowModels).toHaveLength(2);
-        expect(workflowModels).toContain("openai/gpt-4");
-        expect(workflowModels).toContain("anthropic/claude-3");
+        expect(workflowModels).toContain("openai/gpt-4o-mini");
+        expect(workflowModels).toContain("azure/gpt-4o-mini");
 
         // Verify result is successful (both models resolved)
         expect(result.success).toBe(true);
@@ -922,7 +922,7 @@ describe("prefetchScenarioData", () => {
       it("calls prepare only once for two nodes sharing the same model", async () => {
         const prepareFn = vi.fn().mockResolvedValue({
           success: true as const,
-          params: { model: "openai/gpt-4", api_key: "sk-key-a" },
+          params: { model: "openai/gpt-4o-mini", api_key: "sk-key-a" },
         });
 
         const sameModelDsl = {
@@ -934,7 +934,7 @@ describe("prefetchScenarioData", () => {
               data: {
                 name: "LLM A",
                 parameters: [
-                  { identifier: "llm", type: "llm", value: { model: "openai/gpt-4" } },
+                  { identifier: "llm", type: "llm", value: { model: "openai/gpt-4o-mini" } },
                 ],
               },
             },
@@ -944,7 +944,7 @@ describe("prefetchScenarioData", () => {
               data: {
                 name: "LLM B",
                 parameters: [
-                  { identifier: "llm", type: "llm", value: { model: "openai/gpt-4" } },
+                  { identifier: "llm", type: "llm", value: { model: "openai/gpt-4o-mini" } },
                 ],
               },
             },
@@ -969,10 +969,10 @@ describe("prefetchScenarioData", () => {
 
         await prefetchScenarioData(defaultContext, workflowTarget, deps);
 
-        // Both nodes share "openai/gpt-4" → prepare called exactly once for that model
+        // Both nodes share "openai/gpt-4o-mini" → prepare called exactly once for that model
         const workflowModelCalls = prepareFn.mock.calls
           .map((call) => call[1] as string)
-          .filter((m) => m === "openai/gpt-4");
+          .filter((m) => m === "openai/gpt-4o-mini");
         expect(workflowModelCalls).toHaveLength(1);
       });
     });
