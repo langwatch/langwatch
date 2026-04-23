@@ -296,7 +296,6 @@ MODEL_ALIASES: Dict[str, str] = {
     "anthropic/claude-sonnet-4": "anthropic/claude-sonnet-4-20250514",
     "anthropic/claude-opus-4": "anthropic/claude-opus-4-20250514",
     "anthropic/claude-3.5-haiku": "anthropic/claude-3-5-haiku-20241022",
-    "anthropic/claude-3.5-sonnet": "anthropic/claude-3-5-sonnet-20240620"
 }
 
 # Providers that need dot-to-dash translation for their model IDs.
@@ -398,6 +397,40 @@ def normalize_reasoning_from_provider_fields(llm_config: LLMConfig) -> str | Non
     )
 
 
+def has_reasoning_enabled(llm_config: LLMConfig) -> bool:
+    """
+    Check if reasoning/thinking is enabled for this config.
+
+    When reasoning is enabled (via any of the reasoning fields), LiteLLM may
+    auto-enable extended thinking with budget_tokens. If budget_tokens >= max_tokens,
+    the Anthropic API returns an error. This function helps detect when we need
+    to enforce a minimum max_tokens.
+
+    Returns True if any reasoning field is set (reasoning, reasoning_effort,
+    effort, or thinkingLevel).
+    """
+    return bool(
+        llm_config.reasoning
+        or llm_config.reasoning_effort
+        or llm_config.effort
+        or llm_config.thinkingLevel
+    )
+
+
+def _get_reasoning_max_tokens(config_max_tokens: int | None) -> int:
+    """
+    Ensure max_tokens >= REASONING_MODEL_MIN_MAX_TOKENS for reasoning models.
+
+    Reasoning models (OpenAI o1/o3/gpt-5) and models with reasoning enabled
+    (effort, thinkingLevel) require higher max_tokens to accommodate thinking
+    budget tokens that LiteLLM may auto-set.
+    """
+    return max(
+        config_max_tokens or REASONING_MODEL_MIN_MAX_TOKENS,
+        REASONING_MODEL_MIN_MAX_TOKENS,
+    )
+
+
 def is_reasoning_model(model: str | None) -> bool:
     """
     Detects if a model is an OpenAI reasoning model (o1, o3, o4, o5, gpt-5).
@@ -418,9 +451,14 @@ def get_corrected_llm_params(llm_config: LLMConfig) -> dict[str, float | int]:
     """
     Returns corrected temperature and max_tokens for an LLMConfig.
 
-    For reasoning models (o1, o3, o4, o5, gpt-5):
+    For OpenAI reasoning models (o1, o3, o4, o5, gpt-5):
     - temperature: 1.0 (required by DSPy, which handles the API call internally)
     - max_tokens: at least 16000
+
+    For models with reasoning enabled (effort, reasoning, thinkingLevel):
+    - temperature: config value or default, clamped to provider constraints
+    - max_tokens: at least 16000 (LiteLLM may auto-enable extended thinking
+      with budget_tokens that can exceed lower max_tokens values)
 
     For non-reasoning models:
     - temperature: config value or default, clamped to provider constraints
@@ -429,13 +467,11 @@ def get_corrected_llm_params(llm_config: LLMConfig) -> dict[str, float | int]:
     Provider constraints (e.g., Anthropic temperature max 1.0) are applied
     as defense-in-depth validation.
     """
+    # OpenAI reasoning models require temperature=1.0 and min 16000 max_tokens
     if is_reasoning_model(llm_config.model):
         return {
             "temperature": 1.0,
-            "max_tokens": max(
-                llm_config.max_tokens or REASONING_MODEL_MIN_MAX_TOKENS,
-                REASONING_MODEL_MIN_MAX_TOKENS,
-            ),
+            "max_tokens": _get_reasoning_max_tokens(llm_config.max_tokens),
         }
 
     # Get temperature with default, then clamp to provider constraints
@@ -445,6 +481,15 @@ def get_corrected_llm_params(llm_config: LLMConfig) -> dict[str, float | int]:
     clamped_temperature = clamp_to_provider_constraints(
         raw_temperature, "temperature", llm_config.model
     )
+
+    # Models with reasoning enabled need min 16000 max_tokens
+    # LiteLLM may auto-enable extended thinking with budget_tokens that can
+    # exceed lower max_tokens values, causing Anthropic API errors
+    if has_reasoning_enabled(llm_config):
+        return {
+            "temperature": clamped_temperature,
+            "max_tokens": _get_reasoning_max_tokens(llm_config.max_tokens),
+        }
 
     return {
         # Use explicit None check to allow temperature=0 as a valid value
