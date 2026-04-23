@@ -15,7 +15,6 @@ These tests MUST fail before the fix lands and pass after. Verified by running t
 `make test <path>` in `langwatch_nlp/`.
 """
 
-import copy
 import json
 
 import pytest
@@ -27,10 +26,7 @@ from langwatch_nlp.studio.field_parser import (
     autoparse_fields,
 )
 from langwatch_nlp.studio.modules.registry import FIELD_TYPE_TO_DSPY_TYPE
-from langwatch_nlp.studio.parser import (
-    materialized_component_class,
-    parse_workflow,
-)
+from langwatch_nlp.studio.parser import parse_workflow
 from langwatch_nlp.studio.types.dataset import DatasetColumn, DatasetColumnType
 from langwatch_nlp.studio.types.dsl import (
     DatasetInline,
