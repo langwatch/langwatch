@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { transformElasticSearchSpanToSpan } from "../../../elasticsearch/transformers";
-import type { BaseSpan } from "../../../tracer/types";
+import type { BaseSpan, SpanInputOutput } from "../../../tracer/types";
 import {
   flattenSpanTree,
   getFirstInputAsText,
@@ -1591,12 +1591,15 @@ describe("getLastOutputAsText — multi-span fallback", () => {
         input: { type: "text" as const, value: "in2" },
         output: {
           type: "list" as const,
-          value: ["plain", 1] as any,
+          // Intentional malformed shape: `list.value` is typed as
+          // `SpanInputOutput[]`, but real-world traces occasionally ship
+          // bare primitives here. This test pins the fallback behavior.
+          value: ["plain", 1] as unknown as SpanInputOutput[],
         },
       },
     ];
 
-    const output = getLastOutputAsText(spans as any);
+    const output = getLastOutputAsText(spans as BaseSpan[]);
     expect(output).toBe("COMPANY_ANALYSIS");
   });
 });
