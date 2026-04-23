@@ -478,7 +478,7 @@ describe("SerializedHttpAgentAdapter", () => {
       it("renders else-branch when condition is falsy", async () => {
         const config: HttpAgentData = {
           ...defaultConfig,
-          url: "https://api.example.com{% if input.conversationId %}/chat/{{input.conversationId}}/message{% else %}/chat/start{% endif %}",
+          url: "https://api.example.com{% if conversationId %}/chat/{{conversationId}}/message{% else %}/chat/start{% endif %}",
         };
         const adapter = new SerializedHttpAgentAdapter(config);
 
