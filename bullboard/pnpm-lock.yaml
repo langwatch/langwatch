@@ -15,8 +15,8 @@ importers:
         specifier: ^6.20.2
         version: 6.20.3(hono@4.12.14)
       '@hono/node-server':
-        specifier: ^1.19.13
-        version: 1.19.13(hono@4.12.14)
+        specifier: ^2.0.0
+        version: 2.0.0(hono@4.12.14)
       bullmq:
         specifier: ^5.70.1
         version: 5.70.1
@@ -49,9 +49,9 @@ packages:
   '@bull-board/ui@6.20.3':
     resolution: {integrity: sha512-oANyYoW0X+xd0j/09DRyh3u7Q3wqBtXiLEWyZUJIi/Bjp/hINwiw20RwWuRcaFkqkFylEJL9l+pjmeSA9X5L2A==}
 
-  '@hono/node-server@1.19.13':
-    resolution: {integrity: sha512-TsQLe4i2gvoTtrHje625ngThGBySOgSK3Xo2XRYOdqGN1teR8+I7vchQC46uLJi8OF62YTYA3AhSpumtkhsaKQ==}
-    engines: {node: '>=18.14.1'}
+  '@hono/node-server@2.0.0':
+    resolution: {integrity: sha512-n3GfHwwCvHCkGmOwKfxUPOlbfzuO64Sbc5XC4NGPIXxkuOnJrdgExdRKmHfF924r914WRJPT397GdqLvdYTeyQ==}
+    engines: {node: '>=20'}
     peerDependencies:
       hono: ^4
 
@@ -236,7 +236,7 @@ snapshots:
     dependencies:
       '@bull-board/api': 6.20.3(@bull-board/ui@6.20.3)
 
-  '@hono/node-server@1.19.13(hono@4.12.14)':
+  '@hono/node-server@2.0.0(hono@4.12.14)':
     dependencies:
       hono: 4.12.14
 
