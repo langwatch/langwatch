@@ -147,7 +147,7 @@ LangWatch provides a comprehensive set of custom attributes for LLM-specific obs
 | `langwatch.gen_ai.streaming` | boolean | Whether the operation involves streaming | `true`, `false` |
 | `langwatch.input` | string/object | Input data for the span | `"Hello, how are you?"` |
 | `langwatch.output` | string/object | Output data from the span | `"I'm doing well, thank you!"` |
-| `langwatch.contexts` | array | RAG contexts for retrieval-augmented generation | Array of document contexts |
+| `langwatch.rag.contexts` | array | RAG contexts for retrieval-augmented generation | Array of document contexts |
 | `langwatch.labels` | array | Labels for categorizing spans | `["chat", "greeting"]` |
 | `langwatch.params` | object | Parameter data for operations | `{ temperature: 0.7 }` |
 | `langwatch.metrics` | object | Custom metrics data | `{ response_time: 1250 }` |
@@ -224,7 +224,7 @@ span.set_attribute(AttributeKey.LangWatchPromptHandle, "customer-support-greetin
 | `ATTR_LANGWATCH_INPUT` | `langwatch.input` |
 | `ATTR_LANGWATCH_OUTPUT` | `langwatch.output` |
 | `ATTR_LANGWATCH_SPAN_TYPE` | `langwatch.span.type` |
-| `ATTR_LANGWATCH_RAG_CONTEXTS` | `langwatch.contexts` |
+| `ATTR_LANGWATCH_RAG_CONTEXTS` | `langwatch.rag.contexts` |
 | `ATTR_LANGWATCH_METRICS` | `langwatch.metrics` |
 | `ATTR_LANGWATCH_SDK_VERSION` | `langwatch.sdk.version` |
 | `ATTR_LANGWATCH_SDK_NAME` | `langwatch.sdk.name` |

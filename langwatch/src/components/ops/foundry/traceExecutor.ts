@@ -126,7 +126,7 @@ function buildSpan(
   }
 
   if (config.rag?.contexts.length) {
-    span.setAttribute("langwatch.contexts", JSON.stringify(config.rag.contexts));
+    span.setAttribute("langwatch.rag.contexts", JSON.stringify(config.rag.contexts));
   }
 
   if (config.prompt) {
