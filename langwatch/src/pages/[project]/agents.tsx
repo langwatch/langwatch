@@ -10,6 +10,7 @@ import { Bot, Plus } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useState } from "react";
 import { AgentCard } from "~/components/agents/AgentCard";
+import { getAgentEditorDrawer } from "~/components/agents/getAgentEditorDrawer";
 import { CopyAgentDialog } from "~/components/agents/CopyAgentDialog";
 import { PushToCopiesDialog } from "~/components/agents/PushToCopiesDialog";
 import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
@@ -123,22 +124,9 @@ function Page() {
   });
 
   const handleEditAgent = (agent: TypedAgent) => {
-    // Open the appropriate editor based on agent type
-    switch (agent.type) {
-      case "code":
-        openDrawer("agentCodeEditor", { urlParams: { agentId: agent.id } });
-        break;
-      case "http":
-        openDrawer("agentHttpEditor", { urlParams: { agentId: agent.id } });
-        break;
-      case "workflow":
-        // Workflow agents can't be edited directly, just view
-        openDrawer("workflowSelector", { urlParams: { agentId: agent.id } });
-        break;
-      default: {
-        throw new Error(`Unhandled agent type: ${agent.type}`);
-      }
-    }
+    openDrawer(getAgentEditorDrawer(agent.type), {
+      urlParams: { agentId: agent.id },
+    });
   };
 
   const handleDeleteAgent = (agent: TypedAgent) => {

@@ -10,10 +10,13 @@
  * - Tests can inject mocks without vi.mock
  */
 
+import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
+import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
+import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 import {
@@ -461,7 +464,7 @@ async function fetchWorkflowAgentData(
 
   const { inputs, outputs } = extractWorkflowIO(latest.dsl);
 
-  return {
+  const data: WorkflowAgentData = {
     type: "workflow",
     agentId: agent.id,
     workflowId: latest.workflowId,
@@ -471,61 +474,51 @@ async function fetchWorkflowAgentData(
     scenarioMappings: config.scenarioMappings,
     scenarioOutputField: config.scenarioOutputField,
   };
+
+  validateWorkflowAgentMappings(data);
+
+  return data;
 }
 
 /**
  * Extract declared entry inputs and end outputs from an opaque workflow DSL.
  *
- * Mirrors `getInputsOutputs` in optimization_studio/utils/nodeUtils but is
- * defensive: the DSL is `Record<string, unknown>` so we narrow each access.
- * Workflows without an entry/end node return empty arrays; the adapter then
- * falls back to synthesizing a single `input`/`output` identifier.
+ * The DSL is stored as `Record<string, unknown>` (JSON column), so we narrow
+ * into the `Edge[]`/`Node[]` shape `getInputsOutputs` expects and then flatten
+ * its loose return value into typed `WorkflowField`s. Workflows without an
+ * entry/end node yield empty arrays; the adapter synthesises a single
+ * `input`/`output` identifier as a fallback.
  */
 function extractWorkflowIO(dsl: Record<string, unknown>): {
   inputs: WorkflowField[];
   outputs: WorkflowField[];
 } {
-  const nodes = Array.isArray(dsl.nodes) ? (dsl.nodes as unknown[]) : [];
-  const edges = Array.isArray(dsl.edges) ? (dsl.edges as unknown[]) : [];
+  const nodes = (Array.isArray(dsl.nodes) ? dsl.nodes : []) as Node[];
+  const edges = (Array.isArray(dsl.edges) ? dsl.edges : []) as Edge[];
 
-  // Inputs: unique outputs of entry-sourced edges, in first-seen order.
-  const seenSourceHandles = new Set<string>();
-  const inputs: WorkflowField[] = [];
-  for (const edge of edges) {
-    if (typeof edge !== "object" || edge === null) continue;
-    const e = edge as { source?: unknown; sourceHandle?: unknown };
-    if (e.source !== "entry") continue;
-    const handle = typeof e.sourceHandle === "string" ? e.sourceHandle : null;
-    if (!handle || seenSourceHandles.has(handle)) continue;
-    seenSourceHandles.add(handle);
-    const identifier = handle.split(".")[1];
-    if (!identifier) continue;
-    inputs.push({ identifier, type: "str" });
-  }
+  const { inputs: rawInputs, outputs: rawOutputs } = getInputsOutputs(
+    edges,
+    nodes,
+  );
 
-  // Outputs: inputs declared on the end node.
-  const endNode = nodes.find((n): n is Record<string, unknown> => {
-    if (typeof n !== "object" || n === null) return false;
-    const node = n as { id?: unknown; type?: unknown };
-    return node.id === "end" || node.type === "end";
-  });
-  const outputs: WorkflowField[] = [];
-  if (endNode) {
-    const data =
-      typeof endNode.data === "object" && endNode.data !== null
-        ? (endNode.data as Record<string, unknown>)
-        : {};
-    const rawInputs = Array.isArray(data.inputs) ? data.inputs : [];
-    for (const item of rawInputs) {
-      if (typeof item !== "object" || item === null) continue;
-      const field = item as { identifier?: unknown; type?: unknown };
-      if (typeof field.identifier !== "string") continue;
-      outputs.push({
-        identifier: field.identifier,
-        type: typeof field.type === "string" ? field.type : "str",
-      });
-    }
-  }
+  const inputs: WorkflowField[] = (rawInputs ?? []).flatMap((i) =>
+    typeof i.identifier === "string"
+      ? [{ identifier: i.identifier, type: "str" }]
+      : [],
+  );
+
+  const outputs: WorkflowField[] = (Array.isArray(rawOutputs) ? rawOutputs : [])
+    .flatMap((o: unknown): WorkflowField[] => {
+      if (typeof o !== "object" || o === null) return [];
+      const field = o as { identifier?: unknown; type?: unknown };
+      if (typeof field.identifier !== "string") return [];
+      return [
+        {
+          identifier: field.identifier,
+          type: typeof field.type === "string" ? field.type : "str",
+        },
+      ];
+    });
 
   return { inputs, outputs };
 }
