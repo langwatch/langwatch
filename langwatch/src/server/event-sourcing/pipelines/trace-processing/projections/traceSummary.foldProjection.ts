@@ -109,17 +109,21 @@ export function applySpanToSummary({
     span,
   });
 
-  // Trace name: use the root span's name. When multiple root spans exist,
-  // the one with the earliest start time wins (deterministic tie-breaking).
+  // Trace name: use the root span's name. Precedence:
+  // 1. Named roots win over empty-named roots (empty = "not set")
+  // 2. Among multiple named roots, earliest startTimeUnixMs wins
+  // After checkpoint reload, rootSpanStartTimeMs is undefined so first root wins.
   const isRootSpan = span.parentSpanId === null;
   const spanStartMs = span.startTimeUnixMs;
   let traceName = state.traceName;
   let rootSpanStartTimeMs = state.rootSpanStartTimeMs;
   if (isRootSpan) {
-    if (
-      traceName === "" ||
-      (rootSpanStartTimeMs !== undefined && spanStartMs < rootSpanStartTimeMs)
-    ) {
+    const hasNoName = traceName === "";
+    const isEarlierNamedRoot =
+      span.name !== "" &&
+      rootSpanStartTimeMs !== undefined &&
+      spanStartMs < rootSpanStartTimeMs;
+    if (hasNoName || isEarlierNamedRoot) {
       traceName = span.name;
       rootSpanStartTimeMs = spanStartMs;
     }

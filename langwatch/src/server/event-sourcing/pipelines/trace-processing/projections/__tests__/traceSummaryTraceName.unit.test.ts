@@ -147,5 +147,56 @@ describe("applySpanToSummary() trace name extraction", () => {
       state = applySpanToSummary({ state, span: laterRoot });
       expect(state.traceName).toBe("auto-instrumented-GET");
     });
+
+    it("lets a named later root upgrade an empty-named earlier root", () => {
+      const emptyNameRoot = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        name: "",
+        startTimeUnixMs: 1000,
+      });
+
+      const namedRoot = createTestSpan({
+        id: "root-2",
+        spanId: "root-2",
+        parentSpanId: null,
+        name: "OrderAgent",
+        startTimeUnixMs: 2000,
+      });
+
+      // Empty-name root arrives first
+      let state = applySpanToSummary({ state: createInitState(), span: emptyNameRoot });
+      expect(state.traceName).toBe("");
+
+      // Named root arrives later — should upgrade from empty
+      state = applySpanToSummary({ state, span: namedRoot });
+      expect(state.traceName).toBe("OrderAgent");
+    });
+
+    it("does not let a later empty-named root overwrite an earlier named root", () => {
+      const namedRoot = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        name: "OrderAgent",
+        startTimeUnixMs: 1000,
+      });
+
+      const emptyNameRoot = createTestSpan({
+        id: "root-2",
+        spanId: "root-2",
+        parentSpanId: null,
+        name: "",
+        startTimeUnixMs: 2000,
+      });
+
+      let state = applySpanToSummary({ state: createInitState(), span: namedRoot });
+      expect(state.traceName).toBe("OrderAgent");
+
+      // Later empty-named root should NOT overwrite
+      state = applySpanToSummary({ state, span: emptyNameRoot });
+      expect(state.traceName).toBe("OrderAgent");
+    });
   });
 });
