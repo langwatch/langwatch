@@ -31,6 +31,10 @@ jobs:
 
       - name: Commit and push
         run: |
+          if [ ! -d _skills-publish/.git ]; then
+            echo "::error::_skills-publish/.git missing — sync likely wiped the checkout. Refusing to commit into the wrong repo."
+            exit 1
+          fi
           cd _skills-publish
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
