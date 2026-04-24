@@ -1094,14 +1094,26 @@ function buildArrayJoinTimeseriesQuery(
   // @regression issue #3088
   const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
 
-  // Pipeline metrics that group by trace_id with "sum" aggregation are redundant
-  // in the arrayJoin path because the CTE already deduplicates by (trace_id,
-  // group_key). Re-translate them as simple metrics so they participate in the
-  // outer SELECT instead of being silently dropped.
+  // Pipeline metrics that group by trace_id are redundant in the arrayJoin
+  // path because the CTE already deduplicates by (trace_id, group_key): each
+  // trace contributes at most one row per group, so the inner `<agg> BY
+  // trace_id` step becomes identity for trace-level columns. Re-translate
+  // these as simple metrics so they participate in the outer SELECT instead
+  // of being silently dropped (which is what the `avgCostPerModel` and
+  // `avgTokensPerModel` dashboard widgets were hitting — they emit
+  // `pipeline: {field: trace_id, aggregation: avg}` and got blanked out).
   //
-  // Only safe for "sum" aggregation: sum(value_per_trace) is equivalent to the
-  // standard aggregation over deduped traces. Other pipeline aggregations
-  // (avg/min/max) have different semantics and cannot be rewritten this way.
+  // Safe for sum/avg/min/max: on a per-trace scalar `v`, the inner
+  // aggregation collapses to `v` for all four, so the outer aggregation
+  // equals the standard aggregation over deduped traces. Other inner
+  // aggregations (quantile, uniq, etc.) are intentionally left to fall
+  // through — they'd need separate reasoning.
+  const TRACE_ID_PIPELINE_SAFE_AGGS = new Set<string>([
+    "sum",
+    "avg",
+    "min",
+    "max",
+  ]);
   for (let i = 0; i < input.series.length; i++) {
     const series = input.series[i]!;
     const translation = metricTranslations[i]!;
@@ -1109,7 +1121,7 @@ function buildArrayJoinTimeseriesQuery(
 
     if (
       series.pipeline.field === "trace_id" &&
-      series.pipeline.aggregation === "sum"
+      TRACE_ID_PIPELINE_SAFE_AGGS.has(series.pipeline.aggregation)
     ) {
       const innerTranslation = translateMetric(
         series.metric,
@@ -1176,6 +1188,12 @@ function buildArrayJoinTimeseriesQuery(
   );
   cteSelectExprs.push(
     `${traceColumnWrapper(`${ts}.TotalCompletionTokenCount`)} AS trace_completion_tokens`,
+  );
+  cteSelectExprs.push(
+    `${traceColumnWrapper(`${ts}.TokensPerSecond`)} AS trace_tokens_per_second`,
+  );
+  cteSelectExprs.push(
+    `${traceColumnWrapper(`${ts}.TimeToFirstTokenMs`)} AS trace_time_to_first_token_ms`,
   );
 
   // When pre-aggregating eval metrics per-trace, emit each eval metric's full
@@ -2009,6 +2027,8 @@ const DEDUP_FIELD_MAPPINGS: Record<string, string> = {
   TotalDurationMs: "trace_duration_ms",
   TotalPromptTokenCount: "trace_prompt_tokens",
   TotalCompletionTokenCount: "trace_completion_tokens",
+  TokensPerSecond: "trace_tokens_per_second",
+  TimeToFirstTokenMs: "trace_time_to_first_token_ms",
 };
 
 /** Aggregation patterns and their transformation logic */
@@ -2551,4 +2571,5 @@ export const __testOnly__ = {
   extractTraceAggregationColumn,
   replaceColumnWithAlias,
   hasEvalMixedWithTraceMetrics,
+  __testOnly_DEDUP_FIELD_MAPPINGS: DEDUP_FIELD_MAPPINGS,
 };

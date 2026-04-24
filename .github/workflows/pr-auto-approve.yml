@@ -58,7 +58,7 @@ jobs:
 
       - name: Check for existing approvals on current head_sha
         id: short-circuit
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ steps.ctx.outputs.head_sha }}
@@ -107,7 +107,7 @@ jobs:
       # from a prior evaluator run, then APPROVE. Otherwise the PR thread
       # contradicts itself ("does not qualify" comment + bot approval).
       - name: Cleanup stale low-risk artifacts and submit bot APPROVE
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}
@@ -167,7 +167,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Dismiss bot firefighting approvals
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         with:
@@ -224,7 +224,7 @@ jobs:
 
       - name: Strip stale low-risk-change label on synchronize
         if: github.event.action == 'synchronize'
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
         with:
@@ -384,7 +384,7 @@ jobs:
       # exclusive — exactly one populates outputs, so the `||` chain picks
       # the populated one.
       - name: Apply outcome — label, comment, and bot review
-        uses: actions/github-script@f28e40c7f34bde8b3046d885e986cb6290c5673b # v7
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
         env:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ needs.preflight.outputs.head_sha }}

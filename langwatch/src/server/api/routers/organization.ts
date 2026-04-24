@@ -28,6 +28,7 @@ import {
 import {
   DuplicateInviteError,
   INVITE_ALREADY_ACCEPTED_MESSAGE,
+  INVITE_NOT_READY_MESSAGE,
   InviteNotFoundError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
@@ -41,7 +42,7 @@ import { LimitExceededError } from "../../license-enforcement/errors";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { skipPermissionCheck } from "../rbac";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
-import { signUpDataSchema } from "./onboarding";
+import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
@@ -1003,6 +1004,13 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
+      if (invite.status !== "PENDING") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: INVITE_NOT_READY_MESSAGE,
+        });
+      }
+
       // Case-insensitive email comparison: BetterAuth lowercases emails
       // during signup/signin (see `findUserByEmail` in
       // node_modules/better-auth/dist/db/internal-adapter.mjs) so
@@ -1229,29 +1237,34 @@ export const organizationRouter = createTRPCRouter({
       });
       const organizationTeamIds = organizationTeams.map((team) => team.id);
 
-      const currentMemberships = await prisma.teamUser.findMany({
+      const currentTeamBindings = await prisma.roleBinding.findMany({
         where: {
+          organizationId: input.organizationId,
           userId: input.userId,
-          teamId: { in: organizationTeamIds },
+          scopeType: RoleBindingScopeType.TEAM,
+          scopeId: { in: organizationTeamIds },
         },
-        select: { teamId: true, role: true, assignedRoleId: true },
+        select: { scopeId: true, role: true, customRoleId: true },
       });
 
+      const currentMemberships = currentTeamBindings.map((b) => ({
+        teamId: b.scopeId,
+        role: b.role,
+      }));
+
       const userPermissions = await (async () => {
-        const teamIds = organizationTeamIds;
-        if (teamIds.length === 0) return undefined;
-        const teamUsers = await prisma.teamUser.findMany({
-          where: {
-            userId: input.userId,
-            teamId: { in: teamIds },
-            assignedRoleId: { not: null },
-          },
-          include: { assignedRole: true },
+        const customRoleIds = currentTeamBindings
+          .map((b) => b.customRoleId)
+          .filter((id): id is string => !!id);
+        if (customRoleIds.length === 0) return undefined;
+        const customRoles = await prisma.customRole.findMany({
+          where: { id: { in: customRoleIds } },
+          select: { permissions: true },
         });
         const allPermissions: string[] = [];
-        for (const tu of teamUsers) {
-          if (tu.assignedRole?.permissions) {
-            allPermissions.push(...(tu.assignedRole.permissions as string[]));
+        for (const cr of customRoles) {
+          if (cr.permissions) {
+            allPermissions.push(...(cr.permissions as string[]));
           }
         }
         return allPermissions.length > 0 ? allPermissions : undefined;

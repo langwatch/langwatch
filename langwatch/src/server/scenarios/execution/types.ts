@@ -128,6 +128,12 @@ export const CodeAgentDataSchema = z.object({
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /** Which output field to use as the scenario result. When unset, uses the first output. */
   scenarioOutputField: z.string().optional(),
+  /**
+   * Project secrets exposed to the Python code as the `secrets.NAME` namespace.
+   * Pre-fetched so the worker-thread adapter runs without DB access. Mirrors
+   * the studio's addEnvs behavior for in-app workflow execution.
+   */
+  secrets: z.record(z.string(), z.string()).default({}),
 });
 export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
 
@@ -163,6 +169,12 @@ export const WorkflowAgentDataSchema = z.object({
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /** Which output field to use as the scenario result. When unset, uses the first output. */
   scenarioOutputField: z.string().optional(),
+  /**
+   * Project secrets merged into the workflow DSL before execution. Mirrors the
+   * studio's addEnvs behavior so `secrets.NAME` works inside code nodes of the
+   * published workflow.
+   */
+  secrets: z.record(z.string(), z.string()).default({}),
 });
 export type WorkflowAgentData = z.infer<typeof WorkflowAgentDataSchema>;
 

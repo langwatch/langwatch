@@ -103,9 +103,17 @@ export class SerializedWorkflowAgentAdapter extends AgentAdapter {
   private async executeOnNlpService(
     inputRecord: Record<string, string>,
   ): Promise<Record<string, unknown> | null> {
+    // Merge pre-fetched project secrets into the DSL so `secrets.NAME` works
+    // inside code nodes of the published workflow. Any secrets already embedded
+    // in the DSL (there shouldn't be any — they're stripped on save) are
+    // overwritten by the fresh values to avoid leaking stale/decrypted data.
+    const existingSecrets =
+      (this.config.workflow.secrets as Record<string, string> | undefined) ??
+      {};
     const workflow = {
       ...this.config.workflow,
       api_key: this.apiKey,
+      secrets: { ...existingSecrets, ...this.config.secrets },
     };
 
     const event = {

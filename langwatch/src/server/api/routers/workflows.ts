@@ -24,6 +24,10 @@ import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { fireWorkflowCreatedNurturing } from "~/../ee/billing/nurturing/hooks/featureAdoption";
 import { captureException } from "~/utils/posthogErrorCapture";
+import { autoComputeAgentMappings } from "../../workflows/auto-compute-agent-mappings";
+import { createLogger } from "../../../utils/logger/server";
+
+const autoComputeLogger = createLogger("langwatch:workflows:auto-compute");
 
 export const workflowRouter = createTRPCRouter({
   create: protectedProcedure
@@ -1331,6 +1335,21 @@ export const saveOrCommitWorkflowVersion = async ({
         ? updatedVersion.id
         : latestVersion?.id,
     },
+  });
+
+  // Fire-and-forget: auto-compute handles its own errors internally, but the
+  // outer .catch guards against synchronous throws (e.g. invalid args) that
+  // would otherwise surface as an unhandled promise rejection.
+  autoComputeAgentMappings({
+    prisma: ctx.prisma,
+    workflowId: input.workflowId,
+    projectId: input.projectId,
+    dsl: input.dsl,
+  }).catch((err) => {
+    autoComputeLogger.error(
+      { err, workflowId: input.workflowId, projectId: input.projectId },
+      "autoComputeAgentMappings dispatch failed",
+    );
   });
 
   return updatedVersion;

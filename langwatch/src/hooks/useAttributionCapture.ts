@@ -3,7 +3,7 @@ import {
   URL_PARAM_TO_FIELD,
   setAttributionIfAbsent,
   type AttributionField,
-} from "./attribution";
+} from "~/utils/attribution";
 
 /**
  * Strips query and fragment from a referrer URL so we never forward
@@ -30,7 +30,7 @@ function sanitizeReferrer(referrer: string): string | null {
  * unauthenticated public pages — before any navigation can drop the query
  * string.
  *
- * All storage access + schema lives in `./attribution`; this hook is the
+ * All storage access + schema lives in `~/utils/attribution`; this hook is the
  * React-side write trigger only.
  */
 export function useAttributionCapture(): void {

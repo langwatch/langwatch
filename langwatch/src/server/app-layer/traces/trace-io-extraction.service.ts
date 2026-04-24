@@ -193,10 +193,7 @@ export class TraceIOExtractionService {
     // Priority 2: LangWatch attribute
     const langwatchValue = attrs[keys.langwatch];
     if (langwatchValue !== undefined && langwatchValue !== null) {
-      const text =
-        typeof langwatchValue === "string"
-          ? langwatchValue
-          : messagesToText(langwatchValue, type);
+      const text = messagesToText(langwatchValue, type);
       if (text) {
         return { raw: langwatchValue, text, source: "langwatch" };
       }

@@ -125,6 +125,7 @@ export function MemberDetailDialog({
 
       await Promise.all([
         queryClient.roleBinding.listForUser.invalidate(),
+        queryClient.roleBinding.listForOrg.invalidate(),
         queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate(),
         queryClient.organization.getAll.invalidate(),
       ]);

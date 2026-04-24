@@ -810,7 +810,7 @@ describe("Feature: Dataset REST API", () => {
         ]);
       });
 
-      it("returns 400 Bad Request identifying the invalid column", async () => {
+      it("returns 400 Bad Request identifying the invalid column and listing the valid ones", async () => {
         const res = await helpers.api.post(
           "/api/dataset/my-dataset/records",
           { entries: [{ input: "hi", foo: "bar" }] },
@@ -819,6 +819,8 @@ describe("Feature: Dataset REST API", () => {
         expect(res.status).toBe(400);
         const body = await res.json();
         expect(body.message).toContain("foo");
+        expect(body.message).toContain("input");
+        expect(body.message).toContain("output");
       });
     });
 

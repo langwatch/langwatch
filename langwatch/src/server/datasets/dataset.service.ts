@@ -623,7 +623,11 @@ export class DatasetService {
     for (const entry of params.entries) {
       for (const key of Object.keys(entry)) {
         if (!validColumnNames.has(key)) {
-          throw new InvalidColumnError(key, dataset.name);
+          throw new InvalidColumnError({
+            columnName: key,
+            datasetName: dataset.name,
+            validColumns: [...validColumnNames],
+          });
         }
       }
     }

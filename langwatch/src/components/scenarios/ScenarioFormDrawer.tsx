@@ -15,7 +15,9 @@ import { useScenarioTarget } from "../../hooks/useScenarioTarget";
 import { api } from "../../utils/api";
 import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import type { TypedAgent } from "../../server/agents/agent.repository";
+import type { CustomComponentConfig } from "../../optimization_studio/types/dsl";
 import { PromptEditorDrawer } from "../prompts/PromptEditorDrawer";
+import { hasScenarioInputMapping } from "../suites/ScenarioInputMappingSection";
 import { TagList } from "../ui/TagList";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
@@ -233,6 +235,39 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
         return;
       }
+
+      // Gate: workflow agents require valid scenario mappings before running.
+      if (target.type === "workflow") {
+        try {
+          const agent = await utils.agents.getById.fetch({
+            id: target.id,
+            projectId: project.id,
+          });
+          if (agent) {
+            const config = agent.config as CustomComponentConfig;
+            const mappings = config.scenarioMappings ?? {};
+            // We don't have workflow outputs here — server-side pre-run check
+            // covers output validation. Share the input half of the rule with
+            // the editor drawer via hasScenarioInputMapping.
+            if (!hasScenarioInputMapping(mappings)) {
+              toaster.create({
+                title: "Configure scenario mappings",
+                description:
+                  "Set up how this workflow agent maps scenario inputs and outputs before running.",
+                type: "warning",
+                meta: { closable: true },
+              });
+              openDrawer("agentWorkflowEditor", {
+                urlParams: { agentId: target.id },
+              });
+              return;
+            }
+          }
+        } catch {
+          // If agent fetch fails, allow the run to proceed — server will validate.
+        }
+      }
+
       try {
         await form.handleSubmit(async (data) => {
           const savedScenario = await handleSave(data);
@@ -261,7 +296,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         });
       }
     },
-    [handleSave, project?.id, project?.slug, persistTarget, runScenario, formInstance, onClose, router],
+    [handleSave, project?.id, project?.slug, persistTarget, runScenario, formInstance, onClose, router, utils, openDrawer],
   );
   const handleSaveWithoutRunning = useCallback(async () => {
     const form = formInstance;

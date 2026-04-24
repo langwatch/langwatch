@@ -114,6 +114,21 @@ function buildAgentOutputSource(outputs: Variable[]): AvailableSource {
 }
 
 /**
+ * Checks whether at least one source mapping wires to a required scenario
+ * input field (`input` or `messages`). Shared between the full mapping check
+ * and the Save & Run drawer gate — keeps both sides in agreement on what
+ * "mapped enough to run" means for the input half.
+ */
+export function hasScenarioInputMapping(
+  mappings: Record<string, FieldMapping>,
+): boolean {
+  const mappedPaths = Object.values(mappings)
+    .filter((m) => m.type === "source")
+    .map((m) => m.path[0]);
+  return mappedPaths.includes("input") || mappedPaths.includes("messages");
+}
+
+/**
  * Checks whether the scenario mappings are valid.
  * - At least one of input or messages must be mapped.
  * - An output must be selected (not cleared).
@@ -127,16 +142,10 @@ export function isScenarioMappingValid({
   outputs?: Variable[];
   outputField?: string;
 }): boolean {
-  const mappedPaths = Object.values(mappings)
-    .filter((m) => m.type === "source")
-    .map((m) => m.path[0]);
-  const hasRequiredInput =
-    mappedPaths.includes("input") ||
-    mappedPaths.includes("messages");
   const hasOutputs = (outputs ?? []).length > 0;
   // outputField === "" means explicitly cleared; undefined means auto-populate
   const hasOutputMapping = hasOutputs && outputField !== "";
-  return hasRequiredInput && hasOutputMapping;
+  return hasScenarioInputMapping(mappings) && hasOutputMapping;
 }
 
 export function ScenarioInputMappingSection({

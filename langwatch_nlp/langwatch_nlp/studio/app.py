@@ -264,6 +264,8 @@ async def execute_sync(event: StudioClientEvent):
                 raise HTTPException(
                     status_code=500, detail=response.payload.execution_state.error
                 )
+        elif isinstance(response, Error):
+            raise HTTPException(status_code=500, detail=response.payload.message)
 
     # If the loop completes without finding success or error
     raise HTTPException(

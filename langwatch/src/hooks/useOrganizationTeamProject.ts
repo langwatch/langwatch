@@ -259,8 +259,8 @@ export const useOrganizationTeamProject = (
       typeof router.query.project == "string" &&
       finalProject.slug !== router.query.project
     ) {
-      // Preserve the section sub-path (and query string) so a URL like
-      // /[project]/evaluations lands on /<realSlug>/evaluations, not on
+      // Preserve the section sub-path (plus query string and hash) so a URL
+      // like /[project]/evaluations lands on /<realSlug>/evaluations, not on
       // /<realSlug> (project home). See buildProjectRedirectPath for details.
       void router.push(
         buildProjectRedirectPath({

@@ -14,7 +14,9 @@ import {
 import { OrganizationUserRole } from "@prisma/client";
 import type { Organization, Project, Team } from "@prisma/client";
 import { Activity, ChevronDown, ChevronRight, Info, KeyRound, Plus } from "lucide-react";
-import ErrorPage from "~/utils/compat/next-error";
+import { ErrorBoundary } from "react-error-boundary";
+import { PageErrorFallback } from "./ui/PageErrorFallback";
+import { NotFoundScene } from "~/components/NotFoundScene";
 import Head from "~/utils/compat/next-head";
 import { useRouter } from "~/utils/compat/next-router";
 import { signOut } from "~/utils/auth-client";
@@ -326,7 +328,7 @@ export const DashboardLayout = ({
   });
 
   if (typeof router.query.project === "string" && !isLoading && !project) {
-    return <ErrorPage statusCode={404} />;
+    return <NotFoundScene />;
   }
 
   const isOpsRoute = router.pathname.startsWith("/ops");
@@ -763,16 +765,18 @@ export const DashboardLayout = ({
             <CurrentDrawer />
 
             {userIsPartOfTeam ? (
-              showSavedViews ? (
-                <SavedViewsProvider>
-                  {children}
-                  {/* Spacer to prevent fixed bottom bar from covering content */}
-                  <Box height="64px" flexShrink={0} />
-                  <SavedViewsBar />
-                </SavedViewsProvider>
-              ) : (
-                children
-              )
+              <ErrorBoundary FallbackComponent={PageErrorFallback} resetKeys={[router.pathname]}>
+                {showSavedViews ? (
+                  <SavedViewsProvider>
+                    {children}
+                    {/* Spacer to prevent fixed bottom bar from covering content */}
+                    <Box height="64px" flexShrink={0} />
+                    <SavedViewsBar />
+                  </SavedViewsProvider>
+                ) : (
+                  children
+                )}
+              </ErrorBoundary>
             ) : (
               <Alert.Root
                 status="warning"
