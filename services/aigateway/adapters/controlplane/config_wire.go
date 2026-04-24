@@ -17,9 +17,14 @@ type configWire struct {
 }
 
 type providerSlotWire struct {
-	ID          string                 `json:"id"`
-	Type        string                 `json:"type"`
-	Credentials map[string]interface{} `json:"credentials"`
+	ID            string                 `json:"id"`
+	Type          string                 `json:"type"`
+	Credentials   map[string]interface{} `json:"credentials"`
+	// DeploymentMap maps public model ids to provider-native deployment
+	// names (Azure routes on deployment, Bedrock on inference profile,
+	// etc.). Emitted by the control-plane materialiser as a top-level
+	// sibling of credentials — see config.materialiser.ts:buildProviderSlot.
+	DeploymentMap map[string]string `json:"deployment_map,omitempty"`
 }
 
 type fallbackWire struct {
@@ -213,15 +218,11 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 	}
 
 	// deployment_map is a top-level sibling of credentials on the wire
-	// (materialiser emits it when the ModelProvider has a non-empty
-	// deploymentMapping). Extract once; providers that don't care ignore it.
-	if m, ok := p.Credentials["deployment_map"].(map[string]any); ok {
-		cred.DeploymentMap = make(map[string]string, len(m))
-		for k, v := range m {
-			if s, ok := v.(string); ok {
-				cred.DeploymentMap[k] = s
-			}
-		}
+	// (materialiser emits it at ProviderSlot.deployment_map when the
+	// ModelProvider has a non-empty deploymentMapping). Providers that
+	// don't use deployment routing get nil here and ignore it.
+	if len(p.DeploymentMap) > 0 {
+		cred.DeploymentMap = p.DeploymentMap
 	}
 
 	switch cred.ProviderID {
