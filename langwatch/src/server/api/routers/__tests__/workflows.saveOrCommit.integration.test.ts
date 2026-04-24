@@ -32,6 +32,7 @@ describe("saveOrCommitWorkflowVersion", () => {
         id: teamId,
         slug: `test-team-${nanoid(6)}`,
         name: "Test Team",
+        // organizationId has no FK constraint (Prisma relationMode = "prisma")
         organizationId: `test_org_${nanoid(8)}`,
         members: { create: { userId, role: "ADMIN" } },
       },
@@ -116,7 +117,8 @@ describe("saveOrCommitWorkflowVersion", () => {
       expect(instructions?.value).toContain("strict boolean evaluator");
       expect(instructions?.value).not.toContain("helpful assistant");
 
-      // Messages must reference the evaluation inputs
+      // mergeLocalConfigsIntoDsl splits the system message into instructions
+      // and keeps only non-system messages in the messages parameter
       expect(messages?.value).toEqual([
         { role: "user", content: "{{input}}" },
       ]);

@@ -1288,6 +1288,10 @@ export const saveOrCommitWorkflowVersion = async ({
   const [versionMajor] = (latestVersion?.version ?? "0.0").split(".");
   const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
 
+  // Cast required: input.dsl.nodes is z.array(z.any()) from the Zod schema,
+  // while mergeLocalConfigsIntoDsl expects Node<Component>[]. The Zod schema
+  // uses z.any() for nodes because the DSL node types are too polymorphic
+  // for a single Zod discriminated union.
   const dslWithMergedConfigs = {
     ...input.dsl,
     nodes: mergeLocalConfigsIntoDsl(input.dsl.nodes as any) as any,
