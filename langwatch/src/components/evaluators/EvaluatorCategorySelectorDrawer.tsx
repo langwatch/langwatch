@@ -138,7 +138,10 @@ export function EvaluatorCategorySelectorDrawer(
   const onSelectWorkflow =
     props.onSelectWorkflow ??
     (() => openDrawer("workflowSelectorForEvaluator"));
-  const isOpen = props.open === true;
+  // `open` arrives from CurrentDrawer as the drawer-name string (e.g.
+  // "evaluatorCategorySelector"), not a boolean. Treat any non-false,
+  // non-undefined value as open.
+  const isOpen = props.open !== false && props.open !== undefined;
 
   const [view, setView] = useState<View>({ step: "category" });
 
