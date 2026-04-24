@@ -39,10 +39,12 @@ make service svc=aigateway       # run once
 make service-watch svc=aigateway # live reload via air
 ```
 
-Requires `langwatch/.env` with `SVC_AIGATEWAY_LW_GATEWAY_INTERNAL_SECRET`,
-`SVC_AIGATEWAY_LW_GATEWAY_JWT_SECRET`, and `SVC_AIGATEWAY_LW_GATEWAY_BASE_URL`
-set — see the "AI GATEWAY" block at the bottom of `langwatch/.env.example`.
-Generate secrets with `openssl rand -hex 32`. Set
+Requires `langwatch/.env` with `LW_GATEWAY_INTERNAL_SECRET`,
+`LW_GATEWAY_JWT_SECRET`, and `LW_GATEWAY_BASE_URL` set — see the
+"AI GATEWAY" block at the bottom of `langwatch/.env.example`. Generate
+secrets with `openssl rand -hex 32`. The Go gateway and the TS
+control-plane both source the same `.env`, so each secret lives in
+exactly one place (no prefix duplication). Set
 `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_gateway_menu_enabled` to unhide the UI.
 
 ## Commands

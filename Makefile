@@ -17,15 +17,16 @@ setup-hooks:
 # Run a Go service via the mono-binary.
 # Usage: make service svc=aigateway
 #
-# Only env vars prefixed SVC_<SVC>_* are forwarded (prefix stripped).
-# e.g. SVC_AIGATEWAY_LW_GATEWAY_INTERNAL_SECRET → LW_GATEWAY_INTERNAL_SECRET
+# Sources every var from langwatch/.env into the Go process's environment.
+# The gateway + control-plane intentionally share secrets (LW_GATEWAY_*,
+# LW_VIRTUAL_KEY_PEPPER etc.) — one flat .env is simpler than namespace
+# prefixes. Vars the Go service doesn't need are ignored.
 DEV_ENV_FILE ?= langwatch/.env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed langwatch/.env first" && exit 1)
-	@SVC_PREFIX="SVC_$$(echo $(svc) | tr '[:lower:]' '[:upper:]')_"; \
-		eval $$(grep "^$${SVC_PREFIX}" $(DEV_ENV_FILE) | sed "s/^$${SVC_PREFIX}/export /"); \
-		export LOG_FORMAT=pretty; \
+	@set -a && . $(DEV_ENV_FILE) && set +a && \
+		export LOG_FORMAT=pretty && \
 		exec go run ./cmd/service $(svc)
 
 # Run a Go service with live reload on file changes.
@@ -34,9 +35,8 @@ service-watch:
 	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
 	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed langwatch/.env first" && exit 1)
 	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
-	@SVC_PREFIX="SVC_$$(echo $(svc) | tr '[:lower:]' '[:upper:]')_"; \
-		eval $$(grep "^$${SVC_PREFIX}" $(DEV_ENV_FILE) | sed "s/^$${SVC_PREFIX}/export /"); \
-		export LOG_FORMAT=pretty; \
+	@set -a && . $(DEV_ENV_FILE) && set +a && \
+		export LOG_FORMAT=pretty && \
 		air --build.cmd "go build -o ./tmp/$(svc) ./cmd/service" \
 			--build.bin "./tmp/$(svc) $(svc)" \
 			--build.include_ext "go" \
