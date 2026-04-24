@@ -47,5 +47,16 @@ func TestBedrock_StructuredOutputs(t *testing.T) {
 }
 
 func TestBedrock_Cache(t *testing.T) {
-	runCacheCell(t, bedrockCell(t, "cache", chatBody_Cache_Prime, false))
+	// Bedrock Anthropic cache goes through /v1/messages for the same reason
+	// direct Anthropic does — raw-forward preserves cache_control + native
+	// cache_*_input_tokens. Sonnet 4.5 has cache GA; Haiku 4.5 cache is
+	// beta. Override via BEDROCK_CACHE_MODEL.
+	cell := bedrockCell(t, "cache", anthropicNativeCache_Prime, false)
+	cell.endpoint = "/v1/messages"
+	if override := os.Getenv("BEDROCK_CACHE_MODEL"); override != "" {
+		cell.model = override
+	} else {
+		cell.model = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
+	}
+	runCacheCellWith(t, cell, anthropicNativeCache_Prime, anthropicNativeCache_Read)
 }

@@ -52,6 +52,12 @@ type resolvedCell struct {
 	vk        string // "lw_vk_live_..."
 	model     string // e.g. "gpt-5-mini"
 	streaming bool
+	// endpoint is the gateway path to hit. Defaults to /v1/chat/completions
+	// when empty. Anthropic/Bedrock cache cells use /v1/messages so
+	// cache_control markers + cache_*_input_tokens round-trip intact via
+	// raw-forward (chat-completions translates the response shape and
+	// drops Anthropic's cache usage fields).
+	endpoint string
 }
 
 // gatewayURL resolves the gateway base URL from env, defaulting to localhost.
@@ -182,6 +188,35 @@ var cacheablePrefix = strings.Repeat(
 		"engineers, not executives. Avoid marketing language entirely. ",
 	48,
 )
+
+// anthropicNativeCache_Prime + _Read produce /v1/messages wire-shape bodies
+// (top-level `system` array + `max_tokens`) for the anthropic/bedrock cache
+// cells. Going through /v1/chat/completions toward an Anthropic-family
+// provider strips the cache_*_input_tokens fields from the response when
+// the gateway translates to OpenAI-shape; the native endpoint raw-forwards
+// the cache_control marker AND returns the provider's native usage intact.
+func anthropicNativeCache_Prime(model string) []byte {
+	return anthropicNativeCacheBody(model, "What's the first thing you check when a gateway pod's /readyz starts flapping?")
+}
+
+func anthropicNativeCache_Read(model string) []byte {
+	return anthropicNativeCacheBody(model, "Follow-up: same situation but the gateway is at 90% memory. What changes?")
+}
+
+func anthropicNativeCacheBody(model, userTurn string) []byte {
+	return mustJSON(map[string]any{
+		"model":      model,
+		"max_tokens": 16,
+		"system": []map[string]any{{
+			"type":          "text",
+			"text":          cacheablePrefix,
+			"cache_control": map[string]any{"type": "ephemeral"},
+		}},
+		"messages": []map[string]any{
+			{"role": "user", "content": userTurn + " Reply with exactly one word: ok."},
+		},
+	})
+}
 
 // chatBody_Cache_Prime builds a request designed to create a cache entry.
 // For Anthropic-family providers (anthropic / bedrock), the system block
@@ -406,12 +441,19 @@ func extractTraceID(h http.Header) string {
 // caller can handle prime/read retry logic (e.g. cache propagation delay).
 func fireForBody(t *testing.T, rc resolvedCell, body []byte) (int, []byte, string) {
 	t.Helper()
-	req, err := http.NewRequest("POST", gatewayURL()+"/v1/chat/completions", bytes.NewReader(body))
+	endpoint := rc.endpoint
+	if endpoint == "" {
+		endpoint = "/v1/chat/completions"
+	}
+	req, err := http.NewRequest("POST", gatewayURL()+endpoint, bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("build request: %v", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+rc.vk)
 	req.Header.Set("Content-Type", "application/json")
+	if endpoint == "/v1/messages" {
+		req.Header.Set("anthropic-version", "2023-06-01")
+	}
 	client := &http.Client{Timeout: 120 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -427,12 +469,17 @@ func fireForBody(t *testing.T, rc resolvedCell, body []byte) (int, []byte, strin
 // cache_read_input_tokens > 0 AND that both traces land with cost > 0.
 // Returns the captured cost on the read trace.
 func runCacheCell(t *testing.T, rc resolvedCell) float64 {
+	return runCacheCellWith(t, rc, chatBody_Cache_Prime, chatBody_Cache_Read)
+}
+
+// runCacheCellWith is the prime+read driver parameterised on body-builders so
+// callers can use provider-native bodies (e.g. Anthropic /v1/messages shape)
+// instead of the OpenAI-compat chat-completions default.
+func runCacheCellWith(t *testing.T, rc resolvedCell, primeFn, readFn func(string) []byte) float64 {
 	t.Helper()
 	start := time.Now()
 
-	// 1. Prime — may or may not populate cache_creation tokens depending on
-	// provider (anthropic explicit, openai automatic-on-second-identical).
-	status, primeBody, primeTraceID := fireForBody(t, rc, chatBody_Cache_Prime(rc.model))
+	status, primeBody, primeTraceID := fireForBody(t, rc, primeFn(rc.model))
 	if status != 200 {
 		t.Fatalf("prime: want 200, got %d\nbody: %s", status, primeBody)
 	}
@@ -448,7 +495,7 @@ func runCacheCell(t *testing.T, rc resolvedCell) float64 {
 	time.Sleep(8 * time.Second)
 
 	// 2. Read — identical prefix should trip the cache-hit path.
-	status, readBody, readTraceID := fireForBody(t, rc, chatBody_Cache_Read(rc.model))
+	status, readBody, readTraceID := fireForBody(t, rc, readFn(rc.model))
 	if status != 200 {
 		t.Fatalf("read: want 200, got %d\nbody: %s", status, readBody)
 	}
