@@ -355,7 +355,7 @@ export type CellPosition = {
   columnId: string;
 };
 
-export type RowHeightMode = "compact" | "expanded";
+export type RowHeightMode = "compact" | "fit";
 
 export type AutosaveState = "idle" | "saving" | "saved" | "error";
 

@@ -53,8 +53,8 @@ const rowHeightOptions: ToggleOption[] = [
     icon: <ListChevronsDownUp size={18} />,
   },
   {
-    value: "expanded",
-    label: "Expanded",
+    value: "fit",
+    label: "Fit",
     icon: <ListChevronsUpDown size={18} />,
   },
 ];
@@ -250,7 +250,7 @@ export function TableSettingsMenu({
                 {rowHeightOptions.map((option) => {
                   const isActive = rowHeightMode === option.value;
                   const isDisabled =
-                    option.value === "expanded" && isExpandedDisabled;
+                    option.value === "fit" && isExpandedDisabled;
 
                   const button = (
                     <Button
