@@ -323,6 +323,18 @@ export function VirtualKeyCreateDrawer({
         </Drawer.Body>
         <Drawer.Footer>
           <HStack width="full">
+            {(() => {
+              const missing: string[] = [];
+              if (!name) missing.push("name");
+              if (selectedProviderIds.length === 0)
+                missing.push("at least one provider");
+              if (missing.length === 0) return null;
+              return (
+                <Text fontSize="xs" color="fg.muted">
+                  Missing: {missing.join(", ")}
+                </Text>
+              );
+            })()}
             <Spacer />
             <Button
               variant="ghost"
