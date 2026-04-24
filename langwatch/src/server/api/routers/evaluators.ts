@@ -136,9 +136,9 @@ export const evaluatorsRouter = createTRPCRouter({
         id: input.id,
         projectId: input.projectId,
         data: {
-          ...(input.name && { name: input.name }),
-          ...(input.type && { type: input.type }),
-          ...(input.config && {
+          ...(input.name !== undefined && { name: input.name }),
+          ...(input.type !== undefined && { type: input.type }),
+          ...(input.config !== undefined && {
             config: input.config as Prisma.InputJsonValue,
           }),
           ...(input.workflowId !== undefined && {
