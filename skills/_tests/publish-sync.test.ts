@@ -39,6 +39,9 @@ describe("sync publishes self-contained skills", () => {
 
   beforeAll(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "skills-sync-"));
+    // sync() refuses to wipe a target without a .git dir — simulate a real
+    // checkout of langwatch/skills with an empty marker.
+    fs.mkdirSync(path.join(tmpDir, ".git"));
     sync(tmpDir);
   });
 
@@ -66,7 +69,7 @@ describe("sync publishes self-contained skills", () => {
     expect(offenders, `local links must be inlined, not published as-is:\n  ${offenders.join("\n  ")}`).toEqual([]);
   });
 
-  it("contains no leftover MDX syntax", () => {
+  it("contains no leftover MDX syntax or unresolved partial markers", () => {
     for (const file of listMarkdown(tmpDir)) {
       // Strip fenced code blocks so we don't trip on Python/TS imports in examples.
       const content = stripCode(fs.readFileSync(file, "utf8"));
@@ -75,6 +78,23 @@ describe("sync publishes self-contained skills", () => {
       // Block-level JSX self-closing element like `<Component />` on its own line.
       expect(content, `${path.relative(tmpDir, file)} still contains an unrendered JSX component`)
         .not.toMatch(/^<[A-Z]\w*\s*\/>\s*$/m);
+      // The original publish bug: an unresolved `_shared/...` reference or a
+      // `[Reference: ...]` placeholder making it into the published output.
+      expect(content, `${path.relative(tmpDir, file)} still contains a _shared reference`)
+        .not.toContain("_shared/");
+      expect(content, `${path.relative(tmpDir, file)} still contains an unresolved [Reference:] stub`)
+        .not.toMatch(/\[Reference:\s*[^\]]+\]/);
+    }
+  });
+
+  it("refuses to sync into a target without a .git directory", () => {
+    const noGitDir = fs.mkdtempSync(path.join(os.tmpdir(), "skills-sync-nogit-"));
+    try {
+      expect(() => sync(noGitDir)).toThrow(/no \.git directory/);
+      // Confirm no destructive wipe happened: dir is still empty.
+      expect(fs.readdirSync(noGitDir)).toEqual([]);
+    } finally {
+      fs.rmSync(noGitDir, { recursive: true, force: true });
     }
   });
 

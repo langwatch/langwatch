@@ -41,6 +41,15 @@ export function sync(targetDir: string): void {
   if (!fs.existsSync(targetDir)) {
     throw new Error(`Target dir does not exist: ${targetDir}`);
   }
+  if (!fs.existsSync(path.join(targetDir, ".git"))) {
+    // Fail fast before the destructive wipe — a missing .git means the target
+    // is not a checkout of langwatch/skills (silent CI checkout failure, wrong
+    // path, typo). The workflow has its own guard but it runs after sync.
+    throw new Error(
+      `Refusing to sync into ${targetDir}: no .git directory. ` +
+        `Target must be a checkout of langwatch/skills.`
+    );
+  }
   console.log(`Syncing skills to ${targetDir}...`);
   cleanTarget(targetDir);
 

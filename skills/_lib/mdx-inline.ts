@@ -104,15 +104,18 @@ function inlineTree(filePath: string, opts: InlineOptions, stack: string[]): Roo
           `<${node.name} /> in ${filePath} has no matching import`
         );
       }
-      const key = target;
-      if (opts.seenShared?.has(key)) {
+      // Dedup only applies to repo-wide `_shared/` partials. Other imports
+      // (skill-local helpers, future per-skill components) must always inline
+      // in full so we don't drop real content from a composed skill.
+      const isSharedPartial = target.includes(`${path.sep}_shared${path.sep}`);
+      if (isSharedPartial && opts.seenShared?.has(target)) {
         out.push({
           type: "paragraph",
           children: [{ type: "text", value: `(see "${node.name}" above)` }],
         });
         continue;
       }
-      opts.seenShared?.add(key);
+      if (isSharedPartial) opts.seenShared?.add(target);
       const inlined = inlineTree(
         target,
         { ...opts, stripFrontmatter: true },
@@ -138,6 +141,8 @@ export function inlineMdx(sourceFile: string, opts: InlineOptions = {}): string 
   const out = stringifier.stringify(tree) as string;
   // remark-stringify escapes intra-word underscores (e.g. `LANGWATCH_API_KEY`
   // becomes `LANGWATCH\_API\_KEY`) to be safe against emphasis ambiguity, but
-  // CommonMark already treats them as plain text. Restore them.
-  return out.replace(/\\_/g, "_");
+  // CommonMark already treats them as plain text. Only restore where the
+  // underscore is flanked by alphanumerics — leave intentional escapes like
+  // `\_private` (where the leading char isn't alphanumeric) alone.
+  return out.replace(/([A-Za-z0-9])\\_(?=[A-Za-z0-9])/g, "$1_");
 }
