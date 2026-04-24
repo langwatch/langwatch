@@ -23,6 +23,7 @@ import { TRPCError } from "@trpc/server";
 
 import { GatewayAuditLogRepository } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
+import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { nextResetAt, shouldResetBudget } from "./budgetWindow";
 import { ChangeEventRepository } from "./changeEvent.repository";
 
@@ -147,10 +148,19 @@ export class GatewayBudgetService {
     private readonly prisma: PrismaClient,
     private readonly changeEvents = new ChangeEventRepository(prisma),
     private readonly auditLog = new GatewayAuditLogRepository(prisma),
+    private readonly chRepo?: GatewayBudgetClickHouseRepository,
   ) {}
 
-  static create(prisma: PrismaClient): GatewayBudgetService {
-    return new GatewayBudgetService(prisma);
+  static create(
+    prisma: PrismaClient,
+    chRepo?: GatewayBudgetClickHouseRepository,
+  ): GatewayBudgetService {
+    return new GatewayBudgetService(
+      prisma,
+      new ChangeEventRepository(prisma),
+      new GatewayAuditLogRepository(prisma),
+      chRepo,
+    );
   }
 
   async list(organizationId: string): Promise<GatewayBudget[]> {
@@ -451,6 +461,20 @@ export class GatewayBudgetService {
       },
     });
 
+    // Prefer ClickHouse spend (trace-fold ledger) when the repo is wired,
+    // fall back to the PG `spentUsd` column for deploys without CH. The
+    // CH rollup is keyed by (budget, current period) so it self-resets at
+    // period boundaries — no `shouldResetBudget` branch needed on that
+    // path. The PG path still needs it because the column accumulates
+    // across periods until a writer resets it.
+    const chSpendByBudgetId = this.chRepo
+      ? new Map(
+          (await this.chRepo.getSpendForBudgets(input.projectId, applicable)).map(
+            (s) => [s.budgetId, s.spentUsd],
+          ),
+        )
+      : null;
+
     const now = new Date();
     const warnings: BudgetCheckResult["warnings"] = [];
     const blockedBy: BudgetCheckResult["blockedBy"] = [];
@@ -458,13 +482,11 @@ export class GatewayBudgetService {
     let blockReason: string | null = null;
 
     for (const budget of applicable) {
-      const effectiveSpent = shouldResetBudget(
-        budget.window,
-        budget.resetsAt,
-        now,
-      )
-        ? new Prisma.Decimal(0)
-        : budget.spentUsd;
+      const effectiveSpent = chSpendByBudgetId
+        ? new Prisma.Decimal(chSpendByBudgetId.get(budget.id) ?? "0")
+        : shouldResetBudget(budget.window, budget.resetsAt, now)
+          ? new Prisma.Decimal(0)
+          : budget.spentUsd;
 
       scopes.push({
         scope: budget.scopeType.toLowerCase(),

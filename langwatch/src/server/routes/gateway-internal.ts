@@ -23,11 +23,16 @@ import { Prisma as PrismaNs } from "@prisma/client";
 import { createLogger } from "~/utils/logger/server";
 
 import { prisma } from "~/server/db";
+import {
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
 import { getMatchingLLMModelCost } from "~/server/background/workers/collector/cost";
 import {
   GatewayBudgetRepository,
   type DebitLineItem,
 } from "~/server/gateway/budget.repository";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
 import { GatewayConfigMaterialiser } from "~/server/gateway/config.materialiser";
@@ -495,7 +500,20 @@ app.post("/budget/check", async (c) => {
     );
   }
 
-  const service = GatewayBudgetService.create(prisma);
+  const service = GatewayBudgetService.create(
+    prisma,
+    isClickHouseEnabled()
+      ? new GatewayBudgetClickHouseRepository(async (projectId) => {
+          const client = await getClickHouseClientForProject(projectId);
+          if (!client) {
+            throw new Error(
+              `ClickHouse enabled but no client for project ${projectId}`,
+            );
+          }
+          return client;
+        })
+      : undefined,
+  );
   const result = await service.check({
     organizationId: project.team.organizationId,
     teamId: project.teamId,
