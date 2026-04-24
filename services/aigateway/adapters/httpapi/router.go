@@ -189,6 +189,17 @@ func responsesHandler(deps RouterDeps) http.HandlerFunc {
 		}
 		defer release()
 
+		// Same one-off DEBUG body dump as /v1/messages — gated on
+		// LW_LOG_MESSAGE_BODY=1. Helpful for diagnosing codex/opencode
+		// /v1/responses failures where Bifrost's adapter rejects
+		// codex-shaped tools[] or other Responses-API features.
+		if os.Getenv("LW_LOG_MESSAGE_BODY") == "1" {
+			deps.Logger.Info("/v1/responses request body",
+				zap.Int("peek_bytes", len(peek)),
+				zap.String("peek", string(peek)),
+			)
+		}
+
 		model := app.PeekModel(peek)
 		if app.PeekStream(peek) {
 			result, err := deps.App.HandleResponsesStream(r.Context(), bundle, body, model)
