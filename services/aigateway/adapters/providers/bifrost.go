@@ -110,6 +110,11 @@ func (r *BifrostRouter) dispatchResponses(
 		Provider:       provider,
 		Model:          model,
 		RawRequestBody: req.Body,
+		// Empty-slice (not nil) stub lets us bypass Bifrost's
+		// makeResponsesRequest non-nil-Input guard at bifrost.go:778.
+		// On the raw-forward path the provider adapter reads
+		// req.RawRequestBody directly; Input is not consulted.
+		Input: []bfschemas.ResponsesMessage{},
 	}
 	bfCtx := bfschemas.NewBifrostContext(
 		context.WithValue(
@@ -181,6 +186,11 @@ func (r *BifrostRouter) dispatchResponsesStream(
 		Provider:       provider,
 		Model:          model,
 		RawRequestBody: req.Body,
+		// Empty-slice (not nil) stub lets us bypass Bifrost's
+		// makeResponsesRequest non-nil-Input guard at bifrost.go:778.
+		// On the raw-forward path the provider adapter reads
+		// req.RawRequestBody directly; Input is not consulted.
+		Input: []bfschemas.ResponsesMessage{},
 	}
 	bfCtx := bfschemas.NewBifrostContext(
 		context.WithValue(
