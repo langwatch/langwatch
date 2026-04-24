@@ -451,6 +451,29 @@ See [Policy Rules → RE2 syntax](/ai-gateway/policy-rules).
 
 **Root cause (largely fixed):** an older version of the gateway's raw-forward error-passthrough helper used a `case []byte:` type switch that didn't match `json.RawMessage` (distinct named type in Go), so the upstream response bytes that Bifrost stashed on `ExtraFields.RawResponse` got dropped and the 504 fell through with the generic message. Fixed in `df37575c4`. If you still see this on a current build, the upstream may be sending an unanticipated response shape — capture with `LW_LOG_MESSAGE_BODY=1` + `LW_GATEWAY_OUTBOUND_PROXY` (see [Self-hosting → Config → Debug knobs](/ai-gateway/self-hosting/config#debug-development-env-knobs)) to surface the bytes.
 
+## Boot fails with `AI Gateway secrets partial config`
+
+**Symptoms:**
+- Any LangWatch entry point (`pnpm dev`, `pnpm start`, workers, `prisma:*`, CLI scripts) refuses to start.
+- Loud banner in the boot log naming a subset of `LW_VIRTUAL_KEY_PEPPER`, `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET` as missing.
+
+**Root cause:** the three AI-Gateway secrets are an all-or-none group. Setting one or two without the third is always a misconfig — the missing secret will fail at first request rather than at boot, often with cryptic errors like `/resolve-key` HMAC mismatches or VK secrets that can't be hashed. The boot validator (`assertGatewaySecretsAllOrNone`) catches this at import time so every entry point fails the same way at the same place. Added in `3941b5239`.
+
+**Fix — generate the missing one(s):**
+
+```bash
+# Whichever the banner names as missing
+echo "LW_VIRTUAL_KEY_PEPPER=$(openssl rand -hex 32)" >> langwatch/.env
+echo "LW_GATEWAY_INTERNAL_SECRET=$(openssl rand -hex 32)" >> langwatch/.env
+echo "LW_GATEWAY_JWT_SECRET=$(openssl rand -hex 32)" >> langwatch/.env
+```
+
+Restart the entry point (the validator runs at import time, so no incremental refresh).
+
+**If you don't run the AI Gateway at all**, leave all three unset — the validator only fires when at least one is set. The control plane runs cleanly without them; the AI Gateway routes return `503` until the secrets are populated and the gateway pod boots.
+
+**Related dev hint** (warning, not failure): if `FEATURE_FLAG_FORCE_ENABLE` lists `release_ui_ai_gateway_menu_enabled` AND all three secrets are missing, the dev server logs a one-time WARN that the AI Gateway menu will be visible but non-functional until the secrets are populated. This is intentional — it lets you preview the UI without wiring the gateway yet.
+
 ## See also
 
 - [API: Errors](/ai-gateway/api/errors) — full error-type enum and HTTP status mapping.
