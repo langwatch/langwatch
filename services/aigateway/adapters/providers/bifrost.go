@@ -51,13 +51,19 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 
 // Dispatch sends a non-streaming request through bifrost.
 //
-// The inbound body is assumed to be OpenAI-shape (what the gateway exposes
-// on /v1/chat/completions). Bifrost normalizes from this shape to the
-// provider's native wire format (Anthropic Messages API, Gemini
-// generateContent, etc.) and un-normalizes the response back. See
-// parseOpenAIChatRequest for the field mapping; Bifrost's per-provider
-// adapters (core/providers/*) handle the per-provider quirks
-// (stream_options strip, tool-schema rewrite, system-role hoist, etc.).
+// For /v1/chat/completions (RequestTypeChat) the inbound body is
+// OpenAI-shape; we parse it into Bifrost's normalized
+// (Input, Params) pair and Bifrost translates to the provider's native
+// wire format (Anthropic Messages API, Gemini generateContent, etc.)
+// + un-normalizes the response back to OpenAI shape.
+//
+// For /v1/messages (RequestTypeMessages) the inbound body is already
+// provider-native (Anthropic /v1/messages shape). Running it through
+// the OpenAI parser would silently drop Anthropic-specific fields like
+// `thinking`, so we opt into Bifrost's raw-forward mode and let it
+// passthrough. Downstream VKs for `/v1/messages` are expected to route
+// to an Anthropic-family provider; sending it to OpenAI is a caller
+// error and Bifrost/OpenAI will reject accordingly.
 func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred domain.Credential) (*domain.Response, error) {
 	provider := mapProvider(cred.ProviderID)
 	model := req.Model
@@ -65,18 +71,12 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		model = req.Resolved.ModelID
 	}
 
-	messages, params, err := parseOpenAIChatRequest(req.Body)
+	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
 		return nil, err
 	}
-	bfReq := &bfschemas.BifrostChatRequest{
-		Provider: provider,
-		Model:    model,
-		Input:    messages,
-		Params:   params,
-	}
 
-	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
+	bfCtx := bfschemas.NewBifrostContext(withCredential(dispatchCtx, cred), time.Time{})
 
 	resp, berr := r.bf.ChatCompletionRequest(bfCtx, bfReq)
 	if berr != nil {
@@ -91,11 +91,12 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	}, nil
 }
 
-// DispatchStream sends a streaming request through bifrost. Normalized
-// request shape same as Dispatch; chunks returned by Bifrost are already
-// BifrostChatResponse (OpenAI-compatible), so the SSE bytes we emit
-// downstream are the shape the OpenAI SDK expects regardless of which
-// provider Bifrost routed to.
+// DispatchStream sends a streaming request through bifrost. Routing
+// semantics match Dispatch (translate on RequestTypeChat, raw-forward
+// on RequestTypeMessages). Chunks returned by Bifrost are
+// BifrostChatResponse (OpenAI-compatible), so the SSE bytes the gateway
+// emits downstream are the shape the OpenAI SDK expects regardless of
+// which provider Bifrost routed to.
 func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error) {
 	provider := mapProvider(cred.ProviderID)
 	model := req.Model
@@ -103,18 +104,12 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 		model = req.Resolved.ModelID
 	}
 
-	messages, params, err := parseOpenAIChatRequest(req.Body)
+	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
 		return nil, err
 	}
-	bfReq := &bfschemas.BifrostChatRequest{
-		Provider: provider,
-		Model:    model,
-		Input:    messages,
-		Params:   params,
-	}
 
-	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
+	bfCtx := bfschemas.NewBifrostContext(withCredential(dispatchCtx, cred), time.Time{})
 
 	ch, berr := r.bf.ChatCompletionStreamRequest(bfCtx, bfReq)
 	if berr != nil {

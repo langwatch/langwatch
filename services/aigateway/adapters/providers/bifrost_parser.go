@@ -1,12 +1,52 @@
 package providers
 
 import (
+	"context"
 	"fmt"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 
 	"github.com/bytedance/sonic"
+
+	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
+
+// buildChatRequest constructs a BifrostChatRequest appropriate for the
+// inbound request type. RequestTypeChat expects an OpenAI-shape body and
+// goes through the parser (Bifrost then translates per-provider).
+// RequestTypeMessages expects an Anthropic-shape body and is forwarded
+// raw (Bifrost's own adapter decodes it natively).
+//
+// Returned context is enriched with the raw-forward flag when required;
+// callers should use it to derive the BifrostContext.
+func buildChatRequest(
+	ctx context.Context,
+	req *domain.Request,
+	provider bfschemas.ModelProvider,
+	model string,
+) (*bfschemas.BifrostChatRequest, context.Context, error) {
+	if req.Type == domain.RequestTypeMessages {
+		return &bfschemas.BifrostChatRequest{
+				Provider:       provider,
+				Model:          model,
+				RawRequestBody: req.Body,
+				Input:          []bfschemas.ChatMessage{},
+			},
+			context.WithValue(ctx, bfschemas.BifrostContextKeyUseRawRequestBody, true),
+			nil
+	}
+
+	messages, params, err := parseOpenAIChatRequest(req.Body)
+	if err != nil {
+		return nil, ctx, err
+	}
+	return &bfschemas.BifrostChatRequest{
+		Provider: provider,
+		Model:    model,
+		Input:    messages,
+		Params:   params,
+	}, ctx, nil
+}
 
 // parseOpenAIChatRequest decodes an OpenAI-shape /v1/chat/completions body
 // into Bifrost's normalized request structures. Bifrost's own ChatMessage +
