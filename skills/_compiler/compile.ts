@@ -47,7 +47,7 @@ interface CompileOptions {
 // Parsing
 // ──────────────────────────────────────────────────
 
-function parseSkillMd(skillPath: string): ParsedSkill {
+export function parseSkillMd(skillPath: string): ParsedSkill {
   const content = fs.readFileSync(skillPath, "utf8");
   const frontmatterMatch = content.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/);
   if (!frontmatterMatch) {
@@ -77,7 +77,7 @@ function parseSkillMd(skillPath: string): ParsedSkill {
 // Reference resolution
 // ──────────────────────────────────────────────────
 
-function resolveReferences(
+export function resolveReferences(
   body: string,
   skillDir: string,
   seenShared: Set<string>
@@ -287,6 +287,9 @@ Examples:
 // Main
 // ──────────────────────────────────────────────────
 
-const options = parseArgs();
-const result = compile(options);
-console.log(result);
+const isMain = import.meta.url === `file://${process.argv[1]}`;
+if (isMain) {
+  const options = parseArgs();
+  const result = compile(options);
+  console.log(result);
+}

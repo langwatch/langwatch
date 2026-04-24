@@ -27,8 +27,13 @@ jobs:
           path: _skills-publish
           token: ${{ secrets.SKILLS_PUBLISH_TOKEN }}
 
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '20'
+
       - name: Sync skills
-        run: bash skills/_publish/sync.sh _skills-publish
+        run: npx --yes tsx skills/_publish/sync.ts _skills-publish
 
       - name: Commit and push
         run: |
