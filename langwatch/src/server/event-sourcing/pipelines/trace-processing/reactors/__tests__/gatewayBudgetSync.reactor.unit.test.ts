@@ -111,10 +111,9 @@ function mockDeps(
 function ctx(foldState: TraceSummaryData): ReactorContext<TraceSummaryData> {
   return {
     tenantId: "project-1",
-    pipelineName: "trace_processing",
+    aggregateId: "trace-1",
     foldState,
-    currentEventOnlyState: foldState,
-  } as ReactorContext<TraceSummaryData>;
+  };
 }
 
 describe("gatewayBudgetSync reactor", () => {

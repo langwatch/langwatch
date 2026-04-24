@@ -10,6 +10,7 @@ import { ErrorBoundary } from "react-error-boundary";
 import NProgress from "nprogress";
 import { InnerProviders } from "./AppProviders";
 import NotFoundOrErrorPage from "./pages/_not-found";
+import { PageErrorFallback } from "~/components/ui/PageErrorFallback";
 
 /**
  * Root layout — wraps all routes.
