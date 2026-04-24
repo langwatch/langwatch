@@ -82,15 +82,30 @@ func requireEnv(t *testing.T, key string) string {
 	return v
 }
 
+// maxTokensKey returns the right response-length parameter name for a model:
+// OpenAI's gpt-5* + o* series reject `max_tokens` and require
+// `max_completion_tokens`; everyone else accepts `max_tokens`. Bifrost does
+// NOT currently translate this — the gateway forwards whatever the client
+// sends, so the matrix tests have to pick correctly per model family.
+func maxTokensKey(model string) string {
+	if strings.HasPrefix(model, "gpt-5") ||
+		strings.HasPrefix(model, "o1") || strings.HasPrefix(model, "o3") ||
+		strings.HasPrefix(model, "o4") {
+		return "max_completion_tokens"
+	}
+	return "max_tokens"
+}
+
 // chatBody_Simple builds a minimal /v1/chat/completions request.
 func chatBody_Simple(model string) []byte {
-	return mustJSON(map[string]any{
+	body := map[string]any{
 		"model": model,
 		"messages": []map[string]any{
 			{"role": "user", "content": "Respond with exactly one word: ok"},
 		},
-		"max_tokens": 16,
-	})
+		maxTokensKey(model): 16,
+	}
+	return mustJSON(body)
 }
 
 // chatBody_Streamed is identical but with stream=true + usage opt-in.
@@ -100,9 +115,9 @@ func chatBody_Streamed(model string) []byte {
 		"messages": []map[string]any{
 			{"role": "user", "content": "Count from 1 to 5, one number per line."},
 		},
-		"max_tokens":     48,
-		"stream":         true,
-		"stream_options": map[string]any{"include_usage": true},
+		maxTokensKey(model): 48,
+		"stream":            true,
+		"stream_options":    map[string]any{"include_usage": true},
 	})
 }
 
@@ -129,7 +144,7 @@ func chatBody_ToolCalling(model string) []byte {
 				},
 			},
 		},
-		"max_tokens": 64,
+		maxTokensKey(model): 64,
 	})
 }
 
@@ -141,8 +156,8 @@ func chatBody_StructuredOutputs(model string) []byte {
 			{"role": "system", "content": "Reply ONLY with a compact JSON object {\"city\": string, \"country\": string}."},
 			{"role": "user", "content": "Paris"},
 		},
-		"response_format": map[string]any{"type": "json_object"},
-		"max_tokens":      64,
+		"response_format":   map[string]any{"type": "json_object"},
+		maxTokensKey(model): 64,
 	})
 }
 
@@ -208,7 +223,7 @@ func cacheBodyFor(model, userTurn string) []byte {
 			{"role": "system", "content": systemBlock},
 			{"role": "user", "content": userTurn},
 		},
-		"max_tokens": 64,
+		maxTokensKey(model): 64,
 	})
 }
 
@@ -248,9 +263,9 @@ func fireAndAssert(t *testing.T, rc resolvedCell) string {
 		t.Fatalf("want 200, got %d\nbody: %s", resp.StatusCode, raw)
 	}
 
-	traceID := resp.Header.Get("X-LangWatch-Trace-Id")
+	traceID := extractTraceID(resp.Header)
 	if traceID == "" {
-		t.Fatalf("missing X-LangWatch-Trace-Id header in response")
+		t.Fatalf("no trace id on response: traceparent=%q", resp.Header.Get("Traceparent"))
 	}
 
 	// For non-streaming, the body is a single JSON envelope with `usage`.
@@ -297,17 +312,21 @@ func assertTraceCaptured(t *testing.T, traceID string) float64 {
 		if err == nil && resp.StatusCode == 200 {
 			body, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
+			// /api/trace/:id returns a flat trace envelope; metrics sits at
+			// the top level (trace.metrics.{total_cost, prompt_tokens,
+			// completion_tokens, ...}). `total_tokens` isn't a field name —
+			// sum of prompt+completion is how the UI derives it.
 			var parsed struct {
-				Trace struct {
-					Metrics struct {
-						TotalCost   float64 `json:"total_cost"`
-						TotalTokens int     `json:"total_tokens"`
-					} `json:"metrics"`
-				} `json:"trace"`
+				Metrics struct {
+					TotalCost        float64 `json:"total_cost"`
+					PromptTokens     int     `json:"prompt_tokens"`
+					CompletionTokens int     `json:"completion_tokens"`
+				} `json:"metrics"`
 			}
 			if err := json.Unmarshal(body, &parsed); err == nil {
-				if parsed.Trace.Metrics.TotalTokens > 0 && parsed.Trace.Metrics.TotalCost > 0 {
-					return parsed.Trace.Metrics.TotalCost
+				totalTokens := parsed.Metrics.PromptTokens + parsed.Metrics.CompletionTokens
+				if totalTokens > 0 && parsed.Metrics.TotalCost > 0 {
+					return parsed.Metrics.TotalCost
 				}
 			}
 		}
@@ -360,6 +379,23 @@ func cacheReadFromResponse(body []byte) int {
 	return parsed.Usage.PromptTokensDetails.CachedTokens
 }
 
+// extractTraceID pulls the 32-hex trace_id out of the standard W3C
+// `traceparent` header (format: `00-{trace-id}-{span-id}-{flags}`). The
+// aigateway restructure dropped the legacy `X-LangWatch-Trace-Id` header
+// in favour of W3C-only propagation, so tests read from traceparent.
+// Returns "" when the header is absent or malformed.
+func extractTraceID(h http.Header) string {
+	tp := h.Get("Traceparent")
+	if tp == "" {
+		return ""
+	}
+	parts := strings.Split(tp, "-")
+	if len(parts) < 3 || len(parts[1]) != 32 {
+		return ""
+	}
+	return parts[1]
+}
+
 // fireForBody posts a request to the gateway and returns the response body +
 // trace id + status. Unlike fireAndAssert this does NOT fatal on 4xx, so the
 // caller can handle prime/read retry logic (e.g. cache propagation delay).
@@ -378,7 +414,7 @@ func fireForBody(t *testing.T, rc resolvedCell, body []byte) (int, []byte, strin
 	}
 	defer resp.Body.Close()
 	raw, _ := io.ReadAll(resp.Body)
-	return resp.StatusCode, raw, resp.Header.Get("X-LangWatch-Trace-Id")
+	return resp.StatusCode, raw, extractTraceID(resp.Header)
 }
 
 // runCacheCell fires a prime call, waits 2s for the provider to register the
