@@ -28,7 +28,7 @@ export const ATTR_LANGWATCH_SPAN_TYPE = "langwatch.span.type";
  * LangWatch RAG contexts attribute key
  * Used to store retrieval-augmented generation contexts
  */
-export const ATTR_LANGWATCH_RAG_CONTEXTS = "langwatch.contexts";
+export const ATTR_LANGWATCH_RAG_CONTEXTS = "langwatch.rag.contexts";
 
 /**
  * LangWatch metrics attribute key

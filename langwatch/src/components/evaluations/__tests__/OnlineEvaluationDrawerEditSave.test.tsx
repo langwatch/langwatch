@@ -789,7 +789,7 @@ describe.skip("OnlineEvaluationDrawer", () => {
 
       await waitFor(() => {
         expect(
-          screen.getByText(/evaluate all traces in a conversation thread/i),
+          screen.getByText(/evaluate all traces in a thread/i),
         ).toBeInTheDocument();
       });
     });

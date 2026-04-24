@@ -1,7 +1,7 @@
 import type { z } from "zod";
 
 import { getApp } from "../../../../src/server/app-layer/app";
-import type { signUpDataSchema } from "../../../../src/server/api/routers/onboarding/schemas/sign-up-data.schema";
+import type { signUpDataSchema } from "../../../../src/server/schemas/sign-up-data.schema";
 import { captureException } from "../../../../src/utils/posthogErrorCapture";
 import type { CioPersonTraits } from "../types";
 

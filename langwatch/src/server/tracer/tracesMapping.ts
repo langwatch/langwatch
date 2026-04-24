@@ -106,6 +106,48 @@ export function buildMetadataFieldChildren(
   ];
 }
 
+function filterThreadTraces(
+  trace: TraceWithAnnotations,
+  data: { allTraces?: TraceWithAnnotations[]; selectedFields?: string[] },
+  extraFilter?: (t: TraceWithAnnotations) => boolean,
+): TraceWithAnnotations[] | Record<string, unknown>[] {
+  const threadId = trace.metadata?.thread_id;
+  if (!threadId || !data.allTraces) {
+    return [];
+  }
+
+  let threadTraces = data.allTraces
+    .filter((t) => t.metadata?.thread_id === threadId)
+    .sort((a, b) => a.timestamps.started_at - b.timestamps.started_at);
+  if (extraFilter) {
+    threadTraces = threadTraces.filter(extraFilter);
+  }
+
+  if (data.selectedFields && data.selectedFields.length > 0) {
+    return threadTraces.map((threadTrace) => {
+      const filteredTrace: Record<string, unknown> = {};
+      for (const field of data.selectedFields!) {
+        const traceMapping =
+          TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
+        if (traceMapping) {
+          filteredTrace[field] = traceMapping.mapping(
+            threadTrace,
+            "",
+            "",
+            {},
+          );
+        } else {
+          filteredTrace[field] =
+            threadTrace[field as keyof TraceWithAnnotations];
+        }
+      }
+      return filteredTrace;
+    });
+  }
+
+  return threadTraces;
+}
+
 export const TRACE_MAPPINGS = {
   trace_id: {
     mapping: (trace: TraceWithAnnotations) => trace.trace_id,
@@ -429,50 +471,27 @@ export const TRACE_MAPPINGS = {
   threads: {
     mapping: (
       trace: TraceWithAnnotations,
-      key: string,
-      subkey: string,
+      _key: string,
+      _subkey: string,
       data: {
         allTraces?: TraceWithAnnotations[];
         selectedFields?: string[];
       } = {},
-    ) => {
-      // Return all traces that belong to the same thread_id as the current trace
-      const threadId = trace.metadata?.thread_id;
-      if (!threadId || !data.allTraces) {
-        return [];
-      }
-
-      // Filter all traces to find those with the same thread_id
-      const threadTraces = data.allTraces.filter(
-        (t) => t.metadata?.thread_id === threadId,
-      );
-
-      // If selectedFields are provided, extract only those fields from each trace
-      if (data.selectedFields && data.selectedFields.length > 0) {
-        return threadTraces.map((threadTrace) => {
-          const filteredTrace: Record<string, any> = {};
-          for (const field of data.selectedFields!) {
-            const traceMapping =
-              TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
-            if (traceMapping) {
-              filteredTrace[field] = traceMapping.mapping(
-                threadTrace,
-                "",
-                "",
-                {},
-              );
-            } else {
-              filteredTrace[field] =
-                threadTrace[field as keyof TraceWithAnnotations];
-            }
-          }
-          return filteredTrace;
-        });
-      }
-
-      // If no selectedFields, return all traces with full data
-      return threadTraces;
-    },
+    ) => filterThreadTraces(trace, data),
+  },
+  threads_until_current: {
+    mapping: (
+      trace: TraceWithAnnotations,
+      _key: string,
+      _subkey: string,
+      data: {
+        allTraces?: TraceWithAnnotations[];
+        selectedFields?: string[];
+      } = {},
+    ) =>
+      filterThreadTraces(trace, data, (t) => {
+        return t.timestamps.started_at <= trace.timestamps.started_at;
+      }),
   },
 } satisfies Record<
   string,
@@ -923,6 +942,9 @@ const THREAD_TRACES_CHILDREN = [
  */
 export const TRACE_MAPPING_LABELS: Record<string, string | undefined> = {
   formatted_trace: "Full Trace (AI-Readable)",
+  threads: "all traces",
+  threads_until_current: "traces until now",
+  thread_id: "thread_id",
 };
 
 /**
@@ -954,7 +976,9 @@ export function getTraceAvailableSources(
       type: "str" as const,
     })),
     ...Object.entries(TRACE_MAPPINGS)
-      .filter(([key]) => key !== "threads")
+      .filter(
+        ([key]) => key !== "threads" && key !== "threads_until_current",
+      )
       .map(([key, config]) => {
         const hasKeys = "keys" in config && typeof config.keys === "function";
 
@@ -1002,12 +1026,12 @@ export function getTraceAvailableSources(
   return [
     {
       id: "trace",
-      name: "Trace",
+      name: "Current Trace",
       type: "dataset",
       fields: traceFields,
     },
     // Include thread sources at trace level so evaluators can access
-    // full conversation context even when triggered per-trace
+    // full thread context even when triggered per-trace
     ...getThreadAvailableSources(),
   ];
 }
@@ -1019,7 +1043,7 @@ export function getThreadAvailableSources(): TraceAvailableSource[] {
   return [
     {
       id: "thread",
-      name: "Thread",
+      name: "Current Thread",
       type: "dataset",
       fields: [
         // Server-only thread sources at the top for discoverability
@@ -1028,34 +1052,31 @@ export function getThreadAvailableSources(): TraceAvailableSource[] {
           label: THREAD_MAPPING_LABELS[source],
           type: "str" as const,
         })),
-        ...Object.entries(THREAD_MAPPINGS).map(([key, config]) => {
-          // Special handling for "traces" - provide nested children for field selection
-          if (key === "traces") {
+        ...Object.entries(THREAD_MAPPINGS)
+          .filter(([key]) => key !== "traces")
+          .map(([key, config]) => {
+            const hasKeys =
+              "keys" in config && typeof config.keys === "function";
+
+            if (hasKeys) {
+              return {
+                name: key,
+                type: "dict" as const,
+                isComplete: true,
+              };
+            }
+
             return {
               name: key,
-              type: "list" as const,
-              children: THREAD_TRACES_CHILDREN,
-              // Allow selecting traces itself (returns all trace data)
-              isComplete: true,
+              type: "str" as const,
             };
-          }
-
-          const hasKeys = "keys" in config && typeof config.keys === "function";
-
-          // For thread mappings, most fields are complete selections
-          if (hasKeys) {
-            return {
-              name: key,
-              type: "dict" as const,
-              isComplete: true,
-            };
-          }
-
-          return {
-            name: key,
-            type: "str" as const,
-          };
-        }),
+          }),
+        {
+          name: "traces",
+          type: "list" as const,
+          children: THREAD_TRACES_CHILDREN,
+          isComplete: true,
+        },
       ],
     },
   ];

@@ -823,7 +823,9 @@ export const VariableMappingInput = ({
                     marginBottom={1}
                   >
                     <Text fontSize="xs" color="blue.600">
-                      {inProgressPath.path.join(" → ")}
+                      {inProgressPath.path
+                        .map((s) => s.replace(/_/g, " "))
+                        .join(" → ")}
                     </Text>
                     <Text fontSize="xs" color="blue.400">
                       →

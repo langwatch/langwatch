@@ -646,7 +646,7 @@ describe("VariableMappingInput", () => {
     const nestedSources: AvailableSource[] = [
       {
         id: "trace",
-        name: "Trace",
+        name: "Current Trace",
         type: "dataset",
         fields: [
           { name: "input", type: "str" },
@@ -1162,7 +1162,7 @@ describe("VariableMappingInput", () => {
         const sourcesWithCompleteParent: AvailableSource[] = [
           {
             id: "thread",
-            name: "Thread",
+            name: "Current Thread",
             type: "dataset",
             fields: [
               {
@@ -1225,7 +1225,7 @@ describe("VariableMappingInput", () => {
         const sourcesWithCompleteParent: AvailableSource[] = [
           {
             id: "thread",
-            name: "Thread",
+            name: "Current Thread",
             type: "dataset",
             fields: [
               {

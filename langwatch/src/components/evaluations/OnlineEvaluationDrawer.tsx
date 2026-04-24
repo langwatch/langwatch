@@ -1099,7 +1099,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                   <StepRadio
                     value="thread"
                     title="Thread Level"
-                    description="Evaluate all traces in a conversation thread together"
+                    description="Evaluate all traces in a thread together"
                     icon={<Spool />}
                     width="full"
                   />
@@ -1416,8 +1416,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
               <HorizontalFormControl
                 label={
                   <HStack>
-                    Conversation Idle Time
-                    <Tooltip content="Wait for the conversation to be idle (no new messages) before running the evaluation. This prevents re-evaluating on every single message in a conversation.">
+                    Thread Idle Time
+                    <Tooltip content="Wait for the thread to be idle (no new messages) before running the evaluation. This prevents re-evaluating on every single message in a thread.">
                       <HelpCircle size={14} />
                     </Tooltip>
                   </HStack>

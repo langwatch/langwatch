@@ -28,6 +28,7 @@ import {
 import {
   DuplicateInviteError,
   INVITE_ALREADY_ACCEPTED_MESSAGE,
+  INVITE_NOT_READY_MESSAGE,
   InviteNotFoundError,
   OrganizationNotFoundError,
 } from "../../invites/errors";
@@ -41,7 +42,7 @@ import { LimitExceededError } from "../../license-enforcement/errors";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { skipPermissionCheck } from "../rbac";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
-import { signUpDataSchema } from "./onboarding";
+import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
@@ -1000,6 +1001,13 @@ export const organizationRouter = createTRPCRouter({
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: INVITE_ALREADY_ACCEPTED_MESSAGE,
+        });
+      }
+
+      if (invite.status !== "PENDING") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: INVITE_NOT_READY_MESSAGE,
         });
       }
 

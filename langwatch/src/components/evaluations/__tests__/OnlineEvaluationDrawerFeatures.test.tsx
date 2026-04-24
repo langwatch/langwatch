@@ -114,7 +114,7 @@ describe.skip("OnlineEvaluationDrawer - Features", () => {
       // Should NOT see the thread idle timeout dropdown
       await waitFor(() => {
         expect(
-          screen.queryByText(/Conversation Idle Time/i),
+          screen.queryByText(/Thread Idle Time/i),
         ).not.toBeInTheDocument();
       });
     });
@@ -141,7 +141,7 @@ describe.skip("OnlineEvaluationDrawer - Features", () => {
 
       // Should see the thread idle timeout dropdown
       await waitFor(() => {
-        expect(screen.getByText(/Conversation Idle Time/i)).toBeInTheDocument();
+        expect(screen.getByText(/Thread Idle Time/i)).toBeInTheDocument();
       });
     });
 
@@ -163,7 +163,7 @@ describe.skip("OnlineEvaluationDrawer - Features", () => {
 
       // Wait for dropdown to appear
       await waitFor(() => {
-        expect(screen.getByText(/Conversation Idle Time/i)).toBeInTheDocument();
+        expect(screen.getByText(/Thread Idle Time/i)).toBeInTheDocument();
       });
 
       // Check dropdown has correct options
@@ -196,7 +196,7 @@ describe.skip("OnlineEvaluationDrawer - Features", () => {
 
       // Wait for dropdown to appear
       await waitFor(() => {
-        expect(screen.getByText(/Conversation Idle Time/i)).toBeInTheDocument();
+        expect(screen.getByText(/Thread Idle Time/i)).toBeInTheDocument();
       });
 
       // Check default value is 300 (5 minutes)
@@ -222,7 +222,7 @@ describe.skip("OnlineEvaluationDrawer - Features", () => {
 
       // Wait for dropdown to appear
       await waitFor(() => {
-        expect(screen.getByText(/Conversation Idle Time/i)).toBeInTheDocument();
+        expect(screen.getByText(/Thread Idle Time/i)).toBeInTheDocument();
       });
 
       // Change to 10 minutes (600 seconds) - default is 5 minutes (300)
@@ -255,7 +255,7 @@ describe.skip("OnlineEvaluationDrawer - Features", () => {
 
       // Wait for form to be ready
       await waitFor(() => {
-        expect(screen.getByText(/Conversation Idle Time/i)).toBeInTheDocument();
+        expect(screen.getByText(/Thread Idle Time/i)).toBeInTheDocument();
       });
 
       // Set timeout to 10 minutes (600 seconds) - default is 5 minutes
@@ -333,7 +333,7 @@ describe.skip("OnlineEvaluationDrawer - Features", () => {
 
       // Verify dropdown is visible
       await waitFor(() => {
-        expect(screen.getByText(/Conversation Idle Time/i)).toBeInTheDocument();
+        expect(screen.getByText(/Thread Idle Time/i)).toBeInTheDocument();
       });
 
       // Switch to trace level
@@ -342,7 +342,7 @@ describe.skip("OnlineEvaluationDrawer - Features", () => {
       // Dropdown should now be hidden
       await waitFor(() => {
         expect(
-          screen.queryByText(/Conversation Idle Time/i),
+          screen.queryByText(/Thread Idle Time/i),
         ).not.toBeInTheDocument();
       });
     });
