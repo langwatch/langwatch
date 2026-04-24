@@ -10,6 +10,7 @@ import {
   teamRoleHasPermission,
 } from "../server/api/rbac";
 import { api } from "../utils/api";
+import { buildProjectRedirectPath } from "../utils/projectSlugRedirect";
 import { usePublicEnv } from "./usePublicEnv";
 import { noOrgBouncerRoutes, publicRoutes, useRequiredSession } from "./useRequiredSession";
 
@@ -258,11 +259,15 @@ export const useOrganizationTeamProject = (
       typeof router.query.project == "string" &&
       finalProject.slug !== router.query.project
     ) {
-      const returnTo = router.query.return_to;
-      const returnToParam = returnTo
-        ? `?return_to=${encodeURIComponent(returnTo as string)}`
-        : "";
-      void router.push(`/${finalProject.slug}${returnToParam}`);
+      // Preserve the section sub-path (and query string) so a URL like
+      // /[project]/evaluations lands on /<realSlug>/evaluations, not on
+      // /<realSlug> (project home). See buildProjectRedirectPath for details.
+      void router.push(
+        buildProjectRedirectPath({
+          asPath: router.asPath,
+          projectSlug: finalProject.slug,
+        }),
+      );
     }
   }, [
     isDemo,
