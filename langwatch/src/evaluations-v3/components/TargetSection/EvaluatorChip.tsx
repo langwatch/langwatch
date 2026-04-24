@@ -166,17 +166,24 @@ export function EvaluatorChip({
             {status !== "running" && getInlineResult()}
             {/* Missing mapping alert icon - on the right side like prompts */}
             {hasMissingMappings && (
-              <Icon
-                as={LuCircleAlert}
-                color="yellow.fg"
-                boxSize="14px"
-                css={{ animation: `${pulseAnimation} 2s ease-in-out infinite` }}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit();
-                }}
-                data-testid={`evaluator-missing-mapping-alert-${evaluator.id}`}
-              />
+              <Tooltip
+                content="Missing variable mappings - Click to configure"
+                positioning={{ placement: "top" }}
+                openDelay={0}
+                showArrow
+              >
+                <Icon
+                  as={LuCircleAlert}
+                  color="yellow.fg"
+                  boxSize="14px"
+                  css={{ animation: `${pulseAnimation} 2s ease-in-out infinite` }}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit();
+                  }}
+                  data-testid={`evaluator-missing-mapping-alert-${evaluator.id}`}
+                />
+              </Tooltip>
             )}
             <Box className="chevron-icon" marginLeft={-0.5}>
               <LuChevronDown size={12} />
