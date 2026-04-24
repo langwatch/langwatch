@@ -49,6 +49,7 @@ vi.mock("../EvaluatorEditorShared", () => ({
     handleSave: vi.fn(),
     handleDiscard: vi.fn(),
     handleApply: vi.fn(),
+    flushLocalConfig: vi.fn(),
   }),
   EvaluatorEditorBody: () => <div data-testid="mock-editor-body" />,
   EvaluatorEditorFooter: () => <div data-testid="mock-editor-footer" />,

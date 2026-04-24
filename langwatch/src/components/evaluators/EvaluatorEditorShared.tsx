@@ -123,6 +123,7 @@ export type EvaluatorEditorController = {
   handleClose: () => void;
   handleDiscard: () => void;
   handleApply: () => void;
+  flushLocalConfig: () => void;
 };
 
 /**
@@ -514,6 +515,13 @@ export function useEvaluatorEditorController(
     onClose();
   }, [debouncedUpdateLocalConfig, onClose]);
 
+  // Exposed so callers that navigate away without invoking handleClose (e.g.
+  // the unified drawer's Back/step transitions) can still ensure pending
+  // edits reach the parent before the controller unmounts.
+  const flushLocalConfig = useCallback(() => {
+    debouncedUpdateLocalConfig.flush();
+  }, [debouncedUpdateLocalConfig]);
+
   const hasSettings =
     settingsSchema instanceof z.ZodObject &&
     Object.keys(settingsSchema.shape).length > 0;
@@ -553,6 +561,7 @@ export function useEvaluatorEditorController(
     handleClose,
     handleDiscard,
     handleApply,
+    flushLocalConfig,
   };
 }
 

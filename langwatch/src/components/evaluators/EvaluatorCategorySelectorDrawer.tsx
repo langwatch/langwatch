@@ -176,6 +176,9 @@ export function EvaluatorCategorySelectorDrawer(
 
   const handleBack = () => {
     if (view.step === "editor") {
+      // Unmounting the editor cancels the trailing debounce, so flush any
+      // pending local-config update before we navigate back.
+      editorController.flushLocalConfig();
       setView({ step: "type", category: view.category });
       return;
     }
