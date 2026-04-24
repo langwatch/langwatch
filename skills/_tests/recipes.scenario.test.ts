@@ -25,7 +25,11 @@ const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
 
 function copyRecipeSkillToWorkDir(tempFolder: string, recipeName: string) {
-  installSkillToWorkDir(tempFolder, `recipes/${recipeName}`, recipeName);
+  installSkillToWorkDir({
+    workingDirectory: tempFolder,
+    skillSubpath: `recipes/${recipeName}`,
+    installAs: recipeName,
+  });
 }
 
 function findTestFiles(dir: string, pattern: RegExp): string[] {

@@ -25,7 +25,7 @@ const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
 
 function copySkillToWorkDir(tempFolder: string) {
-  installSkillToWorkDir(tempFolder, "prompts");
+  installSkillToWorkDir({ workingDirectory: tempFolder, skillSubpath: "prompts" });
 }
 
 function findFiles(dir: string, pattern: RegExp): string[] {

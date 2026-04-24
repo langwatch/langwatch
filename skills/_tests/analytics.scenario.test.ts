@@ -30,7 +30,7 @@ describe("Analytics Skill", () => {
         path.join(os.tmpdir(), "langwatch-skill-analytics-")
       );
 
-      installSkillToWorkDir(tempFolder, "analytics");
+      installSkillToWorkDir({ workingDirectory: tempFolder, skillSubpath: "analytics" });
 
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,

@@ -31,11 +31,15 @@ export const SKILL_TESTS_SET_ID = "skill-tests";
  * This mirrors what sync.ts does for langwatch/skills publishes, so scenario
  * tests exercise the same self-contained markdown that real consumers receive.
  */
-export function installSkillToWorkDir(
-  workingDirectory: string,
-  skillSubpath: string,
-  installAs?: string
-): void {
+export function installSkillToWorkDir({
+  workingDirectory,
+  skillSubpath,
+  installAs,
+}: {
+  workingDirectory: string;
+  skillSubpath: string;
+  installAs?: string;
+}): void {
   const sourcePath = path.resolve(
     __dirname,
     "../..",
