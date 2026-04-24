@@ -36,6 +36,25 @@ func buildChatRequest(
 			nil
 	}
 
+	// OpenAI-family providers accept the OpenAI wire format natively, so
+	// there is nothing to translate. Running the body through
+	// parse+re-marshal still subtly changes bytes (JSON key ordering,
+	// whitespace, number formatting) which breaks OpenAI's prefix-hash
+	// auto-cache between two otherwise-identical calls. Raw-forward
+	// preserves byte-for-byte identity and keeps cache hits working.
+	// Translation earns its keep only when the target wire format
+	// differs from the inbound (Anthropic / Gemini / Bedrock / Vertex).
+	if isOpenAICompatibleProvider(provider) {
+		return &bfschemas.BifrostChatRequest{
+				Provider:       provider,
+				Model:          model,
+				RawRequestBody: req.Body,
+				Input:          []bfschemas.ChatMessage{},
+			},
+			rawForwardCtx(ctx),
+			nil
+	}
+
 	messages, params, err := parseOpenAIChatRequest(req.Body)
 	if err != nil {
 		return nil, ctx, err
@@ -46,6 +65,20 @@ func buildChatRequest(
 		Input:    messages,
 		Params:   params,
 	}, ctx, nil
+}
+
+// isOpenAICompatibleProvider reports whether the destination provider
+// natively speaks OpenAI chat-completions wire format. When true, the
+// gateway raw-forwards the inbound body rather than parse+re-marshal,
+// preserving byte-for-byte identity so OpenAI prompt-prefix auto-cache
+// continues to hit between repeated calls.
+func isOpenAICompatibleProvider(p bfschemas.ModelProvider) bool {
+	switch p {
+	case bfschemas.OpenAI, bfschemas.Azure:
+		return true
+	default:
+		return false
+	}
 }
 
 // parseOpenAIChatRequest decodes an OpenAI-shape /v1/chat/completions body

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -133,6 +134,20 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 		defer release()
+
+		// One-off DEBUG dump of the inbound /v1/messages body — enabled by
+		// LW_LOG_MESSAGE_BODY=1. Lets operators see exactly what
+		// claude-code / Anthropic SDK clients send when debugging
+		// shape-specific provider rejections (e.g. fields that trigger
+		// HTML 5xx from Anthropic's edge). Must NOT be left on in prod —
+		// dumps full request content including potentially sensitive
+		// prompts.
+		if os.Getenv("LW_LOG_MESSAGE_BODY") == "1" {
+			deps.Logger.Info("/v1/messages request body",
+				zap.Int("peek_bytes", len(peek)),
+				zap.String("peek", string(peek)),
+			)
+		}
 
 		model := app.PeekModel(peek)
 		if app.PeekStream(peek) {
