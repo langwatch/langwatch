@@ -166,6 +166,8 @@ describe("saveOrCommitWorkflowVersion", () => {
 // Helpers
 // ---------------------------------------------------------------------------
 
+let versionCounter = 0;
+
 function buildDslWithLocalPromptConfig({
   oldInstructions,
   oldMessages,
@@ -175,13 +177,14 @@ function buildDslWithLocalPromptConfig({
   oldMessages: Array<{ role: string; content: string }>;
   localPromptConfig: any;
 }) {
+  versionCounter++;
   return {
     workflow_id: "test",
     spec_version: "1.3",
     name: "Test Workflow",
     icon: "🧪",
     description: "test",
-    version: "1",
+    version: `${versionCounter}`,
     nodes: [
       {
         id: "entry",
