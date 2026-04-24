@@ -183,7 +183,14 @@ func responsesHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
+		// Large peek: codex 0.122+ and opencode send ~35-60 KiB bodies
+		// (full tool schemas + multi-turn developer input arrays) where
+		// the top-level `stream` field can land past the 32 KiB default
+		// window. Missing it routes a streaming request through the
+		// non-streaming handler, turns OpenAI's 200+SSE response into a
+		// Bifrost unmarshal failure, and surfaces as a 502 with the SSE
+		// frames as the error body.
+		peek, body, release, ok := readAndPeekBodyLarge(w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
@@ -275,7 +282,30 @@ func requireBundle(w http.ResponseWriter, r *http.Request, logger *zap.Logger) (
 	return bundle, true
 }
 
+// Default peek covers typical chat-completion / messages bodies.
+// /v1/responses callers (codex 0.122+, opencode) send substantially
+// larger bodies — full tool schemas + multi-turn developer-role input
+// arrays routinely run 30-60 KiB — so `stream` may land past the 32 KiB
+// window. The Responses handler opts into readAndPeekBodyLarge instead.
+const (
+	defaultPeekBytes   = 32 * 1024
+	largePeekBytes     = 256 * 1024
+)
+
 func readAndPeekBody(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, io.Reader, func(), bool) {
+	return readAndPeekBodySized(w, r, maxBytes, defaultPeekBytes)
+}
+
+// readAndPeekBodyLarge peeks 256 KiB instead of the 32 KiB default.
+// Use on /v1/responses where coding-agent payloads (codex, opencode)
+// routinely push `stream` and other flags past the standard window —
+// a miss there mis-routes a streaming request to the non-streaming
+// handler, surfacing as a 504/502 SSE-in-error-body to the client.
+func readAndPeekBodyLarge(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, io.Reader, func(), bool) {
+	return readAndPeekBodySized(w, r, maxBytes, largePeekBytes)
+}
+
+func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64, peekSize int) ([]byte, io.Reader, func(), bool) {
 	// Cap body size to prevent OOM on drive-by scans while leaving headroom
 	// for 1M-context LLM workloads (multi-MB prompts, vision images, long
 	// tool-result blocks). Zero / unset → fall back to the shared default
@@ -293,10 +323,7 @@ func readAndPeekBody(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]
 	// prompt (common on coding-agent sessions + Claude Haiku's 2048-token
 	// minimum for cache eligibility) can push "model" past the peek
 	// window, triggering a bogus "missing model field" 400 even though
-	// the key is present. 32 KiB covers typical tool schemas, multi-image
-	// vision previews, and 3K-token cached system prompts (~16 KB of
-	// prose JSON with escaping) without materialising the full body.
-	const peekSize = 32 * 1024
+	// the key is present.
 	peeked := make([]byte, peekSize)
 	n, _ := io.ReadFull(r.Body, peeked)
 	peeked = peeked[:n]

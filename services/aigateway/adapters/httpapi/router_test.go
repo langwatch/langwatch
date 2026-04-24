@@ -406,3 +406,76 @@ func TestRouter_VersionHeader(t *testing.T) {
 
 	assert.Equal(t, "1.0.0", rec.Header().Get("X-LangWatch-Gateway-Version"))
 }
+
+// Regression for the codex/opencode /v1/responses streaming
+// misclassification bug: coding-agent bodies run 30-60 KiB, pushing
+// the top-level `stream` flag past the 32 KiB default peek window.
+// A miss routes a streaming request through the non-streaming
+// handler, OpenAI returns 200+SSE, Bifrost can't unmarshal, client
+// sees a 502 with SSE frames as the error body. The /v1/responses
+// handler must peek far enough to still find `stream` at ~50 KiB.
+func TestRouter_Responses_LargeBody_PicksStreamHandler(t *testing.T) {
+	auth := &mockAuth{
+		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+			return testBundle(), nil
+		},
+	}
+
+	syncCalled := false
+	streamCalled := false
+	provider := &mockStreamProvider{
+		mockProvider: mockProvider{
+			dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+				syncCalled = true
+				return successResponse(), nil
+			},
+		},
+		dispatchStreamFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
+			streamCalled = true
+			return &emptyStreamIter{}, nil
+		},
+	}
+
+	router := buildRouter(
+		app.WithAuth(auth),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	// Build a ~50 KiB /v1/responses body. The `instructions` string is
+	// padded past 32 KiB so `stream` lands outside the default peek
+	// window — same shape codex / opencode send in practice.
+	padding := bytes.Repeat([]byte("x"), 40*1024)
+	body := []byte(`{"model":"gpt-5-mini","input":"hi","instructions":"`)
+	body = append(body, padding...)
+	body = append(body, []byte(`","stream":true}`)...)
+	require.Greater(t, len(body), 40*1024)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/responses", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.False(t, syncCalled, "Responses handler routed large body with stream:true through non-streaming Dispatch")
+	require.True(t, streamCalled, "Responses handler did not pick streaming path for stream:true beyond default peek window")
+}
+
+type mockStreamProvider struct {
+	mockProvider
+	dispatchStreamFn func(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error)
+}
+
+func (m *mockStreamProvider) DispatchStream(ctx context.Context, req *domain.Request, cred domain.Credential) (domain.StreamIterator, error) {
+	if m.dispatchStreamFn != nil {
+		return m.dispatchStreamFn(ctx, req, cred)
+	}
+	return &emptyStreamIter{}, nil
+}
+
+type emptyStreamIter struct{}
+
+func (*emptyStreamIter) Next(_ context.Context) bool { return false }
+func (*emptyStreamIter) Chunk() []byte                { return nil }
+func (*emptyStreamIter) Usage() domain.Usage          { return domain.Usage{} }
+func (*emptyStreamIter) Err() error                   { return nil }
+func (*emptyStreamIter) Close() error                 { return nil }
