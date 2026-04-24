@@ -154,9 +154,11 @@ export const agentsRouter = createTRPCRouter({
         id: input.id,
         projectId: input.projectId,
         data: {
-          ...(input.name && { name: input.name }),
-          ...(input.type && { type: input.type }),
-          ...(input.config && { config: input.config as AgentComponentConfig }),
+          ...(input.name !== undefined && { name: input.name }),
+          ...(input.type !== undefined && { type: input.type }),
+          ...(input.config !== undefined && {
+            config: input.config as AgentComponentConfig,
+          }),
           ...(input.workflowId !== undefined && {
             workflowId: input.workflowId,
           }),

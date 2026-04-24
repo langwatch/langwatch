@@ -451,7 +451,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     if (evaluatorId && isWorkflowEvaluator) {
       const formValues = form.getValues();
       const newName = formValues.name.trim();
-      const nameChanged = newName !== (evaluatorQuery.data?.name ?? "");
+      const nameChanged = newName !== (evaluatorQuery.data?.name?.trim() ?? "");
 
       if (nameChanged) {
         updateMutation.mutate({
