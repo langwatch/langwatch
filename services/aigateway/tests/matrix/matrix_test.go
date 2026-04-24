@@ -435,9 +435,12 @@ func runCacheCell(t *testing.T, rc resolvedCell) float64 {
 		t.Fatal("prime: missing X-LangWatch-Trace-Id")
 	}
 
-	// Wait for the provider's cache to register. Anthropic quotes
-	// "within seconds" so 2s is a safe floor.
-	time.Sleep(2 * time.Second)
+	// Wait for the provider's cache to register. Empirically: Anthropic's
+	// ephemeral cache needs ~5-10s to be readable in test environments,
+	// OpenAI's automatic cache similarly takes a few seconds. Gemini / Vertex
+	// automatic context caching can be slower still. 8s gives all four a
+	// comfortable margin without making the test suite too slow.
+	time.Sleep(8 * time.Second)
 
 	// 2. Read — identical prefix should trip the cache-hit path.
 	status, readBody, readTraceID := fireForBody(t, rc, chatBody_Cache_Read(rc.model))
