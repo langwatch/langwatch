@@ -60,6 +60,11 @@ describe("saveOrCommitWorkflowVersion", () => {
   });
 
   afterAll(async () => {
+    // Unset FK references before deleting to avoid circular dependency
+    await prisma.workflow.updateMany({
+      where: { projectId },
+      data: { latestVersionId: null, currentVersionId: null },
+    });
     await prisma.workflowVersion.deleteMany({ where: { projectId } });
     await prisma.workflow.deleteMany({ where: { projectId } });
     await prisma.project.deleteMany({ where: { id: projectId } });
