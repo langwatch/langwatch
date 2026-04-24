@@ -117,7 +117,6 @@ const PANEL_STYLE = {
   display: "flex",
   flexDirection: "column" as const,
   overflow: "hidden" as const,
-  willChange: "transform",
 };
 
 /**
@@ -139,7 +138,7 @@ export function EvaluatorCategorySelectorDrawer(
   const onSelectWorkflow =
     props.onSelectWorkflow ??
     (() => openDrawer("workflowSelectorForEvaluator"));
-  const isOpen = props.open !== false && props.open !== undefined;
+  const isOpen = props.open === true;
 
   const [view, setView] = useState<View>({ step: "category" });
 

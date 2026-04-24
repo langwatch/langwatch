@@ -496,6 +496,9 @@ export function useEvaluatorEditorController(
     }
   }, [form, onLocalConfigChange, debouncedUpdateLocalConfig]);
 
+  // Flush the trailing debounced update so the parent sees the latest form
+  // state before we close. Without this, a keystroke within 300ms of Apply
+  // is dropped — the drawer closes while the trailing call is still queued.
   const handleApply = useCallback(() => {
     debouncedUpdateLocalConfig.flush();
     onClose();

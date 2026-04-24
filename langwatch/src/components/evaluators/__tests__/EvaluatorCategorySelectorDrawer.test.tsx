@@ -18,9 +18,21 @@ vi.mock("../EvaluatorTypeSelectorContent", () => ({
     quality: "Quality Aspects",
     safety: "Safety",
   },
-  EvaluatorTypeSelectorContent: ({ category }: { category?: string }) => (
+  EvaluatorTypeSelectorContent: ({
+    category,
+    onSelect,
+  }: {
+    category?: string;
+    onSelect?: (evaluatorType: string) => void;
+  }) => (
     <div data-testid="mock-type-selector-content">
       type-content-for-{category}
+      <button
+        data-testid="mock-type-pick"
+        onClick={() => onSelect?.("langevals/exact_match")}
+      >
+        pick
+      </button>
     </div>
   ),
 }));
@@ -194,6 +206,74 @@ describe("EvaluatorCategorySelectorDrawer", () => {
       await user.click(screen.getByText("Cancel"));
 
       expect(mockOnClose).toHaveBeenCalled();
+    });
+  });
+
+  describe("when the editor step is active", () => {
+    it("renders the editor body and footer inline", async () => {
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await user.click(screen.getByTestId("evaluator-category-expected_answer"));
+      await user.click(await screen.findByTestId("mock-type-pick"));
+
+      await waitFor(() => {
+        expect(screen.getByTestId("mock-editor-body")).toBeInTheDocument();
+        expect(screen.getByTestId("mock-editor-footer")).toBeInTheDocument();
+        expect(screen.getByTestId("mock-editor-heading")).toBeInTheDocument();
+      });
+      // Editor step must be hosted inline — no separate drawer opened.
+      expect(mockOpenDrawer).not.toHaveBeenCalledWith(
+        "evaluatorEditor",
+        expect.anything(),
+      );
+    });
+  });
+
+  describe("when the drawer is closed and re-opened", () => {
+    it("resets the view back to the category step", async () => {
+      const user = userEvent.setup();
+      const { rerender } = render(
+        <EvaluatorCategorySelectorDrawer
+          open={true}
+          onClose={mockOnClose}
+          onSelectCategory={mockOnSelectCategory}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      // Drill into the type step
+      await user.click(screen.getByTestId("evaluator-category-safety"));
+      await waitFor(() => {
+        expect(
+          screen.getByTestId("mock-type-selector-content"),
+        ).toBeInTheDocument();
+      });
+
+      // Close the drawer
+      rerender(
+        <EvaluatorCategorySelectorDrawer
+          open={false}
+          onClose={mockOnClose}
+          onSelectCategory={mockOnSelectCategory}
+        />,
+      );
+
+      // Re-open — should start from the category step again, not from the
+      // last-visited type step.
+      rerender(
+        <EvaluatorCategorySelectorDrawer
+          open={true}
+          onClose={mockOnClose}
+          onSelectCategory={mockOnSelectCategory}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByText("Choose Evaluator Category"),
+        ).toBeInTheDocument();
+      });
     });
   });
 });
