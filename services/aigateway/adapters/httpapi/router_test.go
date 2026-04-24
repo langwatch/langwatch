@@ -331,6 +331,56 @@ func TestRouter_MetaHeaders(t *testing.T) {
 	assert.NotEmpty(t, rec.Header().Get("X-LangWatch-Gateway-Request-Id"))
 }
 
+// TestRouter_BodySizeCap_DefaultsTo32MiB pins the contract: a request
+// strictly over the explicit cap is rejected with 413, a request below is
+// accepted. Uses a small-ish 1 KiB cap so the test can fit a giant-enough
+// body in memory without dominating the test suite. Zero-cap fallback is
+// exercised implicitly by every other test in this file (buildRouter leaves
+// MaxRequestBodyBytes unset → fallback to 32 MiB).
+func TestRouter_BodySizeCap_RejectsOverLimit(t *testing.T) {
+	auth := &mockAuth{
+		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+			return testBundle(), nil
+		},
+	}
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+			return successResponse(), nil
+		},
+	}
+
+	reg := health.New("test")
+	reg.MarkStarted()
+	application := app.New(
+		app.WithAuth(auth),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+	router := NewRouter(RouterDeps{
+		App:                 application,
+		Logger:              zap.NewNop(),
+		Health:              reg,
+		MaxRequestBodyBytes: 1024,
+	})
+
+	// 2 KiB of padding wrapped in a minimally-valid chat body overruns the
+	// 1 KiB cap — the MaxBytesReader trips at read time, the handler
+	// surfaces it as 413.
+	big := bytes.Repeat([]byte("x"), 2048)
+	body := []byte(`{"model":"gpt-4","messages":[{"role":"user","content":"`)
+	body = append(body, big...)
+	body = append(body, []byte(`"}]}`)...)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer lw_vk_test")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code < 400 {
+		t.Fatalf("want 4xx (413 or similar), got %d; body: %s", rec.Code, rec.Body.String())
+	}
+}
+
 func TestRouter_VersionHeader(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {

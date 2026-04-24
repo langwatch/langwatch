@@ -289,17 +289,19 @@ The config struct has six groups, each rooted at an env prefix: `LW_GATEWAY_*` (
 
 **Symptoms:**
 - A request with a large prompt / large base64 image / long tool-call argument list returns 413.
-- Response body: `{"error":{"type":"payload_too_large","message":"request body exceeds 2097152 bytes"}}`.
+- Response body: `{"error":{"type":"payload_too_large","message":"request body exceeds 33554432 bytes"}}`.
 
-**Root cause:** the request body exceeded the gateway's 2 MiB request-body cap. The cap is enforced at the edge — before auth, before upstream dispatch — so this is always a client-side payload-size issue, not an auth or provider issue.
+**Root cause:** the request body exceeded the gateway's request-body cap (default **32 MiB**). The cap is enforced at the edge — before auth, before upstream dispatch — so this is always a client-side payload-size issue, not an auth or provider issue.
 
-The cap is a hard-coded constant in v1 (not tunable via env or Helm) to keep every deployment's attack surface identical. Reducing the client payload is the supported fix.
+32 MiB covers the 1M-context + multi-image-vision worst case with headroom; truly-huge workloads can raise it, edge-public deployments can lower it.
+
+**Tuning:** set `SERVER_MAX_REQUEST_BODY_BYTES` (bytes) on the gateway container, or the corresponding Helm value. Set to 0 to fall back to the 32 MiB default. Never disable the cap entirely on a public endpoint — a body-cap-less endpoint is drive-by-scan-able.
 
 **Fix, in increasing order of effort:**
 
-1. Compress / resize large base64 images on the client before including them in the payload. A 4K image base64-encoded is ~6 MB on its own; a single full-res image exceeds the 2 MiB cap.
+1. Compress / resize large base64 images on the client before including them in the payload. A 4K image base64-encoded is ~6 MB on its own; multiple full-res images plus a big system prompt can push past 32 MiB.
 2. Trim long tool-call argument lists or chunk the request across multiple completions.
-3. For legitimately-large workflows (multi-image vision, long-document summarisation) route them through the provider SDK directly rather than the gateway until v1.1 ships a tunable cap.
+3. If your traffic legitimately exceeds 32 MiB (multi-image vision with 1M-context models), raise `SERVER_MAX_REQUEST_BODY_BYTES` on the gateway deployment. Coordinate with ops — raising the cap reduces attack-surface cheapness, so the higher value should be deliberate and scoped to the impacted deployment.
 
 **What NOT to do:** disabling the cap at the LB / ingress layer. A public endpoint with no body cap is drive-by-scan-able; an attacker discovers your endpoint and sends a few GB to see if the pod crashes.
 

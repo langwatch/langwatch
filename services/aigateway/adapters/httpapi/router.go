@@ -16,6 +16,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/pkg/config"
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
@@ -33,6 +34,13 @@ type RouterDeps struct {
 	Version               string
 	TraceRegistry         *customertracebridge.Registry
 	DefaultExportEndpoint string
+	// MaxRequestBodyBytes caps the per-request body size. 0 falls back to
+	// config.DefaultMaxRequestBodyBytes (32 MiB) — sized for 1M-context LLM
+	// workloads where legitimate requests can be multi-MB. Set higher on
+	// enterprise deployments that send full-context 1M Gemini / multi-image
+	// vision payloads; lower on public edge deployments to tighten DDoS
+	// protection.
+	MaxRequestBodyBytes   int64
 }
 
 // NewRouter creates the chi router with all gateway routes mounted.
@@ -85,7 +93,7 @@ func chatHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		peek, body, release, ok := readAndPeekBody(w, r)
+		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
@@ -119,7 +127,7 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		peek, body, release, ok := readAndPeekBody(w, r)
+		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
@@ -153,7 +161,7 @@ func embeddingsHandler(deps RouterDeps) http.HandlerFunc {
 			return
 		}
 
-		peek, body, release, ok := readAndPeekBody(w, r)
+		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
 		if !ok {
 			return
 		}
@@ -200,9 +208,16 @@ func requireBundle(w http.ResponseWriter, r *http.Request, logger *zap.Logger) (
 	return bundle, true
 }
 
-func readAndPeekBody(w http.ResponseWriter, r *http.Request) ([]byte, io.Reader, func(), bool) {
-	// Limit to 2MB to prevent OOM
-	r.Body = http.MaxBytesReader(w, r.Body, 2*1024*1024)
+func readAndPeekBody(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, io.Reader, func(), bool) {
+	// Cap body size to prevent OOM on drive-by scans while leaving headroom
+	// for 1M-context LLM workloads (multi-MB prompts, vision images, long
+	// tool-result blocks). Zero / unset → fall back to the shared default
+	// so integration tests + misconfigured deployments still get a sensible
+	// ceiling.
+	if maxBytes <= 0 {
+		maxBytes = config.DefaultMaxRequestBodyBytes
+	}
+	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 
 	buf := bodyPool.Get().(*bytes.Buffer)
 	// Peek up to 512 bytes

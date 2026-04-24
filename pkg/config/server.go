@@ -10,12 +10,22 @@ import (
 	"time"
 )
 
-const DefaultGracefulSeconds = 5
+const (
+	DefaultGracefulSeconds = 5
+	// DefaultMaxRequestBodyBytes sizes the body cap for 1M-context LLM
+	// workloads where a single request can legitimately carry multi-MB
+	// prompts (vision images, long tool-result blocks, 750K-token context).
+	// Earlier iters used 2 MiB which 413-rejected real enterprise traffic.
+	// 32 MiB gives ~2× headroom over observed worst-case (Gemini 1.5 Pro
+	// with full context + images ≈ 15 MB) while preserving DDoS protection.
+	DefaultMaxRequestBodyBytes = 32 * 1024 * 1024
+)
 
-// Server configures HTTP listen address and graceful shutdown.
+// Server configures HTTP listen address, graceful shutdown, and request body cap.
 type Server struct {
-	Addr            string `env:"ADDR"`
-	GracefulSeconds int    `env:"GRACEFUL_SECONDS"`
+	Addr                string `env:"ADDR"`
+	GracefulSeconds     int    `env:"GRACEFUL_SECONDS"`
+	MaxRequestBodyBytes int64  `env:"MAX_REQUEST_BODY_BYTES"`
 }
 
 // ListenAndServe starts the server and handles graceful shutdown on SIGTERM/SIGINT.

@@ -37,8 +37,9 @@ func defaultConfig() Config {
 	return Config{
 		Environment: "local",
 		Server: config.Server{
-			Addr:            ":5563",
-			GracefulSeconds: 10,
+			Addr:                ":5563",
+			GracefulSeconds:     10,
+			MaxRequestBodyBytes: config.DefaultMaxRequestBodyBytes,
 		},
 		ControlPlane: ControlPlaneConfig{
 			BaseURL: "http://localhost:5560",
