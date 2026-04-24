@@ -39,14 +39,32 @@ post-run.
 Build tags per provider: `live_openai`, `live_anthropic`, `live_gemini`,
 `live_bedrock`, `live_azure`, `live_vertex`. Default `go test` skips all.
 
+Last execution: 2026-04-24. Gateway binary `b98a752dc`. Live run against
+real provider credentials; traces + costs captured on the LangWatch
+platform (`/api/trace/:id`).
+
 | Provider | Simple | Streamed | Tool calling | Structured outputs | Cache |
 |----------|--------|----------|--------------|--------------------|-------|
-| openai | scaffold | scaffold | scaffold | scaffold | scaffold |
-| anthropic | scaffold | scaffold | scaffold | scaffold | scaffold |
-| gemini | scaffold | scaffold | scaffold | scaffold | scaffold |
-| bedrock | scaffold | scaffold | scaffold | scaffold | scaffold |
-| azure | scaffold | scaffold | scaffold | scaffold | scaffold |
-| vertex | scaffold | scaffold | scaffold | scaffold | scaffold |
+| openai    | ✅ 2.95s · \$0.000035  | ✅ 26.20s · \$0.000101 | ✅ 10.60s · \$0.000162 | ✅ 18.95s · \$0.000135 | ❌ cached_tokens=0 (provider) |
+| anthropic | ✅ 5.85s · \$0.000035  | ✅ 9.71s · \$0.000086  | ✅ 5.61s · \$0.000839  | ✅ 5.33s · \$0.000161  | ❌ cached_tokens=0 (provider) |
+| gemini    | ✅ 9.87s · \$0.000075  | ✅ 5.14s · \$0.000099  | ✅ 9.83s · \$0.000253  | ✅ 3.60s · \$0.000178  | ❌ cached_tokens=0 (provider) |
+| bedrock   | 🟡 \*                  | 🟡 \*                  | 🟡 \*                  | 🟡 \*                  | 🟡 \*                         |
+| azure     | ✅ 13.82s · \$0.000035 | ✅ 18.63s · \$0.000080 | ✅ 10.55s · \$0.000152 | ✅ 27.33s · \$0.000128 | ✅ 14.39s · \$0.000489        |
+| vertex    | ✅ 3.55s · \$0.000047  | ✅ 6.26s · \$0.000084  | ✅ 5.79s · \$0.000146  | ✅ 9.42s · \$0.000178  | ❌ cached_tokens=0 (provider) |
+
+**🟡 Bedrock blocker (account-side)**: Anthropic models on Bedrock require
+the AWS account to submit the "Anthropic use-case details form"; until that
+lands we get `404 Model use case details have not been submitted`. The
+`eu.amazon.nova-micro-v1:0` fallback works end-to-end but the LangWatch
+pricing catalog has no entry for Nova, so `total_cost` lands as null and
+the `>0` assertion fails.
+
+**❌ Cache cells (provider-side, not gateway)**: OpenAI / Anthropic / Gemini /
+Vertex all returned `cached_tokens: 0` on the 2nd identical-prefix call
+(1445 input tokens, well over OpenAI's 1024-token cache threshold). Azure
+passed reliably. The gateway correctly forwards `cache_control` bytes and
+identical system prefixes; provider caching is either disabled on the org,
+needs longer propagation than 8s, or hasn't warmed. Not a gateway bug.
 
 Cell format when filled:
 ```
