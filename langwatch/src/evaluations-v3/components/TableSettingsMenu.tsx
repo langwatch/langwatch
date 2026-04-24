@@ -60,7 +60,7 @@ const rowHeightOptions: ToggleOption[] = [
 ];
 
 // Max rows for expanded mode
-const MAX_ROWS_FOR_EXPANDED_MODE = 100;
+const MAX_ROWS_FOR_FIT_MODE = 100;
 
 // =============================================================================
 // Concurrency Popover Component
@@ -198,7 +198,7 @@ export function TableSettingsMenu({
 
   // Get current row count to determine if expanded mode should be disabled
   const rowCount = getRowCount(activeDatasetId);
-  const isExpandedDisabled = rowCount > MAX_ROWS_FOR_EXPANDED_MODE;
+  const isFitDisabled = rowCount > MAX_ROWS_FOR_FIT_MODE;
 
   const { project } = useOrganizationTeamProject();
   const cicdDialog = useDisclosure();
@@ -250,7 +250,7 @@ export function TableSettingsMenu({
                 {rowHeightOptions.map((option) => {
                   const isActive = rowHeightMode === option.value;
                   const isDisabled =
-                    option.value === "fit" && isExpandedDisabled;
+                    option.value === "fit" && isFitDisabled;
 
                   const button = (
                     <Button
@@ -279,7 +279,7 @@ export function TableSettingsMenu({
                     return (
                       <Tooltip
                         key={option.value}
-                        content={`Expanded mode is disabled for datasets with more than ${MAX_ROWS_FOR_EXPANDED_MODE} rows for performance reasons`}
+                        content={`Fit mode is disabled for datasets with more than ${MAX_ROWS_FOR_FIT_MODE} rows for performance reasons`}
                         positioning={{ placement: "top" }}
                         openDelay={100}
                       >
