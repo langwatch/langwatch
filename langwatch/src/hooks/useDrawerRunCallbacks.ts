@@ -17,6 +17,8 @@ export function useDrawerRunCallbacks() {
 
   const onRunComplete = useCallback(
     (result: { scenarioRunId: string; batchRunId?: string }) => {
+      // Transient null during initial auth/project resolve. By the time a
+      // user can click Run Again from a drawer, project.slug is present.
       if (!project?.slug) return;
       const query = result.batchRunId
         ? `?pendingBatch=${result.batchRunId}`
