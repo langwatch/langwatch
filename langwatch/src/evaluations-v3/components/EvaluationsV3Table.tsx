@@ -913,12 +913,14 @@ export function EvaluationsV3Table({
         ]),
       );
 
-      // Check if this row is empty - empty rows don't get executed
-      const _rowIsEmpty = isRowEmpty(datasetValues);
+      // Empty rows (the Excel-style trailing phantom row) don't get executed
+      // and shouldn't render target outputs / evaluator chips.
+      const rowIsEmpty = isRowEmpty(datasetValues);
 
       return {
         rowIndex: index,
         dataset: datasetValues,
+        isEmpty: rowIsEmpty,
         targets: Object.fromEntries(
           targets.map((target) => [
             target.id,
@@ -1145,6 +1147,10 @@ export function EvaluationsV3Table({
             <TargetHeaderFromMeta targetId={targetId} context={context} />
           ),
           cell: (info) => {
+            // Phantom empty rows render nothing in target columns — the
+            // dataset side keeps the click-to-add affordance, but there's
+            // no input to run a target against.
+            if (info.row.original.isEmpty) return null;
             const data = info.getValue() as {
               output: unknown;
               evaluators: Record<string, unknown>;
