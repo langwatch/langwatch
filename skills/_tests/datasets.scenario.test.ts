@@ -12,6 +12,7 @@ import {
   toolCallFix,
   assertSkillWasRead,
   setupLocalCli,
+  installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
@@ -25,18 +26,7 @@ const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
 
 function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "datasets");
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.copyFileSync(
-    path.resolve(__dirname, "../datasets/SKILL.md"),
-    path.join(skillDir, "SKILL.md")
-  );
-  const sharedDir = path.join(skillDir, "_shared");
-  fs.mkdirSync(sharedDir, { recursive: true });
-  const sharedSource = path.resolve(__dirname, "../_shared");
-  if (fs.existsSync(sharedSource)) {
-    execSync(`cp -r ${sharedSource}/* ${sharedDir}/`);
-  }
+  installSkillToWorkDir(tempFolder, "datasets");
 }
 
 function findGeneratedFiles({

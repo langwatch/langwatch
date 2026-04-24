@@ -10,6 +10,7 @@ import {
   createClaudeCodeAgent,
   toolCallFix,
   assertSkillWasRead,
+  installSkillToWorkDir,
   SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
@@ -29,16 +30,7 @@ describe("Analytics Skill", () => {
         path.join(os.tmpdir(), "langwatch-skill-analytics-")
       );
 
-      const skillDir = path.join(tempFolder, ".skills", "analytics");
-      fs.mkdirSync(skillDir, { recursive: true });
-      fs.copyFileSync(
-        path.resolve(__dirname, "../analytics/SKILL.md"),
-        path.join(skillDir, "SKILL.md")
-      );
-      const sharedDir = path.join(skillDir, "_shared");
-      fs.mkdirSync(sharedDir, { recursive: true });
-      const sharedSrc = path.resolve(__dirname, "../_shared");
-      fs.cpSync(sharedSrc, sharedDir, { recursive: true });
+      installSkillToWorkDir(tempFolder, "analytics");
 
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
