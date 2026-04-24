@@ -379,6 +379,14 @@ export function useEvaluatorEditorController(
         onClose();
       }
     },
+    onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
+      toaster.create({
+        title: "Error saving evaluator",
+        description: error.message,
+        type: "error",
+      });
+    },
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -488,6 +496,11 @@ export function useEvaluatorEditorController(
     }
   }, [form, onLocalConfigChange, debouncedUpdateLocalConfig]);
 
+  const handleApply = useCallback(() => {
+    debouncedUpdateLocalConfig.flush();
+    onClose();
+  }, [debouncedUpdateLocalConfig, onClose]);
+
   const hasSettings =
     settingsSchema instanceof z.ZodObject &&
     Object.keys(settingsSchema.shape).length > 0;
@@ -526,7 +539,7 @@ export function useEvaluatorEditorController(
     handleSave,
     handleClose,
     handleDiscard,
-    handleApply: onClose,
+    handleApply,
   };
 }
 
@@ -700,7 +713,7 @@ export function EvaluatorEditorFooter({
           variant="outline"
           size="sm"
           onClick={handleSave}
-          disabled={!isValid}
+          disabled={!isValid || isSaving}
           loading={isSaving}
           data-testid="evaluator-save-button"
         >

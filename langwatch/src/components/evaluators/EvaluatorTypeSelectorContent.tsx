@@ -1,4 +1,4 @@
-import { Box, HStack, Text, VStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { LuExternalLink } from "react-icons/lu";
 import { useRouter } from "~/utils/compat/next-router";
 
@@ -220,7 +220,7 @@ function EvaluatorCard({
 
   const card = (
     <Box
-      as="button"
+      as={disabled ? "div" : "button"}
       onClick={disabled ? undefined : onClick}
       padding={4}
       borderRadius="lg"
@@ -252,9 +252,11 @@ function EvaluatorCard({
           {description}
         </Text>
         {disabled && disabledCta && (
-          <HStack
-            as="span"
-            gap={1}
+          <Button
+            variant="plain"
+            size="xs"
+            height="auto"
+            padding={0}
             color="orange.600"
             fontSize="xs"
             fontWeight="500"
@@ -263,11 +265,12 @@ function EvaluatorCard({
               disabledCta.onClick();
             }}
             data-testid={`${testId}-cta`}
-            cursor="pointer"
           >
-            <Text>{disabledCta.label}</Text>
-            <LuExternalLink size={12} />
-          </HStack>
+            <HStack gap={1}>
+              <Text>{disabledCta.label}</Text>
+              <LuExternalLink size={12} />
+            </HStack>
+          </Button>
         )}
       </VStack>
     </Box>

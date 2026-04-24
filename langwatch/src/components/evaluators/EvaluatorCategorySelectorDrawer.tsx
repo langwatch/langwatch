@@ -143,6 +143,10 @@ export function EvaluatorCategorySelectorDrawer(
 
   const [view, setView] = useState<View>({ step: "category" });
 
+  useEffect(() => {
+    if (!isOpen) setView({ step: "category" });
+  }, [isOpen]);
+
   const currentStepIndex = STEP_ORDER[view.step];
   const prevStepIndexRef = useRef(currentStepIndex);
   const direction = currentStepIndex >= prevStepIndexRef.current ? 1 : -1;
