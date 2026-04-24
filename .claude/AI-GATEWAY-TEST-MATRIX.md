@@ -48,16 +48,17 @@ platform (`/api/trace/:id`).
 | openai    | ✅ 2.95s · \$0.000035  | ✅ 26.20s · \$0.000101 | ✅ 10.60s · \$0.000162 | ✅ 18.95s · \$0.000135 | ❌ cached_tokens=0 (provider) |
 | anthropic | ✅ 5.85s · \$0.000035  | ✅ 9.71s · \$0.000086  | ✅ 5.61s · \$0.000839  | ✅ 5.33s · \$0.000161  | ❌ cached_tokens=0 (provider) |
 | gemini    | ✅ 9.87s · \$0.000075  | ✅ 5.14s · \$0.000099  | ✅ 9.83s · \$0.000253  | ✅ 3.60s · \$0.000178  | ❌ cached_tokens=0 (provider) |
-| bedrock   | 🟡 \*                  | 🟡 \*                  | 🟡 \*                  | 🟡 \*                  | 🟡 \*                         |
+| bedrock   | ✅ 11.44s · \$0.000035 | ✅ 17.80s · \$0.000086 | ✅ 5.72s · \$0.000146  | ✅ 15.33s · \$0.000135 | ❌ cached_tokens=0 (provider) |
 | azure     | ✅ 13.82s · \$0.000035 | ✅ 18.63s · \$0.000080 | ✅ 10.55s · \$0.000152 | ✅ 27.33s · \$0.000128 | ✅ 14.39s · \$0.000489        |
 | vertex    | ✅ 3.55s · \$0.000047  | ✅ 6.26s · \$0.000084  | ✅ 5.79s · \$0.000146  | ✅ 9.42s · \$0.000178  | ❌ cached_tokens=0 (provider) |
 
-**🟡 Bedrock blocker (account-side)**: Anthropic models on Bedrock require
-the AWS account to submit the "Anthropic use-case details form"; until that
-lands we get `404 Model use case details have not been submitted`. The
-`eu.amazon.nova-micro-v1:0` fallback works end-to-end but the LangWatch
-pricing catalog has no entry for Nova, so `total_cost` lands as null and
-the `>0` assertion fails.
+**✅ Bedrock unblocked post iter-110**: two real fixes landed to reach green —
+(a) AWS `AmazonBedrockFullAccess`-equivalent marketplace permissions added
+to `langwatch-dev-bedrock-user` IAM inline policy (previously the account
+could invoke the foundation model but lacked `aws-marketplace:Subscribe`);
+(b) Bedrock model-id normaliser added to the ingest pipeline so the
+cross-region inference prefix (`eu.anthropic.claude-haiku-4-5-20251001-v1:0`)
+maps to the pricing catalog entry (`anthropic/claude-haiku-4.5`).
 
 **❌ Cache cells (provider-side, not gateway)**: OpenAI / Anthropic / Gemini /
 Vertex all returned `cached_tokens: 0` on the 2nd identical-prefix call
