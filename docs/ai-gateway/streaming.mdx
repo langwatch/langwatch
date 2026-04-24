@@ -62,8 +62,6 @@ When the primary returns a retryable error **before** any chunk has been sent to
 
 `X-LangWatch-Fallback-Count` reports how many chain slots were skipped before the successful attempt. `0` means the primary worked; `N` means N providers were tried.
 
-Shipped in `b8016b0` (@sergey Lane A iter 4 pt6).
-
 ## `stream_chunk` guardrails
 
 Guardrails with `direction: stream_chunk` run on **chunks with visible delta text** before emission. Frames without visible text — role-only (`{"delta":{"role":"assistant"}}`), tool-call deltas, terminal usage — skip the guardrail call entirely, so ~95% of stream frames are near-zero overhead. See [Guardrails → stream_chunk](/ai-gateway/guardrails#stream_chunk--terminate-per-chunk-on-visible-deltas).
@@ -191,9 +189,7 @@ In Prometheus / Grafana:
 rate(gateway_requests_total{usage_reported="false"}[5m]) > 0
 ```
 
-If this fires, a client is streaming without `include_usage` and you're effectively not charging those requests. Sergey's warning header + span status make this observable — wire a Grafana alert on `span.status = success_no_usage` too.
-
-Shipped in `56f9134` (@sergey Lane A iter 4 pt5).
+If this fires, a client is streaming without `include_usage` and you're effectively not charging those requests. The gateway's warning header and `span.status = success_no_usage` make this observable — wire a Grafana alert on that span status too.
 
 ## Non-streaming clients
 
