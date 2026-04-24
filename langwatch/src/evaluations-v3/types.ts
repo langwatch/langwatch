@@ -587,8 +587,9 @@ export type TableRowData = {
    * True when the dataset row contains no user-entered values. The table
    * always renders a trailing empty row for Excel-style "click to add,"
    * but that phantom row must not show target outputs or evaluator chips.
+   * The cell renderer uses a truthy check, so `undefined` == not empty.
    */
-  isEmpty: boolean;
+  isEmpty?: boolean;
   targets: Record<
     string,
     {
