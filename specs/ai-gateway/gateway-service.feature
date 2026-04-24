@@ -6,19 +6,19 @@ Feature: Gateway service — public HTTP surface and operational basics
   See contract.md §3.
 
   Background:
-    Given the gateway is listening on :5590
+    Given the gateway is listening on :5563
 
   Rule: Every request gets a request id
 
     @unit
     Scenario: gateway generates request id when client omits it
-      When I POST /v1/chat/completions with a valid VK and no X-LangWatch-Request-Id header
-      Then the response has header "X-LangWatch-Request-Id" set to a value matching `^req_[0-9a-f]{30}$`
+      When I POST /v1/chat/completions with a valid VK and no X-LangWatch-Gateway-Request-Id header
+      Then the response has header "X-LangWatch-Gateway-Request-Id" set to a value matching `^req_[0-9a-f]{30}$`
 
     @unit
     Scenario: gateway echoes client-supplied request id
-      When I POST with "X-LangWatch-Request-Id: abc-correlated-123"
-      Then the response echoes exactly "X-LangWatch-Request-Id: abc-correlated-123"
+      When I POST with "X-LangWatch-Gateway-Request-Id: abc-correlated-123"
+      Then the response echoes exactly "X-LangWatch-Gateway-Request-Id: abc-correlated-123"
       And the access log line carries the same id
 
   Rule: Public HTTP surface shape
