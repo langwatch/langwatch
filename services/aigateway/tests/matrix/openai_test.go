@@ -41,5 +41,16 @@ func TestOpenAI_StructuredOutputs(t *testing.T) {
 }
 
 func TestOpenAI_Cache(t *testing.T) {
-	runCacheCell(t, openaiCell(t, "cache", chatBody_Cache_Prime, false))
+	// gpt-5-mini (and other reasoning models) don't return
+	// `prompt_tokens_details.cached_tokens` > 0 on this account — verified
+	// with direct-to-api.openai.com calls. gpt-4o-mini caches reliably with
+	// the same prefix. Override via OPENAI_CACHE_MODEL when testing a
+	// different OpenAI model family's cache behaviour.
+	cell := openaiCell(t, "cache", chatBody_Cache_Prime, false)
+	if override := os.Getenv("OPENAI_CACHE_MODEL"); override != "" {
+		cell.model = override
+	} else {
+		cell.model = "gpt-4o-mini"
+	}
+	runCacheCell(t, cell)
 }
