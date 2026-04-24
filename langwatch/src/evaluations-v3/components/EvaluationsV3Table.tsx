@@ -50,6 +50,7 @@ import type {
 } from "../types";
 import { convertInlineToRowRecords } from "../utils/datasetConversion";
 import { isRowEmpty } from "../utils/emptyRowDetection";
+import { createEvaluatorEditorCallbacks } from "../utils/evaluatorEditorCallbacks";
 import { isCellInExecution } from "../utils/executionScope";
 import {
   convertFromUIMapping,
@@ -511,21 +512,24 @@ export function EvaluationsV3Table({
     // 1. Fetch the newly created evaluator from DB
     // 2. Add it to the workbench
     // 3. Close the drawer
-    setFlowCallbacks("evaluatorEditor", {
-      onSave: async (savedEvaluator: { id: string; name: string }) => {
-        // Fetch the full evaluator data from DB
-        const evaluator = await trpcUtils.evaluators.getById.fetch({
-          id: savedEvaluator.id,
-          projectId: project?.id ?? "",
-        });
+    setFlowCallbacks(
+      "evaluatorEditor",
+      createEvaluatorEditorCallbacks({
+        onSave: async (savedEvaluator: { id: string; name: string }) => {
+          // Fetch the full evaluator data from DB
+          const evaluator = await trpcUtils.evaluators.getById.fetch({
+            id: savedEvaluator.id,
+            projectId: project?.id ?? "",
+          });
 
-        if (evaluator) {
-          addEvaluatorToWorkbench(evaluator);
-        }
-        closeDrawer(); // Close drawer after adding evaluator to workbench
-        return true; // Indicate navigation was handled to prevent default back behavior
-      },
-    });
+          if (evaluator) {
+            addEvaluatorToWorkbench(evaluator);
+          }
+          closeDrawer(); // Close drawer after adding evaluator to workbench
+          return true; // Indicate navigation was handled to prevent default back behavior
+        },
+      }),
+    );
 
     openDrawer("evaluatorList");
   }, [
@@ -673,24 +677,27 @@ export function EvaluationsV3Table({
     });
     // Set up flow callback for when a NEW evaluator is created during the target flow
     // This handles: add comparison > evaluator > create new > category > fill form > create
-    setFlowCallbacks("evaluatorEditor", {
-      onSave: async (savedEvaluator: { id: string; name: string }) => {
-        // Fetch the full evaluator data from DB to get computed fields
-        const evaluator = await trpcUtils.evaluators.getById.fetch({
-          id: savedEvaluator.id,
-          projectId: project?.id ?? "",
-        });
+    setFlowCallbacks(
+      "evaluatorEditor",
+      createEvaluatorEditorCallbacks({
+        onSave: async (savedEvaluator: { id: string; name: string }) => {
+          // Fetch the full evaluator data from DB to get computed fields
+          const evaluator = await trpcUtils.evaluators.getById.fetch({
+            id: savedEvaluator.id,
+            projectId: project?.id ?? "",
+          });
 
-        if (!evaluator) {
-          closeDrawer();
-          return true;
-        }
+          if (!evaluator) {
+            closeDrawer();
+            return true;
+          }
 
-        // Use handleSelectEvaluatorAsTarget to add the target with proper fields
-        handleSelectEvaluatorAsTarget(evaluator);
-        return true; // Indicate navigation was handled to prevent default back behavior
-      },
-    });
+          // Use handleSelectEvaluatorAsTarget to add the target with proper fields
+          handleSelectEvaluatorAsTarget(evaluator);
+          return true; // Indicate navigation was handled to prevent default back behavior
+        },
+      }),
+    );
     openDrawer("targetTypeSelector");
   }, [
     buildAvailableSources,
