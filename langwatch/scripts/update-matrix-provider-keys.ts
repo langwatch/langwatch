@@ -37,6 +37,10 @@ const UPDATES: { provider: string; env: Record<string, string | undefined> }[] =
       AZURE_OPENAI_API_KEY: process.env.AZURE_OPENAI_API_KEY,
       AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
     },
+    // Azure routes on deployment name, not the bare model id. Customer's
+    // Azure subscription maps "gpt-5-mini" → deployment "gpt-5-mini"
+    // (defaulted) on the langwatchopenaisweden endpoint.
+    deploymentMap: { "gpt-5-mini": "gpt-5-mini" },
   },
   {
     provider: "vertex_ai",

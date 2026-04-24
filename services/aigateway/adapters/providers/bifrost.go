@@ -179,7 +179,8 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 		k.Value = envVar(cred.APIKey)
 		endpoint := cred.Extra["endpoint"]
 		cfg := &bfschemas.AzureKeyConfig{
-			Endpoint: envVar(endpoint),
+			Endpoint:    envVar(endpoint),
+			Deployments: cred.DeploymentMap,
 		}
 		if apiVersion, ok := cred.Extra["api_version"]; ok {
 			v := envVar(apiVersion)
@@ -189,8 +190,9 @@ func credentialToBifrostKey(cred domain.Credential, provider bfschemas.ModelProv
 
 	case bfschemas.Bedrock:
 		cfg := &bfschemas.BedrockKeyConfig{
-			AccessKey: envVar(cred.Extra["access_key"]),
-			SecretKey: envVar(cred.Extra["secret_key"]),
+			AccessKey:   envVar(cred.Extra["access_key"]),
+			SecretKey:   envVar(cred.Extra["secret_key"]),
+			Deployments: cred.DeploymentMap,
 		}
 		if st, ok := cred.Extra["session_token"]; ok && st != "" {
 			v := envVar(st)

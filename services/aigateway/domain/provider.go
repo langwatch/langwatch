@@ -21,6 +21,12 @@ type Credential struct {
 	APIKey     string
 	// Provider-specific fields (Azure endpoint, Bedrock region, etc.)
 	Extra map[string]string
+	// DeploymentMap maps public model ids → provider-specific deployment
+	// names. Azure routes on deployment, not bare model id — a customer
+	// subscription may have a deployment called "my-gpt5-prod" that serves
+	// the "gpt-5-mini" model. Bedrock + Vertex have analogous mappings.
+	// nil or empty when the provider doesn't need deployment mapping.
+	DeploymentMap map[string]string
 }
 
 // Provider dispatches requests to a specific AI provider.

@@ -212,6 +212,18 @@ func providerSlotToCredential(p providerSlotWire) domain.Credential {
 		return ""
 	}
 
+	// deployment_map is a top-level sibling of credentials on the wire
+	// (materialiser emits it when the ModelProvider has a non-empty
+	// deploymentMapping). Extract once; providers that don't care ignore it.
+	if m, ok := p.Credentials["deployment_map"].(map[string]any); ok {
+		cred.DeploymentMap = make(map[string]string, len(m))
+		for k, v := range m {
+			if s, ok := v.(string); ok {
+				cred.DeploymentMap[k] = s
+			}
+		}
+	}
+
 	switch cred.ProviderID {
 	case domain.ProviderAzure:
 		cred.APIKey = getString("api_key")
