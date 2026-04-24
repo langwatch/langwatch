@@ -266,5 +266,55 @@ export function createEnvConfig() {
      */
     skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   });
+
+  if (!process.env.SKIP_ENV_VALIDATION && !process.env.BUILD_TIME) {
+    assertGatewaySecretsAllOrNone(_env);
+  }
+
   return _env;
+}
+
+/**
+ * Cross-field guard on AI Gateway secrets. Each secret is individually
+ * `.optional()` so deployments that don't use the gateway pass clean —
+ * but a deployment that sets two of three is a latent bug that only
+ * surfaces minutes after startup when the first VK request hits
+ * /api/internal/gateway/* and returns 503 auth_upstream_unavailable.
+ *
+ * Lives here instead of in start.ts so workers, CLI scripts, and every
+ * other code path that imports env gets the same assertion at boot
+ * (start.ts already ran this pre-a50e5266f; moving it here covers
+ * workers.ts which otherwise boots through only verifyRedisReady).
+ *
+ * @param {Record<string, unknown>} env
+ */
+export function assertGatewaySecretsAllOrNone(env) {
+  const gwSecrets = {
+    LW_VIRTUAL_KEY_PEPPER: env.LW_VIRTUAL_KEY_PEPPER,
+    LW_GATEWAY_INTERNAL_SECRET: env.LW_GATEWAY_INTERNAL_SECRET,
+    LW_GATEWAY_JWT_SECRET: env.LW_GATEWAY_JWT_SECRET,
+  };
+  const set = Object.entries(gwSecrets).filter(([, v]) => !!v);
+  const missing = Object.entries(gwSecrets)
+    .filter(([, v]) => !v)
+    .map(([k]) => k);
+  if (set.length > 0 && missing.length > 0) {
+    const banner = [
+      "",
+      "========================================================================",
+      "AI Gateway secrets are partially configured.",
+      `  Missing: ${missing.join(", ")}`,
+      "  Either set ALL three secrets (see langwatch/.env.example) or UNSET",
+      "  them all. Partial config leaves /api/internal/gateway/* returning",
+      "  503 auth_upstream_unavailable at request time.",
+      "  Generate each value with: openssl rand -hex 32",
+      "========================================================================",
+      "",
+    ].join("\n");
+    // eslint-disable-next-line no-console
+    console.error(banner);
+    throw new Error(
+      `AI Gateway secrets partial config (missing: ${missing.join(", ")})`,
+    );
+  }
 }

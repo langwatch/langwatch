@@ -63,40 +63,27 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   // Sign in…" loop with no actionable error for the developer.
   await verifyRedisReady();
 
-  // Surface missing AI Gateway secrets up-front. The three secrets
-  // (virtual-key pepper, gateway↔control-plane HMAC, gateway JWT signing
-  // key) must be set together. Partial config is a latent bug — the gateway
-  // endpoints will return 503 auth_upstream_unavailable on first request,
-  // minutes after startup, and a reviewer chasing a "why does my VK not
-  // work" report would have to dig through logs. Either all set or all
-  // unset; fail boot on partial.
+  // Partial-config assertion on LW_VIRTUAL_KEY_PEPPER /
+  // LW_GATEWAY_INTERNAL_SECRET / LW_GATEWAY_JWT_SECRET now lives in
+  // env-create.mjs so workers.ts, CLI scripts, and every other entry
+  // point that imports env get it at import time (was server-only here).
+  //
+  // Server-only dev hint: if the AI Gateway menu is force-flagged on but
+  // no secrets are set at all, the UI renders but /api/internal/gateway/*
+  // returns 503. That's an onboarding confusion that's specific to
+  // running `pnpm dev` with the flag, so the warning stays here.
   const gatewayFlagForced = (process.env.FEATURE_FLAG_FORCE_ENABLE ?? "")
     .split(",")
     .map((s) => s.trim())
     .includes("release_ui_ai_gateway_menu_enabled");
-  const gwSecrets = {
-    LW_VIRTUAL_KEY_PEPPER: process.env.LW_VIRTUAL_KEY_PEPPER,
-    LW_GATEWAY_INTERNAL_SECRET: process.env.LW_GATEWAY_INTERNAL_SECRET,
-    LW_GATEWAY_JWT_SECRET: process.env.LW_GATEWAY_JWT_SECRET,
-  };
-  const gwSet = Object.entries(gwSecrets).filter(([, v]) => !!v);
-  const gwMissing = Object.entries(gwSecrets)
-    .filter(([, v]) => !v)
-    .map(([k]) => k);
-  if (gwSet.length > 0 && gwMissing.length > 0) {
-    logger.error(
-      { missing: gwMissing },
-      `AI Gateway secrets partially configured. Missing: ${gwMissing.join(", ")}.\n` +
-        `  Either set ALL three secrets (see langwatch/.env.example) or UNSET them all.\n` +
-        `  Generate each value with: openssl rand -hex 32`,
-    );
-    process.exit(1);
-  }
-  if (gatewayFlagForced && gwMissing.length === 3) {
+  const gwSecretsUnset =
+    !process.env.LW_VIRTUAL_KEY_PEPPER &&
+    !process.env.LW_GATEWAY_INTERNAL_SECRET &&
+    !process.env.LW_GATEWAY_JWT_SECRET;
+  if (gatewayFlagForced && gwSecretsUnset) {
     logger.warn(
-      { missing: gwMissing },
       "AI Gateway menu forced on via FEATURE_FLAG_FORCE_ENABLE, but no " +
-        "gateway secrets are set. The UI will render but /api/gateway-internal/* " +
+        "gateway secrets are set. The UI will render but /api/internal/gateway/* " +
         "will return 503. See langwatch/.env.example for the required block.",
     );
   }
