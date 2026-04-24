@@ -32,6 +32,7 @@ const (
 	RequestTypeChat       RequestType = "chat"
 	RequestTypeMessages   RequestType = "messages"
 	RequestTypeEmbeddings RequestType = "embeddings"
+	RequestTypeResponses  RequestType = "responses"
 )
 
 // RequestMetadata holds extracted fields for policy evaluation (guardrails, blocked patterns).

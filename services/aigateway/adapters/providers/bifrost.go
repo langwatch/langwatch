@@ -71,6 +71,10 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		model = req.Resolved.ModelID
 	}
 
+	if req.Type == domain.RequestTypeResponses {
+		return r.dispatchResponses(ctx, req, provider, model, cred)
+	}
+
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
 		return nil, err
@@ -91,6 +95,43 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	}, nil
 }
 
+// dispatchResponses routes /v1/responses traffic through Bifrost's
+// ResponsesRequest endpoint. The body is raw-forwarded — Bifrost's
+// provider adapters (currently OpenAI + Azure) decode the native shape
+// themselves. No need to normalize through the chat-completions parser.
+func (r *BifrostRouter) dispatchResponses(
+	ctx context.Context,
+	req *domain.Request,
+	provider bfschemas.ModelProvider,
+	model string,
+	cred domain.Credential,
+) (*domain.Response, error) {
+	bfReq := &bfschemas.BifrostResponsesRequest{
+		Provider:       provider,
+		Model:          model,
+		RawRequestBody: req.Body,
+	}
+	bfCtx := bfschemas.NewBifrostContext(
+		context.WithValue(
+			withCredential(ctx, cred),
+			bfschemas.BifrostContextKeyUseRawRequestBody, true,
+		),
+		time.Time{},
+	)
+
+	resp, berr := r.bf.ResponsesRequest(bfCtx, bfReq)
+	if berr != nil {
+		return nil, classifyBifrostError(ctx, berr)
+	}
+
+	body, _ := sonic.Marshal(resp)
+	return &domain.Response{
+		Body:       body,
+		StatusCode: http.StatusOK,
+		Usage:      extractResponsesUsage(resp),
+	}, nil
+}
+
 // DispatchStream sends a streaming request through bifrost. Routing
 // semantics match Dispatch (translate on RequestTypeChat, raw-forward
 // on RequestTypeMessages). Chunks returned by Bifrost are
@@ -102,6 +143,10 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	model := req.Model
 	if req.Resolved != nil {
 		model = req.Resolved.ModelID
+	}
+
+	if req.Type == domain.RequestTypeResponses {
+		return r.dispatchResponsesStream(ctx, req, provider, model, cred)
 	}
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
@@ -116,6 +161,39 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 		return nil, classifyBifrostError(ctx, berr)
 	}
 
+	return &bifrostStreamIterator{ch: ch}, nil
+}
+
+// dispatchResponsesStream is the streaming sibling of dispatchResponses.
+// Bifrost emits Responses-API-specific SSE event frames
+// (response.created, response.output_item.added, response.output_text.delta,
+// response.completed, ...); the gateway forwards each chunk's serialized
+// BifrostResponsesResponse verbatim — clients using the OpenAI Responses
+// SDK see the shape they expect.
+func (r *BifrostRouter) dispatchResponsesStream(
+	ctx context.Context,
+	req *domain.Request,
+	provider bfschemas.ModelProvider,
+	model string,
+	cred domain.Credential,
+) (domain.StreamIterator, error) {
+	bfReq := &bfschemas.BifrostResponsesRequest{
+		Provider:       provider,
+		Model:          model,
+		RawRequestBody: req.Body,
+	}
+	bfCtx := bfschemas.NewBifrostContext(
+		context.WithValue(
+			withCredential(ctx, cred),
+			bfschemas.BifrostContextKeyUseRawRequestBody, true,
+		),
+		time.Time{},
+	)
+
+	ch, berr := r.bf.ResponsesStreamRequest(bfCtx, bfReq)
+	if berr != nil {
+		return nil, classifyBifrostError(ctx, berr)
+	}
 	return &bifrostStreamIterator{ch: ch}, nil
 }
 
@@ -283,6 +361,21 @@ func extractUsage(resp *bfschemas.BifrostChatResponse) domain.Usage {
 	}
 }
 
+// extractResponsesUsage maps the Responses-API usage block onto the
+// gateway's neutral domain.Usage. The Responses API uses
+// input/output/total_tokens (not prompt/completion) — same numeric
+// content, different names.
+func extractResponsesUsage(resp *bfschemas.BifrostResponsesResponse) domain.Usage {
+	if resp == nil || resp.Usage == nil {
+		return domain.Usage{}
+	}
+	return domain.Usage{
+		PromptTokens:     resp.Usage.InputTokens,
+		CompletionTokens: resp.Usage.OutputTokens,
+		TotalTokens:      resp.Usage.TotalTokens,
+	}
+}
+
 // --- Stream iterator ---
 
 type bifrostStreamIterator struct {
@@ -320,6 +413,22 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 				it.usage = domain.Usage{
 					PromptTokens:     u.PromptTokens,
 					CompletionTokens: u.CompletionTokens,
+					TotalTokens:      u.TotalTokens,
+				}
+			}
+		} else if chunk.BifrostResponsesStreamResponse != nil {
+			// Responses API stream frames (response.created /
+			// response.output_text.delta / response.completed / ...).
+			// Marshal verbatim — clients using the OpenAI Responses SDK
+			// decode these by `type`. Final usage appears on the
+			// response.completed event's nested Response object.
+			data, _ := sonic.Marshal(chunk.BifrostResponsesStreamResponse)
+			it.current = data
+			if resp := chunk.BifrostResponsesStreamResponse.Response; resp != nil && resp.Usage != nil {
+				u := resp.Usage
+				it.usage = domain.Usage{
+					PromptTokens:     u.InputTokens,
+					CompletionTokens: u.OutputTokens,
 					TotalTokens:      u.TotalTokens,
 				}
 			}

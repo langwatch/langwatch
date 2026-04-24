@@ -69,6 +69,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 		v1.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
 		v1.Post("/chat/completions", chatHandler(deps))
 		v1.Post("/messages", messagesHandler(deps))
+		v1.Post("/responses", responsesHandler(deps))
 		v1.Post("/embeddings", embeddingsHandler(deps))
 		v1.Get("/models", modelsHandler(deps))
 	})
@@ -144,6 +145,46 @@ func messagesHandler(deps RouterDeps) http.HandlerFunc {
 			writeSSE(r.Context(), w, result.Iterator)
 		} else {
 			result, err := deps.App.HandleMessages(r.Context(), bundle, body, model)
+			if err != nil {
+				writeError(deps.Logger, w, r.Context(), err)
+				return
+			}
+			setMetaHeaders(w, result.Meta)
+			writeJSONResponse(w, result.Response)
+		}
+	}
+}
+
+// responsesHandler terminates POST /v1/responses — OpenAI's Responses API
+// (used by codex 0.122+, which dropped wire_api="chat" support). The
+// request body is Responses-API-shape (input[] / instructions / tools
+// with native type, stream event frames distinct from chat.completion).
+// We raw-forward to Bifrost's ResponsesRequest endpoint; Bifrost's
+// OpenAI/Azure adapters handle the native wire call.
+func responsesHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+
+		peek, body, release, ok := readAndPeekBody(w, r, deps.MaxRequestBodyBytes)
+		if !ok {
+			return
+		}
+		defer release()
+
+		model := app.PeekModel(peek)
+		if app.PeekStream(peek) {
+			result, err := deps.App.HandleResponsesStream(r.Context(), bundle, body, model)
+			if err != nil {
+				writeError(deps.Logger, w, r.Context(), err)
+				return
+			}
+			setMetaHeaders(w, result.Meta)
+			writeSSE(r.Context(), w, result.Iterator)
+		} else {
+			result, err := deps.App.HandleResponses(r.Context(), bundle, body, model)
 			if err != nil {
 				writeError(deps.Logger, w, r.Context(), err)
 				return
