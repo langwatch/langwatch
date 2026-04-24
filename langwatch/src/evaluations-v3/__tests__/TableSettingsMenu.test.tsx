@@ -68,7 +68,7 @@ describe("TableSettingsMenu", () => {
 
       await waitFor(() => {
         expect(screen.getByText("Compact")).toBeInTheDocument();
-        expect(screen.getByText("Expanded")).toBeInTheDocument();
+        expect(screen.getByText("Fit")).toBeInTheDocument();
       });
     });
 
@@ -107,7 +107,7 @@ describe("TableSettingsMenu", () => {
   });
 
   describe("Row height functionality", () => {
-    it("clicking Expanded changes row height mode", async () => {
+    it("clicking Fit changes row height mode to 'fit'", async () => {
       const user = userEvent.setup();
       render(<TableSettingsMenu />, { wrapper: Wrapper });
 
@@ -116,18 +116,18 @@ describe("TableSettingsMenu", () => {
       });
       await user.click(button);
 
-      // Find the button containing "Expanded" text
-      const expandedText = await screen.findByText("Expanded");
-      const expandedButton = expandedText.closest("button");
-      expect(expandedButton).not.toBeNull();
-      await user.click(expandedButton!);
+      // Find the button containing "Fit" text
+      const fitText = await screen.findByText("Fit");
+      const fitButton = fitText.closest("button");
+      expect(fitButton).not.toBeNull();
+      await user.click(fitButton!);
 
       const updatedStore = useEvaluationsV3Store.getState();
-      expect(updatedStore.ui.rowHeightMode).toBe("expanded");
+      expect(updatedStore.ui.rowHeightMode).toBe("fit");
     });
 
     it("clicking Compact changes row height mode back", async () => {
-      useEvaluationsV3Store.getState().setRowHeightMode("expanded");
+      useEvaluationsV3Store.getState().setRowHeightMode("fit");
 
       const user = userEvent.setup();
       render(<TableSettingsMenu />, { wrapper: Wrapper });
@@ -254,8 +254,8 @@ describe("TableSettingsMenu", () => {
     });
   });
 
-  describe("expanded mode restriction", () => {
-    it("disables Expanded option when dataset has more than 100 rows", async () => {
+  describe("fit mode restriction", () => {
+    it("disables Fit option when dataset has more than 100 rows", async () => {
       // Add a dataset with more than 100 rows
       useEvaluationsV3Store.setState({
         activeDatasetId: "large-dataset",
@@ -288,15 +288,15 @@ describe("TableSettingsMenu", () => {
         expect(screen.getByText("Compact")).toBeInTheDocument();
       });
 
-      // Find the button containing "Expanded" text
-      const expandedText = await screen.findByText("Expanded");
-      const expandedButton = expandedText.closest("button");
+      // Find the button containing "Fit" text
+      const fitText = await screen.findByText("Fit");
+      const fitButton = fitText.closest("button");
 
       // Button should be disabled
-      expect(expandedButton).toBeDisabled();
+      expect(fitButton).toBeDisabled();
     });
 
-    it("does not change to expanded mode when clicking disabled Expanded option", async () => {
+    it("does not change to fit mode when clicking disabled Fit option", async () => {
       // Add a dataset with more than 100 rows
       useEvaluationsV3Store.setState({
         activeDatasetId: "large-dataset",
@@ -324,18 +324,18 @@ describe("TableSettingsMenu", () => {
       });
       await user.click(button);
 
-      const expandedText = await screen.findByText("Expanded");
-      const expandedButton = expandedText.closest("button");
+      const fitText = await screen.findByText("Fit");
+      const fitButton = fitText.closest("button");
 
       // Try to click the disabled button
-      await user.click(expandedButton!);
+      await user.click(fitButton!);
 
       // Mode should still be compact
       const store = useEvaluationsV3Store.getState();
       expect(store.ui.rowHeightMode).toBe("compact");
     });
 
-    it("allows Expanded option when dataset has 100 or fewer rows", async () => {
+    it("allows Fit option when dataset has 100 or fewer rows", async () => {
       // Add a dataset with exactly 100 rows
       useEvaluationsV3Store.setState({
         activeDatasetId: "medium-dataset",
@@ -367,17 +367,17 @@ describe("TableSettingsMenu", () => {
         expect(screen.getByText("Compact")).toBeInTheDocument();
       });
 
-      // Find the button containing "Expanded" text
-      const expandedText = await screen.findByText("Expanded");
-      const expandedButton = expandedText.closest("button");
+      // Find the button containing "Fit" text
+      const fitText = await screen.findByText("Fit");
+      const fitButton = fitText.closest("button");
 
       // Button should NOT be disabled
-      expect(expandedButton).not.toBeDisabled();
+      expect(fitButton).not.toBeDisabled();
 
       // Click should work
-      await user.click(expandedButton!);
+      await user.click(fitButton!);
       const store = useEvaluationsV3Store.getState();
-      expect(store.ui.rowHeightMode).toBe("expanded");
+      expect(store.ui.rowHeightMode).toBe("fit");
     });
   });
 });
