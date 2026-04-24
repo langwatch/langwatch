@@ -430,6 +430,14 @@ describe("AI Gateway — coding-agent matrix", () => {
       const since = new Date();
       const start = Date.now();
 
+      // Sandbox HOME so the user's `~/.gemini/settings.json` doesn't force
+      // OAuth via `security.auth.selectedType: "oauth-personal"`. With a
+      // fresh HOME, gemini-cli falls back to the env-based auth detection
+      // (`getAuthTypeFromEnv` in @google/gemini-cli-core/src/core/contentGenerator.js)
+      // which picks USE_GEMINI when GEMINI_API_KEY is set.
+      const geminiHome = path.join(tempFolder, ".gemini-home");
+      fs.mkdirSync(geminiHome, { recursive: true });
+
       const result = spawnSync(
         "gemini",
         [
@@ -445,9 +453,15 @@ describe("AI Gateway — coding-agent matrix", () => {
           timeout: 600_000,
           env: {
             ...process.env,
-            GOOGLE_GEMINI_BASE_URL: `${GATEWAY_BASE}/v1beta`,
+            HOME: geminiHome,
+            // GOOGLE_GEMINI_BASE_URL must NOT include the /v1beta suffix —
+            // the @google/genai SDK appends `/v1beta/models/<model>:…`
+            // itself. With a `/v1beta`-suffixed base, the path would
+            // become `/v1beta/v1beta/models/...` and 404 on the gateway.
+            GOOGLE_GEMINI_BASE_URL: GATEWAY_BASE,
             GEMINI_API_KEY: vk.secret,
-            // Force gemini-cli into the API-key auth mode (vs OAuth).
+            // Force gemini-cli into the API-key auth mode (vs OAuth /
+            // Vertex). Belt + suspenders alongside the sandboxed HOME.
             GOOGLE_GENAI_USE_VERTEXAI: "false",
           },
         },
