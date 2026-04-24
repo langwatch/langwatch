@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   Center,
   HStack,
@@ -7,6 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useReactFlow } from "@xyflow/react";
+import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "~/utils/compat/next-router";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -116,6 +118,14 @@ export const WizardSidebar = memo(function WizardSidebar({
       }
     };
   }, []);
+
+  const currentStepIndex = STEPS.indexOf(step);
+  const prevStepIndexRef = useRef(currentStepIndex);
+  const slideDirection =
+    currentStepIndex >= prevStepIndexRef.current ? 1 : -1;
+  useEffect(() => {
+    prevStepIndexRef.current = currentStepIndex;
+  }, [currentStepIndex]);
 
   const stepCompletedValue = useStepCompletedValue();
   const enableMonitoringDisabled =
@@ -239,11 +249,34 @@ export const WizardSidebar = memo(function WizardSidebar({
                 />
               </Steps.List>
             </Steps.Root>
-            {step === "task" && <TaskStep />}
-            {step === "dataset" && <DatasetStep />}
-            {step === "execution" && <ExecutionStep />}
-            {step === "evaluation" && <EvaluationStep />}
-            {step === "results" && <ResultsStep />}
+            <Box position="relative" width="full" overflow="hidden">
+              <AnimatePresence
+                mode="wait"
+                initial={false}
+                custom={slideDirection}
+              >
+                <motion.div
+                  key={step}
+                  custom={slideDirection}
+                  variants={{
+                    enter: (dir: number) => ({ x: dir * 60, opacity: 0 }),
+                    center: { x: 0, opacity: 1 },
+                    exit: (dir: number) => ({ x: -dir * 60, opacity: 0 }),
+                  }}
+                  initial="enter"
+                  animate="center"
+                  exit="exit"
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  style={{ width: "100%" }}
+                >
+                  {step === "task" && <TaskStep />}
+                  {step === "dataset" && <DatasetStep />}
+                  {step === "execution" && <ExecutionStep />}
+                  {step === "evaluation" && <EvaluationStep />}
+                  {step === "results" && <ResultsStep />}
+                </motion.div>
+              </AnimatePresence>
+            </Box>
           </VStack>
           <HStack
             ref={stickyRef}

@@ -1,4 +1,5 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
+import { AnimatePresence, motion, type Variants } from "motion/react";
 import {
   Brain,
   CheckSquare,
@@ -7,10 +8,21 @@ import {
   Star,
   Workflow,
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { LuArrowLeft } from "react-icons/lu";
 
 import { Drawer } from "~/components/ui/drawer";
 import { getComplexProps, useDrawer } from "~/hooks/useDrawer";
+import {
+  EvaluatorEditorBody,
+  EvaluatorEditorFooter,
+  EvaluatorEditorHeading,
+  useEvaluatorEditorController,
+} from "./EvaluatorEditorShared";
+import {
+  categoryNames,
+  EvaluatorTypeSelectorContent,
+} from "./EvaluatorTypeSelectorContent";
 
 export type EvaluatorCategoryId =
   | "expected_answer"
@@ -65,9 +77,54 @@ const evaluatorCategories: Array<{
   },
 ];
 
+type View =
+  | { step: "category" }
+  | { step: "type"; category: EvaluatorCategoryId }
+  | {
+      step: "editor";
+      category: EvaluatorCategoryId;
+      evaluatorType: string;
+    };
+
+const STEP_ORDER: Record<View["step"], number> = {
+  category: 0,
+  type: 1,
+  editor: 2,
+};
+
+const SLIDE_VARIANTS: Variants = {
+  enter: (direction: number) => ({
+    x: direction > 0 ? "100%" : "-100%",
+  }),
+  center: {
+    x: 0,
+  },
+  exit: (direction: number) => ({
+    x: direction > 0 ? "-100%" : "100%",
+  }),
+};
+
+const SLIDE_TRANSITION = {
+  type: "spring" as const,
+  stiffness: 420,
+  damping: 42,
+  mass: 1,
+};
+
+const PANEL_STYLE = {
+  position: "absolute" as const,
+  inset: 0,
+  display: "flex",
+  flexDirection: "column" as const,
+  overflow: "hidden" as const,
+  willChange: "transform",
+};
+
 /**
- * Drawer for selecting the category of evaluator to create.
- * Shows cards for each evaluator category plus a "Custom (from Workflow)" option.
+ * Unified drawer for the new-evaluator flow.
+ *
+ * Hosts all three steps (category → type → editor) inside a single
+ * Drawer.Root with a shared direction-aware slide animation between them.
  */
 export function EvaluatorCategorySelectorDrawer(
   props: EvaluatorCategorySelectorDrawerProps,
@@ -84,27 +141,76 @@ export function EvaluatorCategorySelectorDrawer(
     (() => openDrawer("workflowSelectorForEvaluator"));
   const isOpen = props.open !== false && props.open !== undefined;
 
+  const [view, setView] = useState<View>({ step: "category" });
+
+  const currentStepIndex = STEP_ORDER[view.step];
+  const prevStepIndexRef = useRef(currentStepIndex);
+  const direction = currentStepIndex >= prevStepIndexRef.current ? 1 : -1;
+  useEffect(() => {
+    prevStepIndexRef.current = currentStepIndex;
+  }, [currentStepIndex]);
+
+  const editorIsActive = view.step === "editor";
+  const editorEvaluatorType = editorIsActive ? view.evaluatorType : undefined;
+  const editorCategory = editorIsActive ? view.category : undefined;
+  const editorController = useEvaluatorEditorController({
+    open: isOpen && editorIsActive,
+    onClose,
+    evaluatorType: editorEvaluatorType,
+    category: editorCategory,
+    isOpen: isOpen && editorIsActive,
+  });
+
   const handleSelectCategory = (categoryId: EvaluatorCategoryId) => {
     onSelectCategory?.(categoryId);
-    openDrawer("evaluatorTypeSelector", { category: categoryId });
+    setView({ step: "type", category: categoryId });
   };
+
+  const handleSelectEvaluator =
+    (category: EvaluatorCategoryId) => (evaluatorType: string) => {
+      setView({ step: "editor", category, evaluatorType });
+    };
+
+  const handleBack = () => {
+    if (view.step === "editor") {
+      setView({ step: "type", category: view.category });
+      return;
+    }
+    if (view.step === "type") {
+      setView({ step: "category" });
+      return;
+    }
+    if (canGoBack) goBack();
+  };
+
+  const showBackButton = view.step !== "category" || canGoBack;
+  const headerContent =
+    view.step === "editor" ? (
+      <EvaluatorEditorHeading controller={editorController} />
+    ) : (
+      <Heading>
+        {view.step === "type"
+          ? categoryNames[view.category]
+          : "Choose Evaluator Category"}
+      </Heading>
+    );
 
   return (
     <Drawer.Root
       open={isOpen}
       onOpenChange={({ open }) => !open && onClose()}
-      size="md"
+      size="lg"
       modal={false}
     >
       <Drawer.Content>
         <Drawer.CloseTrigger />
         <Drawer.Header>
-          <HStack gap={2}>
-            {canGoBack && (
+          <HStack gap={2} minH="32px">
+            {showBackButton && (
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={goBack}
+                onClick={handleBack}
                 padding={1}
                 minWidth="auto"
                 data-testid="back-button"
@@ -112,7 +218,7 @@ export function EvaluatorCategorySelectorDrawer(
                 <LuArrowLeft size={20} />
               </Button>
             )}
-            <Heading>Choose Evaluator Category</Heading>
+            {headerContent}
           </HStack>
         </Drawer.Header>
         <Drawer.Body
@@ -120,49 +226,112 @@ export function EvaluatorCategorySelectorDrawer(
           flexDirection="column"
           overflow="hidden"
           padding={0}
+          position="relative"
         >
-          <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-              Select a category to see available evaluators, or create a custom
-              one from a workflow.
-            </Text>
+          <AnimatePresence initial={false} custom={direction} mode="popLayout">
+            {view.step === "category" && (
+              <motion.div
+                key="category"
+                custom={direction}
+                variants={SLIDE_VARIANTS}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={SLIDE_TRANSITION}
+                style={PANEL_STYLE}
+              >
+                <VStack gap={4} align="stretch" flex={1} overflowY="auto">
+                  <Text
+                    color="fg.muted"
+                    fontSize="sm"
+                    paddingX={6}
+                    paddingTop={4}
+                  >
+                    Select a category to see available evaluators, or create a
+                    custom one from a workflow.
+                  </Text>
 
-            {/* Category cards */}
-            <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
-              {evaluatorCategories.map((category) => (
-                <CategoryCard
-                  key={category.id}
-                  {...category}
-                  onClick={() => handleSelectCategory(category.id)}
-                />
-              ))}
+                  <VStack
+                    gap={3}
+                    align="stretch"
+                    paddingX={6}
+                    paddingBottom={4}
+                  >
+                    {evaluatorCategories.map((category) => (
+                      <CategoryCard
+                        key={category.id}
+                        {...category}
+                        onClick={() => handleSelectCategory(category.id)}
+                      />
+                    ))}
 
-              {/* Workflow option - separated */}
-              <Box borderTopWidth="1px" borderColor="border" paddingTop={3}>
-                <CategoryCard
-                  id="workflow"
-                  icon={Workflow}
-                  title="Custom (from Workflow)"
-                  description="Create a new workflow for custom evaluation logic"
-                  onClick={onSelectWorkflow}
+                    <Box
+                      borderTopWidth="1px"
+                      borderColor="border"
+                      paddingTop={3}
+                    >
+                      <CategoryCard
+                        id="workflow"
+                        icon={Workflow}
+                        title="Custom (from Workflow)"
+                        description="Create a new workflow for custom evaluation logic"
+                        onClick={onSelectWorkflow}
+                      />
+                    </Box>
+                  </VStack>
+                </VStack>
+              </motion.div>
+            )}
+            {view.step === "type" && (
+              <motion.div
+                key={`type-${view.category}`}
+                custom={direction}
+                variants={SLIDE_VARIANTS}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={SLIDE_TRANSITION}
+                style={PANEL_STYLE}
+              >
+                <EvaluatorTypeSelectorContent
+                  category={view.category}
+                  onSelect={handleSelectEvaluator(view.category)}
+                  onClose={onClose}
                 />
-              </Box>
-            </VStack>
-          </VStack>
+              </motion.div>
+            )}
+            {view.step === "editor" && (
+              <motion.div
+                key={`editor-${view.evaluatorType}`}
+                custom={direction}
+                variants={SLIDE_VARIANTS}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                transition={SLIDE_TRANSITION}
+                style={PANEL_STYLE}
+              >
+                <EvaluatorEditorBody controller={editorController} />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </Drawer.Body>
         <Drawer.Footer borderTopWidth="1px" borderColor="border">
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
+          {view.step === "editor" ? (
+            <EvaluatorEditorFooter
+              controller={editorController}
+              onCancel={onClose}
+            />
+          ) : (
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+          )}
         </Drawer.Footer>
       </Drawer.Content>
     </Drawer.Root>
   );
 }
-
-// ============================================================================
-// Category Card Component
-// ============================================================================
 
 type CategoryCardProps = {
   id: string;
