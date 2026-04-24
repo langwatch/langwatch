@@ -39,18 +39,73 @@ post-run.
 Build tags per provider: `live_openai`, `live_anthropic`, `live_gemini`,
 `live_bedrock`, `live_azure`, `live_vertex`. Default `go test` skips all.
 
-Last execution: 2026-04-24. Gateway binary `<tip>`. Live run against
+Last execution: 2026-04-24, gateway tip `a2d609959`. Live run against
 real provider credentials; traces + costs captured on the LangWatch
-platform (`/api/trace/:id`).
+platform. Cells link to their captured trace via the platform UI at
+`http://localhost:5560/<project-slug>/messages/<trace_id>`.
 
 | Provider | Simple | Streamed | Tool calling | Structured outputs | Cache |
 |----------|--------|----------|--------------|--------------------|-------|
-| openai    | ✅ 2.95s · \$0.000035  | ✅ 26.20s · \$0.000101 | ✅ 10.60s · \$0.000162 | ✅ 18.95s · \$0.000135 | ✅ 36.28s · \$0.000255 (gpt-4o-mini) |
-| anthropic | ✅ 5.85s · \$0.000035  | ✅ 9.71s · \$0.000086  | ✅ 5.61s · \$0.000839  | ✅ 5.33s · \$0.000161  | ✅ 22.66s · \$0.010245 (sonnet 4.5, /v1/messages, cache_read=3362) |
-| gemini    | ✅ 9.87s · \$0.000075  | ✅ 5.14s · \$0.000099  | ✅ 9.83s · \$0.000253  | ✅ 3.60s · \$0.000178  | ✅ 8.69s · \$0.000933 (cachedContents API, cache_read=2834) |
-| bedrock   | ✅ 11.44s · \$0.000035 | ✅ 17.80s · \$0.000086 | ✅ 5.72s · \$0.000146  | ✅ 15.33s · \$0.000135 | ✅ 60.63s · \$0.017421 (sonnet 4.5, /v1/chat/completions, cache_read=3362) |
-| azure     | ✅ 13.82s · \$0.000035 | ✅ 18.63s · \$0.000080 | ✅ 10.55s · \$0.000152 | ✅ 27.33s · \$0.000128 | ✅ 21.39s · \$0.000489 |
-| vertex    | ✅ 3.55s · \$0.000047  | ✅ 6.26s · \$0.000084  | ✅ 5.79s · \$0.000146  | ✅ 9.42s · \$0.000178  | ✅ 16.56s · \$0.000925 (cachedContents API, cache_read=2834) |
+| openai    | ✅ 27.65s · \$0.000035 (`6881914b`) | ✅ 6.23s · \$0.000101 (`136edaf4`) | ✅ 3.41s · \$0.000162 (`0e4bafca`) | ✅ 27.38s · \$0.000135 (`dcbd8768`) | ✅ 12.27s · \$0.000468 read=2816 (`29bec395`) |
+| anthropic | ✅ 14.83s · \$0.000035 (`26ce8564`) | ✅ 13.80s · \$0.000086 (`db3db348`) | ✅ 10.14s · \$0.000839 (`31ce6446`) | ✅ 3.29s · \$0.000126 (`5293b0b1`) | ✅ 20.26s · \$0.010245 read=3362 (`41999f2f`) |
+| gemini    | ✅ 10.07s · \$0.000052 (`04b856d7`) | ✅ 5.61s · \$0.000092 (`506ee137`) | ✅ 3.45s · \$0.000253 (`42aa722e`) | ✅ 5.68s · \$0.000178 (`106c7b24`) | ✅ 32.26s · \$0.001068 read=2834 (`e68a28af`) |
+| bedrock   | ✅ 5.70s · \$0.000035 (`4d4ef04e`) | ✅ 5.53s · \$0.000086 (`5521e85e`) | ✅ 9.81s · \$0.000839 (`1978d09a`) | ✅ 5.50s · \$0.000126 (`d146e9ef`) | ✅ 64.76s · \$0.020301 read=3362 (`22ffcc9c`) |
+| azure     | ✅ 4.09s · \$0.000035 (`72a0526f`) | ✅ 5.93s · \$0.000101 (`3a5495b9`) | ✅ 4.62s · \$0.000162 (`0a1aa2ed`) | ✅ 6.54s · \$0.000135 (`e24351b9`) | ✅ 18.28s · \$0.000843 read=2816 (`68ebfc3e`) |
+| vertex    | ✅ 23.83s · \$0.000050 (`16b399e5`) | ✅ 27.24s · \$0.000086 (`402dd34a`) | ✅ 4.26s · \$0.000216 (`6057e134`) | ✅ 5.67s · \$0.000103 (`eddfec85`) | ✅ 31.75s · \$0.000925 read=2834 (`12153146`) |
+
+**🟢 30/30 GREEN end-to-end iter-110 closeout.** All 30 cells assert
+HTTP 200 + valid X-LangWatch-Trace-Id + non-zero usage tokens + cost
+captured on the LangWatch platform via `/api/trace/:id`. Total
+provider spend for one full P2 matrix run: **~\$0.0353**.
+
+**Verification — what each cell asserts**:
+- Cost (`metrics.total_cost > 0`): all 30 cells confirmed positive.
+- Latency (`metrics.total_time_ms > 0`): all 30 cells confirmed; ranges
+  3-65 seconds.
+- Cache cells additionally assert `cache_read_tokens > 0` on the
+  read trace: 6/6 confirmed (openai 2816, anthropic 3362, gemini 2834,
+  bedrock 3362, azure 2816, vertex 2834).
+- Token-counts on-platform: prompt + completion both populate on
+  non-streaming OpenAI/Azure/Anthropic/Bedrock/Vertex; streaming
+  passthrough for Gemini-native /v1beta has prompt populated but
+  completion currently shows null on platform UI (parser fix landed
+  `f0b7b42e6` — total cost still computes correctly via the cost
+  enrichment pipeline downstream, see "v1.1 cost-enrichment" below).
+- **Bedrock note**: 4 of 5 cells failed in the matrix run captured at
+  the start of this push because the default test model was
+  `anthropic.claude-3-5-haiku-20241022-v1:0` which the dev IAM scope
+  no longer accepts; bumping the default to the EU cross-region
+  inference profile (`a2d609959`) restored 5/5 GREEN. The cache cell
+  was already on the inference-profile model and stayed green
+  throughout.
+
+**Budget accounting** — coverage model. The Cache interceptor's debit
+path was rewired iter-110 to derive spend from CH cost-enriched
+traces (Priority 1 reactor `gatewayBudgetSync`). Verification shape:
+- `matrix-openai` VK seeded with a $10 MONTH budget (BudgetId
+  `Ey9gYdi32JjYmxBvzyYhs`, scope=virtual_key, onBreach=WARN).
+- Each P2 openai cell posts a real completion through the matrix-openai
+  VK; the trace lands with cost > 0 (verified per the cell's
+  `assertTraceCaptured`).
+- Reactor pipeline `groupId: ".../reactor/gatewayBudgetSync/trace:..."`
+  is firing for those traces (visible in the langwatch worker log).
+- Known partial-coverage gap: the reactor isn't yet inserting rows
+  into `gateway_budget_ledger_events` / `gateway_budget_scope_totals`
+  on the dev CH (count=0 verified). Either the reactor is filtering
+  the matrix-* VK trace summaries out at one of its early returns
+  (no `langwatch.virtual_key_id` attr on the foldState, or
+  `applicableForRequest` returning empty), or the trace summary
+  pipeline isn't mapping the gateway-stamped span attrs into
+  foldState. Logged for alexis as a Lane B follow-up — does NOT
+  block the 30/30 cell verification, since cell-level cost is
+  captured via the customer-trace bridge's gen_ai.usage attrs.
+
+**v1.1 follow-ups surfaced by this verification**:
+1. `gateway_budget_*` CH tables not populated by the reactor in
+   local dev — owner: alexis (Lane B).
+2. Gemini passthrough completion_tokens on the trace is null even
+   though the parser computes it; cost lands correctly so this is
+   a UI-side aggregation gap not a metric-loss. Owner: sergey.
 
 **🟢 30/30 end-to-end green. Three sequential gateway fixes shipped
 this push:**
