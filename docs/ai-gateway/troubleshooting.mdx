@@ -457,7 +457,9 @@ See [Policy Rules → RE2 syntax](/ai-gateway/policy-rules).
 - Any LangWatch entry point (`pnpm dev`, `pnpm start`, workers, `prisma:*`, CLI scripts) refuses to start.
 - Loud banner in the boot log naming a subset of `LW_VIRTUAL_KEY_PEPPER`, `LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET` as missing.
 
-**Root cause:** the three AI-Gateway secrets are an all-or-none group. Setting one or two without the third is always a misconfig — the missing secret will fail at first request rather than at boot, often with cryptic errors like `/resolve-key` HMAC mismatches or VK secrets that can't be hashed. The boot validator (`assertGatewaySecretsAllOrNone`) catches this at import time so every entry point fails the same way at the same place. Added in `3941b5239`.
+**Root cause:** the three AI-Gateway secrets are an all-or-none group. Setting one or two without the third is always a misconfig — the missing secret will fail at first request rather than at boot, often with cryptic errors like `/resolve-key` HMAC mismatches or VK secrets that can't be hashed. The boot validator (`assertGatewaySecretsAllOrNone`) catches this at import time so every entry point fails the same way at the same place. Added in `3941b5239`, hardened in a follow-up to skip the client bundle entirely.
+
+<Note>**Browser blank-page on a partial-secret config (legacy)** — between `3941b5239` and the client-skip follow-up, the validator ran inside `createEnvConfig()` and touched the secret keys off the t3-env proxy. The Vite client bundle includes that module, so any browser nav to `/` triggered `@t3-oss/env-core`'s server-leak guard and the page never hydrated (blank screen + a single `Attempted to access a server-side environment variable on the client` console error). Pull to current `feat/ai-gateway` if you see that — the validator now `typeof window === 'undefined'`-gates and reads `process.env` directly, so the client bundle doesn't trip the guard.</Note>
 
 **Fix — generate the missing one(s):**
 
