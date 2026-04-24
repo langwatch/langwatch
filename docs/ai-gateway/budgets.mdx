@@ -74,7 +74,7 @@ Debit flow:
 5. In parallel, the trace-processing pipeline reads the same span, resolves the applicable budgets, and writes one row per budget to the ClickHouse ledger (`gateway_budget_ledger_events`, rolled up into `gateway_budget_scope_totals` by a materialised view). This CH path is idempotent by `(tenant, budget, gateway_request_id)` on the underlying ReplacingMergeTree.
 
 <Note>
-The ClickHouse fold runs alongside the primary ledger today to validate the path. The pre-request budget check reads the primary ledger. The CH totals view becomes the authoritative read in a follow-up, at which point the primary-ledger write path retires. Customer-visible behaviour is unchanged — a $1 budget still blocks at $1 of spend during and after the cutover.
+The ClickHouse path is the primary read when CH is enabled (SaaS and any self-host with the LangWatch CH cluster wired up); the Postgres `spentUsd` column remains as the read fallback for self-hosted installs without CH. Both write paths run in parallel today; the Postgres write path retires in a follow-up. Customer-visible behaviour is unchanged — a $1 budget still blocks at $1 of spend during and after the cutover.
 </Note>
 
 ## Pre-request check
