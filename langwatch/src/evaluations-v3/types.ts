@@ -583,6 +583,12 @@ export type EvaluationsV3Store = EvaluationsV3State & EvaluationsV3Actions;
 export type TableRowData = {
   rowIndex: number;
   dataset: Record<string, string>;
+  /**
+   * True when the dataset row contains no user-entered values. The table
+   * always renders a trailing empty row for Excel-style "click to add,"
+   * but that phantom row must not show target outputs or evaluator chips.
+   */
+  isEmpty: boolean;
   targets: Record<
     string,
     {
