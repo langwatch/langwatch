@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { extractEventsFromSpans } from "../trace-summary.mapper";
+import {
+  extractEventsFromSpans,
+  mapTraceSummaryToTrace,
+} from "../trace-summary.mapper";
+import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { Span } from "~/server/tracer/types";
 
 function makeSpan(overrides: Partial<Span> = {}): Span {
@@ -154,6 +158,92 @@ describe("extractEventsFromSpans", () => {
       const result = extractEventsFromSpans({ spans, projectId: "project-1", traceId: "trace-1" });
 
       expect(result[0]!.timestamps.updated_at).toBe(6000);
+    });
+  });
+});
+
+function makeSummary(
+  overrides: Partial<TraceSummaryData> = {},
+): TraceSummaryData {
+  return {
+    traceId: "trace-1",
+    spanCount: 1,
+    totalDurationMs: 100,
+    computedIOSchemaVersion: "v1",
+    computedInput: null,
+    computedOutput: null,
+    timeToFirstTokenMs: null,
+    timeToLastTokenMs: null,
+    tokensPerSecond: null,
+    containsErrorStatus: false,
+    containsOKStatus: true,
+    errorMessage: null,
+    models: [],
+    totalCost: null,
+    tokensEstimated: false,
+    totalPromptTokenCount: null,
+    totalCompletionTokenCount: null,
+    outputFromRootSpan: true,
+    outputSpanEndTimeMs: 2000,
+    blockedByGuardrail: false,
+    topicId: null,
+    subTopicId: null,
+    annotationIds: [],
+    attributes: {},
+    occurredAt: 1000,
+    createdAt: 1000,
+    updatedAt: 2000,
+    lastEventOccurredAt: 2000,
+    ...overrides,
+  } as TraceSummaryData;
+}
+
+describe("mapTraceSummaryToTrace — display-side single-key wrapper recursion", () => {
+  describe("when computedOutput is a structured json wrapper with a single unknown key", () => {
+    it("drills into the wrapper and returns the inner content as trace.output.value", () => {
+      // Shape produced when the ingestion layer stores the raw
+      // {type: "json", value: {data: {content: "..."}}} wrapper and the
+      // display layer tries to resolve human-readable text.
+      const summary = makeSummary({
+        computedOutput: JSON.stringify({
+          type: "json",
+          value: { data: { content: "COMPANY_ANALYSIS", formatName: "s" } },
+        }),
+      });
+
+      const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+      expect(trace.output?.value).toBe("COMPANY_ANALYSIS");
+    });
+
+    it("falls through to the raw computedOutput when no state-field matches", () => {
+      // `{data: {foo: "bar"}}` has no state-object field to pull text from,
+      // so display returns the stringified payload unchanged.
+      const raw = JSON.stringify({
+        type: "json",
+        value: { data: { foo: "bar" } },
+      });
+      const summary = makeSummary({ computedOutput: raw });
+
+      const trace = mapTraceSummaryToTrace(summary, [], "project-1");
+
+      expect(trace.output?.value).toBe(raw);
+    });
+
+    it("does not infinite-loop on deeply nested single-key wrappers (depth cap)", () => {
+      // Build a 100-deep wrapper with no known field anywhere. The cap must
+      // bail out instead of stack-overflowing.
+      let inner: Record<string, unknown> = {};
+      for (let i = 0; i < 100; i++) {
+        inner = { nested: inner };
+      }
+      const summary = makeSummary({
+        computedOutput: JSON.stringify({ type: "json", value: inner }),
+      });
+
+      expect(() =>
+        mapTraceSummaryToTrace(summary, [], "project-1"),
+      ).not.toThrow();
     });
   });
 });

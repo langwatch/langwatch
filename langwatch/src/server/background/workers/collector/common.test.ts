@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { transformElasticSearchSpanToSpan } from "../../../elasticsearch/transformers";
-import type { BaseSpan } from "../../../tracer/types";
+import type { BaseSpan, SpanInputOutput } from "../../../tracer/types";
 import {
   flattenSpanTree,
   getFirstInputAsText,
@@ -1483,5 +1483,123 @@ describe("typedValueToText()", () => {
 
       expect(result).toBe("");
     });
+  });
+
+  describe("when a top-level special key exists but its value is empty", () => {
+    it("does not short-circuit to empty — returns the stringified payload instead", () => {
+      const result = typedValueToText({
+        type: "json",
+        value: {
+          content: "",
+          formatName: "standard",
+          formattedProperties: "x",
+        },
+      });
+
+      expect(result).not.toBe("");
+      expect(result).toContain("standard");
+    });
+
+    it("drills into a single-key wrapper even when a sibling-less empty key exists", () => {
+      // This is the user's scenario: {data: {content: "..."}} renders as the real content
+      const result = typedValueToText({
+        type: "json",
+        value: {
+          data: {
+            content: "COMPANY_ANALYSIS",
+            formatName: "standard",
+          },
+        },
+      });
+
+      expect(result).toBe("COMPANY_ANALYSIS");
+    });
+
+    it("fixes the `query` → `user_query` typo by returning json.query when set", () => {
+      const result = typedValueToText({
+        type: "json",
+        value: { query: "what is the weather?" },
+      });
+
+      expect(result).toBe("what is the weather?");
+    });
+
+    it("recursive hasNonEmptyValue: nested-empty wrapper skips to the next sibling special key", () => {
+      // Regression: before the recursion, `output` being an object with keys
+      // (even nested-empty) short-circuited the loop and `answer` was never
+      // considered. Now `{ content: "" }` is treated as empty, so the loop
+      // continues past `output` and picks up `answer` instead.
+      const result = typedValueToText({
+        type: "json",
+        value: {
+          output: { content: "" },
+          answer: "the real answer",
+        },
+      });
+
+      expect(result).toBe("the real answer");
+    });
+
+    it("recursive hasNonEmptyValue: does not hang / recurse infinitely on circular references", () => {
+      const circular: Record<string, unknown> = { output: {} };
+      (circular.output as Record<string, unknown>).self = circular;
+      (circular as Record<string, unknown>).answer = "still findable";
+
+      // Explicit safety test: the WeakSet cycle guard must prevent infinite
+      // recursion. Specific text output is not asserted — cycles are not
+      // realistic in real JSON payloads (the JSON encoder would have thrown
+      // before we ever saw them), so this is purely a robustness check.
+      expect(() =>
+        typedValueToText({ type: "json", value: circular }),
+      ).not.toThrow();
+    });
+  });
+});
+
+describe("getLastOutputAsText — multi-span fallback", () => {
+  const base = {
+    trace_id: "t",
+    type: "span" as const,
+    name: "s",
+  };
+
+  it("falls back to an earlier span when the last-finishing span renders as empty", () => {
+    const spans = [
+      {
+        ...base,
+        span_id: "a",
+        parent_id: null,
+        timestamps: { started_at: 100, finished_at: 200 },
+        input: { type: "text" as const, value: "in" },
+        output: {
+          type: "json" as const,
+          value: {
+            data: {
+              content: "COMPANY_ANALYSIS",
+              formatName: "standard",
+            },
+          },
+        },
+      },
+      // A later-finishing span whose output renders to "" under the current heuristics
+      // (nested list of primitives with no structured SpanInputOutput items).
+      {
+        ...base,
+        span_id: "b",
+        parent_id: null,
+        timestamps: { started_at: 150, finished_at: 300 },
+        input: { type: "text" as const, value: "in2" },
+        output: {
+          type: "list" as const,
+          // Intentional malformed shape: `list.value` is typed as
+          // `SpanInputOutput[]`, but real-world traces occasionally ship
+          // bare primitives here. This test pins the fallback behavior.
+          value: ["plain", 1] as unknown as SpanInputOutput[],
+        },
+      },
+    ];
+
+    const output = getLastOutputAsText(spans as BaseSpan[]);
+    expect(output).toBe("COMPANY_ANALYSIS");
   });
 });
