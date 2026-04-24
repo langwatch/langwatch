@@ -404,22 +404,83 @@ describe("AI Gateway — coding-agent matrix", () => {
   // ============================================================
   // gemini-cli (Google Gemini API)
   //
-  // gemini-cli does NOT support a per-invocation API endpoint override — it
-  // always points at generativelanguage.googleapis.com. Routing it through
-  // the LangWatch gateway requires either:
-  //   (a) an upstream gemini-cli base-url flag (issue open in
-  //       google-gemini/gemini-cli)
-  //   (b) a wrapper script that intercepts and proxies, OR
-  //   (c) /etc/hosts override for generativelanguage.googleapis.com
-  //
-  // For now this cell t.skips with a clear reason. Once upstream lands the
-  // base-url flag we can flip the assertion shape to match the others.
+  // Iter-110 retracted andre's earlier "inherent skip" — gemini-cli IS
+  // re-pointable via env vars. The Google @google/genai SDK that gemini-cli
+  // wraps reads `GOOGLE_GEMINI_BASE_URL` and uses it as the API host (with
+  // `x-goog-api-key` for auth). The blocker was the GATEWAY side: it had
+  // no Gemini-native routes (only /v1/chat/completions, /v1/messages,
+  // /v1/responses, /v1/embeddings, /v1/models), so gemini-cli's POST to
+  // /v1beta/models/<model>:generateContent landed on a 404. Once
+  // alexis's v1beta passthrough lands, this cell:
+  //   - Sets GOOGLE_GEMINI_BASE_URL=<gateway>/v1beta
+  //   - Sets GEMINI_API_KEY=<matrix-gemini VK secret>
+  //   - Spawns gemini -p TASK_PROMPT non-interactive
+  //   - Asserts a trace lands + cost > 0
+  // Cache-read assertion is informational on this CLI (gemini implicit
+  // caching needs paid-tier billing; explicit cachedContents flow is
+  // exercised in Lane A's TestGemini_Cache).
   // ============================================================
-  it.skip(
-    "gemini-cli · React vite hello world · trace + cost + cache captured · BLOCKED on upstream base-url flag",
-    () => {
-      // No-op until gemini-cli adds endpoint override.
+  it.skipIf(skipMatrix || !cliAvailable("gemini") || !vkFor("gemini"))(
+    "gemini-cli · React vite hello world · trace + cost + cache captured",
+    async () => {
+      const vk = vkFor("gemini")!;
+      const tempFolder = fs.mkdtempSync(
+        path.join(os.tmpdir(), "lw-cmatrix-gemini-vite-"),
+      );
+      const since = new Date();
+      const start = Date.now();
+
+      const result = spawnSync(
+        "gemini",
+        [
+          "--prompt",
+          TASK_PROMPT,
+          "--yolo",
+          "--model",
+          "gemini-2.5-flash",
+        ],
+        {
+          cwd: tempFolder,
+          encoding: "utf-8",
+          timeout: 600_000,
+          env: {
+            ...process.env,
+            GOOGLE_GEMINI_BASE_URL: `${GATEWAY_BASE}/v1beta`,
+            GEMINI_API_KEY: vk.secret,
+            // Force gemini-cli into the API-key auth mode (vs OAuth).
+            GOOGLE_GENAI_USE_VERTEXAI: "false",
+          },
+        },
+      );
+      if (result.status !== 0) {
+        throw new Error(
+          `gemini exited ${result.status}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
+        );
+      }
+
+      checkReactViteArtifacts(tempFolder, "gemini-cli");
+
+      const metrics = await assertSessionTraces({
+        since,
+        inputSubstring: TASK_INPUT_MARKER,
+        minTraces: 1,
+      });
+      if (metrics.cacheReadTokens === 0) {
+        // eslint-disable-next-line no-console
+        console.warn(
+          "[matrix] gemini-cli · cache_read_tokens=0 — Gemini implicit caching needs paid-tier billing on this account; explicit cachedContents path covered by Lane A TestGemini_Cache",
+        );
+      }
+
+      logMatrixCell({
+        cli: "gemini-cli",
+        task: "react_vite_hello_world",
+        durationMs: Date.now() - start,
+        metrics,
+        testFile: TEST_FILE,
+      });
     },
+    700_000,
   );
 
   // ============================================================
