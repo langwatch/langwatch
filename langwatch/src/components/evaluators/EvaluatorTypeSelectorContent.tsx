@@ -140,9 +140,15 @@ export function EvaluatorTypeSelectorContent({
 
   const handleConfigureAzureSafety = () => {
     onClose?.();
-    if (project?.slug) {
-      void router.push(`/settings/model-providers?provider=azure_safety`);
-    }
+    // Use the global drawer.open URL convention so CurrentDrawer auto-opens
+    // the EditModelProvider drawer pre-selected to azure_safety on arrival.
+    void router.push({
+      pathname: "/settings/model-providers",
+      query: {
+        "drawer.open": "editModelProvider",
+        "drawer.providerKey": "azure_safety",
+      },
+    });
   };
 
   return (
