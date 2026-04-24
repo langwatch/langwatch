@@ -2,6 +2,7 @@ import { Skeleton, VStack } from "@chakra-ui/react";
 import { type Cell, flexRender } from "@tanstack/react-table";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
+import type { TableRowData } from "../../types";
 import { EditableCell } from "./EditableCell";
 
 // ============================================================================
@@ -16,17 +17,8 @@ type ColumnMeta = {
   dataType?: DatasetColumnType; // The actual data type (string, json, list, etc.)
 };
 
-type RowData = {
-  rowIndex: number;
-  dataset: Record<string, string>;
-  targets: Record<
-    string,
-    { output: unknown; evaluators: Record<string, unknown> }
-  >;
-};
-
 type TableCellProps = {
-  cell: Cell<RowData, unknown>;
+  cell: Cell<TableRowData, unknown>;
   rowIndex: number;
   activeDatasetId: string;
   isLoading?: boolean;
