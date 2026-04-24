@@ -1,9 +1,9 @@
 import { describe, expect, it, beforeAll, afterAll } from "vitest";
-import type { PrismaClient } from "@prisma/client";
 import { nanoid } from "nanoid";
-import type { Session } from "~/server/auth";
+import { getTestUser } from "~/utils/testUtils";
 import { prisma } from "~/server/db";
 import { saveOrCommitWorkflowVersion } from "../workflows";
+import type { Session } from "~/server/auth";
 
 /**
  * Integration test for saveOrCommitWorkflowVersion.
@@ -13,41 +13,15 @@ import { saveOrCommitWorkflowVersion } from "../workflows";
  * used a stale prompt when triggered from trace monitors.
  */
 describe("saveOrCommitWorkflowVersion", () => {
-  const projectId = `test_project_${nanoid(8)}`;
-  const userId = `test_user_${nanoid(8)}`;
-  const teamId = `test_team_${nanoid(8)}`;
   const workflowId = `test_workflow_${nanoid(8)}`;
-
-  const ctx = {
-    prisma: prisma as PrismaClient,
-    session: { user: { id: userId } } as Session,
-  };
+  let projectId: string;
+  let userId: string;
 
   beforeAll(async () => {
-    await prisma.user.create({
-      data: { id: userId, email: `${userId}@test.com`, name: "Test User" },
-    });
-    const team = await prisma.team.create({
-      data: {
-        id: teamId,
-        slug: `test-team-${nanoid(6)}`,
-        name: "Test Team",
-        // organizationId has no FK constraint (Prisma relationMode = "prisma")
-        organizationId: `test_org_${nanoid(8)}`,
-        members: { create: { userId, role: "ADMIN" } },
-      },
-    });
-    await prisma.project.create({
-      data: {
-        id: projectId,
-        name: "Test Project",
-        slug: `test-${nanoid(6)}`,
-        teamId: team.id,
-        language: "en",
-        framework: "custom",
-        apiKey: `sk-test-${nanoid(12)}`,
-      },
-    });
+    const user = await getTestUser();
+    projectId = "test-project-id";
+    userId = user.id;
+
     await prisma.workflow.create({
       data: {
         id: workflowId,
@@ -60,31 +34,30 @@ describe("saveOrCommitWorkflowVersion", () => {
   });
 
   afterAll(async () => {
-    // Delete in reverse dependency order, nulling circular FKs first.
-    // CI enforces real FK constraints unlike local (relationMode = "prisma").
-    await prisma.workflow.updateMany({
-      where: { projectId },
-      data: { latestVersionId: null, currentVersionId: null },
-    });
-    await prisma.workflowVersion.updateMany({
-      where: { projectId },
-      data: { parentId: null },
-    });
-    await prisma.workflowVersion.deleteMany({ where: { projectId } });
-    await prisma.workflow.deleteMany({ where: { projectId } });
-    await prisma.project.deleteMany({ where: { id: projectId } });
-    await prisma.$executeRawUnsafe(
-      `DELETE FROM "TeamUser" WHERE "teamId" = '${teamId}'`,
-    );
-    await prisma.team.deleteMany({ where: { id: teamId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
+    await prisma.workflow
+      .update({
+        where: { id: workflowId, projectId },
+        data: { latestVersionId: null, currentVersionId: null },
+      })
+      .catch(() => {});
+    await prisma.workflowVersion
+      .deleteMany({ where: { workflowId, projectId } })
+      .catch(() => {});
+    await prisma.workflow
+      .delete({ where: { id: workflowId, projectId } })
+      .catch(() => {});
+  });
+
+  const getCtx = () => ({
+    prisma,
+    session: { user: { id: userId } } as Session,
   });
 
   describe("when a signature node has localPromptConfig", () => {
     it("merges localPromptConfig into parameters in the persisted DSL", async () => {
-      const dsl = buildDslWithLocalPromptConfig({
-        oldInstructions: "You are a helpful assistant.",
-        oldMessages: [{ role: "user", content: "{{input}}" }],
+      const dsl = buildDsl({
+        instructions: "You are a helpful assistant.",
+        messages: [{ role: "user", content: "{{input}}" }],
         localPromptConfig: {
           llm: { model: "openai/gpt-5-mini", temperature: 0.5 },
           messages: [
@@ -108,7 +81,7 @@ describe("saveOrCommitWorkflowVersion", () => {
       });
 
       const version = await saveOrCommitWorkflowVersion({
-        ctx,
+        ctx: getCtx(),
         input: { projectId, workflowId, dsl },
         autoSaved: false,
         commitMessage: "test localPromptConfig merge",
@@ -150,13 +123,13 @@ describe("saveOrCommitWorkflowVersion", () => {
 
   describe("when a signature node has NO localPromptConfig", () => {
     it("preserves parameters as-is", async () => {
-      const dsl = buildDslWithoutLocalPromptConfig({
+      const dsl = buildDsl({
         instructions: "You are a bias evaluator.",
         messages: [{ role: "user", content: "Evaluate: {{output}}" }],
       });
 
       const version = await saveOrCommitWorkflowVersion({
-        ctx,
+        ctx: getCtx(),
         input: { projectId, workflowId, dsl },
         autoSaved: false,
         commitMessage: "test no localPromptConfig",
@@ -181,14 +154,14 @@ describe("saveOrCommitWorkflowVersion", () => {
 
 let versionCounter = 0;
 
-function buildDslWithLocalPromptConfig({
-  oldInstructions,
-  oldMessages,
+function buildDsl({
+  instructions,
+  messages,
   localPromptConfig,
 }: {
-  oldInstructions: string;
-  oldMessages: Array<{ role: string; content: string }>;
-  localPromptConfig: any;
+  instructions: string;
+  messages: Array<{ role: string; content: string }>;
+  localPromptConfig?: any;
 }) {
   versionCounter++;
   return {
@@ -222,15 +195,11 @@ function buildDslWithLocalPromptConfig({
               type: "llm",
               value: { model: "openai/gpt-5-mini" },
             },
-            {
-              identifier: "instructions",
-              type: "str",
-              value: oldInstructions,
-            },
+            { identifier: "instructions", type: "str", value: instructions },
             {
               identifier: "messages",
               type: "chat_messages",
-              value: oldMessages,
+              value: messages,
             },
           ],
           localPromptConfig,
@@ -240,18 +209,4 @@ function buildDslWithLocalPromptConfig({
     edges: [],
     state: {},
   } as any;
-}
-
-function buildDslWithoutLocalPromptConfig({
-  instructions,
-  messages,
-}: {
-  instructions: string;
-  messages: Array<{ role: string; content: string }>;
-}) {
-  return buildDslWithLocalPromptConfig({
-    oldInstructions: instructions,
-    oldMessages: messages,
-    localPromptConfig: undefined,
-  });
 }
