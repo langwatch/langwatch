@@ -205,6 +205,8 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 
 3. **Auth token 401s at the ingest.** `/api/otel` rejects unauthenticated or expired tokens with 401; the gateway exporter logs the rejection but the hot path is already done. Rotate the token, update the Secret, roll the gateway pod.
 
+   <Note>**OTLP 401/403 noise during the first 30s of startup is suppressed by design.** The gateway's OTel startup-error handler swallows transient transport errors (401, 403, connection-refused, no-such-host) for a 30-second grace window OR until the first successful export — whichever comes first. This avoids logspam during cold-boot races where the gateway is up before the control plane has minted the OTLP token. **If you see OTLP 401 floods AFTER that grace window, the control-plane auth pipeline isn't minting tokens** — first-line check is `LW_GATEWAY_INTERNAL_SECRET` parity between the gateway and control plane (mismatched HMAC secret silently breaks the `/resolve-key` handshake that mints the OTLP token).</Note>
+
 4. **Endpoint URL 404s.** Before the auto-suffix fix, an endpoint like `http://langwatch-app:5560/api/otel` was treated as the full URL; the Go OTLP exporter hit `/api/otel` and got 404 (the receiver is at `/api/otel/v1/traces`). Recent gateway builds append `/v1/traces` automatically when missing. Bump to the latest image.
 
 5. **Sampler dropped the span.** Gateway spans are sampled at 1.0 by default — if you've tuned `GATEWAY_OTEL_SAMPLER_ARG` below 1.0 for cost, spot-checks will miss by design.
