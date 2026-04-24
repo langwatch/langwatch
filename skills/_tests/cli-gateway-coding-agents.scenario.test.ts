@@ -451,6 +451,13 @@ describe("AI Gateway — coding-agent matrix", () => {
           cwd: tempFolder,
           encoding: "utf-8",
           timeout: 600_000,
+          // Explicit stdio['ignore', 'pipe', 'pipe'] — without it,
+          // gemini-cli hangs indefinitely under vitest's spawnSync
+          // (no model traffic, ~0% CPU, /dev/ptmx fd's stuck waiting
+          // for a TTY that vitest's subprocess pipe doesn't provide).
+          // Verified: same env + spawnSync invocation from a
+          // standalone `node -e ...` returned in seconds.
+          stdio: ["ignore", "pipe", "pipe"],
           env: {
             ...process.env,
             HOME: geminiHome,
