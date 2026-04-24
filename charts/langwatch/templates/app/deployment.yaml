@@ -148,6 +148,30 @@ spec:
             {{- end }}
             {{- end }}
 
+            # AI Gateway virtual-key pepper (control-plane only).
+            # The gateway pod must NEVER receive this value — it is used here
+            # in src/server/gateway/virtualKey.crypto.ts to hash incoming VK
+            # plaintext against the stored digest.
+            {{- if .Values.app.virtualKeyPepper.secretKeyRef.name }}
+            - name: LW_VIRTUAL_KEY_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.virtualKeyPepper.secretKeyRef.name }}
+                  key: {{ .Values.app.virtualKeyPepper.secretKeyRef.key }}
+            {{- else if .Values.secrets.existingSecret }}
+            - name: LW_VIRTUAL_KEY_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.secretKeys.virtualKeyPepper | default "virtualKeyPepper" }}
+            {{- else if .Values.autogen.enabled }}
+            - name: LW_VIRTUAL_KEY_PEPPER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
+                  key: virtualKeyPepper
+            {{- end }}
+
             # NextAuth configuration
             - name: NEXTAUTH_PROVIDER
               value: {{ .Values.app.nextAuth.provider | quote }}

@@ -78,6 +78,19 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   {{- end }}
 {{- end }}
 
+{{/* Validate AI Gateway virtual-key pepper (control-plane only; never shared with gateway pod) */}}
+{{- if .Values.app.virtualKeyPepper.secretKeyRef.name }}
+  {{- if empty .Values.app.virtualKeyPepper.secretKeyRef.key }}
+    {{- $errors = append $errors "app.virtualKeyPepper.secretKeyRef.name is set but key is empty" }}
+  {{- end }}
+{{- else if empty .Values.app.virtualKeyPepper.value }}
+  {{- if not .Values.autogen.enabled }}
+    {{- if empty .Values.secrets.existingSecret }}
+      {{- $errors = append $errors "app.virtualKeyPepper must have either value, secretKeyRef, or autogen must be enabled" }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
 {{/* Validate evaluators secrets */}}
 {{- if .Values.app.evaluators.azureOpenAI.enabled }}
   {{- if .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.name }}

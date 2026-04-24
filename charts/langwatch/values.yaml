@@ -76,6 +76,9 @@ secrets:
     # Key for NextAuth secret (used by app)
     ## @param secrets.secretKeys.nextAuthSecret [string] Key name for NextAuth secret.
     nextAuthSecret: "nextAuthSecret"
+    # Key for AI Gateway virtual-key pepper (used by app only)
+    ## @param secrets.secretKeys.virtualKeyPepper [string] Key name for AI Gateway virtual-key pepper.
+    virtualKeyPepper: "virtualKeyPepper"
 
 # =============================================================================
 # Container Image Configurations
@@ -154,6 +157,18 @@ app:
   ## @param app.cronApiKey.value [string] Cron API key value.
   ## @param app.cronApiKey.secretKeyRef [object] Reference to a secret holding the cron API key.
   cronApiKey:
+    value: ""
+    secretKeyRef: { name: "", key: "" }
+
+  # Pepper used when hashing AI Gateway virtual-key secrets (HMAC-SHA256).
+  # Control-plane only — this value is NEVER shared with the gateway pod.
+  # Rotating this value invalidates every previously-issued virtual key,
+  # so treat it as append-only. Autogen keeps it stable across upgrades
+  # by reusing the existing Secret value on redeploy.
+  ## @extra app.virtualKeyPepper Pepper for hashing AI Gateway virtual-key secrets.
+  ## @param app.virtualKeyPepper.value [string] Pepper value (not recommended inline for production).
+  ## @param app.virtualKeyPepper.secretKeyRef [object] Reference to a secret holding the pepper.
+  virtualKeyPepper:
     value: ""
     secretKeyRef: { name: "", key: "" }
 
