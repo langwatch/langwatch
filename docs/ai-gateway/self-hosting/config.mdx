@@ -191,3 +191,32 @@ See [Cookbook: Production runbook](/ai-gateway/cookbooks/production-runbook) for
 - `PROTECTED_ENDPOINTS` (internal): the `/healthz` / `/readyz` / `/metrics` endpoints never require auth and are not rate-limited — give your scraper direct access.
 
 See [Health Checks](/ai-gateway/self-hosting/health-checks) for what each probe validates and [Scaling](/ai-gateway/self-hosting/scaling) for HPA and capacity planning.
+
+## Request body cap
+
+| Var | Default | Purpose |
+|---|---|---|
+| `SERVER_MAX_REQUEST_BODY_BYTES` | `33554432` (32 MiB) | Per-request body cap enforced at the edge before auth or upstream dispatch. Sized for 1 M-context LLM workloads (Gemini 1.5 Pro full-context with images can exceed 10 MiB; Claude with long doc context 5–8 MiB; coding-agent sessions with rich tool schemas 4–6 MiB). Returns `413 payload_too_large` when exceeded |
+
+Public-edge deployments tightening DDoS protection can lower this; enterprise deployments processing full-context multimodal payloads can raise it. The gateway also applies a per-endpoint peek window (32 KiB on `/v1/chat/completions` and `/v1/messages`, 256 KiB on `/v1/responses` to find `stream:true` past large tool/instruction blocks); peek size is internal and not env-tunable today.
+
+## Debug / development env knobs
+
+These are gated env vars used during dev / triage. Never enable in production — they emit verbose data including potentially sensitive prompt content.
+
+| Var | Default | Purpose |
+|---|---|---|
+| `LW_LOG_MESSAGE_BODY` | unset | Set to `1` to log a peek of every inbound `/v1/messages` and `/v1/responses` request body at INFO level. Useful for diagnosing CLI-shape-specific provider rejections (e.g. exact body structure that trips Anthropic's edge HTML response) |
+| `LW_GATEWAY_OUTBOUND_PROXY` | unset | Set to an `http://host:port` URL to route all outbound provider HTTP traffic through a logging proxy (mitmproxy, mitmdump, etc.). Bifrost's `ProxyConfig` is wired from this; covers OpenAI / Anthropic / Gemini / Azure (Bedrock uses the AWS SDK and bypasses HTTP proxy). Use to capture exact outbound URL + headers + body for cache-key-hash debugging or upstream-quirk diagnosis |
+| `FEATURE_FLAG_FORCE_ENABLE` | unset | Comma-separated list of feature flags to force-enable, bypassing PostHog. Most common in dev: `release_ui_ai_gateway_menu_enabled` to make the AI Gateway menu visible without a PostHog distinct-id match. Read by the control plane on boot — restart `pnpm dev` after changing |
+
+Worked example — capturing outbound provider traffic to debug a cache-hit hash mismatch:
+
+```bash
+mitmdump -p 8888 --ssl-insecure &
+export LW_GATEWAY_OUTBOUND_PROXY=http://localhost:8888
+export LW_LOG_MESSAGE_BODY=1
+make service svc=aigateway   # restart picks up both env vars
+```
+
+Replay the failing request via your client; the mitmdump session shows the exact bytes the gateway sends to `api.anthropic.com` (or any other provider), and the gateway log line `peek=...` shows what the client sent in. Diff side-by-side to localise body-mutation bugs (this exact recipe found the iter-110 cache-rule wire-DTO matcher bug — `disable-cache-evals` rule was matching every VK and stripping `cache_control` from outbound bodies, narrowed via 40-byte byte-diff).
