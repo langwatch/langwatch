@@ -280,6 +280,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   } | null>(null);
   const onLocalConfigChangeRef = useRef(onLocalConfigChange);
   onLocalConfigChangeRef.current = onLocalConfigChange;
+  const initializedForEvaluatorRef = useRef<string | null>(null);
 
   // Initialize form with evaluator data (merging local config if present)
   useEffect(() => {
@@ -293,16 +294,19 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
       };
       savedFormValuesRef.current = savedValues;
 
-      // Merge local config over DB data if present
-      const formValues = initialLocalConfig
-        ? {
-            name: initialLocalConfig.name,
-            settings: initialLocalConfig.settings ?? savedValues.settings,
-          }
-        : savedValues;
+      // Only reset form on first data load for this evaluator, not on refetches
+      if (initializedForEvaluatorRef.current !== evaluatorQuery.data.id) {
+        initializedForEvaluatorRef.current = evaluatorQuery.data.id;
+        const formValues = initialLocalConfig
+          ? {
+              name: initialLocalConfig.name,
+              settings: initialLocalConfig.settings ?? savedValues.settings,
+            }
+          : savedValues;
 
-      form.reset(formValues);
-      setHasUnsavedChanges(!!initialLocalConfig);
+        form.reset(formValues);
+        setHasUnsavedChanges(!!initialLocalConfig);
+      }
     }
   }, [evaluatorQuery.data, form, initialLocalConfig]);
 
@@ -443,20 +447,31 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
 
-    // For existing workflow evaluators, we're just "selecting" them, not saving
-    // Call onSave directly without requiring evaluatorType
+    // For existing workflow evaluators, persist name changes via mutation
     if (evaluatorId && isWorkflowEvaluator) {
-      const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
-      const handledNavigation = freshOnSave?.({
-        id: evaluatorId,
-        name: evaluatorQuery.data?.name ?? "",
-      });
-      if (handledNavigation) return;
-      // Default: go back if there's a stack, otherwise close
-      if (getDrawerStack().length > 1) {
-        goBack();
+      const formValues = form.getValues();
+      const newName = formValues.name.trim();
+      const nameChanged = newName !== (evaluatorQuery.data?.name?.trim() ?? "");
+
+      if (nameChanged) {
+        updateMutation.mutate({
+          id: evaluatorId,
+          projectId: project.id,
+          name: newName,
+        });
       } else {
-        onClose();
+        const freshOnSave =
+          getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
+        const handledNavigation = freshOnSave?.({
+          id: evaluatorId,
+          name: evaluatorQuery.data?.name ?? "",
+        });
+        if (handledNavigation) return;
+        if (getDrawerStack().length > 1) {
+          goBack();
+        } else {
+          onClose();
+        }
       }
       return;
     }
