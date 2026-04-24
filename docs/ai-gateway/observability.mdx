@@ -40,7 +40,7 @@ Source of truth: `services/aigateway/adapters/gatewaytracer/attrs.go`. The gatew
 | `langwatch.model_source` | How the model was resolved: `alias` / `explicit_slash` / `implicit`. |
 | `langwatch.streaming` | `true` when the request opted into SSE. |
 | `langwatch.usage.input_tokens` / `langwatch.usage.output_tokens` | Regular input/output tokens. |
-| `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.cache_creation.input_tokens` | Cache-read + cache-creation counters (OTel GenAI semconv — Lane A iter 42 dropped proprietary `langwatch.usage.cache_*_tokens` in favour of these). |
+| `gen_ai.usage.cache_read.input_tokens` / `gen_ai.usage.cache_creation.input_tokens` | Cache-read and cache-creation counters, following the OTel GenAI semconv. |
 | `langwatch.cost_usd` | Computed cost for this request. |
 | `langwatch.duration_ms` | Wall-clock time the gateway spent on the request. |
 | `langwatch.status` | Final status: `success` / `provider_error` / `blocked_by_guardrail` / `budget_exceeded` / etc. |
@@ -96,7 +96,7 @@ From a log line or an error at the client, grab the `X-LangWatch-Request-Id` (`g
 
 ## Trace-id propagation — concrete handshake
 
-Every gateway response carries the following headers (as of Lane A iter 4 pt1 — W3C traceparent + per-tenant OTel router, `e9b04e6`):
+Every gateway response carries the following headers for W3C traceparent propagation and per-tenant OTel routing:
 
 | Response header | Format | Semantics |
 |---|---|---|

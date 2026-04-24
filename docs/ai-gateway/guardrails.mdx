@@ -64,7 +64,7 @@ Use cases: real-time PII termination (credit card numbers, emails, phone numbers
 
 ## Attaching guardrails to a VK
 
-The VK create/edit drawer (Lane B iter 17, `0541bd096`) has three direction sections — **Pre-request**, **Post-response**, **Stream chunk** — each listing every project evaluator whose `executionMode = AS_GUARDRAIL`. Check the box next to an evaluator to attach it to that direction; uncheck to detach. Save the drawer — the gateway picks up the change within 30 s via the `/changes` long-poll.
+The VK create/edit drawer has three direction sections — **Pre-request**, **Post-response**, **Stream chunk** — each listing every project evaluator whose `executionMode = AS_GUARDRAIL`. Check the box next to an evaluator to attach it to that direction; uncheck to detach. Save the drawer — the gateway picks up the change within 30 s via the `/changes` long-poll.
 
 Each direction section also has a **Default-block on evaluator failure** toggle. Off (default) = fail closed (matches `guardrails.request_fail_open: false` / `response_fail_open: false`). On = fail open; the gateway WARN-logs the evaluator failure and proceeds. The helper copy cites the concrete enforcement shapes so you know what the toggle actually does:
 
