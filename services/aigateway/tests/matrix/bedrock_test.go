@@ -47,16 +47,19 @@ func TestBedrock_StructuredOutputs(t *testing.T) {
 }
 
 func TestBedrock_Cache(t *testing.T) {
-	// Bedrock Anthropic cache goes through /v1/messages for the same reason
-	// direct Anthropic does — raw-forward preserves cache_control + native
-	// cache_*_input_tokens. Sonnet 4.5 has cache GA; Haiku 4.5 cache is
-	// beta. Override via BEDROCK_CACHE_MODEL.
-	cell := bedrockCell(t, "cache", anthropicNativeCache_Prime, false)
-	cell.endpoint = "/v1/messages"
+	// Bedrock cache goes through /v1/chat/completions, NOT /v1/messages —
+	// Bifrost's bedrock adapter uses AWS's Converse API and rejects
+	// Anthropic-native /v1/messages bodies with 'Unexpected field type'.
+	// chatBody_Cache_* detects bedrock's `anthropic.claude-…` model id and
+	// emits the system block as a content-block array carrying
+	// cache_control: ephemeral, which Bifrost translates to Bedrock's
+	// cachePoint marker on Converse. Default is sonnet 4.5 (cache GA);
+	// override via BEDROCK_CACHE_MODEL once Haiku 4.5 cache opens.
+	cell := bedrockCell(t, "cache", chatBody_Cache_Prime, false)
 	if override := os.Getenv("BEDROCK_CACHE_MODEL"); override != "" {
 		cell.model = override
 	} else {
 		cell.model = "eu.anthropic.claude-sonnet-4-5-20250929-v1:0"
 	}
-	runCacheCellWith(t, cell, anthropicNativeCache_Prime, anthropicNativeCache_Read)
+	runCacheCell(t, cell)
 }
