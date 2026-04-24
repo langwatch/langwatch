@@ -110,3 +110,12 @@ func (w *guardrailStreamWrapper) Chunk() []byte       { return w.inner.Chunk() }
 func (w *guardrailStreamWrapper) Usage() domain.Usage { return w.inner.Usage() }
 func (w *guardrailStreamWrapper) Err() error          { return w.inner.Err() }
 func (w *guardrailStreamWrapper) Close() error        { return w.inner.Close() }
+
+// RawFraming delegates to the inner iterator so writers can still
+// detect raw-framed (Gemini passthrough) streams through wrapper chains.
+func (w *guardrailStreamWrapper) RawFraming() bool {
+	if rf, ok := w.inner.(domain.RawFramer); ok {
+		return rf.RawFraming()
+	}
+	return false
+}

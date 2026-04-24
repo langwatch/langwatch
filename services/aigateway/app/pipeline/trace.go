@@ -93,6 +93,15 @@ func (w *traceStreamWrapper) Chunk() []byte       { return w.inner.Chunk() }
 func (w *traceStreamWrapper) Usage() domain.Usage { return w.inner.Usage() }
 func (w *traceStreamWrapper) Err() error          { return w.inner.Err() }
 
+// RawFraming delegates to the inner iterator so writers can still
+// detect raw-framed (Gemini passthrough) streams through wrapper chains.
+func (w *traceStreamWrapper) RawFraming() bool {
+	if rf, ok := w.inner.(domain.RawFramer); ok {
+		return rf.RawFraming()
+	}
+	return false
+}
+
 func (w *traceStreamWrapper) Close() error {
 	w.onClose()
 	return w.inner.Close()
