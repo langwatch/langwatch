@@ -38,6 +38,16 @@ type AITraceParams struct {
 	Usage       Usage
 	RequestType RequestType
 
+	// VirtualKeyID is the id of the VK that authorised this request. Stamped
+	// on the customer span so the control plane's trace-processing pipeline
+	// can fold per-budget spend back into ClickHouse idempotently.
+	VirtualKeyID string
+
+	// GatewayRequestID is the per-request ULID issued by the gateway. Acts as
+	// the idempotency key for the CH-fold debit row; replays collapse on the
+	// ReplacingMergeTree's (TenantId, BudgetId, GatewayRequestId) ORDER BY.
+	GatewayRequestID string
+
 	// RequestBody and ResponseBody are the raw JSON bodies for input/output
 	// extraction. Either may be nil (e.g. streaming responses).
 	RequestBody  []byte

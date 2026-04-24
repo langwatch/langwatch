@@ -16,6 +16,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/langwatch/langwatch/pkg/contexts"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/gatewaytracer"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -115,14 +116,24 @@ func (e *Emitter) EndSpan(ctx context.Context, params domain.AITraceParams) {
 		return
 	}
 
-	span.SetAttributes(
+	attrs := []attribute.KeyValue{
 		semconv.GenAIProviderNameKey.String(string(params.ProviderID)),
 		semconv.GenAIRequestModelKey.String(params.Model),
 		semconv.GenAIUsageInputTokensKey.Int(params.Usage.PromptTokens),
 		semconv.GenAIUsageOutputTokensKey.Int(params.Usage.CompletionTokens),
 		attrTotalUsage.Int(params.Usage.TotalTokens),
 		attrCost.Int64(params.Usage.CostMicroUSD),
-	)
+	}
+	// VK id + request id let the control plane's trace-processing pipeline
+	// identify gateway traces and fold idempotent budget debits into ClickHouse.
+	// See specs/ai-gateway/_shared/contract.md §4.5.
+	if params.VirtualKeyID != "" {
+		attrs = append(attrs, attribute.String(gatewaytracer.AttrVirtualKeyID, params.VirtualKeyID))
+	}
+	if params.GatewayRequestID != "" {
+		attrs = append(attrs, attribute.String(gatewaytracer.AttrGatewayReqID, params.GatewayRequestID))
+	}
+	span.SetAttributes(attrs...)
 
 	if input := extractInputMessages(params.RequestBody, params.RequestType); input != "" {
 		span.SetAttributes(attrInputMessages.String(input))

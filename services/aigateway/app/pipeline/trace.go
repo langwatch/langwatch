@@ -31,13 +31,15 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 				}
 				if call.Request.Resolved != nil {
 					end(spanCtx, domain.AITraceParams{
-						ProjectID:    call.Bundle.ProjectID,
-						Model:        call.Request.Resolved.ModelID,
-						ProviderID:   call.Request.Resolved.ProviderID,
-						Usage:        resp.Usage,
-						RequestType:  call.Request.Type,
-						RequestBody:  call.Request.Body,
-						ResponseBody: resp.Body,
+						ProjectID:        call.Bundle.ProjectID,
+						Model:            call.Request.Resolved.ModelID,
+						ProviderID:       call.Request.Resolved.ProviderID,
+						Usage:            resp.Usage,
+						RequestType:      call.Request.Type,
+						VirtualKeyID:     call.Bundle.VirtualKeyID,
+						GatewayRequestID: call.Meta.GatewayRequestID,
+						RequestBody:      call.Request.Body,
+						ResponseBody:     resp.Body,
 					})
 				}
 				return resp, nil
@@ -60,6 +62,7 @@ func Trace(begin BeginSpanFunc, end EndSpanFunc) Interceptor {
 					end:     end,
 					bundle:  call.Bundle,
 					req:     call.Request,
+					meta:    call.Meta,
 					spanCtx: spanCtx,
 				}, nil
 			}
@@ -73,6 +76,7 @@ type traceStreamWrapper struct {
 	end       EndSpanFunc
 	bundle    *domain.Bundle
 	req       *domain.Request
+	meta      *Meta
 	spanCtx   context.Context
 	closeOnce sync.Once
 }
@@ -101,12 +105,14 @@ func (w *traceStreamWrapper) onClose() {
 		// carry it.
 		forkedcontext.ForkWithTimeout(w.spanCtx, 5*time.Second, func(ctx context.Context) error {
 			w.end(ctx, domain.AITraceParams{
-				ProjectID:   w.bundle.ProjectID,
-				Model:       w.req.Resolved.ModelID,
-				ProviderID:  w.req.Resolved.ProviderID,
-				Usage:       w.inner.Usage(),
-				RequestType: w.req.Type,
-				RequestBody: w.req.Body,
+				ProjectID:        w.bundle.ProjectID,
+				Model:            w.req.Resolved.ModelID,
+				ProviderID:       w.req.Resolved.ProviderID,
+				Usage:            w.inner.Usage(),
+				RequestType:      w.req.Type,
+				VirtualKeyID:     w.bundle.VirtualKeyID,
+				GatewayRequestID: w.meta.GatewayRequestID,
+				RequestBody:      w.req.Body,
 			})
 			return nil
 		})
