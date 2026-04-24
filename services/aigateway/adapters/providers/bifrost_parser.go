@@ -32,7 +32,7 @@ func buildChatRequest(
 				RawRequestBody: req.Body,
 				Input:          []bfschemas.ChatMessage{},
 			},
-			context.WithValue(ctx, bfschemas.BifrostContextKeyUseRawRequestBody, true),
+			rawForwardCtx(ctx),
 			nil
 	}
 

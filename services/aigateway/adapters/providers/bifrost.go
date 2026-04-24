@@ -87,6 +87,23 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		return nil, classifyBifrostError(ctx, berr)
 	}
 
+	// /v1/messages callers (Anthropic SDK, claude-code, ...) expect the
+	// provider's native response shape — not Bifrost's OpenAI-normalized
+	// BifrostChatResponse. When the raw-forward branch captured
+	// ExtraFields.RawResponse (SendBackRawResponse=true in the context),
+	// return those bytes verbatim instead of re-marshaling the normalized
+	// struct. OpenAI-compat chat-completions callers keep the normalized
+	// shape.
+	if req.Type == domain.RequestTypeMessages {
+		if rawBody, ok := rawResponseBytes(resp); ok {
+			return &domain.Response{
+				Body:       rawBody,
+				StatusCode: http.StatusOK,
+				Usage:      extractUsage(resp),
+			}, nil
+		}
+	}
+
 	body, _ := sonic.Marshal(resp)
 	return &domain.Response{
 		Body:       body,
@@ -116,17 +133,23 @@ func (r *BifrostRouter) dispatchResponses(
 		// req.RawRequestBody directly; Input is not consulted.
 		Input: []bfschemas.ResponsesMessage{},
 	}
-	bfCtx := bfschemas.NewBifrostContext(
-		context.WithValue(
-			withCredential(ctx, cred),
-			bfschemas.BifrostContextKeyUseRawRequestBody, true,
-		),
-		time.Time{},
-	)
+	bfCtx := bfschemas.NewBifrostContext(rawForwardCtx(withCredential(ctx, cred)), time.Time{})
 
 	resp, berr := r.bf.ResponsesRequest(bfCtx, bfReq)
 	if berr != nil {
 		return nil, classifyBifrostError(ctx, berr)
+	}
+
+	// Prefer the provider's native response bytes so /v1/responses
+	// clients (codex, OpenAI Responses SDK, ...) see the exact wire
+	// frames the provider emitted. Falls back to the normalized
+	// BifrostResponsesResponse marshal if RawResponse is absent.
+	if rawBody, ok := rawResponseBytesResp(resp); ok {
+		return &domain.Response{
+			Body:       rawBody,
+			StatusCode: http.StatusOK,
+			Usage:      extractResponsesUsage(resp),
+		}, nil
 	}
 
 	body, _ := sonic.Marshal(resp)
@@ -192,19 +215,70 @@ func (r *BifrostRouter) dispatchResponsesStream(
 		// req.RawRequestBody directly; Input is not consulted.
 		Input: []bfschemas.ResponsesMessage{},
 	}
-	bfCtx := bfschemas.NewBifrostContext(
-		context.WithValue(
-			withCredential(ctx, cred),
-			bfschemas.BifrostContextKeyUseRawRequestBody, true,
-		),
-		time.Time{},
-	)
+	bfCtx := bfschemas.NewBifrostContext(rawForwardCtx(withCredential(ctx, cred)), time.Time{})
 
 	ch, berr := r.bf.ResponsesStreamRequest(bfCtx, bfReq)
 	if berr != nil {
 		return nil, classifyBifrostError(ctx, berr)
 	}
 	return &bifrostStreamIterator{ch: ch}, nil
+}
+
+// rawForwardCtx enriches a context with both Bifrost flags the
+// raw-forward code path needs: UseRawRequestBody sends the inbound
+// bytes unchanged to the provider adapter; SendBackRawResponse attaches
+// the provider's native response bytes to ExtraFields.RawResponse so
+// the gateway can emit them verbatim downstream.
+func rawForwardCtx(ctx context.Context) context.Context {
+	ctx = context.WithValue(ctx, bfschemas.BifrostContextKeyUseRawRequestBody, true)
+	ctx = context.WithValue(ctx, bfschemas.BifrostContextKeySendBackRawResponse, true)
+	return ctx
+}
+
+// rawResponseBytes extracts the provider's native chat-completion
+// response bytes from BifrostResponseExtraFields.RawResponse. Bifrost
+// populates this only when BifrostContextKeySendBackRawResponse is set
+// on the dispatch context (see rawForwardCtx). Returns (nil, false) if
+// the response or raw payload is absent.
+func rawResponseBytes(resp *bfschemas.BifrostChatResponse) ([]byte, bool) {
+	if resp == nil {
+		return nil, false
+	}
+	return extractRawResponseBytes(resp.ExtraFields.RawResponse)
+}
+
+// rawResponseBytesResp is the Responses-API sibling of rawResponseBytes.
+func rawResponseBytesResp(resp *bfschemas.BifrostResponsesResponse) ([]byte, bool) {
+	if resp == nil {
+		return nil, false
+	}
+	return extractRawResponseBytes(resp.ExtraFields.RawResponse)
+}
+
+// extractRawResponseBytes normalises the various concrete types
+// Bifrost may stash into ExtraFields.RawResponse (typed `interface{}`)
+// into a []byte suitable for writing to the HTTP response.
+func extractRawResponseBytes(raw interface{}) ([]byte, bool) {
+	switch v := raw.(type) {
+	case nil:
+		return nil, false
+	case []byte:
+		if len(v) == 0 {
+			return nil, false
+		}
+		return v, true
+	case string:
+		if v == "" {
+			return nil, false
+		}
+		return []byte(v), true
+	default:
+		b, err := sonic.Marshal(raw)
+		if err != nil || len(b) == 0 {
+			return nil, false
+		}
+		return b, true
+	}
 }
 
 // ListModels returns an empty list — model discovery is VK-config-driven.
