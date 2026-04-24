@@ -209,6 +209,10 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 		return r.dispatchPassthroughStream(ctx, req, provider, model, cred)
 	}
 
+	if req.Type == domain.RequestTypeChat && isOpenAICompatibleProvider(provider) {
+		req.Body = ensureStreamIncludeUsage(req.Body)
+	}
+
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
 		return nil, err

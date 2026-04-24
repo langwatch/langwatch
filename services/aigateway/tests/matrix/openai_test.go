@@ -32,6 +32,16 @@ func TestOpenAI_StreamedCompletion(t *testing.T) {
 	runCell(t, openaiCell(t, "streamed", chatBody_Streamed, true))
 }
 
+// TestOpenAI_StreamedAutoIncludeUsage exercises the auto-injection path:
+// the request body carries stream=true WITHOUT stream_options, the gateway
+// must inject stream_options.include_usage=true before forwarding so the
+// upstream's final SSE chunk carries real token counts. The runCell
+// assertion fails unless the trace lands with total_cost > 0 AND
+// prompt+completion tokens > 0 — which requires the injection to work.
+func TestOpenAI_StreamedAutoIncludeUsage(t *testing.T) {
+	runCell(t, openaiCell(t, "streamed_auto_include_usage", chatBody_StreamedNoUsageOption, true))
+}
+
 func TestOpenAI_ToolCalling(t *testing.T) {
 	runCell(t, openaiCell(t, "tool_calling", chatBody_ToolCalling, false))
 }

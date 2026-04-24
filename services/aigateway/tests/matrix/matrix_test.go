@@ -127,6 +127,27 @@ func chatBody_Streamed(model string) []byte {
 	})
 }
 
+// chatBody_StreamedNoUsageOption exercises the stream_options.include_usage
+// auto-injection path (specs/ai-gateway/streaming.feature → "Streaming
+// usage capture"). OpenAI only emits the final usage SSE chunk when that
+// flag is set on the request body. Most real callers (vanilla OpenAI SDK
+// without opt-in, coding CLIs, LangChain default) DON'T set it — which
+// leaves the gateway trace with tokens=0 + a success_no_usage warning and
+// starves cost-enrichment. The gateway injects the flag for OpenAI-shape
+// providers on the DispatchStream path so cost + budget accounting keep
+// working regardless of caller hygiene. This body intentionally omits
+// stream_options to prove the injection.
+func chatBody_StreamedNoUsageOption(model string) []byte {
+	return mustJSON(map[string]any{
+		"model": model,
+		"messages": []map[string]any{
+			{"role": "user", "content": "Count from 1 to 5, one number per line."},
+		},
+		maxTokensKey(model): 48,
+		"stream":            true,
+	})
+}
+
 // chatBody_ToolCalling exercises OpenAI-compatible function/tool calling.
 func chatBody_ToolCalling(model string) []byte {
 	return mustJSON(map[string]any{

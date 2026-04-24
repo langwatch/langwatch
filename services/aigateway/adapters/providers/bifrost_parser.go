@@ -8,6 +8,8 @@ import (
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 
 	"github.com/bytedance/sonic"
+	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -145,6 +147,36 @@ var chatExtensionKeys = []string{
 	"cached_content",
 	"safety_settings",
 	"labels",
+}
+
+// ensureStreamIncludeUsage injects stream_options.include_usage=true on an
+// OpenAI-shape /v1/chat/completions body when the caller asked for streaming
+// but didn't opt in to the final usage SSE chunk. Without include_usage,
+// OpenAI streams finish with zero prompt/completion tokens — cost-enrichment
+// then has nothing to fold and the trace shows tokens=0 + success_no_usage.
+//
+// The function is a no-op when:
+//   - the body has no "stream":true (non-stream dispatch),
+//   - the body already carries stream_options.include_usage (caller decided).
+//
+// Only call on raw-forward paths for OpenAI / Azure. Anthropic / Gemini /
+// Vertex / Bedrock emit usage natively in their stream deltas and this flag
+// is meaningless on their wire formats.
+func ensureStreamIncludeUsage(body []byte) []byte {
+	if len(body) == 0 {
+		return body
+	}
+	if !gjson.GetBytes(body, "stream").Bool() {
+		return body
+	}
+	if gjson.GetBytes(body, "stream_options.include_usage").Exists() {
+		return body
+	}
+	out, err := sjson.SetBytes(body, "stream_options.include_usage", true)
+	if err != nil {
+		return body
+	}
+	return out
 }
 
 func liftExtensionParams(body []byte, params *bfschemas.ChatParameters) {

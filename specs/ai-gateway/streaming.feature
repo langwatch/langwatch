@@ -93,3 +93,58 @@ Feature: SSE streaming — exact byte preservation post-first-chunk
       When each chunk arrives
       Then the HTTP ResponseWriter's Flusher.Flush() is invoked
       And the test harness confirms bytes reach the client socket within 5ms of bifrost emission
+
+  Rule: Streaming usage capture — gateway injects stream_options.include_usage for OpenAI-shape providers
+
+    # OpenAI's /v1/chat/completions ONLY emits the final `usage` SSE chunk
+    # (prompt/completion tokens) when the request body carries
+    # `stream_options:{include_usage:true}`. Callers without that flag see
+    # tokens_in=0 + tokens_out=0 in the gateway trace. Since the gateway
+    # needs usage for cost enrichment + budget accounting, it injects the
+    # flag on-the-fly when the caller hasn't set it. Anthropic, Gemini,
+    # Vertex, and Bedrock emit usage natively in their stream deltas, so
+    # this injection is skipped for those providers.
+
+    @unit
+    Scenario: OpenAI stream without stream_options gets include_usage injected
+      Given an inbound /v1/chat/completions body with "stream":true and no "stream_options"
+      And the resolved provider is OpenAI
+      When the gateway prepares the upstream request
+      Then the forwarded body contains "stream_options":{"include_usage":true}
+      And the rest of the body is byte-identical to the input (no re-ordering of messages)
+
+    @unit
+    Scenario: OpenAI stream with stream_options.include_usage=false is left untouched
+      Given an inbound /v1/chat/completions body with "stream_options":{"include_usage":false}
+      And the resolved provider is OpenAI
+      When the gateway prepares the upstream request
+      Then the forwarded body still has "include_usage":false
+      And the gateway accepts the caller's override without complaint
+
+    @unit
+    Scenario: OpenAI stream with caller-provided stream_options.include_usage=true is left intact
+      Given an inbound /v1/chat/completions body with "stream_options":{"include_usage":true}
+      When the gateway prepares the upstream request
+      Then the body is forwarded verbatim (no double-set)
+
+    @unit
+    Scenario: non-OpenAI providers are NOT mutated — Anthropic / Gemini / Bedrock emit usage natively
+      Given an inbound /v1/chat/completions body with "stream":true against an Anthropic-bound VK
+      When the gateway prepares the upstream request
+      Then the body does NOT gain "stream_options"
+      And Bifrost's Anthropic translator handles usage via native message_delta
+
+    @unit
+    Scenario: non-streaming requests are NOT mutated
+      Given an inbound /v1/chat/completions body with "stream":false or "stream" absent
+      When the gateway prepares the upstream request
+      Then the body does NOT gain "stream_options"
+
+    @integration
+    Scenario: a real OpenAI streaming call without stream_options yields non-zero tokens on the trace
+      Given a VK bound to OpenAI
+      When the caller POSTs /v1/chat/completions with "stream":true and no stream_options
+      And the upstream response completes
+      Then the OTel span attached to the trace has gen_ai.usage.input_tokens > 0
+      And gen_ai.usage.output_tokens > 0
+      And the gateway does NOT emit the success_no_usage soft warning for this request
