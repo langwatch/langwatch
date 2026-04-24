@@ -107,6 +107,45 @@ describe("GatewayBudgetService.check", () => {
     });
   });
 
+  // Regression for iter-111 Sergey finding: after the outbox/debit
+  // replacement by the trace-fold pipeline, `GatewayBudget.spentUsd` is
+  // a dormant PG column. `/budget/check` correctly reads live spend
+  // from CH into `scopes[]`, but `blockedBy[]` used to also read from
+  // the stale PG column — so the block decision was right, but the
+  // reported spent_usd was wrong by any amount accumulated since
+  // cutover. The UI + error messages surface that number directly.
+  describe("when CH rollup > 0 and legacy PG spentUsd is stale", () => {
+    it("reports blockedBy[].spentUsd from CH, not from the dormant PG column", async () => {
+      const budget = stubBudget({
+        id: "b_ch_sourced",
+        limitUsd: new Prisma.Decimal("100.00"),
+        spentUsd: new Prisma.Decimal("0.00"), // dormant post-cutover
+      });
+      const chRepoStub = {
+        getSpendForBudgets: async () => [
+          { budgetId: "b_ch_sourced", spentUsd: "95.00" },
+        ],
+      } as unknown as Parameters<typeof GatewayBudgetService.create>[1];
+
+      const sut = GatewayBudgetService.create(
+        mockPrismaWithBudgets([budget]),
+        chRepoStub,
+      );
+
+      const result = await sut.check({ ...baseCheck, projectedCostUsd: 10 });
+
+      expect(result.decision).toBe("hard_block");
+      expect(result.blockedBy).toHaveLength(1);
+      // CH figure wins, not the zero from the dormant PG column.
+      expect(result.blockedBy[0]!.spentUsd).toBe("95.000000");
+      // And scopes[] must agree — same source of truth across both lists.
+      const scopeLine = result.scopes.find(
+        (s) => s.scope === "project" && s.scopeId === "project_01",
+      );
+      expect(scopeLine?.spentUsd).toBe("95.000000");
+    });
+  });
+
   describe("when a WARN budget crosses its limit", () => {
     it("warns but does not block", async () => {
       const sut = GatewayBudgetService.create(

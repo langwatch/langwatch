@@ -499,7 +499,7 @@ export class GatewayBudgetService {
       const projectedTotal = effectiveSpent.plus(projected);
       if (projectedTotal.greaterThanOrEqualTo(budget.limitUsd)) {
         if (budget.onBreach === "BLOCK") {
-          blockedBy.push(lineFor(budget));
+          blockedBy.push(lineFor(budget, effectiveSpent));
           blockReason =
             blockReason ??
             `Budget exceeded for scope=${budget.scopeType.toLowerCase()} window=${budget.window.toLowerCase()}`;
@@ -605,14 +605,24 @@ function resolveProjectFromScope(scope: BudgetScope): string | null {
   return scope.kind === "PROJECT" ? scope.projectId : null;
 }
 
-function lineFor(b: GatewayBudget): BudgetCheckResult["blockedBy"][number] {
+// Builds a blockedBy line for a breached budget. `effectiveSpent` is the
+// CH-rollup-derived figure — the authoritative post-cutover spend.
+// `b.spentUsd` (the legacy Prisma column) stopped being maintained when
+// the outbox/debit path was replaced by the trace-fold pipeline, so
+// reading it here would report stale numbers even though the BLOCK
+// decision itself is correct. UI + error messages downstream show
+// this spent_usd to the user, so it must match what `scopes[]` reports.
+function lineFor(
+  b: GatewayBudget,
+  effectiveSpent: Prisma.Decimal,
+): BudgetCheckResult["blockedBy"][number] {
   return {
     budgetId: b.id,
     scope: b.scopeType.toLowerCase(),
     scopeId: b.scopeId,
     window: b.window.toLowerCase(),
     limitUsd: b.limitUsd.toString(),
-    spentUsd: b.spentUsd.toString(),
+    spentUsd: effectiveSpent.toFixed(6),
   };
 }
 
