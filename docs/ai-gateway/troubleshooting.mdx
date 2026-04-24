@@ -414,6 +414,41 @@ func main() { _, err := regexp.Compile(os.Args[1]); if err != nil { fmt.Println(
 
 See [Policy Rules → RE2 syntax](/ai-gateway/policy-rules).
 
+## `504 provider is required`
+
+**Symptoms:**
+- Requests intermittently return `504 provider is required` for a VK that worked fine seconds before.
+- Direct curl with a known-good model name fails the same way.
+
+**Root cause:** the gateway's bundle cache went stale and resolved the VK with an empty provider type. Bifrost's `validateRequest` rejects when `req.Provider == ""`. Most often hits after rapid pnpm-dev / control-plane restarts or after long-running gateway processes.
+
+**Fix:**
+- Restart the gateway pod (`kubectl rollout restart deploy/langwatch-gateway` in prod, `pkill -f "service aigateway" && make service svc=aigateway` in dev). A fresh bundle fetch resolves it.
+- If recurring under steady load, file the gateway log line + repro shape — it points at a Bundle resolver TTL/refresh bug.
+
+**How to disambiguate from a model-name issue**: this same error fires when the model name in the request body isn't recognized by Bifrost's registry. `gpt-5-mini` (alias) and `claude-haiku-4-5` (alias) currently return "provider is required" because Bifrost only resolves concrete dated names like `gpt-4o-mini` or `claude-haiku-4-5-20251001`. Pin to a dated name (or set up a VK alias) and the error goes away. If both the model name is concrete AND the gateway was just restarted, it's a real bundle bug — escalate.
+
+## `504 HTML response received from provider`
+
+**Symptoms:**
+- 504 with the body containing `event: response.created\ndata: {…}` or just plain HTML fragments.
+- Affects coding-agent CLIs (codex, claude-code) more than direct API clients.
+
+**Root causes:**
+
+1. **Body too large for the upstream's edge.** Some providers return HTML 4xx pages instead of JSON when the request body exceeds their per-request tolerance. Coding agents can balloon request bodies past 50 KiB with rich tool schemas + system prompts. **Fix**: reduce body — use `claude --bare --disable-slash-commands` to strip parent skills + plugins; for codex, lower `model_reasoning_effort` and avoid stuffing large `instructions` blocks.
+2. **Upstream auth failure.** Provider returned an HTML 401/403 page rather than JSON. Verify the gateway VK's underlying provider credential is valid (see Settings → Model Providers).
+3. **Upstream API rate limit / outage.** Provider is degraded; falls back via the VK chain if configured.
+4. **The streaming response was misclassified as non-streaming.** Was the cause for codex 0.122+ on `/v1/responses` until iter-110 — `stream:true` lived past the gateway's 32 KiB peek window and `PeekStream(peek)` returned false. Fixed by widening the peek window for `/v1/responses` to 256 KiB.
+
+## `504 failed to unmarshal response from provider API`
+
+**Symptoms:**
+- Gateway returns generic 504 with "failed to unmarshal response from provider API".
+- The actual upstream error from the provider is hidden behind the generic message.
+
+**Root cause (largely fixed):** an older version of the gateway's raw-forward error-passthrough helper used a `case []byte:` type switch that didn't match `json.RawMessage` (distinct named type in Go), so the upstream response bytes that Bifrost stashed on `ExtraFields.RawResponse` got dropped and the 504 fell through with the generic message. Fixed in `df37575c4`. If you still see this on a current build, the upstream may be sending an unanticipated response shape — capture with `LW_LOG_MESSAGE_BODY=1` + `LW_GATEWAY_OUTBOUND_PROXY` (see [Self-hosting → Config → Debug knobs](/ai-gateway/self-hosting/config#debug-development-env-knobs)) to surface the bytes.
+
 ## See also
 
 - [API: Errors](/ai-gateway/api/errors) — full error-type enum and HTTP status mapping.
