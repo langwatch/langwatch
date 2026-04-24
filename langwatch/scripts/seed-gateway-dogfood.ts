@@ -525,14 +525,14 @@ async function main() {
   console.log("╠══════════════════════════════════════════════════════════════╣");
   console.log("║  MATRIX VKs (services/aigateway/tests/matrix)                ║");
   for (const v of matrixVks) {
+    const envSuffix = v.name
+      .toUpperCase()
+      .replace(/-/g, "_")
+      .replace(/^MATRIX_/, "");
     console.log(`║  ${v.name.padEnd(20)} (id=${v.vkId})`);
     console.log(`║      secret: ${v.secret}`);
-    console.log(
-      `║      env var: LANGWATCH_GATEWAY_VK_${v.name
-        .toUpperCase()
-        .replace(/-/g, "_")
-        .replace(/^MATRIX_/, "")}=${v.secret}`,
-    );
+    console.log(`║      LANGWATCH_GATEWAY_VK_${envSuffix}=${v.secret}`);
+    console.log(`║      LANGWATCH_GATEWAY_VK_${envSuffix}_ID=${v.vkId}`);
   }
   console.log("╚══════════════════════════════════════════════════════════════╝");
   console.log("");
