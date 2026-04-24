@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/bytedance/sonic"
@@ -75,6 +76,10 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	if req.Type == domain.RequestTypeResponses {
 		return r.dispatchResponses(ctx, req, provider, model, cred)
+	}
+
+	if req.Type == domain.RequestTypePassthrough {
+		return r.dispatchPassthrough(ctx, req, provider, model, cred)
 	}
 
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
@@ -197,6 +202,10 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 		return r.dispatchResponsesStream(ctx, req, provider, model, cred)
 	}
 
+	if req.Type == domain.RequestTypePassthrough {
+		return r.dispatchPassthroughStream(ctx, req, provider, model, cred)
+	}
+
 	bfReq, dispatchCtx, err := buildChatRequest(ctx, req, provider, model)
 	if err != nil {
 		return nil, err
@@ -242,6 +251,101 @@ func (r *BifrostRouter) dispatchResponsesStream(
 		return nil, classifyBifrostError(ctx, berr)
 	}
 	return &bifrostStreamIterator{ch: ch}, nil
+}
+
+// dispatchPassthrough routes /v1beta/models/... (Gemini-native shape,
+// consumed by gemini-cli and the @google/genai SDK) through Bifrost's
+// Passthrough endpoint. The request body is forwarded verbatim; Bifrost
+// only rewrites auth (x-goog-api-key) and base URL. Response is the raw
+// upstream body with preserved status + headers, suitable for clients
+// that expect Google's native generateContent response shape.
+func (r *BifrostRouter) dispatchPassthrough(
+	ctx context.Context,
+	req *domain.Request,
+	provider bfschemas.ModelProvider,
+	model string,
+	cred domain.Credential,
+) (*domain.Response, error) {
+	bfReq := passthroughRequest(req, model)
+	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
+
+	resp, berr := r.bf.Passthrough(bfCtx, provider, bfReq)
+	if berr != nil {
+		if rawBody, status, ok := rawResponseFromBifrostError(berr); ok {
+			return &domain.Response{
+				Body:       rawBody,
+				StatusCode: status,
+			}, nil
+		}
+		return nil, classifyBifrostError(ctx, berr)
+	}
+
+	status := resp.StatusCode
+	if status == 0 {
+		status = http.StatusOK
+	}
+	return &domain.Response{
+		Body:       resp.Body,
+		StatusCode: status,
+		Headers:    passthroughResponseHeaders(resp.Headers),
+	}, nil
+}
+
+// dispatchPassthroughStream is the streaming sibling of dispatchPassthrough.
+// Bifrost returns chunks whose Body is the raw SSE bytes emitted by the
+// upstream (Google's streamGenerateContent already yields proper
+// `event:/data:` framing); the iterator emits them unchanged so
+// gemini-cli / @google/genai see the exact wire format they expect.
+func (r *BifrostRouter) dispatchPassthroughStream(
+	ctx context.Context,
+	req *domain.Request,
+	provider bfschemas.ModelProvider,
+	model string,
+	cred domain.Credential,
+) (domain.StreamIterator, error) {
+	bfReq := passthroughRequest(req, model)
+	bfCtx := bfschemas.NewBifrostContext(withCredential(ctx, cred), time.Time{})
+
+	ch, berr := r.bf.PassthroughStream(bfCtx, provider, bfReq)
+	if berr != nil {
+		return nil, classifyBifrostError(ctx, berr)
+	}
+	return &bifrostStreamIterator{ch: ch, rawFraming: true}, nil
+}
+
+// passthroughRequest builds the Bifrost-side passthrough request from
+// our domain.Request. Body, method, path, query, and forwarded client
+// headers are carried verbatim; model + provider drive key selection.
+func passthroughRequest(req *domain.Request, model string) *bfschemas.BifrostPassthroughRequest {
+	p := req.Passthrough
+	return &bfschemas.BifrostPassthroughRequest{
+		Model:       model,
+		Method:      p.Method,
+		Path:        p.Path,
+		RawQuery:    p.RawQuery,
+		Body:        req.Body,
+		SafeHeaders: p.Headers,
+	}
+}
+
+// passthroughResponseHeaders returns headers safe to forward to the
+// client. Content-Length and Content-Encoding are dropped since the
+// body we forward may differ in framing from what the upstream sent.
+func passthroughResponseHeaders(in map[string]string) map[string]string {
+	if len(in) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(in))
+	for k, v := range in {
+		switch {
+		case strings.EqualFold(k, "Content-Length"),
+			strings.EqualFold(k, "Content-Encoding"):
+			continue
+		default:
+			out[k] = v
+		}
+	}
+	return out
 }
 
 // rawForwardCtx enriches a context with both Bifrost flags the
@@ -532,6 +636,11 @@ type bifrostStreamIterator struct {
 	usage   domain.Usage
 	err     error
 	done    bool
+	// rawFraming is set on passthrough streams where each chunk.Body is
+	// already formatted SSE bytes from the upstream (Gemini streamGenerateContent
+	// yields proper `event:/data:` framing). Router.writeSSE inspects this
+	// to skip the default `data: <chunk>\n\n` re-wrap.
+	rawFraming bool
 }
 
 func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
@@ -580,10 +689,18 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 					TotalTokens:      u.TotalTokens,
 				}
 			}
+		} else if chunk.BifrostPassthroughResponse != nil {
+			// Passthrough stream chunks carry the raw upstream bytes
+			// (Gemini streamGenerateContent already emits proper
+			// `event:/data:` SSE framing). Forward verbatim — the
+			// writer side knows not to re-wrap when rawFraming is set.
+			it.current = chunk.BifrostPassthroughResponse.Body
 		}
 		return true
 	}
 }
+
+func (it *bifrostStreamIterator) RawFraming() bool { return it.rawFraming }
 
 func (it *bifrostStreamIterator) Chunk() []byte       { return it.current }
 func (it *bifrostStreamIterator) Usage() domain.Usage { return it.usage }

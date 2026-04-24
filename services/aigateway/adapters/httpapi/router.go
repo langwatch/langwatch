@@ -75,6 +75,20 @@ func NewRouter(deps RouterDeps) http.Handler {
 		v1.Get("/models", modelsHandler(deps))
 	})
 
+	// Gemini-native surface. gemini-cli (GOOGLE_GEMINI_BASE_URL) and the
+	// @google/genai SDK POST to `/v1beta/models/{model}:generateContent`
+	// and `:streamGenerateContent`. We raw-forward to Bifrost's Gemini
+	// Passthrough endpoint, which prepends the provider's BaseURL and
+	// swaps our VK secret for the real x-goog-api-key on the way out.
+	// Any path under /v1beta (including :countTokens, :batchEmbedContents,
+	// cachedContents/*) is accepted by the same handler.
+	r.Route("/v1beta", func(v1beta chi.Router) {
+		v1beta.Use(AuthMiddleware(deps.App.Auth()))
+		v1beta.Use(CustomerTraceMiddleware())
+		v1beta.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
+		v1beta.HandleFunc("/*", geminiPassthroughHandler(deps))
+	})
+
 	return r
 }
 
@@ -251,6 +265,124 @@ func embeddingsHandler(deps RouterDeps) http.HandlerFunc {
 	}
 }
 
+// geminiPassthroughHandler terminates any POST /v1beta/... request.
+// Specifically targets the Gemini-native shape used by gemini-cli
+// (`GOOGLE_GEMINI_BASE_URL=http://…/gateway`) and the @google/genai
+// SDK: `/v1beta/models/{model}:generateContent` and its streaming
+// sibling `:streamGenerateContent`. Raw-forwards body, method, and
+// query to Bifrost's Gemini Passthrough; client auth (already parsed
+// via x-goog-api-key or Authorization: Bearer in the middleware) maps
+// to the VK's Gemini provider credential inside Bifrost. The gateway
+// doesn't translate body shape — the upstream response is proxied
+// back verbatim. Streaming paths get raw SSE chunks (upstream already
+// emits `event:`/`data:` framing).
+func geminiPassthroughHandler(deps RouterDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		bundle, ok := requireBundle(w, r, deps.Logger)
+		if !ok {
+			return
+		}
+
+		// Match chat/responses — bodies from coding-agent clients run 30-60 KiB
+		// and we must fit flags like action suffix discovery into the peek.
+		peek, body, release, ok := readAndPeekBodyLarge(w, r, deps.MaxRequestBodyBytes)
+		if !ok {
+			return
+		}
+		defer release()
+
+		path := strings.TrimPrefix(r.URL.Path, "/v1beta")
+		if path == "" {
+			path = "/"
+		}
+		model := geminiModelFromPath(path)
+		isStream := strings.HasSuffix(path, ":streamGenerateContent") ||
+			strings.HasSuffix(path, ":streamGenerateAnswer")
+		_ = peek // body peek not needed beyond MaterializeBody; kept for parity
+
+		meta := domain.PassthroughRequest{
+			Method:   r.Method,
+			Path:     path,
+			RawQuery: r.URL.RawQuery,
+			Headers:  forwardedPassthroughHeaders(r.Header),
+			Stream:   isStream,
+		}
+
+		if isStream {
+			result, err := deps.App.HandlePassthroughStream(r.Context(), bundle, body, model, meta)
+			if err != nil {
+				writeError(deps.Logger, w, r.Context(), err)
+				return
+			}
+			setMetaHeaders(w, result.Meta)
+			writeSSE(r.Context(), w, result.Iterator)
+			return
+		}
+
+		result, err := deps.App.HandlePassthrough(r.Context(), bundle, body, model, meta)
+		if err != nil {
+			writeError(deps.Logger, w, r.Context(), err)
+			return
+		}
+		setMetaHeaders(w, result.Meta)
+		writeJSONResponse(w, result.Response)
+	}
+}
+
+// geminiModelFromPath extracts the model id from a Gemini path like
+// `/models/gemini-2.5-flash:generateContent`. Returns "" when the path
+// doesn't contain a `/models/<id>:<action>` segment (e.g. cachedContents
+// or tuning endpoints where model-by-URL isn't the convention).
+func geminiModelFromPath(path string) string {
+	const prefix = "/models/"
+	i := strings.Index(path, prefix)
+	if i < 0 {
+		return ""
+	}
+	rest := path[i+len(prefix):]
+	if j := strings.IndexByte(rest, ':'); j >= 0 {
+		return rest[:j]
+	}
+	if j := strings.IndexByte(rest, '/'); j >= 0 {
+		return rest[:j]
+	}
+	return rest
+}
+
+// forwardedPassthroughHeaders selects client headers safe to forward
+// upstream. Authorization + x-api-key + x-goog-api-key are dropped (the
+// gateway already resolved the VK secret and Bifrost injects the real
+// provider key). Hop-by-hop headers are dropped per RFC 7230 §6.1.
+func forwardedPassthroughHeaders(h http.Header) map[string]string {
+	if len(h) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(h))
+	for k, vals := range h {
+		if len(vals) == 0 {
+			continue
+		}
+		switch strings.ToLower(k) {
+		case "authorization",
+			"x-api-key",
+			"x-goog-api-key",
+			"host",
+			"content-length",
+			"connection",
+			"proxy-authorization",
+			"proxy-connection",
+			"te",
+			"trailer",
+			"transfer-encoding",
+			"upgrade",
+			"keep-alive":
+			continue
+		}
+		out[k] = vals[0]
+	}
+	return out
+}
+
 func modelsHandler(deps RouterDeps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		bundle, ok := requireBundle(w, r, deps.Logger)
@@ -362,7 +494,20 @@ func (l *lazyPooledBody) Read(p []byte) (n int, err error) {
 }
 
 func writeJSONResponse(w http.ResponseWriter, resp *domain.Response) {
-	w.Header().Set("Content-Type", "application/json")
+	// Forward upstream headers when the dispatcher attached them (Gemini
+	// passthrough path). Content-Type rides through so Google's
+	// `application/json; charset=UTF-8` reaches the client untouched;
+	// Content-Length is already stripped by the dispatcher because our
+	// body may differ from what upstream framed.
+	ct := "application/json"
+	for k, v := range resp.Headers {
+		if strings.EqualFold(k, "Content-Type") {
+			ct = v
+			continue
+		}
+		w.Header().Set(k, v)
+	}
+	w.Header().Set("Content-Type", ct)
 	if resp.StatusCode > 0 {
 		w.WriteHeader(resp.StatusCode)
 	}
@@ -406,11 +551,24 @@ func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIter
 
 	flusher, _ := w.(http.Flusher)
 
+	// Passthrough streams (Gemini streamGenerateContent) yield chunks
+	// that already contain fully-framed SSE bytes from upstream —
+	// forward verbatim, don't re-wrap in another `data: …\n\n` envelope
+	// or append a `[DONE]` trailer (Google doesn't use one).
+	raw := false
+	if rf, ok := iter.(domain.RawFramer); ok {
+		raw = rf.RawFraming()
+	}
+
 	for iter.Next(ctx) {
 		chunk := iter.Chunk()
-		_, _ = w.Write(sseDataPrefix)
-		_, _ = w.Write(chunk)
-		_, _ = w.Write(sseDoubleNL)
+		if raw {
+			_, _ = w.Write(chunk)
+		} else {
+			_, _ = w.Write(sseDataPrefix)
+			_, _ = w.Write(chunk)
+			_, _ = w.Write(sseDoubleNL)
+		}
 		if flusher != nil {
 			flusher.Flush()
 		}
@@ -426,14 +584,16 @@ func writeSSE(ctx context.Context, w http.ResponseWriter, iter domain.StreamIter
 		}
 	}
 
-	if iter.Usage().TotalTokens == 0 {
+	if !raw && iter.Usage().TotalTokens == 0 {
 		warnJSON, _ := sonic.Marshal(map[string]string{"warning": "provider_did_not_report_usage_on_stream"})
 		_, _ = w.Write(sseWarnPrefix)
 		_, _ = w.Write(warnJSON)
 		_, _ = w.Write(sseDoubleNL)
 	}
 
-	_, _ = w.Write(sseDone)
+	if !raw {
+		_, _ = w.Write(sseDone)
+	}
 	if flusher != nil {
 		flusher.Flush()
 	}

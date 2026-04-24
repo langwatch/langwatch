@@ -43,6 +43,33 @@ func (a *App) HandleEmbeddings(ctx context.Context, bundle *domain.Bundle, body 
 	return a.pipeline.Sync(ctx, bundle, &domain.Request{Type: domain.RequestTypeEmbeddings, Model: model, BodyReader: body})
 }
 
+// HandlePassthrough dispatches a provider-native request whose wire shape
+// the gateway doesn't translate (e.g. Gemini /v1beta/models/{m}:generateContent).
+// Body, path, method, query, and forwarded headers ride on req.Passthrough;
+// the provider router's raw-forward dispatch hands them to Bifrost's
+// Passthrough endpoint verbatim.
+func (a *App) HandlePassthrough(ctx context.Context, bundle *domain.Bundle, body io.Reader, model string, meta domain.PassthroughRequest) (*CompletionResult, error) {
+	return a.pipeline.Sync(ctx, bundle, &domain.Request{
+		Type:        domain.RequestTypePassthrough,
+		Model:       model,
+		BodyReader:  body,
+		Passthrough: meta,
+	})
+}
+
+// HandlePassthroughStream is the streaming sibling of HandlePassthrough.
+// Upstream emits pre-framed SSE (Gemini streamGenerateContent); the
+// iterator's RawFraming() returns true so the writer forwards chunks
+// unchanged rather than re-wrapping them.
+func (a *App) HandlePassthroughStream(ctx context.Context, bundle *domain.Bundle, body io.Reader, model string, meta domain.PassthroughRequest) (*StreamResult, error) {
+	return a.pipeline.Stream(ctx, bundle, &domain.Request{
+		Type:        domain.RequestTypePassthrough,
+		Model:       model,
+		BodyReader:  body,
+		Passthrough: meta,
+	})
+}
+
 func PeekStream(body []byte) bool {
 	return gjson.GetBytes(body, "stream").Bool()
 }

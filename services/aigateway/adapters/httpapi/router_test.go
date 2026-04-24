@@ -514,3 +514,122 @@ func (*emptyStreamIter) Chunk() []byte                { return nil }
 func (*emptyStreamIter) Usage() domain.Usage          { return domain.Usage{} }
 func (*emptyStreamIter) Err() error                   { return nil }
 func (*emptyStreamIter) Close() error                 { return nil }
+
+func TestGeminiModelFromPath(t *testing.T) {
+	cases := []struct {
+		path string
+		want string
+	}{
+		{"/models/gemini-2.5-flash:generateContent", "gemini-2.5-flash"},
+		{"/models/gemini-2.5-pro:streamGenerateContent", "gemini-2.5-pro"},
+		{"/models/gemini-1.5-flash-001:countTokens", "gemini-1.5-flash-001"},
+		{"/models/gemini-2.5-flash", "gemini-2.5-flash"},
+		{"/cachedContents", ""},
+		{"/", ""},
+	}
+	for _, c := range cases {
+		t.Run(c.path, func(t *testing.T) {
+			assert.Equal(t, c.want, geminiModelFromPath(c.path))
+		})
+	}
+}
+
+// Regression for the Gemini-native passthrough route. gemini-cli's
+// `GOOGLE_GEMINI_BASE_URL` makes it POST to /v1beta/models/{m}:generateContent
+// (and :streamGenerateContent). The gateway must (1) accept the request,
+// (2) extract model from URL path, (3) call the provider with
+// RequestTypePassthrough, (4) forward method/path/query via req.Passthrough,
+// (5) return the body + status code verbatim. Streaming path must pick
+// DispatchStream instead of Dispatch.
+func TestRouter_GeminiPassthrough_NonStreaming(t *testing.T) {
+	auth := &mockAuth{
+		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+			return testBundle(), nil
+		},
+	}
+
+	var gotReq *domain.Request
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, req *domain.Request, _ domain.Credential) (*domain.Response, error) {
+			gotReq = req
+			return &domain.Response{
+				Body:       []byte(`{"candidates":[{"content":{"parts":[{"text":"hi"}]}}]}`),
+				StatusCode: 200,
+				Headers:    map[string]string{"Content-Type": "application/json; charset=UTF-8"},
+			}, nil
+		},
+	}
+
+	router := buildRouter(
+		app.WithAuth(auth),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	geminiBody := []byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`)
+	req := httptest.NewRequest(http.MethodPost, "/v1beta/models/gemini-2.5-flash:generateContent", bytes.NewReader(geminiBody))
+	req.Header.Set("X-Goog-Api-Key", "lw_vk_test")
+	req.Header.Set("Content-Type", "application/json")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.NotNil(t, gotReq, "provider was not dispatched")
+	assert.Equal(t, domain.RequestTypePassthrough, gotReq.Type)
+	assert.Equal(t, "gemini-2.5-flash", gotReq.Model)
+	assert.Equal(t, "/models/gemini-2.5-flash:generateContent", gotReq.Passthrough.Path)
+	assert.Equal(t, http.MethodPost, gotReq.Passthrough.Method)
+	assert.False(t, gotReq.Passthrough.Stream)
+	// Auth headers must be stripped before forwarding upstream — Bifrost
+	// injects the real provider key.
+	assert.NotContains(t, gotReq.Passthrough.Headers, "X-Goog-Api-Key")
+	assert.NotContains(t, gotReq.Passthrough.Headers, "Authorization")
+
+	// Upstream body + content-type passed through verbatim.
+	assert.Contains(t, rec.Body.String(), "candidates")
+	assert.Equal(t, "application/json; charset=UTF-8", rec.Header().Get("Content-Type"))
+}
+
+func TestRouter_GeminiPassthrough_Streaming_PicksStream(t *testing.T) {
+	auth := &mockAuth{
+		resolveFn: func(_ context.Context, _ string) (*domain.Bundle, error) {
+			return testBundle(), nil
+		},
+	}
+
+	syncCalled := false
+	streamCalled := false
+	var gotReq *domain.Request
+	provider := &mockStreamProvider{
+		mockProvider: mockProvider{
+			dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+				syncCalled = true
+				return successResponse(), nil
+			},
+		},
+		dispatchStreamFn: func(_ context.Context, req *domain.Request, _ domain.Credential) (domain.StreamIterator, error) {
+			streamCalled = true
+			gotReq = req
+			return &emptyStreamIter{}, nil
+		},
+	}
+
+	router := buildRouter(
+		app.WithAuth(auth),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	req := httptest.NewRequest(http.MethodPost,
+		"/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse",
+		bytes.NewReader([]byte(`{"contents":[{"role":"user","parts":[{"text":"hi"}]}]}`)))
+	req.Header.Set("X-Goog-Api-Key", "lw_vk_test")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	require.False(t, syncCalled, "non-streaming Dispatch was called for :streamGenerateContent")
+	require.True(t, streamCalled, "streaming DispatchStream was not called for :streamGenerateContent")
+	require.NotNil(t, gotReq)
+	assert.True(t, gotReq.Passthrough.Stream)
+	assert.Equal(t, "alt=sse", gotReq.Passthrough.RawQuery)
+}

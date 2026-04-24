@@ -44,3 +44,13 @@ type StreamIterator interface {
 	// Close releases resources.
 	Close() error
 }
+
+// RawFramer is an optional StreamIterator extension: when implemented and
+// RawFraming() returns true, Chunk() already contains fully-formed SSE
+// frames (event/data lines with their own framing). Writers should
+// forward chunks verbatim rather than wrapping them in another
+// `data: ... \n\n` envelope. Used by the Gemini-native passthrough path
+// where upstream (streamGenerateContent) emits proper SSE bytes.
+type RawFramer interface {
+	RawFraming() bool
+}
