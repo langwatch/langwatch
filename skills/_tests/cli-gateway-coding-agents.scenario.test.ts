@@ -249,11 +249,18 @@ describe("AI Gateway — coding-agent matrix", () => {
         [
           "--print",
           "--dangerously-skip-permissions",
-          // Pin to haiku-4.5 so we sidestep the thinking-required default
-          // model claude code otherwise picks up. Bigger models would also
-          // work — pinning haiku keeps cost low.
+          // --bare strips hooks, LSP, plugin sync, attribution, auto-memory,
+          // background prefetches, keychain reads, CLAUDE.md auto-discovery.
+          // Without this, the child claude inherits the parent session's
+          // skills + plugins as system blocks → request body balloons past
+          // Anthropic's edge tolerance → HTML 4xx response.
+          "--bare",
+          "--disable-slash-commands",
+          // Pin to dated haiku-4.5 so we sidestep the thinking-required
+          // default model claude code otherwise picks up. The dated name
+          // is what Bifrost's provider registry recognises.
           "--model",
-          "claude-haiku-4-5",
+          "claude-haiku-4-5-20251001",
           TASK_PROMPT,
         ],
         {
@@ -323,9 +330,11 @@ describe("AI Gateway — coding-agent matrix", () => {
           `model_providers.lwgw={ name = "LangWatch Gateway", base_url = "${GATEWAY_BASE_V1}", env_key = "OPENAI_API_KEY", wire_api = "responses" }`,
           "-c",
           "model_provider=lwgw",
-          // Pin to gpt-5-mini for cost — codex defaults to gpt-5.4
+          // Pin to gpt-4o-mini — codex's default gpt-5.4 isn't on Bifrost's
+          // Responses-API model registry yet. gpt-4o-mini is recognised
+          // and cheap.
           "-c",
-          'model="gpt-5-mini"',
+          'model="gpt-4o-mini"',
           "-c",
           'model_reasoning_effort="low"',
           TASK_PROMPT,
