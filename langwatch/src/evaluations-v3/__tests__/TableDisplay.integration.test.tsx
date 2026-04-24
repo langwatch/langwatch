@@ -218,19 +218,19 @@ describe("Row height mode", () => {
       expect(store.ui.rowHeightMode).toBe("compact");
     });
 
-    it("setRowHeightMode changes mode to expanded", () => {
+    it("setRowHeightMode changes mode to fit", () => {
       const store = useEvaluationsV3Store.getState();
 
-      store.setRowHeightMode("expanded");
+      store.setRowHeightMode("fit");
 
       const updatedStore = useEvaluationsV3Store.getState();
-      expect(updatedStore.ui.rowHeightMode).toBe("expanded");
+      expect(updatedStore.ui.rowHeightMode).toBe("fit");
     });
 
     it("setRowHeightMode changes mode back to compact", () => {
       const store = useEvaluationsV3Store.getState();
 
-      store.setRowHeightMode("expanded");
+      store.setRowHeightMode("fit");
       store.setRowHeightMode("compact");
 
       const updatedStore = useEvaluationsV3Store.getState();
@@ -247,7 +247,7 @@ describe("Row height mode", () => {
       ).toBe(true);
 
       // Switch mode
-      store.setRowHeightMode("expanded");
+      store.setRowHeightMode("fit");
 
       const updatedStore = useEvaluationsV3Store.getState();
       expect(updatedStore.ui.expandedCells.size).toBe(0);
