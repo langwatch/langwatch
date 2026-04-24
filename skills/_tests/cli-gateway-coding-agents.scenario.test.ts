@@ -79,13 +79,18 @@ interface TraceMetrics {
 }
 
 /**
- * Polls the LangWatch traces API for ALL traces tagged with the given
- * virtualKeyId since the timestamp, returning aggregated metrics. A coding
- * session fires many requests; we sum tokens + cost across them.
+ * Polls the LangWatch traces API for traces in a time window, optionally
+ * filtered client-side by a substring of the trace's input (since the
+ * traces/search filter shape for span attributes — e.g. langwatch.virtual_key_id
+ * — isn't exposed cleanly through the public REST endpoint today).
+ *
+ * A coding session fires many requests; we sum tokens + cost across them.
  */
 async function assertSessionTraces(opts: {
-  virtualKeyId: string;
+  /** Start of the test window (used as startDate) */
   since: Date;
+  /** Substring of the agent's task prompt — used to filter client-side */
+  inputSubstring?: string;
   timeoutMs?: number;
   /** Caller can require minimum trace count (e.g. > 1 ensures cache had a
    * chance to warm). Default 1. */
@@ -96,18 +101,24 @@ async function assertSessionTraces(opts: {
   const timeout = opts.timeoutMs ?? 60_000;
   const minTraces = opts.minTraces ?? 1;
   const deadline = Date.now() + timeout;
+  const startMs = opts.since.getTime();
 
   while (Date.now() < deadline) {
-    const url =
-      `${LW_BASE}/api/traces/search?` +
-      new URLSearchParams({
-        startedAt: opts.since.toISOString(),
-        "filter[langwatch.virtual_key_id]": opts.virtualKeyId,
-      });
-    const res = await fetch(url, { headers: { "X-Auth-Token": apiKey } });
+    const res = await fetch(`${LW_BASE}/api/traces/search`, {
+      method: "POST",
+      headers: {
+        "X-Auth-Token": apiKey,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        startDate: startMs,
+        endDate: Date.now(),
+      }),
+    });
     if (res.ok) {
       const body = (await res.json()) as {
         traces?: Array<{
+          input?: { value?: string };
           metrics?: {
             total_cost?: number;
             prompt_tokens?: number;
@@ -116,9 +127,12 @@ async function assertSessionTraces(opts: {
           };
         }>;
       };
-      const traces = body.traces ?? [];
-      if (traces.length >= minTraces) {
-        const totals = traces.reduce<TraceMetrics>(
+      const all = body.traces ?? [];
+      const matching = opts.inputSubstring
+        ? all.filter((t) => t.input?.value?.includes(opts.inputSubstring!))
+        : all;
+      if (matching.length >= minTraces) {
+        const totals = matching.reduce<TraceMetrics>(
           (acc, t) => ({
             costUsd: acc.costUsd + (t.metrics?.total_cost ?? 0),
             inputTokens: acc.inputTokens + (t.metrics?.prompt_tokens ?? 0),
@@ -143,7 +157,9 @@ async function assertSessionTraces(opts: {
     await new Promise((r) => setTimeout(r, 2_000));
   }
   throw new Error(
-    `No qualifying traces (minTraces=${minTraces}, all metrics > 0) for VK ${opts.virtualKeyId} within ${timeout}ms`,
+    `No qualifying traces (minTraces=${minTraces}, all metrics > 0) ` +
+      `${opts.inputSubstring ? `matching "${opts.inputSubstring}" ` : ""}` +
+      `within ${timeout}ms`,
   );
 }
 
@@ -199,12 +215,16 @@ function assertReactViteArtifacts(workDir: string): void {
   ).toBeDefined();
 }
 
+// Distinct enough to filter on traces.input.value client-side via substring
+// match (the LW search REST endpoint doesn't expose span-attribute filters
+// like langwatch.virtual_key_id today, so input matching is our hook).
+const TASK_INPUT_MARKER = "react-vite-hello-world-matrix";
 const TASK_PROMPT =
-  "Bootstrap a minimal React + Vite project in this directory: " +
-  "run the appropriate npm/pnpm command to scaffold it, then make the App " +
-  "component render <h1>Hello World</h1>. Don't run the dev server, just " +
-  "set up the project so `vite build` would work. Reply with a one-line " +
-  "summary at the end.";
+  `[task=${TASK_INPUT_MARKER}] Bootstrap a minimal React + Vite project in ` +
+  "this directory: run the appropriate npm/pnpm command to scaffold it, " +
+  "then make the App component render <h1>Hello World</h1>. Don't run the " +
+  "dev server, just set up the project so `vite build` would work. Reply " +
+  "with a one-line summary at the end.";
 
 const TEST_FILE = "skills/_tests/cli-gateway-coding-agents.scenario.test.ts";
 
@@ -229,6 +249,11 @@ describe("AI Gateway — coding-agent matrix", () => {
         [
           "--print",
           "--dangerously-skip-permissions",
+          // Pin to haiku-4.5 so we sidestep the thinking-required default
+          // model claude code otherwise picks up. Bigger models would also
+          // work — pinning haiku keeps cost low.
+          "--model",
+          "claude-haiku-4-5",
           TASK_PROMPT,
         ],
         {
@@ -252,8 +277,8 @@ describe("AI Gateway — coding-agent matrix", () => {
       assertReactViteArtifacts(tempFolder);
 
       const metrics = await assertSessionTraces({
-        virtualKeyId: vk.id,
         since,
+        inputSubstring: TASK_INPUT_MARKER,
         minTraces: 2,
       });
       expect(metrics.cacheReadTokens, "cache_read_tokens > 0 (claude-code aggressively caches system prompts)").toBeGreaterThan(0);
@@ -282,16 +307,39 @@ describe("AI Gateway — coding-agent matrix", () => {
       const since = new Date();
       const start = Date.now();
 
-      const result = spawnSync("codex", ["exec", TASK_PROMPT], {
-        cwd: tempFolder,
-        encoding: "utf-8",
-        timeout: 600_000,
-        env: {
-          ...process.env,
-          OPENAI_BASE_URL: GATEWAY_BASE_V1,
-          OPENAI_API_KEY: vk.secret,
+      const result = spawnSync(
+        "codex",
+        [
+          "exec",
+          "--skip-git-repo-check",
+          "--dangerously-bypass-approvals-and-sandbox",
+          // Define a custom model_provider on the fly that points at the
+          // gateway. Codex's default auth path uses ~/.codex/auth.json
+          // (OAuth) which BYPASSES OPENAI_BASE_URL — so we can't just set
+          // env vars. The -c flags override config.toml at load time.
+          "-c",
+          // Codex 0.122+ requires wire_api="responses" (chat is deprecated).
+          // Gateway exposes POST /v1/responses with OpenAI-equivalent shape.
+          `model_providers.lwgw={ name = "LangWatch Gateway", base_url = "${GATEWAY_BASE_V1}", env_key = "OPENAI_API_KEY", wire_api = "responses" }`,
+          "-c",
+          "model_provider=lwgw",
+          // Pin to gpt-5-mini for cost — codex defaults to gpt-5.4
+          "-c",
+          'model="gpt-5-mini"',
+          "-c",
+          'model_reasoning_effort="low"',
+          TASK_PROMPT,
+        ],
+        {
+          cwd: tempFolder,
+          encoding: "utf-8",
+          timeout: 600_000,
+          env: {
+            ...process.env,
+            OPENAI_API_KEY: vk.secret,
+          },
         },
-      });
+      );
       if (result.status !== 0) {
         throw new Error(
           `codex exited ${result.status}\nstdout:\n${result.stdout}\nstderr:\n${result.stderr}`,
@@ -301,8 +349,8 @@ describe("AI Gateway — coding-agent matrix", () => {
       assertReactViteArtifacts(tempFolder);
 
       const metrics = await assertSessionTraces({
-        virtualKeyId: vk.id,
         since,
+        inputSubstring: TASK_INPUT_MARKER,
         minTraces: 2,
       });
       expect(metrics.cacheReadTokens, "cache_read_tokens > 0 (OpenAI auto-caches >=1024-token prefixes)").toBeGreaterThan(0);
@@ -390,8 +438,8 @@ describe("AI Gateway — coding-agent matrix", () => {
       assertReactViteArtifacts(tempFolder);
 
       const metrics = await assertSessionTraces({
-        virtualKeyId: vk.id,
         since,
+        inputSubstring: TASK_INPUT_MARKER,
         minTraces: 2,
       });
       expect(metrics.cacheReadTokens, "cache_read_tokens > 0 (OpenAI auto-caches >=1024-token prefixes)").toBeGreaterThan(0);

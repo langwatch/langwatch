@@ -94,12 +94,15 @@ Real task: `Bootstrap a React + Vite project, App component renders <h1>Hello Wo
 Naturally exercises tool_use (Read/Write/Bash for npm scaffold) and caching
 (repeated system prompts across many turns).
 
+Last execution: 2026-04-24. Gateway binary `b98a752dc`. 0/4 cells green
+end-to-end; surfaced 2 real gateway feature gaps.
+
 | CLI | React vite hello world |
 |-----|------------------------|
-| claude-code | scaffold |
-| codex | scaffold |
-| gemini-cli | ⏳ blocked on upstream base-url flag (`t.skip` with reason) |
-| opencode | scaffold |
+| claude-code | ❌ `'clear_thinking_20251015' strategy requires 'thinking' to be enabled or adaptive` (Lane A: claude-code's `/v1/messages` requests carry a `thinking` param + system tools; even after `0015e3436` raw-forward fix the field is being dropped or the strategy block is mishandled somewhere in the bridge) |
+| codex | ❌ `404 Not Found: 404 page not found, url: http://localhost:5563/v1/responses` (Lane A: codex 0.122+ dropped `wire_api="chat"` support; gateway needs to expose `/v1/responses` per the OpenAI Responses API. `docs/ai-gateway/cli/codex.mdx` already documents this as supported — doc/code drift) |
+| gemini-cli | ⏭️ `t.skip` with reason — upstream gemini-cli has no base-url flag; needs upstream change OR /etc/hosts override OR proxy wrapper |
+| opencode | ⏭️ skipped — `opencode` binary not installed locally. `pnpm i -g opencode-ai` then re-run |
 
 Cell format when filled:
 ```
