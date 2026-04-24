@@ -6,6 +6,10 @@ license: MIT
 compatibility: Works with Claude Code and similar AI assistants. The `langwatch` CLI is the only interface for platform operations.
 ---
 
+import CliSetup from '../_shared/cli-setup.mdx'
+import PlanLimits from '../_shared/plan-limits.mdx'
+import ConsultantMode from '../_shared/consultant-mode.mdx'
+
 # Test Your Agent with Scenarios
 
 NEVER invent your own agent testing framework. Use `@langwatch/scenario` (Python: `langwatch-scenario`) for code-based tests, or the `langwatch` CLI for no-code platform scenarios. The Scenario framework provides user simulation, judge-based evaluation, multi-turn conversation testing, and adversarial red teaming out of the box.
@@ -41,7 +45,7 @@ Best practices:
 
 ## Plan Limits
 
-See [Plan Limits](_shared/plan-limits.md).
+<PlanLimits />
 
 ---
 
@@ -49,7 +53,7 @@ See [Plan Limits](_shared/plan-limits.md).
 
 ### Step 1: Read the Scenario Docs
 
-See [CLI Setup](_shared/cli-setup.md).
+<CliSetup />
 
 Then read the Scenario-specific pages:
 
@@ -243,7 +247,7 @@ describe("Agent Security", () => {
 
 Use this when the user has no codebase. NOTE: If you have a codebase and want test files, use the Code Approach above instead.
 
-See [CLI Setup](_shared/cli-setup.md).
+<CliSetup />
 
 Then drive everything via `langwatch scenario --help` and `langwatch suite --help`. The basic flow:
 
@@ -261,7 +265,7 @@ ALWAYS run the suite — an unrun scenario is useless. Run `langwatch <subcomman
 
 Once tests are green, summarize what you delivered and suggest 2-3 domain-specific improvements based on what you learned.
 
-See [Consultant Mode](_shared/consultant-mode.md).
+<ConsultantMode />
 
 ## Common Mistakes
 

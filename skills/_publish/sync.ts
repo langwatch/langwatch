@@ -1,15 +1,15 @@
 #!/usr/bin/env npx tsx
 /**
- * Sync SKILL.md files from this repo into a checkout of langwatch/skills,
- * inlining `_shared/*.md` partials so the published files are self-contained.
+ * Sync SKILL.mdx files into a checkout of langwatch/skills, inlining MDX
+ * partials so the published .md files are self-contained.
  *
- * Usage: npx tsx skills/_publish/sync.ts <path-to-skills-repo>
+ * Usage: tsx skills/_publish/sync.ts <path-to-skills-repo>
  */
 
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { resolveReferences } from "../_compiler/compile.js";
+import { inlineMdx } from "../_lib/mdx-inline.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,19 +24,6 @@ const FEATURE_SKILLS = [
   "level-up",
 ];
 
-function splitFrontmatter(content: string): { frontmatter: string; body: string } {
-  const m = content.match(/^(---\n[\s\S]*?\n---\n)([\s\S]*)$/);
-  if (!m) throw new Error("Missing frontmatter");
-  return { frontmatter: m[1], body: m[2] };
-}
-
-function inlineSkill(srcPath: string): string {
-  const raw = fs.readFileSync(srcPath, "utf8");
-  const { frontmatter, body } = splitFrontmatter(raw);
-  const resolved = resolveReferences(body, path.dirname(srcPath), new Set());
-  return frontmatter + resolved;
-}
-
 function cleanTarget(targetDir: string): void {
   for (const entry of fs.readdirSync(targetDir)) {
     if (entry === ".git") continue;
@@ -44,10 +31,10 @@ function cleanTarget(targetDir: string): void {
   }
 }
 
-function writeSkill(targetDir: string, name: string, content: string): void {
+function writeSkill(targetDir: string, name: string, src: string): void {
   const dir = path.join(targetDir, name);
   fs.mkdirSync(dir, { recursive: true });
-  fs.writeFileSync(path.join(dir, "SKILL.md"), content);
+  fs.writeFileSync(path.join(dir, "SKILL.md"), inlineMdx(src));
 }
 
 export function sync(targetDir: string): void {
@@ -58,18 +45,18 @@ export function sync(targetDir: string): void {
   cleanTarget(targetDir);
 
   for (const skill of FEATURE_SKILLS) {
-    const src = path.join(skillsRoot, skill, "SKILL.md");
+    const src = path.join(skillsRoot, skill, "SKILL.mdx");
     if (!fs.existsSync(src)) continue;
-    writeSkill(targetDir, skill, inlineSkill(src));
+    writeSkill(targetDir, skill, src);
     console.log(`  ✓ ${skill}`);
   }
 
   const recipesDir = path.join(skillsRoot, "recipes");
   if (fs.existsSync(recipesDir)) {
     for (const name of fs.readdirSync(recipesDir)) {
-      const src = path.join(recipesDir, name, "SKILL.md");
+      const src = path.join(recipesDir, name, "SKILL.mdx");
       if (!fs.existsSync(src)) continue;
-      writeSkill(targetDir, path.join("recipes", name), inlineSkill(src));
+      writeSkill(targetDir, path.join("recipes", name), src);
       console.log(`  ✓ recipes/${name}`);
     }
   }
