@@ -15,21 +15,21 @@ Feature: ClickHouse Analytics Column Pruning
   # Trace summaries deduplication subquery
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace dedup subquery selects only columns required by the query
     When an analytics query requests the "trace_count" metric
     Then the trace_summaries dedup subquery does not use SELECT *
     And the dedup subquery selects the identity columns needed for deduplication
     And the dedup subquery selects only the metric columns referenced by the query
 
-  @unit
+  @unit @unimplemented
   Scenario: Dedup subquery includes groupBy columns when grouping is active
     When an analytics query requests "total_cost" grouped by "metadata.user_id"
     Then the dedup subquery includes the column mapped to "metadata.user_id"
     And the dedup subquery includes the column mapped to "total_cost"
     And no other payload columns appear in the dedup subquery
 
-  @unit
+  @unit @unimplemented
   Scenario: Dedup subquery includes filter columns when filters are active
     When an analytics query requests "trace_count" filtered by "metadata.labels"
     Then the dedup subquery includes the column mapped to "metadata.labels"
@@ -39,13 +39,13 @@ Feature: ClickHouse Analytics Column Pruning
   # Evaluation runs subquery JOIN
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Evaluation runs subquery selects only needed evaluation columns
     When an analytics query references an evaluation metric like "evaluations.score"
     Then the evaluation_runs subquery does not use SELECT *
     And the evaluation_runs subquery selects only the columns needed for the JOIN key and the referenced metric
 
-  @unit
+  @unit @unimplemented
   Scenario: Evaluation runs subquery adapts columns to groupBy field
     When an analytics query groups by "evaluations.evaluation_passed"
     Then the evaluation_runs subquery includes the "Passed" column
@@ -55,13 +55,13 @@ Feature: ClickHouse Analytics Column Pruning
   # Stored spans JOIN
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Stored spans JOIN selects only needed span columns
     When an analytics query groups by "metadata.span_type"
     Then the stored_spans source selects only the columns needed for the JOIN key and the span type attribute
     And wide columns like Input and Output are excluded from the stored_spans source
 
-  @unit
+  @unit @unimplemented
   Scenario: Stored spans JOIN adapts columns to event-based grouping
     When an analytics query groups by "events.event_type"
     Then the stored_spans source includes the Events.Name column
@@ -71,17 +71,17 @@ Feature: ClickHouse Analytics Column Pruning
   # Query correctness after pruning
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Pruned query generates syntactically valid SQL
     When an analytics timeseries query is built for "trace_count" over a date range
     Then the generated SQL is syntactically valid
 
-  @unit
+  @unit @unimplemented
   Scenario: Pruned query resolves all column references from pruned sources
     When an analytics timeseries query is built for "trace_count" over a date range
     Then every column alias referenced in SELECT, GROUP BY, and ORDER BY is available from the pruned sources
 
-  @unit
+  @unit @unimplemented
   Scenario: Pruned CTE query for arrayJoin grouping preserves metric accuracy
     When an analytics query requests "trace_count" grouped by "metadata.labels"
     Then the CTE inner query selects only identity, period, date, group key, and metric columns
@@ -91,13 +91,13 @@ Feature: ClickHouse Analytics Column Pruning
   # ClickHouse memory safety net
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Analytics queries include a memory spill-to-disk safety setting
     When any analytics query is executed against ClickHouse
     Then the query is sent with a max_bytes_before_external_group_by setting
     So that large GROUP BY operations spill to disk instead of exceeding memory
 
-  @integration
+  @integration @unimplemented
   Scenario: Memory safety setting does not override explicit per-query settings
     When a query is executed with an explicit clickhouse_settings override
     Then the override takes precedence over the default memory safety setting

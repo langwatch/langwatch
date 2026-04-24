@@ -11,7 +11,7 @@ Feature: Subscription Page Plan Management
   # Pricing Model Behavior
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: SEAT_EVENT organization sees billing page on subscription route
     Given the organization uses the SEAT_EVENT pricing model
     When I navigate to the subscription page
@@ -19,7 +19,7 @@ Feature: Subscription Page Plan Management
     And I see the current plan block
     And I see recent invoices
 
-  @integration
+  @integration @unimplemented
   Scenario: TIERED organization can view billing page and migrate
     Given the organization uses the TIERED pricing model
     When I navigate to the subscription page
@@ -27,7 +27,7 @@ Feature: Subscription Page Plan Management
     And I see the current plan block
     And I see an upgrade block below the current plan block
 
-  @integration
+  @integration @unimplemented
   Scenario: TIERED organization current block shows legacy plan from subscription data
     Given the organization uses the TIERED pricing model
     And the organization has an active ACCELERATE subscription
@@ -39,7 +39,7 @@ Feature: Subscription Page Plan Management
   # Page Layout
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Displays subscription page with two plan blocks
     When the subscription page loads
     Then I see two plan blocks: "Developer" (Free) and "Growth"
@@ -49,7 +49,7 @@ Feature: Subscription Page Plan Management
   # Plan Display - Developer (Free) Tier
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Displays Developer plan as current when organization has no paid subscription
     Given the organization has no active paid subscription
     When the subscription page loads
@@ -66,7 +66,7 @@ Feature: Subscription Page Plan Management
       | support               | Community (GitHub & Discord)   |
     And the Developer plan shows "Get Started" button
 
-  @integration
+  @integration @unimplemented
   Scenario: Shows current organization user count in Developer plan block
     Given the organization has no active paid subscription
     And the organization has 2 users
@@ -78,7 +78,7 @@ Feature: Subscription Page Plan Management
   # Plan Display - Growth Tier
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Displays Growth plan features
     When the subscription page loads
     Then the "Growth" plan block shows the following characteristics:
@@ -96,7 +96,7 @@ Feature: Subscription Page Plan Management
   # Seat Management Drawer
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Opens seat management drawer when clicking on user count
     Given the organization has no active paid subscription
     When I click on the user count in the plan block
@@ -104,13 +104,13 @@ Feature: Subscription Page Plan Management
     And I see a collapsible "Show N Members" button for current members
     And I see a "Seats available" section
 
-  @integration
+  @integration @unimplemented
   Scenario: Drawer does not display alert banners
     When I open the seat management drawer
     Then I do not see an admin-requires-core-user info banner
     And I do not see a core-user-limit-exceeded warning banner
 
-  @integration
+  @integration @unimplemented
   Scenario: User list shows member type for each user
     Given the organization has users:
       | name       | type        |
@@ -121,47 +121,47 @@ Feature: Subscription Page Plan Management
     And "Admin User" shows "Full Member"
     And "Jane Doe" shows "Lite Member"
 
-  @integration
+  @integration @unimplemented
   Scenario: Add Seat button is positioned next to Seats available header
     When I open the seat management drawer
     Then I see a button labeled "Add Seat" with a plus icon
     And the button is aligned to the right of the "Seats available" header
 
-  @integration
+  @integration @unimplemented
   Scenario: Clicking Add Seat adds a pending seat immediately
     When I open the seat management drawer
     And I click "Add Seat"
     Then a new pending seat row appears with an email input and a "Full Member" badge
     And the pending seat count increases by 1
 
-  @integration
+  @integration @unimplemented
   Scenario: Can enter email for a pending seat
     When I open the seat management drawer
     And I click "Add Seat"
     And I enter "newuser@example.com" in the seat email field
     Then the pending seat row shows the entered email
 
-  @integration
+  @integration @unimplemented
   Scenario: Clicking Add Seat multiple times in a row adds multiple seats
     When I open the seat management drawer
     And I click "Add Seat" 3 times in a row
     Then 3 new pending seat rows appear in the drawer
 
-  @integration
+  @integration @unimplemented
   Scenario: Each batch-added seat can be removed individually
     When I open the seat management drawer
     And I click "Add Seat" 3 times in a row
     And I remove the second pending seat
     Then 2 pending seat rows remain in the drawer
 
-  @integration
+  @integration @unimplemented
   Scenario: Batch-added seats reflect in the total user count
     When I open the seat management drawer
     And I click "Add Seat" 3 times in a row
     And I close the drawer by clicking Done
     Then the subscription page shows a total of 5 users
 
-  @integration
+  @integration @unimplemented
   Scenario: Cancelling the drawer discards all batch-added seats
     When I open the seat management drawer
     And I click "Add Seat" 2 times in a row
@@ -169,7 +169,7 @@ Feature: Subscription Page Plan Management
     And I reopen the seat management drawer
     Then no pending seat rows are shown
 
-  @integration
+  @integration @unimplemented
   Scenario: Closing the drawer with Done preserves batch-added seats
     When I open the seat management drawer
     And I click "Add Seat" 2 times in a row
@@ -181,7 +181,7 @@ Feature: Subscription Page Plan Management
   # Drawer Auto-Fill for Available Seats
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Drawer shows available seat rows for unused seats on Growth plan
     Given the organization has an active Growth subscription with 6 seats
     And the organization has 1 active core member
@@ -189,7 +189,7 @@ Feature: Subscription Page Plan Management
     Then I see 5 empty seat rows in the "Seats available" section
     And the drawer footer shows "Total Seats: 6"
 
-  @integration
+  @integration @unimplemented
   Scenario: Drawer shows remaining available seats when some are pending
     Given the organization has an active Growth subscription with 6 seats
     And the organization has 1 active core member
@@ -198,7 +198,7 @@ Feature: Subscription Page Plan Management
     Then I see 3 empty seat rows in the "Seats available" section
     And the drawer footer shows "Total Seats: 6"
 
-  @integration
+  @integration @unimplemented
   Scenario: Closing drawer without changes does not trigger subscription update
     Given the organization has an active Growth subscription with 6 seats
     And the organization has 2 active core members
@@ -206,7 +206,7 @@ Feature: Subscription Page Plan Management
     And I close the drawer by clicking Done without entering any emails
     Then the subscription page does not show the "Update seats" block
 
-  @integration
+  @integration @unimplemented
   Scenario: Filling email in auto-filled row sends invite without changing subscription
     Given the organization has an active Growth subscription with 6 seats
     And the organization has 2 active core members
@@ -216,7 +216,7 @@ Feature: Subscription Page Plan Management
     Then an invite is sent to "newuser@example.com"
     And no subscription update is triggered
 
-  @integration
+  @integration @unimplemented
   Scenario: Deleting auto-filled empty row shows subscription downgrade option
     Given the organization has an active Growth subscription with 6 seats
     And the organization has 2 active core members
@@ -225,7 +225,7 @@ Feature: Subscription Page Plan Management
     And I close the drawer by clicking Done
     Then I see an "Update seats" block showing reduced seat count
 
-  @integration
+  @integration @unimplemented
   Scenario: Free plan user filling seat does not send invite
     Given the organization has no active paid subscription
     When I open the seat management drawer
@@ -239,31 +239,31 @@ Feature: Subscription Page Plan Management
   # Billing Toggles and Dynamic Pricing
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Page shows currency selector and billing period toggle
     When the subscription page loads
     Then I see a currency selector defaulting to EUR
     And I see a billing period toggle with Monthly and Annually options
 
-  @integration
+  @integration @unimplemented
   Scenario: Switching to annual billing shows 8% discount badge
     When I select "Annually" billing
     Then a "Save 8%" badge appears
 
-  @integration
+  @integration @unimplemented
   Scenario: Upgrade block shows dynamic total based on core members
     Given the organization has 2 existing core members
     And I have added 1 core member seat in the drawer
     Then the upgrade block shows total for 3 core members
 
-  @integration
+  @integration @unimplemented
   Scenario: Upgrade block total updates when switching currency or billing period
     Given the organization has 3 core members
     When I switch the currency to USD
     And I toggle the billing period
     Then the upgrade block total recalculates accordingly
 
-  @integration
+  @integration @unimplemented
   Scenario: Clicking Upgrade now redirects to Stripe checkout
     Given the organization has pending seats
     When I click "Upgrade now"
@@ -274,14 +274,14 @@ Feature: Subscription Page Plan Management
   # Saving User Changes - Pending State Flow
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Adding seats beyond plan limit shows upgrade required
     Given the organization is on the Developer plan with 2 users
     And I have added a third seat in the seat management drawer
     When I click "Done"
     Then the "Upgrade required" badge appears on the current plan block
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Completing upgrade activates pending users
     Given the organization has pending users awaiting upgrade
     When I complete the payment flow for Growth plan
@@ -289,7 +289,7 @@ Feature: Subscription Page Plan Management
     And the "Growth" plan block shows "Current" indicator
     And the "Developer" plan block no longer shows "Current"
 
-  @integration
+  @integration @unimplemented
   Scenario: Growth plan block shows current after upgrade
     Given the organization has an active Growth subscription
     When I view the subscription page
@@ -300,7 +300,7 @@ Feature: Subscription Page Plan Management
   # Loading States
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Shows loading state while fetching user data
     Given the seat management drawer is opening
     When the user data is being fetched
@@ -311,7 +311,7 @@ Feature: Subscription Page Plan Management
   # Growth Plan Seat Updates
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Growth plan user can add seats and update subscription
     Given the organization has an active Growth subscription
     When I open the seat management drawer
@@ -320,7 +320,7 @@ Feature: Subscription Page Plan Management
     Then I see an "Update seats" block with seat count and price
     And I can click "Update subscription" to finalize the changes
 
-  @integration
+  @integration @unimplemented
   Scenario: Clicking Discard on Update seats block restores original state
     Given the organization has an active Growth subscription
     When I open the seat management drawer
@@ -330,13 +330,13 @@ Feature: Subscription Page Plan Management
     Then the "Update seats" block disappears
     And the user count returns to its original value
 
-  @integration
+  @integration @unimplemented
   Scenario: Growth plan user sees Manage Subscription button
     Given the organization has an active Growth subscription
     When the subscription page loads
     Then I see a "Manage Subscription" button on the current plan block
 
-  @integration
+  @integration @unimplemented
   Scenario: Free plan user does not see Manage Subscription button
     Given the organization has no active paid subscription
     When the subscription page loads
@@ -346,7 +346,7 @@ Feature: Subscription Page Plan Management
   # Usage Page Seat Limit Accuracy
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Usage page reflects purchased seat count as team member limit
     Given the organization has an active Growth subscription with 4 seats
     And the organization has 2 current core members
@@ -357,7 +357,7 @@ Feature: Subscription Page Plan Management
   # Invoice Display
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Invoices table displays correct columns
     Given the organization has a paid subscription
     And the organization has invoices from Stripe
@@ -365,13 +365,13 @@ Feature: Subscription Page Plan Management
     Then I see a "Recent Invoices" section
     And the invoices table has columns: Invoice #, Date, Amount, Status, and a PDF download link
 
-  @integration
+  @integration @unimplemented
   Scenario: Free plan organization does not see invoices section
     Given the organization has no active paid subscription
     When I view the subscription page
     Then I do not see a "Recent Invoices" section
 
-  @integration
+  @integration @unimplemented
   Scenario: Invoices section shows empty state when no invoices exist
     Given the organization has a paid subscription
     And the organization has no invoices
@@ -379,84 +379,84 @@ Feature: Subscription Page Plan Management
     Then I see a "Recent Invoices" section
     And the invoices section displays "No invoices yet"
 
-  @integration
+  @integration @unimplemented
   Scenario: Invoices section shows loading skeleton while fetching
     Given invoices are being fetched
     When I view the subscription page
     Then the invoices section displays a loading skeleton
 
-  @integration
+  @integration @unimplemented
   Scenario: Invoices section limits display to 4 invoices
     Given the organization has a paid subscription
     And the organization has 20 invoices from Stripe
     When I view the subscription page
     Then I see exactly 4 invoices in the table
 
-  @integration
+  @integration @unimplemented
   Scenario: Invoices are ordered by date descending
     Given the organization has a paid subscription
     And the organization has invoices from Stripe
     When I view the subscription page
     Then the invoices are ordered by date descending
 
-  @integration
+  @integration @unimplemented
   Scenario: Invoices section shows "View all in Stripe" link when invoices exist
     Given the organization has a paid subscription
     And the organization has invoices from Stripe
     When I view the subscription page
     Then I see a "View all in Stripe" link in the invoices section
 
-  @integration
+  @integration @unimplemented
   Scenario: "View all in Stripe" link is hidden when no invoices exist
     Given the organization has a paid subscription
     And the organization has no invoices
     When I view the subscription page
     Then I do not see a "View all in Stripe" link
 
-  @integration
+  @integration @unimplemented
   Scenario: Invoices section shows error message when Stripe is unreachable
     Given the Stripe API is unavailable
     When I view the subscription page
     Then the invoices section displays an error message
 
-  @integration
+  @integration @unimplemented
   Scenario: Subscription page remains functional when Stripe invoices fail
     Given the Stripe API is unavailable
     When I view the subscription page
     Then the current plan block is still visible
 
-  @integration
+  @integration @unimplemented
   Scenario: Organization without Stripe customer shows empty invoices
     Given the organization has no Stripe customer record
     When I view the subscription page
     Then I see a "Recent Invoices" section
     And the invoices section displays "No invoices yet"
 
-  @unit
+  @unit @unimplemented
   Scenario: Draft invoices are excluded from the list
     Given Stripe returns invoices with statuses "draft", "open", "paid"
     When the invoices are filtered for display
     Then draft invoices are not included in the result
 
-  @unit
+  @unit @unimplemented
   Scenario: Status color maps "paid" to green
     Given an invoice has status "paid"
     When the status color is resolved
     Then the color is green
 
-  @unit
+  @unit @unimplemented
   Scenario: Status color maps "open" to yellow
     Given an invoice has status "open"
     When the status color is resolved
     Then the color is yellow
 
-  @unit
+  @unit @unimplemented
   Scenario: Status color maps "void" to red
     Given an invoice has status "void"
     When the status color is resolved
     Then the color is red
 
-  @unit
+  @unit @unimplemented
   Scenario: Status color maps "uncollectible" to red
     Given an invoice has status "uncollectible"
     When the status color is resolved

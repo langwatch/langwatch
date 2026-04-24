@@ -15,13 +15,13 @@ Feature: Evaluation history grouping in trace details
   # Default view: grouped, showing latest result only
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Evaluator with multiple runs shows only the latest result
     Then I see a single entry for "Toxicity Check"
     And it displays the result from the most recent run
     And I see the score 0.95 and passed status
 
-  @integration
+  @integration @unimplemented
   Scenario: Evaluator with a single run shows normally without history indicator
     Given the trace also has an evaluator "PII Detection" that ran only once
     Then I see a single entry for "PII Detection"
@@ -31,7 +31,7 @@ Feature: Evaluation history grouping in trace details
   # History indicator
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Evaluator with multiple runs shows a history indicator
     Then the "Toxicity Check" entry shows a history indicator
     And the indicator conveys that 2 previous runs exist
@@ -40,14 +40,14 @@ Feature: Evaluation history grouping in trace details
   # Expanding history
   # ============================================================================
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Expanding history shows previous runs
     When I click the history indicator on "Toxicity Check"
     Then the entry expands to show all 3 runs
     And the runs are ordered from most recent to oldest
     And each run shows its own score, status, and timestamp
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Collapsing history hides previous runs
     Given I expanded the history for "Toxicity Check"
     When I click the history indicator again
@@ -57,7 +57,7 @@ Feature: Evaluation history grouping in trace details
   # Multiple evaluators with history
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Multiple evaluators each group independently
     Given the trace also has an evaluator "Faithfulness" that ran 2 times
     Then I see 2 grouped entries: "Toxicity Check" and "Faithfulness"
@@ -68,7 +68,7 @@ Feature: Evaluation history grouping in trace details
   # Guardrails tab uses the same grouping
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Guardrail evaluations are also grouped by evaluator
     Given the trace has a guardrail evaluator "Content Filter" that ran 2 times
     When I view the guardrails tab
@@ -78,18 +78,18 @@ Feature: Evaluation history grouping in trace details
   # Edge cases
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Evaluations without an evaluator identifier show individually
     Given the trace has evaluations submitted via API without an evaluator identifier
     Then each appears as an individual ungrouped entry
     And they show no history indicator
 
-  @integration
+  @integration @unimplemented
   Scenario: Evaluation counts badge reflects grouped results
     Then the evaluations tab badge counts unique evaluators not individual runs
     And failed/error status is based on the latest run of each evaluator
 
-  @integration
+  @integration @unimplemented
   Scenario: History includes error states
     Given the most recent run of "Toxicity Check" has status "error"
     And the previous run passed with score 0.8

@@ -6,7 +6,7 @@ Feature: Settings Plans Comparison Page
   Background:
     Given I am logged in as a member of an organization on LangWatch Cloud
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Member compares plans on the plans page
     Given my organization is on the "Free" plan
     When I navigate to /settings/plans
@@ -18,7 +18,7 @@ Feature: Settings Plans Comparison Page
     And plan capabilities are shown in side-by-side rows
     And the "Free" plan is shown as my current plan
 
-  @integration
+  @integration @unimplemented
   Scenario: Non-admin members can access plans comparison
     Given I am logged in with role "MEMBER"
     When I navigate to /settings/plans
@@ -26,7 +26,7 @@ Feature: Settings Plans Comparison Page
     And I see Free, Growth, and Enterprise plan columns
     And I do not see an access denied state
 
-  @integration
+  @integration @unimplemented
   Scenario: Growth organizations see Growth as current
     Given my organization is on the "Growth" plan
     When I view /settings/plans
@@ -34,20 +34,20 @@ Feature: Settings Plans Comparison Page
     And the "Free" plan is not shown as current
     And the "Enterprise" plan is not shown as current
 
-  @integration
+  @integration @unimplemented
   Scenario: Legacy tier organizations show no current plan in comparison
     Given my organization is on a legacy tier plan that is not shown in this comparison
     When I view /settings/plans
     Then no plan column is shown as current
 
-  @integration
+  @integration @unimplemented
   Scenario: TIERED organizations see a discontinued plan migration notice
     Given my organization is on a legacy pricing plan that has been discontinued
     When I view /settings/plans
     Then I see a notice that my current pricing model has been discontinued
     And the notice contains a link to /settings/subscription to update my plan
 
-  @integration
+  @integration @unimplemented
   Scenario: Free plan column shows default limits
     Given I am on /settings/plans
     Then the "Free" plan shows:
@@ -60,7 +60,7 @@ Feature: Settings Plans Comparison Page
       | custom evaluations | 3              |
     And the plan is presented as the default starter tier
 
-  @integration
+  @integration @unimplemented
   Scenario: Growth plan column shows seat and usage pricing
     Given I am on /settings/plans
     Then the "Growth" plan shows:
@@ -74,7 +74,7 @@ Feature: Settings Plans Comparison Page
       | lite users                    | unlimited                            |
       | evals simulations and prompts | unlimited                            |
 
-  @integration
+  @integration @unimplemented
   Scenario: Enterprise plan column shows custom commercial option
     Given I am on /settings/plans
     Then the "Enterprise" plan is presented as custom pricing
@@ -89,7 +89,7 @@ Feature: Settings Plans Comparison Page
       | compliance and legal reviews  |
       | custom terms and DPA          |
 
-  @integration
+  @integration @unimplemented
   Scenario: Plan details are visually comparable by row
     Given I am on /settings/plans
     When I look at a capability row in the comparison grid

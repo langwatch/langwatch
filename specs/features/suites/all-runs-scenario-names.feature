@@ -15,31 +15,31 @@ Feature: All Runs rows display scenario names
   Background:
     Given a batch run with scenario runs
 
-  @integration
+  @integration @unimplemented
   Scenario: Run row displays scenario names in the collapsed header
     Given a batch run containing scenarios "Login Flow" and "Checkout Flow"
     When the run row is rendered in collapsed state
     Then the row header displays "Checkout Flow, Login Flow" after the suite name
 
-  @integration
+  @integration @unimplemented
   Scenario: Run row displays single scenario name without separator
     Given a batch run containing scenario "Login Flow"
     When the run row is rendered in collapsed state
     Then the row header displays "Login Flow" after the suite name
 
-  @integration
+  @integration @unimplemented
   Scenario: Run row truncates long scenario name lists
     Given a batch run containing scenarios "Alpha", "Beta", "Gamma", "Delta", "Epsilon"
     When the run row is rendered in collapsed state
     Then the row header displays "Alpha, Beta, Delta +2 more"
 
-  @unit
+  @unit @unimplemented
   Scenario: Extracts unique sorted scenario names from batch run data
     Given scenario runs with names ["Login Flow", "Checkout Flow", "Login Flow"]
     When unique scenario names are extracted
     Then the result is ["Checkout Flow", "Login Flow"]
 
-  @unit
+  @unit @unimplemented
   Scenario: Falls back to scenario ID when name is null or undefined
     Given a scenario run with name null and scenarioId "scenario-abc"
     When the scenario display name is resolved

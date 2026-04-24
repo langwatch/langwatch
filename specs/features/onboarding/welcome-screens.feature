@@ -10,20 +10,20 @@ Feature: Welcome Onboarding Screen for Scenarios
   # Welcome Screen Trigger
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Show welcome screen on first scenario creation
     Given no scenarios exist in the project
     When I click "New Scenario"
     Then I see the scenario welcome screen
 
-  @integration
+  @integration @unimplemented
   Scenario: Proceed from welcome screen to scenario creation
     Given no scenarios exist in the project
     And I see the scenario welcome screen
     When I click the proceed button
     Then the scenario creation flow opens
 
-  @integration
+  @integration @unimplemented
   Scenario: Skip welcome screen when scenarios already exist
     Given scenarios exist in the project
     When I click "New Scenario"
@@ -34,7 +34,7 @@ Feature: Welcome Onboarding Screen for Scenarios
   # Welcome Screen Content
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Scenario welcome screen content
     When I render the scenario welcome screen
     Then I see a title mentioning scenarios

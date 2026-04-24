@@ -8,7 +8,7 @@ Feature: License Generation
     And I am on the licensing settings page
 
   # Happy path - full system flow
-  @e2e
+  @e2e @unimplemented
   Scenario: Generate a valid license for an organization
     Given I navigate to the license generation section
     When I fill in the organization name "Acme Corp"
@@ -32,7 +32,7 @@ Feature: License Generation
     And I see a success message confirming the download
 
   # Form validation and error handling
-  @integration
+  @integration @unimplemented
   Scenario: Display validation error for missing required fields
     Given I navigate to the license generation section
     When I click "Generate License" without filling any fields
@@ -43,14 +43,14 @@ Feature: License Generation
       | expiresAt        | Expiration date is required      |
       | planType         | Plan type is required            |
 
-  @integration
+  @integration @unimplemented
   Scenario: Display validation error for invalid email format
     Given I navigate to the license generation section
     When I fill in the email "invalid-email"
     And I click "Generate License"
     Then I see a validation error "Invalid email format" for the email field
 
-  @integration
+  @integration @unimplemented
   Scenario: Display validation error for past expiration date
     Given I navigate to the license generation section
     When I fill in all required fields
@@ -58,7 +58,7 @@ Feature: License Generation
     And I click "Generate License"
     Then I see a validation error "Expiration date must be in the future"
 
-  @integration
+  @integration @unimplemented
   Scenario: Display validation error for negative plan limits
     Given I navigate to the license generation section
     When I fill in the organization name "Test Org"
@@ -68,7 +68,7 @@ Feature: License Generation
     And I click "Generate License"
     Then I see a validation error "Plan limits must be positive numbers"
 
-  @integration
+  @integration @unimplemented
   Scenario: Generate license with preset plan template
     Given I navigate to the license generation section
     And I fill in the organization name "Enterprise Corp"
@@ -86,7 +86,7 @@ Feature: License Generation
       | maxScenarios        | 1000     |
       | canPublish          | true     |
 
-  @integration
+  @integration @unimplemented
   Scenario: Customize plan limits after selecting template
     Given I navigate to the license generation section
     And I fill in the organization name "Custom Corp"
@@ -97,14 +97,14 @@ Feature: License Generation
     Then the form retains the custom values
     And other fields keep the PRO template defaults
 
-  @integration
+  @integration @unimplemented
   Scenario: License file download uses organization name in filename
     Given I have filled in the organization name "Test Company Inc"
     And I have completed all other required fields
     When I click "Generate License"
     Then the downloaded file is named "Test Company Inc.langwatch-license"
 
-  @integration
+  @integration @unimplemented
   Scenario: License file download sanitizes special characters in filename
     Given I have filled in the organization name "Company/With:Special*Characters"
     And I have completed all other required fields
@@ -112,13 +112,13 @@ Feature: License Generation
     Then the downloaded file has a sanitized filename
     And the filename uses the .langwatch-license extension
 
-  @integration
+  @integration @unimplemented
   Scenario: License file contains valid license key content
     Given I have successfully generated a license
     Then the downloaded file contains a valid base64-encoded license key
     And the file content can be used to activate a license
 
-  @integration
+  @integration @unimplemented
   Scenario: Generate another license after successful generation
     Given I have successfully generated a license
     When I click "Generate Another"
@@ -126,7 +126,7 @@ Feature: License Generation
     And I can enter new license details
 
   # API-level validation
-  @unit
+  @unit @unimplemented
   Scenario: Validate license data schema
     Given valid license input data
     When the schema validation runs
@@ -140,20 +140,20 @@ Feature: License Generation
       | plan.maxMembers  | number | yes      |
       | plan.maxProjects | number | yes      |
 
-  @unit
+  @unit @unimplemented
   Scenario: Generate unique license ID
     Given I generate two licenses with the same input
     When I compare the license IDs
     Then each license has a unique licenseId
 
-  @unit
+  @unit @unimplemented
   Scenario: Sign license with RSA-SHA256
     Given valid license data
     When the license is signed
     Then the signature is a valid RSA-SHA256 signature
     And the signed license can be verified with the public key
 
-  @unit
+  @unit @unimplemented
   Scenario: Encode signed license as base64
     Given a signed license
     When the license is encoded

@@ -14,7 +14,7 @@ Feature: HTTP Agent Support in Evaluations V3
   # UI - Agent List Drawer (HTTP icon/label missing)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP agent displays with correct icon and label in agent list
     Given I have an HTTP agent "My API Agent" saved in the project
     When I click "Add Target"
@@ -27,7 +27,7 @@ Feature: HTTP Agent Support in Evaluations V3
   # UI - Target Editor Routing (currently routes to code editor)
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Click edit on HTTP agent target opens HTTP editor drawer
     Given I have an HTTP agent target "My API Agent" in the workbench
     When I click the edit button on "My API Agent" target header
@@ -35,7 +35,7 @@ Feature: HTTP Agent Support in Evaluations V3
     And the form is populated with the agent's URL, method, body template
     And I do NOT see the code editor drawer
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP agent stays in HTTP editor after creation
     When I click "Add Target"
     And I select "Agent"
@@ -49,7 +49,7 @@ Feature: HTTP Agent Support in Evaluations V3
   # UI - HTTP Agent Mappings
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP agent target shows input mapping section
     Given I have an HTTP agent with inputs "thread_id, input"
     When I add it as a target
@@ -57,13 +57,13 @@ Feature: HTTP Agent Support in Evaluations V3
     Then I see "thread_id" and "input" as mappable inputs
     And I can map each input to a dataset column or literal value
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP agent mappings auto-infer from dataset columns
     Given I have dataset columns "input, expected_output, thread_id"
     When I add an HTTP agent with input "thread_id"
     Then the input "thread_id" is automatically mapped to dataset column "thread_id"
 
-  @integration
+  @integration @unimplemented
   Scenario: Missing HTTP agent mappings show alert on target chip
     Given I have an HTTP agent target with required input "messages"
     And "messages" is not mapped to any source
@@ -74,7 +74,7 @@ Feature: HTTP Agent Support in Evaluations V3
   # DSL Generation - HTTP Node Creation
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: DSL adapter creates HTTP node for HTTP agent target
     Given an HTTP agent target configured with:
       | url          | https://api.example.com/chat   |
@@ -86,7 +86,7 @@ Feature: HTTP Agent Support in Evaluations V3
     And the node includes the HTTP config (url, method, bodyTemplate, outputPath)
     And the node does NOT have type "code"
 
-  @integration
+  @integration @unimplemented
   Scenario: DSL adapter resolves HTTP agent input mappings to dataset
     Given an HTTP agent target with inputs "thread_id", "input"
     And target mappings:
@@ -96,7 +96,7 @@ Feature: HTTP Agent Support in Evaluations V3
     When the workflow DSL is built
     Then the HTTP node inputs reference the entry node outputs
 
-  @integration
+  @integration @unimplemented
   Scenario: DSL adapter includes auth configuration in HTTP node
     Given an HTTP agent with bearer token authentication
     When the workflow DSL is built
@@ -106,13 +106,13 @@ Feature: HTTP Agent Support in Evaluations V3
   # Python Execution - HTTP Node Support in execute_flow
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: execute_flow recognizes HTTP node type
     Given a workflow DSL with an HTTP node
     When execute_flow processes the workflow
     Then the HTTP node is recognized (no "unknown node type" error)
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP node makes request with configured method and URL
     Given an HTTP node with:
       | url    | https://api.example.com/v1/chat |
@@ -120,7 +120,7 @@ Feature: HTTP Agent Support in Evaluations V3
     When execute_flow runs the HTTP node
     Then an HTTP POST request is made to "https://api.example.com/v1/chat"
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP node interpolates inputs into body template
     Given an HTTP node with:
       | bodyTemplate | {"thread_id": "{{thread_id}}", "message": "{{input}}"} |
@@ -130,7 +130,7 @@ Feature: HTTP Agent Support in Evaluations V3
     When execute_flow runs the HTTP node
     Then the request body is {"thread_id": "abc-123", "message": "Hello, world!"}
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP node extracts output using JSONPath
     Given an HTTP node with outputPath "$.choices[0].message.content"
     And the HTTP endpoint returns:
@@ -144,7 +144,7 @@ Feature: HTTP Agent Support in Evaluations V3
     When execute_flow runs the HTTP node
     Then the node output is "Hello! How can I help you?"
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP node applies bearer token authentication
     Given an HTTP node with:
       | auth.type  | bearer        |
@@ -152,7 +152,7 @@ Feature: HTTP Agent Support in Evaluations V3
     When execute_flow runs the HTTP node
     Then the request includes header "Authorization: Bearer sk-test-12345"
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP node applies API key authentication
     Given an HTTP node with:
       | auth.type   | api_key      |
@@ -161,7 +161,7 @@ Feature: HTTP Agent Support in Evaluations V3
     When execute_flow runs the HTTP node
     Then the request includes header "X-API-Key: my-secret-key"
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP node applies custom headers
     Given an HTTP node with headers:
       | key           | value            |
@@ -174,21 +174,21 @@ Feature: HTTP Agent Support in Evaluations V3
   # Error Handling
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP node returns error for connection failure
     Given an HTTP node targeting "https://nonexistent.invalid"
     When execute_flow runs the HTTP node
     Then the node result contains an error
     And the error indicates connection/network failure
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP node returns error for non-2xx response
     Given an HTTP endpoint that returns 401 Unauthorized
     When execute_flow runs the HTTP node
     Then the node result contains an error
     And the error includes status code 401
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP node returns error when JSONPath finds no match
     Given an HTTP node with outputPath "$.nonexistent.path"
     And the endpoint returns {"data": "value"}
@@ -196,7 +196,7 @@ Feature: HTTP Agent Support in Evaluations V3
     Then the node result contains an error
     And the error indicates JSONPath extraction failed
 
-  @integration
+  @integration @unimplemented
   Scenario: HTTP node respects timeout configuration
     Given an HTTP node with timeoutMs 5000
     And an endpoint that takes 10 seconds to respond
@@ -207,7 +207,7 @@ Feature: HTTP Agent Support in Evaluations V3
   # Evaluator Integration
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Evaluators receive HTTP agent output
     Given an HTTP agent target that outputs "Hello from API"
     And an evaluator mapped to target.output
@@ -218,7 +218,7 @@ Feature: HTTP Agent Support in Evaluations V3
   # End-to-End
   # ============================================================================
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Full evaluation run with HTTP agent target
     Given I have an HTTP agent target pointing to a mock endpoint
     And the mock endpoint echoes the input
@@ -229,7 +229,7 @@ Feature: HTTP Agent Support in Evaluations V3
     And evaluator results appear in the spreadsheet
     And aggregate pass rate is shown in the target header
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Single cell re-execution for HTTP agent
     Given I have HTTP agent results from a previous run
     When I click the play button on a specific cell

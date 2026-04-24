@@ -22,7 +22,7 @@ Feature: Onboarding Flow
     Then the "Save" button shows a loading indicator
     And the button is disabled
 
-  @integration
+  @integration @unimplemented
   Scenario: Credential input persists during typing
     Given I am configuring the "openai" provider in onboarding
     When I type "s" in the "OPENAI_API_KEY" field
@@ -33,7 +33,7 @@ Feature: Onboarding Flow
     Then the field shows "sktest123"
     And my input is not lost or reset
 
-  @integration
+  @integration @unimplemented
   Scenario: Save provider configuration in onboarding
     Given I am configuring the "openai" provider in onboarding
     When I enter "sk-test123" in the "OPENAI_API_KEY" field
@@ -42,7 +42,7 @@ Feature: Onboarding Flow
     Then the provider is saved
     And I am redirected to the next step
 
-  @integration
+  @integration @unimplemented
   Scenario: Redirect to evaluations after saving in evaluations onboarding
     Given I am in the evaluations onboarding flow
     And I am configuring a model provider
@@ -50,7 +50,7 @@ Feature: Onboarding Flow
     And I click "Save"
     Then I am redirected to "/@project/evaluations"
 
-  @integration
+  @integration @unimplemented
   Scenario: Redirect to prompts after saving in prompts onboarding
     Given I am in the prompts onboarding flow
     And I am configuring a model provider
@@ -58,7 +58,7 @@ Feature: Onboarding Flow
     And I click "Save"
     Then I am redirected to "/@project/prompts"
 
-  @integration
+  @integration @unimplemented
   Scenario: Form validation works in onboarding context
     Given I am configuring the "openai" provider in onboarding
     When I leave the required "OPENAI_API_KEY" field empty
@@ -67,7 +67,7 @@ Feature: Onboarding Flow
     And the provider is not saved
     And I am not redirected
 
-  @integration
+  @integration @unimplemented
   Scenario: Select default model in onboarding
     Given I am configuring the "openai" provider in onboarding
     When I enter valid API credentials
@@ -76,7 +76,7 @@ Feature: Onboarding Flow
     Then the default model is set to "openai/gpt-4o"
     And the provider is saved
 
-  @integration
+  @integration @unimplemented
   Scenario: Handle OpenAI-specific validation in onboarding
     Given I am configuring the "openai" provider in onboarding
     When I enter only a base URL without an API key
@@ -84,7 +84,7 @@ Feature: Onboarding Flow
     And I click "Save"
     Then the provider is saved (base URL only is valid for OpenAI)
 
-  @integration
+  @integration @unimplemented
   Scenario: Show OpenAI validation error when using default URL without key
     Given I am configuring the "openai" provider in onboarding
     When I enter the default OpenAI base URL
@@ -93,21 +93,21 @@ Feature: Onboarding Flow
     Then I see an error: "API Key is required when using the default OpenAI base URL"
     And the provider is not saved
 
-  @integration
+  @integration @unimplemented
   Scenario: Clear OpenAI validation error when user starts typing
     Given I am configuring the "openai" provider in onboarding
     And I see an OpenAI validation error
     When I start typing in the "OPENAI_API_KEY" field
     Then the validation error is cleared
 
-  @integration
+  @integration @unimplemented
   Scenario: Show loading state while saving in onboarding
     Given I am configuring a model provider in onboarding
     When I click "Save"
     Then the "Save" button shows a loading state
     And the button is disabled during save
 
-  @integration
+  @integration @unimplemented
   Scenario: Handle save errors gracefully in onboarding
     Given I am configuring a model provider in onboarding
     When I enter invalid configuration
@@ -119,7 +119,7 @@ Feature: Onboarding Flow
 
   # API Key Validation Scenarios
 
-  @integration
+  @integration @unimplemented
   Scenario: Validate API key before saving in onboarding
     Given I am configuring the "openai" provider in onboarding
     When I enter an invalid API key "sk-invalid"
@@ -128,7 +128,7 @@ Feature: Onboarding Flow
     And I see an API key validation error
     And the provider is not saved
 
-  @integration
+  @integration @unimplemented
   Scenario: Validate env var API key in onboarding
     Given I am configuring a provider that uses environment variables
     And the provider is enabled via env vars with no stored customKeys
@@ -137,7 +137,7 @@ Feature: Onboarding Flow
     And if valid, the provider is saved
     And if invalid, I see a validation error
 
-  @integration
+  @integration @unimplemented
   Scenario: Validate manually-entered API key when env vars are configured
     Given I am configuring a provider that uses environment variables
     And the API key field shows "HAS_KEY••••••••••••••••••••••••"
@@ -147,7 +147,7 @@ Feature: Onboarding Flow
     And I see an API key validation error
     And the provider is not saved
 
-  @integration
+  @integration @unimplemented
   Scenario: Clear API key validation error when user modifies field
     Given I am configuring the "openai" provider in onboarding
     And I see an API key validation error

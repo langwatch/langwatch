@@ -11,7 +11,7 @@ Feature: Scenario editor new agent flow
   # Core: Agent type selection from scenario editor
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Clicking "Add New Agent" in save-and-run menu opens agent type selection
     Given the save-and-run menu is open
     When I click "Add New Agent"
@@ -19,7 +19,7 @@ Feature: Scenario editor new agent flow
     And I see options for "HTTP Agent", "Code Agent", and "Workflow Agent"
 
   # Regression #1903: clicking "Add New Agent" should keep the type selection flow usable.
-  @integration
+  @integration @unimplemented
   Scenario: Agent type selector drawer remains open after clicking "Add New Agent"
     Given the save-and-run menu is open
     When I click "Add New Agent"
@@ -30,7 +30,7 @@ Feature: Scenario editor new agent flow
   # Full create-agent-from-scenario flow
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Selecting code agent type from scenario editor opens code editor
     Given the save-and-run menu is open
     And I clicked "Add New Agent"
@@ -38,7 +38,7 @@ Feature: Scenario editor new agent flow
     When I select "Code Agent"
     Then the AgentCodeEditorDrawer opens
 
-  @integration
+  @integration @unimplemented
   Scenario: Selecting workflow agent type from scenario editor opens workflow selector
     Given the save-and-run menu is open
     And I clicked "Add New Agent"
@@ -46,7 +46,7 @@ Feature: Scenario editor new agent flow
     When I select "Workflow Agent"
     Then the WorkflowSelectorDrawer opens
 
-  @integration
+  @integration @unimplemented
   Scenario: Selecting HTTP agent type from scenario editor opens HTTP editor
     Given the save-and-run menu is open
     And I clicked "Add New Agent"
@@ -54,13 +54,13 @@ Feature: Scenario editor new agent flow
     When I select "HTTP Agent"
     Then the AgentHttpEditorDrawer opens
 
-  @integration
+  @integration @unimplemented
   Scenario: New agent created from scenario editor is auto-selected as target
     Given I created a new code agent "My Test Agent" via the scenario editor flow
     When the agent is saved
     Then "My Test Agent" is selected as the scenario target with type "code"
 
-  @integration
+  @integration @unimplemented
   Scenario: Cancelling agent type selection returns to scenario editor
     Given the save-and-run menu is open
     And I clicked "Add New Agent"

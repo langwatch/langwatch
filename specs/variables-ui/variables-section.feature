@@ -11,10 +11,12 @@ Feature: Variables section UI
   # Basic display
   # ============================================================================
 
+  @unimplemented
   Scenario: Display section with "Variables" label
     Then the section header displays "Variables"
     And a "+" button is visible next to the header
 
+  @unimplemented
   Scenario: Display existing variables with type icons
     Given a variable "question" of type "str" exists
     And a variable "count" of type "float" exists
@@ -25,12 +27,14 @@ Feature: Variables section UI
   # Adding variables
   # ============================================================================
 
+  @unimplemented
   Scenario: Add new variable
     When I click the "+" button
     Then a new variable row appears with a default name like "input"
     And the new variable has type "str" by default
     And the variable name field is focused for editing
 
+  @unimplemented
   Scenario: Add variable with unique name
     Given a variable "input" already exists
     When I click the "+" button
@@ -40,24 +44,28 @@ Feature: Variables section UI
   # Editing variable name
   # ============================================================================
 
+  @unimplemented
   Scenario: Edit variable name by clicking
     Given a variable "question" exists
     When I click on the variable name "question"
     Then the name becomes an editable text field
     And the text is selected for easy replacement
 
+  @unimplemented
   Scenario: Save variable name on blur
     Given I am editing the variable name
     And I have typed "user_input"
     When I click outside the name field
     Then the variable name is updated to "user_input"
 
+  @unimplemented
   Scenario: Save variable name on Enter
     Given I am editing the variable name
     And I have typed "user_input"
     When I press Enter
     Then the variable name is updated to "user_input"
 
+  @unimplemented
   Scenario: Cancel variable name edit on Escape
     Given a variable "question" exists
     And I am editing the variable name
@@ -65,12 +73,14 @@ Feature: Variables section UI
     When I press Escape
     Then the variable name remains "question"
 
+  @unimplemented
   Scenario: Normalize variable names
     Given I am editing the variable name
     When I type "User Input"
     And I save the name
     Then the variable name is normalized to "user_input"
 
+  @unimplemented
   Scenario: Prevent duplicate variable names
     Given a variable "question" exists
     And a variable "answer" exists
@@ -82,6 +92,7 @@ Feature: Variables section UI
   # Changing variable type
   # ============================================================================
 
+  @unimplemented
   Scenario: Change variable type via dropdown
     Given a variable "question" of type "str" exists
     When I click on the type selector for "question"
@@ -94,11 +105,13 @@ Feature: Variables section UI
   # Deleting variables
   # ============================================================================
 
+  @unimplemented
   Scenario: Delete variable
     Given a variable "question" exists
     When I click the delete (x) button for "question"
     Then the variable "question" is removed from the list
 
+  @unimplemented
   Scenario: Cannot delete when only one output exists
     Given the section is for "outputs"
     And only one output "result" exists
@@ -109,18 +122,21 @@ Feature: Variables section UI
   # Mapping UI (when showMappings=true)
   # ============================================================================
 
+  @unimplemented
   Scenario: Show mapping input when mappings enabled
     Given showMappings is true
     And a variable "question" exists
     Then I see an "=" sign after the variable name
     And I see a mapping input field
 
+  @unimplemented
   Scenario: Hide mapping input when mappings disabled
     Given showMappings is false
     And a variable "question" exists
     Then I do not see an "=" sign
     And I do not see a mapping input field
 
+  @unimplemented
   Scenario: Mapping dropdown shows available sources
     Given showMappings is true
     And available sources include:
@@ -132,6 +148,7 @@ Feature: Variables section UI
     And I see "Test Data" group with fields "input", "expected_output"
     And I see "GPT-4o Runner" group with field "output"
 
+  @unimplemented
   Scenario: Select mapping from dropdown
     Given showMappings is true
     And a variable "question" exists with no mapping
@@ -140,6 +157,7 @@ Feature: Variables section UI
     Then the mapping is set to source "Test Data", field "input"
     And the mapping input displays "Test Data.input"
 
+  @unimplemented
   Scenario: Type default value in mapping input
     Given showMappings is true
     And a variable "question" exists
@@ -147,12 +165,14 @@ Feature: Variables section UI
     And no dropdown option is selected
     Then the variable has a default value of "Hello world"
 
+  @unimplemented
   Scenario: Search filters mapping options
     Given showMappings is true
     And available sources have many fields
     When I type "output" in the mapping input
     Then only fields containing "output" are shown in the dropdown
 
+  @unimplemented
   Scenario: Clear mapping
     Given a variable "question" has a mapping to "Test Data.input"
     When I clear the mapping input
@@ -163,21 +183,25 @@ Feature: Variables section UI
   # Read-only mode (for evaluator fields)
   # ============================================================================
 
+  @unimplemented
   Scenario: Read-only variables cannot be renamed
     Given readOnly is true
     And a variable "output" exists
     Then clicking on the variable name does not make it editable
 
+  @unimplemented
   Scenario: Read-only variables cannot be deleted
     Given readOnly is true
     And a variable "output" exists
     Then the delete button is not visible
 
+  @unimplemented
   Scenario: Read-only variables cannot change type
     Given readOnly is true
     And a variable "output" of type "str" exists
     Then the type selector is disabled or not interactive
 
+  @unimplemented
   Scenario: Read-only variables can still set mappings
     Given readOnly is true
     And showMappings is true
@@ -189,10 +213,12 @@ Feature: Variables section UI
   # canAddRemove=false mode
   # ============================================================================
 
+  @unimplemented
   Scenario: Cannot add variables when canAddRemove=false
     Given canAddRemove is false
     Then the "+" button is not visible
 
+  @unimplemented
   Scenario: Cannot delete variables when canAddRemove=false
     Given canAddRemove is false
     And a variable "question" exists

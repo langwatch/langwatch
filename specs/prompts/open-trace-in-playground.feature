@@ -8,21 +8,21 @@ Feature: Open trace in Playground
 
   # --- Existing: basic null-to-undefined coercion ---
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace without max tokens specified opens in Playground
     Given the traced LLM call did not specify max tokens
     When I open the trace in the Playground
     Then the Playground loads without validation errors
     And max tokens is left unset
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace without temperature specified opens in Playground
     Given the traced LLM call did not specify temperature
     When I open the trace in the Playground
     Then the Playground loads without validation errors
     And temperature is left unset
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace with LLM config values opens in Playground with those values
     Given the traced LLM call used max tokens of 1024
     And the traced LLM call used temperature of 0.7
@@ -31,7 +31,7 @@ Feature: Open trace in Playground
     And max tokens shows 1024
     And temperature shows 0.7
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace without a model specified uses the default model
     Given the traced LLM call did not specify a model
     When I open the trace in the Playground
@@ -52,20 +52,20 @@ Feature: Open trace in Playground
   # but the bridge should extract everything available from the trace
   # regardless of model support.
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace with all OTel numeric parameters maps them to the playground
     Given the traced LLM call includes frequency_penalty, presence_penalty, seed, top_k, min_p, and repetition_penalty
     When I open the trace in the Playground
     Then all numeric parameters are populated in the playground form
     And no validation errors occur
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace with reasoning effort maps it to the playground
     Given the traced LLM call includes a reasoning effort parameter
     When I open the trace in the Playground
     Then the reasoning parameter is populated in the playground form
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace with string-typed numeric parameters coerces them
     Given the traced LLM call has temperature as string "0.7"
     And the traced LLM call has max_tokens as string "2048"
@@ -73,7 +73,7 @@ Feature: Open trace in Playground
     When I open the trace in the Playground
     Then all values are coerced to their correct numeric types
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace with unknown or garbage parameter values skips them gracefully
     Given the traced LLM call has temperature as an object
     And the traced LLM call has frequency_penalty as boolean true
@@ -82,7 +82,7 @@ Feature: Open trace in Playground
     Then the Playground loads without validation errors
     And uncoercible parameters are left unset
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace with only some parameters populates only those
     Given the traced LLM call specifies only temperature and seed
     When I open the trace in the Playground
@@ -91,19 +91,19 @@ Feature: Open trace in Playground
 
   # --- Backend extraction: ClickHouse and Elasticsearch ---
 
-  @integration
+  @integration @unimplemented
   Scenario: ClickHouse backend extracts all OTel gen_ai.request attributes
     Given a span stored in ClickHouse with gen_ai.request.* attributes for all supported parameters
     When the getForPromptStudio API is called
     Then all parameters are returned in the llmConfig response
 
-  @integration
+  @integration @unimplemented
   Scenario: Elasticsearch backend extracts all parameters from span params
     Given a span stored in Elasticsearch with LLM params for all supported parameters
     When the getForPromptStudio API is called
     Then all parameters are returned in the llmConfig response
 
-  @integration
+  @integration @unimplemented
   Scenario: Extra unknown parameters from traces go into litellmParams
     Given a span with non-standard parameters like custom_param or vendor_specific_setting
     When the getForPromptStudio API is called

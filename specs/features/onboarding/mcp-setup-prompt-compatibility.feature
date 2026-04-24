@@ -12,20 +12,20 @@ Feature: LangWatch MCP setup content is safe to paste into Gemini CLI
   # pasted the tracing setup prompt into its chat input.
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Pasting the tracing setup prompt does not crash Gemini CLI
     Given I copy the "Add LangWatch tracing to your code" prompt
     When I paste the prompt into Gemini CLI's chat input
     Then Gemini CLI does not crash with ENAMETOOLONG
     And the setup instructions remain legible to the agent
 
-  @unit
+  @unit @unimplemented
   Scenario: Pasting the "level up" prompt does not crash Gemini CLI
     Given I copy the "Level up with everything LangWatch" prompt
     When I paste the prompt into Gemini CLI's chat input
     Then Gemini CLI does not crash with ENAMETOOLONG
 
-  @unit
+  @unit @unimplemented
   Scenario: Pasting the MCP config JSON does not crash Gemini CLI
     Given I copy the MCP config JSON from the onboarding "MCP" tab
     When I paste the config into Gemini CLI's chat input

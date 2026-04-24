@@ -11,12 +11,14 @@ Feature: Create workflow evaluator via new workflow
   # Category selector UI changes
   # ============================================================================
 
+  @unimplemented
   Scenario: Category selector shows renamed option
     When I open the evaluator category selector
     Then I should see "Create Custom Evaluator" option
     And I should NOT see "Custom (from Workflow)"
     And the description should say "Create a new workflow as custom evaluator"
 
+  @unimplemented
   Scenario: Custom evaluator option has workflow icon
     When I open the evaluator category selector
     Then the "Create Custom Evaluator" option should have a workflow icon
@@ -26,6 +28,7 @@ Feature: Create workflow evaluator via new workflow
   # New workflow creation flow
   # ============================================================================
 
+  @unimplemented
   Scenario: Custom evaluator option opens workflow creator
     Given I am on the evaluators page
     When I click "New Evaluator"
@@ -35,6 +38,7 @@ Feature: Create workflow evaluator via new workflow
     And I should be on step 2 (name and description)
     And I should NOT see the template selection grid
 
+  @unimplemented
   Scenario: New workflow modal shows correct pre-filled values
     Given I clicked "Create Custom Evaluator"
     Then the modal title should say "Create new workflow"
@@ -46,6 +50,7 @@ Feature: Create workflow evaluator via new workflow
   # Workflow and evaluator creation
   # ============================================================================
 
+  @unimplemented
   Scenario: After creating workflow, evaluator is auto-created
     Given I clicked "Create Custom Evaluator"
     And the New Workflow modal is open
@@ -58,11 +63,13 @@ Feature: Create workflow evaluator via new workflow
     And the evaluator should reference the new workflow
     And I should be redirected to the workflow studio
 
+  @unimplemented
   Scenario: Evaluator inherits workflow name automatically
     Given I clicked "Create Custom Evaluator"
     When I create a workflow named "Quality Checker"
     Then the auto-created evaluator should also be named "Quality Checker"
 
+  @unimplemented
   Scenario: Workflow is created with evaluator template structure
     Given I clicked "Create Custom Evaluator"
     When I create workflow "My Evaluator"
@@ -75,6 +82,7 @@ Feature: Create workflow evaluator via new workflow
   # Cancellation and error handling
   # ============================================================================
 
+  @unimplemented
   Scenario: Canceling workflow creation does not create evaluator
     Given I clicked "Create Custom Evaluator"
     And the New Workflow modal is open
@@ -83,6 +91,7 @@ Feature: Create workflow evaluator via new workflow
     And no evaluator should be created
     And I should return to the evaluator category selector
 
+  @unimplemented
   Scenario: Closing modal via X button cancels creation
     Given I clicked "Create Custom Evaluator"
     And the New Workflow modal is open
@@ -90,6 +99,7 @@ Feature: Create workflow evaluator via new workflow
     Then no workflow should be created
     And no evaluator should be created
 
+  @unimplemented
   Scenario: Workflow creation failure does not create orphan evaluator
     Given I clicked "Create Custom Evaluator"
     And the workflow creation will fail (e.g., network error)
@@ -102,6 +112,7 @@ Feature: Create workflow evaluator via new workflow
   # Back navigation
   # ============================================================================
 
+  @unimplemented
   Scenario: Back button from modal returns to category selector
     Given I clicked "Create Custom Evaluator"
     And the New Workflow modal is open
@@ -113,6 +124,7 @@ Feature: Create workflow evaluator via new workflow
   # Evaluator page flow
   # ============================================================================
 
+  @unimplemented
   Scenario: New evaluator appears in list after creation
     Given I created workflow evaluator "New Scorer" via the create flow
     When I navigate to the evaluators page

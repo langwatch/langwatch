@@ -3,7 +3,7 @@ Feature: Project becomes integrated after first trace ingestion
   when the first trace arrives, enabling the messages page to render
   the trace list instead of the welcome screen.
 
-  @integration
+  @integration @unimplemented
   Scenario: Project marks as integrated after first trace ingestion
     Given a project with firstMessage set to false
     And the project uses event-sourcing ingestion
@@ -12,7 +12,7 @@ Feature: Project becomes integrated after first trace ingestion
     And project.integrated is set to true
     And project.language is detected from SDK attributes
 
-  @integration
+  @integration @unimplemented
   Scenario: Messages page renders trace list for integrated projects
     Given a project with featureEventSourcingTraceIngestion enabled
     And disableElasticSearchTraceWriting enabled
