@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.4.1](https://github.com/langwatch/langwatch/compare/skills@v0.4.0...skills@v0.4.1) (2026-04-24)
+
+
+### Bug Fixes
+
+* **skills-publish:** stop sync.sh nuking target repo's .git ([#3425](https://github.com/langwatch/langwatch/issues/3425)) ([72fef44](https://github.com/langwatch/langwatch/commit/72fef447db36d2a820a315d2818df9d6ec381512))
+
+
+### Code Refactoring
+
+* **skills:** real MDX with imports + JSX, retire link-as-partial sleight of hand ([#3432](https://github.com/langwatch/langwatch/issues/3432)) ([3141eb8](https://github.com/langwatch/langwatch/commit/3141eb8569071151c9969efa1a12a30401fd7792))
+
 ## [0.4.0](https://github.com/langwatch/langwatch/compare/skills@v0.3.0...skills@v0.4.0) (2026-04-23)
 
 
