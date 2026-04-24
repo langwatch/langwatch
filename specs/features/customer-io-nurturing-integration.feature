@@ -488,35 +488,35 @@ Feature: Customer.io nurturing integration
   # the original acquisition source.
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Attribution hook captures ref param in sessionStorage on first touch
     Given no existing attribution in sessionStorage
     And the URL contains "?ref=website"
     When the attribution capture hook mounts
     Then sessionStorage key "lw_attrib.leadSource" equals "website"
 
-  @unit
+  @unit @unimplemented
   Scenario: Attribution hook does not overwrite existing first-touch values
     Given sessionStorage "lw_attrib.leadSource" is already "original"
     And the URL contains "?ref=later"
     When the attribution capture hook mounts
     Then sessionStorage key "lw_attrib.leadSource" remains "original"
 
-  @unit
+  @unit @unimplemented
   Scenario: Attribution hook captures full utm tuple when present in URL
     Given no existing attribution in sessionStorage
     And the URL contains utm_source, utm_medium, utm_campaign, utm_term, utm_content
     When the attribution capture hook mounts
     Then sessionStorage contains all five lw_attrib.utm_* keys with the URL values
 
-  @unit
+  @unit @unimplemented
   Scenario: Attribution hook captures document.referrer when present
     Given no existing attribution in sessionStorage
     And document.referrer is "https://www.langwatch.ai/"
     When the attribution capture hook mounts
     Then sessionStorage key "lw_attrib.referrer" equals "https://www.langwatch.ai/"
 
-  @integration
+  @integration @unimplemented
   Scenario: Signup with ref in URL sends lead_source trait and event property to Customer.io
     Given a user lands on the app with "?ref=website" in the URL
     And completes onboarding
@@ -524,14 +524,14 @@ Feature: Customer.io nurturing integration
     Then the user traits sent to Customer.io include lead_source "website"
     And the "signed_up" event properties include leadSource "website"
 
-  @integration
+  @integration @unimplemented
   Scenario: Signup forwards utm tuple to Customer.io
     Given a user lands on the app with utm_source, utm_medium, utm_campaign, utm_term, utm_content in the URL
     And completes onboarding
     When the onboarding flow completes
     Then the user traits sent to Customer.io include utm_source, utm_medium, utm_campaign, utm_term, utm_content
 
-  @integration
+  @integration @unimplemented
   Scenario: Signup without attribution omits those fields from Customer.io traits
     Given a user completes onboarding with no attribution data
     When the onboarding flow completes
