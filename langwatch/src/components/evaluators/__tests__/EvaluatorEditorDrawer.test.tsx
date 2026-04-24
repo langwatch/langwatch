@@ -363,6 +363,44 @@ describe("EvaluatorEditorDrawer — name update regression (#3442)", () => {
         }),
       );
     });
+
+    it("does not call updateMutation when name is unchanged", async () => {
+      const user = userEvent.setup();
+
+      mockGetByIdData.current = {
+        id: "eval-wf-2",
+        projectId: "test-project-id",
+        name: "Unchanged Name",
+        type: "workflow",
+        workflowId: "workflow-2",
+        config: {},
+        fields: [],
+        outputFields: [],
+        slug: "unchanged-name",
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        copiedFromEvaluatorId: null,
+      };
+
+      render(
+        <EvaluatorEditorDrawer
+          open={true}
+          evaluatorId="eval-wf-2"
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("evaluator-name-input")).toBeInTheDocument();
+      });
+
+      // Click save without changing the name
+      const saveButton = screen.getByTestId("save-evaluator-button");
+      await user.click(saveButton);
+
+      expect(mockUpdateMutate).not.toHaveBeenCalled();
+    });
   });
 
   describe("when query refetches while user is editing", () => {
