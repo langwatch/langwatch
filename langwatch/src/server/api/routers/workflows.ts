@@ -11,6 +11,7 @@ import {
   type Workflow,
   workflowJsonSchema,
 } from "../../../optimization_studio/types/dsl";
+import { mergeLocalConfigsIntoDsl } from "../../../optimization_studio/utils/mergeLocalConfigs";
 import { migrateDSLVersion } from "../../../optimization_studio/types/migrate";
 import {
   clearDsl,
@@ -1287,12 +1288,12 @@ export const saveOrCommitWorkflowVersion = async ({
   const [versionMajor] = (latestVersion?.version ?? "0.0").split(".");
   const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
 
-  const dslWithoutStates = JSON.parse(
-    JSON.stringify({
-      ...input.dsl,
-      state: {},
-    }),
-  );
+  const dslWithMergedConfigs = {
+    ...input.dsl,
+    nodes: mergeLocalConfigsIntoDsl(input.dsl.nodes as any) as any,
+    state: {},
+  };
+  const dslWithoutStates = JSON.parse(JSON.stringify(dslWithMergedConfigs));
   const data = {
     commitMessage,
     authorId: ctx.session.user.id,
