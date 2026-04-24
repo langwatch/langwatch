@@ -59,21 +59,23 @@ A single scope can carry multiple budgets with different `on_breach` values. Com
 - Budget A: `team`, `month`, `$4000`, `warn`. Surfaces `X-LangWatch-Budget-Warning: team:80` once 80% of the real ceiling is spent.
 - Budget B: `team`, `month`, `$5000`, `block`. Hard-caps at $5k.
 
-The UI supports this as "Warning thresholds" on a single budget row; Alexis's Prisma schema stores each threshold as its own `GatewayBudget` row for simplicity.
+The UI surfaces this as "Warning thresholds" on a single budget row; each threshold is stored as its own `GatewayBudget` row in the schema for simplicity.
 
 ## Debit model
 
-Gateway operations are debited **after** the response completes, using the provider-reported token counts. The gateway POSTs to `/internal/gateway/budget/debit` with a `gateway_request_id` (ULID). The endpoint is **idempotent** by that id (24-hour dedup window) so gateway retries never double-bill.
+Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` (ULID) and is **idempotent** by that id so gateway retries and trace replays never double-bill.
 
 Debit flow:
 
 1. Gateway streams the response to the client.
-2. When the response closes, gateway computes USD cost from tokens × model price.
-3. Gateway posts the debit (fire-and-forget).
-4. LangWatch control-plane writes a `BudgetLedger` row in a transaction that also updates `spent_usd` on every affected scope.
-5. On retry from the gateway, the dedup key skips re-writing.
+2. When the response closes, the gateway captures the provider's token counts and emits an OTel span carrying `gen_ai.usage.*` plus `langwatch.virtual_key_id` and `langwatch.gateway_request_id`.
+3. The gateway also posts a post-response debit event to the control plane for the primary ledger path.
+4. The control plane recomputes USD cost from `tokens × pricing catalog` (the gateway-side cost is authoritative only when it short-circuits without a provider call, e.g. `blocked_by_guardrail`) and writes a ledger row in a transaction that also increments `spent_usd` on every affected scope (org, team, project, VK, principal).
+5. In parallel, the trace-processing pipeline reads the same span, resolves the applicable budgets, and writes one row per budget to the ClickHouse ledger (`gateway_budget_ledger_events`, rolled up into `gateway_budget_scope_totals` by a materialised view). This CH path is idempotent by `(tenant, budget, gateway_request_id)` on the underlying ReplacingMergeTree.
 
-If the control-plane is unreachable, the gateway queues debits locally and delivers them in FIFO order when the control-plane returns.
+<Note>
+The ClickHouse fold runs alongside the primary ledger today to validate the path. The pre-request budget check reads the primary ledger. The CH totals view becomes the authoritative read in a follow-up, at which point the primary-ledger write path retires. Customer-visible behaviour is unchanged — a $1 budget still blocks at $1 of spend during and after the cutover.
+</Note>
 
 ## Pre-request check
 
@@ -114,22 +116,22 @@ Cache reads / writes are priced **separately** per provider — Anthropic cache 
 
 ## Viewing budget spend (UI)
 
-The **/gateway/budgets** list shows every budget with a utilization bar + hard cap + remaining. Iter 66+69 polish:
+The **/gateway/budgets** list shows every budget with a utilization bar, hard cap, and remaining amount:
 
-- **Spent/Limit column** carries a colored progress bar AND a matching %-badge (🟢 green ≤ 50%, 🟠 orange 50-80%, 🔴 red ≥ 80%/100%) — scanning "which budgets are hot" is a one-glance read, not a mental-math exercise.
+- **Spent/Limit column** carries a colored progress bar and a matching %-badge (green ≤ 50%, orange 50-80%, red ≥ 80%/100%) so scanning "which budgets are hot" is a one-glance read.
 - **Window column** wraps `hour` / `day` / `week` / `month` / `total` in a subtle gray identifier badge matching the rest of the product.
-- **Resets column** shows a humanised relative time ("in 3 days" / "in 11 hours" / "in 15 minutes") with a hover Tooltip for the exact UTC timestamp. TOTAL-window budgets render a muted `never`.
-- **Scope column** resolves the raw scope id into the target's human name + link (iter 69 `a105b0104`): `organization acme-demo`, `team platform`, `virtual_key prod-openai` with a link to the VK detail page, `principal user@example.com`. Resolution is batched in a single findMany per scope type so the column adds no per-row DB cost.
+- **Resets column** shows a humanised relative time ("in 3 days" / "in 11 hours" / "in 15 minutes") with a hover tooltip for the exact UTC timestamp. `total`-window budgets render a muted `never`.
+- **Scope column** resolves the raw scope id into the target's human name and link: `organization acme-demo`, `team platform`, `virtual_key prod-openai` (linking to the VK detail page), `principal user@example.com`. Resolution is batched per scope type so the column adds no per-row DB cost.
 
-Clicking a row opens **/gateway/budgets/[id]** (Lane B iter 18.2, `f85319cc7`) — a detail page mirroring the VK detail page's layout:
+Clicking a row opens **/gateway/budgets/[id]** — a detail page mirroring the VK detail layout:
 
-- **Header action bar**: **Audit history** (deep-links into `/gateway/audit?targetKind=budget&targetId=<budget_id>` pre-filtered to this budget's events, iter 68 `061dcc22f`; stays visible on archived budgets so forensic investigations can start from the archived state, iter 69 `1e64e140f`), **Edit**, **Archive**.
+- **Header action bar**: **Audit history** (deep-links to `/gateway/audit?targetKind=budget&targetId=<budget_id>` pre-filtered to this budget's events; stays visible on archived budgets so forensic investigations can start from the archived state), **Edit**, **Archive**.
 - **Utilization header**: hard cap, spent, remaining, `on_breach` mode.
 - **Identity**: name, description, window, timezone, created/updated timestamps.
 - **Resolved scope target**: same resolution as the list Scope column, plus a full-width link card to the target resource.
-- **Recent 20 debits**: each row shows When (humanised relative + hover-for-exact, iter 67 `4ee9f23ee`), Amount (smart-decimals — shows `$0.0183` not `$0.02`), Model, originating VK (deep-linked to the VK detail page), and the `gateway_request_id` for trace search.
+- **Recent 20 debits**: each row shows When (humanised relative + hover-for-exact), Amount (smart-decimals — e.g. `$0.0183`, not `$0.02`), Model, originating VK (deep-linked to the VK detail page), and the `gateway_request_id` for trace search.
 
-Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys" (Lane B iter 18.1, `3cb7a401a`). The sparkline is gated on ≥ 2 data buckets so the 24 h preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page (iter 68 `1bc0c334f`) for drill-down.
+Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys". The sparkline is gated on ≥ 2 data buckets so the 24-hour preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page for drill-down.
 
 Programmatic equivalent:
 

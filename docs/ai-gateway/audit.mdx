@@ -6,7 +6,7 @@ sidebarTitle: Audit log
 
 Every write through the REST API, the CLI, the tRPC routers, or the UI emits a row into `GatewayAuditLog`. Queryable programmatically via `GET /api/gateway/v1/audit` — the enterprise-governance answer to *"who revoked that key on Tuesday?"* without granting database access.
 
-<Note>**Gateway-specific audit viewing has moved to the platform's global audit log** at `/settings/audit-log` (alexis iter 31, `1303ceb98`). Filter by resource type `virtualKey` / `gatewayBudget` / `gatewayProvider` to see the gateway surface. A full unification — merging `GatewayAuditLog` writes into the main `AuditLog` table so platform admins see every mutation in one view — is scheduled for v1.1. Until then, gateway writes still go to `GatewayAuditLog` and the REST export below remains the programmatic path.</Note>
+<Note>**Gateway-specific audit viewing lives in the platform's global audit log** at `/settings/audit-log`. Filter by resource type (`virtualKey` / `gatewayBudget` / `gatewayProvider`) to scope to the gateway surface. Full unification — merging `GatewayAuditLog` writes into the main `AuditLog` table so platform admins see every mutation in one query — is a follow-up; until then, gateway writes land in `GatewayAuditLog` and the REST export below is the programmatic path.</Note>
 
 ## What's logged
 
@@ -29,10 +29,10 @@ Go to **/settings/audit-log** (gated on `gatewayLogs:view`) and filter by resour
 
 1. **Filter by action** — `VIRTUAL_KEY_CREATED`, `VIRTUAL_KEY_ROTATED`, etc. (UI picker shows these with friendlier labels; the underlying filter sends the enum value.) Useful when investigating "did anyone rotate keys during the incident window?".
 2. **Filter by resource type** — `virtualKey` / `gatewayBudget` / `gatewayProvider` / `gatewayCacheRule`. Narrows the view when you're investigating one resource type.
-3. **Expand with changed-fields diff summary** (iter 65 `8406a762f`) — UPDATE rows expand to show a compact top-level diff (`priority 200 → 300`, `action.ttl 300 → 600` as red-→-green code badges) ABOVE the raw Before/After JSON panels. Common-case scanning is one-line-per-changed-field; deep-forensics still has the full JSON below.
-4. **CREATE/DELETE events show the full field list** (iter 67 `4daae0dd6`) — since those events have a null Before (or null After), the diff summary renders the relevant half as a field list. No more "blank diff" for the most common audit event class.
+3. **Expand with changed-fields diff summary** — UPDATE rows expand to show a compact top-level diff (e.g. `priority 200 → 300`, `action.ttl 300 → 600` as red/green code badges) above the raw Before/After JSON panels. Common-case scanning is one line per changed field; deep-forensics still has the full JSON below.
+4. **CREATE/DELETE events show the full field list** — since those events have a null Before (or null After), the diff summary renders the relevant half as a field list instead of leaving the panel blank for the most common audit event class.
 5. **Deep-link from the target column** — clicking the target id opens the resource's detail page (VK detail, budget detail, provider detail). Skips the "which key was that?" lookup.
-6. **Deep-link IN from resource detail pages** (iter 68 `061dcc22f`) — every VK detail + Budget detail page carries an **Audit history** button that takes you to `/gateway/audit?targetKind=<kind>&targetId=<id>` with a pre-filled filter chip scoped to just that resource. Clear the chip with the `×` icon to re-expand the view. This pattern stays reachable on revoked VKs + archived budgets (iter 69 `1e64e140f`) so forensic investigations start from the current state, not some "active only" fork.
+6. **Deep-link IN from resource detail pages** — every VK detail and budget detail page carries an **Audit history** button that takes you to `/gateway/audit?targetKind=<kind>&targetId=<id>` with a pre-filled filter chip scoped to just that resource. Clear the chip with the `×` icon to re-expand the view. The pattern stays reachable on revoked VKs and archived budgets so forensic investigations start from the current state, not some "active only" fork.
 
 Pagination uses a composite `(createdAt, id)` cursor so batched same-millisecond entries (common when an operator does many mutations from a script) don't dedupe or skip. Load-more button, 50 rows per page.
 
