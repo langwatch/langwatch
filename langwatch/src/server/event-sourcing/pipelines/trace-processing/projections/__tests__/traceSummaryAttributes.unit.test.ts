@@ -175,4 +175,55 @@ describe("applySpanToSummary attribute forwarding", () => {
       expect(state.attributes["langwatch.prompt_ids"]).toBeUndefined();
     });
   });
+
+  // Regression for iter-110 Sergey finding: `gateway_budget_ledger_events`
+  // CH table count=0 despite the gatewayBudgetSync reactor firing. Root
+  // cause: the attribute accumulator's SPAN_ATTR_MAPPINGS allowlist didn't
+  // include the two AI Gateway markers that the reactor reads, so they
+  // never reached foldState.attributes and the reactor early-returned on
+  // `!virtualKeyId || !gatewayRequestId` for every trace.
+  describe("when span has AI Gateway markers", () => {
+    it("forwards langwatch.virtual_key_id to trace attributes", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.virtual_key_id": "vk_live_abc123",
+        },
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span });
+
+      expect(state.attributes["langwatch.virtual_key_id"]).toBe(
+        "vk_live_abc123",
+      );
+    });
+
+    it("forwards langwatch.gateway_request_id to trace attributes", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.gateway_request_id": "req_01HZX0ABCDEF",
+        },
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span });
+
+      expect(state.attributes["langwatch.gateway_request_id"]).toBe(
+        "req_01HZX0ABCDEF",
+      );
+    });
+
+    it("forwards both markers together so the gatewayBudgetSync reactor can fold", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.virtual_key_id": "vk_live_matrix_openai",
+          "langwatch.gateway_request_id": "req_01HZX0XYZ",
+        },
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span });
+
+      // Shape the reactor's early-return check expects.
+      expect(state.attributes["langwatch.virtual_key_id"]).toBeTruthy();
+      expect(state.attributes["langwatch.gateway_request_id"]).toBeTruthy();
+    });
+  });
 });

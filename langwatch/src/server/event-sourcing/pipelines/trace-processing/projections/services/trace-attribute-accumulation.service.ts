@@ -19,6 +19,14 @@ export const SPAN_ATTR_MAPPINGS = [
   [ATTR_KEYS.GEN_AI_AGENT_ID, "gen_ai.agent.id"],
   [ATTR_KEYS.GEN_AI_PROVIDER_NAME, "gen_ai.provider.name"],
   [ATTR_KEYS.LANGWATCH_LANGGRAPH_THREAD_ID, "langgraph.thread_id"],
+  // AI Gateway markers — stamped on every gateway-emitted customer span by
+  // services/aigateway/adapters/customertracebridge/emitter.go so the
+  // downstream gatewayBudgetSync reactor can tell which VK / request fold
+  // into which budget. Without this allowlist entry the keys are dropped
+  // at accumulation time, the reactor early-returns, and CH
+  // gateway_budget_ledger_events stays empty.
+  ["langwatch.virtual_key_id", "langwatch.virtual_key_id"],
+  ["langwatch.gateway_request_id", "langwatch.gateway_request_id"],
 ] as const;
 
 export const STANDARD_RESOURCE_PREFIXES = [
