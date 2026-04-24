@@ -202,6 +202,41 @@ func TestRouter_AuthMiddleware_ValidToken(t *testing.T) {
 	assert.JSONEq(t, `{"choices":[{"message":{"content":"hello"}}]}`, string(body))
 }
 
+// X-Goog-Api-Key — Gemini SDK / gemini-cli's canonical auth header.
+// Verifying the gateway accepts it lets gemini-native clients
+// (gemini-cli, @google/genai SDK) point at the gateway with no auth
+// changes — the VK secret slots into the same place a Google API key
+// would normally go.
+func TestRouter_AuthMiddleware_XGoogApiKey(t *testing.T) {
+	auth := &mockAuth{
+		resolveFn: func(_ context.Context, token string) (*domain.Bundle, error) {
+			if token == "lw_vk_test" {
+				return testBundle(), nil
+			}
+			return nil, herr.New(context.Background(), domain.ErrInvalidAPIKey, nil)
+		},
+	}
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
+			return successResponse(), nil
+		},
+	}
+
+	router := buildRouter(
+		app.WithAuth(auth),
+		app.WithProviders(provider),
+		app.WithLogger(zap.NewNop()),
+	)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", bytes.NewReader(chatBody()))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Goog-Api-Key", "lw_vk_test")
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	assert.Equal(t, http.StatusOK, rec.Code)
+}
+
 func TestRouter_AuthMiddleware_XApiKey(t *testing.T) {
 	auth := &mockAuth{
 		resolveFn: func(_ context.Context, token string) (*domain.Bundle, error) {

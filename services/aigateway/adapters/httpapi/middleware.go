@@ -29,7 +29,7 @@ func AuthMiddleware(resolver app.AuthResolver) func(http.Handler) http.Handler {
 			token := extractToken(r)
 			if token == "" {
 				herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInvalidAPIKey, herr.M{
-					"message": "missing API key; supply Authorization: Bearer <key> or x-api-key header",
+					"message": "missing API key; supply Authorization: Bearer <key>, x-api-key, or x-goog-api-key header",
 				}))
 				return
 			}
@@ -110,6 +110,13 @@ func extractToken(r *http.Request) string {
 		}
 	}
 	if k := r.Header.Get("X-Api-Key"); k != "" {
+		return strings.TrimSpace(k)
+	}
+	// X-Goog-Api-Key — Gemini SDK's canonical auth header (gemini-cli,
+	// google-genai SDK). Lets a Gemini-native client point at the gateway
+	// without changing its auth wiring; the VK secret slots into the same
+	// place the SDK would normally put a Google API key.
+	if k := r.Header.Get("X-Goog-Api-Key"); k != "" {
 		return strings.TrimSpace(k)
 	}
 	return ""
