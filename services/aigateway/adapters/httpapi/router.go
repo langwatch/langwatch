@@ -282,14 +282,18 @@ func requireBundle(w http.ResponseWriter, r *http.Request, logger *zap.Logger) (
 	return bundle, true
 }
 
-// Default peek covers typical chat-completion / messages bodies.
-// /v1/responses callers (codex 0.122+, opencode) send substantially
-// larger bodies — full tool schemas + multi-turn developer-role input
-// arrays routinely run 30-60 KiB — so `stream` may land past the 32 KiB
-// window. The Responses handler opts into readAndPeekBodyLarge instead.
+// Peek sizes are tuned per-endpoint: larger than needed burns memory
+// on every hot-path request (256 KiB × QPS adds up on chat-completions
+// where bodies are small); smaller than needed silently misroutes
+// coding-agent requests on /v1/responses when `stream` lands past the
+// window. /v1/chat/completions and /v1/messages keep the 32 KiB
+// default; /v1/responses uses the 256 KiB variant because codex /
+// opencode routinely send 30-60 KiB bodies with `stream:true` at the
+// tail. Revisit per-endpoint if we observe misses elsewhere; consider
+// an env knob before widening the default.
 const (
-	defaultPeekBytes   = 32 * 1024
-	largePeekBytes     = 256 * 1024
+	defaultPeekBytes = 32 * 1024
+	largePeekBytes   = 256 * 1024
 )
 
 func readAndPeekBody(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, io.Reader, func(), bool) {
@@ -300,7 +304,7 @@ func readAndPeekBody(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]
 // Use on /v1/responses where coding-agent payloads (codex, opencode)
 // routinely push `stream` and other flags past the standard window —
 // a miss there mis-routes a streaming request to the non-streaming
-// handler, surfacing as a 504/502 SSE-in-error-body to the client.
+// handler, surfacing as a 502 SSE-in-error-body to the client.
 func readAndPeekBodyLarge(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]byte, io.Reader, func(), bool) {
 	return readAndPeekBodySized(w, r, maxBytes, largePeekBytes)
 }
@@ -317,13 +321,6 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 
 	buf := bodyPool.Get().(*bytes.Buffer)
-	// Peek enough of the body for PeekModel + PeekStream to find their
-	// keys regardless of Go map iteration order. 512 bytes was too small
-	// for real-world payloads — a system message with a long cached
-	// prompt (common on coding-agent sessions + Claude Haiku's 2048-token
-	// minimum for cache eligibility) can push "model" past the peek
-	// window, triggering a bogus "missing model field" 400 even though
-	// the key is present.
 	peeked := make([]byte, peekSize)
 	n, _ := io.ReadFull(r.Body, peeked)
 	peeked = peeked[:n]
