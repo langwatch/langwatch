@@ -179,7 +179,7 @@ Feature: Scenario Input Mapping
   Scenario: Selecting an agent input emits a stored-format mapping
     Given the ScenarioInputMappingSection rendered for a code agent with inputs "query" and "context"
     When the user selects "query" from the "input" mapping dropdown
-    Then onMappingChange is called with key "query" and a source mapping for path ["input"]
+    Then the mapping for "query" is saved as a source mapping at path ["input"]
 
   # --- Backwards Compatibility ---
 
