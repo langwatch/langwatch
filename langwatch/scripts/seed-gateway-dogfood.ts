@@ -22,7 +22,15 @@
  *   LANGWATCH_API_KEY=sk-lw-... \
  *   OPENAI_API_KEY=sk-proj-... \
  *   ANTHROPIC_API_KEY=sk-ant-... \
+ *   GEMINI_API_KEY=... \
+ *   AWS_ACCESS_KEY_ID=... AWS_SECRET_ACCESS_KEY=... AWS_DEFAULT_REGION=eu-central-1 \
+ *   AZURE_OPENAI_ENDPOINT=https://... AZURE_OPENAI_API_KEY=... \
+ *   GOOGLE_APPLICATION_CREDENTIALS=~/.config/.../vertex-key.json GOOGLE_CLOUD_PROJECT=... GOOGLE_CLOUD_LOCATION=us-central1 \
  *   pnpm tsx scripts/seed-gateway-dogfood.ts
+ *
+ * Any missing provider env vars are tolerated — the corresponding
+ * ModelProvider row is created disabled (`customKeys=null`). Sergey's
+ * provider matrix tests then `t.Skip` the cells that need those creds.
  *
  * If the project matching LANGWATCH_API_KEY already has providers /
  * VKs, the script is idempotent — it upserts rather than duplicates.
@@ -71,6 +79,25 @@ async function main() {
   const anthropicMp = await upsertModelProvider(project, "anthropic", {
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
   });
+  const geminiMp = await upsertModelProvider(project, "gemini", {
+    GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  });
+  const bedrockMp = await upsertModelProvider(project, "bedrock", {
+    AWS_ACCESS_KEY_ID: process.env.AWS_ACCESS_KEY_ID,
+    AWS_SECRET_ACCESS_KEY: process.env.AWS_SECRET_ACCESS_KEY,
+    AWS_DEFAULT_REGION: process.env.AWS_DEFAULT_REGION ?? "eu-central-1",
+  });
+  const azureMp = await upsertModelProvider(project, "azure", {
+    AZURE_OPENAI_ENDPOINT: process.env.AZURE_OPENAI_ENDPOINT,
+    AZURE_OPENAI_API_KEY: process.env.AZURE_OPENAI_API_KEY,
+  });
+  const vertexMp = await upsertModelProvider(project, "vertex_ai", {
+    GOOGLE_APPLICATION_CREDENTIALS:
+      process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    GOOGLE_CLOUD_PROJECT: process.env.GOOGLE_CLOUD_PROJECT,
+    GOOGLE_CLOUD_LOCATION:
+      process.env.GOOGLE_CLOUD_LOCATION ?? "us-central1",
+  });
 
   const openaiBinding = await upsertProviderBinding({
     project,
@@ -90,10 +117,105 @@ async function main() {
     fallbackPriorityGlobal: 2,
     actorUserId,
   });
+  const geminiBinding = await upsertProviderBinding({
+    project,
+    modelProvider: geminiMp,
+    slot: "gemini-primary",
+    rateLimitRpm: 60,
+    rateLimitRpd: 10_000,
+    fallbackPriorityGlobal: 3,
+    actorUserId,
+  });
+  const bedrockBinding = await upsertProviderBinding({
+    project,
+    modelProvider: bedrockMp,
+    slot: "bedrock-primary",
+    rateLimitRpm: 60,
+    rateLimitRpd: 10_000,
+    fallbackPriorityGlobal: 4,
+    actorUserId,
+  });
+  const azureBinding = await upsertProviderBinding({
+    project,
+    modelProvider: azureMp,
+    slot: "azure-primary",
+    rateLimitRpm: 60,
+    rateLimitRpd: 10_000,
+    fallbackPriorityGlobal: 5,
+    actorUserId,
+  });
+  const vertexBinding = await upsertProviderBinding({
+    project,
+    modelProvider: vertexMp,
+    slot: "vertex-primary",
+    rateLimitRpm: 60,
+    rateLimitRpd: 10_000,
+    fallbackPriorityGlobal: 6,
+    actorUserId,
+  });
 
   console.log(
-    `✓ provider bindings: openai(${openaiBinding.id}) + anthropic(${anthropicBinding.id})`,
+    `✓ provider bindings: openai(${openaiBinding.id}) + anthropic(${anthropicBinding.id}) + ` +
+      `gemini(${geminiBinding.id}) + bedrock(${bedrockBinding.id}) + ` +
+      `azure(${azureBinding.id}) + vertex(${vertexBinding.id})`,
   );
+
+  // Matrix VKs — one per provider, simple config, attached to the
+  // provider matrix test suite at services/aigateway/tests/matrix/. Each
+  // VK targets a single provider (no fallback chain) so a matrix cell
+  // failure cleanly attributes to the provider under test.
+  const matrixVks: Array<{
+    name: string;
+    secret: string;
+    vkId: string;
+    binding: { id: string };
+  }> = [];
+  for (const [provider, binding] of [
+    ["openai", openaiBinding],
+    ["anthropic", anthropicBinding],
+    ["gemini", geminiBinding],
+    ["bedrock", bedrockBinding],
+    ["azure", azureBinding],
+    ["vertex", vertexBinding],
+  ] as const) {
+    const vk = await upsertVirtualKey({
+      project,
+      name: `matrix-${provider}`,
+      description: `Provider matrix VK — single-provider chain for ${provider} cells`,
+      environment: "LIVE",
+      providerChain: [binding.id],
+      config: {
+        ...defaultVirtualKeyConfig(),
+        rateLimits: { rpm: 120, tpm: null, rpd: 20_000 },
+        metadata: { tags: [`matrix=${provider}`, "suite=provider-matrix"] },
+      },
+      actorUserId,
+    });
+    matrixVks.push({
+      name: `matrix-${provider}`,
+      secret: vk.secret,
+      vkId: vk.vkId,
+      binding,
+    });
+  }
+
+  // Attach a generous $10 MONTH budget to the matrix-openai VK so the
+  // CH-fold path has a budget to land debit rows against. Sergey's
+  // `assertTraceCaptured` + follow-up `/budget/check` will see spend
+  // accumulate as the matrix runs.
+  const matrixOpenaiVk = matrixVks.find((v) => v.name === "matrix-openai")!;
+  await upsertBudget({
+    organizationId: project.team.organizationId,
+    scopeType: "VIRTUAL_KEY",
+    scopeId: matrixOpenaiVk.vkId,
+    virtualKeyScopedId: matrixOpenaiVk.vkId,
+    name: "matrix-openai monthly",
+    window: "MONTH",
+    limitUsd: "10",
+    spentUsd: "0",
+    onBreach: "WARN",
+    actorUserId,
+  });
 
   // VK #1: prod-openai — policy_rules + rate limits + tags
   const prodOpenaiSecret = await upsertVirtualKey({
@@ -400,6 +522,18 @@ async function main() {
   console.log(`║  mobile-app-test     (id=${mobileAppSecret.vkId})`);
   console.log(`║      secret: ${mobileAppSecret.secret}`);
   console.log(`║  dev-sandbox-legacy  (id=${devSandboxSecret.vkId}) [REVOKED]`);
+  console.log("╠══════════════════════════════════════════════════════════════╣");
+  console.log("║  MATRIX VKs (services/aigateway/tests/matrix)                ║");
+  for (const v of matrixVks) {
+    console.log(`║  ${v.name.padEnd(20)} (id=${v.vkId})`);
+    console.log(`║      secret: ${v.secret}`);
+    console.log(
+      `║      env var: LANGWATCH_GATEWAY_VK_${v.name
+        .toUpperCase()
+        .replace(/-/g, "_")
+        .replace(/^MATRIX_/, "")}=${v.secret}`,
+    );
+  }
   console.log("╚══════════════════════════════════════════════════════════════╝");
   console.log("");
   console.log("✓ gateway dogfood seed complete");
