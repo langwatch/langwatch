@@ -45,3 +45,7 @@ func TestBedrock_ToolCalling(t *testing.T) {
 func TestBedrock_StructuredOutputs(t *testing.T) {
 	runCell(t, bedrockCell(t, "structured_outputs", chatBody_StructuredOutputs, false))
 }
+
+func TestBedrock_Cache(t *testing.T) {
+	runCacheCell(t, bedrockCell(t, "cache", chatBody_Cache_Prime, false))
+}

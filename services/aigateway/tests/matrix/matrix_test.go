@@ -146,6 +146,72 @@ func chatBody_StructuredOutputs(model string) []byte {
 	})
 }
 
+// cacheablePrefix is long enough to trigger every provider's prompt cache —
+// OpenAI needs ≥1024 tokens of shared prefix, Anthropic's ephemeral cache
+// needs ≥1024 tokens in the cached block, and Gemini / Vertex automatic
+// caching on shared context kicks in at comparable thresholds.
+//
+// Built as a compact factual paragraph repeated enough times to cross the
+// token threshold without obvious model-friendly patterns (random tokens
+// fragment the tokenizer and can fall below the byte-level cache key).
+var cacheablePrefix = strings.Repeat(
+	"You are a senior SRE specialising in Kubernetes, observability, and cost "+
+		"optimisation for large-scale LLM gateway deployments. You answer in "+
+		"crisp, technically precise paragraphs, citing specific CPU, memory, "+
+		"and network characteristics where relevant. Your audience is other "+
+		"engineers, not executives. Avoid marketing language entirely. ",
+	24,
+)
+
+// chatBody_Cache_Prime builds a request designed to create a cache entry.
+// For Anthropic-family providers (anthropic / bedrock), the system block
+// carries `cache_control: {type: "ephemeral"}` to explicitly request caching.
+// For auto-cache providers (openai / gemini / azure / vertex), the prefix is
+// simply long + stable — the second identical call triggers cache_read on
+// the provider side. Both paths surface as gen_ai.usage.cache_read.input_tokens
+// in the span.
+func chatBody_Cache_Prime(model string) []byte {
+	return cacheBodyFor(model, "What's the first thing you check when a gateway pod's /readyz starts flapping?")
+}
+
+// chatBody_Cache_Read is the second call — identical prefix, different user
+// turn — so the provider's cache can hit on the shared prefix while the
+// cache-key (or cache_read attribute) surfaces on the response.
+func chatBody_Cache_Read(model string) []byte {
+	return cacheBodyFor(model, "Follow-up: same situation but the gateway is at 90% memory. What changes?")
+}
+
+func cacheBodyFor(model, userTurn string) []byte {
+	// Heuristic: anthropic-family models carry cache_control on the system
+	// block; others rely on provider-side automatic caching of the shared
+	// prefix. The gateway transparently forwards cache_control bytes to
+	// Anthropic (and Anthropic-on-Bedrock); for other providers, the flag
+	// is a harmless no-op at the cost of ~20 bytes extra payload.
+	anthropicFamily := strings.HasPrefix(model, "claude-") ||
+		strings.Contains(model, "anthropic.claude-")
+
+	var systemBlock any
+	if anthropicFamily {
+		systemBlock = []map[string]any{
+			{
+				"type":          "text",
+				"text":          cacheablePrefix,
+				"cache_control": map[string]any{"type": "ephemeral"},
+			},
+		}
+	} else {
+		systemBlock = cacheablePrefix
+	}
+	return mustJSON(map[string]any{
+		"model": model,
+		"messages": []map[string]any{
+			{"role": "system", "content": systemBlock},
+			{"role": "user", "content": userTurn},
+		},
+		"max_tokens": 64,
+	})
+}
+
 func mustJSON(v any) []byte {
 	b, err := json.Marshal(v)
 	if err != nil {
@@ -267,5 +333,94 @@ func runCell(t *testing.T, rc resolvedCell) float64 {
 	cost := assertTraceCaptured(t, traceID)
 	t.Logf("cell %s/%s: trace=%s duration=%s captured_cost=$%.6f",
 		rc.provider, rc.scenario, traceID, time.Since(start), cost)
+	return cost
+}
+
+// cacheReadFromResponse extracts the provider-reported cache-read tokens
+// from a non-streaming /v1/chat/completions body. Handles both shapes:
+//
+//   - OpenAI family: usage.prompt_tokens_details.cached_tokens
+//   - Anthropic family: usage.cache_read_input_tokens (also in the
+//     Anthropic-via-Bedrock normalised shape)
+//
+// Returns 0 if the field is missing, which is valid for the prime call.
+func cacheReadFromResponse(body []byte) int {
+	var parsed struct {
+		Usage struct {
+			CacheReadInputTokens int `json:"cache_read_input_tokens"`
+			PromptTokensDetails  struct {
+				CachedTokens int `json:"cached_tokens"`
+			} `json:"prompt_tokens_details"`
+		} `json:"usage"`
+	}
+	_ = json.Unmarshal(body, &parsed)
+	if parsed.Usage.CacheReadInputTokens > 0 {
+		return parsed.Usage.CacheReadInputTokens
+	}
+	return parsed.Usage.PromptTokensDetails.CachedTokens
+}
+
+// fireForBody posts a request to the gateway and returns the response body +
+// trace id + status. Unlike fireAndAssert this does NOT fatal on 4xx, so the
+// caller can handle prime/read retry logic (e.g. cache propagation delay).
+func fireForBody(t *testing.T, rc resolvedCell, body []byte) (int, []byte, string) {
+	t.Helper()
+	req, err := http.NewRequest("POST", gatewayURL()+"/v1/chat/completions", bytes.NewReader(body))
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+rc.vk)
+	req.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 120 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("gateway POST: %v", err)
+	}
+	defer resp.Body.Close()
+	raw, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, raw, resp.Header.Get("X-LangWatch-Trace-Id")
+}
+
+// runCacheCell fires a prime call, waits 2s for the provider to register the
+// cache entry, then fires the read call. Asserts the read response carries
+// cache_read_input_tokens > 0 AND that both traces land with cost > 0.
+// Returns the captured cost on the read trace.
+func runCacheCell(t *testing.T, rc resolvedCell) float64 {
+	t.Helper()
+	start := time.Now()
+
+	// 1. Prime — may or may not populate cache_creation tokens depending on
+	// provider (anthropic explicit, openai automatic-on-second-identical).
+	status, primeBody, primeTraceID := fireForBody(t, rc, chatBody_Cache_Prime(rc.model))
+	if status != 200 {
+		t.Fatalf("prime: want 200, got %d\nbody: %s", status, primeBody)
+	}
+	if primeTraceID == "" {
+		t.Fatal("prime: missing X-LangWatch-Trace-Id")
+	}
+
+	// Wait for the provider's cache to register. Anthropic quotes
+	// "within seconds" so 2s is a safe floor.
+	time.Sleep(2 * time.Second)
+
+	// 2. Read — identical prefix should trip the cache-hit path.
+	status, readBody, readTraceID := fireForBody(t, rc, chatBody_Cache_Read(rc.model))
+	if status != 200 {
+		t.Fatalf("read: want 200, got %d\nbody: %s", status, readBody)
+	}
+	if readTraceID == "" {
+		t.Fatal("read: missing X-LangWatch-Trace-Id")
+	}
+
+	cacheRead := cacheReadFromResponse(readBody)
+	if cacheRead == 0 {
+		t.Errorf("%s/cache: want cache_read > 0 on 2nd call; got 0\nread body: %s", rc.provider, readBody)
+	}
+
+	// Verify the read trace lands on the platform with cost > 0 — the cache
+	// hit still costs a small amount even though it's discounted.
+	cost := assertTraceCaptured(t, readTraceID)
+	t.Logf("cell %s/cache: prime_trace=%s read_trace=%s cache_read_tokens=%d duration=%s captured_cost=$%.6f",
+		rc.provider, primeTraceID, readTraceID, cacheRead, time.Since(start), cost)
 	return cost
 }

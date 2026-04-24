@@ -39,3 +39,7 @@ func TestAnthropic_ToolCalling(t *testing.T) {
 func TestAnthropic_StructuredOutputs(t *testing.T) {
 	runCell(t, anthropicCell(t, "structured_outputs", chatBody_StructuredOutputs, false))
 }
+
+func TestAnthropic_Cache(t *testing.T) {
+	runCacheCell(t, anthropicCell(t, "cache", chatBody_Cache_Prime, false))
+}

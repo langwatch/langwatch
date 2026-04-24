@@ -46,3 +46,7 @@ func TestAzure_ToolCalling(t *testing.T) {
 func TestAzure_StructuredOutputs(t *testing.T) {
 	runCell(t, azureCell(t, "structured_outputs", chatBody_StructuredOutputs, false))
 }
+
+func TestAzure_Cache(t *testing.T) {
+	runCacheCell(t, azureCell(t, "cache", chatBody_Cache_Prime, false))
+}

@@ -39,3 +39,7 @@ func TestOpenAI_ToolCalling(t *testing.T) {
 func TestOpenAI_StructuredOutputs(t *testing.T) {
 	runCell(t, openaiCell(t, "structured_outputs", chatBody_StructuredOutputs, false))
 }
+
+func TestOpenAI_Cache(t *testing.T) {
+	runCacheCell(t, openaiCell(t, "cache", chatBody_Cache_Prime, false))
+}

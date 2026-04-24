@@ -43,3 +43,7 @@ func TestVertex_ToolCalling(t *testing.T) {
 func TestVertex_StructuredOutputs(t *testing.T) {
 	runCell(t, vertexCell(t, "structured_outputs", chatBody_StructuredOutputs, false))
 }
+
+func TestVertex_Cache(t *testing.T) {
+	runCacheCell(t, vertexCell(t, "cache", chatBody_Cache_Prime, false))
+}

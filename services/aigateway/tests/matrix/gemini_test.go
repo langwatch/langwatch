@@ -39,3 +39,7 @@ func TestGemini_ToolCalling(t *testing.T) {
 func TestGemini_StructuredOutputs(t *testing.T) {
 	runCell(t, geminiCell(t, "structured_outputs", chatBody_StructuredOutputs, false))
 }
+
+func TestGemini_Cache(t *testing.T) {
+	runCacheCell(t, geminiCell(t, "cache", chatBody_Cache_Prime, false))
+}
