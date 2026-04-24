@@ -84,6 +84,18 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 
 	resp, berr := r.bf.ChatCompletionRequest(bfCtx, bfReq)
 	if berr != nil {
+		// Raw-forward paths (/v1/messages, OpenAI-compat chat) ask Bifrost
+		// to retain the provider's native response bytes on the error —
+		// prefer those over the generic 504 provider_timeout mask when
+		// present. Clients like claude-code / OpenAI SDK need the real
+		// provider error envelope (rate-limit hints, overload signals,
+		// billing errors) to surface correctly.
+		if rawBody, status, ok := rawResponseFromBifrostError(berr); ok {
+			return &domain.Response{
+				Body:       rawBody,
+				StatusCode: status,
+			}, nil
+		}
 		return nil, classifyBifrostError(ctx, berr)
 	}
 
@@ -137,6 +149,12 @@ func (r *BifrostRouter) dispatchResponses(
 
 	resp, berr := r.bf.ResponsesRequest(bfCtx, bfReq)
 	if berr != nil {
+		if rawBody, status, ok := rawResponseFromBifrostError(berr); ok {
+			return &domain.Response{
+				Body:       rawBody,
+				StatusCode: status,
+			}, nil
+		}
 		return nil, classifyBifrostError(ctx, berr)
 	}
 
@@ -279,6 +297,29 @@ func extractRawResponseBytes(raw interface{}) ([]byte, bool) {
 		}
 		return b, true
 	}
+}
+
+// rawResponseFromBifrostError peels the provider's native response bytes
+// off a BifrostError — populated by Bifrost when the dispatch context
+// carries BifrostContextKeySendBackRawResponse=true (raw-forward paths).
+// Lets the gateway pass through Anthropic / OpenAI / etc. error
+// envelopes verbatim instead of masking them as a generic 504
+// provider_timeout, which is what clients like claude-code / codex
+// expect to parse (rate-limit hints, overload signals, billing errors
+// etc. ride in the provider-native error shape).
+func rawResponseFromBifrostError(berr *bfschemas.BifrostError) ([]byte, int, bool) {
+	if berr == nil {
+		return nil, 0, false
+	}
+	body, ok := extractRawResponseBytes(berr.ExtraFields.RawResponse)
+	if !ok {
+		return nil, 0, false
+	}
+	status := http.StatusBadGateway
+	if berr.StatusCode != nil && *berr.StatusCode > 0 {
+		status = *berr.StatusCode
+	}
+	return body, status, true
 }
 
 // ListModels returns an empty list — model discovery is VK-config-driven.
