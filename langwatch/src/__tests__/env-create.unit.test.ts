@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { assertGatewaySecretsAllOrNone } from "../env-create.mjs";
+import { assertGatewaySecretsAllOrNone, createEnvConfig } from "../env-create.mjs";
 
 // Regression for iter-110: gateway secrets set partially (e.g. only
 // LW_VIRTUAL_KEY_PEPPER, missing the two HMAC/JWT secrets) let the server
@@ -74,5 +74,35 @@ describe("assertGatewaySecretsAllOrNone", () => {
     const banner = errorSpy.mock.calls.map((c) => c.join(" ")).join("\n");
     expect(banner).toMatch(/AI Gateway secrets are partially configured/i);
     expect(banner).toMatch(/openssl rand -hex 32/);
+  });
+});
+
+// Regression for iter-111 QA finding: `createEnvConfig()` used to pass the
+// t3-env proxy object (_env) to assertGatewaySecretsAllOrNone. Touching any
+// of the server-only gateway secret keys on that proxy from the Vite client
+// bundle throws "Attempted to access a server-side environment variable on
+// the client" — the whole app fails to hydrate, blank page, console has one
+// error. Fix: skip the guard entirely when `typeof window !== "undefined"`
+// and read from `process.env` directly (not the proxy) on the server.
+describe("createEnvConfig — client-safe guard", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("does NOT throw when imported into a browser-like env (window defined)", () => {
+    vi.stubGlobal("window", {});
+    // Even with a half-configured gateway env, the client bundle must
+    // still hydrate — the guard belongs on the server entry points.
+    const original = process.env.LW_VIRTUAL_KEY_PEPPER;
+    process.env.LW_VIRTUAL_KEY_PEPPER = "a".repeat(32);
+    try {
+      expect(() => createEnvConfig()).not.toThrow();
+    } finally {
+      if (original === undefined) {
+        delete process.env.LW_VIRTUAL_KEY_PEPPER;
+      } else {
+        process.env.LW_VIRTUAL_KEY_PEPPER = original;
+      }
+    }
   });
 });

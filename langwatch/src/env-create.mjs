@@ -267,8 +267,17 @@ export function createEnvConfig() {
     skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   });
 
-  if (!process.env.SKIP_ENV_VALIDATION && !process.env.BUILD_TIME) {
-    assertGatewaySecretsAllOrNone(_env);
+  // Server-side only: the validated env proxy from `createEnv()` throws
+  // "Attempted to access a server-side environment variable on the client"
+  // if we touch any of these keys from the browser bundle. Read from
+  // process.env directly and skip the guard entirely when we're being
+  // imported into a client bundle (typeof window !== "undefined").
+  if (
+    typeof window === "undefined" &&
+    !process.env.SKIP_ENV_VALIDATION &&
+    !process.env.BUILD_TIME
+  ) {
+    assertGatewaySecretsAllOrNone(process.env);
   }
 
   return _env;
