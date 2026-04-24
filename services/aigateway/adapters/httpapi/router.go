@@ -220,8 +220,16 @@ func readAndPeekBody(w http.ResponseWriter, r *http.Request, maxBytes int64) ([]
 	r.Body = http.MaxBytesReader(w, r.Body, maxBytes)
 
 	buf := bodyPool.Get().(*bytes.Buffer)
-	// Peek up to 512 bytes
-	peeked := make([]byte, 512)
+	// Peek enough of the body for PeekModel + PeekStream to find their
+	// keys regardless of Go map iteration order. 512 bytes was too small
+	// for real-world payloads — a system message with a long cached
+	// prompt (common on coding-agent sessions) can push "model" past the
+	// first 512 bytes, triggering a bogus "missing model field" 400 even
+	// though the key is present. 16 KiB covers typical tool schemas,
+	// multi-image vision previews, and >10K-token cached system prompts
+	// without materializing the full body.
+	const peekSize = 16 * 1024
+	peeked := make([]byte, peekSize)
 	n, _ := io.ReadFull(r.Body, peeked)
 	peeked = peeked[:n]
 
