@@ -50,6 +50,17 @@ type BundleConfig struct {
 
 	// ProjectOTLPToken is the project's auth token for AI trace export.
 	ProjectOTLPToken string
+
+	// VKDisplayPrefix is the VK's public display prefix (e.g. "lw_vk_live_…").
+	// Carried so rule matchers can target VKs by prefix without leaking the
+	// secret. Sourced from the control-plane config payload.
+	VKDisplayPrefix string
+
+	// VKTags carries VK-level labels honoured by cache rule matchers
+	// (vk_tags). Currently always empty — the schema doesn't store tags
+	// yet — but plumbed end-to-end so future tag wiring is a one-line add
+	// in the control-plane materialiser.
+	VKTags []string
 }
 
 // ModelAlias maps a friendly name to a provider + model.
@@ -154,10 +165,32 @@ type CacheRule struct {
 	Action   CacheAction
 }
 
-// CacheRuleMatch defines when a cache rule applies.
+// CacheRuleMatch defines when a cache rule applies. All non-empty matchers
+// must match for the rule to fire (AND semantics). An empty match struct
+// matches every request — kept as a deliberate operator-friendly default.
+//
+// Matchers added later (e.g. request_metadata) belong here; missing matcher
+// data on the bundle/request must be treated as "doesn't match" so wiring
+// gaps fail safe (don't accidentally apply rules to traffic the operator
+// didn't intend).
 type CacheRuleMatch struct {
 	Models     []string // glob patterns
 	Principals []string
+	VKIDs      []string
+	VKPrefixes []string
+	VKTags     []string
+}
+
+// CacheEvalContext bundles the per-request and per-VK signals that cache
+// rule matchers can target. Lives in domain/ so app/ and app/pipeline/
+// both reference one canonical type — keeps the evaluator interface and
+// the pipeline interceptor in lockstep.
+type CacheEvalContext struct {
+	Model           string
+	VKID            string
+	VKDisplayPrefix string
+	VKTags          []string
+	PrincipalID     string
 }
 
 // CacheAction is the cache behavior to apply.

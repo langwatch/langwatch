@@ -45,7 +45,7 @@ type PolicyMatcher interface {
 
 // CacheEvaluator evaluates cache rules for a request.
 type CacheEvaluator interface {
-	Evaluate(ctx context.Context, rules []domain.CacheRule, model string) *domain.CacheDecision
+	Evaluate(ctx context.Context, rules []domain.CacheRule, eval domain.CacheEvalContext) *domain.CacheDecision
 }
 
 // ModelResolver resolves a raw model string against bundle config.

@@ -5,6 +5,7 @@ import "github.com/langwatch/langwatch/services/aigateway/domain"
 // configWire matches the JSON shape returned by GET /api/internal/gateway/config/:vk_id.
 type configWire struct {
 	ProjectOTLPToken string              `json:"project_otlp_token"`
+	DisplayPrefix    string              `json:"display_prefix"`
 	Providers        []providerSlotWire  `json:"providers"`
 	Fallback         fallbackWire        `json:"fallback"`
 	ModelAliases     map[string]string   `json:"model_aliases"`
@@ -83,9 +84,21 @@ type cacheRuleWire struct {
 	Action   cacheActionWire   `json:"action"`
 }
 
+// cacheMatchersWire mirrors the matchers shape emitted by the control-plane
+// materialiser (langwatch/src/server/gateway/config.materialiser.ts:121-128).
+// Every recognised matcher must have an explicit field — silently dropping a
+// matcher at unmarshal collapses the rule's effective scope to "match all"
+// and was the iter-110 root cause of the matrix anthropic/bedrock cache cells
+// returning cache_creation=0 / cache_read=0 (the seed's `disable-cache-evals`
+// rule, gated on `vk_prefix=lw_vk_eval_`, fell through to matching every VK
+// including matrix-* ones, stripping `cache_control` from the system block).
 type cacheMatchersWire struct {
-	Model       string `json:"model"`
-	PrincipalID string `json:"principal_id"`
+	Model           string            `json:"model"`
+	PrincipalID     string            `json:"principal_id"`
+	VKID            string            `json:"vk_id"`
+	VKPrefix        string            `json:"vk_prefix"`
+	VKTags          []string          `json:"vk_tags"`
+	RequestMetadata map[string]string `json:"request_metadata"`
 }
 
 type cacheActionWire struct {
@@ -102,6 +115,7 @@ func (w *configWire) toDomain() domain.BundleConfig {
 	cfg := domain.BundleConfig{
 		Credentials:      creds,
 		ProjectOTLPToken: w.ProjectOTLPToken,
+		VKDisplayPrefix:  w.DisplayPrefix,
 		AllowedModels:    w.ModelsAllowed,
 		Fallback: domain.FallbackConfig{
 			MaxAttempts: w.Fallback.MaxAttempts,
@@ -189,12 +203,34 @@ func buildCacheRules(wires []cacheRuleWire) []domain.CacheRule {
 		if w.Matchers.PrincipalID != "" {
 			principals = []string{w.Matchers.PrincipalID}
 		}
+		var vkIDs []string
+		if w.Matchers.VKID != "" {
+			vkIDs = []string{w.Matchers.VKID}
+		}
+		var vkPrefixes []string
+		if w.Matchers.VKPrefix != "" {
+			vkPrefixes = []string{w.Matchers.VKPrefix}
+		}
+		// request_metadata is intentionally not yet evaluated end-to-end
+		// (the gateway doesn't surface the inbound request headers to the
+		// cache evaluator yet). Until that wiring lands, a rule that
+		// depends on request_metadata must not silently match every VK —
+		// route it through the same fail-safe as VKTags by collapsing it
+		// into a never-matchable VKTag sentinel. Drops the rule instead
+		// of misapplying it.
+		var vkTags []string = w.Matchers.VKTags
+		if len(w.Matchers.RequestMetadata) > 0 {
+			vkTags = append(vkTags, "__unsupported_matcher_request_metadata__")
+		}
 		rules[i] = domain.CacheRule{
 			ID:       w.ID,
 			Priority: w.Priority,
 			Match: domain.CacheRuleMatch{
 				Models:     models,
 				Principals: principals,
+				VKIDs:      vkIDs,
+				VKPrefixes: vkPrefixes,
+				VKTags:     vkTags,
 			},
 			Action: domain.CacheAction(w.Action.Mode),
 		}
