@@ -8,7 +8,11 @@ import (
 )
 
 // bedrockCell builds a resolved cell for AWS Bedrock using TEST_VK_BEDROCK
-// + BEDROCK_MODEL (defaults to claude-3-5-haiku-20241022).
+// + BEDROCK_MODEL (defaults to the EU cross-region inference profile for
+// claude-haiku-4-5; the un-prefixed `anthropic.claude-3-5-haiku-20241022-v1:0`
+// returns "The provided model identifier is invalid" on the
+// langwatch-dev-bedrock-user IAM policy + eu-central-1 region binding,
+// per the matrix-bedrock VK's customKeys).
 //
 // The gateway's bifrost adapter routes Bedrock requests through the AWS SDK
 // using credentials bound to the VK via the ModelProvider, not env-based
@@ -20,7 +24,7 @@ func bedrockCell(t *testing.T, scenario string, body func(string) []byte, stream
 	vk := requireEnv(t, "TEST_VK_BEDROCK")
 	model := os.Getenv("BEDROCK_MODEL")
 	if model == "" {
-		model = "anthropic.claude-3-5-haiku-20241022-v1:0"
+		model = "eu.anthropic.claude-haiku-4-5-20251001-v1:0"
 	}
 	return resolvedCell{
 		cell:      cell{provider: "bedrock", scenario: scenario, body: body},
