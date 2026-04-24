@@ -73,8 +73,9 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: langwatch
 
-      - name: Install tsx for skills compiler
-        run: npm install -g tsx
+      - name: Install skill tooling
+        run: pnpm install --frozen-lockfile
+        working-directory: skills
 
       - name: Regenerate prompts-data.jsx
         run: bash docs/scripts/sync-prompts.sh

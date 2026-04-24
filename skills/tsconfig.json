@@ -11,5 +11,5 @@
     "noUncheckedIndexedAccess": true
   },
   "include": ["**/*.ts"],
-  "exclude": ["node_modules", "fixtures"]
+  "exclude": ["node_modules", "_tests/fixtures"]
 }

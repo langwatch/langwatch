@@ -9,6 +9,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import { spawn, execSync } from "child_process";
 import chalk from "chalk";
+import { inlineMdx } from "../../_lib/mdx-inline.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -19,6 +20,37 @@ const __dirname = path.dirname(__filename);
  * the skills themselves create at runtime end up.
  */
 export const SKILL_TESTS_SET_ID = "skill-tests";
+
+/**
+ * Inline a SKILL.mdx (resolving its `_shared/*.mdx` imports) and write it as
+ * SKILL.md into a `.skills/<dir>/` folder under the agent's working directory.
+ * `skillSubpath` is relative to `skills/`, e.g. `"tracing"` or
+ * `"recipes/debug-instrumentation"`. `installAs` defaults to the basename of
+ * `skillSubpath` and controls the directory the agent sees under `.skills/`.
+ *
+ * This mirrors what sync.ts does for langwatch/skills publishes, so scenario
+ * tests exercise the same self-contained markdown that real consumers receive.
+ */
+export function installSkillToWorkDir({
+  workingDirectory,
+  skillSubpath,
+  installAs,
+}: {
+  workingDirectory: string;
+  skillSubpath: string;
+  installAs?: string;
+}): void {
+  const sourcePath = path.resolve(
+    __dirname,
+    "../..",
+    skillSubpath,
+    "SKILL.mdx"
+  );
+  const skillName = installAs ?? path.basename(skillSubpath);
+  const skillDir = path.join(workingDirectory, ".skills", skillName);
+  fs.mkdirSync(skillDir, { recursive: true });
+  fs.writeFileSync(path.join(skillDir, "SKILL.md"), inlineMdx(sourcePath));
+}
 
 const cliDistPath = path.resolve(
   __dirname,

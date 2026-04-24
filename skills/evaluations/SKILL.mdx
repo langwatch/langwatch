@@ -6,6 +6,10 @@ license: MIT
 compatibility: Works with Claude Code and similar AI assistants. The `langwatch` CLI is the only interface for platform operations and documentation.
 ---
 
+import CliSetup from '../_shared/cli-setup.mdx'
+import PlanLimits from '../_shared/plan-limits.mdx'
+import ConsultantMode from '../_shared/consultant-mode.mdx'
+
 # Set Up Evaluations for Your Agent
 
 LangWatch Evaluations is a comprehensive QA system. Map the user's request to one branch:
@@ -45,11 +49,11 @@ Some features are code-only (experiments, guardrails) and some are platform-only
 
 ## Plan Limits
 
-See [Plan Limits](_shared/plan-limits.md).
+<PlanLimits />
 
 ## Prerequisites
 
-See [CLI Setup](_shared/cli-setup.md).
+<CliSetup />
 
 Then read the evaluations overview:
 
@@ -196,7 +200,7 @@ Then generate data reflecting EXACTLY this agent's real-world usage. NEVER use g
 
 Once the experiment is working, summarize results and suggest 2-3 domain-specific improvements based on what you learned from the codebase.
 
-See [Consultant Mode](_shared/consultant-mode.md).
+<ConsultantMode />
 
 ## Common Mistakes
 
