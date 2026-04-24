@@ -60,12 +60,26 @@ could invoke the foundation model but lacked `aws-marketplace:Subscribe`);
 cross-region inference prefix (`eu.anthropic.claude-haiku-4-5-20251001-v1:0`)
 maps to the pricing catalog entry (`anthropic/claude-haiku-4.5`).
 
-**❌ Cache cells (provider-side, not gateway)**: OpenAI / Anthropic / Gemini /
-Vertex all returned `cached_tokens: 0` on the 2nd identical-prefix call
-(1445 input tokens, well over OpenAI's 1024-token cache threshold). Azure
-passed reliably. The gateway correctly forwards `cache_control` bytes and
-identical system prefixes; provider caching is either disabled on the org,
-needs longer propagation than 8s, or hasn't warmed. Not a gateway bug.
+**❌ Cache cells — CONFIRMED GATEWAY BUG (re-marshal breaks prefix hash)**:
+
+Direct test against `api.openai.com` bypassing the gateway with identical
+bodies shows `cached_tokens=2176` on the 2nd call (96% cache hit). Through
+the gateway, cached_tokens flaps between 0 and the expected value — matches
+the hypothesis that bifrost re-marshals the request body on the OpenAI →
+OpenAI path (schema translation was shipped in `d84160f32` for the
+OpenAI → Anthropic/Gemini/Bedrock case, but the OpenAI → OpenAI path is
+also going through the unmarshal/re-marshal dance), changing byte
+ordering enough to break OpenAI's prefix-hash cache key.
+
+Expected fix: skip translation when the target provider uses the same
+wire shape as the inbound request (OpenAI/Azure pass-through); keep
+translation for cross-wire routes (OpenAI-client → Anthropic-provider).
+Preserves byte-for-byte for cache-hash correctness on the happy-path same-
+schema route without losing the cross-provider translation ability.
+
+Azure cache passed consistently in the matrix run because Azure's cache
+behaviour seems to survive the re-marshal (different prefix matching?),
+but the re-marshal is the root — not provider-side.
 
 Cell format when filled:
 ```
