@@ -2,6 +2,7 @@ package providers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
@@ -92,6 +93,16 @@ func isOpenAICompatibleProvider(p bfschemas.ModelProvider) bool {
 // max_completion_tokens, ...) unmarshals onto ChatParameters via its json
 // tags. `stream` is not part of ChatParameters — the caller decides the
 // streaming dispatch path, so we simply discard it here.
+//
+// Provider-specific extension fields (e.g. Gemini's `cached_content` for
+// referencing a pre-created CachedContent resource) live in
+// ChatParameters.ExtraParams. The Bifrost gemini translator at
+// providers/gemini/chat.go:50-54 reads the "cached_content" key off
+// ExtraParams and lifts it onto geminiReq.CachedContent — but ExtraParams
+// is `json:"-"`, so a stock json.Unmarshal can't populate it. We lift
+// supported extension keys explicitly here so callers can drive
+// gemini/vertex prompt caching via the standard chat-completions
+// endpoint without needing a native gemini route.
 func parseOpenAIChatRequest(body []byte) ([]bfschemas.ChatMessage, *bfschemas.ChatParameters, error) {
 	if len(body) == 0 {
 		return nil, nil, nil
@@ -109,5 +120,50 @@ func parseOpenAIChatRequest(body []byte) ([]bfschemas.ChatMessage, *bfschemas.Ch
 		return nil, nil, fmt.Errorf("parse params: %w", err)
 	}
 
+	liftExtensionParams(body, &params)
+
 	return messagesWrap.Messages, &params, nil
+}
+
+// chatExtensionKeys enumerates the provider-extension fields the gateway
+// recognises on the inbound /v1/chat/completions body and forwards via
+// ChatParameters.ExtraParams. Bifrost's per-provider translators read these
+// off ExtraParams and lift them onto the provider-native request shape.
+//
+// Currently:
+//   - cached_content: Gemini/Vertex CachedContent reference
+//     (see providers/gemini/chat.go:50-54). Required to read prompt cache
+//     hits on accounts where implicit caching isn't enabled.
+//   - safety_settings: Gemini SafetySettings array
+//     (providers/gemini/chat.go:43-48).
+//   - labels: Gemini per-request labels (providers/gemini/chat.go:57-62).
+//
+// Add new keys here only when a Bifrost translator reads them from
+// ExtraParams — silently lifting an unrecognised field leaks vendor
+// jargon into providers that won't recognise it.
+var chatExtensionKeys = []string{
+	"cached_content",
+	"safety_settings",
+	"labels",
+}
+
+func liftExtensionParams(body []byte, params *bfschemas.ChatParameters) {
+	var raw map[string]json.RawMessage
+	if err := sonic.Unmarshal(body, &raw); err != nil {
+		return
+	}
+	for _, key := range chatExtensionKeys {
+		v, ok := raw[key]
+		if !ok {
+			continue
+		}
+		var decoded interface{}
+		if err := sonic.Unmarshal(v, &decoded); err != nil {
+			continue
+		}
+		if params.ExtraParams == nil {
+			params.ExtraParams = make(map[string]interface{})
+		}
+		params.ExtraParams[key] = decoded
+	}
 }

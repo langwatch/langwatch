@@ -472,6 +472,67 @@ func runCacheCell(t *testing.T, rc resolvedCell) float64 {
 	return runCacheCellWith(t, rc, chatBody_Cache_Prime, chatBody_Cache_Read)
 }
 
+// runCachedContentCacheCell is the gemini/vertex variant: the provider's
+// implicit prompt cache isn't available on every account tier, but the
+// explicit `cachedContents` REST API does work end-to-end. The cell:
+//
+//  1. Calls `setupCachedContent` (direct API, bypasses gateway) to create a
+//     cached content resource holding the long prefix. Returns the resource
+//     name, e.g. "cachedContents/abc123" (Gemini-API) or
+//     "projects/N/locations/R/cachedContents/123" (Vertex).
+//  2. Fires ONE chat-completions call through the gateway with
+//     `cached_content: <name>` in the body. The gateway parser lifts the
+//     extension key onto Bifrost's ChatParameters.ExtraParams; Bifrost's
+//     gemini chat translator (shared with vertex) reads it off ExtraParams
+//     and sets the geminiReq.CachedContent field on the outbound request.
+//  3. Asserts the response carries cached_read_tokens > 0 + the trace lands
+//     on the platform with cost > 0.
+//
+// Returns the captured cost on the read trace.
+func runCachedContentCacheCell(
+	t *testing.T,
+	rc resolvedCell,
+	setupCachedContent func(t *testing.T) string,
+) float64 {
+	t.Helper()
+	start := time.Now()
+
+	cachedName := setupCachedContent(t)
+	if cachedName == "" {
+		t.Fatal("setupCachedContent returned empty name — verify TTL / quota")
+	}
+
+	body, err := json.Marshal(map[string]any{
+		"model":      rc.model,
+		"max_tokens": 16,
+		"messages": []map[string]any{
+			{"role": "user", "content": "Reply with exactly one word: ok."},
+		},
+		"cached_content": cachedName,
+	})
+	if err != nil {
+		t.Fatalf("marshal cached read body: %v", err)
+	}
+
+	status, readBody, readTraceID := fireForBody(t, rc, body)
+	if status != 200 {
+		t.Fatalf("read: want 200, got %d\nbody: %s", status, readBody)
+	}
+	if readTraceID == "" {
+		t.Fatal("read: missing X-LangWatch-Trace-Id")
+	}
+
+	cacheRead := cacheReadFromResponse(readBody)
+	if cacheRead == 0 {
+		t.Errorf("%s/cache: want cache_read > 0 on cachedContent reference; got 0\nread body: %s", rc.provider, readBody)
+	}
+
+	cost := assertTraceCaptured(t, readTraceID)
+	t.Logf("cell %s/cache: cached=%s read_trace=%s cache_read_tokens=%d duration=%s captured_cost=$%.6f",
+		rc.provider, cachedName, readTraceID, cacheRead, time.Since(start), cost)
+	return cost
+}
+
 // runCacheCellWith is the prime+read driver parameterised on body-builders so
 // callers can use provider-native bodies (e.g. Anthropic /v1/messages shape)
 // instead of the OpenAI-compat chat-completions default.

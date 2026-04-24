@@ -39,37 +39,59 @@ post-run.
 Build tags per provider: `live_openai`, `live_anthropic`, `live_gemini`,
 `live_bedrock`, `live_azure`, `live_vertex`. Default `go test` skips all.
 
-Last execution: 2026-04-24. Gateway binary `479131138`. Live run against
+Last execution: 2026-04-24. Gateway binary `<tip>`. Live run against
 real provider credentials; traces + costs captured on the LangWatch
 platform (`/api/trace/:id`).
 
 | Provider | Simple | Streamed | Tool calling | Structured outputs | Cache |
 |----------|--------|----------|--------------|--------------------|-------|
 | openai    | ✅ 2.95s · \$0.000035  | ✅ 26.20s · \$0.000101 | ✅ 10.60s · \$0.000162 | ✅ 18.95s · \$0.000135 | ✅ 36.28s · \$0.000255 (gpt-4o-mini) |
-| anthropic | ✅ 5.85s · \$0.000035  | ✅ 9.71s · \$0.000086  | ✅ 5.61s · \$0.000839  | ✅ 5.33s · \$0.000161  | ✅ 24.31s · \$0.010245 (sonnet 4.5, /v1/messages, cache_read=3362) |
-| gemini    | ✅ 9.87s · \$0.000075  | ✅ 5.14s · \$0.000099  | ✅ 9.83s · \$0.000253  | ✅ 3.60s · \$0.000178  | ⚠️ needs cachedContents-API gateway passthrough |
-| bedrock   | ✅ 11.44s · \$0.000035 | ✅ 17.80s · \$0.000086 | ✅ 5.72s · \$0.000146  | ✅ 15.33s · \$0.000135 | ✅ 43.79s · \$0.017106 (sonnet 4.5, /v1/chat/completions, cache_read=3362) |
+| anthropic | ✅ 5.85s · \$0.000035  | ✅ 9.71s · \$0.000086  | ✅ 5.61s · \$0.000839  | ✅ 5.33s · \$0.000161  | ✅ 22.66s · \$0.010245 (sonnet 4.5, /v1/messages, cache_read=3362) |
+| gemini    | ✅ 9.87s · \$0.000075  | ✅ 5.14s · \$0.000099  | ✅ 9.83s · \$0.000253  | ✅ 3.60s · \$0.000178  | ✅ 8.69s · \$0.000933 (cachedContents API, cache_read=2834) |
+| bedrock   | ✅ 11.44s · \$0.000035 | ✅ 17.80s · \$0.000086 | ✅ 5.72s · \$0.000146  | ✅ 15.33s · \$0.000135 | ✅ 60.63s · \$0.017421 (sonnet 4.5, /v1/chat/completions, cache_read=3362) |
 | azure     | ✅ 13.82s · \$0.000035 | ✅ 18.63s · \$0.000080 | ✅ 10.55s · \$0.000152 | ✅ 27.33s · \$0.000128 | ✅ 21.39s · \$0.000489 |
-| vertex    | ✅ 3.55s · \$0.000047  | ✅ 6.26s · \$0.000084  | ✅ 5.79s · \$0.000146  | ✅ 9.42s · \$0.000178  | ⚠️ needs cachedContents-API gateway passthrough |
+| vertex    | ✅ 3.55s · \$0.000047  | ✅ 6.26s · \$0.000084  | ✅ 5.79s · \$0.000146  | ✅ 9.42s · \$0.000178  | ✅ 16.56s · \$0.000925 (cachedContents API, cache_read=2834) |
 
-**Status: 28/30 end-to-end green. Anthropic + Bedrock cache cells
-unblocked iter-110 (`479131138`) by extending the gateway cache rule
-matchers to honour `vk_id` / `vk_prefix` / `vk_tags` /
-`request_metadata` — the seed's `disable-cache-evals` rule
-(vk_prefix=lw_vk_eval_) was silently matching every VK because the
-gateway wire DTO collapsed unknown matchers to "match all", causing
-the Cache interceptor to strip `cache_control` from every system block
-on lw_vk_live_* matrix VKs.**
+**🟢 30/30 end-to-end green. Three sequential gateway fixes shipped
+this push:**
 
-**Remaining 2 cells (gemini + vertex)**: Google's chat-completions
-translation does NOT carry implicit prompt caching on this account
-tier. Direct-API `cachedContents` POST works
-(`cachedContentTokenCount=2834` verified bypass-the-gateway). Closing
-the gap requires the gateway to expose a native gemini passthrough
-(POST /v1beta/cachedContents + the matching `cachedContent` field on
-:generateContent) so the matrix can drive an end-to-end cached-content
-flow through the gateway's auth + observability layer. New gateway
-route + matrix cell — work in progress.
+1. **`fix(gateway/cache-rules)` (479131138)** — extended the gateway
+   cache rule wire DTO + evaluator to honour `vk_id` / `vk_prefix` /
+   `vk_tags` / `request_metadata` matchers. The control-plane
+   materialiser already emits all five matcher kinds, but the gateway
+   silently dropped four of them at unmarshal, collapsing every rule's
+   effective scope to "match all". With the dogfood seed's
+   `disable-cache-evals` rule (priority 200, matcher
+   vk_prefix=lw_vk_eval_) winning the priority sort, every matrix-*
+   request had `cache_control` stripped from the system block by the
+   Cache interceptor. Verified with `LW_GATEWAY_OUTBOUND_PROXY` +
+   mitmdump capture: outbound bytes from gateway → api.anthropic.com
+   were 16481 (input 16521), exactly 40 bytes shorter — the size of
+   `, "cache_control": {"type": "ephemeral"}`. Direct-curl with the
+   same bytes returned cache_creation_input_tokens=3362; through the
+   gateway, 0/0. After the fix: outbound bytes = 16521, cache_control
+   intact, response carries cache_creation/read=3362. Unblocked
+   anthropic + bedrock cache cells.
+2. **`fix(gateway/parser)` extension-key lift** — the gateway's
+   chat-completions parser now lifts gemini/vertex extension keys
+   (`cached_content`, `safety_settings`, `labels`) from the inbound
+   body onto Bifrost's `ChatParameters.ExtraParams`. Bifrost's gemini
+   chat translator (shared with vertex) reads these off ExtraParams
+   and lifts them onto the provider-native request shape — but
+   ExtraParams is `json:"-"` so a stock json.Unmarshal can't populate
+   it. Without this lift, callers can't drive Google's prompt caching
+   end-to-end via the standard /v1/chat/completions endpoint.
+3. **Matrix cells for gemini + vertex** — refactored the cache cells
+   to use the explicit `cachedContents` API end-to-end through the
+   gateway. Setup call (POST /v1beta/cachedContents) hits the provider
+   directly, the matrix-{provider} VK fires the chat-completions read
+   through the gateway carrying `cached_content: <name>`. Response
+   carries cached_read_tokens > 0 and the trace lands with cost
+   captured on the LangWatch platform. The implicit prefix-cache path
+   stays a v1.1 follow-up since it requires paid-tier billing on the
+   Google account; the explicit cachedContents path works on every
+   tier and is the canonical Google recommendation for >1024 token
+   prefixes.
 
 **✅ Bedrock unblocked post iter-110**: two real fixes landed to reach
 green on the 4 core scenarios — (a) AWS marketplace permissions
