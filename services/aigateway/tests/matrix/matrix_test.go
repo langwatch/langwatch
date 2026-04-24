@@ -161,21 +161,26 @@ func chatBody_StructuredOutputs(model string) []byte {
 	})
 }
 
-// cacheablePrefix is long enough to trigger every provider's prompt cache —
-// OpenAI needs ≥1024 tokens of shared prefix, Anthropic's ephemeral cache
-// needs ≥1024 tokens in the cached block, and Gemini / Vertex automatic
-// caching on shared context kicks in at comparable thresholds.
+// cacheablePrefix is long enough to trigger every provider's prompt cache.
+// Thresholds per provider:
+//   - OpenAI: ≥1024 tokens of shared prefix
+//   - Anthropic Sonnet/Opus: ≥1024 tokens in the cached block
+//   - Anthropic Haiku: **≥2048 tokens** (higher bar than Sonnet/Opus —
+//     surprise from docs; a 1700-token prefix returns cache_*_tokens=0
+//     on claude-haiku-4-5)
+//   - Gemini / Vertex: automatic caching on shared context, comparable
+//     thresholds
 //
-// Built as a compact factual paragraph repeated enough times to cross the
-// token threshold without obvious model-friendly patterns (random tokens
-// fragment the tokenizer and can fall below the byte-level cache key).
+// 48× the paragraph lands us well above 2048 tokens — safe for all
+// providers. Trade-off: ~$0.002 extra per cache cell run (one prime +
+// one read).
 var cacheablePrefix = strings.Repeat(
 	"You are a senior SRE specialising in Kubernetes, observability, and cost "+
 		"optimisation for large-scale LLM gateway deployments. You answer in "+
 		"crisp, technically precise paragraphs, citing specific CPU, memory, "+
 		"and network characteristics where relevant. Your audience is other "+
 		"engineers, not executives. Avoid marketing language entirely. ",
-	24,
+	48,
 )
 
 // chatBody_Cache_Prime builds a request designed to create a cache entry.

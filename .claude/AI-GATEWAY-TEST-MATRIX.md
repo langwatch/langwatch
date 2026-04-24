@@ -79,14 +79,25 @@ cross-wire routes (OpenAI-client → Anthropic/Gemini/Bedrock/Vertex) keep
 translation. Verified 10/10 cache hits through gateway on gpt-4o-mini;
 Azure cache reliably hits on the same path.
 
-**v1 limit — cross-schema cache_control preservation**: When a caller
-uses `/v1/chat/completions` with an Anthropic / Gemini / Bedrock / Vertex
-VK, the gateway's translator converts the OpenAI-shape request to the
-provider's native wire format. Anthropic's `cache_control: {type:
-"ephemeral"}` markers and Gemini/Vertex's implicit cache-prefix hashing
-aren't preserved byte-identical across this translation, so cache
-operations return `cached_tokens=0`. Workarounds until v1.1 ships a
-translator-side preservation path:
+**v1 limit — cache cells for non-OpenAI-family providers**:
+Sharpened via direct-to-provider tests (bypassing the gateway):
+
+- **Anthropic + Bedrock**: `cache_creation_input_tokens=0` AND
+  `cache_read_input_tokens=0` even on a direct call with
+  `cache_control: {type: "ephemeral"}` on a 3371-token system block
+  (above the 2048 Haiku threshold). `claude-haiku-4-5-20251001` on
+  the test account returns zero cache stats on both prime + read —
+  likely an Anthropic-account beta-access requirement OR a Haiku-4-5-
+  specific limitation (prompt caching is "in beta" per Anthropic docs
+  for Claude 4.5 models). Not reproducible as a gateway bug.
+- **Gemini + Vertex**: automatic caching is opt-in via the
+  `cachedContents` API, not an implicit by-default behaviour like
+  OpenAI. Our matrix test asserts OpenAI-style `cached_tokens > 0`
+  which doesn't apply to Gemini's cache model. Would require a
+  separate cell that first creates a cached content + references it
+  by name; outside iter-110 scope.
+
+Workarounds in-place for v1:
 
 1. **`/v1/messages` endpoint** (Anthropic-native; recommended) —
    callers wanting Anthropic-style prompt caching should POST to
@@ -99,9 +110,20 @@ translator-side preservation path:
 3. **Gemini / Vertex caching via the native client/SDK** until the
    gateway ships the `/v1/chat/completions → Gemini` cache translator.
 
-v1.1 follow-up: translator-side `cache_control` preservation (+ equivalent
-for Gemini/Vertex shared-context hashing) on the `/v1/chat/completions →
-non-OpenAI` code path.
+v1.1 follow-ups on cache:
+
+1. **Re-run Anthropic/Bedrock cache** once the Anthropic account has
+   beta access OR on a non-Haiku model (Sonnet 4.5 / Opus 4.5). The
+   gateway correctly forwards `cache_control` on /v1/messages raw-
+   forward — problem is provider-side.
+2. **Build a Gemini/Vertex `cachedContents`-aware cache cell** that
+   exercises Google's explicit cache-creation API rather than the
+   OpenAI-style implicit-cache assertion. Separate test shape, out of
+   iter-110 scope.
+3. **Translator-side `cache_control` preservation** for cross-schema
+   routes (`/v1/chat/completions → Anthropic`) so callers who want
+   Anthropic-style caching via the OpenAI endpoint can round-trip the
+   marker through a custom header / body extension.
 
 Cell format when filled:
 ```
@@ -131,15 +153,24 @@ Real task: `Bootstrap a React + Vite project, App component renders <h1>Hello Wo
 Naturally exercises tool_use (Read/Write/Bash for npm scaffold) and caching
 (repeated system prompts across many turns).
 
-Last execution: 2026-04-24. Gateway binary `b98a752dc`. 0/4 cells green
-end-to-end; surfaced 2 real gateway feature gaps.
+Last execution: 2026-04-24 (post Anthropic-billing diagnosis + multiple
+gateway iterations). Gateway binary `a4286eb86`. 0/4 cells green end-to-end.
+
+The 2 Lane A gateway feature gaps that this matrix originally surfaced have
+been **shipped + verified fixed** on the gateway side:
+- `83a70fd4f` added `POST /v1/responses` route (codex 0.122 dropped chat-completions wire-api support)
+- `0015e3436` made `/v1/messages` raw-forward thinking-field-preserving
+- `84c79a065` extended raw-forward to RESPONSES so Anthropic-shape body roundtrips intact
+- `a4286eb86` extended raw-forward to `/v1/chat/completions` for OpenAI-family providers (preserves prefix-cache hash on ingress)
+
+Remaining failures are external to gateway code:
 
 | CLI | React vite hello world |
 |-----|------------------------|
-| claude-code | ❌ `'clear_thinking_20251015' strategy requires 'thinking' to be enabled or adaptive` (Lane A: claude-code's `/v1/messages` requests carry a `thinking` param + system tools; even after `0015e3436` raw-forward fix the field is being dropped or the strategy block is mishandled somewhere in the bridge) |
-| codex | ❌ `404 Not Found: 404 page not found, url: http://localhost:5563/v1/responses` (Lane A: codex 0.122+ dropped `wire_api="chat"` support; gateway needs to expose `/v1/responses` per the OpenAI Responses API. `docs/ai-gateway/cli/codex.mdx` already documents this as supported — doc/code drift) |
+| claude-code | 🟡 BLOCKED on Anthropic billing — gateway returns 502 with the upstream error `"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."` Anthropic API key needs credit at console.anthropic.com. Gateway pipeline verified working via direct curl returning Anthropic-shape body with cache_*_input_tokens. |
+| codex | 🔴 `/v1/responses` route now exists but Bifrost dispatch returns 504 `HTML response received from provider` from upstream OpenAI. Distinct from claude-code billing — needs separate Lane A investigation (Bifrost ResponsesRequest URL/auth, gpt-5-mini Responses-API eligibility, or model-name mismatch). |
 | gemini-cli | ⏭️ `t.skip` with reason — upstream gemini-cli has no base-url flag; needs upstream change OR /etc/hosts override OR proxy wrapper |
-| opencode | ⏭️ skipped — `opencode` binary not installed locally. `pnpm i -g opencode-ai` then re-run |
+| opencode | 🔴 opencode 1.14.22 installed but `OPENCODE_CONFIG_HOME` + `opencode.json` config approach my test uses doesn't route opencode's calls through the gateway — gateway log shows zero opencode-source requests after a 114s session. Needs investigation of opencode 1.14's correct non-interactive custom-baseURL setup (auth CLI flow, plugin, env var, etc.). |
 
 Cell format when filled:
 ```
