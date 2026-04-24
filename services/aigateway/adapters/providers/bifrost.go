@@ -6,6 +6,7 @@ package providers
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -276,10 +277,19 @@ func rawResponseBytesResp(resp *bfschemas.BifrostResponsesResponse) ([]byte, boo
 // extractRawResponseBytes normalises the various concrete types
 // Bifrost may stash into ExtraFields.RawResponse (typed `interface{}`)
 // into a []byte suitable for writing to the HTTP response.
+//
+// Bifrost's providers/utils EnrichError stores RawResponse as
+// json.RawMessage (a distinct type from []byte in Go's type switch,
+// so we must match it explicitly before the generic []byte branch).
 func extractRawResponseBytes(raw interface{}) ([]byte, bool) {
 	switch v := raw.(type) {
 	case nil:
 		return nil, false
+	case json.RawMessage:
+		if len(v) == 0 {
+			return nil, false
+		}
+		return []byte(v), true
 	case []byte:
 		if len(v) == 0 {
 			return nil, false
