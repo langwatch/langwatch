@@ -28,6 +28,7 @@ import {
   parseEvaluationResult,
 } from "~/utils/evaluationResults";
 import { parseLLMError } from "~/utils/formatLLMError";
+import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../constants";
 import { useEvaluatorName } from "../../hooks/useEvaluatorName";
 import type { EvaluatorConfig } from "../../types";
 
@@ -167,7 +168,7 @@ export function EvaluatorChip({
             {/* Missing mapping alert icon - on the right side like prompts */}
             {hasMissingMappings && (
               <Tooltip
-                content="Missing variable mappings - Click to configure"
+                content={TARGET_MISSING_MAPPING_TOOLTIP}
                 positioning={{ placement: "top" }}
                 openDelay={0}
                 showArrow
