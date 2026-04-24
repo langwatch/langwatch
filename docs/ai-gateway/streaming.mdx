@@ -146,23 +146,23 @@ Streaming responses are just as expensive as non-streaming, but the usage block 
 | Provider | How usage is reported on a stream |
 |---|---|
 | Anthropic | `message_delta` event with final `usage.output_tokens` (+ `usage.cache_read_input_tokens` when applicable) |
-| OpenAI | Only when the client opts in with `stream_options: {include_usage: true}` — the final data-only chunk carries `usage`. Without the opt-in, usage is never sent over SSE |
+| OpenAI / Azure OpenAI | The final data-only chunk carries `usage` when the request body has `stream_options: {include_usage: true}`. **The gateway auto-injects this flag** on OpenAI/Azure streaming requests when the caller hasn't set it — see below |
 | Bedrock | Usage on the final `message_delta` event, same as Anthropic |
 | Vertex / Gemini | Usage on the terminal `candidates[].finishReason` event |
 
 The gateway watches every chunk for a non-zero usage block and debits the budget ledger based on the last non-empty snapshot. Key behaviour:
 
 - **Empty deltas don't zero-stomp real numbers.** OpenAI's pre-terminal "empty usage" deltas are ignored; the real numbers arrive on the last chunk.
-- **Missing usage is surfaced as a warning.** If the provider never reports usage (OpenAI without `stream_options: {include_usage: true}`), the gateway:
-  - Debits `$0` for that request.
-  - Adds `X-LangWatch-Usage-Warning: provider_did_not_report_usage_on_stream` to the response headers.
-  - Sets `span.status = success_no_usage` so you can alert on it.
+- **OpenAI/Azure auto-injects `stream_options: {include_usage: true}`.** Most OpenAI SDKs don't set this flag by default — without it, OpenAI never emits usage on the SSE stream, and the gateway would have to debit `$0`. The gateway's `DispatchStream` path detects OpenAI/Azure + `stream:true` + missing flag and injects the option via `sjson.SetBytes` before the body reaches Bifrost. Other body fields round-trip byte-for-byte (so OpenAI's prompt-prefix auto-cache still hits on identical prefixes). Callers who explicitly set `stream_options: {include_usage: false}` are honoured (never overwritten).
+- **`success_no_usage` warning is now rare.** With the auto-injection above, OpenAI streams should always report usage. If you still see `span.status = success_no_usage` or the `X-LangWatch-Usage-Warning: provider_did_not_report_usage_on_stream` header, it means either (a) the caller opted out of usage explicitly via `include_usage: false`, or (b) the provider returned a stream without a final usage frame (very rare — file a bug with the trace id).
 
-### How to always report streaming usage (OpenAI clients)
+### Setting `stream_options.include_usage` in your client
+
+Auto-injection means you don't have to. But for clarity and robustness when you change gateways, the explicit form is identical to direct-OpenAI usage:
 
 ```python
 for chunk in client.chat.completions.create(
-    model="gpt-5-mini",
+    model="gpt-4o-mini",
     messages=[...],
     stream=True,
     stream_options={"include_usage": True},
@@ -172,16 +172,14 @@ for chunk in client.chat.completions.create(
 
 ```ts
 const stream = await openai.chat.completions.create({
-  model: "gpt-5-mini",
+  model: "gpt-4o-mini",
   messages: [...],
   stream: true,
   stream_options: { include_usage: true },
 });
 ```
 
-This should be default for any client routing through the gateway, otherwise streaming calls show `$0` in your budget reports and budgets don't enforce correctly. The docs-team recommendation is: **wrap your OpenAI SDK in a helper that sets `stream_options.include_usage` by default**, so engineers can't forget.
-
-### Alerting on missing usage
+### Alerting on missing usage (residual cases)
 
 In Prometheus / Grafana:
 
@@ -189,7 +187,7 @@ In Prometheus / Grafana:
 rate(gateway_requests_total{usage_reported="false"}[5m]) > 0
 ```
 
-If this fires, a client is streaming without `include_usage` and you're effectively not charging those requests. The gateway's warning header and `span.status = success_no_usage` make this observable — wire a Grafana alert on that span status too.
+After the gateway-side auto-injection landed, this should sit at zero in steady state for OpenAI / Azure streaming traffic. If it spikes, capture the request body via `LW_LOG_MESSAGE_BODY=1` (see [Self-hosting → Config → Debug knobs](/ai-gateway/self-hosting/config#debug-development-env-knobs)) and check whether the caller is opting out of usage explicitly.
 
 ## Non-streaming clients
 
