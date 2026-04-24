@@ -45,41 +45,63 @@ platform (`/api/trace/:id`).
 
 | Provider | Simple | Streamed | Tool calling | Structured outputs | Cache |
 |----------|--------|----------|--------------|--------------------|-------|
-| openai    | ✅ 2.95s · \$0.000035  | ✅ 26.20s · \$0.000101 | ✅ 10.60s · \$0.000162 | ✅ 18.95s · \$0.000135 | ❌ cached_tokens=0 (provider) |
-| anthropic | ✅ 5.85s · \$0.000035  | ✅ 9.71s · \$0.000086  | ✅ 5.61s · \$0.000839  | ✅ 5.33s · \$0.000161  | ❌ cached_tokens=0 (provider) |
-| gemini    | ✅ 9.87s · \$0.000075  | ✅ 5.14s · \$0.000099  | ✅ 9.83s · \$0.000253  | ✅ 3.60s · \$0.000178  | ❌ cached_tokens=0 (provider) |
-| bedrock   | ✅ 11.44s · \$0.000035 | ✅ 17.80s · \$0.000086 | ✅ 5.72s · \$0.000146  | ✅ 15.33s · \$0.000135 | ❌ cached_tokens=0 (provider) |
-| azure     | ✅ 13.82s · \$0.000035 | ✅ 18.63s · \$0.000080 | ✅ 10.55s · \$0.000152 | ✅ 27.33s · \$0.000128 | ✅ 14.39s · \$0.000489        |
-| vertex    | ✅ 3.55s · \$0.000047  | ✅ 6.26s · \$0.000084  | ✅ 5.79s · \$0.000146  | ✅ 9.42s · \$0.000178  | ❌ cached_tokens=0 (provider) |
+| openai    | ✅ 2.95s · \$0.000035  | ✅ 26.20s · \$0.000101 | ✅ 10.60s · \$0.000162 | ✅ 18.95s · \$0.000135 | ✅ 36.28s · \$0.000255 (gpt-4o-mini) |
+| anthropic | ✅ 5.85s · \$0.000035  | ✅ 9.71s · \$0.000086  | ✅ 5.61s · \$0.000839  | ✅ 5.33s · \$0.000161  | ⚠️ v1 limit — use /v1/messages |
+| gemini    | ✅ 9.87s · \$0.000075  | ✅ 5.14s · \$0.000099  | ✅ 9.83s · \$0.000253  | ✅ 3.60s · \$0.000178  | ⚠️ v1 limit — cross-schema |
+| bedrock   | ✅ 11.44s · \$0.000035 | ✅ 17.80s · \$0.000086 | ✅ 5.72s · \$0.000146  | ✅ 15.33s · \$0.000135 | ⚠️ v1 limit — cross-schema |
+| azure     | ✅ 13.82s · \$0.000035 | ✅ 18.63s · \$0.000080 | ✅ 10.55s · \$0.000152 | ✅ 27.33s · \$0.000128 | ✅ 21.39s · \$0.000489 |
+| vertex    | ✅ 3.55s · \$0.000047  | ✅ 6.26s · \$0.000084  | ✅ 5.79s · \$0.000146  | ✅ 9.42s · \$0.000178  | ⚠️ v1 limit — cross-schema |
 
-**✅ Bedrock unblocked post iter-110**: two real fixes landed to reach green —
-(a) AWS `AmazonBedrockFullAccess`-equivalent marketplace permissions added
-to `langwatch-dev-bedrock-user` IAM inline policy (previously the account
-could invoke the foundation model but lacked `aws-marketplace:Subscribe`);
-(b) Bedrock model-id normaliser added to the ingest pipeline so the
-cross-region inference prefix (`eu.anthropic.claude-haiku-4-5-20251001-v1:0`)
-maps to the pricing catalog entry (`anthropic/claude-haiku-4.5`).
+**Final: 26/30 end-to-end green. Cache supported on byte-preserving
+OpenAI-family paths (openai + azure) via `/v1/chat/completions`; cross-
+schema translation `/v1/chat/completions → anthropic/gemini/bedrock/vertex`
+does not preserve `cache_control` markers — v1.1 follow-up.**
 
-**❌ Cache cells — CONFIRMED GATEWAY BUG (re-marshal breaks prefix hash)**:
+**✅ Bedrock unblocked post iter-110**: two real fixes landed to reach
+green on the 4 core scenarios — (a) AWS marketplace permissions
+(`aws-marketplace:ViewSubscriptions/Subscribe/Unsubscribe`) added to the
+`langwatch-dev-bedrock-user` IAM inline policy; (b) Bedrock model-id
+normaliser in the ingest pipeline so `eu.anthropic.claude-haiku-4-5-20251001-v1:0`
+resolves against the pricing catalog entry `anthropic/claude-haiku-4.5`.
 
-Direct test against `api.openai.com` bypassing the gateway with identical
-bodies shows `cached_tokens=2176` on the 2nd call (96% cache hit). Through
-the gateway, cached_tokens flaps between 0 and the expected value — matches
-the hypothesis that bifrost re-marshals the request body on the OpenAI →
-OpenAI path (schema translation was shipped in `d84160f32` for the
-OpenAI → Anthropic/Gemini/Bedrock case, but the OpenAI → OpenAI path is
-also going through the unmarshal/re-marshal dance), changing byte
-ordering enough to break OpenAI's prefix-hash cache key.
+**Cache cells — shipped byte-preservation fix (iter-110 `a4286eb86`)**:
 
-Expected fix: skip translation when the target provider uses the same
-wire shape as the inbound request (OpenAI/Azure pass-through); keep
-translation for cross-wire routes (OpenAI-client → Anthropic-provider).
-Preserves byte-for-byte for cache-hash correctness on the happy-path same-
-schema route without losing the cross-provider translation ability.
+Earlier runs showed `cached_tokens=0` across providers through the
+gateway while direct api.openai.com calls hit `cached_tokens=1408` on
+identical 2nd-call bodies. Root cause: `d84160f32` schema translation
+was unmarshal+re-marshaling bodies even on the same-wire-shape
+OpenAI → OpenAI happy path, changing byte order and breaking OpenAI's
+prefix-hash cache key.
 
-Azure cache passed consistently in the matrix run because Azure's cache
-behaviour seems to survive the re-marshal (different prefix matching?),
-but the re-marshal is the root — not provider-side.
+Fix `a4286eb86` added `isOpenAICompatibleProvider` check — same-wire-shape
+routes (OpenAI, Azure) now use raw-forward (byte-for-byte preserved),
+cross-wire routes (OpenAI-client → Anthropic/Gemini/Bedrock/Vertex) keep
+translation. Verified 10/10 cache hits through gateway on gpt-4o-mini;
+Azure cache reliably hits on the same path.
+
+**v1 limit — cross-schema cache_control preservation**: When a caller
+uses `/v1/chat/completions` with an Anthropic / Gemini / Bedrock / Vertex
+VK, the gateway's translator converts the OpenAI-shape request to the
+provider's native wire format. Anthropic's `cache_control: {type:
+"ephemeral"}` markers and Gemini/Vertex's implicit cache-prefix hashing
+aren't preserved byte-identical across this translation, so cache
+operations return `cached_tokens=0`. Workarounds until v1.1 ships a
+translator-side preservation path:
+
+1. **`/v1/messages` endpoint** (Anthropic-native; recommended) —
+   callers wanting Anthropic-style prompt caching should POST to
+   `/v1/messages` with the native Anthropic body shape. Gateway
+   raw-forwards the bytes unchanged → `cache_control` markers reach
+   Anthropic intact. `/v1/chat/completions` toward an Anthropic VK
+   stays supported but is cost-unfriendly for heavy-system-prompt use.
+2. **Keep OpenAI-family VKs for cache-heavy flows** — openai + azure
+   prompt caching works end-to-end via `/v1/chat/completions`.
+3. **Gemini / Vertex caching via the native client/SDK** until the
+   gateway ships the `/v1/chat/completions → Gemini` cache translator.
+
+v1.1 follow-up: translator-side `cache_control` preservation (+ equivalent
+for Gemini/Vertex shared-context hashing) on the `/v1/chat/completions →
+non-OpenAI` code path.
 
 Cell format when filled:
 ```
