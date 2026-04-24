@@ -60,9 +60,8 @@ describe("saveOrCommitWorkflowVersion", () => {
   });
 
   afterAll(async () => {
-    // Unset all FK references before deleting to avoid circular dependencies
-    // (Workflow → WorkflowVersion via latestVersionId/currentVersionId,
-    //  WorkflowVersion → WorkflowVersion via parentId)
+    // Delete in reverse dependency order, nulling circular FKs first.
+    // CI enforces real FK constraints unlike local (relationMode = "prisma").
     await prisma.workflow.updateMany({
       where: { projectId },
       data: { latestVersionId: null, currentVersionId: null },
@@ -74,6 +73,9 @@ describe("saveOrCommitWorkflowVersion", () => {
     await prisma.workflowVersion.deleteMany({ where: { projectId } });
     await prisma.workflow.deleteMany({ where: { projectId } });
     await prisma.project.deleteMany({ where: { id: projectId } });
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM "TeamUser" WHERE "teamId" = '${teamId}'`,
+    );
     await prisma.team.deleteMany({ where: { id: teamId } });
     await prisma.user.deleteMany({ where: { id: userId } });
   });
