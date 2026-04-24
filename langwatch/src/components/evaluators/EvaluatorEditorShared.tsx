@@ -469,6 +469,9 @@ export function useEvaluatorEditorController(
   const handleClose = useCallback(() => {
     if (hasUnsavedChanges) {
       if (onLocalConfigChange) {
+        // Mirror handleApply: flush the trailing debounced update so the
+        // parent gets the last edits before unmount cancels the pending call.
+        debouncedUpdateLocalConfig.flush();
         onClose();
         return;
       }
@@ -485,7 +488,14 @@ export function useEvaluatorEditorController(
     } else {
       onClose();
     }
-  }, [hasUnsavedChanges, onLocalConfigChange, canGoBack, goBack, onClose]);
+  }, [
+    hasUnsavedChanges,
+    onLocalConfigChange,
+    canGoBack,
+    goBack,
+    onClose,
+    debouncedUpdateLocalConfig,
+  ]);
 
   const handleDiscard = useCallback(() => {
     if (savedFormValuesRef.current) {
