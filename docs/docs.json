@@ -512,6 +512,13 @@
                 ]
               },
               {
+                "group": "Gemini CLI",
+                "icon": "/images/logos/google.svg",
+                "pages": [
+                  "ai-gateway/cli/gemini-cli"
+                ]
+              },
+              {
                 "group": "OpenCode",
                 "icon": "code",
                 "pages": [
