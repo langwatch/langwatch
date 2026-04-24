@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/bytedance/sonic"
@@ -370,6 +371,18 @@ func (a *account) GetKeysForProvider(ctx context.Context, provider bfschemas.Mod
 
 func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfschemas.ProviderConfig, error) {
 	cfg := &bfschemas.ProviderConfig{}
+	if proxyURL := os.Getenv("LW_GATEWAY_OUTBOUND_PROXY"); proxyURL != "" {
+		// Debug-only: route outbound provider traffic through an HTTP proxy
+		// (e.g. `http://localhost:8888` for mitmproxy). Lets operators
+		// capture the exact request Bifrost sends to provider APIs —
+		// unblocks outbound-delta diagnosis (headers, body) when a
+		// provider-side behavior (e.g. Anthropic cache) fires on direct
+		// curl but not through the gateway. Do NOT set in production.
+		cfg.ProxyConfig = &bfschemas.ProxyConfig{
+			Type: bfschemas.HTTPProxy,
+			URL:  proxyURL,
+		}
+	}
 	cfg.CheckAndSetDefaults()
 	return cfg, nil
 }
