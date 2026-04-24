@@ -8,6 +8,9 @@ package otelsetup
 
 import (
 	"context"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	otelapi "go.opentelemetry.io/otel"
@@ -20,6 +23,59 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/contexts"
 )
+
+// startupErrorHandler silences OTLP export errors during the first few
+// seconds of startup. The gateway commonly races its OTel exporter
+// against control-plane readiness — the first few batches hit 401/503
+// while auth is still being minted — and the default handler logs each
+// batch as a WARN. Once we've seen a single successful export (signalled
+// by `markHealthy`), the filter unlocks and every error flows through
+// normally again.
+type startupErrorHandler struct {
+	delegate otelapi.ErrorHandler
+	until    time.Time
+	healthy  atomic.Bool
+	once     sync.Once
+}
+
+func newStartupErrorHandler(delegate otelapi.ErrorHandler, graceWindow time.Duration) *startupErrorHandler {
+	return &startupErrorHandler{
+		delegate: delegate,
+		until:    time.Now().Add(graceWindow),
+	}
+}
+
+func (h *startupErrorHandler) Handle(err error) {
+	if err == nil {
+		return
+	}
+	if h.healthy.Load() {
+		h.delegate.Handle(err)
+		return
+	}
+	if time.Now().Before(h.until) && isTransportAuthError(err) {
+		// Swallow: grace-window auth/transport noise.
+		return
+	}
+	h.delegate.Handle(err)
+}
+
+// markHealthy is called by a SpanProcessor wrapper after the first
+// successful export batch. Flips the filter off for the rest of the
+// process lifetime.
+func (h *startupErrorHandler) markHealthy() {
+	h.once.Do(func() { h.healthy.Store(true) })
+}
+
+func isTransportAuthError(err error) bool {
+	s := err.Error()
+	return strings.Contains(s, "401") ||
+		strings.Contains(s, "403") ||
+		strings.Contains(s, "unauthorized") ||
+		strings.Contains(s, "Unauthorized") ||
+		strings.Contains(s, "connection refused") ||
+		strings.Contains(s, "no such host")
+}
 
 // Options configures the telemetry provider. Fields left empty are filled from
 // the context's ServiceInfo when available.
@@ -79,6 +135,18 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 		return nil, err
 	}
 
+	// Suppress startup-race auth/transport noise from the OTLP exporter —
+	// the default handler emits WARN for every batch, which floods logs
+	// for ~5s until the control-plane mints auth. The filter auto-disables
+	// once the healthyExporter wrapper sees a successful export, or after
+	// the 30s grace window elapses (whichever comes first).
+	startupFilter := newStartupErrorHandler(
+		otelapi.GetErrorHandler(),
+		30*time.Second,
+	)
+	otelapi.SetErrorHandler(startupFilter)
+	wrappedExp := healthyExporterWrap(exp, startupFilter.markHealthy)
+
 	attrs := []attribute.KeyValue{
 		semconv.ServiceName(serviceName),
 		semconv.ServiceVersion(serviceVersion),
@@ -113,7 +181,7 @@ func New(ctx context.Context, opts Options) (*Provider, error) {
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithResource(res),
-		sdktrace.WithBatcher(exp,
+		sdktrace.WithBatcher(wrappedExp,
 			sdktrace.WithBatchTimeout(batchTimeout),
 			sdktrace.WithMaxQueueSize(queueSize),
 		),
@@ -130,4 +198,29 @@ func (p *Provider) Shutdown(ctx context.Context) error {
 		return p.tp.Shutdown(ctx)
 	}
 	return nil
+}
+
+// healthyExporter wraps a SpanExporter, invoking `onHealthy` the first
+// time ExportSpans returns nil. Used to flip the startupErrorHandler
+// filter off once the collector is actually answering.
+type healthyExporter struct {
+	inner     sdktrace.SpanExporter
+	onHealthy func()
+	once      sync.Once
+}
+
+func healthyExporterWrap(inner sdktrace.SpanExporter, onHealthy func()) sdktrace.SpanExporter {
+	return &healthyExporter{inner: inner, onHealthy: onHealthy}
+}
+
+func (h *healthyExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
+	err := h.inner.ExportSpans(ctx, spans)
+	if err == nil {
+		h.once.Do(h.onHealthy)
+	}
+	return err
+}
+
+func (h *healthyExporter) Shutdown(ctx context.Context) error {
+	return h.inner.Shutdown(ctx)
 }
