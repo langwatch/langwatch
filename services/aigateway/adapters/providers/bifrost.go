@@ -5,6 +5,7 @@
 package providers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -12,6 +13,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/tidwall/gjson"
 
 	"github.com/bytedance/sonic"
 	bifrost "github.com/maximhq/bifrost/core"
@@ -284,11 +287,21 @@ func (r *BifrostRouter) dispatchPassthrough(
 	if status == 0 {
 		status = http.StatusOK
 	}
-	return &domain.Response{
+	out := &domain.Response{
 		Body:       resp.Body,
 		StatusCode: status,
 		Headers:    passthroughResponseHeaders(resp.Headers),
-	}, nil
+	}
+	// Cost-enrichment downstream needs prompt/completion token counts on
+	// the customer span. Bifrost's Passthrough adapter returns raw bytes
+	// without a typed Usage struct, so extract Gemini's `usageMetadata`
+	// here. Sibling logic in the stream iterator parses the same shape
+	// per-chunk; this branch handles the synchronous :generateContent
+	// (non-streaming) response.
+	if u, ok := parseGeminiPassthroughUsage(resp.Body); ok {
+		out.Usage = u
+	}
+	return out, nil
 }
 
 // dispatchPassthroughStream is the streaming sibling of dispatchPassthrough.
@@ -695,9 +708,62 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			// `event:/data:` SSE framing). Forward verbatim — the
 			// writer side knows not to re-wrap when rawFraming is set.
 			it.current = chunk.BifrostPassthroughResponse.Body
+			// Parse Gemini-native usageMetadata out of the chunk body so
+			// the trace wrapper can stamp prompt/completion/cached
+			// tokens on the customer span. Bifrost's Passthrough adapter
+			// doesn't emit a typed Usage struct on these chunks (raw
+			// passthrough by design), so we crack the JSON here. Each
+			// non-final chunk omits usageMetadata; we keep the last
+			// non-zero values seen so the iterator's Usage() reports
+			// the FINAL token totals at stream close.
+			if u, ok := parseGeminiPassthroughUsage(chunk.BifrostPassthroughResponse.Body); ok {
+				it.usage = u
+			}
 		}
 		return true
 	}
+}
+
+// parseGeminiPassthroughUsage extracts Gemini's `usageMetadata` block from a
+// raw streamGenerateContent SSE chunk body. Lines have the form
+//
+//	data: {"candidates":[…],"usageMetadata":{…},"modelVersion":"…"}\n\n
+//
+// gjson tolerates the `data: ` prefix because we strip leading non-JSON
+// bytes before searching. Returns (Usage{}, false) when the chunk doesn't
+// carry usageMetadata (intermediate chunks); the iterator keeps its prior
+// last-seen value so the FINAL chunk's totals win.
+func parseGeminiPassthroughUsage(body []byte) (domain.Usage, bool) {
+	if len(body) == 0 {
+		return domain.Usage{}, false
+	}
+	// Strip leading `data: ` framing if present so gjson can parse the
+	// embedded JSON object directly.
+	scan := body
+	if i := bytes.IndexByte(scan, '{'); i > 0 {
+		scan = scan[i:]
+	}
+	usage := gjson.GetBytes(scan, "usageMetadata")
+	if !usage.Exists() {
+		return domain.Usage{}, false
+	}
+	prompt := int(usage.Get("promptTokenCount").Int())
+	completion := int(usage.Get("candidatesTokenCount").Int())
+	total := int(usage.Get("totalTokenCount").Int())
+	if prompt == 0 && completion == 0 && total == 0 {
+		return domain.Usage{}, false
+	}
+	if total == 0 {
+		total = prompt + completion
+	}
+	// Note: cachedContentTokenCount (when present) is folded into prompt
+	// tokens upstream by Gemini; the trace pipeline derives cache_read
+	// from a separate gen_ai.usage.cache_read attr, not from total.
+	return domain.Usage{
+		PromptTokens:     prompt,
+		CompletionTokens: completion,
+		TotalTokens:      total,
+	}, true
 }
 
 func (it *bifrostStreamIterator) RawFraming() bool { return it.rawFraming }

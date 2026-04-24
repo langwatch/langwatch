@@ -200,15 +200,82 @@ func parseTraceparent(tp string) (traceID []byte, spanID []byte) {
 }
 
 // extractInputMessages returns the JSON-encoded messages array from the request body.
-func extractInputMessages(body []byte, _ domain.RequestType) string {
+func extractInputMessages(body []byte, reqType domain.RequestType) string {
 	if len(body) == 0 {
 		return ""
+	}
+	// Gemini-native /v1beta passthrough bodies carry `contents` not
+	// `messages`. Convert to a synthetic chat-completion `messages`
+	// shape so the LangWatch trace viewer renders the conversation
+	// the same way it does for the OpenAI / Anthropic surfaces.
+	if reqType == domain.RequestTypePassthrough {
+		return geminiContentsAsMessages(body)
 	}
 	r := gjson.GetBytes(body, "messages")
 	if !r.Exists() {
 		return ""
 	}
 	return r.Raw
+}
+
+// geminiContentsAsMessages flattens Gemini's `systemInstruction` +
+// `contents[]` into a chat-style `[{role, content}, …]` array. Gemini's
+// roles are "user" / "model"; the latter maps to "assistant" so the
+// downstream trace viewer doesn't render an unknown role badge.
+func geminiContentsAsMessages(body []byte) string {
+	var msgs []string
+	if sys := gjson.GetBytes(body, "systemInstruction"); sys.Exists() {
+		text := joinGeminiPartsText(sys.Get("parts"))
+		if text != "" {
+			msgs = append(msgs, fmt.Sprintf(`{"role":"system","content":%q}`, text))
+		}
+	}
+	contents := gjson.GetBytes(body, "contents")
+	if !contents.Exists() {
+		if len(msgs) == 0 {
+			return ""
+		}
+		return "[" + strings.Join(msgs, ",") + "]"
+	}
+	contents.ForEach(func(_, v gjson.Result) bool {
+		role := v.Get("role").String()
+		if role == "model" {
+			role = "assistant"
+		}
+		if role == "" {
+			role = "user"
+		}
+		text := joinGeminiPartsText(v.Get("parts"))
+		if text == "" {
+			return true
+		}
+		msgs = append(msgs, fmt.Sprintf(`{"role":%q,"content":%q}`, role, text))
+		return true
+	})
+	if len(msgs) == 0 {
+		return ""
+	}
+	return "[" + strings.Join(msgs, ",") + "]"
+}
+
+// joinGeminiPartsText concatenates all `parts[].text` fields, ignoring
+// non-text part types (functionCall / functionResponse / inlineData) for
+// the trace-viewer string rendering.
+func joinGeminiPartsText(parts gjson.Result) string {
+	if !parts.Exists() || !parts.IsArray() {
+		return ""
+	}
+	var out strings.Builder
+	parts.ForEach(func(_, p gjson.Result) bool {
+		if t := p.Get("text"); t.Exists() {
+			if out.Len() > 0 {
+				out.WriteByte('\n')
+			}
+			out.WriteString(t.String())
+		}
+		return true
+	})
+	return out.String()
 }
 
 // extractOutputMessages returns the JSON-encoded assistant message(s) from the response body.
@@ -242,6 +309,18 @@ func extractOutputMessages(body []byte, reqType domain.RequestType) string {
 			return ""
 		}
 		return `[{"role":"assistant","content":` + content.Raw + `}]`
+	case domain.RequestTypePassthrough:
+		// Gemini-native: candidates[].content.parts[].text. The bytes here
+		// are either a single :generateContent JSON or the concatenated
+		// SSE chunks from streamGenerateContent (the trace wrapper now
+		// stamps the LAST chunk's body); both use the same nested shape.
+		text := joinGeminiPartsText(
+			gjson.GetBytes(body, "candidates.0.content.parts"),
+		)
+		if text == "" {
+			return ""
+		}
+		return fmt.Sprintf(`[{"role":"assistant","content":%q}]`, text)
 	default:
 		return ""
 	}
