@@ -12,38 +12,38 @@ Feature: Customer.io nurturing integration
   # R1: NurturingService — Customer.io API client
   # ---------------------------------------------------------------------------
 
-  @unit
+  @unit @unimplemented
   Scenario: Identify call authenticates with Basic Auth using the configured API key
     Given a NurturingService created with an API key and region "us"
     When identifyUser is called with a user ID and traits
     Then an HTTP request is sent to "cdp.customer.io/v1/identify" with Basic Auth using the API key
     And the request body contains the user ID and traits
 
-  @unit
+  @unit @unimplemented
   Scenario: Identify call routes to EU endpoint when region is eu
     Given a NurturingService created with an API key and region "eu"
     When identifyUser is called with a user ID and traits
     Then the request is sent to "cdp-eu.customer.io/v1/identify"
 
-  @unit
+  @unit @unimplemented
   Scenario: Track call sends event payload to Customer.io
     Given a NurturingService created with an API key
     When trackEvent is called with a user ID, event name, and properties
     Then an HTTP request is sent to the track endpoint with the event payload
 
-  @unit
+  @unit @unimplemented
   Scenario: Group call sends organization traits to Customer.io
     Given a NurturingService created with an API key
     When groupUser is called with a user ID, group ID, and org traits
     Then an HTTP request is sent to the group endpoint with the org traits
 
-  @unit
+  @unit @unimplemented
   Scenario: Batch call combines multiple operations into a single request
     Given a NurturingService created with an API key
     When batch is called with multiple identify and track calls
     Then a single HTTP request is sent to the batch endpoint containing all calls
 
-  @unit
+  @unit @unimplemented
   Scenario: NurturingService enforces a 10-second request timeout
     Given a NurturingService created with an API key
     And the Customer.io API does not respond within 10 seconds
@@ -51,7 +51,7 @@ Feature: Customer.io nurturing integration
     Then the request is aborted
     And the timeout error is captured for observability
 
-  @unit
+  @unit @unimplemented
   Scenario: NurturingService swallows API errors without throwing
     Given a NurturingService created with an API key
     And the Customer.io API returns a 500 error
@@ -59,7 +59,7 @@ Feature: Customer.io nurturing integration
     Then the method resolves without throwing
     And the error is logged and captured for observability
 
-  @unit
+  @unit @unimplemented
   Scenario: Null service resolves all methods without making HTTP requests
     Given a NurturingService created via createNull
     When identifyUser is called
@@ -70,25 +70,25 @@ Feature: Customer.io nurturing integration
   # R9: Environment configuration and graceful degradation
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Service is active when CUSTOMER_IO_API_KEY is configured
     Given the app config includes a customerIoApiKey
     When the app is initialized
     Then getApp().nurturing is an active NurturingService instance
 
-  @integration
+  @integration @unimplemented
   Scenario: Service is a no-op when CUSTOMER_IO_API_KEY is absent
     Given the app config has no customerIoApiKey
     When the app is initialized
     Then getApp().nurturing is a null NurturingService that silently no-ops
 
-  @integration
+  @integration @unimplemented
   Scenario: Region defaults to US when CUSTOMER_IO_REGION is not set
     Given the app config has no customerIoRegion
     When the app is initialized
     Then the NurturingService uses the US regional endpoint
 
-  @integration
+  @integration @unimplemented
   Scenario: Test app uses null NurturingService
     Given createTestApp is called
     Then getApp().nurturing is a null NurturingService that silently no-ops
@@ -97,7 +97,7 @@ Feature: Customer.io nurturing integration
   # R2: Signup identification — onboarding hook
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: New signup identifies user with traits in Customer.io
     Given a user completes onboarding with name "Jane Doe" and email "jane@example.com"
     And the signup data includes role "engineer" and company size "11-50"
@@ -105,28 +105,28 @@ Feature: Customer.io nurturing integration
     Then the user is identified in Customer.io with email, name, role, and company_size
     And the user traits include has_traces false and has_evaluations false
 
-  @integration
+  @integration @unimplemented
   Scenario: New signup associates user with organization via group call
     Given a user completes onboarding
     And the organization is named "Acme Corp"
     When the onboarding flow completes
     Then the user is associated with the organization via a group call
 
-  @integration
+  @integration @unimplemented
   Scenario: New signup tracks signed_up event
     Given a user completes onboarding
     And the signup data includes role "engineer" and company size "11-50"
     When the onboarding flow completes
     Then a "signed_up" event is tracked for the user with the signup metadata
 
-  @integration
+  @integration @unimplemented
   Scenario: Signup identification includes optional marketing fields when present
     Given a user completes onboarding with utm_campaign "launch-week"
     And the signup data includes how_heard "twitter"
     When the onboarding flow completes
     Then the user traits sent to Customer.io include utm_campaign and how_heard
 
-  @integration
+  @integration @unimplemented
   Scenario: Customer.io failure during signup does not block onboarding
     Given a user completes onboarding
     And the Customer.io API is unavailable
@@ -134,7 +134,7 @@ Feature: Customer.io nurturing integration
     Then the organization is created successfully
     And the Customer.io error is captured for observability
 
-  @integration
+  @integration @unimplemented
   Scenario: Signup with no Customer.io key configured completes without errors
     Given a user completes onboarding
     And no Customer.io API key is configured
@@ -146,39 +146,39 @@ Feature: Customer.io nurturing integration
   # R3: Trace integration reactor — customerIoTraceSync
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: First trace identifies user with trace milestones
     Given a project that has never received a trace
     When the first trace is processed with sdk_language "python" and sdk_framework "openai"
     Then the user is identified in Customer.io with has_traces true
     And the user traits include sdk_language, sdk_framework, and first_trace_at
 
-  @integration
+  @integration @unimplemented
   Scenario: First trace fires first_trace_integrated event
     Given a project that has never received a trace
     When the first trace is processed with sdk_language "python" and sdk_framework "openai"
     Then a "first_trace_integrated" event is tracked with sdk_language, sdk_framework, and project_id
 
-  @integration
+  @integration @unimplemented
   Scenario: First trace fires immediately without debouncing
     Given a project that has never received a trace
     When the first trace is processed
     Then the Customer.io calls are made immediately without delay
 
-  @integration
+  @integration @unimplemented
   Scenario: Subsequent traces update count and timestamp with debouncing
     Given a project that already has traces
     When a new trace is processed
     Then the user is identified in Customer.io with updated trace_count and last_trace_at
     And the update is debounced so at most one call per project per 5 minutes
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace sync reactor uses project-scoped job ID for debouncing
     Given the customerIoTraceSync reactor
     When makeJobId is called for a project
     Then the returned ID is "cio-trace-sync-{projectId}"
 
-  @unit
+  @unit @unimplemented
   Scenario: Trace sync does not duplicate first-trace detection logic
     Given the projectMetadata reactor already tracks first trace via Project.firstMessage
     When the customerIoTraceSync reactor processes a trace
@@ -188,38 +188,38 @@ Feature: Customer.io nurturing integration
   # R4: Evaluation sync reactor — customerIoEvaluationSync
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: First evaluation identifies user with evaluation milestones
     Given an organization with no prior evaluations
     When the first evaluation is processed with type "llm_judge"
     Then the user is identified in Customer.io with has_evaluations true and evaluation_count 1
     And the user traits include first_evaluation_at
 
-  @integration
+  @integration @unimplemented
   Scenario: First evaluation fires first_evaluation_created event
     Given an organization with no prior evaluations
     When the first evaluation is processed with type "llm_judge"
     Then a "first_evaluation_created" event is tracked with evaluation_type and project_id
 
-  @integration
+  @integration @unimplemented
   Scenario: Subsequent evaluations update identify with evaluation count
     Given an organization that already has evaluations
     When a new evaluation is processed with score 0.85 and passed true
     Then the user is identified with updated evaluation_count and last_evaluation_at
 
-  @integration
+  @integration @unimplemented
   Scenario: Subsequent evaluations fire evaluation_ran event
     Given an organization that already has evaluations
     When a new evaluation is processed with score 0.85 and passed true
     Then an "evaluation_ran" event is tracked with evaluation_id, score, and passed
 
-  @integration
+  @integration @unimplemented
   Scenario: Subsequent evaluation updates are debounced per project
     Given an organization that already has evaluations
     When a new evaluation is processed with score 0.85 and passed true
     Then the update is debounced per project
 
-  @unit
+  @unit @unimplemented
   Scenario: Evaluation sync reactor uses project-scoped job ID for debouncing
     Given the customerIoEvaluationSync reactor
     When makeJobId is called for a project
@@ -229,13 +229,13 @@ Feature: Customer.io nurturing integration
   # R5: Daily usage sync reactor — customerIoDailyUsageSync
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Daily usage fold pushes aggregated metrics to Customer.io
     Given the projectDailySdkUsage fold has completed for a project
     When the daily usage sync reactor runs
     Then the user is identified in Customer.io with trace_count, daily_trace_count, and trace_count_updated_at
 
-  @unit
+  @unit @unimplemented
   Scenario: Daily usage sync sends cumulative totals not reset counters
     Given accumulated usage data for a project
     When the daily usage sync reactor builds the trait payload
@@ -246,34 +246,34 @@ Feature: Customer.io nurturing integration
   # R6: Team and feature adoption hooks
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Team member invite updates member count and fires event
     Given a user invites a team member with email "bob@example.com" and role "member"
     When the invite is sent
     Then the user is identified in Customer.io with updated team_member_count
     And a "team_member_invited" event is tracked with invited_email and role
 
-  @integration
+  @integration @unimplemented
   Scenario: Workflow creation updates workflow count and fires event
     Given a user creates a workflow in a project
     When the workflow is saved
     Then the user is identified in Customer.io with updated workflow_count
     And a "workflow_created" event is tracked with workflow_id and project_id
 
-  @integration
+  @integration @unimplemented
   Scenario: Scenario creation updates scenario count and fires event
     Given a user creates a scenario in a project
     When the scenario is saved
     Then the user is identified in Customer.io with updated scenario_count
     And a "scenario_created" event is tracked with scenario_id and project_id
 
-  @integration
+  @integration @unimplemented
   Scenario: Experiment run fires event
     Given a user runs an experiment in a project
     When the experiment completes
     Then an "experiment_ran" event is tracked with experiment_id and project_id
 
-  @integration
+  @integration @unimplemented
   Scenario: Feature adoption hook failure does not break the originating action
     Given a user creates a workflow
     And the Customer.io API is unavailable
@@ -285,19 +285,19 @@ Feature: Customer.io nurturing integration
   # R7: Activity tracking — inactivity detection
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: User login pushes last_active_at to Customer.io
     Given a user logs in or refreshes their session
     When the auth session callback fires
     Then the user is identified in Customer.io with last_active_at set to the current time
 
-  @integration
+  @integration @unimplemented
   Scenario: Activity tracking is debounced to avoid excessive API calls
     Given a user refreshes their session multiple times within one hour
     When the auth session callback fires each time
     Then at most one Customer.io identify call is made per hour
 
-  @integration
+  @integration @unimplemented
   Scenario: Activity tracking failure does not break the login flow
     Given a user logs in
     And the Customer.io API is unavailable
@@ -331,7 +331,7 @@ Feature: Customer.io nurturing integration
   # that calls getApp().nurturing.identifyUser().
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Product selection fires a separate identify call after flavour is picked
     Given a user has completed organization setup
     And the user reaches the "Pick your flavour" onboarding screen
@@ -339,14 +339,14 @@ Feature: Customer.io nurturing integration
     Then a separate identifyUser call is made to Customer.io with product_interest "observability"
     And this call is independent of the initial signup identification
 
-  @integration
+  @integration @unimplemented
   Scenario: Product interest is updated independently of signup flow
     Given a user completed onboarding without selecting a product interest
     When the user later selects a product interest from the flavour screen
     Then the user is identified in Customer.io with the selected product_interest
     And no other signup traits are re-sent
 
-  @unit
+  @unit @unimplemented
   Scenario Outline: Flavour selection maps to correct product_interest trait value
     Given a user reaches the "Pick your flavour" onboarding screen
     When the user selects "<selection>"
@@ -359,14 +359,14 @@ Feature: Customer.io nurturing integration
       | Prompt Management  | prompt_management  |
       | Agent Simulations  | agent_simulations  |
 
-  @integration
+  @integration @unimplemented
   Scenario: Product interest identify call is fire-and-forget
     Given a user reaches the "Pick your flavour" onboarding screen
     When the user selects "Observability"
     Then the product_interest identify call is dispatched without awaiting a response
     And the caller receives control back immediately
 
-  @integration
+  @integration @unimplemented
   Scenario: Product interest identify failure does not break onboarding navigation
     Given a user reaches the "Pick your flavour" onboarding screen
     And the Customer.io API is unavailable
@@ -382,33 +382,33 @@ Feature: Customer.io nurturing integration
   # is org-wide (aggregated across all projects in the organization).
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: First prompt creation identifies user with has_prompts true
     Given an organization with no prompts across any project
     When a user creates their first prompt
     Then the user is identified in Customer.io with has_prompts true and org-wide prompt_count 1
 
-  @integration
+  @integration @unimplemented
   Scenario: First prompt creation fires first_prompt_created event
     Given an organization with no prompts across any project
     When a user creates their first prompt
     Then a "first_prompt_created" event is tracked with project_id
 
-  @integration
+  @integration @unimplemented
   Scenario: Subsequent prompt creation updates org-wide prompt_count without firing first event
     Given an organization that already has prompts
     When a user creates another prompt in any project
     Then the user is identified in Customer.io with updated org-wide prompt_count
     And no "first_prompt_created" event is tracked
 
-  @integration
+  @integration @unimplemented
   Scenario: Prompt creation tracked regardless of whether created via platform UI or API
     Given an organization with no prompts across any project
     When a prompt is created via the REST API
     Then the user is identified in Customer.io with has_prompts true
     And a "first_prompt_created" event is tracked
 
-  @integration
+  @integration @unimplemented
   Scenario: Prompt creation hook failure does not break the prompt mutation
     Given a user creates a prompt
     And the Customer.io API is unavailable
@@ -424,39 +424,39 @@ Feature: Customer.io nurturing integration
   # Debounce key is project-scoped (tenantId only), matching trace sync.
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: First simulation run identifies user with has_simulations true
     Given an organization with no prior simulation runs across any project
     When the first simulation is processed in the simulation_processing pipeline
     Then the user is identified in Customer.io with has_simulations true and org-wide simulation_count 1
     And the user traits include first_simulation_at
 
-  @integration
+  @integration @unimplemented
   Scenario: First simulation run fires first_simulation_ran event
     Given an organization with no prior simulation runs across any project
     When the first simulation is processed in the simulation_processing pipeline
     Then a "first_simulation_ran" event is tracked with project_id
 
-  @integration
+  @integration @unimplemented
   Scenario: First simulation fires immediately without debouncing
     Given an organization with no prior simulation runs
     When the first simulation is processed
     Then the Customer.io calls are made immediately without delay
 
-  @integration
+  @integration @unimplemented
   Scenario: Subsequent simulation runs update org-wide count and timestamp with debouncing
     Given an organization that already has simulation runs
     When a new simulation is processed
     Then the user is identified in Customer.io with updated org-wide simulation_count and last_simulation_at
     And the update is debounced so at most one call per project per debounce window
 
-  @unit
+  @unit @unimplemented
   Scenario: Simulation sync reactor uses project-scoped job ID for debouncing
     Given the customerIoSimulationSync reactor
     When makeJobId is called for a project
     Then the returned ID is "cio-sim-sync-{tenantId}"
 
-  @integration
+  @integration @unimplemented
   Scenario: Simulation tracking is independent of scenario template creation
     Given a user creates a scenario template
     When the scenario is saved
@@ -466,7 +466,7 @@ Feature: Customer.io nurturing integration
   # R13: Trait schema + signup defaults
   # ---------------------------------------------------------------------------
 
-  @integration
+  @integration @unimplemented
   Scenario: Signup defaults include has_prompts and has_simulations as false
     Given a user completes onboarding
     When the onboarding flow completes

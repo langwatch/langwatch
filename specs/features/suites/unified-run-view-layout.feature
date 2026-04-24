@@ -7,7 +7,7 @@ Feature: Unified group-by and list/grid view across all run views
     Given I am logged into a project with scenario runs
 
   # Happy path: external runs view has the same controls as suite runs
-  @e2e
+  @e2e @unimplemented
   Scenario: External set view shows group-by and list/grid toggle
     Given an SDK client has submitted scenario runs with scenarioSetId "nightly-regression"
     When I open the external set "nightly-regression"
@@ -19,7 +19,7 @@ Feature: Unified group-by and list/grid view across all run views
     Then scenario results display as rows
 
   # Happy path: all three views share the same layout controls
-  @e2e
+  @e2e @unimplemented
   Scenario: All run views provide the same layout controls
     Given a suite "Checkout Tests" with run history exists
     And an SDK client has submitted scenario runs with scenarioSetId "ci-smoke"
@@ -31,7 +31,7 @@ Feature: Unified group-by and list/grid view across all run views
     Then I see a group-by selector and a list/grid view toggle
 
   # External runs omit "Target" from group-by since targets do not apply
-  @integration
+  @integration @unimplemented
   Scenario: External set group-by selector omits target option
     Given I am viewing an external set detail panel
     When the filter bar renders
@@ -39,21 +39,21 @@ Feature: Unified group-by and list/grid view across all run views
     And the group-by selector does not have a "Target" option
 
   # Suite view retains all group-by options including Target
-  @integration
+  @integration @unimplemented
   Scenario: Suite detail group-by selector includes target option
     Given I am viewing a suite detail panel with targets
     When the filter bar renders
     Then the group-by selector has options "None", "Scenario", and "Target"
 
   # All runs view includes all group-by options
-  @integration
+  @integration @unimplemented
   Scenario: All runs group-by selector includes all options
     Given I am viewing the all runs panel
     When the filter bar renders
     Then the group-by selector has options "None", "Scenario", and "Target"
 
   # External set respects group-by selection
-  @integration
+  @integration @unimplemented
   Scenario: Grouping by scenario in external set groups runs under scenario headers
     Given an external set with runs across scenarios "Login" and "Signup"
     When I select "Scenario" from the group-by selector
@@ -61,7 +61,7 @@ Feature: Unified group-by and list/grid view across all run views
     And each group header shows the scenario name, pass rate, and run count
 
   # External set supports list/grid toggle
-  @integration
+  @integration @unimplemented
   Scenario: External set supports list and grid view modes
     Given an external set with expanded run results
     When I select the grid view toggle
@@ -70,7 +70,7 @@ Feature: Unified group-by and list/grid view across all run views
     Then scenario results display as rows
 
   # All views show the same layout controls
-  @integration
+  @integration @unimplemented
   Scenario: Each view shows scenario filter, status filter, group-by, and view toggle
     Given I am viewing a suite detail panel
     Then I see a scenario filter, pass/fail filter, group-by selector, and view toggle
@@ -80,14 +80,14 @@ Feature: Unified group-by and list/grid view across all run views
     Then I see a scenario filter, pass/fail filter, group-by selector, and view toggle
 
   # View mode persists when switching between views
-  @integration
+  @integration @unimplemented
   Scenario: View mode selection carries over between views
     Given I select the list view toggle on the suite detail panel
     When I navigate to the all runs panel
     Then the list view is still selected
 
   # Group-by "None" in external set shows batch run grouping
-  @integration
+  @integration @unimplemented
   Scenario: External set with group-by None shows batch run grouping
     Given an external set with multiple batch runs
     When group-by is set to "None"

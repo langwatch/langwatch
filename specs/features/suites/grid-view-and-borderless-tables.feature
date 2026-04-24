@@ -12,38 +12,38 @@ Feature: Scenario result grid view and full-width borderless run history
 
   # --- List/Grid View Toggle ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Filter bar shows a list/grid view toggle on suite detail
     Given a suite has run history
     When I view the suite detail panel
     Then a list/grid view toggle is visible in the filter bar
     And the default view is grid
 
-  @integration
+  @integration @unimplemented
   Scenario: Filter bar shows a list/grid view toggle on all runs
     Given multiple suites have run history
     When I view the all runs panel
     Then a list/grid view toggle is visible in the filter bar
 
-  @integration
+  @integration @unimplemented
   Scenario: Switching to grid view shows scenario results as cards
     Given a run row is expanded to show scenario results
     When I select the grid view toggle
     Then scenario results display as cards in a responsive grid
 
-  @integration
+  @integration @unimplemented
   Scenario: Switching to list view shows scenario results as rows
     Given a run row is expanded to show scenario results
     When I select the list view toggle
     Then scenario results display as rows in the current list layout
 
-  @e2e
+  @e2e @unimplemented
   Scenario: View toggle preference persists within the session
     Given I select the grid view toggle
     When I navigate to a different suite and back
     Then the grid view is still selected
 
-  @integration
+  @integration @unimplemented
   Scenario: Grid layout is responsive
     Given a run row is expanded in grid view
     When the viewport narrows
@@ -51,13 +51,13 @@ Feature: Scenario result grid view and full-width borderless run history
 
   # --- Run Rows Expanded by Default ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Run rows are expanded by default
     Given a suite has run history
     When I view the suite detail panel
     Then all run rows are expanded showing their scenario results
 
-  @integration
+  @integration @unimplemented
   Scenario: All runs panel rows are expanded by default
     Given multiple suites have run history
     When I view the all runs panel
@@ -65,7 +65,7 @@ Feature: Scenario result grid view and full-width borderless run history
 
   # --- Card Content ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Grid card shows scenario name, target, and iteration
     Given a run row is expanded in grid view
     When I view a scenario result card
@@ -75,31 +75,31 @@ Feature: Scenario result grid view and full-width borderless run history
 
   # --- Full-Width Borderless Tables ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Run history rows span the full container width
     Given a suite has run history
     When I view the suite detail panel
     Then run history rows span the full container width
 
-  @integration
+  @integration @unimplemented
   Scenario: Run history rows have no rounded corners
     Given a suite has run history
     When I view the suite detail panel
     Then run history rows have no rounded corners
 
-  @integration
+  @integration @unimplemented
   Scenario: Run row headers are sticky when scrolling
     Given a run row is expanded with many scenario results
     When I scroll down through the results
     Then the run row header remains visible at the top
 
-  @integration
+  @integration @unimplemented
   Scenario: Expanded scenario rows span the full container width
     Given a run row is expanded to show scenario results
     When I view the expanded content in list view
     Then scenario rows span the full container width
 
-  @integration
+  @integration @unimplemented
   Scenario: Expanded scenario rows have no outer border radius
     Given a run row is expanded to show scenario results
     When I view the expanded content in list view

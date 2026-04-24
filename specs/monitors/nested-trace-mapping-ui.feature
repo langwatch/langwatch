@@ -8,6 +8,7 @@ Feature: Nested Trace Mapping UI
     Given I am in the evaluator editor configuring mappings
     And I have sample traces available
 
+  @unimplemented
   Scenario: Select simple field (no nesting)
     Given I'm mapping the "input" evaluator field
     When I click the mapping input
@@ -16,6 +17,7 @@ Feature: Nested Trace Mapping UI
     And no nested selector should show
     And the mapping should be complete
 
+  @unimplemented
   Scenario: Select field with one level of nesting (metadata)
     Given I'm mapping the "customer_type" evaluator field
     When I click the mapping input
@@ -27,6 +29,7 @@ Feature: Nested Trace Mapping UI
     And the mapping should be complete
     And the value should be { source: "metadata", key: "customer_type" }
 
+  @unimplemented
   Scenario: Select field with two levels of nesting (spans)
     Given I'm mapping the "llm_output" evaluator field
     And traces have spans from multiple models
@@ -41,6 +44,7 @@ Feature: Nested Trace Mapping UI
     And the mapping should be complete
     And the value should be { source: "spans", key: "gpt-4o", subkey: "output" }
 
+  @unimplemented
   Scenario: Remove nested badge to re-select
     Given I have mapped "metadata -> customer_type"
     When I click the X on the "customer_type" badge
@@ -48,6 +52,7 @@ Feature: Nested Trace Mapping UI
     And the nested key dropdown should reappear
     And I should be able to select a different key
 
+  @unimplemented
   Scenario: Remove root badge clears all
     Given I have mapped "metadata -> customer_type"
     When I click the X on the "metadata" badge
@@ -55,6 +60,7 @@ Feature: Nested Trace Mapping UI
     And the input should return to empty state
     And the mapping should be cleared
 
+  @unimplemented
   Scenario: Remove middle badge in three-level nesting
     Given I have mapped "spans -> gpt-4o -> output"
     When I click the X on the "gpt-4o" badge
@@ -62,6 +68,7 @@ Feature: Nested Trace Mapping UI
     And "output" badge should be removed
     And span names dropdown should reappear
 
+  @unimplemented
   Scenario: Thread level traces mapping with multi-select
     Given I'm mapping "conversation" for thread level
     And thread sources are available
@@ -72,6 +79,7 @@ Feature: Nested Trace Mapping UI
     Then badges for "input" and "output" should appear inside the multi-select
     And the mapping should include selectedFields: ["input", "output"]
 
+  @unimplemented
   Scenario: Keyboard navigation in dropdown
     Given the mapping dropdown is open
     When I press Arrow Down
@@ -79,30 +87,35 @@ Feature: Nested Trace Mapping UI
     When I press Enter
     Then the highlighted option should be selected
 
+  @unimplemented
   Scenario: Search/filter in dropdown
     Given the mapping dropdown is open with many options
     When I type "meta"
     Then only options containing "meta" should be visible
     And "metadata" should be in the filtered list
 
+  @unimplemented
   Scenario: Visual connector between badges
     Given I have selected "metadata" as the source
     And the nested dropdown is visible
     Then there should be an L-shaped connector
     And the connector should visually link the badges
 
+  @unimplemented
   Scenario: Dropdown closes on outside click
     Given the mapping dropdown is open
     When I click outside the dropdown
     Then the dropdown should close
     And my current selection should be preserved
 
+  @unimplemented
   Scenario: Hover state on badges
     Given I have a badge "metadata" displayed
     When I hover over the badge
     Then the X button should become more visible
     And the badge should have a hover state
 
+  @unimplemented
   Scenario: Empty state with no sources
     Given no trace sources are available
     When I open the mapping dropdown

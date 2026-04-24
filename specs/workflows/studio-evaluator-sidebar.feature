@@ -9,25 +9,25 @@ Feature: Studio Evaluator Sidebar Migration
 
   # --- Sidebar Changes ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Single evaluator draggable replaces individual evaluator types
     Then the sidebar evaluator section shows a single "Evaluator" draggable item
     And the sidebar does not list individual evaluator types like "exact_match" or "faithfulness"
 
-  @integration
+  @integration @unimplemented
   Scenario: Prompting Techniques section is removed
     Then the sidebar does not contain a "Prompting Techniques" section
     And there is no "ChainOfThought" draggable item
 
   # --- Evaluator Creation via Drawer ---
 
-  @integration
+  @integration @unimplemented
   Scenario: Dragging evaluator to canvas opens the evaluator editor drawer
     When I drag the "Evaluator" item from the sidebar onto the canvas
     Then an evaluator node placeholder is created on the canvas
     And the EvaluatorEditorDrawer opens automatically
 
-  @integration
+  @integration @unimplemented
   Scenario: Saving evaluator from drawer creates a project-level evaluator and configures the node
     Given I have dragged the "Evaluator" item onto the canvas
     And the EvaluatorEditorDrawer is open
@@ -38,7 +38,7 @@ Feature: Studio Evaluator Sidebar Migration
     And the node displays the evaluator name
     And the drawer closes
 
-  @integration
+  @integration @unimplemented
   Scenario: Cancelling evaluator drawer removes the placeholder node
     Given I have dragged the "Evaluator" item onto the canvas
     And the EvaluatorEditorDrawer is open
@@ -47,7 +47,7 @@ Feature: Studio Evaluator Sidebar Migration
 
   # --- Backward Compatibility ---
 
-  @unit
+  @unit @unimplemented
   Scenario: Existing workflows with inline evaluator config still render correctly
     Given a workflow was saved with evaluator nodes using the old inline config pattern
     When the workflow loads
@@ -56,7 +56,7 @@ Feature: Studio Evaluator Sidebar Migration
 
   # --- Cleanup ---
 
-  @unit
+  @unit @unimplemented
   Scenario: Registry no longer exports prompting techniques for sidebar
     Then the node registry does not include prompting technique entries for the sidebar
     And the ALLOWED_EVALUATORS list is no longer used to populate the sidebar

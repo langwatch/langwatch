@@ -10,7 +10,7 @@ Feature: Model params preparation error feedback
   # currently returns null for all failure cases. Each case must return a
   # ModelParamsResult with a specific reason code and actionable message.
 
-  @unit
+  @unit @unimplemented
   Scenario: Reject model string without provider prefix
     Given a model string "gpt-4" without a slash separator
     When model params preparation runs
@@ -18,7 +18,7 @@ Feature: Model params preparation error feedback
     And the error message includes "gpt-4"
     And the error message explains the expected "provider/model" format
 
-  @unit
+  @unit @unimplemented
   Scenario: Reject model when provider is not found in project
     Given a model string "azure/gpt-4" with valid format
     And the project has no provider named "azure"
@@ -26,7 +26,7 @@ Feature: Model params preparation error feedback
     Then it returns failure with reason "provider_not_found"
     And the error message includes the provider name "azure"
 
-  @unit
+  @unit @unimplemented
   Scenario: Reject model when provider exists but is not enabled
     Given a model string "azure/gpt-4" with valid format
     And the project has provider "azure" but it is disabled
@@ -34,7 +34,7 @@ Feature: Model params preparation error feedback
     Then it returns failure with reason "provider_not_enabled"
     And the error message includes the provider name "azure"
 
-  @unit
+  @unit @unimplemented
   Scenario: Reject when resolved params are missing API key
     Given a model string "openai/gpt-4" with valid format
     And the provider "openai" is enabled
@@ -43,7 +43,7 @@ Feature: Model params preparation error feedback
     Then it returns failure with reason "missing_params"
     And the error message mentions missing API key or model
 
-  @unit
+  @unit @unimplemented
   Scenario: Reject when resolved params are missing model
     Given a model string "openai/gpt-4" with valid format
     And the provider "openai" is enabled
@@ -52,7 +52,7 @@ Feature: Model params preparation error feedback
     Then it returns failure with reason "missing_params"
     And the error message mentions missing API key or model
 
-  @unit
+  @unit @unimplemented
   Scenario: Return preparation_error on unexpected exception
     Given a model string "openai/gpt-4" with valid format
     And getProjectModelProviders throws an unexpected error
@@ -60,7 +60,7 @@ Feature: Model params preparation error feedback
     Then it returns failure with reason "preparation_error"
     And the error message includes the original error detail
 
-  @unit
+  @unit @unimplemented
   Scenario: Return success with LiteLLM params on valid configuration
     Given a model string "openai/gpt-4" with valid format
     And the provider "openai" is enabled with a valid API key
@@ -73,7 +73,7 @@ Feature: Model params preparation error feedback
   # prefetchScenarioData must forward the reason code and actionable message
   # from the modelParamsProvider instead of a generic error.
 
-  @unit
+  @unit @unimplemented
   Scenario: Prefetcher forwards reason code from model params failure
     Given modelParamsProvider returns failure with reason "provider_not_enabled"
     And the failure message is "Provider 'azure' is not enabled for this project"
@@ -81,7 +81,7 @@ Feature: Model params preparation error feedback
     Then the result includes reason "provider_not_enabled"
     And the error message is "Provider 'azure' is not enabled for this project"
 
-  @unit
+  @unit @unimplemented
   Scenario: Prefetcher logs model params failure with reason
     Given modelParamsProvider returns failure with reason "invalid_model_format"
     When prefetchScenarioData is called
@@ -94,21 +94,21 @@ Feature: Model params preparation error feedback
   # The TRPC router that triggers scenario execution must surface the
   # structured error so the frontend can display an actionable message.
 
-  @integration
+  @integration @unimplemented
   Scenario: TRPC layer returns actionable error for invalid model format
     Given a project with a prompt configured with model "gpt-4"
     When a scenario run is triggered via the TRPC endpoint
     Then the response contains an error message explaining the "provider/model" format
     And the error is not the generic "Failed to prepare model params"
 
-  @integration
+  @integration @unimplemented
   Scenario: TRPC layer returns actionable error for disabled provider
     Given a project with provider "azure" that is disabled
     And a prompt configured with model "azure/gpt-4"
     When a scenario run is triggered via the TRPC endpoint
     Then the response contains an error mentioning provider "azure" is not enabled
 
-  @integration
+  @integration @unimplemented
   Scenario: TRPC layer returns actionable error for missing API key
     Given a project with provider "openai" enabled but no API key
     And a prompt configured with model "openai/gpt-4"

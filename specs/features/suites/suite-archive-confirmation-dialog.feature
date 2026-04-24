@@ -9,7 +9,7 @@ Feature: Suite archive confirmation dialog
 
   # The archive flow uses a Chakra Dialog instead of a browser-native window.confirm.
   # This covers the full happy path: context menu -> dialog -> confirm.
-  @integration
+  @integration @unimplemented
   Scenario: Archive confirmation dialog appears when archiving a suite
     When I right-click on the "Smoke Tests" suite
     And I click "Archive" in the context menu
@@ -17,21 +17,21 @@ Feature: Suite archive confirmation dialog
     And the dialog displays the suite name "Smoke Tests"
     And the dialog explains that archived suites no longer appear in the sidebar
 
-  @integration
+  @integration @unimplemented
   Scenario: Cancel dismisses the archive confirmation dialog without archiving
     Given the archive confirmation dialog is open for "Smoke Tests"
     When I click "Cancel"
     Then the dialog closes
     And the suite "Smoke Tests" is still visible in the sidebar
 
-  @integration
+  @integration @unimplemented
   Scenario: Confirm archives the suite
     Given the archive confirmation dialog is open for "Smoke Tests"
     When I click "Archive"
     Then the suite is archived
     And the dialog closes
 
-  @integration
+  @integration @unimplemented
   Scenario: Buttons are disabled while archive is in progress
     Given the archive confirmation dialog is open for "Smoke Tests"
     When the archive request is in progress

@@ -20,16 +20,19 @@ Feature: BetterAuth additive schema migration
   # Column additions (all IF NOT EXISTS for idempotency)
   # ============================================================================
 
+  @unimplemented
   Scenario: Account.password column added
     When I apply the additive migration
     Then the "Account" table has a "password" column of type TEXT
     And the "password" column is nullable
 
+  @unimplemented
   Scenario: Account.type has a default value
     When I apply the additive migration
     Then the "Account"."type" column has a default of "oauth"
     And existing rows keep their previous value
 
+  @unimplemented
   Scenario: Session has ipAddress, userAgent, createdAt, updatedAt
     When I apply the additive migration
     Then the "Session" table has an "ipAddress" column of type TEXT
@@ -37,6 +40,7 @@ Feature: BetterAuth additive schema migration
     And a "createdAt" column of type TIMESTAMP with a default of now()
     And an "updatedAt" column of type TIMESTAMP with a default of now()
 
+  @unimplemented
   Scenario: VerificationToken gets an id primary key and timestamps
     When I apply the additive migration
     Then the "VerificationToken" table has an "id" column as its primary key
@@ -47,6 +51,7 @@ Feature: BetterAuth additive schema migration
   # Non-regression: everything the app depends on today still works
   # ============================================================================
 
+  @unimplemented
   Scenario: NextAuth credentials signin still works after the migration
     Given the migration has been applied
     And a user exists with a bcrypt password on the User table
@@ -55,6 +60,7 @@ Feature: BetterAuth additive schema migration
     And their session row in "Session" is created with createdAt/updatedAt timestamps
     And the session row has a nullable ipAddress and userAgent
 
+  @unimplemented
   Scenario: NextAuth Auth0 OAuth signin still works after the migration
     Given the migration has been applied
     And an organization exists with ssoDomain "acme.com" and ssoProvider "waad|acme-connection"
@@ -62,11 +68,13 @@ Feature: BetterAuth additive schema migration
     Then they are added to the organization as a MEMBER (new user case)
     And the Account row is written
 
+  @unimplemented
   Scenario: The Prisma client regenerates cleanly
     When I run "pnpm prisma:generate:typescript"
     Then it exits with code 0
     And the generated client reflects the new columns
 
+  @unimplemented
   Scenario: Typecheck passes after the schema change
     When I run "pnpm typecheck"
     Then no new errors appear in the langwatch app (packages/* may have pre-existing errors)
@@ -75,6 +83,7 @@ Feature: BetterAuth additive schema migration
   # Idempotency
   # ============================================================================
 
+  @unimplemented
   Scenario: Applying the migration twice is a no-op
     Given the migration has already been applied once
     When I try to apply it again

@@ -6,19 +6,19 @@ Feature: All Runs panel shows all scenario runs
   Background:
     Given a project with scenario runs
 
-  @integration
+  @integration @unimplemented
   Scenario: Pre-suite scenario runs appear in All Runs
     Given scenario runs exist with scenarioSetId "default"
     When I fetch all suite run data
     Then the pre-suite runs are included in the results
 
-  @integration
+  @integration @unimplemented
   Scenario: Suite-created runs still appear in All Runs
     Given scenario runs exist with a suite-pattern scenarioSetId
     When I fetch all suite run data
     Then the suite runs are included in the results
 
-  @integration
+  @integration @unimplemented
   Scenario: All run types appear together
     Given scenario runs exist with scenarioSetId "default"
     And scenario runs exist with a suite-pattern scenarioSetId

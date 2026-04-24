@@ -10,7 +10,7 @@ Feature: Upgrade Modal Variant System
   # Store: Existing Variants Unchanged
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: open() sets limit variant with legacy fields
     When I call open("workflows", 5, 10)
     Then the store state is:
@@ -21,7 +21,7 @@ Feature: Upgrade Modal Variant System
       | current   | 5           |
       | max       | 10          |
 
-  @unit
+  @unit @unimplemented
   Scenario: openSeats() sets seats variant and clears legacy fields
     When I call openSeats with organizationId "org-1", currentSeats 3, newSeats 5
     Then the store state is:
@@ -33,7 +33,7 @@ Feature: Upgrade Modal Variant System
       | newSeats       | 5      |
     And the legacy fields limitType, current, max are null
 
-  @unit
+  @unit @unimplemented
   Scenario: close() resets all state
     Given the modal is open in any variant mode
     When I call close()
@@ -47,7 +47,7 @@ Feature: Upgrade Modal Variant System
   # Store: New Lite Member Restriction Variant
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: openLiteMemberRestriction() sets restriction variant
     When I call openLiteMemberRestriction with resource "prompts"
     Then the store state is:
@@ -57,7 +57,7 @@ Feature: Upgrade Modal Variant System
       | resource | prompts                |
     And the legacy fields limitType, current, max are null
 
-  @unit
+  @unit @unimplemented
   Scenario: openLiteMemberRestriction() works without resource
     When I call openLiteMemberRestriction without resource
     Then the store state is:
@@ -66,7 +66,7 @@ Feature: Upgrade Modal Variant System
       | mode     | liteMemberRestriction  |
       | resource | undefined              |
 
-  @unit
+  @unit @unimplemented
   Scenario: close() resets lite member restriction state
     Given the modal is open in liteMemberRestriction mode
     When I call close()
@@ -79,7 +79,7 @@ Feature: Upgrade Modal Variant System
   # Variant Map Exhaustiveness
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: every variant mode has a corresponding content component
     Given the UpgradeModalVariant union has modes "limit", "seats", "liteMemberRestriction"
     Then the MODAL_CONTENT map has an entry for each mode

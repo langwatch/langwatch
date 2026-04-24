@@ -44,6 +44,7 @@ Feature: RSA License Validation
     When I verify the signature with the public key
     Then the signature is invalid
 
+  @unimplemented
   Scenario: Rejects license with wrong signature
     Given a license with a signature from a different key pair
     When I verify the signature with the public key
@@ -58,16 +59,19 @@ Feature: RSA License Validation
   # Expiration Checking
   # ============================================================================
 
+  @unimplemented
   Scenario: License is valid when expiration is in the future
     Given a license with expiration date "2030-12-31T23:59:59Z"
     When I check if the license is expired
     Then the license is not expired
 
+  @unimplemented
   Scenario: License is expired when expiration is in the past
     Given a license with expiration date "2020-01-01T00:00:00Z"
     When I check if the license is expired
     Then the license is expired
 
+  @unimplemented
   Scenario: License expires at exactly the expiration time
     Given a license with expiration date at the current moment
     When I check if the license is expired
@@ -83,16 +87,19 @@ Feature: RSA License Validation
     Then validation succeeds
     And the result contains planInfo with maxMembers 5
 
+  @unimplemented
   Scenario: Validation fails for invalid format
     Given a license key "garbage-data"
     When I validate the license
     Then validation fails with error "Invalid license format"
 
+  @unimplemented
   Scenario: Validation fails for invalid signature
     Given a license with tampered data
     When I validate the license
     Then validation fails with error "Invalid signature"
 
+  @unimplemented
   Scenario: Validation fails for expired license
     Given a valid but expired license for plan "PRO"
     When I validate the license
@@ -102,6 +109,7 @@ Feature: RSA License Validation
   # License Data Structure
   # ============================================================================
 
+  @unimplemented
   Scenario: Extracts all license fields correctly
     Given a license with:
       | licenseId         | lic-001                  |

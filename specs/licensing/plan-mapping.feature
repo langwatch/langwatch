@@ -8,6 +8,7 @@ Feature: License to PlanInfo Mapping
   # Basic Mapping
   # ============================================================================
 
+  @unimplemented
   Scenario: Maps license plan data to PlanInfo structure
     Given a license with plan type "PRO" and name "Pro"
     When I map the license to PlanInfo
@@ -64,6 +65,7 @@ Feature: License to PlanInfo Mapping
   # Constants: UNLIMITED_PLAN
   # ============================================================================
 
+  @unimplemented
   Scenario: UNLIMITED_PLAN has correct structure for backward compatibility
     When I access the UNLIMITED_PLAN constant
     Then the plan type is "OPEN_SOURCE"
@@ -81,6 +83,7 @@ Feature: License to PlanInfo Mapping
   # Constants: FREE_PLAN
   # ============================================================================
 
+  @unimplemented
   Scenario: FREE_PLAN has correct limits for expired/invalid licenses
     When I access the FREE_PLAN constant
     Then the plan type is "FREE"

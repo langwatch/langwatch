@@ -10,7 +10,7 @@ Feature: Scenario Library
   # Navigation
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Navigate to scenarios list
     When I navigate to "/my-project/simulations"
     Then I see the scenarios list page
@@ -20,7 +20,7 @@ Feature: Scenario Library
   # List View
   # ============================================================================
 
-  @e2e
+  @e2e @unimplemented
   Scenario: View scenarios in list
     Given scenarios exist in the project:
       | name          | labels              |
@@ -31,13 +31,13 @@ Feature: Scenario Library
     And each row shows the scenario name
     And each row shows the labels
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Click scenario row to edit
     Given scenario "Refund Flow" exists
     When I click on "Refund Flow" in the list
     Then I navigate to the scenario editor
 
-  @integration
+  @integration @unimplemented
   Scenario: Empty state when no scenarios
     Given no scenarios exist in the project
     When I am on the scenarios list page
@@ -48,7 +48,7 @@ Feature: Scenario Library
   # Filtering
   # ============================================================================
 
-  @e2e
+  @e2e @unimplemented
   Scenario: Filter scenarios by label
     Given scenarios exist with various labels
     When I select label "support" in the filter
