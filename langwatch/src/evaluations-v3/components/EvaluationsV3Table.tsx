@@ -71,7 +71,7 @@ import { TargetSuperHeader } from "./TargetSuperHeader";
 import { VirtualizedTableBody } from "./VirtualizedTableBody";
 
 // Max rows for expanded mode (disable virtualization above this)
-const MAX_ROWS_FOR_EXPANDED_MODE = 100;
+const MAX_ROWS_FOR_FIT_MODE = 100;
 
 // Default percentage widths for columns (stored as numbers, e.g., 16 means 16%)
 const CHECKBOX_WIDTH_PX = 40; // Checkbox is fixed pixels
@@ -870,7 +870,7 @@ export function EvaluationsV3Table({
   // - Disable virtualization in expanded mode for datasets <= 100 rows
   const rowHeightMode = ui.rowHeightMode;
   const shouldVirtualize =
-    rowHeightMode === "compact" || rowCount > MAX_ROWS_FOR_EXPANDED_MODE;
+    rowHeightMode === "compact" || rowCount > MAX_ROWS_FOR_FIT_MODE;
 
   const selectedRows = ui.selectedRows;
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
