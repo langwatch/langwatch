@@ -57,6 +57,7 @@ describe("PromptsApiService.get", () => {
   });
 
   describe("when fetching with a tag", () => {
+    /** @scenario passes tag as query parameter to the API */
     it("passes tag as query parameter to the API", async () => {
       const mockPrompt = promptResponseFactory.build();
       mockGet.mockResolvedValue({ data: mockPrompt, error: undefined });
