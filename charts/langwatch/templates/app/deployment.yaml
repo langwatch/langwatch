@@ -172,6 +172,23 @@ spec:
                   key: virtualKeyPepper
             {{- end }}
 
+            # AI Gateway shared auth — HMAC internal-call signing + per-request
+            # JWT issuance. The gateway pod pulls these from the same Secret
+            # (see charts/gateway/templates/deployment.yaml). Rotating either
+            # value requires rolling both Deployments.
+            {{- if .Values.gateway.chartManaged }}
+            - name: LW_GATEWAY_INTERNAL_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }}
+                  key: {{ .Values.gateway.secrets.internalSecretKey | default "LW_GATEWAY_INTERNAL_SECRET" }}
+            - name: LW_GATEWAY_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.gateway.secrets.existingSecretName | default "langwatch-gateway-auth" }}
+                  key: {{ .Values.gateway.secrets.jwtSecretKey | default "LW_GATEWAY_JWT_SECRET" }}
+            {{- end }}
+
             # NextAuth configuration
             - name: NEXTAUTH_PROVIDER
               value: {{ .Values.app.nextAuth.provider | quote }}
