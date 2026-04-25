@@ -79,12 +79,33 @@ PostHog receives these as `personProperties.project_id` and `personProperties.or
 
 ### Caching Strategy
 
-A 5-second TTL (`FEATURE_FLAG_CACHE_TTL_MS`) is used at two levels:
+Two TTLs cover different access patterns:
 
-1. **Server-side**: `StaleWhileRevalidateCache` with Redis (shared) + memory (per-instance)
-2. **Client-side**: React Query `staleTime`
+| Constant | Default | Used by |
+|----------|---------|---------|
+| `FEATURE_FLAG_CACHE_TTL_MS` | 5 s | Frontend `useFeatureFlag`, server-side default |
+| `KILL_SWITCH_CACHE_TTL_MS` | 60 s | Hot-path backend killswitches (per-span / per-event) |
+
+Both share one Redis-backed `StaleWhileRevalidateCache` instance whose underlying storage TTL equals the larger of the two windows. Per-call callers pass `cacheTtlMs` via `FeatureFlagOptions` to opt into the longer window; everyone else gets the 5 s default.
 
 Cache key format: `{flagKey}:{distinctId}:{projectId}:{organizationId}`
+
+### Local evaluation (PostHog)
+
+When `POSTHOG_FEATURE_FLAGS_KEY` is set, `posthog-node` is initialised with `personalApiKey` + `featureFlagsPollingInterval` (default 5 min). The SDK polls flag definitions in the background and resolves `isFeatureEnabled` in-process — no `/flags` request per call.
+
+The env var accepts either:
+- a Feature Flags Secure key (`phs_*`) — the current PostHog recommendation, scoped to flag evaluation only, **or**
+- a legacy Personal API key (`phx_*`) — supported for backward compatibility.
+
+This collapses the cost of per-span killswitch checks. Without local evaluation, each cache miss is one billable PostHog request; with it, the only billable traffic is the polling itself, **independent of evaluation volume**.
+
+PostHog bills each local-evaluation poll as 10 feature-flag requests (a single poll fetches all flag definitions in one HTTP request, but the billing multiplier is 10×). At the default 5 min interval:
+
+- 12 polls/hour × 24 × 30 ≈ **8.6 k poll requests / server / month** (HTTP)
+- × 10 billing multiplier ≈ **86 k billable units / server / month**
+
+Set `POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS` to lower the poll interval if you need flag changes to propagate faster than 5 min.
 
 ### Flag Naming Convention
 

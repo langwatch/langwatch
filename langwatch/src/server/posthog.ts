@@ -4,10 +4,31 @@ import { env } from "../env.mjs";
 
 const logger = createLogger("langwatch:posthog:client");
 
-// Create a private singleton instance
+// Default poll interval for local flag evaluation. 5min × 10 evals/poll =
+// ~86_400 billed evals per server per month, vs. one billed call per
+// uncached flag check without local evaluation. With dozens of per-span
+// killswitch checks per second, the local-evaluation path is dramatically
+// cheaper. Override via POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS.
+const DEFAULT_FLAGS_POLLING_INTERVAL_MS = 5 * 60 * 1000;
+
+// Create a private singleton instance.
+// When POSTHOG_FEATURE_FLAGS_KEY is set (Feature Flags Secure API key, phs_*,
+// or a legacy Personal API key, phx_*), posthog-node enables local
+// evaluation: flag definitions are polled in the background and
+// `isFeatureEnabled` resolves in-process without a /flags request per call.
+// The SDK option is named `personalApiKey` for historical reasons but accepts
+// both key types.
 const _posthogInstance = env.POSTHOG_KEY
   ? new PostHog(env.POSTHOG_KEY, {
       host: env.POSTHOG_HOST,
+      ...(env.POSTHOG_FEATURE_FLAGS_KEY
+        ? {
+            personalApiKey: env.POSTHOG_FEATURE_FLAGS_KEY,
+            featureFlagsPollingInterval:
+              env.POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS ??
+              DEFAULT_FLAGS_POLLING_INTERVAL_MS,
+          }
+        : {}),
     })
   : null;
 

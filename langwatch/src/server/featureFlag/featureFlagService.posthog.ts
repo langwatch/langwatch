@@ -1,7 +1,10 @@
 import { getLangWatchTracer } from "langwatch";
 import { createLogger } from "~/utils/logger/server";
 import { getPostHogInstance } from "../posthog";
-import { FEATURE_FLAG_CACHE_TTL_MS } from "./constants";
+import {
+  FEATURE_FLAG_CACHE_TTL_MS,
+  KILL_SWITCH_CACHE_TTL_MS,
+} from "./constants";
 import { StaleWhileRevalidateCache } from "./staleWhileRevalidateCache.redis";
 import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
 
@@ -39,9 +42,13 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
     "langwatch.posthog-feature-flag-service",
   );
 
+  // Underlying storage TTL is the larger of the two windows so kill-switch
+  // callers passing ttlOverrideMs = KILL_SWITCH_CACHE_TTL_MS don't get
+  // evicted by Redis at the frontend-flag staleness window.
   private readonly cache = new StaleWhileRevalidateCache(
     FEATURE_FLAG_CACHE_TTL_MS,
     FEATURE_FLAG_CACHE_TTL_MS,
+    KILL_SWITCH_CACHE_TTL_MS,
   );
 
   constructor() {
@@ -87,8 +94,9 @@ export class FeatureFlagServicePostHog implements FeatureFlagServiceInterface {
         const orgId = options?.organizationId;
         const cacheKey = `${flagKey}:${distinctId}:${projectId ?? ""}:${orgId ?? ""}`;
 
-        // Check hybrid cache first
-        const cachedResult = await this.cache.get(cacheKey);
+        // Check hybrid cache first. Hot-path callers may pass a longer
+        // cacheTtlMs to extend the staleness window without hitting PostHog.
+        const cachedResult = await this.cache.get(cacheKey, options?.cacheTtlMs);
         if (cachedResult !== undefined) {
           span.setAttribute("feature.flag.source", "posthog-cached");
           span.setAttribute("feature.flag.enabled", cachedResult.value);
