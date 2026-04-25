@@ -18,6 +18,11 @@ from langwatch_nlp.topic_clustering.utils import (
     generate_embeddings,
 )
 from langwatch_nlp.logger import get_logger
+from langwatch_nlp.aigateway_client import (
+    GatewayHTTPError,
+    GatewayNotConfiguredError,
+    chat_completions as gateway_chat_completions,
+)
 
 T = TypeVar("T")
 
@@ -50,55 +55,104 @@ def generate_topic_names(
         else ""
     )
 
-    try:
-        response = litellm.completion(
-            temperature=0.0,
-            messages=[
-                {
-                    "role": "system",
-                    "content": f'You are a highly knowledgeable assistant tasked with taxonomy for naming topics \
-                        based on a list of examples. Provide a single, descriptive name for each topic. \
-                        Avoid using "and" or "&" in the name, try to summarize it with a single concept. \
-                        Topic names should not be similar to each other, as the data is already organized, \
-                        the disambiguation between two similar topics should be clear from the name alone.\
-                            {existing_message}',
+    messages = [
+        {
+            "role": "system",
+            "content": f'You are a highly knowledgeable assistant tasked with taxonomy for naming topics \
+                based on a list of examples. Provide a single, descriptive name for each topic. \
+                Avoid using "and" or "&" in the name, try to summarize it with a single concept. \
+                Topic names should not be similar to each other, as the data is already organized, \
+                the disambiguation between two similar topics should be clear from the name alone.\
+                    {existing_message}',
+        },
+        {"role": "user", "content": f"{topic_examples_str}"},
+    ]
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "topicNames",
+                "parameters": {
+                    "type": "object",
+                    "properties": dict(
+                        [
+                            (f"topic_{index}", {"type": "string"})
+                            for index in range(len(topic_examples))
+                        ]
+                    ),
                 },
-                {"role": "user", "content": f"{topic_examples_str}"},
-            ],
-            tools=[
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "topicNames",
-                        "parameters": {
-                            "type": "object",
-                            "properties": dict(
-                                [
-                                    (f"topic_{index}", {"type": "string"})
-                                    for index in range(len(topic_examples))
-                                ]
-                            ),
-                        },
-                        "description": 'use this function to name the topics based on the examples provided, avoid using "and" or "&" in the name, try to name it with a single 2-3 words concept.',
-                    },
-                }
-            ],
-            tool_choice={"type": "function", "function": {"name": "topicNames"}},
-            **litellm_params,  # type: ignore
+                "description": 'use this function to name the topics based on the examples provided, avoid using "and" or "&" in the name, try to name it with a single 2-3 words concept.',
+            },
+        }
+    ]
+    tool_choice = {"type": "function", "function": {"name": "topicNames"}}
+
+    # Prefer the LangWatch AI Gateway when LW_GATEWAY_BASE_URL is set —
+    # part of the langwatch_nlp → Go migration (see specs/nlp-go/_shared/
+    # contract.md). Topic clustering stays in Python, but the LLM call
+    # underneath swaps from LiteLLM to a thin gateway HTTP call so we can
+    # decommission LiteLLM once Studio + playground are off it.
+    response = None
+    used_gateway = False
+    project_id = os.environ.get("LANGWATCH_TOPIC_CLUSTERING_PROJECT_ID", "topic-clustering")
+    try:
+        gateway_response = gateway_chat_completions(
+            model=str(litellm_params.get("model")),
+            messages=messages,
+            litellm_params=litellm_params,
+            project_id=project_id,
+            origin="topic_clustering",
+            tools=tools,
+            tool_choice=tool_choice,
+            temperature=0.0,
         )
-    except Exception as e:
-        logger.error(
-            "Failed to generate topic names",
-            topic_count=len(topic_examples),
-            error=str(e),
-        )
-        raise ValueError(
-            f"Failed to generate topic names for {len(topic_examples)} topics: {e}\n\nExisting: {existing_str}\n\nTopic examples: {topic_examples_str}\n\n. Error: {e}"
+        used_gateway = True
+        # The gateway returns OpenAI-shape JSON. Parse the tool-call
+        # arguments out without touching litellm types.
+        choice = gateway_response["choices"][0]
+        tool_args_raw = choice["message"]["tool_calls"][0]["function"]["arguments"]
+        topic_names_dict = json.loads(tool_args_raw)
+        # Cost from gateway: not in the response body — landed on the
+        # trace pile via OTLP. Surface zero here; cost dashboards see it
+        # via X-LangWatch-Project-Id attribution. Keep the function's
+        # return shape unchanged for callers.
+        total_cost = 0.0
+    except GatewayNotConfiguredError:
+        # Fall back to LiteLLM — pre-migration behavior unchanged.
+        pass
+    except (GatewayHTTPError, Exception) as gw_err:  # noqa: BLE001
+        # Any gateway failure (network, 5xx, parse error) falls back to
+        # LiteLLM so a flaky gateway never breaks topic clustering.
+        logger.warning(
+            "Gateway call failed, falling back to LiteLLM",
+            error=str(gw_err),
         )
 
-    total_cost = completion_cost(response)
+    if not used_gateway:
+        try:
+            response = litellm.completion(
+                temperature=0.0,
+                messages=messages,
+                tools=tools,
+                tool_choice=tool_choice,
+                **litellm_params,  # type: ignore
+            )
+        except Exception as e:
+            logger.error(
+                "Failed to generate topic names",
+                topic_count=len(topic_examples),
+                error=str(e),
+            )
+            raise ValueError(
+                f"Failed to generate topic names for {len(topic_examples)} topics: {e}\n\nExisting: {existing_str}\n\nTopic examples: {topic_examples_str}\n\n. Error: {e}"
+            )
 
-    topic_names: list[str] = list(json.loads(response.choices[0].message.tool_calls[0].function.arguments).values())  # type: ignore
+        total_cost = completion_cost(response)
+        topic_names_dict = json.loads(
+            response.choices[0].message.tool_calls[0].function.arguments  # type: ignore
+        )
+
+    topic_names: list[str] = list(topic_names_dict.values())
     topic_names = topic_names[0 : len(topic_examples)]
     if len(topic_names) != len(topic_examples):
         raise ValueError("topic_names and topic_examples must have the same length.")
