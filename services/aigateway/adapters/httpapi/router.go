@@ -42,6 +42,12 @@ type RouterDeps struct {
 	// vision payloads; lower on public edge deployments to tighten DDoS
 	// protection.
 	MaxRequestBodyBytes int64
+	// InternalSecret is the shared HMAC secret used by internal callers
+	// (today: services/nlpgo) that present per-request inline credentials
+	// instead of a Virtual Key. Empty means the inline-credentials inbound
+	// path is disabled — only VK auth is accepted. See _shared/contract.md
+	// §8.1.
+	InternalSecret string
 }
 
 // NewRouter creates the chi router with all gateway routes mounted.
@@ -65,6 +71,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	}
 
 	r.Route("/v1", func(v1 chi.Router) {
+		v1.Use(InternalAuthMiddleware(deps.InternalSecret, deps.MaxRequestBodyBytes))
 		v1.Use(AuthMiddleware(deps.App.Auth()))
 		v1.Use(CustomerTraceMiddleware())
 		v1.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
@@ -83,6 +90,7 @@ func NewRouter(deps RouterDeps) http.Handler {
 	// Any path under /v1beta (including :countTokens, :batchEmbedContents,
 	// cachedContents/*) is accepted by the same handler.
 	r.Route("/v1beta", func(v1beta chi.Router) {
+		v1beta.Use(InternalAuthMiddleware(deps.InternalSecret, deps.MaxRequestBodyBytes))
 		v1beta.Use(AuthMiddleware(deps.App.Auth()))
 		v1beta.Use(CustomerTraceMiddleware())
 		v1beta.Use(TraceRegistryMiddleware(deps.TraceRegistry, deps.DefaultExportEndpoint))
