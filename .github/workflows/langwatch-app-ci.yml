@@ -270,9 +270,21 @@ jobs:
             sleep 1
           done
 
-          # Verify storage policy is available
+          # Verify storage policy is available. The HTTP-readiness probe above can
+          # return success before system.storage_policies is queryable (race against
+          # config-load), so retry briefly instead of failing on the first transient
+          # connection-reset/exit-7. Observed flake on shard 2 of run 24928953505.
           echo "Verifying storage policy..."
-          curl -sf "http://localhost:8123/?user=default&password=ci_password" -d "SELECT policy_name, volume_name, disks FROM system.storage_policies WHERE policy_name = 'local_primary'"
+          for i in {1..15}; do
+            if curl -sf "http://localhost:8123/?user=default&password=ci_password" -d "SELECT policy_name, volume_name, disks FROM system.storage_policies WHERE policy_name = 'local_primary'"; then
+              break
+            fi
+            if [ "$i" -eq 15 ]; then
+              echo "storage policy never became queryable" >&2
+              exit 1
+            fi
+            sleep 1
+          done
 
       - name: Run ClickHouse migrations
         working-directory: langwatch
