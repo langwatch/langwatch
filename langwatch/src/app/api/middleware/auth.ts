@@ -1,7 +1,7 @@
 import type { Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import { prisma } from "~/server/db";
-import { createUnifiedAuthMiddleware } from "~/server/pat/auth-middleware";
+import { createUnifiedAuthMiddleware } from "~/server/api-key/auth-middleware";
 
 /**
  * Variables set by the auth middleware.
@@ -9,9 +9,9 @@ import { createUnifiedAuthMiddleware } from "~/server/pat/auth-middleware";
  */
 export type AuthMiddlewareVariables = {
   project: Project;
-  patId?: string;
-  patUserId?: string;
-  patOrganizationId?: string;
+  apiKeyId?: string;
+  apiKeyUserId?: string;
+  apiKeyOrganizationId?: string;
 };
 
 /**

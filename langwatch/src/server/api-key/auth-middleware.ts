@@ -1,27 +1,27 @@
 import type { PrismaClient, Project } from "@prisma/client";
 import type { MiddlewareHandler } from "hono";
 import { TokenResolver, type ResolvedToken } from "./token-resolver";
-import { PatPermissionDeniedError } from "./errors";
+import { ApiKeyPermissionDeniedError } from "./errors";
 import type { Permission } from "~/server/api/rbac";
-import { resolvePatPermission } from "~/server/rbac/role-binding-resolver";
+import { resolveApiKeyPermission } from "~/server/rbac/role-binding-resolver";
 import { DomainError } from "~/server/app-layer/domain-error";
 import { createLogger } from "~/utils/logger/server";
+import { getTokenType } from "./api-key-token.utils";
 
 const logger = createLogger("langwatch:api:unified-auth");
-const permissionLogger = createLogger("langwatch:api:pat-ceiling");
+const permissionLogger = createLogger("langwatch:api:api-key-ceiling");
 
 /**
- * Variables set by the unified auth middleware, extending the existing
- * AuthMiddlewareVariables shape.
+ * Variables set by the unified auth middleware.
  */
 export type UnifiedAuthVariables = {
   project: Project;
-  /** Set when the request was authenticated via PAT */
-  patId?: string;
-  /** The user ID from the PAT (not set for legacy keys) */
-  patUserId?: string;
-  /** The organization ID from the PAT */
-  patOrganizationId?: string;
+  /** Set when the request was authenticated via API key (not legacy project key) */
+  apiKeyId?: string;
+  /** The user ID from the API key (not set for legacy project keys) */
+  apiKeyUserId?: string;
+  /** The organization ID from the API key */
+  apiKeyOrganizationId?: string;
   /** The resolved token details */
   resolvedToken?: ResolvedToken;
 };
@@ -30,9 +30,8 @@ export type UnifiedAuthVariables = {
  * Parses the Authorization header to extract credentials for all supported
  * auth methods:
  *   1. Basic Auth: base64(projectId:token) — for SDKs
- *   2. Bearer PAT: pat-lw-... + X-Project-Id header
- *   3. Bearer Legacy: sk-lw-... (project ID implicit in key)
- *   4. X-Auth-Token: legacy header (any token type)
+ *   2. Bearer: sk-lw-... or pat-lw-... + X-Project-Id header
+ *   3. X-Auth-Token: legacy header (any token type)
  */
 function extractCredentials(
   getHeader: (name: string) => string | undefined,
@@ -81,21 +80,14 @@ function extractCredentials(
 }
 
 /**
- * Unified Hono auth middleware that handles all three auth methods:
- *   - Basic Auth (base64 decode projectId:pat)
- *   - Bearer PAT (Authorization: Bearer pat-lw-... + X-Project-Id header)
+ * Unified Hono auth middleware that handles all auth methods:
+ *   - Basic Auth (base64 decode projectId:token)
+ *   - Bearer API key (Authorization: Bearer sk-lw-... + X-Project-Id header)
  *   - Legacy (X-Auth-Token: sk-lw-... unchanged)
  *
- * Sets `project`, `patId`, `patUserId`, `patOrganizationId` on the context.
+ * Sets `project`, `apiKeyId`, `apiKeyUserId`, `apiKeyOrganizationId` on context.
  *
- * Takes a PrismaClient via injection so the middleware isn't coupled to the
- * module-scope `~/server/db` global and can be exercised with a test client
- * or a per-request Prisma instance.
- *
- * markUsed is late — called only after `next()` returns a 2xx response. This
- * keeps `lastUsedAt` aligned with *successful* request outcomes rather than
- * merely successful authentication, mirroring the route-owned pattern in
- * `collector.ts`.
+ * markUsed is late — called only after `next()` returns a 2xx response.
  */
 export function createUnifiedAuthMiddleware({
   prisma,
@@ -154,15 +146,12 @@ export function createUnifiedAuthMiddleware({
     }
 
     if (!resolved) {
+      const tokenType = getTokenType(credentials.token);
       logger.warn(
         {
           ...diag,
           hasToken: true,
-          tokenType: credentials.token.startsWith("pat-lw-")
-            ? "pat"
-            : credentials.token.startsWith("sk-lw-")
-              ? "legacy"
-              : "unknown",
+          tokenType,
           hasProjectId: !!credentials.projectId,
         },
         "Authentication failed: invalid credentials",
@@ -176,22 +165,21 @@ export function createUnifiedAuthMiddleware({
     c.set("project", resolved.project);
     c.set("resolvedToken", resolved);
 
-    if (resolved.type === "pat") {
-      c.set("patId", resolved.patId);
-      c.set("patUserId", resolved.userId);
-      c.set("patOrganizationId", resolved.organizationId);
+    if (resolved.type === "apiKey") {
+      c.set("apiKeyId", resolved.apiKeyId);
+      c.set("apiKeyUserId", resolved.userId);
+      c.set("apiKeyOrganizationId", resolved.organizationId);
     }
 
     await next();
 
-    // Late markUsed: only when the handler produced a success response. Keeps
-    // lastUsedAt tied to successful request outcomes, not mere authentication.
+    // Late markUsed: only when the handler produced a success response.
     if (
-      resolved.type === "pat" &&
+      resolved.type === "apiKey" &&
       c.res.status >= 200 &&
       c.res.status < 300
     ) {
-      resolver.markUsed({ patId: resolved.patId });
+      resolver.markUsed({ apiKeyId: resolved.apiKeyId });
     }
   };
 }
@@ -237,23 +225,15 @@ export function collectAuthDiagnostics(c: {
 }
 
 /**
- * Enforces the PAT permission ceiling for an already-resolved token.
+ * Enforces the API key permission ceiling for an already-resolved token.
  *
- * Legacy tokens are granted full access (current behavior — project API keys
- * bypass RBAC). PAT tokens must satisfy `effective = PAT ∩ user` at the
+ * Legacy project keys are granted full access (current behavior — project API
+ * keys bypass RBAC). API keys must satisfy `effective = ApiKey ∩ user` at the
  * project scope for the requested permission.
  *
- * Throws `PatPermissionDeniedError` when a PAT is denied so route handlers
- * can catch a typed domain error (kind `pat_permission_denied`, httpStatus
- * 403) instead of inspecting an ad-hoc descriptor. Returns normally when
- * access is granted. This helper exists so both Hono middleware and inline
- * route handlers (collector, otel, track_event) share one enforcement path.
- *
- * `prisma` is injected rather than imported from module scope so the helper
- * doesn't leak infrastructure; callers already hold a client to construct
- * TokenResolver and can pass the same instance.
+ * Throws `ApiKeyPermissionDeniedError` when denied.
  */
-export async function enforcePatCeiling({
+export async function enforceApiKeyCeiling({
   prisma,
   resolved,
   permission,
@@ -262,11 +242,11 @@ export async function enforcePatCeiling({
   resolved: ResolvedToken;
   permission: Permission;
 }): Promise<void> {
-  if (resolved.type !== "pat") return;
+  if (resolved.type !== "apiKey") return;
 
-  const allowed = await resolvePatPermission({
+  const allowed = await resolveApiKeyPermission({
     prisma,
-    patId: resolved.patId,
+    apiKeyId: resolved.apiKeyId,
     userId: resolved.userId,
     organizationId: resolved.organizationId,
     scope: {
@@ -280,16 +260,16 @@ export async function enforcePatCeiling({
   if (!allowed) {
     permissionLogger.warn(
       {
-        patId: resolved.patId,
+        apiKeyId: resolved.apiKeyId,
         userId: resolved.userId,
         projectId: resolved.project.id,
         permission,
       },
-      "PAT ceiling check failed",
+      "API key ceiling check failed",
     );
-    throw new PatPermissionDeniedError(permission, {
+    throw new ApiKeyPermissionDeniedError(permission, {
       meta: {
-        patId: resolved.patId,
+        apiKeyId: resolved.apiKeyId,
         userId: resolved.userId,
         projectId: resolved.project.id,
       },
@@ -298,30 +278,24 @@ export async function enforcePatCeiling({
 }
 
 /**
- * Converts a PAT permission denial thrown by `enforcePatCeiling` into a
- * Hono-style JSON + status tuple. Re-throws anything that isn't a
- * `PatPermissionDeniedError` so genuine infrastructure errors surface.
- *
- * Route handlers use this in their auth try/catch to preserve the existing
- * descriptor-style early-return ergonomics while the underlying enforcement
- * path is now a typed domain error.
+ * Converts an API key permission denial into a Hono-style JSON response.
+ * Re-throws anything that isn't an `ApiKeyPermissionDeniedError`.
  */
-export function patCeilingDenialResponse(
+export function apiKeyCeilingDenialResponse(
   error: unknown,
 ): { error: string; message: string; status: 403 } {
-  if (DomainError.isHandled(error) && error.kind === "pat_permission_denied") {
+  if (DomainError.isHandled(error) && error.kind === "api_key_permission_denied") {
     return { error: "Forbidden", message: error.message, status: 403 };
   }
   throw error;
 }
 
 /**
- * Hono middleware that applies the PAT ceiling for a specific permission.
+ * Hono middleware that applies the API key ceiling for a specific permission.
  * Must be chained AFTER createUnifiedAuthMiddleware — reads `resolvedToken`
- * from context. Accepts a PrismaClient via injection so enforcement never
- * reaches for a module-scope client.
+ * from context.
  */
-export function requirePatPermission({
+export function requireApiKeyPermission({
   prisma,
   permission,
 }: {
@@ -331,7 +305,6 @@ export function requirePatPermission({
   return async (c, next) => {
     const resolved = c.get("resolvedToken") as ResolvedToken | undefined;
     if (!resolved) {
-      // No token resolved — auth middleware should have run first.
       return c.json(
         { error: "Unauthorized", message: "Authentication required" },
         401,
@@ -339,9 +312,9 @@ export function requirePatPermission({
     }
 
     try {
-      await enforcePatCeiling({ prisma, resolved, permission });
+      await enforceApiKeyCeiling({ prisma, resolved, permission });
     } catch (error) {
-      const denial = patCeilingDenialResponse(error);
+      const denial = apiKeyCeilingDenialResponse(error);
       return c.json(
         { error: denial.error, message: denial.message },
         denial.status,
