@@ -125,12 +125,15 @@ topic clustering on Python. Roll out per-project via feature flag.
 
 ### Phase 4 — tests + QA
 - [ ] Provider matrix tests `tests/matrix/` with build tags (ash)
-- [ ] Engine integration tests with real HTTP gateway stub (sarah)
+- [x] Engine integration tests with real HTTP gateway stub (sarah) — 7 e2e tests through full chi router via httptest, including signature node end-to-end against stub gateway
 - [ ] Topic clustering swap LiteLLM → gateway HTTP (ash, scoped down)
-- [ ] PR opened + CI green
+- [x] PR opened + CI green — PR #3483 (https://github.com/langwatch/langwatch/pull/3483) draft against feat/ai-gateway
 - [ ] CodeRabbit review addressed
 - [ ] Browser QA: real workflows in Studio across providers
 - [ ] Screenshots embedded in PR via img402.dev
+
+### Status snapshot per iteration
+- 2026-04-25 iter1: scaffolding + DSL + planner + dataset/code/HTTP blocks + engine orchestrator + handler wiring + 7 integration tests (sarah). gateway inline-creds + gatewayclient + litellm translator + llmexecutor (ash). PR #3483 opened draft. 143/143 nlpgo tests + 13 new aigateway tests green.
 
 ## Open questions / risks
 - Gateway inline-creds auth path is a precondition for everything in the Go
