@@ -2,6 +2,7 @@ package aigateway
 
 import (
 	"context"
+	"os"
 	"time"
 
 	"github.com/langwatch/langwatch/pkg/clog"
@@ -72,6 +73,7 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Hydrate(&cfg); err != nil {
 		return Config{}, err
 	}
+	applyLegacyEnvAliases(&cfg)
 	if cfg.CustomerTraceBridge.BaseURL == "" {
 		cfg.CustomerTraceBridge.BaseURL = cfg.ControlPlane.BaseURL
 	}
@@ -83,4 +85,44 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// applyLegacyEnvAliases reads the chart/saas-style env var names that the
+// gateway chart's configmap and the langwatch-saas terraform deployment have
+// historically set, and maps them onto the canonical struct fields. The
+// canonical names (resolved via the Hydrate prefix scheme — e.g. SERVER_ADDR,
+// LW_GATEWAY_BASE_URL, LOG_LEVEL, OTEL_OTLP_ENDPOINT) take precedence; the
+// legacy fallbacks only fire when the canonical env var is absent.
+//
+// Without this layer, both the chart and saas terraform shipped GATEWAY_*
+// prefixed env vars that the Go code never read, leaving the gateway running
+// on dev defaults (ControlPlane.BaseURL = http://localhost:5560) in any pod
+// — passing /healthz but failing every real VK call with auth_upstream_unavailable.
+//
+// DEPRECATE: remove once all chart users + saas terraform have migrated to
+// canonical names. Track via the existence of GATEWAY_LISTEN_ADDR / friends
+// in any deployed configmap or terraform; safe to drop when grep returns
+// zero hits across deployment manifests.
+func applyLegacyEnvAliases(cfg *Config) {
+	type alias struct {
+		canonical, legacy string
+		apply             func(string)
+	}
+	aliases := []alias{
+		{"SERVER_ADDR", "GATEWAY_LISTEN_ADDR", func(v string) { cfg.Server.Addr = v }},
+		{"LW_GATEWAY_BASE_URL", "GATEWAY_CONTROL_PLANE_URL", func(v string) { cfg.ControlPlane.BaseURL = v }},
+		{"LOG_LEVEL", "GATEWAY_LOG_LEVEL", func(v string) { cfg.Log.Level = v }},
+		{"OTEL_OTLP_ENDPOINT", "GATEWAY_OTEL_DEFAULT_ENDPOINT", func(v string) { cfg.OTel.OTLPEndpoint = v }},
+	}
+	for _, a := range aliases {
+		// Match Hydrate's "empty == not set" semantics (pkg/config/config.go).
+		// Treat canonical=unset OR canonical=empty as "open to legacy fallback";
+		// only a non-empty canonical value short-circuits the alias.
+		if os.Getenv(a.canonical) != "" {
+			continue
+		}
+		if v := os.Getenv(a.legacy); v != "" {
+			a.apply(v)
+		}
+	}
 }
