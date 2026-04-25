@@ -3,6 +3,12 @@ version: "2"
 run:
   timeout: 5m
   modules-download-mode: readonly
+  # Pin analysis target to the highest Go version golangci-lint v2.11.4 was
+  # built with (1.25). Without this, lint refuses to analyze code whose
+  # go.mod targets a newer Go than the linter's own build toolchain.
+  # Track upstream: golangci-lint follows "latest-1" — bump when v2.x ships
+  # built with go1.26.
+  go: "1.25"
 
 linters:
   # ── Defaults (always on) ───────────────────────────────────────────────
