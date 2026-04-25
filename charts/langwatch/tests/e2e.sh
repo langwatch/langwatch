@@ -370,6 +370,7 @@ test_workers() {
   hc upgrade "$RELEASE" "$CHART_DIR" \
     -f "$CHART_DIR/tests/values-e2e.yaml" \
     --set app.replicaCount=1 \
+    --set workers.enabled=true \
     --set workers.replicaCount=1 \
     --wait --timeout "${TIMEOUT}s"
   pass "helm upgrade (workers deployed)"
