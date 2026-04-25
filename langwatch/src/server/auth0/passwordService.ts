@@ -81,11 +81,40 @@ async function parseJsonSafe(res: Response): Promise<unknown> {
 }
 
 /**
- * Get a Management API access token via client_credentials grant.
- * Token is not cached in v1 — one extra call per password change is fine.
+ * In-memory cache for the Management API token. Auth0 issues these for the
+ * full `expires_in` duration (typically 24h for M2M). We keyed it on the
+ * mgmtClientId so a credential rotation invalidates automatically. A 60s
+ * safety window guards against using a token that's about to expire.
+ */
+interface CachedToken {
+  token: string;
+  expiresAtMs: number;
+  clientId: string;
+}
+let cachedToken: CachedToken | null = null;
+const TOKEN_SAFETY_WINDOW_MS = 60_000;
+
+/** Test-only: clear the cached Management API token. */
+export function _resetManagementApiTokenCache(): void {
+  cachedToken = null;
+}
+
+/**
+ * Get a Management API access token via client_credentials grant. Caches the
+ * token for its declared `expires_in` minus a 60s safety window so successive
+ * password changes don't each pay a token-issuance round-trip and don't burn
+ * the tenant's token-issuance rate budget unnecessarily.
  */
 export async function getManagementApiToken(): Promise<string> {
   const config = loadConfig();
+
+  if (
+    cachedToken &&
+    cachedToken.clientId === config.mgmtClientId &&
+    Date.now() < cachedToken.expiresAtMs - TOKEN_SAFETY_WINDOW_MS
+  ) {
+    return cachedToken.token;
+  }
 
   const res = await fetch(`${config.issuer}/oauth/token`, {
     method: "POST",
@@ -99,7 +128,12 @@ export async function getManagementApiToken(): Promise<string> {
   });
 
   const body = (await parseJsonSafe(res)) as
-    | { access_token?: string; error?: string; error_description?: string }
+    | {
+        access_token?: string;
+        expires_in?: number;
+        error?: string;
+        error_description?: string;
+      }
     | undefined;
 
   if (!res.ok || !body?.access_token) {
@@ -112,6 +146,18 @@ export async function getManagementApiToken(): Promise<string> {
         `Auth0 client_credentials grant failed with status ${res.status}`,
       body,
     });
+  }
+
+  // Auth0 always returns expires_in for client_credentials. Treat a missing
+  // value defensively as "don't cache" rather than risking a stale token.
+  if (typeof body.expires_in === "number" && body.expires_in > 0) {
+    cachedToken = {
+      token: body.access_token,
+      expiresAtMs: Date.now() + body.expires_in * 1000,
+      clientId: config.mgmtClientId,
+    };
+  } else {
+    cachedToken = null;
   }
 
   return body.access_token;

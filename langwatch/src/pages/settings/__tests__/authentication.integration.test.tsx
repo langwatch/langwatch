@@ -174,11 +174,17 @@ describe("<AuthenticationSettings/>", () => {
           fireEvent.click(submitBtns[0]!);
         });
 
+        // Tight assertion — Auth0 mode must NOT leak currentPassword in
+        // the mutation payload (see related CodeRabbit finding).
         await waitFor(() => {
-          expect(mockChangePassword).toHaveBeenCalledWith(
-            expect.objectContaining({ newPassword: "new-pw-123456" }),
-          );
+          expect(mockChangePassword).toHaveBeenCalledTimes(1);
         });
+        const payload = mockChangePassword.mock.calls[0]?.[0] as Record<
+          string,
+          unknown
+        >;
+        expect(payload).toEqual({ newPassword: "new-pw-123456" });
+        expect(payload).not.toHaveProperty("currentPassword");
         await waitFor(() => {
           expect(mockToasterCreate).toHaveBeenCalledWith(
             expect.objectContaining({

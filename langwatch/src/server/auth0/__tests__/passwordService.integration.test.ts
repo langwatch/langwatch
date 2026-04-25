@@ -38,6 +38,7 @@ vi.mock("../../../env.mjs", () => ({
 
 import {
   Auth0ApiError,
+  _resetManagementApiTokenCache,
   changeAuth0Password,
   getManagementApiToken,
   updateUserPassword,
@@ -102,6 +103,9 @@ afterAll(async () => {
 beforeEach(() => {
   captured = [];
   handler = () => ({ status: 404 });
+  // Reset between cases so each test starts with no cached Management
+  // API token (the cache is module-scoped).
+  _resetManagementApiTokenCache();
 });
 
 describe("getManagementApiToken", () => {
@@ -109,7 +113,11 @@ describe("getManagementApiToken", () => {
     it("returns the access token", async () => {
       handler = () => ({
         status: 200,
-        body: { access_token: "mgmt-token", token_type: "Bearer" },
+        body: {
+          access_token: "mgmt-token",
+          token_type: "Bearer",
+          expires_in: 3600,
+        },
       });
 
       const token = await getManagementApiToken();
@@ -120,6 +128,42 @@ describe("getManagementApiToken", () => {
         client_secret: "test-client-secret",
         audience: `${auth0Issuer}/api/v2/`,
       });
+    });
+  });
+
+  describe("when called twice within the cache lifetime", () => {
+    it("returns the cached token without a second token request", async () => {
+      handler = () => ({
+        status: 200,
+        body: {
+          access_token: "cached-mgmt-token",
+          token_type: "Bearer",
+          expires_in: 3600,
+        },
+      });
+
+      const t1 = await getManagementApiToken();
+      const t2 = await getManagementApiToken();
+
+      expect(t1).toBe("cached-mgmt-token");
+      expect(t2).toBe("cached-mgmt-token");
+      // Only ONE request was made — second call was served from cache.
+      expect(captured).toHaveLength(1);
+    });
+  });
+
+  describe("when the response is missing expires_in", () => {
+    it("does not cache the token (defensive)", async () => {
+      handler = () => ({
+        status: 200,
+        body: { access_token: "uncached-mgmt-token", token_type: "Bearer" },
+      });
+
+      await getManagementApiToken();
+      await getManagementApiToken();
+      // Both calls hit the network because we refused to cache without
+      // an explicit expiry.
+      expect(captured).toHaveLength(2);
     });
   });
 
