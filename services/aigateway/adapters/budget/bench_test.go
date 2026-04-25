@@ -48,4 +48,3 @@ func BenchmarkPrecheck_HardStop(b *testing.B) {
 		_, _ = checker.Precheck(ctx, bundle)
 	}
 }
-
