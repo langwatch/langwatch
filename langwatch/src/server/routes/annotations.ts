@@ -34,7 +34,7 @@ async function authenticateRequest(
   c: Context,
   permission: Permission,
 ) {
-  const credentials = extractCredentials(c);
+  const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) {
     return {
       error:

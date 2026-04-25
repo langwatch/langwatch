@@ -65,12 +65,23 @@ vi.mock("~/hooks/useDrawer", () => ({
     closeDrawer: mockCloseDrawer,
     openDrawer: mockOpenDrawer,
     drawerOpen: vi.fn(() => false),
+    canGoBack: false,
+    goBack: vi.fn(),
   }),
   getComplexProps: () => ({
     evaluatorType: "langevals/exact_match",
     category: "expected_answer",
   }),
   useDrawerParams: () => ({ category: "expected_answer" }),
+  getDrawerStack: () => [],
+  getFlowCallbacks: () => null,
+  setFlowCallbacks: vi.fn(),
+}));
+
+vi.mock("~/hooks/useLicenseEnforcement", () => ({
+  useLicenseEnforcement: () => ({
+    checkAndProceed: (fn: () => void) => fn(),
+  }),
 }));
 
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
@@ -84,6 +95,8 @@ vi.mock("~/hooks/useOrganizationTeamProject", () => ({
 
 // Mock the tRPC API
 const mockCreateMutate = vi.fn();
+const mockUpdateMutate = vi.fn();
+const mockGetByIdData = { current: null as Record<string, unknown> | null };
 
 vi.mock("~/utils/api", () => ({
   api: {
@@ -96,13 +109,13 @@ vi.mock("~/utils/api", () => ({
       },
       getById: {
         useQuery: vi.fn(() => ({
-          data: null,
+          data: mockGetByIdData.current,
           isLoading: false,
         })),
       },
       update: {
         useMutation: vi.fn(() => ({
-          mutate: vi.fn(),
+          mutate: mockUpdateMutate,
           isPending: false,
         })),
       },
@@ -283,6 +296,169 @@ describe.skip("EvaluatorEditorDrawer", () => {
         // Check for SVG - LuArrowLeft renders as SVG
         const svg = backButton.querySelector("svg");
         expect(svg).toBeInTheDocument();
+      });
+    });
+  });
+});
+
+/**
+ * Regression tests for bug #3442: Evaluator name update does not persist.
+ * These use the module-level mocks but override getById data per test.
+ */
+describe("EvaluatorEditorDrawer — name update regression (#3442)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetByIdData.current = null;
+  });
+
+  afterEach(() => {
+    mockGetByIdData.current = null;
+    cleanup();
+  });
+
+  describe("when editing a workflow evaluator name", () => {
+    it("calls updateMutation with the new name", async () => {
+      const user = userEvent.setup();
+
+      mockGetByIdData.current = {
+        id: "eval-wf-1",
+        projectId: "test-project-id",
+        name: "Original Workflow Name",
+        type: "workflow",
+        workflowId: "workflow-1",
+        config: {},
+        fields: [],
+        outputFields: [],
+        slug: "original-workflow-name",
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        copiedFromEvaluatorId: null,
+      };
+
+      render(
+        <EvaluatorEditorDrawer
+          open={true}
+          evaluatorId="eval-wf-1"
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("evaluator-name-input")).toBeInTheDocument();
+      });
+
+      const nameInput = screen.getByTestId("evaluator-name-input");
+      await user.clear(nameInput);
+      await user.type(nameInput, "Updated Workflow Name");
+
+      const saveButton = screen.getByTestId("save-evaluator-button");
+      await user.click(saveButton);
+
+      expect(mockUpdateMutate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          id: "eval-wf-1",
+          projectId: "test-project-id",
+          name: "Updated Workflow Name",
+        }),
+      );
+    });
+
+    it("does not call updateMutation when name is unchanged", async () => {
+      const user = userEvent.setup();
+
+      mockGetByIdData.current = {
+        id: "eval-wf-2",
+        projectId: "test-project-id",
+        name: "Unchanged Name",
+        type: "workflow",
+        workflowId: "workflow-2",
+        config: {},
+        fields: [],
+        outputFields: [],
+        slug: "unchanged-name",
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        copiedFromEvaluatorId: null,
+      };
+
+      render(
+        <EvaluatorEditorDrawer
+          open={true}
+          evaluatorId="eval-wf-2"
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("evaluator-name-input")).toBeInTheDocument();
+      });
+
+      // Click save without changing the name
+      const saveButton = screen.getByTestId("save-evaluator-button");
+      await user.click(saveButton);
+
+      expect(mockUpdateMutate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when query refetches while user is editing", () => {
+    it("preserves user edits and does not reset the form", async () => {
+      const user = userEvent.setup();
+
+      mockGetByIdData.current = {
+        id: "eval-bi-1",
+        projectId: "test-project-id",
+        name: "DB Name",
+        type: "evaluator",
+        config: { evaluatorType: "langevals/exact_match", settings: {} },
+        fields: [],
+        outputFields: [],
+        slug: "db-name",
+        archivedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        copiedFromEvaluatorId: null,
+        workflowId: null,
+      };
+
+      const { rerender } = render(
+        <EvaluatorEditorDrawer
+          open={true}
+          evaluatorId="eval-bi-1"
+          evaluatorType="langevals/exact_match"
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await waitFor(() => {
+        expect(screen.getByTestId("evaluator-name-input")).toBeInTheDocument();
+      });
+
+      // User types a new name
+      const nameInput = screen.getByTestId("evaluator-name-input");
+      await user.clear(nameInput);
+      await user.type(nameInput, "My New Name");
+
+      expect(nameInput).toHaveValue("My New Name");
+
+      // Simulate query refetch (new object reference, same data)
+      mockGetByIdData.current = { ...mockGetByIdData.current };
+
+      rerender(
+        <EvaluatorEditorDrawer
+          open={true}
+          evaluatorId="eval-bi-1"
+          evaluatorType="langevals/exact_match"
+        />,
+      );
+
+      // Name should still be the user's edit, not reset to DB value
+      await waitFor(() => {
+        expect(screen.getByTestId("evaluator-name-input")).toHaveValue(
+          "My New Name",
+        );
       });
     });
   });

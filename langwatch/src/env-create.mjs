@@ -121,6 +121,21 @@ export function createEnvConfig() {
 
       POSTHOG_KEY: z.string().optional(),
       POSTHOG_HOST: z.string().optional(),
+      // Feature Flags Secure API key (phs_*) — or a legacy Personal API key
+      // (phx_*) — enables local feature flag evaluation in posthog-node. When
+      // set, server-side `isFeatureEnabled` does NOT hit /flags per call;
+      // instead the SDK polls flag definitions periodically and evaluates
+      // locally. See https://posthog.com/docs/feature-flags/local-evaluation
+      POSTHOG_FEATURE_FLAGS_KEY: z.string().optional(),
+      // Polling interval (ms) for local flag definition refresh. PostHog default
+      // is 30s; we default to 5min because each poll counts as 10 flag evaluations
+      // for billing. Lower this if you need flag changes to propagate faster.
+      // Empty-string values in .env are coerced to undefined so they fall back
+      // to the runtime default instead of failing .positive() with 0.
+      POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS: z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().int().positive().optional(),
+      ),
       DISABLE_USAGE_STATS: z.boolean().optional(),
       LANGWATCH_NLP_LAMBDA_CONFIG: z.string().optional(),
 
@@ -228,6 +243,9 @@ export function createEnvConfig() {
       COGNITO_CLIENT_SECRET: process.env.COGNITO_CLIENT_SECRET,
       POSTHOG_KEY: process.env.POSTHOG_KEY,
       POSTHOG_HOST: process.env.POSTHOG_HOST,
+      POSTHOG_FEATURE_FLAGS_KEY: process.env.POSTHOG_FEATURE_FLAGS_KEY,
+      POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS:
+        process.env.POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS,
       DISABLE_USAGE_STATS:
         process.env.DISABLE_USAGE_STATS === "1" ||
         process.env.DISABLE_USAGE_STATS?.toLowerCase() === "true",

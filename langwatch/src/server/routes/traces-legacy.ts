@@ -45,7 +45,7 @@ export const app = new Hono().basePath("/api");
  * keys — callers invoke it after a successful response.
  */
 async function authenticateRequest(c: Context, permission: Permission) {
-  const credentials = extractCredentials(c);
+  const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) {
     return {
       error:

@@ -150,6 +150,27 @@ describe("when no model providers are configured", () => {
 
     expect(screen.getByText("Model Provider Required")).toBeInTheDocument();
   });
+
+  it("renders a Configure model provider button linking to /settings/model-providers in a new tab", () => {
+    render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+    const primaryLink = screen.getByTestId(
+      "scenario-ai-configure-model-provider-button",
+    );
+    expect(primaryLink).toHaveAccessibleName("Configure model provider");
+    expect(primaryLink).toHaveAttribute("href", "/settings/model-providers");
+    expect(primaryLink).toHaveAttribute("target", "_blank");
+    expect(primaryLink).toHaveAttribute("rel", expect.stringContaining("noopener"));
+    expect(primaryLink).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
+  });
+
+  it("keeps the inline explanatory text alongside the button", () => {
+    render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+    expect(
+      screen.getByText(/Scenarios require a model provider to run/i),
+    ).toBeInTheDocument();
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -215,7 +236,22 @@ describe("given azure is the only enabled provider and project.defaultModel is n
 
       fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
 
-      expect(screen.getByText(/default model/i)).toBeInTheDocument();
+      expect(screen.getByText(/no default model set/i)).toBeInTheDocument();
+    });
+
+    it("renders a Configure default model button linking to /settings/model-providers in a new tab", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+
+      const link = screen.getByTestId(
+        "scenario-ai-configure-default-model-button",
+      );
+      expect(link).toHaveAccessibleName("Configure default model");
+      expect(link).toHaveAttribute("href", "/settings/model-providers");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+      expect(link).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
     });
   });
 });
@@ -248,6 +284,21 @@ describe("given azure is the only enabled provider and project.defaultModel is o
       fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
 
       expect(screen.getByText(/provider.*disabled|disabled.*provider/i)).toBeInTheDocument();
+    });
+
+    it("renders a Configure default model button linking to /settings/model-providers in a new tab", () => {
+      render(<ScenarioAIGeneration form={null} />, { wrapper: Wrapper });
+
+      fireEvent.click(screen.getByRole("button", { name: /generate with ai/i }));
+
+      const link = screen.getByTestId(
+        "scenario-ai-configure-default-model-button",
+      );
+      expect(link).toHaveAccessibleName("Configure default model");
+      expect(link).toHaveAttribute("href", "/settings/model-providers");
+      expect(link).toHaveAttribute("target", "_blank");
+      expect(link).toHaveAttribute("rel", expect.stringContaining("noopener"));
+      expect(link).toHaveAttribute("rel", expect.stringContaining("noreferrer"));
     });
   });
 });

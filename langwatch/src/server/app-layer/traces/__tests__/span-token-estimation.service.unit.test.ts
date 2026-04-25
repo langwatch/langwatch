@@ -482,6 +482,7 @@ describe("OtlpSpanTokenEstimationService", () => {
           "token-estimation-killswitch",
           "global",
           false,
+          expect.objectContaining({ cacheTtlMs: expect.any(Number) }),
         );
       });
     });
@@ -527,7 +528,10 @@ describe("OtlpSpanTokenEstimationService", () => {
           "token-estimation-project-killswitch",
           "project-456",
           false,
-          { projectId: "project-456" },
+          expect.objectContaining({
+            projectId: "project-456",
+            cacheTtlMs: expect.any(Number),
+          }),
         );
       });
     });

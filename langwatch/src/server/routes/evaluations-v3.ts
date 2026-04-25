@@ -80,7 +80,7 @@ const authenticateRequest = async (
   c: { req: { header: (name: string) => string | undefined } },
   permission: Permission,
 ) => {
-  const credentials = extractCredentials(c);
+  const credentials = extractCredentials((name) => c.req.header(name));
   if (!credentials) {
     return { error: "Missing credentials", status: 401 as const };
   }

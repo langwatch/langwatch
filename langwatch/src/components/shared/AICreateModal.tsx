@@ -369,5 +369,18 @@ function NoModelProvidersWarning() {
 }
 
 function NoModelProvidersFooter() {
-  return null;
+  return (
+    <HStack gap={2} justify="flex-end">
+      <Button colorPalette="blue" asChild>
+        <a
+          data-testid="ai-create-modal-configure-model-provider-button"
+          href="/settings/model-providers"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Configure model provider
+        </a>
+      </Button>
+    </HStack>
+  );
 }
