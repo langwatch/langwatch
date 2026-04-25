@@ -45,6 +45,15 @@ export function createEnvConfig() {
       AUTH0_CLIENT_ID: z.string().optional(),
       AUTH0_CLIENT_SECRET: z.string().optional(),
       AUTH0_ISSUER: z.string().optional(),
+      // Separate Machine-to-Machine application credentials for Auth0
+      // Management API access (e.g. password changes via PATCH /users).
+      // The user-login application is typically a Single Page Application
+      // and cannot use the client_credentials grant. When unset, the
+      // service falls back to AUTH0_CLIENT_ID/SECRET (works only when
+      // the login app is a Regular Web Application with Client
+      // Credentials enabled — uncommon).
+      AUTH0_MGMT_CLIENT_ID: z.string().optional(),
+      AUTH0_MGMT_CLIENT_SECRET: z.string().optional(),
       API_TOKEN_JWT_SECRET: optionalIfBuildTime(z.string().min(1)),
       ELASTICSEARCH_NODE_URL: z.string().optional(),
       ELASTICSEARCH_API_KEY: z.string().optional(),
@@ -161,6 +170,8 @@ export function createEnvConfig() {
       AUTH0_CLIENT_ID: process.env.AUTH0_CLIENT_ID,
       AUTH0_CLIENT_SECRET: process.env.AUTH0_CLIENT_SECRET,
       AUTH0_ISSUER: process.env.AUTH0_ISSUER,
+      AUTH0_MGMT_CLIENT_ID: process.env.AUTH0_MGMT_CLIENT_ID,
+      AUTH0_MGMT_CLIENT_SECRET: process.env.AUTH0_MGMT_CLIENT_SECRET,
       API_TOKEN_JWT_SECRET: process.env.API_TOKEN_JWT_SECRET,
       ELASTICSEARCH_NODE_URL: process.env.ELASTICSEARCH_NODE_URL,
       ELASTICSEARCH_API_KEY: process.env.ELASTICSEARCH_API_KEY,

@@ -47,20 +47,27 @@ const getProviderDisplayName = (
   return titleCase(provider);
 };
 
-const changePasswordSchema = z
-  .object({
-    currentPassword: z.string().min(1, "Current password is required"),
-    newPassword: z.string().min(8, "Password must be at least 8 characters"),
-    confirmPassword: z
-      .string()
-      .min(8, "Password must be at least 8 characters"),
-  })
-  .refine((data) => data.newPassword === data.confirmPassword, {
-    message: "Passwords don't match",
-    path: ["confirmPassword"],
-  });
+const buildChangePasswordSchema = (requireCurrent: boolean) =>
+  z
+    .object({
+      currentPassword: requireCurrent
+        ? z.string().min(1, "Current password is required")
+        : z.string().optional(),
+      newPassword: z.string().min(8, "Password must be at least 8 characters"),
+      confirmPassword: z
+        .string()
+        .min(8, "Password must be at least 8 characters"),
+    })
+    .refine((data) => data.newPassword === data.confirmPassword, {
+      message: "Passwords don't match",
+      path: ["confirmPassword"],
+    });
 
-type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
+interface ChangePasswordFormValues {
+  currentPassword?: string;
+  newPassword: string;
+  confirmPassword: string;
+}
 
 export default function AuthenticationSettings() {
   const { data: accounts, isLoading } = api.user.getLinkedAccounts.useQuery({});
@@ -73,8 +80,14 @@ export default function AuthenticationSettings() {
   const apiContext = api.useContext();
   const { data: ssoStatus } = api.user.getSsoStatus.useQuery({});
 
+  // Auth0 mode trusts the authenticated session as proof of identity and
+  // doesn't require the user to re-type their current password (modern
+  // Auth0 tenants don't expose the Resource Owner Password Grant we'd
+  // need to verify it server-side). The email/credential mode still does.
+  const requireCurrentPassword =
+    publicEnv.data?.NEXTAUTH_PROVIDER !== "auth0";
   const passwordForm = useForm<ChangePasswordFormValues>({
-    resolver: zodResolver(changePasswordSchema),
+    resolver: zodResolver(buildChangePasswordSchema(requireCurrentPassword)),
     defaultValues: {
       currentPassword: "",
       newPassword: "",
@@ -165,7 +178,8 @@ export default function AuthenticationSettings() {
           <Text>({session?.user?.email})</Text>
         </VStack>
 
-        {publicEnv.data?.NEXTAUTH_PROVIDER === "email" && (
+        {(publicEnv.data?.NEXTAUTH_PROVIDER === "email" ||
+          publicEnv.data?.NEXTAUTH_PROVIDER === "auth0") && (
           <HorizontalFormControl
             label="Change Password"
             helper={<Text>Password must be at least 8 characters long.</Text>}
@@ -173,20 +187,22 @@ export default function AuthenticationSettings() {
             {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
             <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
               <VStack width="full" align="stretch" gap={4} marginTop={4}>
-                <Field.Root
-                  invalid={!!passwordForm.formState.errors.currentPassword}
-                >
-                  <Field.Label>Current Password</Field.Label>
-                  <Input
-                    type="password"
-                    {...passwordForm.register("currentPassword")}
-                  />
-                  {passwordForm.formState.errors.currentPassword && (
-                    <Field.ErrorText>
-                      {passwordForm.formState.errors.currentPassword.message}
-                    </Field.ErrorText>
-                  )}
-                </Field.Root>
+                {requireCurrentPassword && (
+                  <Field.Root
+                    invalid={!!passwordForm.formState.errors.currentPassword}
+                  >
+                    <Field.Label>Current Password</Field.Label>
+                    <Input
+                      type="password"
+                      {...passwordForm.register("currentPassword")}
+                    />
+                    {passwordForm.formState.errors.currentPassword && (
+                      <Field.ErrorText>
+                        {passwordForm.formState.errors.currentPassword.message}
+                      </Field.ErrorText>
+                    )}
+                  </Field.Root>
+                )}
                 <Field.Root
                   invalid={!!passwordForm.formState.errors.newPassword}
                 >

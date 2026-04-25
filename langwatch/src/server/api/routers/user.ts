@@ -10,6 +10,10 @@ import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions"
 import { rateLimit } from "~/server/rateLimit";
 import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
+import {
+  Auth0ApiError,
+  changeAuth0Password,
+} from "~/server/auth0/passwordService";
 
 export const userRouter = createTRPCRouter({
   /**
@@ -194,7 +198,10 @@ export const userRouter = createTRPCRouter({
   changePassword: protectedProcedure
     .input(
       z.object({
-        currentPassword: z.string(),
+        // Optional because the Auth0 path doesn't verify current password
+        // against Auth0 (modern tenants phase out the Resource Owner
+        // Password Grant). The email/credential path still requires it.
+        currentPassword: z.string().optional(),
         newPassword: z
           .string()
           .min(8, "Password must be at least 8 characters"),
@@ -202,7 +209,10 @@ export const userRouter = createTRPCRouter({
     )
     .use(skipPermissionCheck)
     .mutation(async ({ ctx, input }) => {
-      if (env.NEXTAUTH_PROVIDER !== "email") {
+      if (
+        env.NEXTAUTH_PROVIDER !== "email" &&
+        env.NEXTAUTH_PROVIDER !== "auth0"
+      ) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Password changes are not available for this auth provider",
@@ -216,7 +226,9 @@ export const userRouter = createTRPCRouter({
       // the `currentPassword` to recover the user's plaintext (bcrypt
       // is slow but not infinite). 5 attempts per 15 minutes per user
       // mirrors `/forget-password`'s budget. Iter 49 of the migration
-      // audit (bug 36).
+      // audit (bug 36). Applies to the Auth0 path too — both to
+      // throttle brute-force against the Auth0 Authentication API
+      // and to avoid hammering Auth0 rate limits.
       const limit = await rateLimit({
         key: `user.changePassword:${ctx.session.user.id}`,
         windowSeconds: 60 * 15,
@@ -227,6 +239,58 @@ export const userRouter = createTRPCRouter({
           code: "TOO_MANY_REQUESTS",
           message: "Too many password change attempts. Please try again later.",
         });
+      }
+
+      if (env.NEXTAUTH_PROVIDER === "auth0") {
+        const auth0Account = await ctx.prisma.account.findFirst({
+          where: {
+            userId: ctx.session.user.id,
+            provider: "auth0",
+          },
+          select: { providerAccountId: true },
+        });
+
+        if (!auth0Account) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Auth0 account not found for the current user",
+          });
+        }
+
+        try {
+          await changeAuth0Password({
+            auth0UserId: auth0Account.providerAccountId,
+            newPassword: input.newPassword,
+          });
+        } catch (error) {
+          if (error instanceof Auth0ApiError) {
+            if (error.code === "insufficient_scope") {
+              throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message:
+                  "Auth0 is not authorized to update users. Ask an administrator to enable the update:users scope on the Auth0 application.",
+              });
+            }
+            if (error.code === "not_configured") {
+              throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message:
+                  "Auth0 is not configured on the server. Set AUTH0_ISSUER, AUTH0_CLIENT_ID, and AUTH0_CLIENT_SECRET.",
+              });
+            }
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message:
+                "Could not update password with Auth0. Please try again later.",
+            });
+          }
+          throw error;
+        }
+
+        // Auth0 manages its own sessions — don't revoke BetterAuth sessions
+        // here (the user's app session is still valid; Auth0 OIDC sessions
+        // are managed by Auth0's tenant-level session settings).
+        return { success: true };
       }
 
       const credentialAccount = await ctx.prisma.account.findFirst({
@@ -241,6 +305,13 @@ export const userRouter = createTRPCRouter({
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "User not found or password not set",
+        });
+      }
+
+      if (!input.currentPassword) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Current password is required",
         });
       }
 
