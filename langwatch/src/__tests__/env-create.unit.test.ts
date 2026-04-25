@@ -71,7 +71,7 @@ describe("assertGatewaySecretsAllOrNone", () => {
         LW_VIRTUAL_KEY_PEPPER: "a".repeat(32),
       }),
     ).toThrow();
-    const banner = errorSpy.mock.calls.map((c) => c.join(" ")).join("\n");
+    const banner = errorSpy.mock.calls.map((c: unknown[]) => c.join(" ")).join("\n");
     expect(banner).toMatch(/AI Gateway secrets are partially configured/i);
     expect(banner).toMatch(/openssl rand -hex 32/);
   });

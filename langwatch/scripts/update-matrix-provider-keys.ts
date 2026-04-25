@@ -10,7 +10,11 @@ import { readFileSync } from "fs";
 import { prisma } from "../src/server/db";
 import { ModelProviderRepository } from "../src/server/modelProviders/modelProvider.repository";
 
-const UPDATES: { provider: string; env: Record<string, string | undefined> }[] = [
+const UPDATES: {
+  provider: string;
+  env: Record<string, string | undefined>;
+  deploymentMap?: Record<string, string>;
+}[] = [
   {
     provider: "openai",
     env: { OPENAI_API_KEY: process.env.OPENAI_API_KEY },
