@@ -39,16 +39,11 @@ CREATE INDEX "GatewayCacheRule_organizationId_archivedAt_priority_idx"
 CREATE INDEX "GatewayCacheRule_organizationId_enabled_priority_idx"
     ON "GatewayCacheRule" ("organizationId", "enabled", "priority");
 
--- Foreign keys -------------------------------------------------------------
-ALTER TABLE "GatewayCacheRule"
-    ADD CONSTRAINT "GatewayCacheRule_organizationId_fkey"
-    FOREIGN KEY ("organizationId") REFERENCES "Organization"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
-
-ALTER TABLE "GatewayCacheRule"
-    ADD CONSTRAINT "GatewayCacheRule_createdById_fkey"
-    FOREIGN KEY ("createdById") REFERENCES "User"("id")
-    ON DELETE RESTRICT ON UPDATE CASCADE;
+-- Foreign keys intentionally OMITTED.
+-- Per project policy, FK constraints on hot-path / org-scoped tables are
+-- avoided to keep distribution + sharding flexible. Referential integrity
+-- is enforced at the service layer (see GatewayCacheRule service guards
+-- against orphan org/createdBy refs at write time).
 
 -- Down migration (manual) --------------------------------------------------
 -- To roll back, uncomment + run:
