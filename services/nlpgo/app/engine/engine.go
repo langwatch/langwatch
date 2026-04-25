@@ -323,13 +323,18 @@ type runState struct {
 	firstError  *NodeError
 	endNodeID   string
 	totalCost   float64
+	// edgesByTarget indexes Edge entries by their target node id so
+	// resolveInputs can rename outputs.<source_name> → inputs.<target_name>
+	// per Studio's wire convention.
+	edgesByTarget map[string][]dsl.Edge
 }
 
 func newRunState(w *dsl.Workflow) *runState {
 	r := &runState{
-		nodes:   make(map[string]*dsl.Node, len(w.Nodes)),
-		outputs: make(map[string]map[string]any, len(w.Nodes)),
-		states:  make(map[string]*NodeState, len(w.Nodes)),
+		nodes:         make(map[string]*dsl.Node, len(w.Nodes)),
+		outputs:       make(map[string]map[string]any, len(w.Nodes)),
+		states:        make(map[string]*NodeState, len(w.Nodes)),
+		edgesByTarget: make(map[string][]dsl.Edge, len(w.Edges)),
 	}
 	for i := range w.Nodes {
 		n := &w.Nodes[i]
@@ -337,6 +342,9 @@ func newRunState(w *dsl.Workflow) *runState {
 		if n.Type == dsl.ComponentEnd && r.endNodeID == "" {
 			r.endNodeID = n.ID
 		}
+	}
+	for _, e := range w.Edges {
+		r.edgesByTarget[e.Target] = append(r.edgesByTarget[e.Target], e)
 	}
 	return r
 }
@@ -362,35 +370,61 @@ func (r *runState) recordError(e *NodeError) {
 	}
 }
 
-// resolveInputs walks parents[id] and copies upstream outputs into the
-// new map. The Edge's sourceHandle ("outputs.x") and targetHandle
-// ("inputs.y") name the columns: this node's input "y" = source node's
-// output "x". When source/target handles aren't of the form "outputs.X"
-// or "inputs.X" the engine falls back to mapping by identifier (so
-// short-form workflow files still work).
-func (r *runState) resolveInputs(plan *planner.Plan, id string) map[string]any {
+// resolveInputs builds the input map for a node by following each
+// inbound Edge from the workflow. The Edge's sourceHandle and
+// targetHandle name the columns being plumbed: a typical Studio edge
+// has sourceHandle="outputs.q", targetHandle="inputs.x" meaning "this
+// node's input 'x' is the source node's output 'q'". We support the
+// stripped form too (just "q" / "x") so workflows authored without the
+// outputs./inputs. prefix still wire correctly. When an edge has no
+// usable handle (rare; typically just a control-flow edge), all
+// upstream outputs are merged in by their original names — preserving
+// today's "all keys flow through" behavior for legacy workflows.
+func (r *runState) resolveInputs(_ *planner.Plan, id string) map[string]any {
 	out := map[string]any{}
-	// Build a list of edges that target this node by walking the
-	// workflow's edge table — planner's Parents/Children map is keyed
-	// by node id, not by edge id, so we re-derive from the plan once
-	// per node. Cheap enough at the scales workflows run at.
 	r.mu.Lock()
-	parents := plan.Parents[id]
+	edges := r.edgesByTarget[id]
 	r.mu.Unlock()
-	for _, parentID := range parents {
-		parentOut, ok := r.outputs[parentID]
+	for _, e := range edges {
+		parentOut, ok := r.outputs[e.Source]
 		if !ok {
 			continue
 		}
-		// If we don't know the edge handles, copy all parent outputs
-		// into the input map keyed by their original names. Downstream
-		// nodes that need handle-specific routing will re-derive when
-		// the engine learns the workflow's edge mapping (next iter).
-		for k, v := range parentOut {
-			out[k] = v
+		srcKey := stripHandlePrefix(e.SourceHandle, "outputs.")
+		tgtKey := stripHandlePrefix(e.TargetHandle, "inputs.")
+		switch {
+		case srcKey != "" && tgtKey != "":
+			if v, exists := parentOut[srcKey]; exists {
+				out[tgtKey] = v
+			}
+		case srcKey != "":
+			if v, exists := parentOut[srcKey]; exists {
+				out[srcKey] = v
+			}
+		case tgtKey != "":
+			// No source key — bind all parent outputs under the target.
+			out[tgtKey] = parentOut
+		default:
+			// Control-flow edge with no handles: merge everything.
+			for k, v := range parentOut {
+				out[k] = v
+			}
 		}
 	}
 	return out
+}
+
+// stripHandlePrefix removes a leading "outputs." or "inputs." from a
+// Studio edge handle. Returns the bare key. Empty input → empty output
+// (signals "no handle on this edge").
+func stripHandlePrefix(handle, prefix string) string {
+	if handle == "" {
+		return ""
+	}
+	if strings.HasPrefix(handle, prefix) {
+		return handle[len(prefix):]
+	}
+	return handle
 }
 
 func finalize(state *runState, traceID string, started time.Time, ctxErr error) *ExecuteResult {

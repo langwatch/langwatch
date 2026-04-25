@@ -342,6 +342,46 @@ func TestSync_LLMNodeReturnsExecutorUnavailableUntilWired(t *testing.T) {
 	assert.Equal(t, "llm_executor_unavailable", res.Error.Type)
 }
 
+// TestSync_EdgeHandleRenamesAcrossNodes verifies the engine honors
+// Studio's outputs.X → inputs.Y renaming on edges. Customer workflows
+// frequently use edges like sourceHandle="outputs.question",
+// targetHandle="inputs.user_query"; without renaming the downstream
+// node would never see its declared input.
+func TestSync_EdgeHandleRenamesAcrossNodes(t *testing.T) {
+	stack := setupStack(t)
+	defer stack.close()
+
+	body := `{
+	  "workflow": {
+	    "workflow_id":"wf","api_key":"k","spec_version":"1.3","name":"x","icon":"x","description":"x","version":"x",
+	    "template_adapter":"default",
+	    "nodes":[
+	      {"id":"entry","type":"entry","data":{
+	        "outputs":[{"identifier":"question","type":"str"}],
+	        "dataset":{"inline":{"records":{"question":["hello"]}}},
+	        "entry_selection":0,
+	        "train_size":1.0,"test_size":0.0,"seed":1
+	      }},
+	      {"id":"end","type":"end","data":{
+	        "inputs":[{"identifier":"user_query","type":"str"}]
+	      }}
+	    ],
+	    "edges":[
+	      {"id":"e1","source":"entry","sourceHandle":"outputs.question","target":"end","targetHandle":"inputs.user_query","type":"default"}
+	    ],
+	    "state":{}
+	  }
+	}`
+
+	res := postSync(t, stack, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+	// The edge renamed entry.outputs.question → end.inputs.user_query.
+	// Result MUST surface under "user_query", not under "question".
+	assert.Equal(t, "hello", res.Result["user_query"])
+	_, hasOldName := res.Result["question"]
+	assert.False(t, hasOldName, "renamed inputs must not leak the source name into the end-node output")
+}
+
 // TestHealthz exposes the /healthz endpoint to smoke-test the full
 // chain (router + middlewares + health registry). No engine activity.
 func TestHealthz(t *testing.T) {
