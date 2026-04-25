@@ -64,6 +64,18 @@ export function Optimize() {
     optimizationState: state.optimization,
   }));
 
+  // Hide the Optimize button when the project is on the Go NLP engine.
+  // Optimization was DSPy-only and the Go engine intentionally drops DSPy
+  // (see specs/nlp-go/feature-flag.feature). Server-side guards reject
+  // optimize websocket events too — UI hide is the visible half.
+  const engineMode = api.workflow.engineMode.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id, staleTime: 60_000 },
+  );
+  if (engineMode.data && !engineMode.data.optimizeEnabled) {
+    return null;
+  }
+
   const isRunning = optimizationState?.status === "running";
 
   const form = useForm<OptimizeForm>({
