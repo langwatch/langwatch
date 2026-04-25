@@ -13,6 +13,24 @@ images:
   app:
     pullPolicy: Never
 
+# ── Gateway: use locally-built image (kind-load'd by workflow), since ghcr's
+# ── ai-gateway image is published only on release-please tags. ────────────────
+gateway:
+  image:
+    repository: langwatch/ai-gateway
+    tag: e2e
+    pullPolicy: Never
+  # autoscaling.customMetrics requires a metrics-adapter that isn't in the
+  # CI kind cluster — drop to a single replica with HPA off so install can
+  # converge on the test cluster.
+  replicaCount: 1
+  autoscaling:
+    enabled: false
+  # Kind cluster has no ingress controller; chart-default Ingress would
+  # reference a non-existent IngressClass.
+  ingress:
+    enabled: false
+
 # ── services that require private images — set to 0 replicas ─────────────────
 app:
   replicaCount: 0

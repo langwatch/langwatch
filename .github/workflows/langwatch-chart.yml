@@ -88,12 +88,18 @@ jobs:
       - name: Build app image
         if: matrix.build_app
         run: docker build -t langwatch/langwatch:2.6.0 ../..
+      # The gateway image isn't published to ghcr yet — build it locally so
+      # the chart e2e can install. values-e2e.yaml overrides
+      # gateway.image.{repository,tag,pullPolicy} to match.
+      - name: Build gateway image
+        run: docker build -t langwatch/ai-gateway:e2e -f ../../Dockerfile.go_service ../..
       - uses: helm/kind-action@v1
         with:
           cluster_name: ${{ matrix.cluster }}
       - name: Load images into Kind
         run: |
           kind load docker-image langwatch/clickhouse-serverless:next --name ${{ matrix.cluster }}
+          kind load docker-image langwatch/ai-gateway:e2e --name ${{ matrix.cluster }}
           if [ "${{ matrix.build_app }}" = "true" ]; then
             kind load docker-image langwatch/langwatch:2.6.0 --name ${{ matrix.cluster }}
           fi
