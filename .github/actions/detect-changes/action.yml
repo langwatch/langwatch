@@ -2,18 +2,29 @@
 #
 # On `pull_request` / `pull_request_target` we diff the PR against its
 # base using dorny/paths-filter. On every other event (push, schedule,
-# workflow_dispatch, merge_group) we force `relevant=true` so the real
-# jobs always run — required aggregator checks need a concrete result.
+# workflow_dispatch, merge_group) we force every declared filter to
+# `true` so the real jobs always run — required aggregator checks need
+# a concrete result.
 #
 # The caller MUST check out the repo first so this composite action is
 # accessible — dorny/paths-filter then reads the diff against the PR
 # base.
 #
+# IMPORTANT: every filter key the caller wants to consume must be
+# declared as an `outputs.<key>` entry below AND echoed into the force
+# step. dorny/paths-filter sets per-key outputs internally, but a
+# composite action only exposes outputs it explicitly declares — silently
+# missing entries land as empty strings. See #3461 for the regression
+# that added `feature-parity` here after callers had been reading an
+# undeclared output.
+#
 # Usage:
 #   jobs:
 #     changes:
 #       runs-on: ubuntu-latest
-#       outputs: { relevant: ${{ steps.detect.outputs.relevant }} }
+#       outputs:
+#         relevant: ${{ steps.detect.outputs.relevant }}
+#         feature-parity: ${{ steps.detect.outputs.feature-parity }}
 #       steps:
 #         - uses: actions/checkout@...
 #         - uses: ./.github/actions/detect-changes
@@ -22,16 +33,21 @@
 #             filters: |
 #               relevant:
 #                 - 'foo/**'
+#               feature-parity:
+#                 - 'specs/**'
 name: detect-changes
 description: Decide whether a path-filtered workflow should run real work.
 inputs:
   filters:
-    description: YAML filter block for dorny/paths-filter (must define a `relevant` filter).
+    description: YAML filter block for dorny/paths-filter (must define `relevant` + `feature-parity` filters).
     required: true
 outputs:
   relevant:
     description: "'true' if relevant paths changed, or if event is not a PR."
     value: ${{ steps.filter.outputs.relevant || steps.force.outputs.relevant }}
+  feature-parity:
+    description: "'true' if feature-parity-relevant paths changed, or if event is not a PR."
+    value: ${{ steps.filter.outputs.feature-parity || steps.force.outputs.feature-parity }}
 
 runs:
   using: composite
@@ -43,8 +59,10 @@ runs:
       with:
         filters: ${{ inputs.filters }}
 
-    - name: Force relevant on non-PR events
+    - name: Force every filter true on non-PR events
       if: github.event_name != 'pull_request' && github.event_name != 'pull_request_target'
       id: force
       shell: bash
-      run: echo "relevant=true" >> "$GITHUB_OUTPUT"
+      run: |
+        echo "relevant=true" >> "$GITHUB_OUTPUT"
+        echo "feature-parity=true" >> "$GITHUB_OUTPUT"
