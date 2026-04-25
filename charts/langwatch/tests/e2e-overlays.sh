@@ -360,6 +360,7 @@ test_install_prod_ingress() {
     -f "${OVERLAYS}/size-prod.yaml" \
     -f "${OVERLAYS}/access-ingress.yaml" \
     -f "${CHART_DIR}/tests/values-e2e.yaml" \
+    --set workers.enabled=true \
     --set workers.replicaCount=0
   pass "helm install (prod + ingress)"
 
