@@ -30,9 +30,11 @@ import path from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-// Avoid 5562/5563/5572 (default nlpgo, aigateway, post-event-test) so this
-// test can run alongside other live nlpgo tests without colliding.
-const NLPGO_PORT = 5573;
+// Port choice: 55620 (one extra zero on the standard nlpgo :5562) so the
+// test doesn't collide with any worktree running langwatch on PORT=5570
+// (which would put aigateway on :5573 by the +N*10 convention). High
+// enough not to clash with any normal dev server or another test slot.
+const NLPGO_PORT = 55620;
 const REPO_ROOT = path.resolve(__dirname, "../../../../../..");
 
 let nlpgoProcess: ChildProcess | null = null;
