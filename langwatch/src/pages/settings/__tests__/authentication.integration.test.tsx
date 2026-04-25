@@ -1,10 +1,10 @@
 /**
  * @vitest-environment jsdom
  *
- * Integration tests for the /settings/authentication page — specifically
- * that the Change Password form renders (and submits to
- * api.user.changePassword) for tenants configured with
- * NEXTAUTH_PROVIDER="auth0", not just "email".
+ * Integration tests for the /settings/authentication page — verifying that
+ * the Change Password entry point is gated correctly and that opening it
+ * surfaces the dialog with the right shape (Current Password field shown
+ * for email/credential mode, hidden for Auth0 mode).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -100,8 +100,6 @@ vi.mock("~/utils/auth-client", () => ({
   linkAccount: vi.fn(),
 }));
 
-// SettingsLayout pulls in DashboardLayout → lots of dependencies. For a
-// focused page-content test, replace it with a pass-through wrapper.
 vi.mock("~/components/SettingsLayout", () => ({
   __esModule: true,
   default: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -122,6 +120,13 @@ beforeEach(() => {
   mockUnlinkAccount.mockReset();
   mockToasterCreate.mockReset();
   publicEnvRef.current = { NEXTAUTH_PROVIDER: "auth0" };
+  linkedAccountsRef.current = [
+    {
+      id: "acc-1",
+      provider: "auth0",
+      providerAccountId: "auth0|user-123",
+    },
+  ];
 });
 
 afterEach(() => {
@@ -129,22 +134,30 @@ afterEach(() => {
 });
 
 describe("<AuthenticationSettings/>", () => {
-  describe("when NEXTAUTH_PROVIDER is auth0", () => {
-    it("renders the Change Password form without a Current Password field", () => {
+  describe("when NEXTAUTH_PROVIDER is auth0 with an Email/Password (auth0 db) identity", () => {
+    it("does not render the form by default — only a Change Password button next to the linked identity", () => {
       renderPage();
+      expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
       expect(
         screen.getByRole("button", { name: /Change Password/i }),
       ).toBeTruthy();
-      expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
-      expect(screen.getByLabelText(/Confirm New Password/i)).toBeTruthy();
-      // Auth0 mode trusts the session; current password is not asked.
-      expect(screen.queryByLabelText(/Current Password/i)).toBeNull();
     });
 
-    describe("when the user submits a valid new password and confirmation", () => {
-      it("calls api.user.changePassword with only newPassword", async () => {
+    describe("when the user clicks Change Password", () => {
+      it("opens the dialog with no Current Password field, calls api.user.changePassword, and closes on success", async () => {
         mockChangePassword.mockResolvedValue({ success: true });
         renderPage();
+
+        await act(async () => {
+          fireEvent.click(
+            screen.getByRole("button", { name: /Change Password/i }),
+          );
+        });
+        // Dialog now visible
+        await waitFor(() => {
+          expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+        });
+        expect(screen.queryByLabelText(/Current Password/i)).toBeNull();
 
         fireEvent.change(screen.getByLabelText(/^New Password$/i), {
           target: { value: "new-pw-123456" },
@@ -152,10 +165,13 @@ describe("<AuthenticationSettings/>", () => {
         fireEvent.change(screen.getByLabelText(/Confirm New Password/i), {
           target: { value: "new-pw-123456" },
         });
+        // Click the submit button inside the dialog (the only "Change
+        // Password" button visible while the dialog is open).
         await act(async () => {
-          fireEvent.click(
-            screen.getByRole("button", { name: /Change Password/i }),
-          );
+          const submitBtns = screen
+            .getAllByRole("button", { name: /Change Password/i })
+            .filter((b) => (b as HTMLButtonElement).type === "submit");
+          fireEvent.click(submitBtns[0]!);
         });
 
         await waitFor(() => {
@@ -171,80 +187,72 @@ describe("<AuthenticationSettings/>", () => {
             }),
           );
         });
+        // Dialog closes — the new-password field is gone again.
+        await waitFor(() => {
+          expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
+        });
       });
     });
 
-    describe("when the server returns an error", () => {
-      it("shows an error toast", async () => {
-        mockChangePassword.mockRejectedValue(
-          new Error(
-            "Auth0 is not authorized to update users. Ask an administrator to enable the update:users scope on the Auth0 application.",
-          ),
-        );
+    describe("when the linked identity is a social provider via auth0 (e.g. google-oauth2|...)", () => {
+      it("does not show the Change Password button (no password to update)", () => {
+        linkedAccountsRef.current = [
+          {
+            id: "acc-google",
+            provider: "auth0",
+            providerAccountId: "google-oauth2|abc",
+          },
+        ];
         renderPage();
+        expect(
+          screen.queryByRole("button", { name: /Change Password/i }),
+        ).toBeNull();
+      });
+    });
+  });
 
-        fireEvent.change(screen.getByLabelText(/^New Password$/i), {
-          target: { value: "new-pw-123456" },
-        });
-        fireEvent.change(screen.getByLabelText(/Confirm New Password/i), {
-          target: { value: "new-pw-123456" },
-        });
+  describe("when NEXTAUTH_PROVIDER is email", () => {
+    it("renders a dedicated Change Password section with a button (no inline form)", () => {
+      publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
+      renderPage();
+      expect(
+        screen.getByRole("button", { name: /Change Password/i }),
+      ).toBeTruthy();
+      // The form fields are NOT visible until the dialog opens.
+      expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
+    });
+
+    describe("when the dialog is opened", () => {
+      it("shows the Current Password field too", async () => {
+        publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
+        renderPage();
         await act(async () => {
           fireEvent.click(
             screen.getByRole("button", { name: /Change Password/i }),
           );
         });
-
         await waitFor(() => {
-          expect(mockToasterCreate).toHaveBeenCalledWith(
-            expect.objectContaining({
-              title: "Failed to change password",
-              type: "error",
-            }),
-          );
+          expect(screen.getByLabelText(/Current Password/i)).toBeTruthy();
         });
-      });
-    });
-
-    describe("when new password and confirmation do not match", () => {
-      it("shows a client-side validation error and does not call the mutation", async () => {
-        renderPage();
-
-        fireEvent.change(screen.getByLabelText(/^New Password$/i), {
-          target: { value: "new-pw-123456" },
-        });
-        fireEvent.change(screen.getByLabelText(/Confirm New Password/i), {
-          target: { value: "different-1234" },
-        });
-        await act(async () => {
-          fireEvent.click(
-            screen.getByRole("button", { name: /Change Password/i }),
-          );
-        });
-
-        await waitFor(() => {
-          expect(screen.getByText(/Passwords don't match/i)).toBeTruthy();
-        });
-        expect(mockChangePassword).not.toHaveBeenCalled();
+        expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
       });
     });
   });
 
   describe("when NEXTAUTH_PROVIDER is a different oauth provider (e.g. google)", () => {
-    it("does not render the Change Password form", () => {
+    it("does not render the Change Password entry point", () => {
       publicEnvRef.current = { NEXTAUTH_PROVIDER: "google" };
+      linkedAccountsRef.current = [
+        {
+          id: "acc-google",
+          provider: "google",
+          providerAccountId: "google-id",
+        },
+      ];
       renderPage();
-      expect(screen.queryByLabelText(/Current Password/i)).toBeNull();
-      expect(screen.queryByLabelText(/^New Password$/i)).toBeNull();
-    });
-  });
-
-  describe("when NEXTAUTH_PROVIDER is email", () => {
-    it("renders the form including the Current Password field (regression)", () => {
-      publicEnvRef.current = { NEXTAUTH_PROVIDER: "email" };
-      renderPage();
-      expect(screen.getByLabelText(/Current Password/i)).toBeTruthy();
-      expect(screen.getByLabelText(/^New Password$/i)).toBeTruthy();
+      expect(
+        screen.queryByRole("button", { name: /Change Password/i }),
+      ).toBeNull();
     });
   });
 });

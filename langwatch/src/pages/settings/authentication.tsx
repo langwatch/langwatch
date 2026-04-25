@@ -1,22 +1,18 @@
 import {
   Button,
-  Card,
-  Field,
   Heading,
   HStack,
   IconButton,
-  Input,
   Spacer,
   Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { zodResolver } from "@hookform/resolvers/zod";
 import { linkAccount, useSession } from "~/utils/auth-client";
-import { useForm } from "react-hook-form";
+import { useState } from "react";
 import { LuKeyRound, LuX } from "react-icons/lu";
-import { z } from "zod";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { ChangePasswordDialog } from "../../components/settings/ChangePasswordDialog";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import SettingsLayout from "../../components/SettingsLayout";
 import { toaster } from "../../components/ui/toaster";
@@ -47,53 +43,35 @@ const getProviderDisplayName = (
   return titleCase(provider);
 };
 
-const buildChangePasswordSchema = (requireCurrent: boolean) =>
-  z
-    .object({
-      currentPassword: requireCurrent
-        ? z.string().min(1, "Current password is required")
-        : z.string().optional(),
-      newPassword: z.string().min(8, "Password must be at least 8 characters"),
-      confirmPassword: z
-        .string()
-        .min(8, "Password must be at least 8 characters"),
-    })
-    .refine((data) => data.newPassword === data.confirmPassword, {
-      message: "Passwords don't match",
-      path: ["confirmPassword"],
-    });
-
-interface ChangePasswordFormValues {
-  currentPassword?: string;
-  newPassword: string;
-  confirmPassword: string;
-}
+/**
+ * The user can change their password in-app when their primary identity is
+ * a database/credential one — i.e. BetterAuth credentials in email mode, or
+ * an `auth0|*` (Username-Password-Authentication) account in Auth0 mode.
+ * Social linked identities (Google via Auth0, etc.) don't have a password
+ * we can update.
+ */
+const isCredentialAccount = (account: {
+  provider: string;
+  providerAccountId: string;
+}) => {
+  if (account.provider === "credential") return true;
+  if (account.provider === "auth0") {
+    const [strategy] = account.providerAccountId.split("|");
+    return strategy === "auth0";
+  }
+  return false;
+};
 
 export default function AuthenticationSettings() {
   const { data: accounts, isLoading } = api.user.getLinkedAccounts.useQuery({});
   const unlinkAccount = api.user.unlinkAccount.useMutation();
-  const changePasswordMutation = api.user.changePassword.useMutation();
   const { organization } = useOrganizationTeamProject();
   const { data: session } = useSession();
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const apiContext = api.useContext();
   const { data: ssoStatus } = api.user.getSsoStatus.useQuery({});
-
-  // Auth0 mode trusts the authenticated session as proof of identity and
-  // doesn't require the user to re-type their current password (modern
-  // Auth0 tenants don't expose the Resource Owner Password Grant we'd
-  // need to verify it server-side). The email/credential mode still does.
-  const requireCurrentPassword =
-    publicEnv.data?.NEXTAUTH_PROVIDER !== "auth0";
-  const passwordForm = useForm<ChangePasswordFormValues>({
-    resolver: zodResolver(buildChangePasswordSchema(requireCurrentPassword)),
-    defaultValues: {
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    },
-  });
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const hasSSOProvider = !!organization?.ssoProvider;
   const pendingSsoSetup = ssoStatus?.pendingSsoSetup ?? false;
@@ -101,6 +79,14 @@ export default function AuthenticationSettings() {
   if (!isAuthProvider) {
     return null;
   }
+
+  // Auth0 mode trusts the authenticated session as proof of identity (modern
+  // Auth0 tenants don't expose the Resource Owner Password Grant required to
+  // verify the current password server-side). Email/credential mode still
+  // requires the current password.
+  const requireCurrentPassword = isAuthProvider !== "auth0";
+  const canChangePassword =
+    isAuthProvider === "email" || isAuthProvider === "auth0";
 
   const handleLinkProvider = () => {
     if (!isAuthProvider) return;
@@ -143,32 +129,10 @@ export default function AuthenticationSettings() {
     }
   };
 
-  const onPasswordSubmit = async (values: ChangePasswordFormValues) => {
-    try {
-      await changePasswordMutation.mutateAsync({
-        currentPassword: values.currentPassword,
-        newPassword: values.newPassword,
-      });
-      toaster.create({
-        title: "Password changed successfully",
-        type: "success",
-        meta: {
-          closable: true,
-        },
-      });
-      passwordForm.reset();
-    } catch (error) {
-      toaster.create({
-        title: "Failed to change password",
-        description:
-          error instanceof Error ? error.message : "Please try again",
-        type: "error",
-        meta: {
-          closable: true,
-        },
-      });
-    }
-  };
+  // Email-mode: keep a dedicated section since there's no Linked Sign-in
+  // Methods list to hang the link off. It's just a button now — clicking
+  // opens the dialog, not an inline form.
+  const showEmailModePasswordSection = isAuthProvider === "email";
 
   return (
     <SettingsLayout>
@@ -178,71 +142,23 @@ export default function AuthenticationSettings() {
           <Text>({session?.user?.email})</Text>
         </VStack>
 
-        {(publicEnv.data?.NEXTAUTH_PROVIDER === "email" ||
-          publicEnv.data?.NEXTAUTH_PROVIDER === "auth0") && (
+        {showEmailModePasswordSection && (
           <HorizontalFormControl
             label="Change Password"
-            helper={<Text>Password must be at least 8 characters long.</Text>}
+            helper={
+              <Text>
+                Update the password used to sign in to LangWatch.
+              </Text>
+            }
           >
-            {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
-            <form onSubmit={passwordForm.handleSubmit(onPasswordSubmit)}>
-              <VStack width="full" align="stretch" gap={4} marginTop={4}>
-                {requireCurrentPassword && (
-                  <Field.Root
-                    invalid={!!passwordForm.formState.errors.currentPassword}
-                  >
-                    <Field.Label>Current Password</Field.Label>
-                    <Input
-                      type="password"
-                      {...passwordForm.register("currentPassword")}
-                    />
-                    {passwordForm.formState.errors.currentPassword && (
-                      <Field.ErrorText>
-                        {passwordForm.formState.errors.currentPassword.message}
-                      </Field.ErrorText>
-                    )}
-                  </Field.Root>
-                )}
-                <Field.Root
-                  invalid={!!passwordForm.formState.errors.newPassword}
-                >
-                  <Field.Label>New Password</Field.Label>
-                  <Input
-                    type="password"
-                    {...passwordForm.register("newPassword")}
-                  />
-                  {passwordForm.formState.errors.newPassword && (
-                    <Field.ErrorText>
-                      {passwordForm.formState.errors.newPassword.message}
-                    </Field.ErrorText>
-                  )}
-                </Field.Root>
-                <Field.Root
-                  invalid={!!passwordForm.formState.errors.confirmPassword}
-                >
-                  <Field.Label>Confirm New Password</Field.Label>
-                  <Input
-                    type="password"
-                    {...passwordForm.register("confirmPassword")}
-                  />
-                  {passwordForm.formState.errors.confirmPassword && (
-                    <Field.ErrorText>
-                      {passwordForm.formState.errors.confirmPassword.message}
-                    </Field.ErrorText>
-                  )}
-                </Field.Root>
-                <HStack width="full" justify="end">
-                  <Button
-                    type="submit"
-                    colorPalette="orange"
-                    disabled={changePasswordMutation.isPending}
-                    loading={changePasswordMutation.isPending}
-                  >
-                    Change Password
-                  </Button>
-                </HStack>
-              </VStack>
-            </form>
+            <HStack width="full" justify="end" marginTop={4}>
+              <Button
+                colorPalette="orange"
+                onClick={() => setChangePasswordOpen(true)}
+              >
+                Change Password
+              </Button>
+            </HStack>
           </HorizontalFormControl>
         )}
 
@@ -271,30 +187,43 @@ export default function AuthenticationSettings() {
                 <Spinner />
               ) : (
                 <VStack width="full" align="end" gap={6} marginTop={4}>
-                  <VStack align="start" gap={1}>
-                    {accounts?.map((account) => (
-                      <HStack key={account.id} width="full">
-                        <LuKeyRound />
-                        <Text>
-                          {getProviderDisplayName(
-                            account.provider,
-                            account.providerAccountId,
+                  <VStack align="stretch" gap={1} width="full">
+                    {accounts?.map((account) => {
+                      const credential = isCredentialAccount(account);
+                      return (
+                        <HStack key={account.id} width="full">
+                          <LuKeyRound />
+                          <Text>
+                            {getProviderDisplayName(
+                              account.provider,
+                              account.providerAccountId,
+                            )}
+                          </Text>
+                          <Spacer />
+                          {credential && canChangePassword && (
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              colorPalette="orange"
+                              onClick={() => setChangePasswordOpen(true)}
+                            >
+                              Change Password
+                            </Button>
                           )}
-                        </Text>
-                        <Spacer />
-                        {accounts.length > 1 && (
-                          <IconButton
-                            aria-label="Remove sign-in method"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void handleUnlink(account.id)}
-                            disabled={unlinkAccount.isLoading}
-                          >
-                            <LuX />
-                          </IconButton>
-                        )}
-                      </HStack>
-                    ))}
+                          {accounts.length > 1 && (
+                            <IconButton
+                              aria-label="Remove sign-in method"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void handleUnlink(account.id)}
+                              disabled={unlinkAccount.isLoading}
+                            >
+                              <LuX />
+                            </IconButton>
+                          )}
+                        </HStack>
+                      );
+                    })}
                   </VStack>
                   <Button
                     onClick={handleLinkProvider}
@@ -310,6 +239,14 @@ export default function AuthenticationSettings() {
             </HorizontalFormControl>
           )}
       </VStack>
+
+      {canChangePassword && (
+        <ChangePasswordDialog
+          open={changePasswordOpen}
+          onClose={() => setChangePasswordOpen(false)}
+          requireCurrentPassword={requireCurrentPassword}
+        />
+      )}
     </SettingsLayout>
   );
 }
