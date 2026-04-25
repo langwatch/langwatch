@@ -138,12 +138,20 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 	})
 
 	probes := health.New(contexts.MustGetServiceInfo(ctx).Environment)
-	probes.RegisterReadiness("auth_cache_warm", func() (bool, string) {
-		if authSvc.KnownRevision() == 0 {
-			return false, "no revision observed yet"
-		}
-		return true, ""
-	})
+	// Note: previously had an `auth_cache_warm` readiness check gated on
+	// `authSvc.KnownRevision() != 0`, but maxRev was never incremented
+	// anywhere in the codebase — so the check failed forever and pods
+	// never went ready. Cold-start chicken-and-egg: K8s won't route
+	// traffic until /readyz=200; first Resolve only happens once traffic
+	// routes; so the cache could never warm. Removed entirely — the
+	// resolver warms organically on the first request per VK and an
+	// unwarmed gateway adds at most one extra ~50-200ms control-plane
+	// round-trip on cold-cache requests, which is the correct behavior
+	// for a fresh deployment. If we ever ship the bootstrap-pull
+	// feature (specs/ai-gateway/auth-cache.feature: "Bootstrap-pull
+	// enables gateway to serve when control plane is cold") the
+	// /readyz signal can be re-added based on the bootstrap completion
+	// state, not on observed traffic.
 	probes.MarkStarted()
 
 	return ctx, &Deps{

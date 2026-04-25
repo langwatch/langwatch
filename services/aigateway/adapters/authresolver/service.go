@@ -54,8 +54,6 @@ type Service struct {
 	softBump         time.Duration
 	hardGrace        time.Duration
 
-	mu     sync.Mutex
-	maxRev int64
 	stopCh chan struct{}
 }
 
@@ -345,13 +343,6 @@ func (s *Service) populateConfig(ctx context.Context, bundle *domain.Bundle) {
 	}
 	bundle.Config = cfg
 	bundle.Credentials = cfg.Credentials
-}
-
-// KnownRevision returns the max revision observed (for readiness probes).
-func (s *Service) KnownRevision() int64 {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.maxRev
 }
 
 // Start launches the background refresh loop.
