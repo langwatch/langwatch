@@ -21,8 +21,9 @@ export const originColors: Record<
   application: { background: "blue.subtle", color: "blue.emphasized" },
   evaluation: { background: "green.subtle", color: "green.emphasized" },
   simulation: { background: "pink.subtle", color: "pink.emphasized" },
-  playground: { background: "purple.subtle", color: "purple.emphasized" },
-  workflow: { background: "teal.subtle", color: "teal.emphasized" },
+  playground: { background: "teal.subtle", color: "teal.emphasized" },
+  gateway: { background: "purple.subtle", color: "purple.emphasized" },
+  workflow: { background: "cyan.subtle", color: "cyan.emphasized" },
 };
 
 /**

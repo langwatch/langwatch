@@ -370,24 +370,54 @@ function extractContexts(
 }
 
 /**
- * Extracts error information from span status.
+ * Extracts error information from span status, preferring the OTel
+ * exception event's structured attributes over the span-level statusMessage.
+ *
+ * Priority (first hit wins):
+ *   1. Newest exception event's attributes["exception.message"]
+ *   2. Span-level attributes["exception.message"]
+ *   3. statusMessage
+ *   4. "Unknown error"
+ *
+ * Rationale: upstream instrumentors (incl. our Go gateway — see iter 68
+ * 86aad630d) attach rich actionable text on the exception event itself;
+ * statusMessage is often a short HTTP-status summary ("Bad Request") that
+ * loses the actionable detail.
  */
 function extractError(
   statusCode: NormalizedStatusCode | null,
   statusMessage: string | null,
   spanAttributes: NormalizedAttributes,
+  events: readonly { name: string; attributes: NormalizedAttributes }[],
 ): ErrorCapture | null {
   if (statusCode !== NormalizedStatusCode.ERROR) {
     return null;
   }
 
-  const errorMessage =
-    statusMessage ??
-    (typeof spanAttributes["exception.message"] === "string"
-      ? spanAttributes["exception.message"]
-      : "Unknown error");
+  const exceptionEvents = events.filter((e) => e.name === "exception");
+  const latestExceptionEvent =
+    exceptionEvents.length > 0
+      ? exceptionEvents[exceptionEvents.length - 1]
+      : undefined;
 
-  const stacktrace = spanAttributes["exception.stacktrace"];
+  const eventMessage = latestExceptionEvent?.attributes["exception.message"];
+  const attrMessage = spanAttributes["exception.message"];
+
+  const errorMessage =
+    (typeof eventMessage === "string" && eventMessage.length > 0
+      ? eventMessage
+      : undefined) ??
+    (typeof attrMessage === "string" && attrMessage.length > 0
+      ? attrMessage
+      : undefined) ??
+    statusMessage ??
+    "Unknown error";
+
+  const eventStacktrace = latestExceptionEvent?.attributes["exception.stacktrace"];
+  const attrStacktrace = spanAttributes["exception.stacktrace"];
+  const stacktrace =
+    (typeof eventStacktrace === "string" ? eventStacktrace : undefined) ??
+    (typeof attrStacktrace === "string" ? attrStacktrace : undefined);
   const stacktraceArray =
     typeof stacktrace === "string" ? stacktrace.split("\n") : [];
 
@@ -449,6 +479,7 @@ export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
       normalizedSpan.statusCode,
       normalizedSpan.statusMessage,
       normalizedSpan.spanAttributes,
+      normalizedSpan.events,
     ),
     timestamps,
     metrics: extractMetrics(normalizedSpan.spanAttributes),

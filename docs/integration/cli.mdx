@@ -243,6 +243,108 @@ langwatch prompt tag create --help
 
 This keeps the CLI honest — new capabilities show up in `--help` the moment they ship, so you never have to wonder whether a flag exists.
 
+## AI Gateway commands
+
+The CLI also provisions AI Gateway resources — virtual keys, budgets, provider bindings, cache rules — without touching the UI. Behaviour matches the dashboard exactly; the CLI and UI share a server-side service layer.
+
+### Virtual keys
+
+```bash
+# List
+langwatch virtual-keys list
+langwatch virtual-keys list --format json
+
+# Create (returns the secret once; store it immediately)
+langwatch virtual-keys create \
+  --name prod-key \
+  --env live \
+  --provider gpc_01HZX... \
+  --provider gpc_01HZY...
+
+# Get details
+langwatch virtual-keys get vk_01HZX9K3MN...
+
+# Rotate (new secret shown once; old stops working immediately, ~60s to propagate)
+langwatch virtual-keys rotate vk_01HZX9K3MN...
+
+# Revoke (hard, no grace)
+langwatch virtual-keys revoke vk_01HZX9K3MN...
+```
+
+`--provider` takes a **provider-credential id** (from `langwatch gateway-providers list`), not a plain provider name. Pass the flag multiple times to bind more than one provider.
+
+### Gateway budgets
+
+```bash
+langwatch gateway-budgets list
+
+langwatch gateway-budgets create \
+  --name eng-team-monthly \
+  --scope team --team team_01HZ... \
+  --window month --limit 5000 --on-breach warn
+
+# Other scopes: --scope organization|project|virtual-key|principal
+langwatch gateway-budgets archive bgt_01HZ...
+```
+
+`--window` accepts `minute|hour|day|week|month|total`. `--on-breach` is `block` (default) or `warn`. `--limit` is USD. List output colourises spent-vs-limit — red at ≥100%, yellow at ≥80%.
+
+### Provider bindings
+
+```bash
+langwatch gateway-providers list
+
+langwatch gateway-providers create \
+  --model-provider mp_01HZ... \
+  --slot primary \
+  --rate-limit-rpm 10000 \
+  --rate-limit-tpm 1000000 \
+  --rotation-policy manual
+
+langwatch gateway-providers disable gpc_01HZ...
+```
+
+Returns the `gpc_*` id you then pass to `--provider` on VK create. `--slot` is free-text (`primary`, `eu-region`, `canary`). `--rotation-policy` accepts `manual` in v1; `auto` and `external_secret_store` are v1.1.
+
+### Cache rules
+
+```bash
+# List (sorted priority DESC)
+langwatch cache-rules list
+
+# Create (matchers are ANDed; at least one required)
+langwatch cache-rules create \
+  --name force-cache-enterprise \
+  --priority 300 \
+  --mode force --ttl 600 \
+  --match-tag tier=enterprise
+
+# Update / disable / archive
+langwatch cache-rules update <rule_id> --priority 400
+langwatch cache-rules update <rule_id> --disable
+langwatch cache-rules archive <rule_id>
+
+# Bulk git-ops pattern: export → commit → apply
+langwatch cache-rules export --file cache-rules.json
+langwatch cache-rules apply --file cache-rules.json
+```
+
+Matcher flags: `--match-vk`, `--match-vk-prefix`, `--match-tag key=value`, `--match-principal`, `--match-model <name-or-*-glob>`, `--match-metadata key=value`. `--mode` is `respect | force | disable`.
+
+Required token permissions map onto the [RBAC](/ai-gateway/rbac) grants:
+
+| Command group | Permission |
+|---|---|
+| `virtual-keys list|get` | `virtualKeys:view` |
+| `virtual-keys create` | `virtualKeys:create` |
+| `virtual-keys rotate` | `virtualKeys:rotate` |
+| `virtual-keys revoke` | `virtualKeys:delete` |
+| `gateway-budgets *` | `gatewayBudgets:*` |
+| `gateway-providers *` | `gatewayProviders:*` |
+| `cache-rules *` | `gatewayCacheRules:*` |
+
+See the [public REST API reference](/ai-gateway/api/chat-completions) for direct HTTP calls that don't require Node.
+
 ## Use the CLI as your agent's control plane
 
 The CLI was designed so that an AI coding assistant can operate LangWatch end-to-end on your behalf. Skills like [Tracing, Evaluations, Scenarios, and Prompt Versioning](/skills/directory) are built on top of it — the assistant reads docs via `langwatch docs`, runs platform operations via the subcommands, and verifies its own work by searching traces and inspecting simulation runs.

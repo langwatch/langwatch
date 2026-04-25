@@ -51,7 +51,7 @@
   "navigation": {
     "anchors": [
       {
-        "anchor": "Documentation",
+        "anchor": "Platform",
         "icon": "book-open",
         "groups": [
           {
@@ -212,7 +212,7 @@
                   "platform/rbac",
                   "platform/audit-log",
                   "platform/scim",
-                  "platform/scim-groups"
+                  "platform/model-providers"
                 ]
               }
             ]
@@ -252,7 +252,7 @@
         ]
       },
       {
-        "anchor": "Integrations",
+        "anchor": "Observability",
         "icon": "plug",
         "groups": [
           {
@@ -458,6 +458,176 @@
             "pages": [
               "integration/opentelemetry/guide",
               "integration/rest-api"
+            ]
+          }
+        ]
+      },
+      {
+        "anchor": "AI Gateway",
+        "icon": "route",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "ai-gateway/overview",
+              "ai-gateway/quickstart",
+              "ai-gateway/concepts"
+            ]
+          },
+          {
+            "group": "SDK Integration",
+            "pages": [
+              {
+                "group": "Python",
+                "icon": "python",
+                "pages": [
+                  "ai-gateway/sdks/python"
+                ]
+              },
+              {
+                "group": "TypeScript",
+                "icon": "square-js",
+                "pages": [
+                  "ai-gateway/sdks/typescript"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Coding CLI Integrations",
+            "pages": [
+              "ai-gateway/cli/overview",
+              {
+                "group": "Claude Code",
+                "icon": "/images/logos/anthropic.svg",
+                "pages": [
+                  "ai-gateway/cli/claude-code"
+                ]
+              },
+              {
+                "group": "Codex",
+                "icon": "/images/logos/openai.svg",
+                "pages": [
+                  "ai-gateway/cli/codex"
+                ]
+              },
+              {
+                "group": "Gemini CLI",
+                "icon": "/images/logos/google.svg",
+                "pages": [
+                  "ai-gateway/cli/gemini-cli"
+                ]
+              },
+              {
+                "group": "OpenCode",
+                "icon": "code",
+                "pages": [
+                  "ai-gateway/cli/opencode"
+                ]
+              },
+              {
+                "group": "Cursor",
+                "icon": "arrow-pointer",
+                "pages": [
+                  "ai-gateway/cli/cursor"
+                ]
+              },
+              {
+                "group": "Aider",
+                "icon": "wand-magic-sparkles",
+                "pages": [
+                  "ai-gateway/cli/aider"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "Virtual Keys & Budgets",
+            "pages": [
+              "ai-gateway/virtual-keys",
+              "ai-gateway/budgets",
+              "ai-gateway/provider-bindings",
+              "ai-gateway/rate-limits",
+              "ai-gateway/rbac"
+            ]
+          },
+          {
+            "group": "Providers",
+            "pages": [
+              "ai-gateway/providers/overview",
+              "ai-gateway/providers/openai",
+              "ai-gateway/providers/anthropic",
+              "ai-gateway/providers/azure-openai",
+              "ai-gateway/providers/bedrock",
+              "ai-gateway/providers/vertex",
+              "ai-gateway/providers/gemini",
+              "ai-gateway/providers/custom-openai-compatible",
+              "ai-gateway/providers/fallback-chains"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              {
+                "group": "Caching & Performance",
+                "pages": [
+                  "ai-gateway/caching-passthrough",
+                  "ai-gateway/streaming"
+                ]
+              },
+              {
+                "group": "Safety & Governance",
+                "pages": [
+                  "ai-gateway/guardrails",
+                  "ai-gateway/blocked-patterns",
+                  "ai-gateway/security",
+                  "ai-gateway/audit"
+                ]
+              },
+              "ai-gateway/model-naming",
+              "ai-gateway/model-aliases",
+              {
+                "group": "Operations",
+                "pages": [
+                  "ai-gateway/observability",
+                  "ai-gateway/troubleshooting"
+                ]
+              }
+            ]
+          },
+          {
+            "group": "API Reference",
+            "pages": [
+              "ai-gateway/api/chat-completions",
+              "ai-gateway/api/messages",
+              "ai-gateway/api/embeddings",
+              "ai-gateway/api/models",
+              "ai-gateway/api/errors",
+              "ai-gateway/api/management"
+            ]
+          },
+          {
+            "group": "Self-Hosting",
+            "pages": [
+              "ai-gateway/self-hosting/helm",
+              "ai-gateway/self-hosting/config",
+              "ai-gateway/self-hosting/dns-and-tls",
+              "ai-gateway/self-hosting/health-checks",
+              "ai-gateway/self-hosting/scaling"
+            ]
+          },
+          {
+            "group": "Cookbooks",
+            "pages": [
+              "ai-gateway/cookbooks/ci-smoke-test",
+              "ai-gateway/cookbooks/migrate-from-direct",
+              "ai-gateway/cookbooks/migrate-from-portkey",
+              "ai-gateway/cookbooks/credential-leak-incident",
+              "ai-gateway/cookbooks/multi-tenant-reseller",
+              "ai-gateway/cookbooks/cache-control-rollout",
+              "ai-gateway/cookbooks/prometheus-alerts",
+              "ai-gateway/cookbooks/grafana-dashboard",
+              "ai-gateway/cookbooks/production-runbook"
             ]
           }
         ]
@@ -875,6 +1045,10 @@
     {
       "source": "/self-hosting/kubernetes-helm",
       "destination": "/self-hosting/deployment/kubernetes-helm"
+    },
+    {
+      "source": "/ai-gateway/cli/langwatch-cli",
+      "destination": "/integration/cli"
     }
   ]
 }

@@ -24,6 +24,13 @@ export const Actions = {
   DELETE: "delete",
   MANAGE: "manage", // Full CRUD + settings
   SHARE: "share",
+  // Gateway-specific actions: `rotate` is a sub-action of `update` for virtual
+  // keys but callers may want to grant it independently. `attach`/`detach`
+  // apply to guardrails — these are also treated as sub-actions of `update`
+  // by the hierarchy helper below.
+  ROTATE: "rotate",
+  ATTACH: "attach",
+  DETACH: "detach",
 } as const;
 
 export type Action = (typeof Actions)[keyof typeof Actions];
@@ -48,6 +55,14 @@ export const Resources = {
   SECRETS: "secrets",
   PLAYGROUND: "playground",
   OPS: "ops",
+  // AI Gateway resources — see specs/ai-gateway/_shared/contract.md §10
+  VIRTUAL_KEYS: "virtualKeys",
+  GATEWAY_BUDGETS: "gatewayBudgets",
+  GATEWAY_PROVIDERS: "gatewayProviders",
+  GATEWAY_GUARDRAILS: "gatewayGuardrails",
+  GATEWAY_LOGS: "gatewayLogs",
+  GATEWAY_USAGE: "gatewayUsage",
+  GATEWAY_CACHE_RULES: "gatewayCacheRules",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -110,6 +125,32 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Team
     "team:view",
     "team:manage",
+    // AI Gateway (admin has full gateway CRUD + rotation)
+    "virtualKeys:view",
+    "virtualKeys:create",
+    "virtualKeys:update",
+    "virtualKeys:delete",
+    "virtualKeys:rotate",
+    "virtualKeys:manage",
+    "gatewayBudgets:view",
+    "gatewayBudgets:create",
+    "gatewayBudgets:update",
+    "gatewayBudgets:delete",
+    "gatewayBudgets:manage",
+    "gatewayProviders:view",
+    "gatewayProviders:update",
+    "gatewayProviders:manage",
+    "gatewayGuardrails:view",
+    "gatewayGuardrails:attach",
+    "gatewayGuardrails:detach",
+    "gatewayGuardrails:manage",
+    "gatewayLogs:view",
+    "gatewayUsage:view",
+    "gatewayCacheRules:view",
+    "gatewayCacheRules:create",
+    "gatewayCacheRules:update",
+    "gatewayCacheRules:delete",
+    "gatewayCacheRules:manage",
   ],
   [TeamUserRole.MEMBER]: [
     // Projects
@@ -150,6 +191,17 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "secrets:manage",
     // Team
     "team:view",
+    // AI Gateway (member: can manage own VKs + see budgets, cannot delete budgets)
+    "virtualKeys:view",
+    "virtualKeys:create",
+    "virtualKeys:update",
+    "virtualKeys:rotate",
+    "gatewayBudgets:view",
+    "gatewayProviders:view",
+    "gatewayGuardrails:view",
+    "gatewayLogs:view",
+    "gatewayUsage:view",
+    "gatewayCacheRules:view",
   ],
   [TeamUserRole.VIEWER]: [
     // Projects
@@ -174,6 +226,14 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "secrets:view",
     // Team
     "team:view",
+    // AI Gateway (viewer: read-only)
+    "virtualKeys:view",
+    "gatewayBudgets:view",
+    "gatewayProviders:view",
+    "gatewayGuardrails:view",
+    "gatewayLogs:view",
+    "gatewayUsage:view",
+    "gatewayCacheRules:view",
   ],
   [TeamUserRole.CUSTOM]: [
     // CUSTOM role permissions fall back to VIEWER if no assignedRoleId or custom role has no permissions
@@ -199,6 +259,14 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "secrets:view",
     // Team
     "team:view",
+    // AI Gateway (custom role default: same baseline as VIEWER, overridable via CustomRole.permissions)
+    "virtualKeys:view",
+    "gatewayBudgets:view",
+    "gatewayProviders:view",
+    "gatewayGuardrails:view",
+    "gatewayLogs:view",
+    "gatewayUsage:view",
+    "gatewayCacheRules:view",
   ],
 };
 
@@ -260,8 +328,17 @@ export function hasPermissionWithHierarchy(
     return true;
   }
 
-  // Hierarchy rule: manage permissions include view, create, update, and delete permissions
-  const actionSuffixes = [":view", ":create", ":update", ":delete"];
+  // Hierarchy rule: manage permissions include view, create, update, delete,
+  // and gateway-specific sub-actions (rotate, attach, detach).
+  const actionSuffixes = [
+    ":view",
+    ":create",
+    ":update",
+    ":delete",
+    ":rotate",
+    ":attach",
+    ":detach",
+  ];
   for (const suffix of actionSuffixes) {
     if (requestedPermission.endsWith(suffix)) {
       const managePermission = requestedPermission.replace(suffix, ":manage");
@@ -769,8 +846,8 @@ export async function hasOrganizationPermission(
     return permission === "organization:view";
   }
 
-  // All other permissions resolved via ORGANIZATION-scoped RoleBindings
-  return checkPermissionFromBindings({
+  // Primary path: resolve via ORGANIZATION-scoped RoleBindings.
+  const permittedByBindings = await checkPermissionFromBindings({
     prisma: ctx.prisma,
     userId,
     organizationId,
@@ -778,6 +855,29 @@ export async function hasOrganizationPermission(
     organizationRole: orgMember.role,
     permission,
   });
+  if (permittedByBindings) return true;
+
+  // Legacy fallback: users migrated before RoleBindings existed keep their
+  // TeamUser row (with ADMIN/MEMBER/VIEWER role) but may have zero
+  // RoleBindings. For org-scoped permission checks we union across every
+  // TeamUser the user has in the organization — this matches the intent
+  // that org ADMINs / team ADMINs have broad access to org-scoped gateway
+  // resources (audit, org-level budgets, cache rules) without requiring a
+  // RoleBinding backfill first.
+  const teamMemberships = await ctx.prisma.teamUser.findMany({
+    where: { userId, team: { organizationId } },
+    select: { role: true, assignedRoleId: true },
+  });
+  for (const tu of teamMemberships) {
+    const permitted = await resolveBindingPermission(
+      { role: tu.role, customRoleId: tu.assignedRoleId ?? null },
+      orgMember.role,
+      permission,
+      ctx.prisma,
+    );
+    if (permitted) return true;
+  }
+  return false;
 }
 
 // ============================================================================

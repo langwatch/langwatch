@@ -12,6 +12,7 @@ const SEED_VIEWS = [
   { name: "Evaluations", filters: { "traces.origin": ["evaluation"] } },
   { name: "Simulations", filters: { "traces.origin": ["simulation"] } },
   { name: "Playground", filters: { "traces.origin": ["playground"] } },
+  { name: "Gateway", filters: { "traces.origin": ["gateway"] } },
 ];
 
 /**
@@ -42,6 +43,8 @@ export class SavedViewService {
 
     if (count === 0) {
       await this.seedViews({ projectId });
+    } else {
+      await this.backfillMissingSeedViews({ projectId });
     }
 
     return await this.repository.findAll({ projectId, userId });
@@ -191,6 +194,33 @@ export class SavedViewService {
         name: seed.name,
         filters: seed.filters as Prisma.InputJsonValue,
         order: i,
+      })),
+    });
+  }
+
+  /**
+   * Creates seed views that are missing from already-seeded projects — for
+   * example, a new "Gateway" default view that didn't exist when the
+   * project was first seeded. Identified by name only, so renamed views
+   * are not re-created and user customizations are preserved.
+   */
+  private async backfillMissingSeedViews({ projectId }: { projectId: string }) {
+    const existing = await this.repository.findAll({ projectId });
+    const existingNames = new Set(existing.map((v) => v.name));
+    const missing = SEED_VIEWS.filter((seed) => !existingNames.has(seed.name));
+    if (missing.length === 0) return;
+
+    const highestOrder = existing.reduce(
+      (acc, v) => (v.order > acc ? v.order : acc),
+      -1,
+    );
+    await this.repository.createMany({
+      views: missing.map((seed, i) => ({
+        id: nanoid(),
+        projectId,
+        name: seed.name,
+        filters: seed.filters as Prisma.InputJsonValue,
+        order: highestOrder + 1 + i,
       })),
     });
   }

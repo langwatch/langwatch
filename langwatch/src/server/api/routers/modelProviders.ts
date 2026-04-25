@@ -63,6 +63,13 @@ export const modelProviderRouter = createTRPCRouter({
         id: z.string().optional(),
         projectId: z.string(),
         provider: z.string(),
+        // Human-readable label shown in the settings list and the model
+        // selector group headers. Defaults to the humanized provider name
+        // (e.g. "openai" → "OpenAI") when omitted. Iter 109 added the
+        // column; now exposing it on the write path so operators can
+        // distinguish multiple same-provider instances at different
+        // scopes.
+        name: z.string().trim().min(1).max(128).optional(),
         enabled: z.boolean(),
         customKeys: z.object({}).passthrough().optional().nullable(),
         customModels: customModelUpdateInputSchema.optional().nullable(),
@@ -72,25 +79,48 @@ export const modelProviderRouter = createTRPCRouter({
           .optional()
           .nullable(),
         defaultModel: z.string().optional(),
+        // Multi-scope writes (iter 109). `scopes` is the canonical shape;
+        // `scopeType`/`scopeId` remain for the transition period so older
+        // callers still compile. When both arrive, `scopes` wins. The
+        // service runs the fail-closed authz check on every entry before
+        // persisting — any non-manageable scope aborts the whole write.
+        scopes: z
+          .array(
+            z.object({
+              scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
+              scopeId: z.string().min(1),
+            }),
+          )
+          .min(1, "At least one scope must be selected.")
+          .optional(),
+        scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]).optional(),
+        scopeId: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
-      return await service.updateModelProvider({
-        id: input.id,
-        projectId: input.projectId,
-        provider: input.provider,
-        enabled: input.enabled,
-        customKeys: input.customKeys as
-          | Record<string, unknown>
-          | null
-          | undefined,
-        customModels: input.customModels,
-        customEmbeddingsModels: input.customEmbeddingsModels,
-        extraHeaders: input.extraHeaders,
-        defaultModel: input.defaultModel,
-      });
+      return await service.updateModelProvider(
+        {
+          id: input.id,
+          projectId: input.projectId,
+          provider: input.provider,
+          name: input.name,
+          enabled: input.enabled,
+          customKeys: input.customKeys as
+            | Record<string, unknown>
+            | null
+            | undefined,
+          customModels: input.customModels,
+          customEmbeddingsModels: input.customEmbeddingsModels,
+          extraHeaders: input.extraHeaders,
+          defaultModel: input.defaultModel,
+          scopes: input.scopes,
+          scopeType: input.scopeType,
+          scopeId: input.scopeId,
+        },
+        { prisma: ctx.prisma, session: ctx.session },
+      );
     }),
 
   delete: protectedProcedure
@@ -104,7 +134,10 @@ export const modelProviderRouter = createTRPCRouter({
     .use(checkProjectPermission("project:delete"))
     .mutation(async ({ input, ctx }) => {
       const service = ModelProviderService.create(ctx.prisma);
-      return await service.deleteModelProvider(input);
+      return await service.deleteModelProvider(input, {
+        prisma: ctx.prisma,
+        session: ctx.session,
+      });
     }),
 
   /**

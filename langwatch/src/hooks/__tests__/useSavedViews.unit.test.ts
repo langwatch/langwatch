@@ -489,14 +489,15 @@ describe("savedViewsLogic", () => {
   // --- DEFAULT_VIEWS ---
 
   describe("DEFAULT_VIEWS", () => {
-    it("has 5 default views in order", () => {
-      expect(DEFAULT_VIEWS).toHaveLength(5);
+    it("has 6 default views in order", () => {
+      expect(DEFAULT_VIEWS).toHaveLength(6);
       expect(DEFAULT_VIEWS.map((v) => v.name)).toEqual([
         "All Traces",
         "Application",
         "Evaluations",
         "Simulations",
         "Playground",
+        "Gateway",
       ]);
     });
 

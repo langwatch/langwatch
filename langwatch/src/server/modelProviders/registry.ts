@@ -42,18 +42,34 @@ type ModelProviderDefinition = {
   blurb?: string;
   /** Provider-level parameter constraints (e.g., temperature max for Anthropic) */
   parameterConstraints?: ParameterConstraints;
+  /**
+   * Keys that are operationally optional for manual setup. The credential
+   * schemas use `.nullable().optional()` to permit env-var fallback, so
+   * Zod's `.isOptional()` can't distinguish "truly optional override" from
+   * "required but nullable for storage". This list is the UI source of
+   * truth for which fields render the muted "optional" affordance.
+   */
+  optionalKeys?: string[];
 };
 
 export type MaybeStoredModelProvider = Omit<
   ModelProvider,
   | "id"
   | "projectId"
+  | "name"
   | "createdAt"
   | "updatedAt"
   | "customModels"
   | "customEmbeddingsModels"
 > & {
   id?: string;
+  /**
+   * Human-readable name (iter 109). Optional in the inbound shape used
+   * by form seeding where registry defaults get promoted before a row
+   * exists; persisted rows always carry a value. Defaults derive from
+   * the humanized provider name with auto-suffixing for collisions.
+   */
+  name?: string;
   /** Registry model IDs (populated from the model registry, not user-managed) */
   models?: string[] | null;
   /** Registry embedding model IDs (populated from the model registry) */
@@ -64,6 +80,23 @@ export type MaybeStoredModelProvider = Omit<
   customEmbeddingsModels?: CustomModelEntry[] | null;
   disabledByDefault?: boolean;
   extraHeaders?: { key: string; value: string }[] | null;
+  /**
+   * Multi-scope grant set (iter 109). Every persisted MP has at least
+   * one entry; registry-seeded placeholders for providers that don't
+   * have a row yet omit the field. Consumers that need access-control
+   * reasoning should read this array rather than the collapsed single-
+   * scope pair below.
+   */
+  scopes?: Array<{
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
+    scopeId: string;
+  }>;
+  /**
+   * Narrowest-scope pair derived from `scopes` for legacy callers that
+   * still key by scopeType/scopeId. New code should read `scopes[]`.
+   */
+  scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId?: string;
 };
 
 // ============================================================================
@@ -169,6 +202,10 @@ export const modelProviders = {
       CUSTOM_API_KEY: z.string().nullable().optional(),
       CUSTOM_BASE_URL: z.string().nullable().optional(),
     }),
+    // CUSTOM_BASE_URL is required (the endpoint can't be inferred); the
+    // API key is genuinely optional because some proxies (local vLLM,
+    // unauthenticated LiteLLM) don't require it.
+    optionalKeys: ["CUSTOM_API_KEY"],
     enabledSince: new Date("2023-01-01"),
     blurb:
       "Use this option for LiteLLM proxy, self-hosted vLLM or any other model providers that supports the /chat/completions endpoint.",
@@ -195,6 +232,11 @@ export const modelProviders = {
           });
         }
       }),
+    // The base URL is an override (defaults to api.openai.com). The API
+    // key is the primary credential — the superRefine still permits an
+    // empty key when a base URL is set, but the typical user path is
+    // "paste key here".
+    optionalKeys: ["OPENAI_BASE_URL"],
     enabledSince: new Date("2023-01-01"),
   },
   anthropic: {
@@ -206,6 +248,7 @@ export const modelProviders = {
       ANTHROPIC_API_KEY: z.string().min(1),
       ANTHROPIC_BASE_URL: z.string().nullable().optional(),
     }),
+    optionalKeys: ["ANTHROPIC_BASE_URL"],
     enabledSince: new Date("2023-01-01"),
     // Anthropic API limits temperature to 0-1 range
     parameterConstraints: {
@@ -235,6 +278,9 @@ export const modelProviders = {
         AZURE_API_GATEWAY_VERSION: z.string().nullable().optional(),
       })
       .passthrough(),
+    // Direct-mode and gateway-mode each need both of their two fields;
+    // the useApiGateway toggle in the UI swaps which pair is visible.
+    optionalKeys: [],
     enabledSince: new Date("2023-01-01"),
   },
   bedrock: {
@@ -247,6 +293,10 @@ export const modelProviders = {
       AWS_SECRET_ACCESS_KEY: z.string().nullable().optional(),
       AWS_REGION_NAME: z.string().nullable().optional(),
     }),
+    // All three AWS creds are required for manual Bedrock setup; the
+    // `.nullable().optional()` on the schema is only to permit env-var
+    // fallback in the inbound payload.
+    optionalKeys: [],
     enabledSince: new Date("2023-01-01"),
   },
   vertex_ai: {

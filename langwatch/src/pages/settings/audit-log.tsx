@@ -1,5 +1,6 @@
 import {
   Alert,
+  Badge,
   Box,
   Button,
   Card,
@@ -14,7 +15,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
-import { Download, Search } from "lucide-react";
+import { ArrowLeft, Download, Search } from "lucide-react";
+import { Link } from "~/components/ui/link";
 import { useRouter } from "~/utils/compat/next-router";
 import Parse from "papaparse";
 import { useState } from "react";
@@ -70,6 +72,16 @@ function AuditLogPage() {
   const [actionFilter, setActionFilter] = useState(
     (router.query.actionFilter as string) ?? "",
   );
+  // Gateway deep-link filters: when a VK or budget detail page links
+  // to /settings/audit-log?targetKind=virtual_key&targetId=vk_xxx the
+  // filters are read straight from the URL and sent to the backend so
+  // the user lands on a pre-filtered history of that resource.
+  const urlTargetKind =
+    typeof router.query.targetKind === "string"
+      ? router.query.targetKind
+      : "";
+  const urlTargetId =
+    typeof router.query.targetId === "string" ? router.query.targetId : "";
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     project?.id ?? null,
   );
@@ -116,6 +128,8 @@ function AuditLogPage() {
         action: actionFilter || undefined,
         startDate: startDate.getTime(),
         endDate: endDate.getTime(),
+        targetKind: urlTargetKind || undefined,
+        targetId: urlTargetId || undefined,
       },
       {
         enabled: !!organization && isEnterprise,
@@ -141,11 +155,28 @@ function AuditLogPage() {
             <Alert.Content>
               <Alert.Title>Enterprise Feature</Alert.Title>
               <Alert.Description>
-                Audit logs are available on Enterprise plans. Contact sales to
-                upgrade.
+                Organisation-wide audit logs (logins, member changes, settings,
+                RBAC, billing) are available on Enterprise plans. Contact sales
+                to upgrade.
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
+          {project && (
+            <Alert.Root status="success">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Title>AI Gateway audit is available to you</Alert.Title>
+                <Alert.Description>
+                  Virtual-key, budget, provider, and cache-rule changes are
+                  logged for every plan.{" "}
+                  <Link href={`/${project.slug}/gateway/audit`}>
+                    Open the Gateway audit log
+                  </Link>
+                  .
+                </Alert.Description>
+              </Alert.Content>
+            </Alert.Root>
+          )}
           <Box width="full">
             <ContactSalesBlock />
           </Box>
@@ -310,16 +341,64 @@ function AuditLogPage() {
     }
   };
 
+  const clearTargetFilter = () => {
+    const { targetKind: _tk, targetId: _tid, ...rest } = router.query;
+    void router.replace({ pathname: router.pathname, query: rest });
+  };
+
+  // Derive a return URL back to the originating detail page when the
+  // operator arrived via a VK/budget deep-link. Mirrors the gateway
+  // audit.tsx breadcrumb so the UX is consistent across both views.
+  const backToResource = (() => {
+    if (!urlTargetKind || !urlTargetId || !project?.slug) return null;
+    if (urlTargetKind === "virtual_key") {
+      return {
+        href: `/${project.slug}/gateway/virtual-keys/${urlTargetId}`,
+        label: "Virtual key",
+      };
+    }
+    if (urlTargetKind === "budget") {
+      return {
+        href: `/${project.slug}/gateway/budgets/${urlTargetId}`,
+        label: "Budget",
+      };
+    }
+    return null;
+  })();
+
   return (
     <SettingsLayout>
       <VStack gap={6} width="full" align="start">
         <HStack width="full" marginTop={2}>
           <VStack align="start" gap={1}>
+            {backToResource && (
+              <Link
+                href={backToResource.href}
+                color="fg.muted"
+                fontSize="sm"
+              >
+                <HStack gap={1}>
+                  <ArrowLeft size={14} /> {backToResource.label}
+                </HStack>
+              </Link>
+            )}
             <Heading as="h2">Audit Log</Heading>
             <Text color="fg.muted">
               View all audit logs for your organization. Filter by project,
               user, action type, or date range.
             </Text>
+            {urlTargetKind && urlTargetId && (
+              <Badge
+                colorPalette="orange"
+                variant="surface"
+                gap={1}
+                cursor="pointer"
+                onClick={clearTargetFilter}
+                title="Clear target filter"
+              >
+                {urlTargetKind} = {urlTargetId.slice(0, 24)}… ×
+              </Badge>
+            )}
           </VStack>
           <Spacer />
           {organizations && project && (
@@ -451,8 +530,10 @@ function AuditLogPage() {
               <Table.Header>
                 <Table.Row>
                   <Table.ColumnHeader>Timestamp</Table.ColumnHeader>
+                  <Table.ColumnHeader>Source</Table.ColumnHeader>
                   <Table.ColumnHeader>User</Table.ColumnHeader>
                   <Table.ColumnHeader>Action</Table.ColumnHeader>
+                  <Table.ColumnHeader>Target</Table.ColumnHeader>
                   <Table.ColumnHeader>Project</Table.ColumnHeader>
                   <Table.ColumnHeader>IP Address</Table.ColumnHeader>
                   <Table.ColumnHeader>Error</Table.ColumnHeader>
@@ -474,6 +555,21 @@ function AuditLogPage() {
                       </VStack>
                     </Table.Cell>
                     <Table.Cell>
+                      <Badge
+                        size="sm"
+                        variant="subtle"
+                        colorPalette={
+                          (log as any).source === "gateway"
+                            ? "purple"
+                            : "gray"
+                        }
+                      >
+                        {(log as any).source === "gateway"
+                          ? "Gateway"
+                          : "Platform"}
+                      </Badge>
+                    </Table.Cell>
+                    <Table.Cell>
                       {log.user ? (
                         <VStack align="start" gap={0}>
                           <Text fontSize="sm" fontWeight="medium">
@@ -493,6 +589,22 @@ function AuditLogPage() {
                       <Text fontSize="sm" fontFamily="mono">
                         {log.action}
                       </Text>
+                    </Table.Cell>
+                    <Table.Cell>
+                      {(log as any).targetKind && (log as any).targetId ? (
+                        <VStack align="start" gap={0}>
+                          <Text fontSize="xs" color="fg.muted">
+                            {(log as any).targetKind}
+                          </Text>
+                          <Text fontSize="xs" fontFamily="mono">
+                            {((log as any).targetId as string).slice(0, 16)}…
+                          </Text>
+                        </VStack>
+                      ) : (
+                        <Text fontSize="sm" color="fg.subtle">
+                          —
+                        </Text>
+                      )}
                     </Table.Cell>
                     <Table.Cell>
                       {log.projectId ? (

@@ -76,6 +76,9 @@ secrets:
     # Key for NextAuth secret (used by app)
     ## @param secrets.secretKeys.nextAuthSecret [string] Key name for NextAuth secret.
     nextAuthSecret: "nextAuthSecret"
+    # Key for AI Gateway virtual-key pepper (used by app only)
+    ## @param secrets.secretKeys.virtualKeyPepper [string] Key name for AI Gateway virtual-key pepper.
+    virtualKeyPepper: "virtualKeyPepper"
 
 # =============================================================================
 # Container Image Configurations
@@ -154,6 +157,18 @@ app:
   ## @param app.cronApiKey.value [string] Cron API key value.
   ## @param app.cronApiKey.secretKeyRef [object] Reference to a secret holding the cron API key.
   cronApiKey:
+    value: ""
+    secretKeyRef: { name: "", key: "" }
+
+  # Pepper used when hashing AI Gateway virtual-key secrets (HMAC-SHA256).
+  # Control-plane only — this value is NEVER shared with the gateway pod.
+  # Rotating this value invalidates every previously-issued virtual key,
+  # so treat it as append-only. Autogen keeps it stable across upgrades
+  # by reusing the existing Secret value on redeploy.
+  ## @extra app.virtualKeyPepper Pepper for hashing AI Gateway virtual-key secrets.
+  ## @param app.virtualKeyPepper.value [string] Pepper value (not recommended inline for production).
+  ## @param app.virtualKeyPepper.secretKeyRef [object] Reference to a secret holding the pepper.
+  virtualKeyPepper:
     value: ""
     secretKeyRef: { name: "", key: "" }
 
@@ -542,6 +557,9 @@ app:
 # Uses the same container image as the app but runs `pnpm start:workers`.
 ## @section Workers
 workers:
+
+  ## @param workers.enabled [default: true] Deploy the workers Deployment + PDB.
+  enabled: true
 
   # Number of worker replicas
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
@@ -1472,3 +1490,39 @@ redis:
       limits:
         cpu: 500m
         memory: 512Mi
+
+## @section AI Gateway
+## The gateway is a Go service that fronts LLM provider traffic with
+## virtual keys, budgets, guardrails, caching, and fallback routing.
+## See charts/gateway/values.yaml for the full set of knobs; the block
+## below is passed through Helm's subchart value plumbing. Setting
+## `gateway.chartManaged: false` disables the gateway entirely — useful
+## for air-gapped deploys that proxy LLM calls through a separate pipe.
+##
+## Shared auth: LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET live
+## on the umbrella-materialised Secret `{{ .Release.Name }}-gateway-auth`
+## and are referenced by both the langwatch-app Deployment and the
+## gateway Deployment. Rotating either value requires rolling both pods.
+gateway:
+  ## @param gateway.chartManaged [default: true] Lift the AI gateway pod as part of this chart (false = external or off).
+  chartManaged: true
+
+  # The gateway subchart defaults (image, probes, HPA, NetworkPolicy,
+  # PDB, SecurityContext) live in charts/gateway/values.yaml. Common
+  # umbrella-level overrides below; everything else inherits.
+
+  ## @param gateway.controlPlane.baseUrl [string, default: http://langwatch-app:5560] URL the gateway uses to reach langwatch-app. Defaults assume release name `langwatch`.
+  controlPlane:
+    baseUrl: http://langwatch-app:5560
+
+  ## @param gateway.secrets.existingSecretName [string, default: langwatch-gateway-auth] Name of the Secret carrying LW_GATEWAY_INTERNAL_SECRET and LW_GATEWAY_JWT_SECRET. Must be created out-of-band (terraform / external-secrets) and shared with langwatch-app's env. The umbrella chart does NOT materialise it.
+  secrets:
+    existingSecretName: langwatch-gateway-auth
+
+  ## @param gateway.otel.endpoint [string, default: http://langwatch-app:5560/api/otel] OTLP/HTTP ingest URL the gateway exports spans to. In-cluster default targets langwatch-app. Point at an external collector (Honeycomb / Datadog OTLP receiver / Grafana Agent) if you already have one. Leave empty to disable gateway trace export entirely.
+  ## @param gateway.otel.authExistingSecretName [string, default: ""] Name of a Secret carrying the X-Auth-Token attached to every OTLP span export. Production path — rotate the token by rotating the Secret. Required when endpoint points at /api/otel; the ingest rejects unauthenticated spans with 401.
+  ## @param gateway.otel.authSecretKey [string, default: token] Key inside `otel.authExistingSecretName` holding the token.
+  otel:
+    endpoint: http://langwatch-app:5560/api/otel
+    authExistingSecretName: ""
+    authSecretKey: token

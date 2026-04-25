@@ -13,6 +13,24 @@ import {
   modelProviders,
   type ParameterConstraints,
 } from "../../modelProviders/registry";
+import { parseWireValue } from "../../modelProviders/wireFormat";
+
+/**
+ * Normalises either wire format ("mp_abc/gpt-5" or "openai/gpt-5") into
+ * the legacy provider-prefixed form LiteLLM expects. We always use the
+ * resolved ModelProvider's provider string rather than trusting the
+ * prefix in the wire value — the two never disagree for resolved rows,
+ * and this keeps LiteLLM routing stable when new mp-id values arrive.
+ */
+function toLitellmModelId(wireValue: string, provider: string): string {
+  const parsed = parseWireValue(wireValue);
+  if (parsed.kind === "mp-id" || parsed.kind === "legacy") {
+    return `${provider}/${parsed.model}`;
+  }
+  // Unknown shapes — no slash — were treated as provider-less in the
+  // original code and just passed to LiteLLM verbatim.
+  return wireValue;
+}
 
 /**
  * Simplified model metadata for frontend consumption
@@ -215,10 +233,16 @@ export const prepareLitellmParams = async ({
 }) => {
   const params: Record<string, string> = {};
 
+  // Normalise the incoming wire value for LiteLLM. After iter 109 two
+  // formats coexist: the canonical `{mpId}/{model}` and the legacy
+  // `{provider}/{model}`. LiteLLM only understands the latter; translate
+  // the model portion into a canonical provider-prefixed form using the
+  // resolved ModelProvider so downstream routing keeps working.
+  const litellmModelInput = toLitellmModelId(model, modelProvider.provider);
   // Translate model ID for LiteLLM (e.g., "anthropic/claude-opus-4.5" -> "anthropic/claude-opus-4-5")
   // Custom models use OpenAI-compatible API format, so we replace the prefix.
   // LiteLLM routes "openai/" prefixed models through its OpenAI-compatible handler.
-  params.model = translateModelIdForLitellm(model).replace(
+  params.model = translateModelIdForLitellm(litellmModelInput).replace(
     "custom/",
     "openai/",
   );

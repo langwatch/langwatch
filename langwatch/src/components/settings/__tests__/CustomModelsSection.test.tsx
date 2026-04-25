@@ -41,6 +41,9 @@ function buildState(
     projectDefaultModel: null,
     projectTopicClusteringModel: null,
     projectEmbeddingsModel: null,
+    name: "OpenAI",
+    scopes: [],
+    scopeType: "PROJECT",
     isSaving: false,
     errors: {},
     ...overrides,
@@ -52,6 +55,9 @@ function buildActions(
 ): UseModelProviderFormActions {
   return {
     setEnabled: vi.fn(),
+    setName: vi.fn(),
+    setScopes: vi.fn(),
+    setScopeType: vi.fn(),
     setUseApiGateway: vi.fn(),
     setCustomKey: vi.fn(),
     addExtraHeader: vi.fn(),

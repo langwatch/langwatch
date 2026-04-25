@@ -1,6 +1,5 @@
 import crypto from "node:crypto";
 import { customAlphabet } from "nanoid";
-import { env } from "~/env.mjs";
 
 const LOOKUP_ID_LENGTH = 16;
 const SECRET_LENGTH = 48;
@@ -14,36 +13,11 @@ export const PAT_PREFIX = "pat-lw-";
 export const LEGACY_PREFIX = "sk-lw-";
 
 /**
- * Returns the server-side pepper used when HMAC-hashing PAT secrets.
- *
- * Using HMAC-SHA256 with a pepper (rather than plain SHA-256) means a
- * DB-only leak is useless on its own: the attacker needs the pepper
- * too. We reuse the same `CREDENTIALS_SECRET` / `NEXTAUTH_SECRET` pair
- * already required for AES encryption of stored credentials, so no new
- * env var is introduced.
- *
- * PAT secrets are 48 chars from a 62-char alphabet (~286 bits of
- * entropy), so the hash algorithm's computational cost is irrelevant
- * to brute-force resistance — we deliberately don't use a slow KDF
- * (bcrypt/argon2) because `verifySecret` runs on every authenticated
- * request and any extra latency would be a DoS surface.
- */
-function getPatPepper(): string {
-  const pepper = env.CREDENTIALS_SECRET ?? env.NEXTAUTH_SECRET;
-  if (!pepper) {
-    throw new Error(
-      "PAT pepper not configured: set CREDENTIALS_SECRET or NEXTAUTH_SECRET",
-    );
-  }
-  return pepper;
-}
-
-/**
  * Generates a new split-format PAT token.
  *
  * Format: pat-lw-{lookupId}_{secret}
  *   - lookupId: indexed in plaintext for O(1) DB lookup
- *   - secret: stored as HMAC-SHA256 digest only (see `hashSecret`)
+ *   - secret: stored as SHA-256 hash only
  *
  * Returns the full plaintext token (shown once to user),
  * plus the lookupId and hashedSecret for DB storage.
@@ -89,17 +63,11 @@ export function splitPatToken(
 }
 
 /**
- * HMAC-SHA256 of a PAT secret, keyed by the server pepper. Deterministic
- * and fast — suitable for per-request verification on the hot path.
- *
- * See `getPatPepper` for the rationale behind HMAC-over-pepper vs a
- * slow KDF here.
+ * Hashes a secret using SHA-256. Deterministic and fast — suitable for
+ * per-request verification on the hot path.
  */
 export function hashSecret(secret: string): string {
-  return crypto
-    .createHmac("sha256", getPatPepper())
-    .update(secret)
-    .digest("hex");
+  return crypto.createHash("sha256").update(secret).digest("hex");
 }
 
 /**
