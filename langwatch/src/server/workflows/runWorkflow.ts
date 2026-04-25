@@ -7,7 +7,7 @@ import type {
 } from "../../optimization_studio/types/dsl";
 import type { StudioClientEvent } from "../../optimization_studio/types/events";
 import { getEntryInputs } from "../../optimization_studio/utils/nodeUtils";
-import { nlpgoFetch } from "../nlpgo/nlpgoFetch";
+import { nlpgoFetch, type NLPOrigin } from "../nlpgo/nlpgoFetch";
 import { getProjectModelProviders } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators.generated";
@@ -117,6 +117,7 @@ export async function runEvaluationWorkflow(
       versionId,
       true, // do_not_trace
       false, // run_evaluations - disable evaluators inside the workflow when running as an online evaluation
+      "evaluation",
     );
 
     // Process the result
@@ -160,6 +161,7 @@ export async function runWorkflow(
   versionId?: string,
   do_not_trace?: boolean,
   run_evaluations?: boolean,
+  origin: NLPOrigin = "workflow",
 ) {
   const workflow = await prisma.workflow.findUnique({
     where: { id: workflowId, projectId },
@@ -208,7 +210,7 @@ export async function runWorkflow(
             ? inputs.do_not_trace
             : false,
       ...(typeof run_evaluations === "boolean" && { run_evaluations }),
-      origin: "workflow",
+      origin,
     },
   };
 
@@ -221,7 +223,7 @@ export async function runWorkflow(
     projectId,
     path: "/studio/execute_sync",
     body: event,
-    origin: "workflow",
+    origin,
   });
 
   if (!response.ok) {
