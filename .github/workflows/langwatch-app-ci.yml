@@ -288,7 +288,22 @@ jobs:
 
       - name: Run ClickHouse migrations
         working-directory: langwatch
-        run: pnpm clickhouse:migrate
+        # ClickHouse's HTTP probe can answer SELECT 1 via curl while the
+        # Node @clickhouse/client still sees ECONNREFUSED on its first
+        # connect (IPv6/IPv4 dual-stack bind race under --network host).
+        # Retry the whole migrate step a couple of times to absorb the
+        # cold-start window. Observed flake: run 24930819915 shard 3.
+        run: |
+          for i in 1 2 3; do
+            if pnpm clickhouse:migrate; then
+              exit 0
+            fi
+            if [ "$i" -lt 3 ]; then
+              echo "clickhouse:migrate attempt $i failed; sleeping 5s and retrying"
+              sleep 5
+            fi
+          done
+          exit 1
 
       - name: Run integration tests with coverage (shard ${{ matrix.shard }}/4)
         id: integration-tests
