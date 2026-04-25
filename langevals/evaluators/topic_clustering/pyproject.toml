@@ -20,6 +20,7 @@ dependencies = [
     "scipy>=1.14.1,<2",
     "tenacity>=8.5.0,<9",
     "structlog>=24.1.0",
+    "nanoid>=2.0.0,<3",
 ]
 
 [dependency-groups]
