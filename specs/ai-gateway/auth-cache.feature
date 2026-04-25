@@ -98,7 +98,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
 
     @unit
     Scenario: hard expiry cap stops the stale-while-error chain
-      Given the cache holds an entry stale-extended for 30 minutes past its JWT exp
+      Given the cache holds an entry stale-extended past the LW_GATEWAY_AUTH_CACHE_HARD_GRACE cap (default 3h)
       And the control plane is still unreachable
       When I send a request with that VK
       Then the gateway evicts the cached entry
