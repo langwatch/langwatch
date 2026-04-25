@@ -53,33 +53,19 @@ spec:
                   name: {{ .Values.secrets.existingSecretName }}
                   key: {{ .Values.secrets.jwtSecretPreviousKey }}
             {{- end }}
-            {{- if .Values.redis.existingSecretName }}
-            - name: GATEWAY_REDIS_URL
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.redis.existingSecretName }}
-                  key: url
-            {{- else if .Values.redis.url }}
-            - name: GATEWAY_REDIS_URL
-              value: {{ .Values.redis.url | quote }}
-            {{- end }}
-            {{- if .Values.admin.existingAuthSecretName }}
-            - name: GATEWAY_ADMIN_AUTH_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.admin.existingAuthSecretName }}
-                  key: {{ .Values.admin.authSecretKey | default "token" }}
-            {{- end }}
-            {{- if .Values.otel.authExistingSecretName }}
-            - name: GATEWAY_OTEL_DEFAULT_AUTH_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.otel.authExistingSecretName }}
-                  key: {{ .Values.otel.authSecretKey | default "token" }}
-            {{- else if .Values.otel.authToken }}
-            - name: GATEWAY_OTEL_DEFAULT_AUTH_TOKEN
-              value: {{ .Values.otel.authToken | quote }}
-            {{- end }}
+            {{- /*
+              GATEWAY_REDIS_URL, GATEWAY_ADMIN_AUTH_TOKEN, and
+              GATEWAY_OTEL_DEFAULT_AUTH_TOKEN are intentionally NOT injected.
+              The current Go gateway (services/aigateway/) does not have a
+              Redis client (auth cache is in-process LRU), an admin/pprof
+              listener, or an OTel auth-token field on its config struct.
+              These values.yaml knobs remain as forward-compat surface for
+              v1.1; wiring them at the env-var layer today would silently
+              drop them and mislead operators into thinking they're tuning
+              behavior. OTLP authentication for self-hosters is delivered
+              via OTEL_OTLP_HEADERS (e.g. "Authorization=Bearer …") on the
+              OTel struct in pkg/config/otel.go.
+            */}}
           startupProbe:
             httpGet:
               path: /startupz
