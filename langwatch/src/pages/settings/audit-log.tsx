@@ -155,28 +155,14 @@ function AuditLogPage() {
             <Alert.Content>
               <Alert.Title>Enterprise Feature</Alert.Title>
               <Alert.Description>
-                Organisation-wide audit logs (logins, member changes, settings,
-                RBAC, billing) are available on Enterprise plans. Contact sales
+                Organisation-wide audit logs — including AI Gateway events
+                (virtual-key / budget / provider / cache-rule mutations)
+                alongside logins, member changes, settings, RBAC, and
+                billing — are available on Enterprise plans. Contact sales
                 to upgrade.
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
-          {project && (
-            <Alert.Root status="success">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>AI Gateway audit is available to you</Alert.Title>
-                <Alert.Description>
-                  Virtual-key, budget, provider, and cache-rule changes are
-                  logged for every plan.{" "}
-                  <Link href={`/${project.slug}/gateway/audit`}>
-                    Open the Gateway audit log
-                  </Link>
-                  .
-                </Alert.Description>
-              </Alert.Content>
-            </Alert.Root>
-          )}
           <Box width="full">
             <ContactSalesBlock />
           </Box>

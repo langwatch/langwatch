@@ -97,7 +97,6 @@ model User {
     gatewayBudgetsCreated   GatewayBudget[]        @relation("GatewayBudgetCreatedBy")
     principalVirtualKeys    VirtualKey[]           @relation("VirtualKeyPrincipalUser")
     principalGatewayBudgets GatewayBudget[]        @relation("PrincipalScopedGatewayBudgets")
-    gatewayAuditLogs        GatewayAuditLog[]      @relation("GatewayAuditLogActor")
 }
 
 model VerificationToken {
@@ -341,7 +340,6 @@ model Project {
     gatewayProviderCreds     GatewayProviderCredential[]
     gatewayBudgets           GatewayBudget[]                     @relation("ProjectScopedGatewayBudgets")
     gatewayChangeEvents      GatewayChangeEvent[]
-    gatewayAuditLogs         GatewayAuditLog[]
 
     @@index([teamId])
 }
@@ -952,6 +950,19 @@ model OrganizationFeature {
     @@index([organizationId])
 }
 
+// AuditLog is the unified governance ledger. Both gateway-driven mutations
+// (VK/budget/provider-binding/cache-rule via the 4 gateway services) and
+// platform-driven actions (tRPC mutations via auditLogMutations middleware)
+// write here. There is no separate GatewayAuditLog table — see migration
+// 20260425000000_consolidate_gateway_audit_into_audit_log.
+//
+// Two write shapes coexist on the same table:
+//   * Platform shape  — `args` + `metadata` + `error` carry the call-site
+//     context. `targetKind`, `targetId`, `before`, `after` stay null.
+//   * Gateway shape   — `targetKind`, `targetId`, `before`, `after` carry
+//     resource identity + diff. `args` / `metadata` / `error` stay null.
+// The /settings/audit-log page renders both via a `source` field computed
+// from the presence of `targetKind` (gateway = purple badge, platform = grey).
 model AuditLog {
     id             String   @id @default(cuid())
     createdAt      DateTime @default(now())
@@ -965,12 +976,20 @@ model AuditLog {
     userAgent      String?
     metadata       Json?
 
+    // Gateway-shape governance fields (see model docstring above).
+    targetKind     String?
+    targetId       String?
+    before         Json?
+    after          Json?
+
     @@index([createdAt])
     @@index([userId])
     @@index([projectId])
     @@index([organizationId])
     @@index([action])
     @@index([ipAddress])
+    @@index([organizationId, createdAt])
+    @@index([targetKind, targetId])
 }
 
 enum PromptScope {
@@ -1413,8 +1432,8 @@ model BillingMeterCheckpoint {
 //   gateway_request_id (outbox pattern — writes from the Go gateway).
 // - GatewayChangeEvent: monotonically-increasing revision feed consumed by
 //   the gateway's long-poll `/internal/gateway/changes?since=N` endpoint.
-// - GatewayAuditLog: full actor/action/before/after audit for every
-//   gateway-surface mutation.
+// - AuditLog (top of file): unified actor/action/before/after audit for
+//   every gateway-surface mutation alongside platform mutations.
 // ============================================================================
 
 enum VirtualKeyEnvironment {
@@ -1489,22 +1508,13 @@ enum GatewayChangeEventKind {
     CACHE_RULE_DELETED
 }
 
-enum GatewayAuditAction {
-    VIRTUAL_KEY_CREATED
-    VIRTUAL_KEY_UPDATED
-    VIRTUAL_KEY_ROTATED
-    VIRTUAL_KEY_REVOKED
-    VIRTUAL_KEY_DELETED
-    BUDGET_CREATED
-    BUDGET_UPDATED
-    BUDGET_DELETED
-    PROVIDER_BINDING_CREATED
-    PROVIDER_BINDING_UPDATED
-    PROVIDER_BINDING_DELETED
-    CACHE_RULE_CREATED
-    CACHE_RULE_UPDATED
-    CACHE_RULE_DELETED
-}
+// Gateway audit action codes — kept as a TypeScript const union in
+// langwatch/src/server/gateway/auditLog.repository.ts (no Prisma enum
+// because gateway rows now write to the shared `AuditLog` table whose
+// `action` column is a free-form String).
+//
+// enum GatewayAuditAction { ... } — removed in migration
+// 20260425000000_consolidate_gateway_audit_into_audit_log.
 
 enum GatewayCacheRuleMode {
     RESPECT
@@ -1736,25 +1746,9 @@ model GatewayChangeEvent {
     @@index([budgetId])
 }
 
-model GatewayAuditLog {
-    id             String             @id @default(nanoid())
-    organizationId String
-    projectId      String?
-    project        Project?           @relation(fields: [projectId], references: [id], onDelete: SetNull)
-    actorUserId    String?
-    actor          User?              @relation("GatewayAuditLogActor", fields: [actorUserId], references: [id], onDelete: SetNull)
-    action         GatewayAuditAction
-    targetKind     String             // "virtual_key" | "budget" | "provider_binding"
-    targetId       String
-    before         Json?
-    after          Json?
-    createdAt      DateTime           @default(now())
-
-    @@index([organizationId, createdAt])
-    @@index([projectId, createdAt])
-    @@index([actorUserId])
-    @@index([targetKind, targetId])
-}
+// model GatewayAuditLog removed — gateway services now write to the
+// shared `AuditLog` model (top of file). See migration
+// 20260425000000_consolidate_gateway_audit_into_audit_log.
 
 // AI Gateway cache-control rules — operator-defined overrides without
 // client code changes. Org-scoped; compiled into the VK bundle at

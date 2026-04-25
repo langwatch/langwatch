@@ -317,7 +317,7 @@ Feature: Cache control rules — operator-defined overrides without client code 
     When the user clicks the Switch in the row's Enabled column
     Then the rule's enabled flag flips to false
     And a GatewayChangeEvent is emitted (kind = CACHE_RULE_UPDATED)
-    And a GatewayAuditLog row records the toggle with before/after JSON
+    And an AuditLog row (gateway shape) records the toggle with before/after JSON
 
   Scenario: Create drawer uses progressive disclosure for mode-dependent fields
     When the user opens the "New cache rule" drawer

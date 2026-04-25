@@ -176,7 +176,7 @@ Feature: AI Gateway — Budgets
     When I open its detail page
     Then Edit and Archive buttons are hidden (archived — actions are no-op)
     But the "Audit history" button is still visible and deep-links to
-      /gateway/audit?targetKind=budget&targetId=budget_…
+      /settings/audit-log?targetKind=budget&targetId=budget_…
 
   @visual
   Scenario: Budget detail Recent debits humanises When + Amount columns

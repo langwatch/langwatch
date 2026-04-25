@@ -114,7 +114,7 @@ function BudgetDetailPage() {
                   the full lifecycle trail stays queryable so operators
                   can reconstruct why a budget was archived. */}
               <Link
-                href={`/${project?.slug}/gateway/audit?targetKind=budget&targetId=${budget.id}`}
+                href={`/settings/audit-log?targetKind=budget&targetId=${budget.id}`}
               >
                 <Button variant="outline" size="sm">
                   <FileClock size={14} /> Audit history

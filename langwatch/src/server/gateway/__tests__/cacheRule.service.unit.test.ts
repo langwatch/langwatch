@@ -6,12 +6,12 @@ function mockPrisma(gatewayCacheRule: Record<string, any>): any {
   return {
     gatewayCacheRule,
     gatewayChangeEvent: { create: vi.fn(async () => ({ revision: 1n })) },
-    gatewayAuditLog: { create: vi.fn(async () => undefined) },
+    auditLog: { create: vi.fn(async () => undefined) },
     $transaction: async (cb: (tx: any) => any) =>
       cb({
         gatewayCacheRule,
         gatewayChangeEvent: { create: vi.fn(async () => ({ revision: 1n })) },
-        gatewayAuditLog: { create: vi.fn(async () => undefined) },
+        auditLog: { create: vi.fn(async () => undefined) },
       }),
   };
 }

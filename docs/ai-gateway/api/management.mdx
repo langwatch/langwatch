@@ -384,7 +384,7 @@ Common management-side types:
 
 ## Audit
 
-Every write emits a row in `GatewayAuditLog` — visible under **/settings/audit-log** (filter by resource type `virtualKey` / `gatewayBudget` / `gatewayProvider`). Writes via API tokens without an associated user (service tokens) are attributed to `actor = "svc_<projectId>"`. See [Audit log](/ai-gateway/audit) for the REST export path + the v1.1 unification roadmap.
+Every write emits a row in the platform-wide `AuditLog` (gateway shape — `targetKind` / `targetId` / `before` / `after`). Visible under **/settings/audit-log** with the Source = "Gateway" badge; filter by Target (`virtual_key` / `budget` / `provider_binding` / `cache_rule`) to scope. Writes via API tokens are attributed to the API token's resolved user. See [Audit log](/ai-gateway/audit) for the full schema, REST export path, and migration note from the v3.0 gateway-only table.
 
 ## Rate limits
 

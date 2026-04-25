@@ -1,8 +1,8 @@
 /**
  * Business logic for virtual keys. Framework-agnostic (no tRPC / Hono imports).
  * Every mutation method runs inside a Prisma transaction that also appends a
- * GatewayChangeEvent (for the gateway's long-poll feed) and a
- * GatewayAuditLog (for humans).
+ * GatewayChangeEvent (for the gateway's long-poll feed) and an
+ * AuditLog row in gateway shape (for humans).
  */
 import { randomBytes } from "crypto";
 

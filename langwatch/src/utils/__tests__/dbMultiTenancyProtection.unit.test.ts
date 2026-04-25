@@ -74,23 +74,6 @@ describe("guardProjectId — exempt org-scoped gateway models", () => {
     });
   });
 
-  describe("findMany on GatewayAuditLog with organizationId + cursor", () => {
-    it("does NOT throw (audit is org-level, projectId column allows null)", async () => {
-      await expect(
-        runGuard({
-          model: "GatewayAuditLog",
-          action: "findMany",
-          args: {
-            where: {
-              organizationId: "org_01",
-              createdAt: { lt: new Date() },
-            },
-          },
-        }),
-      ).resolves.toBe("ok");
-    });
-  });
-
   describe("createMany on VirtualKeyProviderCredential without projectId", () => {
     it("does NOT throw — join table, projectId reachable via parent VK", async () => {
       // This path is hit on every VK create + every update that changes the

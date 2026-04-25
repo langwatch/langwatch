@@ -6,10 +6,11 @@ Feature: AI Gateway — RBAC legacy ADMIN fallback for org-scoped checks
   # Regression coverage for finding #28 (sergey 1fdf9b160). The bug was that
   # `hasOrganizationPermission` in src/server/api/rbac.ts only consulted ORG-scoped
   # RoleBinding rows; legacy admins whose permissions come from OrganizationUser /
-  # TeamUser ADMIN rows (the pre-RBAC world) got 401 on /gateway/audit,
-  # /gateway/budgets org-list, /gateway/cache-rules. Fix: union TeamUser ADMIN
-  # roles in the org as a fallback when ORG-scoped bindings are empty, but keep
-  # the strict org-admin check for `organization:manage` (no escalation risk).
+  # TeamUser ADMIN rows (the pre-RBAC world) got 401 on /gateway/audit (since
+  # consolidated into /settings/audit-log), /gateway/budgets org-list,
+  # /gateway/cache-rules. Fix: union TeamUser ADMIN roles in the org as a
+  # fallback when ORG-scoped bindings are empty, but keep the strict org-admin
+  # check for `organization:manage` (no escalation risk).
 
   Background:
     Given organization "acme" exists with team "platform" and project "gateway-demo"
@@ -23,7 +24,10 @@ Feature: AI Gateway — RBAC legacy ADMIN fallback for org-scoped checks
 
   @integration
   Scenario: Audit log listing page renders populated for legacy org ADMIN
-    When "alice@acme.test" visits "/acme-demo-b4UwtJ/gateway/audit"
+    # Post-consolidation: gateway audit rows are visible at /settings/audit-log
+    # alongside platform rows. Legacy org ADMINs reach the page via the same
+    # TeamUser fallback path tested for /gateway/budgets and /gateway/cache-rules.
+    When "alice@acme.test" visits "/settings/audit-log"
     Then the response status is 200
     And the audit-log table shows at least 1 row
     And the response does NOT redirect to "/auth/signin"

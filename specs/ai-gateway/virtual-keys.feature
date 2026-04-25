@@ -261,7 +261,7 @@ Feature: AI Gateway — Virtual Keys
   Scenario: VK detail has a deep-link Audit history button that pre-filters the log
     Given virtual key "prod-key" has 4 audit entries (created, updated, rotated, revoked)
     When I open the VK detail page and click "Audit history"
-    Then I land on /gateway/audit?targetKind=virtual_key&targetId=vk_…
+    Then I land on /settings/audit-log?targetKind=virtual_key&targetId=vk_…
     And the audit page shows only the 4 entries for that VK
     And I see a clickable "target = vk_…" chip that clears the filter when ×-tapped
 

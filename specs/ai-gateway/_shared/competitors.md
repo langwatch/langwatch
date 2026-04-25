@@ -96,7 +96,7 @@ Nexos publishes a clean per-CLI integration guide page (we only saw Codex). We s
 | Coding-CLI integration docs (Claude Code / Codex / opencode) | ✅ in progress | minimal | minimal | ✅ Codex only |
 | Helm chart for self-host | ✅ (sub-chart of LangWatch) | ✅ | manual | ❌ |
 | RBAC integrated with SSO/SCIM | ✅ via existing LangWatch RBAC | ✅ Enterprise only | Enterprise only | hosted only |
-| Audit log of gateway actions | ✅ (`GatewayAuditLog` table) | ✅ Enterprise only | Enterprise only | hosted only |
+| Audit log of gateway actions | ✅ (unified `AuditLog` table — same surface as platform audit) | ✅ Enterprise only | Enterprise only | hosted only |
 | Built on bifrost/core for provider breadth | ✅ | native | ❌ (their own) | unknown |
 
 **Our differentiators, ranked:**

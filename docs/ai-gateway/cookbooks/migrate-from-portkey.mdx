@@ -119,7 +119,7 @@ We recommend the following sequence over 2-4 weeks:
 3. **Week 3 — flip customer traffic.** Route 50% of customer traffic through LangWatch, with a feature flag that can instantly revert.
 4. **Week 4 — decommission Portkey.** Once metrics show parity, null out the Portkey integration. Keep the Portkey org active for 30 days in case of rollback; delete after.
 
-Run `/gateway/usage` spend + `/gateway/audit` mutation history in parallel to your existing Portkey analytics during the rollout — the LangWatch audit log will show you every VK / budget / provider mutation, which is especially useful in the cutover period when your ops team is still adjusting governance.
+Run `/gateway/usage` spend + `/settings/audit-log` (filter Target = `virtual_key` / `budget` / etc.) mutation history in parallel to your existing Portkey analytics during the rollout — the LangWatch audit log will show you every VK / budget / provider mutation alongside platform actions, which is especially useful in the cutover period when your ops team is still adjusting governance.
 
 ## Feature-parity gaps (be explicit)
 

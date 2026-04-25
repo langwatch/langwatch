@@ -89,12 +89,12 @@ function mockPrisma(args: {
     },
     gatewayProviderCredential,
     gatewayChangeEvent: { create: changeEventCreate },
-    gatewayAuditLog: { create: auditCreate },
+    auditLog: { create: auditCreate },
     $transaction: async (fn: (tx: unknown) => Promise<unknown>) =>
       fn({
         gatewayProviderCredential,
         gatewayChangeEvent: { create: changeEventCreate },
-        gatewayAuditLog: { create: auditCreate },
+        auditLog: { create: auditCreate },
       }),
   } as unknown as PrismaClient;
 

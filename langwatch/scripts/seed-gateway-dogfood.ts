@@ -846,15 +846,15 @@ async function seedAuditLog(args: {
   cacheRules: Array<{ id: string; name: string }>;
   providerBindings: Array<{ id: string; slot: string }>;
 }) {
-  // Idempotency guard: GatewayAuditLog has no natural unique key
-  // (PK=nanoid, no composite constraint on target + action + day), so
+  // Idempotency guard: AuditLog has no natural unique key for gateway-shape
+  // rows (PK=cuid, no composite constraint on target + action + day), so
   // a second run of this seed would pile on synthetic VIRTUAL_KEY_CREATED
   // rows and make the Audit page show two (or more) 'created' events per
   // VK. @ariana finding #10. If the first seeded VK already has any
   // audit rows attached, assume the full replay ran before and skip.
   const firstVkId = args.virtualKeys[0]?.id;
   if (firstVkId) {
-    const alreadySeeded = await prisma.gatewayAuditLog.count({
+    const alreadySeeded = await prisma.auditLog.count({
       where: {
         organizationId: args.organizationId,
         targetKind: "virtual_key",
@@ -869,7 +869,7 @@ async function seedAuditLog(args: {
       return;
     }
   }
-  const events: Prisma.GatewayAuditLogCreateManyInput[] = [];
+  const events: Prisma.AuditLogCreateManyInput[] = [];
   const now = Date.now();
   const daysAgo = (d: number) => new Date(now - d * 24 * 60 * 60 * 1000);
 
@@ -877,7 +877,7 @@ async function seedAuditLog(args: {
     events.push({
       organizationId: args.organizationId,
       projectId: args.projectId,
-      actorUserId: args.actorUserId,
+      userId: args.actorUserId,
       action: "VIRTUAL_KEY_CREATED",
       targetKind: "virtual_key",
       targetId: vk.id,
@@ -890,7 +890,7 @@ async function seedAuditLog(args: {
   events.push({
     organizationId: args.organizationId,
     projectId: args.projectId,
-    actorUserId: args.actorUserId,
+    userId: args.actorUserId,
     action: "VIRTUAL_KEY_UPDATED",
     targetKind: "virtual_key",
     targetId: args.virtualKeys[0]?.id ?? "vk_unknown",
@@ -901,7 +901,7 @@ async function seedAuditLog(args: {
   events.push({
     organizationId: args.organizationId,
     projectId: args.projectId,
-    actorUserId: args.actorUserId,
+    userId: args.actorUserId,
     action: "VIRTUAL_KEY_ROTATED",
     targetKind: "virtual_key",
     targetId: args.virtualKeys[1]?.id ?? "vk_unknown",
@@ -915,7 +915,7 @@ async function seedAuditLog(args: {
     events.push({
       organizationId: args.organizationId,
       projectId: args.projectId,
-      actorUserId: args.actorUserId,
+      userId: args.actorUserId,
       action: "VIRTUAL_KEY_REVOKED",
       targetKind: "virtual_key",
       targetId: revoked.id,
@@ -928,7 +928,7 @@ async function seedAuditLog(args: {
     events.push({
       organizationId: args.organizationId,
       projectId: args.projectId,
-      actorUserId: args.actorUserId,
+      userId: args.actorUserId,
       action: "BUDGET_CREATED",
       targetKind: "budget",
       targetId: b.id,
@@ -942,7 +942,7 @@ async function seedAuditLog(args: {
     events.push({
       organizationId: args.organizationId,
       projectId: args.projectId,
-      actorUserId: args.actorUserId,
+      userId: args.actorUserId,
       action: "BUDGET_UPDATED",
       targetKind: "budget",
       targetId: args.budgets[0].id,
@@ -955,7 +955,7 @@ async function seedAuditLog(args: {
     events.push({
       organizationId: args.organizationId,
       projectId: args.projectId,
-      actorUserId: args.actorUserId,
+      userId: args.actorUserId,
       action: "PROVIDER_BINDING_CREATED",
       targetKind: "provider_binding",
       targetId: pb.id,
@@ -968,7 +968,7 @@ async function seedAuditLog(args: {
     events.push({
       organizationId: args.organizationId,
       projectId: args.projectId,
-      actorUserId: args.actorUserId,
+      userId: args.actorUserId,
       action: "CACHE_RULE_CREATED",
       targetKind: "cache_rule",
       targetId: cr.id,
@@ -981,7 +981,7 @@ async function seedAuditLog(args: {
     events.push({
       organizationId: args.organizationId,
       projectId: args.projectId,
-      actorUserId: args.actorUserId,
+      userId: args.actorUserId,
       action: "CACHE_RULE_UPDATED",
       targetKind: "cache_rule",
       targetId: args.cacheRules[0].id,
@@ -991,7 +991,7 @@ async function seedAuditLog(args: {
     });
   }
 
-  const result = await prisma.gatewayAuditLog.createMany({
+  const result = await prisma.auditLog.createMany({
     data: events,
     skipDuplicates: true,
   });

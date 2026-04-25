@@ -74,15 +74,14 @@ Debits carry the VK's `organization_id` as a filter predicate on every Postgres 
 
 ## Privileged actions are audited
 
-Every write through the REST API or the UI emits a row in `GatewayAuditLog`:
+Every write through the REST API or the UI emits a row in the platform-wide `AuditLog` (gateway shape):
 
-- `actorUserId` — the real user if the action was via session / personal-access token.
-- `actor` — the machine principal (e.g. `svc_<projectId>`) for service-token writes.
-- `action` — `virtualKey.created`, `virtualKey.rotated`, `budget.archived`, `provider.disabled`, etc.
-- `target` — resource id the action affected.
-- `metadata` — JSON diff on update actions.
+- `userId` — the resolved actor user (session, PAT, or API token mapped to a user).
+- `action` — string code: `VIRTUAL_KEY_CREATED`, `VIRTUAL_KEY_ROTATED`, `BUDGET_DELETED`, `PROVIDER_BINDING_UPDATED`, etc.
+- `targetKind` / `targetId` — resource kind + id the action affected.
+- `before` / `after` — JSON diff on update actions.
 
-Audit logs are visible to organization admins under **/settings/audit-log** (filter by resource type to narrow to gateway mutations). Retention: 7 years default, extendable on request.
+Audit logs are visible to organization admins under **/settings/audit-log** with a Source = "Gateway" badge for gateway rows. Retention: 7 years default, extendable on request.
 
 Rotations and revocations are considered security-sensitive and generate an organization-wide notification (configurable).
 

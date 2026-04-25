@@ -58,7 +58,7 @@ Click **Create**. The full secret is revealed inline with a **Copy** button and 
 
 Clicking a row in the list opens the detail page (`/gateway/virtual-keys/<vk_id>`). Four sections, top-to-bottom:
 
-1. **Header** — name + action bar: **Audit history** (deep-links into `/gateway/audit?targetKind=virtual_key&targetId=<vk_id>` with a pre-filled filter chip showing only this VK's events), **Edit**, **Rotate**, **Revoke**. The Audit history deep-link is the fastest way to reconstruct "who changed this VK, when" during an incident.
+1. **Header** — name + action bar: **Audit history** (deep-links into `/settings/audit-log?targetKind=virtual_key&targetId=<vk_id>` with a pre-filled filter chip showing only this VK's events alongside any related platform actions), **Edit**, **Rotate**, **Revoke**. The Audit history deep-link is the fastest way to reconstruct "who changed this VK, when" during an incident.
 2. **Identity / Activity** — id, prefix, environment, status, description, and humanised **Last used** + **Created** (hover for exact timestamp). Revision number shown when non-zero — increments on every `VIRTUAL_KEY_UPDATED` audit row.
 3. **Provider fallback chain** — ordered rows, each showing provider icon + readable name + slot badge (`primary` / `fallback-1` / `fallback-2` / …) + credential id. Clarifies at-a-glance which provider is in the driver's seat and what falls back when it errors.
 4. **Configuration summary** — compact read-only view (no drawer needed) of the runtime config that's actually in effect:
