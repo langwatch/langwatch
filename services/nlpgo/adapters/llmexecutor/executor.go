@@ -183,17 +183,26 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 	}, nil
 }
 
-// translatedModelOrInferred returns the model id we put on the wire to the
-// gateway. For custom providers we translate the prefix to "openai/" so the
-// gateway dispatches via Bifrost's openai-compat path; for everything else
-// the post-translation id is fine.
+// translatedModelOrInferred returns the BARE model id we put on the wire
+// in the JSON body. The provider prefix ("openai/", "anthropic/", …) is
+// for routing only — Bifrost picks the provider from Credential.ProviderID
+// and the underlying provider API rejects a request whose body.model
+// carries the langwatch-internal prefix (OpenAI 400s on "openai/gpt-5-mini").
+//
+// For custom OpenAI-compatible providers (Together, Mistral, Groq, …) the
+// caller's `api_base` in litellm_params already routes the request away
+// from canonical OpenAI; the bare model id is what the custom endpoint
+// expects.
 func translatedModelOrInferred(translated, gatewayProvider, original string) string {
-	originalProvider, originalModel := litellm.SplitProviderModel(original)
-	if originalProvider == "custom" {
-		// custom/<model> → openai/<model> at gateway boundary.
-		_ = gatewayProvider
-		return "openai/" + originalModel
+	_, bareTranslated := litellm.SplitProviderModel(translated)
+	if bareTranslated != "" {
+		return bareTranslated
 	}
+	// Defensive fall-back: if the translated id had no provider prefix
+	// (shouldn't happen for any of the providers we route), emit it
+	// verbatim so the original behavior is preserved.
+	_ = gatewayProvider
+	_ = original
 	return translated
 }
 

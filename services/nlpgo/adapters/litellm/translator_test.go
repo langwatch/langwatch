@@ -115,16 +115,24 @@ func TestApplyReasoningOverrides_PinsTemperatureAndFloorsMaxTokens(t *testing.T)
 	if body["temperature"] != float64(1.0) {
 		t.Errorf("expected temperature pinned to 1.0, got %v", body["temperature"])
 	}
-	if body["max_tokens"] != reasoningMaxTokensFloor {
-		t.Errorf("expected max_tokens floored to %d, got %v", reasoningMaxTokensFloor, body["max_tokens"])
+	if _, present := body["max_tokens"]; present {
+		t.Errorf("max_tokens must be removed for reasoning models, got %v", body["max_tokens"])
+	}
+	if body["max_completion_tokens"] != reasoningMaxTokensFloor {
+		t.Errorf("expected max_completion_tokens floored to %d, got %v",
+			reasoningMaxTokensFloor, body["max_completion_tokens"])
 	}
 }
 
 func TestApplyReasoningOverrides_HighMaxTokensPreserved(t *testing.T) {
 	body := map[string]any{"max_tokens": 32000}
 	ApplyReasoningOverrides("openai/o3", body)
-	if body["max_tokens"] != 32000 {
-		t.Errorf("expected high max_tokens preserved, got %v", body["max_tokens"])
+	if _, present := body["max_tokens"]; present {
+		t.Errorf("max_tokens must be removed for reasoning models, got %v", body["max_tokens"])
+	}
+	if body["max_completion_tokens"] != 32000 {
+		t.Errorf("expected high max_completion_tokens preserved, got %v",
+			body["max_completion_tokens"])
 	}
 }
 

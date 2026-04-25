@@ -189,8 +189,19 @@ func toDomainCredential(ic inlineCreds) (domain.Credential, error) {
 	}
 }
 
+// inlineCredentialID is the synthetic credential id we put on every
+// Credential we build from inline credentials. Bifrost's account
+// resolver requires a non-empty id (see services/aigateway/adapters/
+// providers/bifrost.go:486). nlpgo only ever sends one credential per
+// call so a constant suffices; aigateway's HTTP layer assigns real
+// ULIDs because it picks among many configured credentials per VK.
+func inlineCredentialID(provider domain.ProviderID) string {
+	return "nlpgo-inline-" + string(provider)
+}
+
 func openAICred(m map[string]string) domain.Credential {
 	return domain.Credential{
+		ID:         inlineCredentialID(domain.ProviderOpenAI),
 		ProviderID: domain.ProviderOpenAI,
 		APIKey:     m["api_key"],
 		Extra:      stringExtras(m, "api_key"),
@@ -199,6 +210,7 @@ func openAICred(m map[string]string) domain.Credential {
 
 func anthropicCred(m map[string]string) domain.Credential {
 	return domain.Credential{
+		ID:         inlineCredentialID(domain.ProviderAnthropic),
 		ProviderID: domain.ProviderAnthropic,
 		APIKey:     m["api_key"],
 		Extra:      stringExtras(m, "api_key"),
@@ -231,6 +243,7 @@ func azureCred(m map[string]any) domain.Credential {
 		}
 	}
 	return domain.Credential{
+		ID:         inlineCredentialID(domain.ProviderAzure),
 		ProviderID: domain.ProviderAzure,
 		APIKey:     apiKey,
 		Extra:      extra,
@@ -239,6 +252,7 @@ func azureCred(m map[string]any) domain.Credential {
 
 func bedrockCred(m map[string]string) domain.Credential {
 	return domain.Credential{
+		ID:         inlineCredentialID(domain.ProviderBedrock),
 		ProviderID: domain.ProviderBedrock,
 		APIKey:     m["aws_access_key_id"],
 		Extra:      stringExtras(m, "aws_access_key_id"),
@@ -247,6 +261,7 @@ func bedrockCred(m map[string]string) domain.Credential {
 
 func vertexCred(m map[string]string) domain.Credential {
 	return domain.Credential{
+		ID:         inlineCredentialID(domain.ProviderVertex),
 		ProviderID: domain.ProviderVertex,
 		APIKey:     m["vertex_credentials"],
 		Extra:      stringExtras(m, "vertex_credentials"),
@@ -255,6 +270,7 @@ func vertexCred(m map[string]string) domain.Credential {
 
 func geminiCred(m map[string]string) domain.Credential {
 	return domain.Credential{
+		ID:         inlineCredentialID(domain.ProviderGemini),
 		ProviderID: domain.ProviderGemini,
 		APIKey:     m["api_key"],
 		Extra:      stringExtras(m, "api_key"),

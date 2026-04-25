@@ -111,28 +111,31 @@ func ApplyReasoningOverrides(modelID string, body map[string]any) bool {
 	if !IsReasoningModel(modelID) {
 		return false
 	}
-	mutated := false
 	body["temperature"] = float64(1.0)
-	mutated = true
-	if v, ok := body["max_tokens"]; !ok {
-		body["max_tokens"] = reasoningMaxTokensFloor
-	} else {
-		switch n := v.(type) {
-		case int:
-			if n < reasoningMaxTokensFloor {
-				body["max_tokens"] = reasoningMaxTokensFloor
-			}
-		case int64:
-			if n < reasoningMaxTokensFloor {
-				body["max_tokens"] = reasoningMaxTokensFloor
-			}
-		case float64:
-			if n < float64(reasoningMaxTokensFloor) {
-				body["max_tokens"] = reasoningMaxTokensFloor
-			}
+	// OpenAI's reasoning-class models (o1/o3/o4/o5/gpt-5) reject
+	// max_tokens with HTTP 400 ("Unsupported parameter: 'max_tokens'
+	// is not supported with this model. Use 'max_completion_tokens'
+	// instead."). Migrate the field if the caller set it, and apply
+	// the floor either way.
+	existing := body["max_tokens"]
+	delete(body, "max_tokens")
+	floor := reasoningMaxTokensFloor
+	switch n := existing.(type) {
+	case int:
+		if n > floor {
+			floor = n
+		}
+	case int64:
+		if int(n) > floor {
+			floor = int(n)
+		}
+	case float64:
+		if int(n) > floor {
+			floor = int(n)
 		}
 	}
-	return mutated
+	body["max_completion_tokens"] = floor
+	return true
 }
 
 // ClampAnthropicTemperature pins temperature to [0, 1] for anthropic

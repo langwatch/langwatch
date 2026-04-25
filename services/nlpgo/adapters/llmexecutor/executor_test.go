@@ -103,8 +103,8 @@ func TestExecute_AnthropicModelIDDotToDash(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := bodyField(t, gw.lastReq.Body, "model")
-	if got != "anthropic/claude-opus-4-5" {
-		t.Errorf("expected anthropic dot→dash, got %q", got)
+	if got != "claude-opus-4-5" {
+		t.Errorf("expected anthropic dot→dash on bare model, got %q", got)
 	}
 }
 
@@ -119,12 +119,17 @@ func TestExecute_AnthropicAliasExpansion(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := bodyField(t, gw.lastReq.Body, "model")
-	if got != "anthropic/claude-sonnet-4-20250514" {
-		t.Errorf("expected anthropic alias expansion, got %q", got)
+	if got != "claude-sonnet-4-20250514" {
+		t.Errorf("expected anthropic alias expansion (bare), got %q", got)
 	}
 }
 
-func TestExecute_CustomFlipsToOpenAIPrefix(t *testing.T) {
+func TestExecute_CustomEmitsBareModelInBody(t *testing.T) {
+	// Library pivot: body.model is the bare provider model id; the
+	// custom→openai routing now happens via the credential's
+	// ProviderID inside the dispatcher adapter, not by rewriting the
+	// body. OpenAI-compatible custom endpoints (Together, Mistral,
+	// Groq, …) accept bare model names natively.
 	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
 	exec := New(gw)
 	_, err := exec.Execute(context.Background(), app.LLMRequest{
@@ -138,8 +143,8 @@ func TestExecute_CustomFlipsToOpenAIPrefix(t *testing.T) {
 		t.Fatal(err)
 	}
 	got := bodyField(t, gw.lastReq.Body, "model")
-	if got != "openai/my-llm" {
-		t.Errorf("expected custom→openai prefix at gateway boundary, got %q", got)
+	if got != "my-llm" {
+		t.Errorf("expected bare model on the wire, got %q", got)
 	}
 }
 
@@ -162,9 +167,14 @@ func TestExecute_ReasoningModelOverridesTempAndMaxTokens(t *testing.T) {
 	if tempV != 1.0 {
 		t.Errorf("expected reasoning model temperature pinned to 1.0, got %v", tempV)
 	}
-	maxV := bodyFloat(t, gw.lastReq.Body, "max_tokens")
+	// Reasoning models migrate max_tokens → max_completion_tokens
+	// (OpenAI's reasoning API rejects max_tokens with HTTP 400).
+	if hasField(t, gw.lastReq.Body, "max_tokens") {
+		t.Errorf("max_tokens must be absent for reasoning models")
+	}
+	maxV := bodyFloat(t, gw.lastReq.Body, "max_completion_tokens")
 	if maxV < 16000 {
-		t.Errorf("expected reasoning model max_tokens floored to 16000, got %v", maxV)
+		t.Errorf("expected reasoning model max_completion_tokens floored to 16000, got %v", maxV)
 	}
 }
 
@@ -367,6 +377,16 @@ func bodyField(t *testing.T, body []byte, key string) string {
 	}
 	s, _ := m[key].(string)
 	return s
+}
+
+func hasField(t *testing.T, body []byte, key string) bool {
+	t.Helper()
+	var m map[string]any
+	if err := json.Unmarshal(body, &m); err != nil {
+		t.Fatalf("decode body: %v", err)
+	}
+	_, present := m[key]
+	return present
 }
 
 func bodyFloat(t *testing.T, body []byte, key string) float64 {

@@ -7,6 +7,7 @@ package matrix
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 	"time"
@@ -79,6 +80,15 @@ func runSimpleCompletion(t *testing.T, exec *llmexecutor.Executor, model string,
 		ProjectID:     "matrix-test",
 	})
 	if err != nil {
+		// Surface the upstream provider body when present so failures
+		// in the live matrix point straight at the provider's complaint
+		// (model id, missing param, auth, etc.) rather than a generic
+		// "non-2xx 400". GatewayHTTPError carries the verbatim bytes.
+		var ge *llmexecutor.GatewayHTTPError
+		if errors.As(err, &ge) {
+			t.Fatalf("Execute %s failed (status=%d): %s\nbody: %s",
+				model, ge.StatusCode, err, string(ge.Body))
+		}
 		t.Fatalf("Execute %s: %v", model, err)
 	}
 	return resp
