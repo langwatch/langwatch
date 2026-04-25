@@ -4,22 +4,58 @@ description: Point a public hostname at the AI Gateway — AWS ELB / NLB + Cloud
 sidebarTitle: DNS & TLS
 ---
 
-The AI Gateway is a customer-facing HTTPS endpoint. Clients (OpenAI SDKs, Claude Code, Cursor, curl) resolve a hostname, open a TLS connection, and send chat-completion requests. This page covers the default SaaS posture (`gateway.langwatch.ai`) and the self-hoster checklist to point your own hostname at a private deployment.
+The AI Gateway is a customer-facing HTTPS endpoint. Clients (OpenAI SDKs, Claude Code, Cursor, curl) resolve a hostname, open a TLS connection, and send chat-completion requests. This page covers the SaaS posture (`gateway.langwatch.ai`) and the self-hoster checklist to point your own hostname at a private deployment.
 
-## Default: separate hostname on a shared load balancer
+## SaaS: dedicated NLB + ACM cert + Cloudflare DNS-only
 
-LangWatch SaaS exposes the gateway at `gateway.langwatch.ai`, sharing the same AWS application load balancer as `app.langwatch.ai` but routed to a different Kubernetes Service. This keeps two properties:
+LangWatch SaaS exposes the gateway at `gateway.langwatch.ai` on a **dedicated AWS Network Load Balancer** with its own ACM-managed certificate, separate from the classic ELB that serves `app.langwatch.ai`. The two hostnames do not share a load balancer.
 
-- **Clean split of customer surfaces.** Management traffic (UI, tRPC, REST token CRUD) lands on `app.langwatch.ai`; data-plane traffic (chat completions, streaming) lands on `gateway.langwatch.ai`. You can pin monitoring, rate limits, and WAF rules to each hostname independently.
-- **Single LB, no extra ingress controller.** The nginx-ingress controller serves both hostnames off the same listener; certificates are issued per hostname via cert-manager + Let's Encrypt.
+```
+(customer) ─DNS─▶ gateway.langwatch.ai
+                       ▼
+             Cloudflare CNAME (DNS-only / gray cloud)
+                       ▼
+       a9837743b…elb.eu-central-1.amazonaws.com  ← AWS NLB hostname
+                       │
+                       ├─ TLS terminates here (ACM cert: gateway.langwatch.ai)
+                       ▼
+            Service `langwatch-gateway-service` (LoadBalancer, port 443)
+                       ▼
+                    Gateway Pod :5563
+```
 
-The chart default (`charts/gateway/values.yaml`):
+Posture rationale:
+
+- **NLB instead of nginx-ingress + ELB.** The gateway has different traffic shape than the LangWatch app: long-lived SSE streams, layer-4 passthrough, sub-ms latency budget. NLB suits this; the app's ELB+nginx posture would buffer SSE without the unbuffered annotations and add a layer-7 hop on every request.
+- **ACM cert instead of cert-manager.** The cert is provisioned via AWS Certificate Manager and validated by DNS-01 (CNAME records published in Cloudflare). cert-manager runs on the app cluster but the gateway uses the AWS-native path because TLS terminates on the NLB itself.
+- **Cloudflare in DNS-only mode (the gray cloud, NOT proxied).** Critical — see [Cloudflare proxy mode is wrong for the gateway](#cloudflare-proxy-mode-is-wrong-for-the-gateway) below.
+
+Self-hosters who want the same recipe should follow the [AWS NLB + ACM + Cloudflare](#aws-nlb--acm--cloudflare-recommended-for-aws-self-hosts) section below.
+
+## Self-hosted: point your own hostname at the gateway
+
+Pick a hostname under a domain you control (e.g. `gateway.acme.internal` or `gateway.acme.com`) and pick the posture that matches your platform:
+
+- [AWS NLB + ACM + Cloudflare](#aws-nlb--acm--cloudflare-recommended-for-aws-self-hosts) — recommended for AWS, matches SaaS.
+- [nginx-ingress + cert-manager](#nginx-ingress--cert-manager-default-chart) — what the chart renders by default; works on any cluster with an nginx-ingress controller.
+- [AWS ALB](#aws-alb-alternative) — alternative for shops standardised on AWS Load Balancer Controller.
+- [GCP / Azure / on-prem](#gcp--azure--on-prem) — same shape, different controller.
+
+You need three things lined up for a working TLS endpoint:
+
+1. **An external DNS record** — `gateway.acme.com` must resolve to the load balancer in front of the gateway.
+2. **A valid TLS certificate** — either issued by ACM (NLB/ALB termination), cert-manager (nginx-ingress termination), or your own PEM.
+3. **A Service or Ingress resource that exposes the gateway pod on `:443`** — the chart renders this from `ingress.enabled` (nginx posture) or from a Service-level override (NLB+ACM posture).
+
+### nginx-ingress + cert-manager (default chart)
+
+The umbrella chart's default posture lives at `charts/gateway/values.yaml`:
 
 ```yaml
 ingress:
   enabled: true
   className: nginx
-  host: gateway.langwatch.ai
+  host: gateway.acme.com
   path: /v1
   pathType: Prefix
   tls:
@@ -35,88 +71,137 @@ ingress:
 
 The four `proxy-*` annotations are load-bearing — they unlock SSE streaming through nginx. Removing them will cause streamed `/v1/chat/completions` responses to buffer until the full body arrives, which breaks incremental rendering in every OpenAI SDK.
 
-## Self-hosted: point your own hostname at the gateway
-
-Pick a hostname under a domain you control (e.g. `gateway.acme.internal` or `gateway.acme.com`). The gateway chart accepts it directly:
+cert-manager with a DNS-01 Let's Encrypt issuer is the zero-touch path for the cert:
 
 ```yaml
-ingress:
-  host: gateway.acme.com
-  tls:
-    enabled: true
-    secretName: gateway-tls-acme
+# clusterissuer-letsencrypt.yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretRef:
+      name: letsencrypt-prod
+    solvers:
+      - dns01:
+          cloudflare:
+            apiTokenSecretRef:
+              name: cloudflare-api-token
+              key: api-token
 ```
 
-You need three things lined up for a working TLS endpoint:
+The `cert-manager.io/cluster-issuer: letsencrypt-prod` annotation on the Ingress picks it up — cert-manager observes the Ingress, requests the cert, and stores it in `gateway-tls` (or whatever `ingress.tls.secretName` you set).
 
-1. **A Kubernetes Ingress resource the chart renders** — handled by `ingress.enabled: true`. Confirm with `kubectl -n <ns> get ingress`.
-2. **An external DNS record** — `gateway.acme.com` must resolve to the load balancer your ingress controller is behind.
-3. **A valid TLS certificate** — either cert-manager auto-issues via Let's Encrypt, or you bring your own PEM.
+DNS for this posture: a CNAME from `gateway.acme.com` to your nginx-ingress LoadBalancer (typically `<hash>.elb.<region>.amazonaws.com` on EKS, an external IP on bare metal). Cloudflare can be in proxied (orange) **or** DNS-only (gray) mode here — Cloudflare proxying is compatible with cert-manager-issued certs because both Cloudflare's edge cert and the origin cert are publicly-signed; no 526. Privacy + latency trade-offs from the [proxy-mode-is-wrong](#cloudflare-proxy-mode-is-wrong-for-the-gateway) discussion still apply, so DNS-only is still the recommendation for the AI Gateway.
 
-### AWS NLB + Cloudflare (typical EKS + Cloudflare setup)
+### AWS NLB + ACM + Cloudflare (recommended for AWS self-hosts)
+
+This matches the SaaS posture: TLS terminates on a dedicated AWS NLB with an ACM cert, Cloudflare resolves DNS only. Best for AWS self-hosts that want sub-ms TLS handshake and layer-4 passthrough.
 
 ```
 (customer) ─DNS─▶ gateway.acme.com
                        ▼
-             Cloudflare CNAME (proxied or DNS-only)
+             Cloudflare CNAME (DNS-only / gray cloud)
                        ▼
-         abc123.elb.eu-central-1.amazonaws.com  ← AWS NLB auto-generated DNS name
+         abc123.elb.eu-central-1.amazonaws.com  ← AWS NLB hostname
+                       │
+                       ├─ TLS terminates here (ACM cert: gateway.acme.com)
                        ▼
-            nginx-ingress Service (LoadBalancer type)
+            Service type=LoadBalancer (port 443 → 5563)
                        ▼
                     Gateway Pod :5563
 ```
 
 Concrete checklist:
 
-1. **Confirm the NLB hostname your nginx-ingress Service advertises.** On EKS this is an `elb.<region>.amazonaws.com` DNS name, not a stable IP:
+1. **Provision the ACM certificate** (request before the LoadBalancer Service so the cert ARN is ready when the controller provisions the NLB):
 
    ```bash
-   kubectl -n ingress-nginx get svc ingress-nginx-controller \
+   aws acm request-certificate \
+     --domain-name gateway.acme.com \
+     --validation-method DNS \
+     --region <your-region>
+   ```
+
+   Then describe the cert to find the validation CNAME records you need to publish in Cloudflare:
+
+   ```bash
+   aws acm describe-certificate --certificate-arn <arn> \
+     --query 'Certificate.DomainValidationOptions[].ResourceRecord' \
+     --region <your-region>
+   ```
+
+   Returns a `Name` and `Value` per domain — add both as CNAME records in Cloudflare (proxy: DNS-only). ACM polls these continuously; status flips from `PENDING_VALIDATION` → `ISSUED` once DNS propagates. Typical: 1-5 min, worst-case ~30 min.
+
+   ⚠️ **No manual force-revalidate API.** If you wait 30+ min and ACM is still pending, verify the CNAME with `dig CNAME _<token>.gateway.acme.com +short` — the answer must match the value in `aws acm describe-certificate`. If `dig` resolves correctly, ACM will pick it up shortly; if not, fix the Cloudflare record.
+
+   To watch status:
+
+   ```bash
+   aws acm describe-certificate --certificate-arn <arn> \
+     --query 'Certificate.Status' --region <your-region>
+   ```
+
+2. **Configure the gateway Service as `LoadBalancer` with NLB + ACM annotations.** This is a Service-level config (not the Ingress); set it via the chart's Service block or apply directly:
+
+   ```yaml
+   # values.yaml override (or templates/service.yaml customisation)
+   gateway:
+     service:
+       type: LoadBalancer
+       port: 443
+       targetPort: 5563
+       annotations:
+         service.beta.kubernetes.io/aws-load-balancer-type: nlb
+         service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+         service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:<region>:<account>:certificate/<id>
+         service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+         service.beta.kubernetes.io/aws-load-balancer-backend-protocol: tcp
+   ```
+
+   The AWS Load Balancer Controller sees these annotations and provisions an NLB with the ACM cert attached. Wait for the NLB hostname to appear:
+
+   ```bash
+   kubectl get svc langwatch-gateway-service -n langwatch \
      -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
    ```
 
-   Example output: `a1b2c3d4e5f6.elb.eu-central-1.amazonaws.com`.
+   Provisioning is typically 2-5 min after the cert flips `ISSUED`.
 
-2. **Add a CNAME in Cloudflare** pointing `gateway.acme.com` → that NLB hostname. Do **not** use an A record — the NLB's underlying IPs rotate and any pinned IP will 404 within days.
+3. **Add a CNAME in Cloudflare** pointing `gateway.acme.com` → the NLB hostname. **Proxy status: DNS-only (gray cloud, NOT orange).** See the next section for why.
 
-   - **Proxied (orange cloud) ✓** — terminates TLS at Cloudflare's edge, forwards to origin. You still need a valid cert on the origin (cert-manager Let's Encrypt works).
-   - **DNS-only (grey cloud) ✓** — Cloudflare just resolves the CNAME; TLS is served directly by nginx-ingress. Lower latency by 10–30 ms, but you lose Cloudflare's WAF / DDoS protection.
-
-   TTL: set to `Auto` (Cloudflare's default ~5 min) — AWS occasionally rotates NLB DNS during scale events.
-
-3. **Issue the TLS certificate.** cert-manager with a DNS-01 Let's Encrypt issuer is the zero-touch path:
-
-   ```yaml
-   # clusterissuer-letsencrypt.yaml
-   apiVersion: cert-manager.io/v1
-   kind: ClusterIssuer
-   metadata:
-     name: letsencrypt-prod
-   spec:
-     acme:
-       server: https://acme-v02.api.letsencrypt.org/directory
-       privateKeySecretRef:
-         name: letsencrypt-prod
-       solvers:
-         - dns01:
-             cloudflare:
-               apiTokenSecretRef:
-                 name: cloudflare-api-token
-                 key: api-token
+   ```
+   Type:  CNAME
+   Name:  gateway
+   Target: abc123.elb.eu-central-1.amazonaws.com
+   Proxy: DNS only (gray cloud)
+   TTL:   Auto
    ```
 
-   The gateway chart's `cert-manager.io/cluster-issuer: letsencrypt-prod` annotation picks it up — cert-manager observes the Ingress, requests the cert, and stores it in `gateway-tls` (or whatever `ingress.tls.secretName` you set).
+   Do **not** use an A record — NLB underlying IPs rotate and any pinned IP will fail within days.
 
 4. **Verify end-to-end**:
 
    ```bash
-   dig +short gateway.acme.com          # → elb.<region>.amazonaws.com
+   dig +short gateway.acme.com           # → elb.<region>.amazonaws.com hostname
    openssl s_client -connect gateway.acme.com:443 -servername gateway.acme.com </dev/null 2>&1 | grep -E 'subject=|issuer='
    curl -sSf https://gateway.acme.com/healthz
    ```
 
    `/healthz` returns `{"status":"ok","version":"..."}` when the pod is live.
+
+### Cloudflare proxy mode is wrong for the gateway
+
+When the gateway TLS terminates on an AWS NLB (the SaaS + AWS-self-host posture), Cloudflare **must** stay in DNS-only mode (gray cloud). Four independent reasons, any one of which is enough:
+
+1. **TLS certificate validation.** The NLB serves the ACM cert valid for `gateway.acme.com`. Cloudflare's edge would terminate TLS using its own Universal SSL cert, then re-handshake to origin — but Cloudflare's origin-fetch client validates origin certs against Cloudflare's chain, and an ACM cert presented for the same hostname under `:443` will trip a 526 (`invalid SSL certificate`) on the edge. You'd have to either disable origin cert validation (Cloudflare's "Authenticated Origin Pulls" mode flipped off) or install the Cloudflare CA on the NLB — both add operational fragility for zero benefit.
+2. **Latency.** Cloudflare proxy adds ~10-30 ms per request even for cached zero-config setups, on top of the ~50 ms Cloudflare edge → AWS region path. The AI Gateway aims for sub-ms overhead beyond bifrost; halving that budget on every request defeats the design.
+3. **SSE / streaming buffering.** Cloudflare's proxy buffers small response chunks for compression and bot-detection scoring. SSE responses with single-token deltas (every OpenAI-shape stream) can stall by hundreds of milliseconds at the edge before being released to the client. The result: streaming feels broken even when it's working.
+4. **Privacy.** With Cloudflare proxying, the edge sees every customer's plaintext LLM prompt and completion (TLS terminates at Cloudflare). For enterprise customers under data-residency or PII constraints, that's a non-starter — the whole reason to run a gateway is to keep prompt content within your own boundary.
+
+The trade-off you accept by going DNS-only: no Cloudflare WAF, no Cloudflare DDoS scrubbing, no edge caching. AI Gateway responses are uncacheable anyway (`Cache-Control: no-store`), DDoS protection lives at the AWS Shield layer for NLB, and WAF rules belong on the application — not on the LLM data path.
 
 ### AWS ALB (alternative)
 
@@ -159,15 +244,23 @@ You can still run path-based if you explicitly want to; set `ingress.host` to ma
 
 ## Cloudflare-specific notes
 
-- **Proxy mode (orange cloud)** is compatible with streaming when Cloudflare's HTTP/2 is on (default). SSE flows end-to-end.
-- **Bot Fight Mode** can false-positive on Claude Code and OpenAI SDK traffic patterns (steady POST cadence from a single IP). Either allowlist SDK UAs or disable Bot Fight Mode on the gateway hostname.
-- **Cache rules**: gateway responses should not be cached by Cloudflare. The default "respect origin headers" is correct — the gateway sets `Cache-Control: no-store` on every response, so Cloudflare won't cache. Don't add a Page Rule that forces caching.
+- **Proxy mode (orange cloud)** is wrong for the AI Gateway. See [Cloudflare proxy mode is wrong for the gateway](#cloudflare-proxy-mode-is-wrong-for-the-gateway). Always use DNS-only (gray cloud).
+- **Bot Fight Mode** can false-positive on Claude Code and OpenAI SDK traffic patterns (steady POST cadence from a single IP). Even in DNS-only mode, BFM can fire on the zone level — disable on the gateway hostname or the whole zone if the gateway lives in a dedicated zone.
+- **Cache rules**: gateway responses should not be cached. The default "respect origin headers" is correct — the gateway sets `Cache-Control: no-store` on every response. Don't add a Page Rule that forces caching, and don't enable Cloudflare's "Cache Everything" preset.
+- **Universal SSL** stays on automatically when the record is in the zone, but is unused in DNS-only mode (TLS terminates at the origin's cert, not Cloudflare's). Leave it on — it has no effect when the record is gray-cloud.
 
 ## Verifying end-to-end
 
 Once DNS + TLS are live, run a full-stack smoke:
 
 ```bash
+# DNS resolves to the right load balancer
+dig +short gateway.acme.com
+
+# TLS is the cert you expect (ACM ARN matches `Subject:` line)
+openssl s_client -connect gateway.acme.com:443 -servername gateway.acme.com </dev/null 2>&1 \
+  | grep -E 'subject=|issuer='
+
 # Health
 curl -sSf https://gateway.acme.com/healthz
 
@@ -182,4 +275,4 @@ curl -sSf https://gateway.acme.com/v1/chat/completions \
   -d '{"model":"openai/gpt-5-mini","messages":[{"role":"user","content":"ping"}]}'
 ```
 
-The last call traces end-to-end through auth, blocked-pattern enforcement, budget pre-check, dispatch to the upstream provider, token accounting, and outbox debit. If it returns a valid completion, your DNS + TLS + ingress + gateway + control plane + provider chain is healthy.
+The last call traces end-to-end through auth, blocked-pattern enforcement, budget pre-check, dispatch to the upstream provider, token accounting, and trace ingest. If it returns a valid completion, your DNS + TLS + load-balancer + gateway + control plane + provider chain is healthy.
