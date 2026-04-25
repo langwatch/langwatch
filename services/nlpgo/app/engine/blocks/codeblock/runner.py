@@ -81,7 +81,7 @@ def main() -> int:
                 if name not in result:
                     raise KeyError(f"missing_output: {name}")
                 outputs[name] = result[name]
-    except BaseException as exc:
+    except Exception as exc:  # noqa: BLE001 — sandbox runner intentionally catches every user-code exception so Go can render a structured error in Studio
         error = {
             "type": type(exc).__name__,
             "message": str(exc),
