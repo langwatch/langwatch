@@ -25,6 +25,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
@@ -115,7 +116,18 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 		return app.GatewayRequest{}, fmt.Errorf("could not infer provider from model %q", req.Model)
 	}
 
-	translatedModel := litellm.TranslateModelID(req.Model)
+	// Reconstruct the prefixed model id before TranslateModelID so its
+	// providersNeedingDotToDash gate can see the provider. The engine
+	// strips the prefix in `splitModel` (engine.go) and stores it on
+	// req.Provider — without re-prefixing here, TranslateModelID falls
+	// to its empty-provider safety branch (treats as anthropic-like)
+	// and dot→dashes every model id, mangling Gemini + Vertex + Gemini's
+	// 2.5 family on the inline-credentials path.
+	prefixedModel := req.Model
+	if !strings.Contains(req.Model, "/") && provider != "" {
+		prefixedModel = provider + "/" + req.Model
+	}
+	translatedModel := litellm.TranslateModelID(prefixedModel)
 	gatewayProvider := litellm.GatewayProviderForModel(provider)
 
 	// Build the OpenAI-shape body.

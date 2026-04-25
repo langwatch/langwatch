@@ -108,6 +108,35 @@ func TestExecute_AnthropicModelIDDotToDash(t *testing.T) {
 	}
 }
 
+// TestExecute_GeminiPrefixStrippedDoesNotMangleDots is the regression
+// test for the iter-21 Gemini bug. The engine's runSignature splits the
+// canonical "<provider>/<model>" id into separate Model + Provider
+// fields before constructing app.LLMRequest. With only the bare model
+// in req.Model, TranslateModelID's empty-provider safety branch fires
+// and dot→dashes the id (intended for bare anthropic model names like
+// "claude-3.5-sonnet"). For gemini/vertex/etc. that mangling silently
+// breaks the upstream call (`gemini-2.5-flash` → `gemini-2-5-flash`,
+// 404 from Google). Fix: reconstruct the prefixed id from req.Provider
+// before calling TranslateModelID.
+func TestExecute_GeminiBareModelWithProviderPreservesDots(t *testing.T) {
+	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
+	exec := New(gw)
+	_, err := exec.Execute(context.Background(), app.LLMRequest{
+		// Mirrors what engine.runSignature emits after splitModel:
+		// Model = bare, Provider = separate.
+		Model:         "gemini-2.5-flash",
+		Provider:      "gemini",
+		LiteLLMParams: map[string]any{"api_key": "k"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := bodyField(t, gw.lastReq.Body, "model")
+	if got != "gemini-2.5-flash" {
+		t.Errorf("dots must be preserved for gemini; got %q", got)
+	}
+}
+
 func TestExecute_AnthropicAliasExpansion(t *testing.T) {
 	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
 	exec := New(gw)
