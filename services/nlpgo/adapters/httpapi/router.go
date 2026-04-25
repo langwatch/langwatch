@@ -30,6 +30,10 @@ type RouterDeps struct {
 	// MaxRequestBodyBytes caps per-request body size. 0 = no cap (used
 	// by tests). In production the operator sets this via env.
 	MaxRequestBodyBytes int64
+	// PlaygroundProxy serves /go/proxy/v1/* by forwarding to the
+	// in-process aigateway dispatcher. nil → /go/proxy/v1/* returns the
+	// 501 stub (used by tests that don't exercise the playground path).
+	PlaygroundProxy PlaygroundProxy
 }
 
 // NewRouter assembles the chi router.
@@ -60,7 +64,8 @@ func NewRouter(deps RouterDeps) http.Handler {
 			s.Post("/execute_sync", executeSyncHandler(deps.App))
 			s.Post("/execute", executeStreamHandler(deps.App))
 		})
-		g.HandleFunc("/proxy/v1/*", proxyPassthroughHandler(deps.App))
+		g.HandleFunc("/proxy/v1/*", proxyPassthroughHandler(deps.PlaygroundProxy))
+		g.HandleFunc("/proxy/v1beta/*", proxyPassthroughHandler(deps.PlaygroundProxy))
 	})
 
 	// Fall-through: proxy everything else to uvicorn child.

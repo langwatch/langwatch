@@ -273,17 +273,48 @@ func streamHeartbeat(r *http.Request) time.Duration {
 	return 15 * time.Second
 }
 
-// proxyPassthroughHandler reverse-proxies /go/proxy/v1/* into the AI
-// Gateway. Scaffold returns 501; the real implementation forwards via
-// httputil.ReverseProxy after authenticating with the gateway internal
-// secret.
-func proxyPassthroughHandler(_ *app.App) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInternal, herr.M{
-			"reason": "gateway_proxy_not_implemented",
-			"path":   r.URL.Path,
-		}))
+// PlaygroundProxy is the dispatcher surface the playground-proxy
+// handler needs. The real implementation is *dispatcher.Dispatcher
+// (services/aigateway/dispatcher); the interface lets tests pass a
+// fake without spinning up a real Bifrost.
+type PlaygroundProxy interface {
+	Dispatch(ctx context.Context, req playgroundProxyRequest) (*playgroundProxyResponse, error)
+	DispatchStream(ctx context.Context, req playgroundProxyRequest) (playgroundProxyStream, error)
+}
+
+// proxyPassthroughHandler implements /go/proxy/v1/* — the OpenAI-shape
+// playground proxy. Reads x-litellm-* credential headers, builds a
+// dispatcher request, forwards via the in-process aigateway dispatcher,
+// streams the response back.
+//
+// Wire shape:
+//   - Path -> RequestType: /chat/completions = chat, /messages = messages,
+//     /embeddings = embeddings, /responses = responses, anything else
+//     under /v1beta/* = passthrough.
+//   - body.stream=true picks DispatchStream; default DispatchMutex.
+//   - body.model lets us infer the bare model id when the request has
+//     a provider-prefixed model (`openai/gpt-5-mini` → `gpt-5-mini`).
+//
+// Returns:
+//   - 200 + verbatim provider response body for non-streaming.
+//   - 200 + Server-Sent Events for streaming, mirroring the SSE wire
+//     shape the playground UI expects today (text/event-stream
+//     newline-delimited frames).
+//   - 400 on missing-provider/bad-body input errors.
+//   - 502 when the upstream provider returns an error or the
+//     dispatcher errors mid-stream.
+func proxyPassthroughHandler(proxy PlaygroundProxy) http.HandlerFunc {
+	if proxy == nil {
+		// Fall back to the original 501 stub when the dispatcher isn't
+		// wired (eg. in tests that don't exercise the playground path).
+		return func(w http.ResponseWriter, r *http.Request) {
+			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInternal, herr.M{
+				"reason": "gateway_proxy_not_wired",
+				"path":   r.URL.Path,
+			}))
+		}
 	}
+	return playgroundProxyDispatch(proxy)
 }
 
 // versionHandler echoes basic identity so callers can verify they're

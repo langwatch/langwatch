@@ -3,6 +3,7 @@ package cmd
 
 import (
 	"context"
+	"net/http"
 
 	"go.uber.org/zap"
 
@@ -10,6 +11,7 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/nlpgo"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/dispatcheradapter"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/httpapi"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
@@ -18,6 +20,7 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/evaluatorblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
+
 
 // Root is the service entrypoint called by cmd/service.
 func Root(ctx context.Context, _ []string) error {
@@ -59,6 +62,12 @@ func Root(ctx context.Context, _ []string) error {
 	llm := llmexecutor.New(dispatcheradapter.New(disp))
 	deps.Logger.Info("nlpgo_llm_wired", zap.String("transport", "in_process_dispatcher"))
 
+	// Playground proxy uses the SAME dispatcher (no second Bifrost
+	// process). It bridges the OpenAI-shape /go/proxy/v1/* surface
+	// (used by the prompt playground + model.factory.ts) into the
+	// in-process gateway. Header-based auth: x-litellm-* → Credential.
+	playground := httpapi.NewPlaygroundProxyFromShim(playgroundDispatcherShim{disp: disp})
+
 	// Evaluator + agent-workflow blocks call the LangWatch app's own
 	// HTTP API. Both share the same LangWatchBaseURL (NLPGO_ENGINE_LANGWATCH_BASE_URL).
 	// Per-block timeouts default to 12min (Lambda max 15min minus 3min margin).
@@ -82,7 +91,7 @@ func Root(ctx context.Context, _ []string) error {
 		app.WithWorkflowExecutor(executor),
 	)
 
-	return nlpgo.Serve(ctx, application, deps, cfg)
+	return nlpgo.Serve(ctx, application, deps, cfg, playground)
 }
 
 // splitCSV splits "a,b,c" into ["a","b","c"], trimming whitespace and
@@ -109,4 +118,47 @@ func splitCSV(s string) []string {
 		}
 	}
 	return out
+}
+
+// playgroundDispatcherShim adapts *dispatcher.Dispatcher (which works in
+// terms of dispatcher.Request/Response) to httpapi.DispatcherShim (which
+// works in terms of the playground-handler-internal struct shapes). The
+// shim is mechanical: a field-by-field copy. We keep it in cmd/ so the
+// httpapi package doesn't take a dependency on the dispatcher package.
+type playgroundDispatcherShim struct {
+	disp *dispatcher.Dispatcher
+}
+
+func (s playgroundDispatcherShim) Dispatch(ctx context.Context, req httpapi.DispatchRequest) (*httpapi.DispatchResponse, error) {
+	resp, err := s.disp.Dispatch(ctx, dispatcher.Request{
+		Type:       req.Type,
+		Model:      req.Model,
+		Body:       req.Body,
+		Credential: req.Credential,
+	})
+	if err != nil {
+		return nil, err
+	}
+	hdr := http.Header{}
+	for k, v := range resp.Headers {
+		hdr.Set(k, v)
+	}
+	return &httpapi.DispatchResponse{
+		StatusCode: resp.StatusCode,
+		Body:       resp.Body,
+		Headers:    hdr,
+	}, nil
+}
+
+func (s playgroundDispatcherShim) DispatchStream(ctx context.Context, req httpapi.DispatchRequest) (httpapi.DispatchStream, error) {
+	iter, err := s.disp.DispatchStream(ctx, dispatcher.Request{
+		Type:       req.Type,
+		Model:      req.Model,
+		Body:       req.Body,
+		Credential: req.Credential,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return iter, nil
 }

@@ -16,7 +16,11 @@ import (
 // Serve wires the app into HTTP transport and lifecycle management,
 // blocking until shutdown. The uvicorn child is started first so the
 // reverse proxy is healthy when the HTTP listener starts accepting.
-func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) error {
+//
+// `playground` may be nil in test contexts that don't exercise the
+// /go/proxy/v1/* path; the handler falls back to a typed 501 in that
+// case so misconfiguration is loud rather than silent.
+func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config, playground httpapi.PlaygroundProxy) error {
 	deps.Logger.Info("nlpgo_starting", zap.String("addr", cfg.Server.Addr))
 
 	info := contexts.MustGetServiceInfo(ctx)
@@ -27,6 +31,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		Version:             info.Version,
 		ChildProxy:          deps.ChildProxy,
 		MaxRequestBodyBytes: cfg.Server.MaxRequestBodyBytes,
+		PlaygroundProxy:     playground,
 	})
 
 	srv := &http.Server{
