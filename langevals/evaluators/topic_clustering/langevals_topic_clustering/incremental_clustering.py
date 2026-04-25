@@ -284,7 +284,11 @@ def setup_endpoints(app: FastAPI):
             logger.info("Creating new topics/subtopics from unassigned traces", step="3/3")
             new_topics, new_subtopics, traces_from_new_topics_to_assign, cost = (
                 maybe_create_new_topics_and_subtopics_from_unassigned_traces(
-                    model=params.litellm_params["model"],
+                    # Use the deployment-name-resolved model id (Azure path
+                    # rewrites azure/<published> → azure/<deployment>); without
+                    # this fix the override at lines 256-258 was computed and
+                    # then discarded, mirroring the bug CodeRabbit caught.
+                    model=model,
                     litellm_params=params.litellm_params,
                     embeddings_litellm_params=params.embeddings_litellm_params,
                     traces=traces_with_embeddings,

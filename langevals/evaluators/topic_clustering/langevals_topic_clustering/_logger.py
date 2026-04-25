@@ -89,15 +89,11 @@ def _configure_structlog() -> None:
     log_level_str = os.environ.get("LOG_LEVEL", "INFO" if not is_test else "ERROR")
     log_level = getattr(logging, log_level_str.upper(), logging.INFO)
 
-    def add_logger_name(
-        logger: WrappedLogger, method_name: str, event_dict: EventDict
-    ) -> EventDict:
-        """Add logger name to the event dict."""
-        # The logger name is passed as the first argument to get_logger()
-        record = event_dict.get("_record")
-        if record and hasattr(record, "name"):
-            event_dict["logger"] = record.name
-        return event_dict
+    # Note: the upstream langwatch_nlp/logger.py defined a nested
+    # add_logger_name processor here but never wired it into the
+    # processors list (CodeRabbit caught this dead code in #3483).
+    # Drop it; structlog already names loggers via the get_logger()
+    # bind path the rest of this module configures.
 
     # Shared processors for all environments
     shared_processors: list[structlog.types.Processor] = [
