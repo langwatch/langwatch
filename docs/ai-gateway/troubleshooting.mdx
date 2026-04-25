@@ -222,7 +222,7 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 - Optionally accompanied by INFO `auth_cache_serve_stale` lines on the same `vk_id`s.
 - Customers report no rejection — traffic flows normally.
 
-This is the gateway's **stale-while-error** path running on a transient control-plane outage. Each cached auth bundle that crosses its JWT expiry while the control plane is unreachable is bumped by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` (default `5m`) and continues to serve, up to a hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default `30m`). Customers don't see 401s during this window; the WARN line is informational, not page-worthy.
+This is the gateway's **stale-while-error** path running on a transient control-plane outage. Each cached auth bundle that crosses its JWT expiry while the control plane is unreachable is bumped by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` (default `5m`) and continues to serve, up to a hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default `6h`). Customers don't see 401s during this window; the WARN line is informational, not page-worthy.
 
 **What to do:**
 

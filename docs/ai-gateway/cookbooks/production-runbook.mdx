@@ -242,7 +242,7 @@ curl -s http://localhost:6060/debug/pprof/goroutine?debug=1 | \
 
 **Symptom:** The LangWatch control plane is unreachable (deployment incident, DNS hiccup, network partition). The gateway's L1 auth cache is full of valid resolved-key bundles, but `/api/internal/gateway/resolve-key` is returning errors. Operator wants to know: are customers being rejected, or is the gateway riding through?
 
-The gateway's auth resolver runs **stale-while-error** by default: when the cached entry's JWT crosses its natural expiry AND the control-plane refresh fails for **transport-class reasons** (network error, dial timeout, 5xx, connection refused, malformed/unparseable response, JWT verify failure), it bumps the soft expiry by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` (default `5m`) and serves the cached bundle. This continues every refresh attempt up to the hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` past the JWT exp (default `30m`).
+The gateway's auth resolver runs **stale-while-error** by default: when the cached entry's JWT crosses its natural expiry AND the control-plane refresh fails for **transport-class reasons** (network error, dial timeout, 5xx, connection refused, malformed/unparseable response, JWT verify failure), it bumps the soft expiry by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` (default `5m`) and serves the cached bundle. This continues every refresh attempt up to the hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` past the JWT exp (default `6h`). The hard cap is deliberately generous — the soft-bump path runs on **every** refresh attempt without a successful response, so the hard cap is the true outage backstop, not a steady-state knob.
 
 **Auth-class rejections** — explicit `401` / `403` / `404` from `/resolve-key` — bypass the grace window entirely and evict immediately. A revoked credential never gets stale-served.
 
@@ -303,7 +303,7 @@ The gateway is a cache of the control plane, so a surprising amount continues to
 
 | Component down | Customer impact | How long gateway stays up | Notes |
 |---|---|---|---|
-| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default 30 min) of stale-while-error; bootstrap cache + Redis L2 extend coverage to cold-for-pod VKs | Outbox re-enqueues debits safely; they flush on recovery. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
+| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default 6 h) of stale-while-error; bootstrap cache + Redis L2 extend coverage to cold-for-pod VKs | Outbox re-enqueues debits safely; they flush on recovery. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
 | One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite — circuit breaker + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
 | Redis L2 cache | +~30 ms on cold-for-pod VKs | Indefinite — L1 + `/resolve-key` cover the miss | Fail-open by design (poison entries `DEL`, network errors log and miss) |
 | Gateway pod (crash / eviction) | None — HPA replaces, PDB holds ≥ 2 replicas | N/A | Stateless; new pod warms from Redis L2 + `/bootstrap` |

@@ -44,7 +44,7 @@ Source of truth: `services/gateway/internal/config/config.go` `Load()`.
 | `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS` | `false` | On startup, pre-warm L1 via `/bootstrap` (all-keys snapshot). Off by default — large orgs opt in |
 | `GATEWAY_JWT_REFRESH_THRESHOLD` | `5m` | Refresh JWT when within this window of expiry; backgrounded so the hot path doesn't block |
 | `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` | `5m` | When the control plane is briefly unreachable on refresh, extend the cached entry's soft expiry by this duration on each transport-class failure (network error, dial timeout, 5xx, malformed/unparseable response, JWT verify failure). Auth-class rejections (401/403/404) evict immediately — no grace for known-bad credentials |
-| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` | `30m` | Hard cap on stale-while-error: total grace beyond the JWT's natural exp before forced eviction. Set to `0s` to disable stale-while-error entirely (legacy behaviour: hard-fail at JWT exp on every refresh failure) |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` | `6h` | Hard cap on stale-while-error: total grace beyond the JWT's natural exp before forced eviction. The default is deliberately generous — the soft-bump path runs on every refresh attempt without a successful response, so the hard cap is the true outage backstop. Set to `0s` to disable stale-while-error entirely (legacy behaviour: hard-fail at JWT exp on every refresh failure) |
 
 See [Auth Cache Architecture](/ai-gateway/observability#auth-cache-architecture) for the L1/L2 design and [Production runbook → Control-plane outage](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook.
 
