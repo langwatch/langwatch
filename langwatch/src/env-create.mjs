@@ -161,6 +161,8 @@ export function createEnvConfig() {
       // Customer.io Nurturing
       CUSTOMER_IO_API_KEY: z.string().optional(),
       CUSTOMER_IO_REGION: z.enum(["us", "eu"]).optional(),
+      // Customer.io In-App Messaging (Track API site ID from workspace settings)
+      CUSTOMER_IO_SITE_ID: z.string().optional(),
 
       // Notifications
       SLACK_PLAN_LIMIT_CHANNEL: z.string().optional(),
@@ -273,6 +275,7 @@ export function createEnvConfig() {
       HUBSPOT_FORM_ID: process.env.HUBSPOT_FORM_ID,
       CUSTOMER_IO_API_KEY: process.env.CUSTOMER_IO_API_KEY,
       CUSTOMER_IO_REGION: process.env.CUSTOMER_IO_REGION,
+      CUSTOMER_IO_SITE_ID: process.env.CUSTOMER_IO_SITE_ID,
       SLACK_PLAN_LIMIT_CHANNEL: process.env.SLACK_PLAN_LIMIT_CHANNEL,
       SLACK_CHANNEL_SIGNUPS: process.env.SLACK_CHANNEL_SIGNUPS,
       SLACK_CHANNEL_SUBSCRIPTIONS: process.env.SLACK_CHANNEL_SUBSCRIPTIONS,

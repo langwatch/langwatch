@@ -6,6 +6,7 @@ import Script from "~/utils/compat/next-script";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { api } from "~/utils/api";
 import posthog from "posthog-js";
+import { useCustomerIo } from "./useCustomerIo";
 
 export function ExtraFooterComponents() {
   const session = useRequiredSession({ required: false });
@@ -45,12 +46,26 @@ export function SignedInExtraFooterComponents() {
   const updateLastLogin = api.user.updateLastLogin.useMutation();
 
   const session = useRequiredSession();
+  const publicEnv = usePublicEnv();
   const { organization, project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
 
   const hasTracked = useRef(false);
   const hasUpdatedLastLogin = useRef(false);
+
+  // Customer.io in-app messaging — must be called unconditionally (React
+  // hook rules). The hook guards on isImpersonating internally.
+  const cioWriteKey = publicEnv.data?.CUSTOMER_IO_API_KEY;
+  const cioSiteId = publicEnv.data?.CUSTOMER_IO_SITE_ID;
+  useCustomerIo({
+    writeKey: cioWriteKey ?? "",
+    siteId: cioSiteId ?? "",
+    user: session.data?.user ?? { id: "" },
+    organization: organization ?? undefined,
+    isImpersonating: !!session.data?.user?.impersonator,
+    enabled: !!cioWriteKey && !!cioSiteId && !!session.data?.user,
+  });
 
   useEffect(() => {
     if (!session.data?.user?.email || !organization?.name || hasTracked.current)
