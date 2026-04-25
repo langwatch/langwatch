@@ -157,15 +157,15 @@ func computeInternalSignature(secret []byte, method, path, ts string, body []byt
 // The translator in services/nlpgo/adapters/litellm/ produces this shape
 // from a workflow node's litellm_params.
 type inlineCredentials struct {
-	Provider  string                 `json:"provider"`
-	OpenAI    map[string]string      `json:"openai,omitempty"`
-	Anthropic map[string]string      `json:"anthropic,omitempty"`
-	Azure     map[string]any         `json:"azure,omitempty"`
-	Bedrock   map[string]string      `json:"bedrock,omitempty"`
-	VertexAI  map[string]string      `json:"vertex_ai,omitempty"`
-	Gemini    map[string]string      `json:"gemini,omitempty"`
-	Custom    map[string]string      `json:"custom,omitempty"`
-	Extras    map[string]any         `json:"-"`
+	Provider  string            `json:"provider"`
+	OpenAI    map[string]string `json:"openai,omitempty"`
+	Anthropic map[string]string `json:"anthropic,omitempty"`
+	Azure     map[string]any    `json:"azure,omitempty"`
+	Bedrock   map[string]string `json:"bedrock,omitempty"`
+	VertexAI  map[string]string `json:"vertex_ai,omitempty"`
+	Gemini    map[string]string `json:"gemini,omitempty"`
+	Custom    map[string]string `json:"custom,omitempty"`
+	Extras    map[string]any    `json:"-"`
 }
 
 func parseInlineCredentials(header string) (domain.Credential, error) {

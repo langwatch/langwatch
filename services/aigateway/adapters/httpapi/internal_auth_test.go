@@ -35,7 +35,7 @@ func TestInternalAuth_AbsentHeaderFallsThrough(t *testing.T) {
 		}
 	}))
 
-	req := httptest.NewRequest("POST", "/v1/chat/completions", strings.NewReader("{}"))
+	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", strings.NewReader("{}"))
 	rec := httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
 
@@ -85,7 +85,7 @@ func TestInternalAuth_SuccessOpenAI(t *testing.T) {
 	if cred.Extra["api_base"] != "https://api.openai.com/v1" {
 		t.Fatalf("expected Extra[api_base], got %v", cred.Extra)
 	}
-	if string(capturedBody) != string(body) {
+	if !bytes.Equal(capturedBody, body) {
 		t.Fatalf("body must be re-readable by the handler unchanged")
 	}
 }
