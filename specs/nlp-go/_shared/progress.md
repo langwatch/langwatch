@@ -217,10 +217,10 @@ topic clustering on Python. Roll out per-project via feature flag.
 ### Phase 2 — TS app integration
 - [x] Feature flag `release_nlp_go_engine_enabled` wired in `runWorkflow.ts` (ash, via `nlpgoFetch`)
 - [ ] Same wiring for `playground.ts` (Vercel AI SDK custom-fetch — follow-up)
-- [x] HMAC signing with `LW_NLPGO_INTERNAL_SECRET` (ash) — body-only canonical, hardening to METHOD\nPATH\nTS\nBODYHASH = follow-up
+- [x] **HMAC removed entirely** (sarah, fea1e5151) — library pivot eliminated the TS→nlpgo HTTP signing requirement; matches today's no-auth posture for the legacy `/studio/*` path. No `LW_NLPGO_INTERNAL_SECRET`, no `sign.ts`, no inline-creds bridge.
 - [x] Optimize button hidden when flag is on (ash) — `workflow.engineMode` tRPC query + UI guard
-- [ ] Optimize endpoint 410 / websocket guard (server-side enforcement, follow-up)
-- [x] Telemetry origin header set in runWorkflow (ash) — propagated through translator → gateway
+- [x] Optimize endpoint 410 / websocket guard (ash, 27238ce28) — REST guard + websocket entry rejects with 410 envelope when project is on Go engine
+- [x] Telemetry origin header set in runWorkflow (ash) — propagated through engine ctx → dispatcher
 
 ### Phase 3 — deployment
 - [x] `Dockerfile.langwatch_nlp.lambda` bundles Go binary + entry script (ash) — Go build stage in multi-stage; entrypoint at `langwatch_nlp/scripts/entrypoint.sh`
@@ -230,13 +230,22 @@ topic clustering on Python. Roll out per-project via feature flag.
 - [ ] Terraform: no memory bump expected; verify (ash)
 
 ### Phase 4 — tests + QA
-- [x] Provider matrix tests `tests/matrix/` with build tags (ash) — 6 providers (openai, anthropic, azure, bedrock, vertex, gemini), `live_*` build tags, README, env-var skip pattern
-- [x] Engine integration tests with real HTTP gateway stub (sarah) — 8 e2e tests through full chi router via httptest, including signature node end-to-end against stub gateway and edge handle rename test
-- [ ] Topic clustering swap LiteLLM → gateway HTTP (ash, in progress)
-- [x] PR opened + CI green — PR #3483 (https://github.com/langwatch/langwatch/pull/3483) draft against feat/ai-gateway
-- [ ] CodeRabbit review addressed (drive-pr loop active)
-- [ ] Browser QA: real workflows in Studio across providers
-- [ ] Screenshots embedded in PR via img402.dev
+- [x] Provider matrix tests **removed** (sarah, ba6d13353) — duplicated `services/aigateway/tests/matrix/` per rchaves's direction. Wire-format bugs they caught (prefix stripping, max_completion_tokens, Credential.ID, field-name mapping, DeploymentMap) are now protected by the e2e tests below + the `dispatcheradapter` unit tests.
+- [x] Engine integration tests through real chi router via httptest (sarah) — 8 sync workflow tests + 2 SSE streaming tests + 5 proxypass round-trip tests + 3 realistic code-block tests (stdlib + missing-import UX + urllib network) + 12 dispatcheradapter credential tests. All green.
+- [x] **Real workflow end-to-end against live OpenAI** (sarah, 2f4e7087a) — `TestSync_RealWorkflowEndToEnd_OpenAI`, gated by `live_openai`. Posts a Studio-shape DSL through `/go/studio/execute_sync`, signature node hits real OpenAI gpt-5-mini via in-process dispatcher.
+- [x] **TS integration test against live nlpgo subprocess** (sarah, ba6d13353) — `langwatch/src/server/nlpgo/__tests__/nlpgoFetch.integration.test.ts`. Spawns real nlpgo binary, mocks FF=true, calls real `nlpgoFetch` helper with Studio-shape DSL, asserts model output. **Stays on CI.**
+- [x] Topic clustering migrated to langevals (ash) — workspace member at `langevals/evaluators/topic_clustering/`, TS topicClustering.ts flag-forks, lambda module + API Gateway routes in `langwatch-saas#460`. Tests skipped in CI per rchaves; manual exercise points at langevals on :5561.
+- [x] PR opened — PR #3483 (https://github.com/langwatch/langwatch/pull/3483). QA evidence table embedded with 20 numbered proof points.
+- [ ] CodeRabbit review addressed (small inline comments outstanding; not blocking review)
+- [ ] **Browser dogfood — deferred to a focused follow-up iter.** Local pnpm dev wedged in this worktree (CH bootstrap completes, app server bg task exits 1). The TS integration test above proves the same chain headlessly with a real subprocess + real OpenAI; the browser screenshot is purely visual confirmation of the Optimize-button hide.
+
+### Phase 5 — review-ready (this PR)
+- [x] PR description rewritten with QA evidence table (20 proof points + file links + execution times)
+- [x] No new env vars / secrets / helm values vs today's config
+- [x] All Go tests green (127/127); TS integration test green (1/1)
+- [x] PR base updated to main; force-rebased clean (Ash, post langwatch-saas#bd6ce5b09 squash)
+- [ ] CI green on PR #3483 (in flight)
+- [ ] Mark PR ready-for-review when CI clears
 
 ### Status snapshot per iteration
 - 2026-04-25 iter1: scaffolding + DSL + planner + dataset/code/HTTP blocks + engine orchestrator + handler wiring + 7 integration tests (sarah). gateway inline-creds + gatewayclient + litellm translator + llmexecutor (ash). PR #3483 opened draft. 143/143 nlpgo tests + 13 new aigateway tests green.
