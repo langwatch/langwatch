@@ -73,7 +73,7 @@ jobs:
         with:
           go-version-file: go.mod
           cache-dependency-path: go.sum
-      - uses: golangci/golangci-lint-action@4afd733a84b2f1a21f7c2e8d1cda72e8a18e4cad # v6
+      - uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84 # v6.5.2
         with:
           version: v2.1.6
           args: ./services/aigateway/... ./pkg/... ./cmd/...
