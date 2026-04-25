@@ -9,11 +9,11 @@ import "testing"
 //
 // Required env:
 //   - GEMINI_API_KEY
-//   - GEMINI_MODEL (defaults to gemini-2.0-flash)
+//   - GEMINI_MODEL (defaults to gemini-2.5-flash)
 func TestGemini_SimpleCompletion(t *testing.T) {
 	mc := loadContext(t)
 	apiKey := requireEnv(t, "GEMINI_API_KEY")
-	model := envOrDefault("GEMINI_MODEL", "gemini/gemini-2.0-flash")
+	model := envOrDefault("GEMINI_MODEL", "gemini/gemini-2.5-flash")
 	exec := newExecutor(t, mc)
 
 	resp := runSimpleCompletion(t, exec, model, map[string]any{

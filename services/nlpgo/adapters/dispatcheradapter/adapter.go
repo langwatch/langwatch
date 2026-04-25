@@ -84,7 +84,7 @@ func (a *Adapter) dispatch(ctx context.Context, req app.GatewayRequest, typ doma
 	}
 	resp, err := a.disp.Dispatch(ctx, dispatcher.Request{
 		Type:       typ,
-		Model:      req.Model,
+		Model:      bareModel(req.Model),
 		Body:       req.Body,
 		Credential: cred,
 	})
@@ -105,7 +105,7 @@ func (a *Adapter) dispatchStream(ctx context.Context, req app.GatewayRequest, ty
 	}
 	iter, err := a.disp.DispatchStream(ctx, dispatcher.Request{
 		Type:       typ,
-		Model:      req.Model,
+		Model:      bareModel(req.Model),
 		Body:       req.Body,
 		Credential: cred,
 	})
@@ -275,6 +275,30 @@ func geminiCred(m map[string]string) domain.Credential {
 		APIKey:     m["api_key"],
 		Extra:      stringExtras(m, "api_key"),
 	}
+}
+
+// bareModel strips the langwatch-internal provider prefix
+// ("openai/", "anthropic/", "gemini/", …) from a model id before
+// passing it to Bifrost. The provider is already routed via
+// Credential.ProviderID; downstream provider APIs reject the prefixed
+// form (Anthropic returns 404, OpenAI 400). When no slash is present
+// the input is returned verbatim.
+func bareModel(modelID string) string {
+	if i := indexByte(modelID, '/'); i >= 0 {
+		return modelID[i+1:]
+	}
+	return modelID
+}
+
+// indexByte avoids pulling in strings just for ByteIndex; tiny adapter
+// scope.
+func indexByte(s string, b byte) int {
+	for i := 0; i < len(s); i++ {
+		if s[i] == b {
+			return i
+		}
+	}
+	return -1
 }
 
 // stringExtras copies a string-map dropping the named keys. Used to

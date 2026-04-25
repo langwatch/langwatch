@@ -17,7 +17,7 @@ import (
 func TestAnthropic_SimpleCompletion(t *testing.T) {
 	mc := loadContext(t)
 	apiKey := requireEnv(t, "ANTHROPIC_API_KEY")
-	model := envOrDefault("ANTHROPIC_MODEL", "anthropic/claude-3-5-sonnet-20240620")
+	model := envOrDefault("ANTHROPIC_MODEL", "anthropic/claude-sonnet-4-5")
 	exec := newExecutor(t, mc)
 
 	resp := runSimpleCompletion(t, exec, model, map[string]any{
@@ -49,7 +49,7 @@ func TestAnthropic_TemperatureClamp(t *testing.T) {
 	apiKey := requireEnv(t, "ANTHROPIC_API_KEY")
 	exec := newExecutor(t, mc)
 
-	model := envOrDefault("ANTHROPIC_MODEL", "anthropic/claude-3-5-sonnet-20240620")
+	model := envOrDefault("ANTHROPIC_MODEL", "anthropic/claude-sonnet-4-5")
 	temp := 1.5
 	maxTok := 32
 
