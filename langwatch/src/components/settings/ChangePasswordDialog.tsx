@@ -7,12 +7,6 @@ import { Dialog } from "../ui/dialog";
 import { toaster } from "../ui/toaster";
 import { api } from "../../utils/api";
 
-interface ChangePasswordFormValues {
-  currentPassword?: string;
-  newPassword: string;
-  confirmPassword: string;
-}
-
 const buildSchema = (requireCurrent: boolean) =>
   z
     .object({
@@ -28,6 +22,8 @@ const buildSchema = (requireCurrent: boolean) =>
       message: "Passwords don't match",
       path: ["confirmPassword"],
     });
+
+type ChangePasswordFormValues = z.infer<ReturnType<typeof buildSchema>>;
 
 interface ChangePasswordDialogProps {
   open: boolean;

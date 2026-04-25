@@ -242,10 +242,17 @@ export const userRouter = createTRPCRouter({
       }
 
       if (env.NEXTAUTH_PROVIDER === "auth0") {
+        // Only the Auth0 database connection (`auth0|<id>` providerAccountId)
+        // has a password we can update via the Management API. Social
+        // identities linked through Auth0 (google-oauth2|..., github|...,
+        // windowslive|...) are managed by their upstream IdPs — calling
+        // PATCH /api/v2/users with `connection: "Username-Password-Authentication"`
+        // on those would fail.
         const auth0Account = await ctx.prisma.account.findFirst({
           where: {
             userId: ctx.session.user.id,
             provider: "auth0",
+            providerAccountId: { startsWith: "auth0|" },
           },
           select: { providerAccountId: true },
         });
@@ -253,7 +260,8 @@ export const userRouter = createTRPCRouter({
         if (!auth0Account) {
           throw new TRPCError({
             code: "NOT_FOUND",
-            message: "Auth0 account not found for the current user",
+            message:
+              "No Auth0 database (Email/Password) account is linked to this user. Password changes are only supported for that sign-in method.",
           });
         }
 
@@ -287,9 +295,18 @@ export const userRouter = createTRPCRouter({
           throw error;
         }
 
-        // Auth0 manages its own sessions — don't revoke BetterAuth sessions
-        // here (the user's app session is still valid; Auth0 OIDC sessions
-        // are managed by Auth0's tenant-level session settings).
+        // Auth0's OIDC sessions are managed by the Auth0 tenant, but the
+        // LangWatch *app* session is a BetterAuth row in our DB and is NOT
+        // invalidated by the Management API password change. Revoke other
+        // devices' app sessions so a stolen session token cannot outlive a
+        // password rotation. Same impersonation safeguard as the email path.
+        if (!ctx.session.user.impersonator && ctx.session.sessionId) {
+          await revokeOtherSessionsForUser({
+            prisma: ctx.prisma,
+            userId: ctx.session.user.id,
+            keepSessionId: ctx.session.sessionId,
+          });
+        }
         return { success: true };
       }
 
