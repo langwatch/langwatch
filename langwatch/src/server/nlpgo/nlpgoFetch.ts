@@ -1,7 +1,6 @@
 import { featureFlagService } from "../featureFlag/featureFlag.service";
 import { lambdaFetch } from "../../utils/lambdaFetch";
 import { getProjectLambdaArn } from "../../optimization_studio/server/lambda";
-import { signNLPGORequest } from "./sign";
 
 /**
  * Origin tag for the X-LangWatch-Origin header. Set at the request
@@ -54,11 +53,12 @@ export interface NLPGOFetchResult<T> {
  *
  * When the flag is on:
  *  - the path is rewritten with the `/go` prefix
- *  - the body is HMAC-signed with `LW_NLPGO_INTERNAL_SECRET`
  *  - X-LangWatch-Origin is added with the call site's origin
  *
- * When off (or the secret is missing): existing behavior — unsigned POST
- * to the legacy Python handler. Bit-identical to today's traffic shape.
+ * When off: existing behavior — POST to the legacy Python handler.
+ * Bit-identical to today's traffic shape. There is no auth on this
+ * hop — TS app and nlpgo share the Lambda function URL boundary, the
+ * same posture today's Python NLP service uses.
  *
  * Topic clustering and other code paths that should stay on Python
  * regardless MUST NOT call this helper — they should keep using
@@ -76,19 +76,6 @@ export async function nlpgoFetch<T = unknown>(
     "Content-Type": "application/json",
     "X-LangWatch-Origin": opts.origin,
   };
-
-  if (goEnabled) {
-    const secret = process.env.LW_NLPGO_INTERNAL_SECRET;
-    if (secret) {
-      headers["X-LangWatch-NLPGO-Signature"] = signNLPGORequest(
-        secret,
-        bodyStr,
-      );
-    }
-    // If the secret is missing, the Go side fails open with the
-    // X-LangWatch-NLPGO-Auth=disabled header — operator visibility
-    // without breaking traffic. Production deploys MUST set the secret.
-  }
 
   const functionArn = process.env.LANGWATCH_NLP_LAMBDA_CONFIG
     ? await getProjectLambdaArn(opts.projectId)

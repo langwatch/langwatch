@@ -46,7 +46,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 
 	child := uvicornchild.New(uvicornchild.Options{
 		Command:   cfg.Child.Command,
-		Args:      cfg.Child.Args,
+		Args:      splitArgs(cfg.Child.ArgsRaw),
 		HealthURL: cfg.Child.HealthURL,
 		Disabled:  cfg.Child.Bypass,
 		Logger:    logger,
@@ -82,6 +82,24 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Child:      child,
 		ChildProxy: proxy,
 	}, nil
+}
+
+// splitArgs tokenizes a space-separated args string from env into a
+// []string for exec.Command. Quoted args aren't supported (operator
+// passes simple flag lists in practice; if quoting is needed, add a
+// shell-style splitter behind a feature flag).
+func splitArgs(s string) []string {
+	var out []string
+	start := 0
+	for i := 0; i <= len(s); i++ {
+		if i == len(s) || s[i] == ' ' || s[i] == '\t' {
+			if i > start {
+				out = append(out, s[start:i])
+			}
+			start = i + 1
+		}
+	}
+	return out
 }
 
 func resolveNodeID(ctx context.Context, logger *zap.Logger) string {

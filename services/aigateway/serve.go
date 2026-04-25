@@ -27,7 +27,6 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		TraceRegistry:         deps.TraceRegistry,
 		DefaultExportEndpoint: cfg.CustomerTraceBridge.BaseURL + "/api/otel",
 		MaxRequestBodyBytes:   cfg.Server.MaxRequestBodyBytes,
-		InternalSecret:        cfg.ControlPlane.InternalSecret,
 	})
 
 	srv := &http.Server{Handler: handler, Addr: cfg.Server.Addr, ReadHeaderTimeout: 10 * time.Second}

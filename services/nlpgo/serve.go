@@ -25,7 +25,6 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		Logger:              deps.Logger,
 		Health:              deps.Health,
 		Version:             info.Version,
-		InternalSecret:      cfg.InternalSecret,
 		ChildProxy:          deps.ChildProxy,
 		MaxRequestBodyBytes: cfg.Server.MaxRequestBodyBytes,
 	})

@@ -19,11 +19,6 @@ type Config struct {
 	Log         clog.Config   `env:"LOG"`
 	OTel        config.OTel   `env:"OTEL"`
 
-	// Internal secret for HMAC auth on /go/* routes. Mirrors
-	// LW_GATEWAY_INTERNAL_SECRET. Empty = auth disabled (dev only —
-	// the middleware emits an X-LangWatch-NLPGO-Auth=disabled header).
-	InternalSecret string `env:"LW_NLPGO_INTERNAL_SECRET"`
-
 	// AI Gateway connection — used by the LLM block executor and by
 	// /go/proxy/v1/*.
 	Gateway GatewayClientConfig `env:"LW_GATEWAY"`
@@ -54,8 +49,9 @@ type UvicornChildConfig struct {
 	// Command is the binary to exec. Default: uvicorn.
 	Command string `env:"COMMAND"`
 	// Args are passed verbatim. Default targets langwatch_nlp.main:app
-	// on 127.0.0.1:5561.
-	Args []string `env:"ARGS"`
+	// on 127.0.0.1:5561. Supplied as a single space-separated string
+	// (config.Hydrate doesn't support []string env unmarshal).
+	ArgsRaw string `env:"ARGS"`
 	// HealthURL is what nlpgo polls to gauge child readiness.
 	HealthURL string `env:"HEALTH_URL"`
 	// UpstreamURL is where the reverse proxy sends fall-through traffic.
@@ -88,7 +84,7 @@ func defaultConfig() Config {
 		},
 		Child: UvicornChildConfig{
 			Command:     "uvicorn",
-			Args:        []string{"langwatch_nlp.main:app", "--host", "127.0.0.1", "--port", "5561"},
+			ArgsRaw:     "langwatch_nlp.main:app --host 127.0.0.1 --port 5561",
 			HealthURL:   "http://127.0.0.1:5561/health",
 			UpstreamURL: "http://127.0.0.1:5561",
 		},

@@ -19,11 +19,10 @@ import (
 
 // RouterDeps are the dependencies the router needs.
 type RouterDeps struct {
-	App            *app.App
-	Logger         *zap.Logger
-	Health         *health.Registry
-	Version        string
-	InternalSecret string
+	App     *app.App
+	Logger  *zap.Logger
+	Health  *health.Registry
+	Version string
 	// ChildProxy reverse-proxies any unmatched (non-/go/*) request to
 	// the uvicorn child. Required when nlpgo is the entrypoint; nil-safe
 	// for tests where there is no child.
@@ -56,7 +55,6 @@ func NewRouter(deps RouterDeps) http.Handler {
 	}
 
 	r.Route("/go", func(g chi.Router) {
-		g.Use(HMACAuthMiddleware(deps.InternalSecret))
 		g.Get("/version", versionHandler(deps.Version))
 		g.Route("/studio", func(s chi.Router) {
 			s.Post("/execute_sync", executeSyncHandler(deps.App))
