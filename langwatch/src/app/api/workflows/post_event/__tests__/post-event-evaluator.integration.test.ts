@@ -48,7 +48,14 @@ vi.mock("../../../../../optimization_studio/server/addEnvs", async () => {
   };
 });
 
-const NLPGO_PORT = 5573;
+// Per-owner port scheme: 5561X / 5562X range (production port + extra
+// trailing digit, makes the dev↔test connection obvious to readers).
+// Each live integration test that spawns its own nlpgo subprocess
+// claims a unique port:
+//   55620 — playground proxy live OpenAI
+//   55610 — post_event SSE FF gating
+//   55611 — this test (post_event evaluator with real provider e2e)
+const NLPGO_PORT = 55611;
 const REPO_ROOT = path.resolve(__dirname, "../../../../../../..");
 
 let nlpgoProcess: ChildProcess | null = null;

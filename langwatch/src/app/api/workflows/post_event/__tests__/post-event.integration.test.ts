@@ -46,9 +46,17 @@ vi.mock("../../../../../optimization_studio/server/addEnvs", async () => {
   };
 });
 
-// Avoid 5562 (default) and 5563 (aigateway default) so this test can
-// run alongside a live `make dev` without colliding.
-const NLPGO_PORT = 5572;
+// Per-owner port scheme (rchaves's call): use the 5561X / 5562X range.
+// Each port corresponds to a "real" production port + an extra trailing
+// digit, so the connection between dev port and test port is obvious
+// to readers and high enough to avoid collision with langwatch app on
+// 5570, nlpgo on 5562, aigateway on 5563 even when the dev stack is
+// running. Each live integration test that spawns its own nlpgo
+// subprocess claims a unique port:
+//   55620 — playground proxy live OpenAI (Ash)
+//   55610 — this test (post_event SSE FF gating)
+//   55611 — post_event evaluator with real provider e2e
+const NLPGO_PORT = 55610;
 const REPO_ROOT = path.resolve(__dirname, "../../../../../../..");
 
 let nlpgoProcess: ChildProcess | null = null;
