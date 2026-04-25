@@ -1,6 +1,8 @@
 package app
 
 import (
+	"context"
+
 	"go.uber.org/zap"
 )
 
@@ -15,6 +17,44 @@ type App struct {
 	secrets    SecretsResolver
 	childProxy ChildProxy
 	childMgr   ChildManager
+	executor   WorkflowExecutor
+}
+
+// WorkflowExecutor is the engine port: takes a parsed workflow + inputs
+// and returns the final result. Defined here so the handler doesn't
+// import the engine package directly (cleaner test surface).
+type WorkflowExecutor interface {
+	Execute(ctx context.Context, req WorkflowRequest) (*WorkflowResult, error)
+}
+
+// WorkflowRequest is the shape passed to the engine. Mirrors the engine
+// package's ExecuteRequest so the handler doesn't need to know engine
+// internals.
+type WorkflowRequest struct {
+	WorkflowJSON []byte
+	Inputs       map[string]any
+	Origin       string
+	TraceID      string
+	ProjectID    string
+}
+
+// WorkflowResult is the engine's response, ready for JSON serialization.
+type WorkflowResult struct {
+	TraceID    string         `json:"trace_id"`
+	Status     string         `json:"status"`
+	Result     map[string]any `json:"result,omitempty"`
+	Nodes      map[string]any `json:"nodes,omitempty"`
+	TotalCost  float64        `json:"total_cost,omitempty"`
+	DurationMS int64          `json:"duration_ms,omitempty"`
+	Error      *WorkflowError `json:"error,omitempty"`
+}
+
+// WorkflowError is the structured error attached when the engine fails.
+type WorkflowError struct {
+	NodeID    string `json:"node_id,omitempty"`
+	Type      string `json:"type"`
+	Message   string `json:"message"`
+	Traceback string `json:"traceback,omitempty"`
 }
 
 // Option configures an App.
@@ -53,6 +93,12 @@ func WithChildProxy(p ChildProxy) Option { return func(a *App) { a.childProxy = 
 
 // WithChildManager injects the uvicorn lifecycle manager.
 func WithChildManager(m ChildManager) Option { return func(a *App) { a.childMgr = m } }
+
+// WithWorkflowExecutor injects the workflow engine.
+func WithWorkflowExecutor(e WorkflowExecutor) Option { return func(a *App) { a.executor = e } }
+
+// Executor returns the configured workflow executor (nil during scaffold).
+func (a *App) Executor() WorkflowExecutor { return a.executor }
 
 // Logger returns the configured logger or a noop if unset.
 func (a *App) Logger() *zap.Logger {
