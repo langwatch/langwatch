@@ -3,10 +3,13 @@ name: gateway-matrix
 # AI Gateway provider × scenario matrix — runs the live-credential
 # Go matrix (services/aigateway/tests/matrix) against real LLM
 # providers + the LangWatch control plane. Costs ~$0.07 per full
-# run (28 cells of OpenAI/Anthropic/Gemini/Bedrock/Azure/Vertex on
-# cheap models). Gated to nightly + manual dispatch — too expensive
-# to run on every PR; the per-PR safety net is the unit test layer
-# that mocks providers at the bifrost adapter boundary.
+# run (31 cells: 5 canonical scenarios — simple, streamed,
+# tool_calling, structured_outputs, cache — across OpenAI/Anthropic/
+# Gemini/Bedrock/Azure/Vertex on cheap models, plus 1 OpenAI-only
+# streamed-auto-include-usage regression cell). Gated to nightly +
+# manual dispatch — too expensive to run on every PR; the per-PR
+# safety net is the unit test layer that mocks providers at the
+# bifrost adapter boundary.
 #
 # Touches needing this matrix:
 #   - services/aigateway/**          (gateway data plane)
