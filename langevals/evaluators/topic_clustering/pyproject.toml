@@ -26,6 +26,17 @@ dependencies = [
 test = [
     "pytest>=7.4.2",
     "python-dotenv>=1.0.1",
+    # Imported by the ported test suite (pytest_httpx for HTTPXMock,
+    # pandas for the integration-test CSV fixtures, httpx for direct
+    # client calls). Without them, pytest collection fails on import,
+    # which compounds with langevals's pass_rate_plugin assuming
+    # session.pass_rates was set in pytest_collection_modifyitems and
+    # produces an obscured AttributeError instead of the real
+    # ModuleNotFoundError. Pinning here keeps the test deps scoped to
+    # the topic_clustering workspace member.
+    "pytest-httpx>=0.30.0",
+    "pandas>=2.2.3,<3",
+    "httpx>=0.27.0",
 ]
 dev = ["ipykernel>=6.29.4"]
 
