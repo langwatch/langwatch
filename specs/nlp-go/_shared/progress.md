@@ -101,39 +101,43 @@ topic clustering on Python. Roll out per-project via feature flag.
 - [x] `services/nlpgo/app/ports.go` interfaces (sarah) — `GatewayClient`, `LLMClient`, `LLMRequest`/`LLMResponse`, `ChatMessage`, `Tool`, `CodeRunner`, `CodeRequest`/`CodeResult`, `ChildHealth`, `ChildProxy`, `ChildManager`, `SecretsResolver`. Translator maps Provider/Model + Origin + reasoning_effort. `go build ./services/nlpgo/... ./cmd/service/...` clean.
 
 ### Phase 1 — engine + gateway client
-- [ ] DSL parser + Go structs (sarah)
-- [ ] Engine: topo sort + node executor (sarah)
-- [ ] Dataset block (sarah)
-- [ ] HTTP block (sarah)
-- [ ] Code block via `runner.py` subprocess (sarah)
-- [ ] **Gateway inline-creds inbound auth path** in `services/aigateway/` (ash)
-- [ ] `litellm_params` translator (ash)
-- [ ] Gateway client (HTTP, HMAC, streaming) (ash)
-- [ ] LLM block (ash, depends on engine ports + gateway client)
+- [x] DSL parser + Go structs (sarah)
+- [x] Engine: topo sort + node executor (sarah) — orchestrator with planner-driven layered execution + per-layer goroutine fan-out
+- [x] Dataset block (sarah) — column-oriented materialization, deterministic split
+- [x] HTTP block (sarah) — Liquid templates, JSONPath, SSRF protection, all 5 methods + 3 auth schemes
+- [x] Code block via `runner.py` subprocess (sarah) — Python sandbox, structured errors, timeouts, isolation
+- [x] **Gateway inline-creds inbound auth path** in `services/aigateway/` (ash) — 13 unit tests
+- [x] `litellm_params` translator (ash) — 24 unit tests across 7 providers
+- [x] Gateway client (HTTP, HMAC, streaming) (ash) — 7 unit tests with httptest server
+- [x] LLM block (ash, depends on engine ports + gateway client) — `llmexecutor` adapter, 14 unit tests
 
 ### Phase 2 — TS app integration
-- [ ] Feature flag `release_nlp_go_engine_enabled` wired in `runWorkflow.ts` + `playground.ts` (ash)
-- [ ] HMAC signing with `LW_NLPGO_INTERNAL_SECRET` (ash)
-- [ ] Optimize button hidden + 410 endpoint when flag on (ash)
-- [ ] Telemetry origin headers set per call site (ash)
+- [x] Feature flag `release_nlp_go_engine_enabled` wired in `runWorkflow.ts` (ash, via `nlpgoFetch`)
+- [ ] Same wiring for `playground.ts` (Vercel AI SDK custom-fetch — follow-up)
+- [x] HMAC signing with `LW_NLPGO_INTERNAL_SECRET` (ash) — body-only canonical, hardening to METHOD\nPATH\nTS\nBODYHASH = follow-up
+- [x] Optimize button hidden when flag is on (ash) — `workflow.engineMode` tRPC query + UI guard
+- [ ] Optimize endpoint 410 / websocket guard (server-side enforcement, follow-up)
+- [x] Telemetry origin header set in runWorkflow (ash) — propagated through translator → gateway
 
 ### Phase 3 — deployment
-- [ ] `Dockerfile.langwatch_nlp.lambda` bundles Go binary + entry script (sarah/ash)
-- [ ] `NLPGO_BYPASS=1` honored in entry script (ash)
-- [ ] Helm chart updates if needed (ash)
+- [x] `Dockerfile.langwatch_nlp.lambda` bundles Go binary + entry script (ash) — Go build stage in multi-stage; entrypoint at `langwatch_nlp/scripts/entrypoint.sh`
+- [x] `NLPGO_BYPASS=1` honored in entry script (ash)
+- [ ] Helm chart updates if needed (ash) — likely no changes since same container; verify
+- [ ] Dev `Dockerfile.langwatch_nlp` mirror update (ash, follow-up)
 - [ ] Terraform: no memory bump expected; verify (ash)
 
 ### Phase 4 — tests + QA
-- [ ] Provider matrix tests `tests/matrix/` with build tags (ash)
-- [x] Engine integration tests with real HTTP gateway stub (sarah) — 7 e2e tests through full chi router via httptest, including signature node end-to-end against stub gateway
-- [ ] Topic clustering swap LiteLLM → gateway HTTP (ash, scoped down)
+- [x] Provider matrix tests `tests/matrix/` with build tags (ash) — 6 providers (openai, anthropic, azure, bedrock, vertex, gemini), `live_*` build tags, README, env-var skip pattern
+- [x] Engine integration tests with real HTTP gateway stub (sarah) — 8 e2e tests through full chi router via httptest, including signature node end-to-end against stub gateway and edge handle rename test
+- [ ] Topic clustering swap LiteLLM → gateway HTTP (ash, in progress)
 - [x] PR opened + CI green — PR #3483 (https://github.com/langwatch/langwatch/pull/3483) draft against feat/ai-gateway
-- [ ] CodeRabbit review addressed
+- [ ] CodeRabbit review addressed (drive-pr loop active)
 - [ ] Browser QA: real workflows in Studio across providers
 - [ ] Screenshots embedded in PR via img402.dev
 
 ### Status snapshot per iteration
 - 2026-04-25 iter1: scaffolding + DSL + planner + dataset/code/HTTP blocks + engine orchestrator + handler wiring + 7 integration tests (sarah). gateway inline-creds + gatewayclient + litellm translator + llmexecutor (ash). PR #3483 opened draft. 143/143 nlpgo tests + 13 new aigateway tests green.
+- 2026-04-25 iter1 cont: TS app `nlpgoFetch` + `runWorkflow.ts` switch + Optimize button hide (ash). Provider matrix tests (ash). Lambda Dockerfile bundles Go binary with NLPGO_BYPASS entrypoint (ash). 8 e2e tests (sarah added edge-handle-rename). CI lint fix on internal_auth.go (sarah).
 
 ## Open questions / risks
 - Gateway inline-creds auth path is a precondition for everything in the Go
