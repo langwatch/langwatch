@@ -45,7 +45,7 @@ Windows: `minute`, `hour`, `day`, `week`, `month`, `total`.
 
 Hierarchical: a single request is checked against every budget that applies. **Any** hard-block breach blocks; warnings compose.
 
-Spend is debited after the response completes, using the token counts the provider reported, via an idempotent outbox so gateway retries never double-bill.
+Spend is debited after the response completes, using the token counts the provider reported, via the trace-fold reactor — replays of the same `gateway_request_id` collapse so gateway retries never double-bill.
 
 See [Budgets](/ai-gateway/budgets).
 
@@ -162,7 +162,7 @@ Every response carries `X-LangWatch-Request-Id: grq_<ULID>`. Use it to:
 - File a support ticket — the first thing we ask for.
 - Debug CLI integrations — the Codex / Claude Code logs echo these.
 
-The id also flows into the `BudgetLedger` as the idempotency key for debit retries, so a single request is billed exactly once even across gateway restarts.
+The id also flows into the CH ledger as the idempotency key for debit replays, so a single request is billed exactly once even across gateway restarts.
 
 ## What's intentionally *not* here
 
