@@ -17,8 +17,10 @@ import (
 	"github.com/oklog/ulid/v2"
 
 	"github.com/langwatch/langwatch/services/nlpgo/app"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/dataset"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/evaluatorblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/planner"
@@ -27,10 +29,13 @@ import (
 // Engine wires the per-block executors together. It's the unit the
 // HTTP handler invokes per /go/studio/execute_sync request.
 type Engine struct {
-	http  *httpblock.Executor
-	code  *codeblock.Executor
-	llm   app.LLMClient
-	logger Logger
+	http             *httpblock.Executor
+	code             *codeblock.Executor
+	llm              app.LLMClient
+	evaluator        *evaluatorblock.Executor
+	agentWorkflow    *agentblock.WorkflowRunner
+	langwatchBaseURL string
+	logger           Logger
 }
 
 // Logger is the minimal logger interface the engine needs. Any *zap.Logger
@@ -43,10 +48,13 @@ type Logger interface {
 
 // Options configures an Engine.
 type Options struct {
-	HTTP   *httpblock.Executor
-	Code   *codeblock.Executor
-	LLM    app.LLMClient
-	Logger Logger
+	HTTP             *httpblock.Executor
+	Code             *codeblock.Executor
+	LLM              app.LLMClient
+	Evaluator        *evaluatorblock.Executor
+	AgentWorkflow    *agentblock.WorkflowRunner
+	LangWatchBaseURL string // base URL for evaluator + agent-workflow callbacks (e.g. https://app.langwatch.ai)
+	Logger           Logger
 }
 
 // New builds an Engine.
@@ -55,10 +63,13 @@ func New(opts Options) *Engine {
 		opts.Logger = noopLogger{}
 	}
 	return &Engine{
-		http:   opts.HTTP,
-		code:   opts.Code,
-		llm:    opts.LLM,
-		logger: opts.Logger,
+		http:             opts.HTTP,
+		code:             opts.Code,
+		llm:              opts.LLM,
+		evaluator:        opts.Evaluator,
+		agentWorkflow:    opts.AgentWorkflow,
+		langwatchBaseURL: strings.TrimRight(opts.LangWatchBaseURL, "/"),
+		logger:           opts.Logger,
 	}
 }
 
@@ -185,6 +196,10 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 		// Decorator: produces no outputs of its own; signature nodes
 		// reference it via a parameter and apply it at LLM-call time.
 		return map[string]any{}, nil
+	case dsl.ComponentEvaluator:
+		return e.runEvaluator(ctx, req, node, inputs, ns)
+	case dsl.ComponentAgent:
+		return e.runAgent(ctx, req, node, inputs, ns)
 	default:
 		return nil, &NodeError{Type: "unsupported_node_kind", Message: "node kind not supported on Go engine: " + string(node.Type)}
 	}
@@ -315,6 +330,158 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 		out[name] = resp.Content
 	}
 	return out, nil
+}
+
+// runEvaluator dispatches an evaluator node to the LangWatch evaluator
+// HTTP endpoint via the evaluatorblock executor. Mirrors
+// langwatch_nlp/.../evaluators/langwatch.py LangWatchEvaluator.forward —
+// the evaluator slug + settings + name come from the node parameters,
+// the data dict from upstream inputs.
+func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
+	if e.evaluator == nil {
+		return nil, &NodeError{Type: "evaluator_executor_unavailable", Message: "evaluator executor not configured"}
+	}
+	if e.langwatchBaseURL == "" {
+		return nil, &NodeError{Type: "evaluator_unconfigured", Message: "LangWatchBaseURL is required to call the evaluator API"}
+	}
+	if req.Workflow == nil || req.Workflow.APIKey == "" {
+		return nil, &NodeError{Type: "evaluator_unauthorized", Message: "workflow.api_key is required for evaluator dispatch"}
+	}
+
+	slug := paramString(node.Data.Parameters, "evaluator")
+	if slug == "" {
+		return nil, &NodeError{Type: "evaluator_missing_slug", Message: "evaluator parameter is required (e.g. langevals/exact_match)"}
+	}
+
+	res, err := e.evaluator.Execute(ctx, evaluatorblock.Request{
+		BaseURL:       e.langwatchBaseURL,
+		APIKey:        req.Workflow.APIKey,
+		EvaluatorSlug: slug,
+		Name:          paramString(node.Data.Parameters, "name"),
+		Settings:      paramAnyMap(node.Data.Parameters, "settings"),
+		Data:          inputs,
+		TraceID:       req.TraceID,
+		Origin:        req.Origin,
+	})
+	if err != nil {
+		return nil, &NodeError{Type: "evaluator_error", Message: err.Error()}
+	}
+
+	// Surface the full result on the node state for the SSE consumer +
+	// final result panel. The Studio expects the same field names the
+	// Python EvaluationResultWithMetadata produces.
+	out := map[string]any{
+		"status":   res.Status,
+		"details":  res.Details,
+	}
+	if res.Score != nil {
+		out["score"] = *res.Score
+	}
+	if res.Passed != nil {
+		out["passed"] = *res.Passed
+	}
+	if res.Label != "" {
+		out["label"] = res.Label
+	}
+	if res.Cost != nil {
+		out["cost"] = map[string]any{
+			"currency": res.Cost.Currency,
+			"amount":   res.Cost.Amount,
+		}
+		ns.Cost = res.Cost.Amount
+	}
+
+	// The evaluator node may declare a subset of outputs (e.g. a
+	// workflow that only cares about `passed`). Filter to declared
+	// names if present; otherwise hand back everything.
+	declared := outputNames(node.Data.Outputs)
+	if len(declared) == 0 {
+		return out, nil
+	}
+	filtered := make(map[string]any, len(declared))
+	for _, name := range declared {
+		if v, ok := out[name]; ok {
+			filtered[name] = v
+		}
+	}
+	return filtered, nil
+}
+
+// runAgent dispatches an agent node based on its `agent_type` parameter.
+// Three modes match langwatch_nlp/.../studio/parser.py "agent" branch:
+//
+//   - http     → reuse the HTTP-block executor with the agent's URL/method/etc.
+//   - code     → reuse the code-block executor with the agent's `code`.
+//   - workflow → call the LangWatch app's /api/workflows/<id>[/<version>]/run
+//                via the agentblock.WorkflowRunner.
+func (e *Engine) runAgent(ctx context.Context, req ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
+	agentType := paramString(node.Data.Parameters, "agent_type")
+	switch agentType {
+	case "http":
+		return e.runHTTP(ctx, node, inputs, ns)
+	case "code":
+		return e.runCode(ctx, node, inputs, ns)
+	case "workflow":
+		return e.runAgentWorkflow(ctx, req, node, inputs, ns)
+	case "":
+		return nil, &NodeError{Type: "agent_missing_type", Message: "agent_type parameter is required (http | code | workflow)"}
+	default:
+		return nil, &NodeError{Type: "agent_unknown_type", Message: "unknown agent_type: " + agentType}
+	}
+}
+
+// runAgentWorkflow handles agent_type=workflow: POST to the LangWatch
+// app's /api/workflows/<id>[/<version>]/run with the resolved inputs.
+func (e *Engine) runAgentWorkflow(ctx context.Context, req ExecuteRequest, node *dsl.Node, inputs map[string]any, ns *NodeState) (map[string]any, *NodeError) {
+	if e.agentWorkflow == nil {
+		return nil, &NodeError{Type: "agent_workflow_executor_unavailable", Message: "agent workflow runner not configured"}
+	}
+	if e.langwatchBaseURL == "" {
+		return nil, &NodeError{Type: "agent_unconfigured", Message: "LangWatchBaseURL is required to call workflow agents"}
+	}
+	if req.Workflow == nil || req.Workflow.APIKey == "" {
+		return nil, &NodeError{Type: "agent_unauthorized", Message: "workflow.api_key is required for agent workflow dispatch"}
+	}
+
+	workflowID := paramString(node.Data.Parameters, "workflow_id")
+	if workflowID == "" {
+		return nil, &NodeError{Type: "agent_missing_workflow_id", Message: "workflow_id parameter is required for agent_type=workflow"}
+	}
+
+	res, err := e.agentWorkflow.Execute(ctx, agentblock.WorkflowRunRequest{
+		BaseURL:    e.langwatchBaseURL,
+		APIKey:     req.Workflow.APIKey,
+		WorkflowID: workflowID,
+		VersionID:  paramString(node.Data.Parameters, "version_id"),
+		Inputs:     inputs,
+		TraceID:    req.TraceID,
+		Origin:     req.Origin,
+	})
+	if err != nil {
+		return nil, &NodeError{Type: "agent_workflow_error", Message: err.Error()}
+	}
+
+	_ = ns
+	// The /run endpoint returns the workflow's output directly. If the
+	// agent node declares specific output names, bind to the first one;
+	// otherwise expose under "value" matching the http-block convention.
+	declared := outputNames(node.Data.Outputs)
+	if len(declared) == 1 {
+		return map[string]any{declared[0]: res.Result}, nil
+	}
+	if m, ok := res.Result.(map[string]any); ok && len(declared) > 1 {
+		// Workflow already returned a map — try to bind declared names.
+		filtered := make(map[string]any, len(declared))
+		for _, name := range declared {
+			if v, ok := m[name]; ok {
+				filtered[name] = v
+			}
+		}
+		if len(filtered) > 0 {
+			return filtered, nil
+		}
+	}
+	return map[string]any{"value": res.Result}, nil
 }
 
 // runState aggregates per-node outputs and tracks the first error
@@ -489,6 +656,22 @@ func paramInt(params []dsl.Field, name string) int {
 		}
 	}
 	return 0
+}
+
+// paramAnyMap reads a parameter as map[string]any. Unlike paramStringMap,
+// the values can be any JSON-decodable type — useful for evaluator
+// settings like {"threshold": 0.8, "model": "openai/gpt-5-mini"}.
+func paramAnyMap(params []dsl.Field, name string) map[string]any {
+	for _, p := range params {
+		if p.Identifier != name {
+			continue
+		}
+		var m map[string]any
+		if err := jsonUnmarshalRaw(p.Value, &m); err == nil {
+			return m
+		}
+	}
+	return nil
 }
 
 func paramStringMap(params []dsl.Field, name string) map[string]string {

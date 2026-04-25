@@ -60,6 +60,13 @@ type EngineConfig struct {
 	// SandboxPython — the python interpreter used for the code block.
 	// Default: python3 (resolved via PATH inside the container).
 	SandboxPython string `env:"SANDBOX_PYTHON"`
+	// LangWatchBaseURL — base URL for evaluator + agent-workflow callbacks.
+	// In production this is the public LangWatch app URL (eg.
+	// https://app.langwatch.ai); in dev it's typically http://host.docker.internal:5560
+	// or http://localhost:5560 depending on the deployment shape.
+	// Required for evaluator + agent_type=workflow nodes; absent →
+	// those nodes return a typed "evaluator_unconfigured" error.
+	LangWatchBaseURL string `env:"LANGWATCH_BASE_URL"`
 }
 
 func defaultConfig() Config {

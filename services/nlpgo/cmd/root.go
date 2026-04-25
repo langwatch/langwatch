@@ -13,7 +13,9 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/agentblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/evaluatorblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
 
@@ -57,10 +59,19 @@ func Root(ctx context.Context, _ []string) error {
 	llm := llmexecutor.New(dispatcheradapter.New(disp))
 	deps.Logger.Info("nlpgo_llm_wired", zap.String("transport", "in_process_dispatcher"))
 
+	// Evaluator + agent-workflow blocks call the LangWatch app's own
+	// HTTP API. Both share the same LangWatchBaseURL (NLPGO_ENGINE_LANGWATCH_BASE_URL).
+	// Per-block timeouts default to 12min (Lambda max 15min minus 3min margin).
+	evalExec := evaluatorblock.New(evaluatorblock.Options{})
+	agentWfRunner := agentblock.NewWorkflowRunner(agentblock.WorkflowRunnerOptions{})
+
 	eng := engine.New(engine.Options{
-		HTTP: httpExec,
-		Code: codeExec,
-		LLM:  llm,
+		HTTP:             httpExec,
+		Code:             codeExec,
+		LLM:              llm,
+		Evaluator:        evalExec,
+		AgentWorkflow:    agentWfRunner,
+		LangWatchBaseURL: cfg.Engine.LangWatchBaseURL,
 	})
 	executor := engineAdapter{eng: eng}
 
