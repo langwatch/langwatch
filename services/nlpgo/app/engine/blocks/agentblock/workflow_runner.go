@@ -39,16 +39,22 @@ type WorkflowRunner struct {
 // WorkflowRunnerOptions configures a WorkflowRunner.
 type WorkflowRunnerOptions struct {
 	Client         *http.Client  // nil → default client
-	DefaultTimeout time.Duration // 0 → 10 min (matches NLP_DSPY_CUSTOM_NODE_TIMEOUT_SECONDS=600)
+	DefaultTimeout time.Duration // 0 → 12 min (Lambda max is 15 min; we leave a 3-min margin)
 }
 
 // NewWorkflowRunner builds a runner.
+//
+// Default timeout is 12 minutes — customer agents can run long
+// (multi-step LLM chains, slow tools) and the Python side's
+// NLP_DSPY_CUSTOM_NODE_TIMEOUT_SECONDS=600 was too tight in practice.
+// Lambda's hard ceiling is 15 minutes; 12 leaves a 3-minute margin
+// for clean shutdown + response writing.
 func NewWorkflowRunner(opts WorkflowRunnerOptions) *WorkflowRunner {
 	if opts.Client == nil {
 		opts.Client = &http.Client{}
 	}
 	if opts.DefaultTimeout == 0 {
-		opts.DefaultTimeout = 10 * time.Minute
+		opts.DefaultTimeout = 12 * time.Minute
 	}
 	return &WorkflowRunner{
 		client:      opts.Client,

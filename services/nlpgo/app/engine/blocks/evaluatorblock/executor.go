@@ -37,16 +37,21 @@ type Executor struct {
 // Options configures an Executor.
 type Options struct {
 	Client         *http.Client  // nil → http.DefaultClient
-	DefaultTimeout time.Duration // 0 → 5min
+	DefaultTimeout time.Duration // 0 → 12min (Lambda max 15min; we leave 3min margin)
 }
 
 // New builds an Executor with the given options.
+//
+// Default timeout is 12 minutes — customer evaluators can chain LLM
+// calls (ragas's answer_correctness etc.) and time out under load.
+// Lambda's hard ceiling is 15 minutes; 12 leaves a 3-minute margin
+// for clean shutdown + response writing.
 func New(opts Options) *Executor {
 	if opts.Client == nil {
 		opts.Client = &http.Client{}
 	}
 	if opts.DefaultTimeout == 0 {
-		opts.DefaultTimeout = 5 * time.Minute
+		opts.DefaultTimeout = 12 * time.Minute
 	}
 	return &Executor{
 		client:      opts.Client,
