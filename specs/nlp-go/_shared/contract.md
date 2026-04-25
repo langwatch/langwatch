@@ -15,7 +15,7 @@
 - Strip out DSPy and LiteLLM monkey-patching entirely. The new engine is plain Go structs + a stateless prompt builder; the proxy is plain HTTP.
 
 **Non-goals**
-- Rewriting topic clustering. It stays on Python (sklearn, sentence-transformers). Only the LLM-naming step inside topic clustering swaps from LiteLLM to a small HTTP call into the AI Gateway.
+- Rewriting topic clustering. It stays on Python (sklearn, scipy, numpy + LiteLLM). What *does* move: the hosting service. When `release_nlp_go_engine_enabled` is on, topic clustering routes to **langevals** (a new workspace member at `langevals/evaluators/topic_clustering/`) instead of `langwatch_nlp`. When off, traffic stays on `langwatch_nlp` unchanged. Long-term goal: all Python lives in `langevals`; `langwatch_nlp` can be deleted once the flag is at 100%.
 - Backwards-incompatible URL or DSL changes for customers. The Studio JSON schema is frozen for v1; only internal interfaces move.
 - Deleting Python NLP code in this PR. Removal is a follow-up after the flag has been at 100% for two release cycles.
 
@@ -231,9 +231,14 @@ Workflows pass `chat_messages` between nodes. The engine MUST:
 - Backend: `featureFlagService` (PostHog when configured, in-memory otherwise).
 - Distinct id: **projectId**. Per-project rollout.
 - Env override: `RELEASE_NLP_GO_ENGINE_ENABLED=1` (also honored via `FEATURE_FLAG_FORCE_ENABLE`).
-- Decision points (TS app): `runWorkflow.ts`, `playground.ts`. Topic clustering (`topicClustering.ts`) is **not** gated.
-- When on: TS app prepends `/go` to the path AND signs the request with `LW_NLPGO_INTERNAL_SECRET`.
-- When off: existing path, no signing — bit-identical to today's traffic.
+- Decision points (TS app): `runWorkflow.ts`, `playground.ts`, `topicClustering.ts`. **All three** flip together so a flagged project sees the new path everywhere.
+- When on:
+  - **runWorkflow + playground:** TS app prepends `/go` and routes to nlpgo (single container with Go front-door + Python child).
+  - **topic clustering:** TS app routes to **langevals** at `${LANGEVALS_BASE_URL}/topics/{batch,incremental}_clustering` (new langevals workspace member). The langwatch_nlp side is bypassed.
+- When off:
+  - All three call sites stay on the legacy paths (langwatch_nlp), bit-identical to today's traffic.
+
+The library pivot for nlpgo→aigateway (see §8) removed the LW_NLPGO_INTERNAL_SECRET HMAC bridge — both /go/* and the langevals /topics/* hops follow today's no-auth posture (Lambda Function URL + URL secrecy + restrictive SG).
 
 ---
 
