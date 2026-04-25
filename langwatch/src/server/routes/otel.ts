@@ -87,7 +87,7 @@ const tokenResolver = TokenResolver.create(prisma);
 async function authenticateAndCheckLimit(c: {
   req: { raw: Request; header: (name: string) => string | undefined };
 }) {
-  const credentials = extractCredentials(c);
+  const credentials = extractCredentials((name) => c.req.header(name));
 
   if (!credentials) {
     return { error: "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.", status: 401 as const };

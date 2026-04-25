@@ -34,14 +34,12 @@ export type UnifiedAuthVariables = {
  *   3. Bearer Legacy: sk-lw-... (project ID implicit in key)
  *   4. X-Auth-Token: legacy header (any token type)
  */
-function extractCredentials(c: {
-  req: {
-    header: (name: string) => string | undefined;
-  };
-}): { token: string; projectId: string | null } | null {
-  const authHeader = c.req.header("authorization");
-  const xAuthToken = c.req.header("x-auth-token");
-  const xProjectId = c.req.header("x-project-id");
+function extractCredentials(
+  getHeader: (name: string) => string | undefined,
+): { token: string; projectId: string | null } | null {
+  const authHeader = getHeader("authorization");
+  const xAuthToken = getHeader("x-auth-token");
+  const xProjectId = getHeader("x-project-id");
 
   // Priority 1: Basic Auth — carries both projectId and token
   if (authHeader?.toLowerCase().startsWith("basic ")) {
@@ -101,7 +99,7 @@ export function createUnifiedAuthMiddleware({
   const resolver = TokenResolver.create(prisma);
 
   return async (c, next) => {
-    const credentials = extractCredentials(c);
+    const credentials = extractCredentials((name) => c.req.header(name));
 
     if (!credentials) {
       return c.json(
