@@ -1,4 +1,3 @@
-import { Text, VStack } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import type { TargetValue } from "../components/scenarios/TargetSelector";
 import { toaster } from "../components/ui/toaster";
@@ -52,32 +51,18 @@ export function useRunScenario({
       if (!hasEnabledProviders) {
         toaster.create({
           title: "No model provider configured",
-          description: (
-            <VStack align="start" gap={1}>
-              <Text>
-                A model provider must be configured to run scenarios.
-              </Text>
-              <a
-                href="/settings/model-providers"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: "inline-block",
-                  padding: "4px 8px",
-                  marginTop: "4px",
-                  fontSize: "12px",
-                  backgroundColor: "white",
-                  color: "#c53030",
-                  borderRadius: "4px",
-                  textDecoration: "none",
-                }}
-              >
-                Configure model providers
-              </a>
-            </VStack>
-          ),
+          description: "A model provider must be configured to run scenarios.",
           type: "error",
           meta: { closable: true },
+          action: {
+            label: "Configure model providers",
+            onClick: () =>
+              window.open(
+                "/settings/model-providers",
+                "_blank",
+                "noopener,noreferrer"
+              ),
+          },
         });
         return;
       }
