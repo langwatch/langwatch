@@ -10,7 +10,11 @@ requires-python = ">=3.11"
 dependencies = [
     "langevals-core>=0.1.0",
     "fastapi>=0.111.1,<1",
-    "litellm>=1.81.3",
+    # Pinned to match the rest of the langevals workspace (>=1.79.0 across
+    # langevals-core, ragas, langevals, legacy). Tightening to >=1.81.3 forced
+    # uv to look for pre-releases of langchain-openai (constrained <0.3.0 by
+    # the legacy evaluator), which broke the workspace lock resolution.
+    "litellm>=1.79.0",
     "numpy>=1.26.4,<3",
     "scikit-learn>=1.5.2,<2",
     "scipy>=1.14.1,<2",

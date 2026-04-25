@@ -25,6 +25,7 @@ members = [
     "langevals-openai",
     "langevals-presidio",
     "langevals-ragas",
+    "langevals-topic-clustering",
 ]
 
 [[package]]
@@ -2014,6 +2015,7 @@ all = [
     { name = "langevals-openai" },
     { name = "langevals-presidio" },
     { name = "langevals-ragas" },
+    { name = "langevals-topic-clustering" },
 ]
 azure = [
     { name = "langevals-azure" },
@@ -2035,6 +2037,9 @@ presidio = [
 ]
 ragas = [
     { name = "langevals-ragas" },
+]
+topic-clustering = [
+    { name = "langevals-topic-clustering" },
 ]
 
 [package.dev-dependencies]
@@ -2068,6 +2073,8 @@ requires-dist = [
     { name = "langevals-presidio", marker = "extra == 'presidio'", editable = "evaluators/presidio" },
     { name = "langevals-ragas", marker = "extra == 'all'", editable = "evaluators/ragas" },
     { name = "langevals-ragas", marker = "extra == 'ragas'", editable = "evaluators/ragas" },
+    { name = "langevals-topic-clustering", marker = "extra == 'all'", editable = "evaluators/topic_clustering" },
+    { name = "langevals-topic-clustering", marker = "extra == 'topic-clustering'", editable = "evaluators/topic_clustering" },
     { name = "mangum", specifier = ">=0.17.0" },
     { name = "markdown", specifier = ">=3.6" },
     { name = "nest-asyncio", specifier = ">=1.6.0" },
@@ -2078,7 +2085,7 @@ requires-dist = [
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "uvicorn", specifier = ">=0.29.0" },
 ]
-provides-extras = ["azure", "openai", "ragas", "lingua", "langevals", "presidio", "legacy", "all"]
+provides-extras = ["azure", "openai", "ragas", "lingua", "langevals", "presidio", "legacy", "topic-clustering", "all"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -2465,6 +2472,49 @@ requires-dist = [
 dev = [{ name = "ipykernel", specifier = ">=6.29.4" }]
 test = [
     { name = "flaky", specifier = ">=3.8.1" },
+    { name = "pytest", specifier = ">=7.4.2" },
+    { name = "python-dotenv", specifier = ">=1.0.1" },
+]
+
+[[package]]
+name = "langevals-topic-clustering"
+version = "0.1.0"
+source = { editable = "evaluators/topic_clustering" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "langevals-core" },
+    { name = "litellm" },
+    { name = "numpy" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "structlog" },
+    { name = "tenacity" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "ipykernel" },
+]
+test = [
+    { name = "pytest" },
+    { name = "python-dotenv" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.111.1,<1" },
+    { name = "langevals-core", editable = "langevals_core" },
+    { name = "litellm", specifier = ">=1.79.0" },
+    { name = "numpy", specifier = ">=1.26.4,<3" },
+    { name = "scikit-learn", specifier = ">=1.5.2,<2" },
+    { name = "scipy", specifier = ">=1.14.1,<2" },
+    { name = "structlog", specifier = ">=24.1.0" },
+    { name = "tenacity", specifier = ">=8.5.0,<9" },
+]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ipykernel", specifier = ">=6.29.4" }]
+test = [
     { name = "pytest", specifier = ">=7.4.2" },
     { name = "python-dotenv", specifier = ">=1.0.1" },
 ]
@@ -4633,6 +4683,15 @@ wheels = [
 ]
 
 [[package]]
+name = "structlog"
+version = "25.5.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/ef/52/9ba0f43b686e7f3ddfeaa78ac3af750292662284b3661e91ad5494f21dbc/structlog-25.5.0.tar.gz", hash = "sha256:098522a3bebed9153d4570c6d0288abf80a031dfdb2048d59a49e9dc2190fc98", size = 1460830, upload-time = "2025-10-27T08:28:23.028Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a8/45/a132b9074aa18e799b891b91ad72133c98d8042c70f6240e4c5f9dabee2f/structlog-25.5.0-py3-none-any.whl", hash = "sha256:a8453e9b9e636ec59bd9e79bbd4a72f025981b3ba0f5837aebf48f02f37a7f9f", size = 72510, upload-time = "2025-10-27T08:28:21.535Z" },
+]
+
+[[package]]
 name = "sympy"
 version = "1.14.0"
 source = { registry = "https://pypi.org/simple" }
@@ -4821,6 +4880,8 @@ dependencies = [
 wheels = [
     { url = "https://files.pythonhosted.org/packages/0f/8b/4b61d6e13f7108f36910df9ab4b58fd389cc2520d54d81b88660804aad99/torch-2.10.0-2-cp311-none-macosx_11_0_arm64.whl", hash = "sha256:418997cb02d0a0f1497cf6a09f63166f9f5df9f3e16c8a716ab76a72127c714f", size = 79423467, upload-time = "2026-02-10T21:44:48.711Z" },
     { url = "https://files.pythonhosted.org/packages/d3/54/a2ba279afcca44bbd320d4e73675b282fcee3d81400ea1b53934efca6462/torch-2.10.0-2-cp312-none-macosx_11_0_arm64.whl", hash = "sha256:13ec4add8c3faaed8d13e0574f5cd4a323c11655546f91fbe6afa77b57423574", size = 79498202, upload-time = "2026-02-10T21:44:52.603Z" },
+    { url = "https://files.pythonhosted.org/packages/36/ab/7b562f1808d3f65414cd80a4f7d4bb00979d9355616c034c171249e1a303/torch-2.10.0-3-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:ac5bdcbb074384c66fa160c15b1ead77839e3fe7ed117d667249afce0acabfac", size = 915518691, upload-time = "2026-03-11T14:15:43.147Z" },
+    { url = "https://files.pythonhosted.org/packages/b3/7a/abada41517ce0011775f0f4eacc79659bc9bc6c361e6bfe6f7052a6b9363/torch-2.10.0-3-cp312-cp312-manylinux_2_28_x86_64.whl", hash = "sha256:98c01b8bb5e3240426dcde1446eed6f40c778091c8544767ef1168fc663a05a6", size = 915622781, upload-time = "2026-03-11T14:17:11.354Z" },
     { url = "https://files.pythonhosted.org/packages/78/89/f5554b13ebd71e05c0b002f95148033e730d3f7067f67423026cc9c69410/torch-2.10.0-cp311-cp311-manylinux_2_28_aarch64.whl", hash = "sha256:3282d9febd1e4e476630a099692b44fdc214ee9bf8ee5377732d9d9dfe5712e4", size = 145992610, upload-time = "2026-01-21T16:25:26.327Z" },
     { url = "https://files.pythonhosted.org/packages/ae/30/a3a2120621bf9c17779b169fc17e3dc29b230c29d0f8222f499f5e159aa8/torch-2.10.0-cp311-cp311-manylinux_2_28_x86_64.whl", hash = "sha256:a2f9edd8dbc99f62bc4dfb78af7bf89499bca3d753423ac1b4e06592e467b763", size = 915607863, upload-time = "2026-01-21T16:25:06.696Z" },
     { url = "https://files.pythonhosted.org/packages/6f/3d/c87b33c5f260a2a8ad68da7147e105f05868c281c63d65ed85aa4da98c66/torch-2.10.0-cp311-cp311-win_amd64.whl", hash = "sha256:29b7009dba4b7a1c960260fc8ac85022c784250af43af9fb0ebafc9883782ebd", size = 113723116, upload-time = "2026-01-21T16:25:21.916Z" },
