@@ -303,8 +303,10 @@ func TestSync_CodeBlockEndToEnd(t *testing.T) {
 
 // TestSync_RejectsUnsupportedNodeKind exercises the planner →
 // executor → handler error path the TS feature flag relies on for
-// fall-back: an "agent" node returns a structured error so the TS app
-// knows to route this workflow to Python.
+// fall-back. Uses a fictitious "future_kind" type so the test stays
+// stable as we grow the supportedKinds set (agent + evaluator joined
+// the set in iter-18 once the agentblock + evaluatorblock executors
+// landed).
 func TestSync_RejectsUnsupportedNodeKind(t *testing.T) {
 	stack := setupStack(t)
 	defer stack.close()
@@ -315,20 +317,46 @@ func TestSync_RejectsUnsupportedNodeKind(t *testing.T) {
 	    "template_adapter":"default",
 	    "nodes":[
 	      {"id":"entry","type":"entry","data":{"train_size":1.0,"test_size":0.0,"seed":1}},
-	      {"id":"a","type":"agent","data":{"agent":"agents/foo","agent_type":"http"}}
+	      {"id":"f","type":"future_kind_reserved_for_test","data":{}}
 	    ],
-	    "edges":[{"id":"e1","source":"entry","sourceHandle":"x","target":"a","targetHandle":"x","type":"default"}],
+	    "edges":[{"id":"e1","source":"entry","sourceHandle":"x","target":"f","targetHandle":"x","type":"default"}],
 	    "state":{}
 	  }
 	}`
 	res := postSync(t, stack, body)
 	require.Equal(t, "error", res.Status)
 	require.NotNil(t, res.Error)
-	// The planner wraps this as planner.UnsupportedNodeKindError; the
-	// app-layer engine_error is the wrapper.
+	// Planner.UnsupportedNodeKindError bubbles up via the engine_error
+	// wrapper at the app boundary; the message still names the offending
+	// kind so the TS feature flag can choose to fall back to Python.
 	assert.Equal(t, "engine_error", res.Error.Type)
-	assert.Contains(t, res.Error.Message, "unsupported")
-	assert.Contains(t, res.Error.Message, "agent")
+	assert.Contains(t, res.Error.Message, "future_kind")
+}
+
+// TestSync_RejectsRetiredKindRetriever exercises the new
+// RetiredNodeKindError path — retired kinds get a different reason
+// code so the Studio UI can surface a "remove the node" message
+// instead of the unsupported-kind fall-back message.
+func TestSync_RejectsRetiredKindRetriever(t *testing.T) {
+	stack := setupStack(t)
+	defer stack.close()
+
+	body := `{
+	  "workflow": {
+	    "workflow_id":"wf","api_key":"k","spec_version":"1.3","name":"x","icon":"x","description":"x","version":"x",
+	    "template_adapter":"default",
+	    "nodes":[
+	      {"id":"entry","type":"entry","data":{"train_size":1.0,"test_size":0.0,"seed":1}},
+	      {"id":"r","type":"retriever","data":{}}
+	    ],
+	    "edges":[{"id":"e1","source":"entry","sourceHandle":"x","target":"r","targetHandle":"x","type":"default"}],
+	    "state":{}
+	  }
+	}`
+	res := postSync(t, stack, body)
+	require.Equal(t, "error", res.Status)
+	require.NotNil(t, res.Error)
+	assert.Contains(t, res.Error.Message, "retired")
 }
 
 // TestSync_LLMNodeReturnsExecutorUnavailableUntilWired covers the

@@ -127,26 +127,31 @@ func TestPlan_RejectsDuplicateNodeID(t *testing.T) {
 }
 
 func TestPlan_RejectsUnsupportedNodeKind(t *testing.T) {
+	// "future_kind" is a fictitious type not yet supported; covers the
+	// case where a workflow ships from the future of the DSL with a
+	// node kind nlpgo hasn't grown an executor for. The planner must
+	// reject so the TS app can fall back to the legacy Python path.
+	const futureKind dsl.ComponentType = "future_kind_reserved_for_test"
 	w := &dsl.Workflow{
 		Nodes: []dsl.Node{
 			{ID: "Entry", Type: dsl.ComponentEntry},
-			{ID: "Agent", Type: dsl.ComponentAgent},
+			{ID: "Future", Type: futureKind},
 		},
-		Edges: []dsl.Edge{{ID: "e1", Source: "Entry", Target: "Agent"}},
+		Edges: []dsl.Edge{{ID: "e1", Source: "Entry", Target: "Future"}},
 	}
 	_, err := planner.New(w)
 	require.Error(t, err)
 	var unsup *planner.UnsupportedNodeKindError
 	require.True(t, errors.As(err, &unsup))
-	assert.Equal(t, "Agent", unsup.NodeID)
-	assert.Equal(t, dsl.ComponentAgent, unsup.Kind)
+	assert.Equal(t, "Future", unsup.NodeID)
+	assert.Equal(t, futureKind, unsup.Kind)
 }
 
 func TestPlan_RejectsRetiredKindRetriever(t *testing.T) {
 	w := &dsl.Workflow{
 		Nodes: []dsl.Node{
 			{ID: "Entry", Type: dsl.ComponentEntry},
-			{ID: "Retriever", Type: dsl.ComponentType("retriever")},
+			{ID: "Retriever", Type: dsl.ComponentRetriever},
 		},
 		Edges: []dsl.Edge{{ID: "e1", Source: "Entry", Target: "Retriever"}},
 	}
@@ -155,7 +160,7 @@ func TestPlan_RejectsRetiredKindRetriever(t *testing.T) {
 	var ret *planner.RetiredNodeKindError
 	require.True(t, errors.As(err, &ret), "want RetiredNodeKindError, got %T: %v", err, err)
 	assert.Equal(t, "Retriever", ret.NodeID)
-	assert.Equal(t, dsl.ComponentType("retriever"), ret.Kind)
+	assert.Equal(t, dsl.ComponentRetriever, ret.Kind)
 	assert.Contains(t, ret.Message, "retired")
 }
 
@@ -163,7 +168,7 @@ func TestPlan_RejectsRetiredKindCustom(t *testing.T) {
 	w := &dsl.Workflow{
 		Nodes: []dsl.Node{
 			{ID: "Entry", Type: dsl.ComponentEntry},
-			{ID: "Custom", Type: dsl.ComponentType("custom")},
+			{ID: "Custom", Type: dsl.ComponentCustom},
 		},
 		Edges: []dsl.Edge{{ID: "e1", Source: "Entry", Target: "Custom"}},
 	}
@@ -175,20 +180,44 @@ func TestPlan_RejectsRetiredKindCustom(t *testing.T) {
 	assert.Contains(t, ret.Message, "not supported")
 }
 
-func TestPlan_RetiredTakesPriorityOverUnsupported(t *testing.T) {
-	// A workflow with both a retired (retriever) and an unsupported (agent)
-	// node should surface the more-actionable retired-kind error first.
-	// Reasoning: retired = the customer must remove/replace the node;
-	// unsupported = the customer waits for a future release.
+func TestPlan_AcceptsAgentAndEvaluatorKinds(t *testing.T) {
+	// Agent + evaluator were 501-rejected pre-iter-17; iter-18 wires them
+	// into the engine. Planner must accept them so a workflow that mixes
+	// signature + evaluator + agent runs end-to-end on the Go path.
 	w := &dsl.Workflow{
 		Nodes: []dsl.Node{
 			{ID: "Entry", Type: dsl.ComponentEntry},
-			{ID: "Retriever", Type: dsl.ComponentType("retriever")},
+			{ID: "Sig", Type: dsl.ComponentSignature},
+			{ID: "Eval", Type: dsl.ComponentEvaluator},
 			{ID: "Agent", Type: dsl.ComponentAgent},
+			{ID: "End", Type: dsl.ComponentEnd},
+		},
+		Edges: []dsl.Edge{
+			{ID: "e1", Source: "Entry", Target: "Sig"},
+			{ID: "e2", Source: "Sig", Target: "Eval"},
+			{ID: "e3", Source: "Eval", Target: "Agent"},
+			{ID: "e4", Source: "Agent", Target: "End"},
+		},
+	}
+	plan, err := planner.New(w)
+	require.NoError(t, err)
+	assert.NotNil(t, plan)
+}
+
+func TestPlan_RetiredTakesPriorityOverUnsupported(t *testing.T) {
+	// A workflow with both a retired (retriever) and an unsupported
+	// (future_kind) node should surface the more-actionable retired-kind
+	// error first. Reasoning: retired = the customer must remove/replace
+	// the node; unsupported = the customer waits for a future release.
+	w := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "Entry", Type: dsl.ComponentEntry},
+			{ID: "Retriever", Type: dsl.ComponentRetriever},
+			{ID: "Future", Type: dsl.ComponentType("future_kind_reserved_for_test")},
 		},
 		Edges: []dsl.Edge{
 			{ID: "e1", Source: "Entry", Target: "Retriever"},
-			{ID: "e2", Source: "Entry", Target: "Agent"},
+			{ID: "e2", Source: "Entry", Target: "Future"},
 		},
 	}
 	_, err := planner.New(w)

@@ -23,11 +23,17 @@ type streamFrame struct {
 // readSSE consumes an SSE stream until done, error, or stop returns
 // true. Returns the decoded frames in order. Caller times out the
 // underlying HTTP request via http.Client.Timeout.
+//
+// Wire format (matches Python's /studio/execute):
+//
+//	data: {"type":"<name>","payload":{...}}\n\n
+//
+// frame.Event surfaces the JSON's `type`; frame.Data surfaces the
+// JSON's `payload` so test assertions stay terse.
 func readSSE(t *testing.T, r io.Reader, stop func(streamFrame) bool) []streamFrame {
 	t.Helper()
 	out := []streamFrame{}
 	br := bufio.NewReader(r)
-	var event string
 	var data string
 	for {
 		line, err := br.ReadString('\n')
@@ -40,21 +46,18 @@ func readSSE(t *testing.T, r io.Reader, stop func(streamFrame) bool) []streamFra
 		line = strings.TrimRight(line, "\r\n")
 		switch {
 		case line == "":
-			if event != "" || data != "" {
-				var d map[string]any
-				if data != "" {
-					_ = json.Unmarshal([]byte(data), &d)
-				}
-				frame := streamFrame{Event: event, Data: d}
+			if data != "" {
+				var raw map[string]any
+				_ = json.Unmarshal([]byte(data), &raw)
+				eventType, _ := raw["type"].(string)
+				payload, _ := raw["payload"].(map[string]any)
+				frame := streamFrame{Event: eventType, Data: payload}
 				out = append(out, frame)
 				if stop != nil && stop(frame) {
 					return out
 				}
-				event = ""
 				data = ""
 			}
-		case strings.HasPrefix(line, "event: "):
-			event = strings.TrimPrefix(line, "event: ")
 		case strings.HasPrefix(line, "data: "):
 			if data != "" {
 				data += "\n"
@@ -116,13 +119,14 @@ func TestStream_EmitsExecutionStateChangePerNodeThenDone(t *testing.T) {
 	frames := readSSE(t, resp.Body, func(f streamFrame) bool { return f.Event == "done" })
 
 	// Each node should appear at least once with status "running" and
-	// once with "success" (or directly success for entry).
+	// once with "success" (or directly success for entry). Wire shape:
+	// {type: "component_state_change", payload: {component_id, execution_state}}.
 	stateCount := map[string]int{}
 	for _, f := range frames {
-		if f.Event == "execution_state_change" {
-			st, _ := f.Data["state"].(map[string]any)
-			id, _ := f.Data["node_id"].(string)
-			status, _ := st["status"].(string)
+		if f.Event == "component_state_change" {
+			es, _ := f.Data["execution_state"].(map[string]any)
+			id, _ := f.Data["component_id"].(string)
+			status, _ := es["status"].(string)
 			stateCount[id+":"+status]++
 		}
 	}
@@ -130,7 +134,10 @@ func TestStream_EmitsExecutionStateChangePerNodeThenDone(t *testing.T) {
 	assert.GreaterOrEqual(t, stateCount["end:success"], 1, "end should have a success state event")
 
 	// Final frame should be done with status success and the result
-	// containing the entry's output.
+	// containing the entry's output. Done's payload still carries the
+	// Go-engine-internal {status, result, ...} since these tests assert
+	// on the full envelope; Python's done is bare but the TS Studio
+	// reducer ignores extra fields.
 	last := frames[len(frames)-1]
 	require.Equal(t, "done", last.Event)
 	assert.Equal(t, "success", last.Data["status"])
@@ -186,7 +193,7 @@ func TestStream_HeartbeatTicksDuringSlowRun(t *testing.T) {
 
 	heartbeats := 0
 	for _, f := range frames {
-		if f.Event == "is_alive" {
+		if f.Event == "is_alive_response" {
 			heartbeats++
 		}
 	}

@@ -229,27 +229,32 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 		}
 
 		for ev := range events {
-			payload := ev.Payload
-			if payload == nil {
-				payload = map[string]any{}
-			}
-			if ev.TraceID != "" {
-				payload["trace_id"] = ev.TraceID
-			}
-			writeSSE(w, flusher, ev.Type, payload)
+			writeSSE(w, flusher, ev.Type, ev.Payload)
 		}
 	}
 }
 
-// writeSSE serializes one event frame in SSE format and flushes.
-func writeSSE(w http.ResponseWriter, flusher http.Flusher, eventType string, data map[string]any) {
-	b, err := json.Marshal(data)
-	if err != nil {
-		b = []byte(`{"error":"marshal_failed"}`)
+// writeSSE serializes one event frame as
+//
+//	data: {"type":"<type>","payload":{...}}\n\n
+//
+// matching the Python /studio/execute SSE contract that Studio's TS
+// parser expects (langwatch/src/app/api/workflows/post_event/post-event.ts
+// reads only `data:` lines and JSON.parses the rest). An optional
+// `event:` line is intentionally omitted — the TS parser ignores it
+// today and emitting it confused early SSE rounds-tripping. The
+// `payload` key is omitted entirely when the event has no payload
+// (e.g. is_alive_response, done — Python's bare events).
+func writeSSE(w http.ResponseWriter, flusher http.Flusher, eventType string, payload map[string]any) {
+	frame := map[string]any{"type": eventType}
+	if len(payload) > 0 {
+		frame["payload"] = payload
 	}
-	_, _ = w.Write([]byte("event: "))
-	_, _ = w.Write([]byte(eventType))
-	_, _ = w.Write([]byte("\ndata: "))
+	b, err := json.Marshal(frame)
+	if err != nil {
+		b = []byte(`{"type":"error","payload":{"message":"marshal_failed"}}`)
+	}
+	_, _ = w.Write([]byte("data: "))
 	_, _ = w.Write(b)
 	_, _ = w.Write([]byte("\n\n"))
 	flusher.Flush()

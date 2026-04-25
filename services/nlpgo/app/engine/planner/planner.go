@@ -21,6 +21,8 @@ var supportedKinds = map[dsl.ComponentType]struct{}{
 	dsl.ComponentCode:               {},
 	dsl.ComponentHTTP:               {},
 	dsl.ComponentPromptingTechnique: {},
+	dsl.ComponentEvaluator:          {},
+	dsl.ComponentAgent:              {},
 }
 
 // Plan is the result of validating + topologically sorting a workflow.
@@ -78,8 +80,8 @@ func (e *UnsupportedNodeKindError) Error() string {
 // inside signature nodes; `custom` was historically a placeholder
 // kind that never had a real executor.
 var retiredKinds = map[dsl.ComponentType]string{
-	dsl.ComponentType("retriever"): "retriever was retired; remove the node from the workflow",
-	dsl.ComponentType("custom"):    "custom node kind is not supported; replace with code/http/agent/signature/evaluator",
+	dsl.ComponentRetriever: "retriever was retired; remove the node from the workflow",
+	dsl.ComponentCustom:    "custom node kind is not supported; replace with code/http/agent/signature/evaluator",
 }
 
 // RetiredNodeKindError signals the workflow contains a node kind that

@@ -1,6 +1,7 @@
 import { captureException } from "~/utils/posthogErrorCapture";
 import { getS3CacheKey } from "../../../../optimization_studio/server/addEnvs";
 import { invokeLambda } from "../../../../optimization_studio/server/lambda";
+import { isNlpGoEnabled } from "~/server/nlpgo/nlpgoFetch";
 import type {
   StudioClientEvent,
   StudioServerEvent,
@@ -8,6 +9,18 @@ import type {
 import { createLogger } from "../../../../utils/logger/server";
 
 const logger = createLogger("langwatch:post_event");
+
+/** Event types the Go engine handles natively. Others (is_alive,
+ *  stop_execution, execute_optimization) keep going to the Python sidecar
+ *  even when the FF is on — `is_alive` and `stop_execution` are
+ *  Studio-control plumbing that hasn't been ported yet, and
+ *  `execute_optimization` is intentionally rejected at the route layer
+ *  with a 410 (DSPy is gone). */
+const GO_ENGINE_EVENT_TYPES = new Set([
+  "execute_flow",
+  "execute_component",
+  "execute_evaluation",
+]);
 
 export const studioBackendPostEvent = async ({
   projectId,
@@ -25,7 +38,14 @@ export const studioBackendPostEvent = async ({
   try {
     const s3CacheKey = getS3CacheKey(projectId);
 
-    reader = await invokeLambda(projectId, message, s3CacheKey);
+    const goEnabled =
+      GO_ENGINE_EVENT_TYPES.has(message.type) &&
+      (await isNlpGoEnabled({ projectId }));
+
+    reader = await invokeLambda(projectId, message, s3CacheKey, {
+      path: goEnabled ? "/go/studio/execute" : "/studio/execute",
+      headers: goEnabled ? { "X-LangWatch-Origin": "workflow" } : undefined,
+    });
   } catch (error) {
     if (
       (error as any)?.cause?.code === "ECONNREFUSED" ||

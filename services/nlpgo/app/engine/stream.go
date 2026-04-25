@@ -113,8 +113,9 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 	wg.Wait()
 }
 
-// heartbeat emits is_alive frames at the given interval until ctx is
-// done. Skipped silently when the run completes faster than one tick.
+// heartbeat emits is_alive_response frames at the given interval until
+// ctx is done. Skipped silently when the run completes faster than one
+// tick. The type matches Python's StudioServerEvent union.
 func heartbeat(ctx context.Context, traceID string, every time.Duration, out chan<- StreamEvent) {
 	t := time.NewTicker(every)
 	defer t.Stop()
@@ -123,7 +124,7 @@ func heartbeat(ctx context.Context, traceID string, every time.Duration, out cha
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			emit(out, StreamEvent{Type: "is_alive", TraceID: traceID})
+			emit(out, StreamEvent{Type: "is_alive_response", TraceID: traceID})
 		}
 	}
 }
@@ -132,7 +133,7 @@ func heartbeat(ctx context.Context, traceID string, every time.Duration, out cha
 // slow) and a blocking send for everything else (state changes are
 // load-bearing — never drop).
 func emit(out chan<- StreamEvent, ev StreamEvent) {
-	if ev.Type == "is_alive" {
+	if ev.Type == "is_alive_response" {
 		select {
 		case out <- ev:
 		default:
@@ -142,13 +143,43 @@ func emit(out chan<- StreamEvent, ev StreamEvent) {
 	out <- ev
 }
 
+// stateEvent wraps a per-node update in the Python-aligned
+// `component_state_change` envelope that the Studio TS parser expects:
+//
+//	{type: "component_state_change",
+//	 payload: {component_id: <id>, execution_state: <ExecutionState>}}
+//
+// We project NodeState onto Python's ExecutionState shape so all
+// downstream consumers (Studio reducer, Sentry capture, etc.) see one
+// schema regardless of which engine produced the event.
 func stateEvent(traceID, nodeID string, ns *NodeState) StreamEvent {
+	es := map[string]any{"status": ns.Status}
+	if ns.Inputs != nil {
+		es["inputs"] = ns.Inputs
+	}
+	if ns.Outputs != nil {
+		es["outputs"] = ns.Outputs
+	}
+	if ns.Cost > 0 {
+		es["cost"] = ns.Cost
+	}
+	if ns.Error != nil {
+		es["error"] = ns.Error.Message
+	}
+	if ns.DurationMS > 0 {
+		// Python emits `timestamps.{started_at, finished_at}` — we don't
+		// track absolute clock-times in NodeState yet, so emit a single
+		// finished_at = now and leave started_at to the running event.
+		es["timestamps"] = map[string]any{
+			"finished_at": time.Now().UnixMilli(),
+		}
+	}
 	return StreamEvent{
-		Type:    "execution_state_change",
+		Type:    "component_state_change",
 		TraceID: traceID,
 		Payload: map[string]any{
-			"node_id": nodeID,
-			"state":   ns,
+			"component_id":    nodeID,
+			"execution_state": es,
 		},
 	}
 }
