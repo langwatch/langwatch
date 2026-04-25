@@ -62,6 +62,27 @@ export type ScopeSpend = {
   spentUsd: string;
 };
 
+/**
+ * Read-shape for ledger events. Mirrors the columns previously read off
+ * the PG `GatewayBudgetLedger` table, scoped to whatever the caller needs
+ * (one VK, one budget, or all VKs in a project). All fields use the same
+ * names as the equivalent Prisma row so call sites can be migrated with
+ * minimal shape juggling.
+ */
+export type LedgerEventRow = {
+  id: string; // GatewayRequestId — unique within (tenant, budget)
+  budgetId: string;
+  virtualKeyId: string;
+  amountUsd: string; // Decimal-as-string
+  model: string;
+  providerSlot: string | null;
+  tokensInput: number;
+  tokensOutput: number;
+  durationMs: number | null;
+  status: GatewayBudgetLedgerStatus;
+  occurredAt: Date;
+};
+
 export class GatewayBudgetClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
@@ -249,6 +270,156 @@ export class GatewayBudgetClickHouseRepository {
           spentUsd: "0",
         },
     );
+  }
+
+  /**
+   * Most recent ledger events for a single budget, ordered by `OccurredAt`
+   * descending. Used by the budget detail page to render the recent-activity
+   * panel (post-cutover replacement for `prisma.gatewayBudgetLedger.findMany`
+   * in budget.service.ts:getDetail).
+   */
+  async recentEventsForBudget(
+    tenantId: string,
+    budgetId: string,
+    limit = 20,
+  ): Promise<LedgerEventRow[]> {
+    const client = await this.resolveClient(tenantId);
+    const result = await client.query({
+      query: `
+        SELECT
+          GatewayRequestId AS id,
+          BudgetId AS budgetId,
+          VirtualKeyId AS virtualKeyId,
+          toString(AmountUSD) AS amountUsd,
+          Model AS model,
+          ProviderSlot AS providerSlot,
+          TokensInput AS tokensInput,
+          TokensOutput AS tokensOutput,
+          DurationMS AS durationMs,
+          Status AS status,
+          toUnixTimestamp64Milli(OccurredAt) AS occurredAtMs
+        FROM ${EVENTS_TABLE}
+        WHERE TenantId = {tenantId:String}
+          AND BudgetId = {budgetId:String}
+        ORDER BY OccurredAt DESC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: { tenantId, budgetId, limit },
+      format: "JSONEachRow",
+    });
+    type Row = Omit<LedgerEventRow, "occurredAt" | "status"> & {
+      occurredAtMs: string;
+      status: string;
+    };
+    const rows = (await result.json()) as Row[];
+    return rows.map(toLedgerEventRow);
+  }
+
+  /**
+   * Ledger events for a set of virtual keys within a time window.
+   * Used by the project-wide gateway usage page (post-cutover replacement
+   * for `prisma.gatewayBudgetLedger.findMany` in usage.service.ts:summary).
+   *
+   * Note: a single completion that triggers N applicable budgets produces
+   * N ledger rows (one per budget). This matches the pre-cutover PG
+   * semantics — callers that want per-request semantics need to dedup
+   * by `id` (GatewayRequestId) themselves.
+   */
+  async eventsForVirtualKeys(
+    tenantId: string,
+    virtualKeyIds: string[],
+    fromDate: Date,
+    toDate: Date,
+  ): Promise<LedgerEventRow[]> {
+    if (virtualKeyIds.length === 0) return [];
+    const client = await this.resolveClient(tenantId);
+    const params: Record<string, string | number> = {
+      tenantId,
+      from: fromDate.getTime(),
+      to: toDate.getTime(),
+    };
+    const placeholders = virtualKeyIds
+      .map((id, i) => {
+        params[`vk${i}`] = id;
+        return `{vk${i}:String}`;
+      })
+      .join(",");
+    const result = await client.query({
+      query: `
+        SELECT
+          GatewayRequestId AS id,
+          BudgetId AS budgetId,
+          VirtualKeyId AS virtualKeyId,
+          toString(AmountUSD) AS amountUsd,
+          Model AS model,
+          ProviderSlot AS providerSlot,
+          TokensInput AS tokensInput,
+          TokensOutput AS tokensOutput,
+          DurationMS AS durationMs,
+          Status AS status,
+          toUnixTimestamp64Milli(OccurredAt) AS occurredAtMs
+        FROM ${EVENTS_TABLE}
+        WHERE TenantId = {tenantId:String}
+          AND VirtualKeyId IN (${placeholders})
+          AND OccurredAt >= fromUnixTimestamp64Milli({from:Int64})
+          AND OccurredAt <  fromUnixTimestamp64Milli({to:Int64})
+        ORDER BY OccurredAt DESC
+      `,
+      query_params: params,
+      format: "JSONEachRow",
+    });
+    type Row = Omit<LedgerEventRow, "occurredAt" | "status"> & {
+      occurredAtMs: string;
+      status: string;
+    };
+    const rows = (await result.json()) as Row[];
+    return rows.map(toLedgerEventRow);
+  }
+}
+
+function toLedgerEventRow(r: {
+  id: string;
+  budgetId: string;
+  virtualKeyId: string;
+  amountUsd: string;
+  model: string;
+  providerSlot: string | null;
+  tokensInput: number;
+  tokensOutput: number;
+  durationMs: number | null;
+  status: string;
+  occurredAtMs: string;
+}): LedgerEventRow {
+  return {
+    id: r.id,
+    budgetId: r.budgetId,
+    virtualKeyId: r.virtualKeyId,
+    amountUsd: r.amountUsd,
+    model: r.model,
+    providerSlot: r.providerSlot && r.providerSlot !== "" ? r.providerSlot : null,
+    tokensInput: Number(r.tokensInput),
+    tokensOutput: Number(r.tokensOutput),
+    durationMs:
+      r.durationMs === null || r.durationMs === undefined || Number(r.durationMs) === 0
+        ? null
+        : Number(r.durationMs),
+    status: ledgerStatusFromCH(r.status),
+    occurredAt: new Date(Number(r.occurredAtMs)),
+  };
+}
+
+function ledgerStatusFromCH(raw: string): GatewayBudgetLedgerStatus {
+  switch (raw.toLowerCase()) {
+    case "success":
+      return "SUCCESS";
+    case "provider_error":
+      return "PROVIDER_ERROR";
+    case "blocked_by_guardrail":
+      return "BLOCKED_BY_GUARDRAIL";
+    case "cancelled":
+      return "CANCELLED";
+    default:
+      return "SUCCESS";
   }
 }
 

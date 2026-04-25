@@ -19,7 +19,6 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import { loggerMiddleware } from "~/app/api/middleware/logger";
 import { tracerMiddleware } from "~/app/api/middleware/tracer";
-import { Prisma as PrismaNs } from "@prisma/client";
 import { createLogger } from "~/utils/logger/server";
 
 import { prisma } from "~/server/db";
@@ -27,11 +26,6 @@ import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
 } from "~/server/clickhouse/clickhouseClient";
-import { getMatchingLLMModelCost } from "~/server/background/workers/collector/cost";
-import {
-  GatewayBudgetRepository,
-  type DebitLineItem,
-} from "~/server/gateway/budget.repository";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { ChangeEventRepository } from "~/server/gateway/changeEvent.repository";
@@ -555,192 +549,13 @@ app.post("/budget/check", async (c) => {
   );
 });
 
-/**
- * §4.5 — idempotent post-response debit. Outbox pattern on the platform side;
- * gateway POSTs fire-and-forget with at-least-once retry keyed by
- * `gateway_request_id` (24h dedup window).
- *
- * Request:  { gateway_request_id, vk_id, actual_cost_micro_usd, tokens, model, ... }
- * Response: { deduped, budgets: [{scope, remaining_usd, spent_usd}, ...] }
- */
-app.post("/budget/debit", async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as {
-    gateway_request_id?: string;
-    vk_id?: string;
-    actual_cost_micro_usd?: number | string;
-    tokens?: {
-      input?: number;
-      output?: number;
-      cache_read?: number;
-      cache_write?: number;
-    };
-    model?: string;
-    provider_slot?: string | null;
-    duration_ms?: number | null;
-    status?: string;
-  };
-
-  if (!body.gateway_request_id || !body.vk_id || !body.model) {
-    return c.json(
-      {
-        error: {
-          type: "bad_request",
-          code: "missing_required_fields",
-          message: "gateway_request_id, vk_id, and model are required",
-        },
-      },
-      400,
-    );
-  }
-
-  const vk = await prisma.virtualKey.findUnique({
-    where: { id: body.vk_id },
-  });
-  if (!vk) {
-    return c.json(
-      {
-        error: {
-          type: "invalid_api_key",
-          code: "virtual_key_not_found",
-          message: "unknown virtual key",
-        },
-      },
-      404,
-    );
-  }
-  const project = await prisma.project.findUnique({
-    where: { id: vk.projectId },
-    include: { team: true },
-  });
-  if (!project) {
-    return c.json(
-      {
-        error: {
-          type: "internal_error",
-          code: "project_orphaned",
-          message: "virtual key references missing project",
-        },
-      },
-      500,
-    );
-  }
-
-  const status = normaliseDebitStatus(body.status);
-  // Gateway sends actual_cost_micro_usd (microdollars, 1/1_000_000 USD).
-  // Typically 0 — control-plane recomputes from tokens × pricing catalog.
-  // Non-zero is trusted (blocked_by_guardrail sends 0; no provider call).
-  const wireMicroUSD =
-    typeof body.actual_cost_micro_usd === "number"
-      ? body.actual_cost_micro_usd
-      : typeof body.actual_cost_micro_usd === "string"
-        ? Number.parseInt(body.actual_cost_micro_usd, 10) || 0
-        : 0;
-  const wireAmount = wireMicroUSD / 1_000_000;
-
-  let computedAmount = wireAmount;
-  if (wireAmount === 0 && status === "SUCCESS" && body.model) {
-    const pricing = await getMatchingLLMModelCost(project.id, body.model);
-    if (pricing) {
-      // Deduct cache-read tokens from input at 50% discount — mirrors how
-      // analytics/cost-enrichment computes spend on traces. Anthropic +
-      // Bedrock charge cache-write at ~125%; pricing catalog already
-      // blended that into the published inputCostPerToken.
-      const inputTokens = body.tokens?.input ?? 0;
-      const outputTokens = body.tokens?.output ?? 0;
-      const cacheReadTokens = body.tokens?.cache_read ?? 0;
-      const billableInput = Math.max(0, inputTokens - cacheReadTokens);
-      const inputCost =
-        (pricing.inputCostPerToken ?? 0) * billableInput +
-        (pricing.inputCostPerToken ?? 0) * 0.5 * cacheReadTokens;
-      const outputCost = (pricing.outputCostPerToken ?? 0) * outputTokens;
-      computedAmount = inputCost + outputCost;
-    } else {
-      logger.warn(
-        { model: body.model, projectId: project.id },
-        "no pricing catalog match for model — debit stored at 0 USD",
-      );
-    }
-  }
-
-  const amount = new PrismaNs.Decimal(computedAmount);
-  const repo = new GatewayBudgetRepository(prisma);
-
-  const lines: DebitLineItem[] = await prisma.$transaction(async (tx) => {
-    const applicable = await repo.applicableForRequest(
-      {
-        organizationId: project.team.organizationId,
-        teamId: project.teamId,
-        projectId: project.id,
-        virtualKeyId: vk.id,
-        principalUserId: vk.principalUserId,
-      },
-      tx,
-    );
-
-    const out: DebitLineItem[] = [];
-    for (const budget of applicable) {
-      out.push(
-        await repo.debit(
-          {
-            budget,
-            gatewayRequestId: body.gateway_request_id!,
-            virtualKeyId: vk.id,
-            providerCredentialId: null,
-            amountUsd: amount,
-            tokensInput: body.tokens?.input ?? 0,
-            tokensOutput: body.tokens?.output ?? 0,
-            tokensCacheRead: body.tokens?.cache_read ?? 0,
-            tokensCacheWrite: body.tokens?.cache_write ?? 0,
-            model: body.model!,
-            providerSlot: body.provider_slot ?? null,
-            durationMs: body.duration_ms ?? null,
-            status,
-          },
-          tx,
-        ),
-      );
-    }
-    return out;
-  });
-
-  const anyDeduped = lines.some((l) => l.deduped);
-  return c.json(
-    {
-      deduped: anyDeduped && lines.every((l) => l.deduped),
-      budgets: lines.map((l) => ({
-        budget_id: l.budgetId,
-        scope: l.scope.toLowerCase(),
-        scope_id: l.scopeId,
-        limit_usd: l.limitUsd,
-        spent_usd: l.spentUsd,
-        remaining_usd: l.remainingUsd,
-        deduped: l.deduped,
-      })),
-    },
-    200,
-  );
-});
-
-function normaliseDebitStatus(
-  raw: string | undefined,
-):
-  | "SUCCESS"
-  | "PROVIDER_ERROR"
-  | "BLOCKED_BY_GUARDRAIL"
-  | "CANCELLED" {
-  switch ((raw ?? "").toLowerCase()) {
-    case "success":
-      return "SUCCESS";
-    case "provider_error":
-      return "PROVIDER_ERROR";
-    case "blocked_by_guardrail":
-      return "BLOCKED_BY_GUARDRAIL";
-    case "cancelled":
-      return "CANCELLED";
-    default:
-      return "SUCCESS";
-  }
-}
+// §4.5 — `/budget/debit` is removed. Cost recording is now driven by the
+// trace-fold reactor on the trace-processing pipeline
+// (langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/
+// gatewayBudgetSync.reactor.ts), which folds OTel span usage attributes
+// into the ClickHouse `gateway_budget_ledger_events` table. Single source
+// of truth, no PG dual-write — see CLAUDE.md & the migration
+// 00017_create_gateway_budget_ledger.sql for the CH schema.
 
 /**
  * §4.6 — inline guardrail pipeline.

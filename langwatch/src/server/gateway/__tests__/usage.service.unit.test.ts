@@ -1,28 +1,50 @@
-import { Prisma, type PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
+import type {
+  GatewayBudgetClickHouseRepository,
+  LedgerEventRow,
+} from "../budget.clickhouse.repository";
 import { GatewayUsageService } from "../usage.service";
 
-type LedgerStub = {
-  virtualKeyId: string;
-  amountUsd: Prisma.Decimal;
-  model: string;
-  status: "SUCCESS" | "PROVIDER_ERROR" | "BLOCKED_BY_GUARDRAIL" | "CANCELLED";
-  occurredAt: Date;
-};
+type EventStub = Pick<
+  LedgerEventRow,
+  "virtualKeyId" | "amountUsd" | "model" | "status" | "occurredAt"
+>;
 
 function mockPrisma(
   virtualKeys: Array<{ id: string; name: string; displayPrefix: string }>,
-  ledger: LedgerStub[],
 ): PrismaClient {
   return {
     virtualKey: {
       findMany: async () => virtualKeys,
-    },
-    gatewayBudgetLedger: {
-      findMany: async () => ledger,
+      findFirst: async ({
+        where,
+      }: {
+        where: { id: string; projectId: string };
+      }) =>
+        virtualKeys.some((v) => v.id === where.id) ? { id: where.id } : null,
     },
   } as unknown as PrismaClient;
+}
+
+function mockChRepo(events: EventStub[]): GatewayBudgetClickHouseRepository {
+  const fullEvents: LedgerEventRow[] = events.map((e, i) => ({
+    id: `evt_${i}`,
+    budgetId: "budget_test",
+    virtualKeyId: e.virtualKeyId,
+    amountUsd: e.amountUsd,
+    model: e.model,
+    providerSlot: null,
+    tokensInput: 0,
+    tokensOutput: 0,
+    durationMs: null,
+    status: e.status,
+    occurredAt: e.occurredAt,
+  }));
+  return {
+    eventsForVirtualKeys: async () => fullEvents,
+  } as unknown as GatewayBudgetClickHouseRepository;
 }
 
 const window = {
@@ -33,7 +55,7 @@ const window = {
 describe("GatewayUsageService.summary", () => {
   describe("when the project has no virtual keys", () => {
     it("short-circuits with an empty summary (no ledger read)", async () => {
-      const sut = GatewayUsageService.create(mockPrisma([], []));
+      const sut = GatewayUsageService.create(mockPrisma([]), mockChRepo([]));
       const result = await sut.summary("proj_01", window);
       expect(result).toEqual({
         totalUsd: "0.000000",
@@ -50,35 +72,33 @@ describe("GatewayUsageService.summary", () => {
   describe("when a project has ledger entries", () => {
     it("aggregates by VK, model, and day with sorted top-10", async () => {
       const sut = GatewayUsageService.create(
-        mockPrisma(
-          [
-            { id: "vk_01", name: "prod-openai", displayPrefix: "lw_abc" },
-            { id: "vk_02", name: "prod-anthropic", displayPrefix: "lw_def" },
-          ],
-          [
-            {
-              virtualKeyId: "vk_01",
-              amountUsd: new Prisma.Decimal("1.00"),
-              model: "gpt-5-mini",
-              status: "SUCCESS",
-              occurredAt: new Date("2026-04-15T10:00:00Z"),
-            },
-            {
-              virtualKeyId: "vk_01",
-              amountUsd: new Prisma.Decimal("2.00"),
-              model: "gpt-5-mini",
-              status: "SUCCESS",
-              occurredAt: new Date("2026-04-16T10:00:00Z"),
-            },
-            {
-              virtualKeyId: "vk_02",
-              amountUsd: new Prisma.Decimal("0.50"),
-              model: "claude-haiku",
-              status: "SUCCESS",
-              occurredAt: new Date("2026-04-15T10:00:00Z"),
-            },
-          ],
-        ),
+        mockPrisma([
+          { id: "vk_01", name: "prod-openai", displayPrefix: "lw_abc" },
+          { id: "vk_02", name: "prod-anthropic", displayPrefix: "lw_def" },
+        ]),
+        mockChRepo([
+          {
+            virtualKeyId: "vk_01",
+            amountUsd: "1.00",
+            model: "gpt-5-mini",
+            status: "SUCCESS",
+            occurredAt: new Date("2026-04-15T10:00:00Z"),
+          },
+          {
+            virtualKeyId: "vk_01",
+            amountUsd: "2.00",
+            model: "gpt-5-mini",
+            status: "SUCCESS",
+            occurredAt: new Date("2026-04-16T10:00:00Z"),
+          },
+          {
+            virtualKeyId: "vk_02",
+            amountUsd: "0.50",
+            model: "claude-haiku",
+            status: "SUCCESS",
+            occurredAt: new Date("2026-04-15T10:00:00Z"),
+          },
+        ]),
       );
 
       const result = await sut.summary("proj_01", window);
@@ -101,25 +121,23 @@ describe("GatewayUsageService.summary", () => {
   describe("blocked-by-guardrail tally", () => {
     it("counts rows with status BLOCKED_BY_GUARDRAIL separately from totalRequests", async () => {
       const sut = GatewayUsageService.create(
-        mockPrisma(
-          [{ id: "vk_01", name: "prod", displayPrefix: "lw_abc" }],
-          [
-            {
-              virtualKeyId: "vk_01",
-              amountUsd: new Prisma.Decimal("0.00"),
-              model: "gpt-5-mini",
-              status: "BLOCKED_BY_GUARDRAIL",
-              occurredAt: new Date("2026-04-15T10:00:00Z"),
-            },
-            {
-              virtualKeyId: "vk_01",
-              amountUsd: new Prisma.Decimal("1.00"),
-              model: "gpt-5-mini",
-              status: "SUCCESS",
-              occurredAt: new Date("2026-04-15T11:00:00Z"),
-            },
-          ],
-        ),
+        mockPrisma([{ id: "vk_01", name: "prod", displayPrefix: "lw_abc" }]),
+        mockChRepo([
+          {
+            virtualKeyId: "vk_01",
+            amountUsd: "0.00",
+            model: "gpt-5-mini",
+            status: "BLOCKED_BY_GUARDRAIL",
+            occurredAt: new Date("2026-04-15T10:00:00Z"),
+          },
+          {
+            virtualKeyId: "vk_01",
+            amountUsd: "1.00",
+            model: "gpt-5-mini",
+            status: "SUCCESS",
+            occurredAt: new Date("2026-04-15T11:00:00Z"),
+          },
+        ]),
       );
       const result = await sut.summary("proj_01", window);
       expect(result.totalRequests).toBe(2);
@@ -130,10 +148,8 @@ describe("GatewayUsageService.summary", () => {
   describe("avgUsdPerRequest", () => {
     it("is exactly 0 when there are no requests", async () => {
       const sut = GatewayUsageService.create(
-        mockPrisma(
-          [{ id: "vk_01", name: "prod", displayPrefix: "lw_abc" }],
-          [],
-        ),
+        mockPrisma([{ id: "vk_01", name: "prod", displayPrefix: "lw_abc" }]),
+        mockChRepo([]),
       );
       const result = await sut.summary("proj_01", window);
       expect(result.avgUsdPerRequest).toBe("0.000000");
@@ -141,25 +157,23 @@ describe("GatewayUsageService.summary", () => {
 
     it("is totalUsd / totalRequests to 6 decimals", async () => {
       const sut = GatewayUsageService.create(
-        mockPrisma(
-          [{ id: "vk_01", name: "prod", displayPrefix: "lw_abc" }],
-          [
-            {
-              virtualKeyId: "vk_01",
-              amountUsd: new Prisma.Decimal("1.234567"),
-              model: "x",
-              status: "SUCCESS",
-              occurredAt: new Date("2026-04-15T10:00:00Z"),
-            },
-            {
-              virtualKeyId: "vk_01",
-              amountUsd: new Prisma.Decimal("2.345678"),
-              model: "x",
-              status: "SUCCESS",
-              occurredAt: new Date("2026-04-15T10:00:00Z"),
-            },
-          ],
-        ),
+        mockPrisma([{ id: "vk_01", name: "prod", displayPrefix: "lw_abc" }]),
+        mockChRepo([
+          {
+            virtualKeyId: "vk_01",
+            amountUsd: "1.234567",
+            model: "x",
+            status: "SUCCESS",
+            occurredAt: new Date("2026-04-15T10:00:00Z"),
+          },
+          {
+            virtualKeyId: "vk_01",
+            amountUsd: "2.345678",
+            model: "x",
+            status: "SUCCESS",
+            occurredAt: new Date("2026-04-15T10:00:00Z"),
+          },
+        ]),
       );
       const result = await sut.summary("proj_01", window);
       expect(result.avgUsdPerRequest).toBe("1.790123");

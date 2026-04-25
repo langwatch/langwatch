@@ -1,7 +1,32 @@
 import { Prisma, type GatewayBudget, type PrismaClient } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
+import type {
+  GatewayBudgetClickHouseRepository,
+  LedgerEventRow,
+} from "../budget.clickhouse.repository";
 import { GatewayBudgetService } from "../budget.service";
+
+function mockChRepoWithEvents(
+  events: Array<Partial<LedgerEventRow> & Pick<LedgerEventRow, "id">>,
+): GatewayBudgetClickHouseRepository {
+  const fullEvents: LedgerEventRow[] = events.map((e) => ({
+    id: e.id,
+    budgetId: e.budgetId ?? "b_01",
+    virtualKeyId: e.virtualKeyId ?? "vk_test",
+    amountUsd: e.amountUsd ?? "0",
+    model: e.model ?? "gpt-5-mini",
+    providerSlot: e.providerSlot ?? null,
+    tokensInput: e.tokensInput ?? 0,
+    tokensOutput: e.tokensOutput ?? 0,
+    durationMs: e.durationMs ?? null,
+    status: e.status ?? "SUCCESS",
+    occurredAt: e.occurredAt ?? new Date(),
+  }));
+  return {
+    recentEventsForBudget: async () => fullEvents,
+  } as unknown as GatewayBudgetClickHouseRepository;
+}
 
 function stubBudget(overrides: Partial<GatewayBudget> = {}): GatewayBudget {
   return {
@@ -287,6 +312,7 @@ describe("GatewayBudgetService.getDetail", () => {
       },
       virtualKey: {
         findUnique: vi.fn(async () => scopeRow),
+        findMany: vi.fn(async () => []),
       },
       user: {
         findUnique: vi.fn(async () => scopeRow),
@@ -402,8 +428,8 @@ describe("GatewayBudgetService.getDetail", () => {
         mockPrismaWithDetail(
           stubBudget(),
           { name: "Proj", slug: "proj" },
-          [{ id: "l_01", occurredAt: new Date() }],
         ),
+        mockChRepoWithEvents([{ id: "l_01" }]),
       );
       const detail = await sut.getDetail("b_01", "org_01");
       expect(detail?.recentLedger).toHaveLength(1);

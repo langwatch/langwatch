@@ -1,14 +1,16 @@
 /**
- * Aggregate read-side queries over the GatewayBudgetLedger. Groups spend by
- * scope, time bucket, and principal so the /gateway/usage UI can render
+ * Aggregate read-side queries over the gateway budget ledger. Groups spend
+ * by scope, time bucket, and principal so the /gateway/usage UI can render
  * governance-grade reporting without pushing raw rows to the browser.
  *
- * These queries are read-only and take a time window. They do NOT consult
- * the budget table's current `spentUsd` — that column is the point-in-time
- * remaining-budget cache, not historical spend. Historical spend always
- * comes from the ledger.
+ * Source of truth (post iter-111 cutover): the CH
+ * `gateway_budget_ledger_events` table, populated by the trace-fold reactor.
+ * Reads go through `GatewayBudgetClickHouseRepository`; the legacy PG
+ * GatewayBudgetLedger has no live data and will be dropped in a follow-up.
  */
 import { Prisma, type PrismaClient } from "@prisma/client";
+
+import type { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 
 export type UsageWindow = { fromDate: Date; toDate: Date };
 
@@ -59,10 +61,16 @@ export type VirtualKeyUsageSummary = {
 };
 
 export class GatewayUsageService {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly chRepo?: GatewayBudgetClickHouseRepository,
+  ) {}
 
-  static create(prisma: PrismaClient): GatewayUsageService {
-    return new GatewayUsageService(prisma);
+  static create(
+    prisma: PrismaClient,
+    chRepo?: GatewayBudgetClickHouseRepository,
+  ): GatewayUsageService {
+    return new GatewayUsageService(prisma, chRepo);
   }
 
   async summary(
@@ -74,23 +82,18 @@ export class GatewayUsageService {
       select: { id: true, name: true, displayPrefix: true },
     });
     const vkIds = virtualKeys.map((v) => v.id);
-    if (vkIds.length === 0) {
+    if (vkIds.length === 0 || !this.chRepo) {
       return emptySummary();
     }
 
-    const ledger = await this.prisma.gatewayBudgetLedger.findMany({
-      where: {
-        virtualKeyId: { in: vkIds },
-        occurredAt: { gte: window.fromDate, lt: window.toDate },
-      },
-      select: {
-        virtualKeyId: true,
-        amountUsd: true,
-        model: true,
-        status: true,
-        occurredAt: true,
-      },
-    });
+    // Project-scoped CH read: TenantId is projectId in the ledger events
+    // table (matches how the trace-fold reactor writes them).
+    const ledger = await this.chRepo.eventsForVirtualKeys(
+      projectId,
+      vkIds,
+      window.fromDate,
+      window.toDate,
+    );
 
     const byVk = new Map<
       string,
@@ -176,28 +179,16 @@ export class GatewayUsageService {
       where: { id: virtualKeyId, projectId },
       select: { id: true },
     });
-    if (!vk) {
+    if (!vk || !this.chRepo) {
       return emptyVkSummary();
     }
 
-    const ledger = await this.prisma.gatewayBudgetLedger.findMany({
-      where: {
-        virtualKeyId,
-        occurredAt: { gte: window.fromDate, lt: window.toDate },
-      },
-      select: {
-        id: true,
-        amountUsd: true,
-        model: true,
-        providerSlot: true,
-        tokensInput: true,
-        tokensOutput: true,
-        durationMs: true,
-        status: true,
-        occurredAt: true,
-      },
-      orderBy: { occurredAt: "desc" },
-    });
+    const ledger = await this.chRepo.eventsForVirtualKeys(
+      projectId,
+      [virtualKeyId],
+      window.fromDate,
+      window.toDate,
+    );
 
     const byModel = new Map<
       string,
@@ -263,7 +254,7 @@ export class GatewayUsageService {
 function bumpBucket(
   map: Map<string, { totalUsd: Prisma.Decimal; requests: number }>,
   key: string,
-  amount: Prisma.Decimal,
+  amount: Prisma.Decimal | string,
 ) {
   const existing = map.get(key);
   if (existing) {

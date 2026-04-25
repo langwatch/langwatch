@@ -209,25 +209,75 @@ export class GatewayBudgetService {
     const budget = await this.get(id, organizationId);
     if (!budget) return null;
 
-    const [scopeTarget, recentLedger] = await Promise.all([
-      this.resolveScopeTarget(budget),
-      this.prisma.gatewayBudgetLedger.findMany({
-        where: { budgetId: budget.id },
-        orderBy: { occurredAt: "desc" },
-        take: 20,
-        select: {
-          id: true,
-          virtualKeyId: true,
-          amountUsd: true,
-          model: true,
-          status: true,
-          occurredAt: true,
-          virtualKey: { select: { name: true, displayPrefix: true } },
-        },
-      }),
-    ]);
+    const scopeTarget = await this.resolveScopeTarget(budget);
+
+    // Recent ledger entries come from ClickHouse
+    // (gateway_budget_ledger_events). The CH events table doesn't carry
+    // the VK name/displayPrefix fields, so we resolve those via a
+    // single Prisma round-trip on the distinct VK ids in the slice.
+    let recentLedger: BudgetDetail["recentLedger"] = [];
+    if (this.chRepo) {
+      const tenantId = await this.resolveTenantIdForBudget(budget);
+      const events = tenantId
+        ? await this.chRepo.recentEventsForBudget(tenantId, budget.id, 20)
+        : [];
+      const vkIds = Array.from(new Set(events.map((e) => e.virtualKeyId)));
+      const vks = vkIds.length
+        ? await this.prisma.virtualKey.findMany({
+            where: { id: { in: vkIds } },
+            select: { id: true, name: true, displayPrefix: true },
+          })
+        : [];
+      const vkById = new Map(vks.map((v) => [v.id, v]));
+      recentLedger = events.map((e) => ({
+        id: e.id,
+        virtualKeyId: e.virtualKeyId,
+        amountUsd: new Prisma.Decimal(e.amountUsd),
+        model: e.model,
+        status: e.status,
+        occurredAt: e.occurredAt,
+        virtualKey: vkById.get(e.virtualKeyId)
+          ? {
+              name: vkById.get(e.virtualKeyId)!.name,
+              displayPrefix: vkById.get(e.virtualKeyId)!.displayPrefix,
+            }
+          : null,
+      }));
+    }
 
     return { budget, scopeTarget, recentLedger };
+  }
+
+  /**
+   * Resolve the projectId that the ClickHouse client should be scoped to
+   * when reading ledger events for `budget`. Tenant resolution mirrors the
+   * trace-fold reactor's logic: the events table is sharded on
+   * `TenantId = projectId` so only org/team/project/VK-scoped budgets
+   * have a meaningful tenant; principal-scoped budgets cross projects
+   * and we return null (no ledger lookup).
+   */
+  private async resolveTenantIdForBudget(
+    budget: GatewayBudget,
+  ): Promise<string | null> {
+    switch (budget.scopeType) {
+      case "PROJECT":
+        return budget.scopeId;
+      case "VIRTUAL_KEY": {
+        const vk = await this.prisma.virtualKey.findUnique({
+          where: { id: budget.scopeId },
+          select: { projectId: true },
+        });
+        return vk?.projectId ?? null;
+      }
+      case "ORGANIZATION":
+      case "TEAM":
+        // Org/team budgets span multiple projects → no single CH tenant
+        // to query. Recent-ledger panel is empty for these scopes until a
+        // future iteration teaches the repo to fan out across projects.
+        return null;
+      case "PRINCIPAL":
+        return null;
+    }
   }
 
   private async resolveScopeTarget(

@@ -9,10 +9,28 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import {
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 
 import { checkOrganizationPermission, checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+function chRepoOrUndefined() {
+  if (!isClickHouseEnabled()) return undefined;
+  return new GatewayBudgetClickHouseRepository(async (projectId) => {
+    const client = await getClickHouseClientForProject(projectId);
+    if (!client) {
+      throw new Error(
+        `ClickHouse enabled but no client for project ${projectId}`,
+      );
+    }
+    return client;
+  });
+}
 
 const scopeSchema = z.discriminatedUnion("kind", [
   z.object({
@@ -46,7 +64,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .use(checkOrganizationPermission("gatewayBudgets:view"))
     .query(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
-      const service = GatewayBudgetService.create(ctx.prisma);
+      const service = GatewayBudgetService.create(ctx.prisma, chRepoOrUndefined());
       const rows = await service.list(input.organizationId);
       const scopeTargets = await resolveScopeTargetsBatch(
         ctx.prisma,
@@ -63,7 +81,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("gatewayBudgets:view"))
     .query(async ({ ctx, input }) => {
-      const service = GatewayBudgetService.create(ctx.prisma);
+      const service = GatewayBudgetService.create(ctx.prisma, chRepoOrUndefined());
       const rows = await service.listForProject(input.projectId);
       const project = await ctx.prisma.project.findUnique({
         where: { id: input.projectId },
@@ -85,7 +103,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .use(checkOrganizationPermission("gatewayBudgets:view"))
     .query(async ({ ctx, input }) => {
       await requireOrgAccess(ctx, input.organizationId);
-      const service = GatewayBudgetService.create(ctx.prisma);
+      const service = GatewayBudgetService.create(ctx.prisma, chRepoOrUndefined());
       const detail = await service.getDetail(input.id, input.organizationId);
       if (!detail) {
         throw new TRPCError({ code: "NOT_FOUND", message: "budget not found" });
@@ -121,7 +139,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("gatewayBudgets:create"))
     .mutation(async ({ ctx, input }) => {
-      const service = GatewayBudgetService.create(ctx.prisma);
+      const service = GatewayBudgetService.create(ctx.prisma, chRepoOrUndefined());
       const row = await service.create({
         organizationId: input.organizationId,
         scope: input.scope,
@@ -150,7 +168,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("gatewayBudgets:update"))
     .mutation(async ({ ctx, input }) => {
-      const service = GatewayBudgetService.create(ctx.prisma);
+      const service = GatewayBudgetService.create(ctx.prisma, chRepoOrUndefined());
       const row = await service.update({
         ...input,
         actorUserId: ctx.session.user.id,
@@ -162,7 +180,7 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), id: z.string() }))
     .use(checkOrganizationPermission("gatewayBudgets:delete"))
     .mutation(async ({ ctx, input }) => {
-      const service = GatewayBudgetService.create(ctx.prisma);
+      const service = GatewayBudgetService.create(ctx.prisma, chRepoOrUndefined());
       const row = await service.archive({
         ...input,
         actorUserId: ctx.session.user.id,
