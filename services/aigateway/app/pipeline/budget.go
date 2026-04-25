@@ -2,12 +2,9 @@ package pipeline
 
 import (
 	"context"
-	"sync"
-	"time"
 
 	"go.uber.org/zap"
 
-	"github.com/langwatch/langwatch/pkg/forkedcontext"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -15,12 +12,10 @@ import (
 // BudgetPrecheckFunc checks whether the request is within budget.
 type BudgetPrecheckFunc func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetVerdict, error)
 
-// BudgetDebitFunc records cost after a successful response.
-type BudgetDebitFunc func(ctx context.Context, bundle *domain.Bundle, usage domain.Usage)
-
-// Budget creates an interceptor that prechecks budget before dispatch and
-// debits cost after a successful response.
-func Budget(precheck BudgetPrecheckFunc, debit BudgetDebitFunc, logger *zap.Logger) Interceptor {
+// Budget creates an interceptor that prechecks budget before dispatch.
+// Cost recording is NOT done here — the trace-fold reactor on the control
+// plane folds OTel span usage attributes into the ClickHouse budget ledger.
+func Budget(precheck BudgetPrecheckFunc, logger *zap.Logger) Interceptor {
 	pre := func(ctx context.Context, call *Call) error {
 		verdict, err := precheck(ctx, call.Bundle)
 		if err != nil {
@@ -45,16 +40,7 @@ func Budget(precheck BudgetPrecheckFunc, debit BudgetDebitFunc, logger *zap.Logg
 				if err := pre(ctx, call); err != nil {
 					return nil, err
 				}
-				resp, err := next(ctx, call)
-				if err != nil {
-					return nil, err
-				}
-				usage := resp.Usage
-				if usage.Model == "" {
-					usage.Model = call.Request.Model
-				}
-				debit(ctx, call.Bundle, usage)
-				return resp, nil
+				return next(ctx, call)
 			}
 		},
 		Stream: func(next StreamFunc) StreamFunc {
@@ -62,71 +48,8 @@ func Budget(precheck BudgetPrecheckFunc, debit BudgetDebitFunc, logger *zap.Logg
 				if err := pre(ctx, call); err != nil {
 					return nil, err
 				}
-				iter, err := next(ctx, call)
-				if err != nil {
-					return nil, err
-				}
-				return &budgetStreamWrapper{
-					inner:  iter,
-					debit:  debit,
-					bundle: call.Bundle,
-					model:  call.Request.Model,
-				}, nil
+				return next(ctx, call)
 			}
 		},
 	}
-}
-
-// budgetStreamWrapper debits budget when the stream closes.
-type budgetStreamWrapper struct {
-	inner     domain.StreamIterator
-	debit     BudgetDebitFunc
-	bundle    *domain.Bundle
-	model     string
-	lastCtx   context.Context
-	closeOnce sync.Once
-}
-
-func (w *budgetStreamWrapper) Next(ctx context.Context) bool {
-	w.lastCtx = ctx
-	if !w.inner.Next(ctx) {
-		w.onClose()
-		return false
-	}
-	return true
-}
-
-func (w *budgetStreamWrapper) Chunk() []byte       { return w.inner.Chunk() }
-func (w *budgetStreamWrapper) Usage() domain.Usage { return w.inner.Usage() }
-func (w *budgetStreamWrapper) Err() error          { return w.inner.Err() }
-
-// RawFraming delegates to the inner iterator so writers can still
-// detect raw-framed (Gemini passthrough) streams through wrapper chains.
-func (w *budgetStreamWrapper) RawFraming() bool {
-	if rf, ok := w.inner.(domain.RawFramer); ok {
-		return rf.RawFraming()
-	}
-	return false
-}
-
-func (w *budgetStreamWrapper) Close() error {
-	w.onClose()
-	return w.inner.Close()
-}
-
-func (w *budgetStreamWrapper) onClose() {
-	w.closeOnce.Do(func() {
-		ctx := w.lastCtx
-		if ctx == nil {
-			ctx = context.Background()
-		}
-		forkedcontext.ForkWithTimeout(ctx, 5*time.Second, func(ctx context.Context) error {
-			usage := w.inner.Usage()
-			if usage.Model == "" {
-				usage.Model = w.model
-			}
-			w.debit(ctx, w.bundle, usage)
-			return nil
-		})
-	})
 }

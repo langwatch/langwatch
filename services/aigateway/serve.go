@@ -39,7 +39,6 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config) er
 		lifecycle.Closer("otel", deps.OTel.Shutdown),
 		lifecycle.Closer("customer-trace-bridge", deps.TraceBridge.Shutdown),
 		lifecycle.Worker("auth", deps.Auth.Start, deps.Auth.Stop),
-		lifecycle.Worker("budget-outbox", deps.BudgetOutbox.Start, deps.BudgetOutbox.Stop),
 		lifecycle.ListenServer("http", srv),
 	)
 	return g.Run(ctx)

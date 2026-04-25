@@ -12,7 +12,7 @@ import (
 
 // Regression: Gemini /v1beta/streamGenerateContent passthrough was
 // emitting `data: data: {json}\n\n` — double-wrapped — because the
-// pipeline's stream wrappers (budget, trace, guardrail) didn't
+// pipeline's stream wrappers (trace, guardrail) didn't
 // forward the inner iterator's RawFraming() marker. The outermost
 // iterator the router saw was a wrapper that didn't implement
 // domain.RawFramer, so writeSSE fell through to the default framing
@@ -20,18 +20,6 @@ import (
 //
 // The fix: every wrapper must forward RawFraming() via a delegating
 // method so RawFramer propagates through the full chain.
-func TestBudgetStreamWrapper_ForwardsRawFraming(t *testing.T) {
-	inner := &rawFramerStub{raw: true}
-	w := &budgetStreamWrapper{inner: inner}
-
-	rf, ok := any(w).(domain.RawFramer)
-	require.True(t, ok, "budgetStreamWrapper must implement domain.RawFramer")
-	assert.True(t, rf.RawFraming(), "budgetStreamWrapper.RawFraming() must delegate to inner=true")
-
-	inner.raw = false
-	assert.False(t, rf.RawFraming(), "budgetStreamWrapper.RawFraming() must delegate to inner=false")
-}
-
 func TestGuardrailStreamWrapper_ForwardsRawFraming(t *testing.T) {
 	inner := &rawFramerStub{raw: true}
 	w := &guardrailStreamWrapper{inner: inner}
@@ -55,9 +43,8 @@ func TestTraceStreamWrapper_ForwardsRawFraming(t *testing.T) {
 func TestStreamWrapperChain_PreservesRawFraming(t *testing.T) {
 	inner := &rawFramerStub{raw: true}
 
-	// Outer → inner: guardrail(trace(budget(bifrost)))
-	layered := domain.StreamIterator(&budgetStreamWrapper{inner: inner})
-	layered = &traceStreamWrapper{inner: layered}
+	// Outer → inner: guardrail(trace(bifrost))
+	layered := domain.StreamIterator(&traceStreamWrapper{inner: inner})
 	layered = &guardrailStreamWrapper{inner: layered}
 
 	rf, ok := any(layered).(domain.RawFramer)

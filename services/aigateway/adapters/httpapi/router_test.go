@@ -68,8 +68,6 @@ func (m *mockBudget) Precheck(ctx context.Context, bundle *domain.Bundle) (domai
 	return domain.BudgetAllow, nil
 }
 
-func (m *mockBudget) Debit(_ context.Context, _ *domain.Bundle, _ domain.Usage) {}
-
 // --- Helpers ---
 
 func testBundle() *domain.Bundle {

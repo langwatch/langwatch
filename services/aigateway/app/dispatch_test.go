@@ -46,7 +46,6 @@ func (m *mockRateLimiter) Allow(ctx context.Context, vkID string, limits domain.
 
 type mockBudget struct {
 	precheckFn func(ctx context.Context, bundle *domain.Bundle) (domain.BudgetVerdict, error)
-	debitCalls int
 }
 
 func (m *mockBudget) Precheck(ctx context.Context, bundle *domain.Bundle) (domain.BudgetVerdict, error) {
@@ -54,10 +53,6 @@ func (m *mockBudget) Precheck(ctx context.Context, bundle *domain.Bundle) (domai
 		return m.precheckFn(ctx, bundle)
 	}
 	return domain.BudgetAllow, nil
-}
-
-func (m *mockBudget) Debit(_ context.Context, _ *domain.Bundle, _ domain.Usage) {
-	m.debitCalls++
 }
 
 type mockGuardrails struct {
@@ -385,25 +380,6 @@ func TestHandleChat_FallbackOnProviderError(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, 2, callCount)
 	assert.Equal(t, 1, result.Meta.FallbackCount)
-}
-
-func TestHandleChat_DebitsCostAfterSuccess(t *testing.T) {
-	provider := &mockProvider{
-		dispatchFn: func(_ context.Context, _ *domain.Request, _ domain.Credential) (*domain.Response, error) {
-			return successResponse(), nil
-		},
-	}
-	budget := &mockBudget{}
-
-	application := New(
-		WithProviders(provider),
-		WithBudget(budget),
-		WithLogger(zap.NewNop()),
-	)
-
-	_, err := application.HandleChat(context.Background(), testBundle(), bytes.NewReader(testBody()), "gpt-4")
-	require.NoError(t, err)
-	assert.Equal(t, 1, budget.debitCalls)
 }
 
 func TestHandleChat_EmitsTraceAfterSuccess(t *testing.T) {

@@ -76,7 +76,7 @@ func (a *App) buildInterceptors() []pipeline.Interceptor {
 		chain = append(chain, pipeline.Cache(a.cache.Evaluate))
 	}
 	if a.budget != nil {
-		chain = append(chain, pipeline.Budget(a.budget.Precheck, a.budget.Debit, a.logger))
+		chain = append(chain, pipeline.Budget(a.budget.Precheck, a.logger))
 	}
 	if a.guardrails != nil {
 		chain = append(chain, pipeline.Guardrail(

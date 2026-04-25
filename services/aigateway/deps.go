@@ -39,7 +39,6 @@ type Deps struct {
 	Auth          *authresolver.Service
 	Providers     *providers.BifrostRouter
 	RateLimiter   *ratelimit.Limiter
-	BudgetOutbox  *budget.Outbox
 	BudgetChecker *budget.Checker
 	Policy        *policy.Matcher
 	Cache         *cacherules.Evaluator
@@ -128,12 +127,7 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		return ctx, nil, fmt.Errorf("ratelimit init: %w", err)
 	}
 
-	budgetOutbox := budget.NewOutbox(budget.OutboxOptions{
-		Poster: cpClient,
-		Logger: logger,
-	})
 	budgetChecker := budget.NewChecker(budget.CheckerOptions{
-		Outbox: budgetOutbox,
 		Logger: logger,
 	})
 
@@ -164,7 +158,6 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Auth:          authSvc,
 		Providers:     router,
 		RateLimiter:   limiter,
-		BudgetOutbox:  budgetOutbox,
 		BudgetChecker: budgetChecker,
 		Policy:        policy.NewMatcher(),
 		Cache:         cacherules.NewEvaluator(),

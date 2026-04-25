@@ -49,10 +49,3 @@ func BenchmarkPrecheck_HardStop(b *testing.B) {
 	}
 }
 
-// BenchmarkNewULID is the idempotency-key generator used per request.
-func BenchmarkNewULID(b *testing.B) {
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		_ = newULID()
-	}
-}
