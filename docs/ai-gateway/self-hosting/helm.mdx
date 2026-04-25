@@ -4,98 +4,89 @@ description: Deploy the LangWatch AI Gateway alongside your self-hosted LangWatc
 sidebarTitle: Helm
 ---
 
-The AI Gateway ships as a sub-chart of the LangWatch Helm chart. It runs as a separate Kubernetes Deployment (own pod, own container, own service) and reuses the LangWatch control-plane for VK CRUD, budget accounting, and guardrail execution.
+The AI Gateway ships as a sub-chart (`charts/gateway/`) of the LangWatch umbrella chart (`charts/langwatch/`). Installing the umbrella with `gateway.chartManaged: true` (the default) lifts the gateway pod alongside `langwatch-app` in the same release. The gateway runs as a separate Kubernetes Deployment (own pod, own container, own service) and reaches the LangWatch control plane for VK resolution, budget enforcement, and guardrail execution.
 
-## Enabling the gateway
+<Note>The gateway sub-chart's `version` and `appVersion` are bumped in **lockstep** with the umbrella `langwatch` chart by release-please (`.github/release-please-config.json` `.` package extra-files). `helm install langwatch/langwatch@3.x` always pulls a matching gateway sub-chart — operators should never need to pin them separately.</Note>
 
-In your `values.yaml`:
+## Pre-create the runtime secrets
+
+**The gateway pod will not start until two values exist in a Kubernetes Secret that the chart references but does not materialise.** This is the most common rollout failure, so do it before `helm install`:
+
+```bash
+# Default Secret name when installing the umbrella `langwatch` chart.
+# (Gateway sub-chart standalone uses `gateway-runtime-secrets` instead;
+# pass --set gateway.secrets.existingSecretName=... to override either.)
+kubectl create secret generic langwatch-gateway-auth \
+  --namespace langwatch \
+  --from-literal=LW_GATEWAY_INTERNAL_SECRET="$(openssl rand -hex 32)" \
+  --from-literal=LW_GATEWAY_JWT_SECRET="$(openssl rand -hex 32)"
+```
+
+Both values MUST also be mounted on the `langwatch-app` Deployment under the same env-var names — the gateway and control plane sign and verify each other's calls byte-for-byte. The umbrella chart references one Secret name from both Deployments to keep them in sync; if you split secrets across two Kubernetes Secrets, ensure the values match.
+
+The third sensitive value, `LW_VIRTUAL_KEY_PEPPER`, is **control-plane-only**: it hashes virtual-key secrets at rest and must never leave the `langwatch-app` pod. The gateway never reads it.
+
+Failure mode if you skip this step: the gateway pod's `valueFrom.secretKeyRef` resolves against a missing Secret and the pod loops in `CreateContainerConfigError` until the `helm install --atomic` deadline (default 8 min) trips a rollback.
+
+## Image registry and tag
+
+The gateway image is published to **Docker Hub** (`docker.io/langwatch/ai-gateway`) by the `ai-gateway` matrix entry in `.github/workflows/publish-docker-app.yml` on every `release.published` event for `langwatch@*` tags. Each release publishes three tags: `<version>`, `latest`, and `<short-sha>`.
+
+In the chart, leaving `image.tag: ""` (the default) resolves to `.Chart.AppVersion`, which is bumped in lockstep with the langwatch app version. Override only when you mirror the image to an internal registry or pin to a specific sha for a hotfix:
 
 ```yaml
 gateway:
-  enabled: true
-  replicas: 2
   image:
-    repository: ghcr.io/langwatch/ai-gateway
-    tag: v1.0.0  # or a 12-char sha — main pushes `:latest` + `:<sha12>`
-  service:
-    type: ClusterIP
-    port: 7400
-  ingress:
-    enabled: true
-    host: gateway.your-corp.com
-    tls:
-      secretName: gateway-tls
-  resources:
-    requests: { cpu: 200m, memory: 256Mi }
-    limits:   { cpu: 1,    memory: 1Gi }
-  env:
-    # Secrets — only these three var names use the LW_ prefix.
-    LW_GATEWAY_INTERNAL_SECRET: { secretKeyRef: { name: gateway-secrets, key: internal } }
-    LW_GATEWAY_JWT_SECRET: { secretKeyRef: { name: gateway-secrets, key: jwt } }
-    LW_GATEWAY_JWT_SECRET_PREVIOUS: { secretKeyRef: { name: gateway-secrets, key: jwt-previous, optional: true } }
-    # Non-secret tuning — GATEWAY_* prefix.
-    GATEWAY_CONTROL_PLANE_URL: "http://langwatch-app:5560"
-    GATEWAY_REDIS_URL: redis://langwatch-redis:6379/2
-    GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS: "false"  # reserved; no-op today, see Config docs
-
-  # Admin / pprof listener — loopback-bound by default.
-  # kubectl port-forward is the supported access path in the default posture.
-  # For non-k8s deploys that can't port-forward, bind non-loopback AND supply
-  # an existingAuthSecretName to gate the listener with a bearer token.
-  admin:
-    addr: "127.0.0.1:6060"   # set to "" to disable pprof entirely
-    # existingAuthSecretName: gateway-admin-token  # optional bearer gate
-    # authSecretKey: token                         # default "token"
-
-  # Graceful drain on SIGTERM
-  # preDrainWait + timeout + slack MUST be ≤ terminationGracePeriodSeconds.
-  # Default 5 + 15 + 10 = 30 matches the chart's terminationGracePeriodSeconds.
-  shutdown:
-    preDrainWait: 5s    # time /readyz=503 + sleep for LB endpoint propagation
-    timeout: 15s        # max wait for in-flight handlers to finish
-  terminationGracePeriodSeconds: 30
-
-  # Edge protection.
-  # maxRequestBodyBytes: enforced before auth; a 1 GB drive-by scan can't
-  #   pressure pod memory or the auth cache. Raise for vision workloads.
-  # Server timeouts close slowloris-style attacks. WriteTimeout
-  #   is DELIBERATELY NOT EXPOSED — whole-response caps kill SSE; per-chunk
-  #   deadlines live in the dispatcher. IdleTimeout MUST exceed your
-  #   nginx-ingress keepalive_timeout (typical 75s) so nginx closes first.
-  security:
-    maxRequestBodyBytes: 10485760  # 10 MiB; renders as %d int in configmap.yaml
-    readHeaderTimeout: 5s
-    readTimeout: 60s
-    idleTimeout: 120s
-
-  # Budget outbox tuning
-  budget:
-    outboxFlushInterval: "1s"
-    outboxMaxRetries: 8
-    liveThresholdPct: 90      # trigger tier-2 live /budget/check at ≥ this % of cap
-    liveTimeout: "200ms"      # Go duration; fail-open on timeout
-
-  # Per-direction guardrail budgets
-  guardrails:
-    preTimeout: "1500ms"        # fail-closed unless guardrails.request_fail_open=true on VK
-    postTimeout: "1500ms"       # fail-closed unless guardrails.response_fail_open=true on VK
-    streamChunkWindow: "50ms"   # per-chunk budget; fail-OPEN with verdict metric (contract)
-
-  healthcheck:
-    livenessProbe:
-      httpGet: { path: /healthz, port: 7400 }
-      initialDelaySeconds: 5
-    readinessProbe:
-      httpGet: { path: /readyz, port: 7400 }
-      initialDelaySeconds: 5
-      failureThreshold: 3
-    startupProbe:
-      httpGet: { path: /startupz, port: 7400 }
-      periodSeconds: 10
-      failureThreshold: 30
+    repository: docker.io/langwatch/ai-gateway   # default
+    tag: ""                                       # default → .Chart.AppVersion (lockstep)
+    pullPolicy: IfNotPresent
 ```
 
-<Note>The chart ships defaults for every new field (admin / budget / guardrails) — `helm upgrade` from an earlier chart version works without overrides.</Note>
+## Enabling the gateway
+
+In your umbrella `values.yaml`:
+
+```yaml
+gateway:
+  chartManaged: true                              # default; flip to false to disable
+
+  # Where the gateway reaches the control plane. The default targets the
+  # langwatch-app Service in the same namespace.
+  controlPlane:
+    baseUrl: http://langwatch-app:5560
+
+  # Secret you pre-created above.
+  secrets:
+    existingSecretName: langwatch-gateway-auth    # default for the umbrella chart
+    internalSecretKey: LW_GATEWAY_INTERNAL_SECRET # key WITHIN that Secret
+    jwtSecretKey: LW_GATEWAY_JWT_SECRET           # key WITHIN that Secret
+
+  # OTLP endpoint the gateway exports spans to. Default targets the
+  # control plane's /api/otel ingest, which routes spans into the
+  # owning project via the langwatch.project_id span attribute.
+  otel:
+    endpoint: http://langwatch-app:5560/api/otel
+    # Production: provide the X-Auth-Token via a pre-existing Secret.
+    authExistingSecretName: ""
+    authSecretKey: token
+
+  ingress:
+    enabled: true
+    className: nginx
+    host: gateway.your-corp.com
+    path: /v1                                     # only /v1/* needs to be public
+    pathType: Prefix
+    tls:
+      enabled: true
+      secretName: gateway-tls
+
+  # Edge protection. Cap request body before auth runs so a misconfigured
+  # caller can't OOM the pod. 10 MiB fits ~3 MiB prompts plus base64 images.
+  security:
+    maxRequestBodyBytes: 10485760                 # 10 MiB
+```
+
+The full set of overridable fields lives in `charts/gateway/values.yaml` (canonical for everything not exposed at the umbrella surface). All defaults are production-safe; you should only need to override `controlPlane.baseUrl`, `secrets.existingSecretName`, `ingress.host`, and the OTLP endpoint.
 
 Apply:
 
@@ -105,120 +96,91 @@ helm upgrade --install langwatch langwatch/langwatch \
   --namespace langwatch --create-namespace
 ```
 
-## Secrets
+## Env vars wired by the chart
 
-Provision these via your secrets manager (e.g. `kubectl create secret`):
+Source of truth: `charts/gateway/templates/configmap.yaml` (commit `d14576b1e`) and `charts/gateway/templates/deployment.yaml`. The chart wires only the env vars the Go gateway actually reads — knobs in `values.yaml` that don't appear here are forward-compat surface for v1.1 (e.g. `cache.bootstrapAllKeys`, `admin.*`, `redis.url`) and are silently ignored by the running binary. The canonical names are derived by `services/aigateway/config.go` `pkg/config.Hydrate`, which walks the Config struct's `env:"…"` tags and joins parent/child with `_`.
 
-```bash
-kubectl create secret generic gateway-secrets \
-  --from-literal=internal="$(openssl rand -hex 32)" \
-  --from-literal=jwt="$(openssl rand -hex 32)" \
-  -n langwatch
-```
+| Env var | Source | Purpose |
+|---|---|---|
+| `SERVER_ADDR` | configmap (`":5563"`) | Public listen addr. Service `targetPort` matches |
+| `LOG_LEVEL` | configmap (`logging.level`) | `debug` / `info` / `warn` / `error` |
+| `LW_GATEWAY_BASE_URL` | configmap (`controlPlane.baseUrl`) | Where the gateway reaches `/api/internal/gateway/*` on the control plane |
+| `OTEL_OTLP_ENDPOINT` | configmap (`otel.endpoint`, only when set) | OTLP/HTTP ingest URL |
+| `SERVER_MAX_REQUEST_BODY_BYTES` | configmap (`security.maxRequestBodyBytes`) | Body-size cap, rendered as `%d` int |
+| `LW_GATEWAY_INTERNAL_SECRET` | Secret `secrets.existingSecretName` | HMAC for `/api/internal/gateway/*` calls |
+| `LW_GATEWAY_JWT_SECRET` | Secret `secrets.existingSecretName` | HS256 for resolve-key JWT |
+| `LW_GATEWAY_JWT_SECRET_PREVIOUS` | Secret (only when `secrets.jwtSecretPreviousKey` is set) | Retired key during rotation overlap |
 
-Then mirror the same values into the LangWatch app's secret (`LW_GATEWAY_INTERNAL_SECRET`, `LW_GATEWAY_JWT_SECRET`) so signing/verification align.
+The deployment template intentionally does not inject `GATEWAY_REDIS_URL`, `GATEWAY_ADMIN_AUTH_TOKEN`, or `GATEWAY_OTEL_DEFAULT_AUTH_TOKEN` — the v1 gateway has no Redis client, admin/pprof listener, or OTLP auth-token field on its config struct, and silently dropping them at the env-var layer would mislead operators. OTLP authentication for self-hosters is delivered via `OTEL_OTLP_HEADERS` (e.g. `Authorization=Bearer …`) on the OTel config struct in `pkg/config/otel.go`. See `charts/gateway/templates/deployment.yaml` for the rationale comment.
 
-`LW_VIRTUAL_KEY_PEPPER` is control-plane-only and should never appear in gateway secrets.
+## Secret rotation
 
-### Secret rotation
-
-Rotate `LW_GATEWAY_JWT_SECRET` (and `LW_GATEWAY_INTERNAL_SECRET`) without downtime using the dual-key overlap pattern. The chart exposes the retired key via a second secret reference:
+Rotate `LW_GATEWAY_JWT_SECRET` without downtime using the dual-key overlap pattern. The chart conditionally injects a second `secretKeyRef` from the same Secret when `jwtSecretPreviousKey` is set:
 
 ```yaml
 gateway:
   secrets:
-    jwtSecretName: gateway-secrets
-    jwtSecretKey: jwt
-    # During rotation: point at the previous key for ~15 min. Remove after.
-    jwtSecretPreviousName: gateway-secrets
-    jwtSecretPreviousKey: jwt-previous
+    existingSecretName: langwatch-gateway-auth
+    jwtSecretKey: LW_GATEWAY_JWT_SECRET
+    # Rotation window only: which key in the same Secret holds the retired
+    # value. Empty = strict single-key mode (production steady state).
+    jwtSecretPreviousKey: LW_GATEWAY_JWT_SECRET_PREVIOUS
 ```
 
-The `deployment.yaml` conditionally renders the second `secretKeyRef` — when `jwtSecretPreviousName` is empty (steady state), no second env var is set and the gateway runs in strict mode.
+When `jwtSecretPreviousKey` is non-empty, the deployment renders a second env var (`LW_GATEWAY_JWT_SECRET_PREVIOUS`) and the gateway's resolver verifies tokens against either value. When empty, no second env var is set and the gateway runs strict.
 
 **4-step zero-downtime flow:**
 
-1. Flip the control-plane signing secret to the new value.
-2. Update the `gateway-secrets` Secret: store both old and new (`jwt = new`, `jwt-previous = old`). `helm upgrade` with `jwtSecretPreviousKey: jwt-previous`.
-3. Rolling restart: new pods pick up both keys. Old bundles verify against `jwt-previous`, new bundles sign+verify with `jwt`.
-4. After ~15 min (longest bundle TTL), remove `jwt-previous` from the Secret and `jwtSecretPreviousName` from values. Rolling restart. Strict mode resumes.
+1. Flip the control plane's signing secret to the new value (rotate `LW_GATEWAY_JWT_SECRET` on the `langwatch-app` Deployment first — the issuer must accept the new value before the gateway starts seeing it on inbound JWTs).
+2. Update the `langwatch-gateway-auth` Secret: keep `LW_GATEWAY_JWT_SECRET` pointing at the new value, add `LW_GATEWAY_JWT_SECRET_PREVIOUS` carrying the old value. `helm upgrade` with `gateway.secrets.jwtSecretPreviousKey: LW_GATEWAY_JWT_SECRET_PREVIOUS`.
+3. Rolling restart picks up both keys. Tokens signed under the old key verify against `LW_GATEWAY_JWT_SECRET_PREVIOUS`; new tokens use `LW_GATEWAY_JWT_SECRET`.
+4. After ~15 min (longest pre-rotation bundle TTL), remove `LW_GATEWAY_JWT_SECRET_PREVIOUS` from the Secret and unset `jwtSecretPreviousKey`. Rolling restart. Strict mode resumes.
 
-The gateway emits a `jwt_secret_rotation_active` WARN log on boot whenever the previous-key env var is set — operators should monitor for runaway rotation windows (accepting a retired key forever is a security-posture regression).
+The gateway emits a `jwt_secret_rotation_active` WARN log on boot whenever the previous-key env var is set — operators should monitor for runaway rotation windows (accepting a retired key indefinitely is a security-posture regression):
 
 ```bash
-# Alert on rotation window > 30 min
-kubectl logs -n langwatch deploy/langwatch-gateway | \
-  grep jwt_secret_rotation_active
+kubectl logs -n langwatch deploy/langwatch-gateway | grep jwt_secret_rotation_active
 ```
 
-`LW_GATEWAY_INTERNAL_SECRET` rotation uses the identical pattern (`internalSecretPreviousKey`) — the HMAC verifier accepts both secrets during the overlap window. Rotate both together in one operation.
+`LW_GATEWAY_INTERNAL_SECRET` rotation uses the same Secret slot under a `previous` key — the HMAC verifier accepts both during the overlap window. Rotate both together in one operation when possible.
 
 See [Config → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation) for the env-var contract.
+
+## Dependencies on the control plane
+
+Two control-plane components must be running for the gateway to function fully:
+
+- **`langwatch-app`** on `gateway.controlPlane.baseUrl` (default `http://langwatch-app:5560`). The gateway hits `/api/internal/gateway/resolve-key`, `/changes`, and `/budget/check` synchronously. If unreachable, the gateway extends its cached entries via stale-while-error (see `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` / `HARD_GRACE`) but new VKs cannot resolve and rate limits cannot tighten.
+- **`langwatch-workers`** running the trace-processing pipeline. **Budget enforcement depends on this.** The gateway emits OTLP spans with cost attrs but does NOT debit budgets directly — the workers' trace-fold reactor (`gatewayBudgetSync.reactor.ts`) reads finalised spans, computes cost, and inserts ledger rows into ClickHouse. The `gateway_budget_scope_totals_mv` materialized view aggregates spend, and `/budget/check` reads from that view. **If `workers.enabled: false`, gateway traces still flow but spend never accumulates against budgets, so hard-cap scopes will not block at the configured limit.** Self-hosters running the umbrella chart get workers by default; standalone `charts/gateway` installs MUST point at a control plane that has the worker pipeline running.
 
 ## Networking
 
 The gateway needs to reach:
 
-- The LangWatch control-plane (`GATEWAY_CONTROL_PLANE_URL`) for `/api/internal/gateway/*` calls.
-- Redis (`GATEWAY_REDIS_URL`) for L2 auth cache — optional, can run without.
-- Outbound to each provider API (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, Gemini). Network policy must allow egress.
+- The LangWatch control plane (`gateway.controlPlane.baseUrl` → `LW_GATEWAY_BASE_URL`) for `/api/internal/gateway/*` calls.
+- Outbound to each provider API (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, Gemini). NetworkPolicy must allow egress (see below).
 
-Clients reach the gateway via the Ingress (`gateway.your-corp.com`) on port 443.
+Clients reach the gateway via the Ingress (`gateway.your-corp.com`) on port 443. The chart hardcodes the path to `/v1` so only the OpenAI-compatible / Anthropic / Gemini routes are publicly reachable; `/healthz`, `/readyz`, `/metrics`, and `/debug/pprof/*` are NEVER exposed via the public Ingress. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls) for the full DNS/cert flow.
 
 ## Scaling
 
-The gateway is stateless and horizontally scalable. Enable HPA on CPU and request-rate:
-
-```yaml
-gateway:
-  autoscaling:
-    enabled: true
-    minReplicas: 2
-    maxReplicas: 10
-    targetCPUUtilizationPercentage: 70
-```
-
-In-flight streaming requests pin a connection to a single replica; HPA should scale slowly (target CPU) rather than chasing spikes that would drop live streams.
+See [Scaling](/ai-gateway/self-hosting/scaling) for HPA configuration, replica sizing, and Redis L2 cache guidance. Quick summary: the gateway is stateless and horizontally scalable; the chart's HPA defaults to 2-10 replicas at 70% CPU plus a custom `lw_gateway_rps` metric (requires Prometheus-adapter). In-flight streaming requests pin to a single replica, so HPA should scale on smoothed signals rather than chasing spikes.
 
 ## High availability
 
-- Run ≥2 replicas with a PodDisruptionBudget so rolling updates don't remove every pod simultaneously.
-- Use Redis (`GATEWAY_REDIS_URL`) as L2 cache so a replica joining a running cluster warms up from shared cache rather than hammering the control-plane. This is the primary mechanism for keeping replicas serving while the control plane is briefly offline — see [Auth-cache stale-while-error](/ai-gateway/self-hosting/config#auth-cache) for the soft/hard-grace knobs.
-- `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement to pre-warm L1 with every active VK on startup; the flag is wired in chart values but currently has no Go-side implementation, so setting it has no effect today. Use Redis L2 + the auth-cache stale-while-error grace window for cold-start coverage.
+- Run ≥2 replicas with a PodDisruptionBudget (chart default `minAvailable: 1`) so rolling updates don't remove every pod simultaneously.
+- The auth-cache stale-while-error grace window (`LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` / `HARD_GRACE`) keeps replicas serving with cached VK bundles when the control plane is briefly offline. See [Auth-cache stale-while-error](/ai-gateway/self-hosting/config#auth-cache) for the soft/hard-grace knobs.
+- The Redis L2 cache (`gateway.redis.url`) is **forward-compat surface today** — the v1 gateway has no Redis client, so this knob is a no-op. v1.1 will wire it for replica-warm-up on HPA scale-out. Don't rely on it for cold-start coverage in v1; the auth-cache grace window is the only operational backstop.
 
 ## Monitoring
 
-The gateway exposes Prometheus metrics at `/metrics`:
+The gateway binary exposes Prometheus metrics at `/metrics` (port 5563). For the metric names + labels, see [Observability](/ai-gateway/observability).
 
-- `gateway_requests_total{provider, model, status}` — count of requests by provider and final status.
-- `gateway_request_duration_seconds_bucket` — histogram of end-to-end latency.
-- `gateway_provider_duration_seconds_bucket{provider}` — upstream provider latency.
-- `gateway_cache_hits_total{outcome=hit|miss|bypass|force}`.
-- `gateway_budget_blocks_total{scope}` — budget hard-cap rejections.
-- `gateway_guardrail_blocks_total{direction}` — guardrail rejections.
-- `gateway_circuit_state{provider}` — 0 closed / 1 half-open / 2 open.
-- `gateway_auth_cache_size{layer=l1|l2}` / `gateway_auth_cache_hits_total`.
-
-Scrape with the standard Prometheus Operator `ServiceMonitor`:
-
-```yaml
-gateway:
-  metrics:
-    serviceMonitor:
-      enabled: true
-      namespace: monitoring
-      interval: 30s
-```
+<Note>The chart does not currently render a `ServiceMonitor` object. Scrape via your own ServiceMonitor pointed at the gateway Service (port 80, target 5563), or via Pod-level annotations if your Prometheus uses the legacy annotation-based discovery. Chart-managed `ServiceMonitor` is on the v1.1 roadmap.</Note>
 
 ## Probes
 
-Three Kubernetes probes are provided; all hit the gateway's own `/healthz`, `/readyz`, `/startupz`:
-
-- **Liveness (`/healthz`)** — returns `200 {"status":"ok"}` as long as the process is alive. Never calls the control-plane.
-- **Readiness (`/readyz`)** — only `200` when: bifrost/core is initialised, at least one provider credential resolves successfully, the control-plane's `/api/internal/gateway/resolve-key` is reachable (or bootstrap cache is populated), and the `/changes` long-poll goroutine is running. Returns `503` with a JSON body listing failed checks otherwise.
-- **Startup (`/startupz`)** — similar to readiness but lenient on bootstrap duration for large VK populations. Optionally runs a one-shot network connectivity probe (see below) against a configured host list; if any host fails to resolve or dial, `/startupz` never flips green and k8s recycles the pod.
-
-The readiness definition is strict on purpose — a pod should not be hit by the Service until every dependency is usable, otherwise the first requests after a rollout fail.
+The chart wires three Kubernetes probes against the gateway's `/healthz` (liveness), `/readyz` (readiness), and `/startupz` (startup) endpoints, all on container port 5563. See [Health checks](/ai-gateway/self-hosting/health-checks) for the canonical reference: probe semantics, cadence tuning, what each endpoint dials, and how to interpret a flapping `/readyz` during a rollout.
 
 ### Startup network check
 
@@ -247,7 +209,11 @@ The probe is disabled by default (empty list) so greenfield and air-gapped-via-f
 
 ## Admin listener
 
-The gateway's `net/http/pprof` diagnostic surface ships behind a dedicated listener. Three deployment postures, pick the one that matches your cluster:
+<Note>
+**v1 status:** the chart's `gateway.admin.*` value keys are forward-compat surface — the v1 gateway binary does not expose an admin/pprof listener and the deployment template does not inject `GATEWAY_ADMIN_ADDR` / `GATEWAY_ADMIN_AUTH_TOKEN` (see the rationale comment in `charts/gateway/templates/deployment.yaml`). The three postures below describe the planned v1.1 contract; setting the values today is a no-op. For live diagnostics in v1, fall back to `kubectl exec` + the production-runbook recipes.
+</Note>
+
+The gateway's `net/http/pprof` diagnostic surface (v1.1) will ship behind a dedicated listener. Three deployment postures, pick the one that matches your cluster:
 
 ### Posture 1: disabled
 
@@ -501,9 +467,9 @@ Consequence for operators: an upgrade path where `helm upgrade` would have silen
 
 ## Upgrade procedure
 
-The gateway is versioned independently of the LangWatch app, but they share a contract. A gateway version is compatible with control-plane versions within the same major (see the compatibility matrix in the release notes).
+Gateway and control plane are versioned in **lockstep** — release-please bumps both `charts/gateway/Chart.yaml` and `charts/langwatch/Chart.yaml` to the same version on every langwatch release. A single `helm upgrade langwatch langwatch/langwatch` rolls both pods together via the umbrella chart's RollingUpdate strategy.
 
-1. Deploy the new control-plane first (it must understand both old and new signature formats during the rollout).
-2. Deploy the new gateway.
+1. `helm diff upgrade langwatch langwatch/langwatch -f values.yaml --version <new>` to preview the change set.
+2. `helm upgrade langwatch langwatch/langwatch -f values.yaml --version <new>`. The umbrella's `langwatch-app` Deployment rolls first; the gateway Deployment rolls second on the next reconcile because it depends on the new control-plane image accepting both signature formats during the rollout (see [Secret rotation](#secret-rotation) for the dual-key contract that makes this safe).
 3. Monitor `gateway_provider_duration_seconds` and `gateway_requests_total{status!="2xx"}` for ~30 min.
-4. Roll back via `helm rollback` if anomalies appear — the gateway's cache survives restarts and requests resume immediately.
+4. Roll back via `helm rollback langwatch <revision>` if anomalies appear — the gateway's cache survives restarts and requests resume immediately. Both sub-charts roll back together.
