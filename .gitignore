@@ -58,12 +58,12 @@ browser-tests/
 /.browser-test-screenshots/
 
 # Ralph-loop agent coordination files — internal working state, not shipped.
-# PR body content lives on GitHub; cross-lane readiness + iter journals are
-# local-only. If something here matters long-term it should graduate to
-# docs/ or specs/ instead.
-.claude/LANE-*.md
-.claude/PR-DESCRIPTION.md
-.claude/V1-GA-READINESS.md
+# PR body content lives on GitHub; cross-lane readiness + iter journals,
+# follow-up notes, audit drafts, etc. are local-only. If something here
+# matters long-term it should graduate to docs/ or specs/ instead.
+# README.md is the exception — it documents the .claude/ layout itself.
+.claude/*.md
+!.claude/README.md
 
 # Playwright E2E tests
 agentic-e2e-tests/test-results/
