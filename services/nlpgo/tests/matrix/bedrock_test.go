@@ -18,7 +18,11 @@ func TestBedrock_SimpleCompletion(t *testing.T) {
 	akid := requireEnv(t, "BEDROCK_AWS_ACCESS_KEY_ID")
 	sak := requireEnv(t, "BEDROCK_AWS_SECRET_ACCESS_KEY")
 	region := envOrDefault("BEDROCK_AWS_REGION", "us-east-1")
-	modelTail := envOrDefault("BEDROCK_MODEL", "anthropic.claude-3-sonnet-20240229-v1:0")
+	// Default uses an on-demand-capable model id. Bedrock requires
+	// inference-profile prefixes (us.* / eu.*) for many newer models;
+	// override BEDROCK_MODEL when running against a region/profile that
+	// expects a specific format for your account.
+	modelTail := envOrDefault("BEDROCK_MODEL", "anthropic.claude-3-haiku-20240307-v1:0")
 	exec := newExecutor(t, mc)
 
 	resp := runSimpleCompletion(t, exec, "bedrock/"+modelTail, map[string]any{
