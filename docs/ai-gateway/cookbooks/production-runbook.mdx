@@ -197,7 +197,7 @@ kubectl exec -n langwatch deploy/langwatch-gateway -- \
 
 **Symptom:** A pod stays in `Terminating` for the full `terminationGracePeriodSeconds`, then gets SIGKILLed. In-flight requests ended abruptly. Alertmanager fires on the `gateway_draining` gauge being 1 for > grace.
 
-The pod received SIGTERM but at least one request handler never returned before `shutdown.timeout` expired. Iter 24 (`ea167ca`) exposes this via two gauges:
+The pod received SIGTERM but at least one request handler never returned before `shutdown.timeout` expired. The drain pipeline exposes this via two gauges:
 
 | Metric | During healthy drain | During stuck drain |
 |---|---|---|
@@ -238,13 +238,72 @@ curl -s http://localhost:6060/debug/pprof/goroutine?debug=1 | \
 
 **Temporary workaround:** bump `shutdown.timeout` + `terminationGracePeriodSeconds` to give the hanging request time to complete. Only appropriate while you diagnose the root cause — long grace periods slow down rolling deploys and make HPA scale-downs feel sluggish.
 
+## Recipe 8 — Control-plane outage / stale-while-error
+
+**Symptom:** The LangWatch control plane is unreachable (deployment incident, DNS hiccup, network partition). The gateway's L1 auth cache is full of valid resolved-key bundles, but `/api/internal/gateway/resolve-key` is returning errors. Operator wants to know: are customers being rejected, or is the gateway riding through?
+
+The gateway's auth resolver runs **stale-while-error** by default: when the cached entry's JWT crosses its natural expiry AND the control-plane refresh fails for **transport-class reasons** (network error, dial timeout, 5xx, connection refused, malformed/unparseable response, JWT verify failure), it bumps the soft expiry by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` (default `5m`) and serves the cached bundle. This continues every refresh attempt up to the hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` past the JWT exp (default `30m`).
+
+**Auth-class rejections** — explicit `401` / `403` / `404` from `/resolve-key` — bypass the grace window entirely and evict immediately. A revoked credential never gets stale-served.
+
+**Diagnose:**
+
+```bash
+# 1. Are stale-serve INFO logs firing? (= grace is active and serving traffic)
+kubectl logs -n langwatch -l app=langwatch-gateway --tail=200 | \
+  grep auth_cache_serve_stale
+
+# 2. Are transport-class refresh failures spewing? (= control plane unreachable)
+kubectl logs -n langwatch -l app=langwatch-gateway --tail=200 | \
+  grep auth_cache_refresh_transport_failure
+
+# 3. Are hard evictions firing? (= grace exhausted, rejection mode)
+kubectl logs -n langwatch -l app=langwatch-gateway --tail=500 | \
+  grep auth_cache_hard_evict
+```
+
+The three log lines form a ladder operators read in order:
+
+| Log line | Level | Meaning | Operator action |
+|---|---|---|---|
+| `auth_cache_serve_stale` | INFO | Grace is active; cached bundle is being served past JWT exp | None — this is expected behaviour during outage. Includes `vk_id`, `stale_for`, `hard_grace_remaining`, `refresh_error_class` |
+| `auth_cache_refresh_transport_failure` | WARN | Each refresh attempt is failing; soft expiry bumped. Includes `error`, `error_class`, `new_soft_expires_at` | Investigate control plane (this is the actual outage signal). Stop bumping once CP returns |
+| `auth_cache_hard_evict` | ERROR | Grace cap exceeded OR auth rejection. `reason` field disambiguates: `hard_cap_exceeded` (outage too long) vs `auth_rejection` (real bad-credential evict) vs `auth_rejection_async` / `hard_cap_exceeded_on_lookup` | If `hard_cap_exceeded`, customers start seeing 401s. Bump `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` if outage is ongoing and you'd rather extend than reject |
+
+**Customer-facing behaviour during the grace window:**
+
+- Requests against any VK that resolved successfully **before** the outage continue to work transparently.
+- Requests against any VK **never seen by this pod** (cold) still fail — the gateway has no bundle to fall back to. Mitigation: enable `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` so every pod warms its L1 with all active VKs at startup. Pair with Redis L2 (`GATEWAY_REDIS_URL`) so HPA-scaled pods inherit the warm set.
+- Requests against any VK whose JWT was **revoked just before the outage** but the revocation `/changes` event hadn't propagated yet — these stay served until the cache entry crosses its hard cap. Acceptable trade-off for the grace; auth rejections from a healthy CP still evict instantly via `auth_cache_hard_evict reason=auth_rejection`.
+
+**Tune:**
+
+| Knob | When to lower | When to raise |
+|---|---|---|
+| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` | If you want refresh attempts to back off less aggressively (e.g. 1m for tighter retry density) | If your control plane is consistently slow under load and you want to reduce refresh-attempt churn during partial degradation |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` | If you have strict revocation-latency SLOs (compliance / regulated deployments) and would rather hard-fail than serve a long-stale bundle | If your control plane has known multi-hour planned-maintenance windows and you'd rather ride through |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE=0s` | **Restores legacy behaviour:** any refresh failure past JWT exp evicts immediately. Pick this if you operate under a security regime where stale-while-error is unacceptable | n/a (zero is the disable signal) |
+
+**Alert pattern (log-based, no metric infra required):**
+
+```bash
+# Fire if hard_evict reason=hard_cap_exceeded appears more than N times in 5 min
+# Indicates the outage exceeded the configured grace and customers are now being rejected.
+kubectl logs -n langwatch -l app=langwatch-gateway --since=5m | \
+  grep -c 'auth_cache_hard_evict.*reason=hard_cap_exceeded'
+```
+
+A non-zero count is the page-worthy signal; the WARN spew alone (`auth_cache_refresh_transport_failure`) is informational while customers are still being served.
+
+See [Config → Auth cache](/ai-gateway/self-hosting/config#auth-cache) for the env-var contract.
+
 ## Graceful degradation — what survives what
 
 The gateway is a cache of the control plane, so a surprising amount continues to work when pieces go down. Quick reference:
 
 | Component down | Customer impact | How long gateway stays up | Notes |
 |---|---|---|---|
-| LangWatch control plane | None for cached VKs | ≥ 15 min (JWT TTL) + bootstrap cache; Redis L2 extends indefinitely | Outbox re-enqueues debits safely; they flush on recovery. New VK creation is blocked until control plane returns |
+| LangWatch control plane | None for cached VKs | ~15 min JWT exp + `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default 30 min) of stale-while-error; bootstrap cache + Redis L2 extend coverage to cold-for-pod VKs | Outbox re-enqueues debits safely; they flush on recovery. New VK creation is blocked until control plane returns. See [Recipe 8](#recipe-8--control-plane-outage--stale-while-error) for the operator runbook |
 | One upstream provider | None for VKs with fallback; 502/504 for VKs without | Indefinite — circuit breaker + fallback chain absorb it | `gateway_circuit_state{credential_id}` shows which provider is down |
 | Redis L2 cache | +~30 ms on cold-for-pod VKs | Indefinite — L1 + `/resolve-key` cover the miss | Fail-open by design (poison entries `DEL`, network errors log and miss) |
 | Gateway pod (crash / eviction) | None — HPA replaces, PDB holds ≥ 2 replicas | N/A | Stateless; new pod warms from Redis L2 + `/bootstrap` |

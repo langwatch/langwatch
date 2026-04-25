@@ -215,6 +215,24 @@ kubectl logs <gateway-pod> | grep -E 'otlp|exporter'
 
 **Quick sanity check:** filter **Traces** for the last 5 minutes with **Origin = Gateway** and search for your `X-LangWatch-Request-Id`. If the row is there, you were looking at the wrong filter/project. If not, the export path dropped the span — diagnose via the log grep above.
 
+## `auth_cache_refresh_transport_failure` WARN spew in logs
+
+**Symptoms:**
+- Sustained WARN-level lines reading `auth_cache_refresh_transport_failure vk_id=... error=... error_class=transport new_soft_expires_at=...`.
+- Optionally accompanied by INFO `auth_cache_serve_stale` lines on the same `vk_id`s.
+- Customers report no rejection — traffic flows normally.
+
+This is the gateway's **stale-while-error** path running on a transient control-plane outage. Each cached auth bundle that crosses its JWT expiry while the control plane is unreachable is bumped by `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP` (default `5m`) and continues to serve, up to a hard cap of `LW_GATEWAY_AUTH_CACHE_HARD_GRACE` (default `30m`). Customers don't see 401s during this window; the WARN line is informational, not page-worthy.
+
+**What to do:**
+
+1. Check whether the control plane is actually unreachable (Kubernetes events, control-plane pod logs, `/api/health` from inside the gateway pod).
+2. If it is, no operator action on the gateway side — wait for control-plane recovery and the WARN spew will stop on the next successful refresh (followed by a DEBUG `auth_cache_refresh_success` line per VK).
+3. If you start seeing `auth_cache_hard_evict reason=hard_cap_exceeded` ERROR lines, **the grace cap has been crossed and customers are now being rejected** — see [Production runbook → Recipe 8](/ai-gateway/cookbooks/production-runbook#recipe-8--control-plane-outage--stale-while-error) for the operator playbook + how to extend the cap if the outage is ongoing.
+4. To disable stale-while-error entirely (regulated deployments where stale-served bundles are unacceptable), set `LW_GATEWAY_AUTH_CACHE_HARD_GRACE=0s`. Refresh failures past JWT exp will then evict immediately and customers will see 401 `invalid_api_key` for the duration of the outage.
+
+**What this is NOT:** an HMAC mismatch, a misconfigured `LW_GATEWAY_INTERNAL_SECRET`, or a credential issue. Auth-class failures (401/403/404 from `/resolve-key`) bypass the grace window entirely and emit `auth_cache_hard_evict reason=auth_rejection` instead.
+
 ## Trace-id propagation not working
 
 **Symptoms:**
