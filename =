@@ -1,0 +1,41 @@
+🔄 Ralph loop activated in this session!
+
+Iteration: 1
+Max iterations: 20
+Completion promise: AUDIT COMPLETE (ONLY output when TRUE - do not lie!)
+
+The stop hook is now active. When you try to exit, the SAME PROMPT will be
+fed back to you. You'll see your previous work in files, creating a
+self-referential loop where you iteratively improve on the same task.
+
+To monitor: head -10 .claude/ralph-loop.local.md
+
+⚠️  WARNING: This loop cannot be stopped manually! It will run infinitely
+    unless you set --max-iterations or --completion-promise.
+
+🔄
+
+Read /home/boxd/workspace/langwatch/.worktrees/audit-model-providers/AUDIT_BRIEF.md and execute the audit contract: classify every @unimplemented scenario in specs/model-providers/ by appending rows to specs/model-providers/AUDIT_MANIFEST.md. Print AUDIT COMPLETE when manifest row count @unimplemented count.
+
+═══════════════════════════════════════════════════════════
+CRITICAL - Ralph Loop Completion Promise
+═══════════════════════════════════════════════════════════
+
+To complete this loop, output this EXACT text:
+  <promise>AUDIT COMPLETE</promise>
+
+STRICT REQUIREMENTS (DO NOT VIOLATE):
+  ✓ Use <promise> XML tags EXACTLY as shown above
+  ✓ The statement MUST be completely and unequivocally TRUE
+  ✓ Do NOT output false statements to exit the loop
+  ✓ Do NOT lie even if you think you should exit
+
+IMPORTANT - Do not circumvent the loop:
+  Even if you believe you're stuck, the task is impossible,
+  or you've been running too long - you MUST NOT output a
+  false promise statement. The loop is designed to continue
+  until the promise is GENUINELY TRUE. Trust the process.
+
+  If the loop should stop, the promise statement will become
+  true naturally. Do not force it by lying.
+═══════════════════════════════════════════════════════════
