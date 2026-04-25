@@ -65,8 +65,14 @@ export function ChangePasswordDialog({
 
   const onSubmit = async (values: ChangePasswordFormValues) => {
     try {
+      // Only forward `currentPassword` when the server actually needs it
+      // (email/credential mode). In Auth0 mode the dialog doesn't render
+      // the field; sending an empty string would obscure that and could
+      // bite us if the server-side schema is later tightened.
       await changePasswordMutation.mutateAsync({
-        currentPassword: values.currentPassword,
+        ...(requireCurrentPassword
+          ? { currentPassword: values.currentPassword }
+          : {}),
         newPassword: values.newPassword,
       });
       toaster.create({
