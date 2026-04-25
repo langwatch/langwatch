@@ -3,6 +3,73 @@
 > Loop-stable progress doc. Every iteration of the Ralph Loop reads this on startup
 > and updates it before exit. Survives across sessions where /tmp/ does not.
 
+## ⚠️ OPEN DECISION (raised by @rchaves, awaiting confirmation)
+
+**Question:** should `nlpgo → AI Gateway` be a library import or an HTTP call?
+
+The current spec/contract assumes HTTP-with-HMAC-and-inline-credentials. rchaves
+challenged this on three grounds:
+1. Lambda is in an isolated VPC with no path back to the cluster — the gateway
+   would have to be reached over a public hop, which is silly.
+2. He doesn't want a fourth server in the deployment topology.
+3. With library mode, the inbound-HMAC + inline-credentials extension on the
+   gateway disappears entirely.
+
+**Proposed pivot (ash, 2026-04-25):** flip to library. Reasons:
+- The "untrusted user code shares memory with provider keys" concern was wrong —
+  per contract.md §7 the code block runs as a Python *subprocess* (stdin/stdout,
+  no network), so the Go process is a clean key boundary.
+- nlpgo imports `services/aigateway/dispatcher` (a new in-process surface that
+  exposes the provider router with a BYO-credentials entry-point); skips VK
+  resolution, rate-limit, budget, guardrail evaluation by default — those are
+  control-plane-state checks irrelevant to studio runs.
+- nlpgo still talks **directly** to providers (OpenAI, Anthropic, Bedrock,
+  Vertex) over Lambda's existing 443-anywhere egress. No public gateway hop.
+- HTTP gateway service stays for direct VK customers — unchanged.
+
+**Provider quirks belong in the gateway, not in nlpgo:** model-id dot→dash,
+Anthropic alias expansion, Anthropic temperature clamp `[0,1]`, reasoning model
+overrides (o1/o3/gpt-5 → temp=1.0, max_tokens floor) — all should live in the
+gateway's per-provider adapters so direct VK customers benefit too. nlpgo's
+"litellm translator" shrinks to: read DSL → build clean ProviderRequest → hand
+to library. The DSL-side `reasoning_effort/thinkingLevel/effort` aliasing stays
+in nlpgo (Studio UI concern, not gateway concern).
+
+**Open: TS → nlpgo HMAC.** rchaves implied the internal secret could "go away
+completely". Today's Python NLP path has no auth (Function URL + URL secrecy).
+Adding HMAC only on `/go/*` is asymmetric. Two options:
+- Drop the HMAC entirely; match today's no-auth posture for nlpgo.
+- Keep HMAC for `/go/*` only as defense in depth (current spec/code).
+Awaiting rchaves's confirmation before ripping out `LW_NLPGO_INTERNAL_SECRET`.
+
+**What lands once confirmed:**
+- contract.md §8/§9 rewrite (gateway = library; provider quirks at gateway).
+- llm-block.feature + proxy.feature scenarios drop inline-creds header steps.
+- specs/ai-gateway/provider-quirks.feature added (model-id, temp clamps,
+  reasoning overrides as gateway-level guarantees).
+- services/nlpgo/adapters/gatewayclient/ → renamed to gatewaycall, becomes a
+  thin shim over an imported `services/aigateway/dispatcher` package.
+- The proposed gateway "inline-credentials inbound" middleware never gets built.
+- If rchaves confirms drop-HMAC: TS sign.ts, nlpgo httpapi/middleware.go HMAC,
+  middleware_test.go all roll back.
+
+**Status (2026-04-25, end of iteration):**
+- ash + sarah converged on quirks-stay-in-nlpgo (rchaves's "fail naturally"
+  was aspirational; the prime directive "customers with crazy existing
+  workflows must keep working perfectly" wins).
+- ✅ **A — dot→dash at the source** landed as PR #459 on langwatch-saas:
+  https://github.com/langwatch/langwatch-saas/pull/459 (Anthropic-only,
+  8 affected ids, 20 unit tests, follow-up tracked).
+- ✅ **E — SSE round-trip test for legacy /studio/* via proxypass**
+  landed by sarah at c9e3b7243.
+- ⏸ **B — drop LW_NLPGO_INTERNAL_SECRET + revert HMAC code** queued.
+- ⏸ **C — refactor aigateway to expose a dispatcher package + rip
+  gatewayclient/llmexecutor on nlpgo side** queued.
+- ⏸ **D — translator strip-down to DSL→ProviderRequest** queued (ash).
+- All B/C/D items hold pending **explicit rchaves ack** on:
+  1. Library not HTTP for nlpgo→gateway
+  2. Drop LW_NLPGO_INTERNAL_SECRET on TS→nlpgo
+
 ## Goal
 
 Replace the Python `langwatch_nlp` workflow execution engine with a Go service
