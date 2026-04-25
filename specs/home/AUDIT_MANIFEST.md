@@ -1,6 +1,6 @@
-# specs/home — @unimplemented audit manifest
+# specs/home — unimplemented audit manifest
 
-Total @unimplemented scenarios: 93
+Total unimplemented scenarios: 93
 Classified: 93
 
 | File | Scenario | Class | Rationale |
