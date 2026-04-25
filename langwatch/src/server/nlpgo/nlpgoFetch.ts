@@ -112,3 +112,31 @@ export async function isNlpGoEnabled(
     organizationId: opts.organizationId,
   });
 }
+
+/**
+ * Return the OpenAI-compatible proxy base URL for the playground +
+ * modelProviders surface, gated on `release_nlp_go_engine_enabled`.
+ *
+ * - FF on  → `${LANGWATCH_NLP_SERVICE}/go/proxy/v1` (Go playground proxy:
+ *   dispatcher in-process, real AI Gateway, no LiteLLM)
+ * - FF off → `${LANGWATCH_NLP_SERVICE}/proxy/v1` (legacy LiteLLM proxy
+ *   on the uvicorn child)
+ *
+ * On the wire shape stays bit-identical: x-litellm-* credential headers
+ * + OpenAI-shape body. The Go side parses x-litellm-* via gatewayproxy/
+ * headers.go and forwards to the gateway dispatcher; the Python side
+ * keeps doing whatever LiteLLM does today. Customers don't see a
+ * difference unless they've opted into the Go path.
+ */
+export async function nlpgoProxyBaseURL(opts: {
+  projectId: string;
+  baseURL: string;
+  organizationId?: string;
+}): Promise<string> {
+  const goEnabled = await isNlpGoEnabled({
+    projectId: opts.projectId,
+    organizationId: opts.organizationId,
+  });
+  const trimmed = opts.baseURL.replace(/\/$/, "");
+  return goEnabled ? `${trimmed}/go/proxy/v1` : `${trimmed}/proxy/v1`;
+}
