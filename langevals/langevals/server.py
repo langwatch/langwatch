@@ -111,6 +111,34 @@ for evaluator_name, evaluator_package in evaluators.items():
         create_evaluator_routes(evaluator_cls)
 
 
+# Special-case: topic_clustering is a langevals workspace member but does
+# NOT fit the per-trace evaluator interface (it's a batch operation that
+# returns topics + assignments, not a per-trace score). It registers its
+# own /topics/batch_clustering and /topics/incremental_clustering routes
+# via a register_routes(app) hook. Imported conditionally so per-evaluator
+# Lambda builds (--extra azure / openai / ragas / …) that don't include
+# topic_clustering keep working.
+def _maybe_register_topic_clustering_routes() -> None:
+    only_filter = (
+        sys.argv[2].split(",")
+        if len(sys.argv) > 2 and sys.argv[1] == "--only"
+        else None
+    )
+    if only_filter is not None and "topic_clustering" not in only_filter:
+        return
+    try:
+        from langevals_topic_clustering import register_routes as _register
+    except ImportError:
+        # Package not installed in this build; skip silently — matches the
+        # per-evaluator deploy model where each Lambda only ships one extra.
+        return
+    print("Loading langevals_topic_clustering (special routes)")
+    _register(app)
+
+
+_maybe_register_topic_clustering_routes()
+
+
 @app.get("/healthcheck")
 async def healthcheck():
     return {"status": "healthy"}

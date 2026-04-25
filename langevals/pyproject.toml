@@ -28,6 +28,7 @@ lingua = ["langevals-lingua"]
 langevals = ["langevals-langevals"]
 presidio = ["langevals-presidio"]
 legacy = ["langevals-legacy"]
+topic_clustering = ["langevals-topic_clustering"]
 all = [
     "langevals-azure",
     "langevals-langevals",
@@ -36,6 +37,7 @@ all = [
     "langevals-ragas",
     "langevals-presidio",
     "langevals-openai",
+    "langevals-topic_clustering",
 ]
 
 [project.scripts]
@@ -79,6 +81,7 @@ langevals-lingua = { workspace = true }
 langevals-langevals = { workspace = true }
 langevals-presidio = { workspace = true }
 langevals-legacy = { workspace = true }
+langevals-topic_clustering = { workspace = true }
 
 # PyTorch CPU index for Linux
 [[tool.uv.index]]
