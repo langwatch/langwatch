@@ -110,7 +110,7 @@ func (d *Dispatcher) Passthrough(ctx context.Context, req PassthroughRequest) (*
 	if err := validate(req.Request); err != nil {
 		return nil, err
 	}
-	req.Request.Type = domain.RequestTypePassthrough
+	req.Type = domain.RequestTypePassthrough
 	dr := domainRequest(req.Request, &req.HTTP)
 	return d.providers.Dispatch(ctx, dr, req.Credential)
 }
@@ -120,7 +120,7 @@ func (d *Dispatcher) PassthroughStream(ctx context.Context, req PassthroughReque
 	if err := validate(req.Request); err != nil {
 		return nil, err
 	}
-	req.Request.Type = domain.RequestTypePassthrough
+	req.Type = domain.RequestTypePassthrough
 	dr := domainRequest(req.Request, &req.HTTP)
 	return d.providers.DispatchStream(ctx, dr, req.Credential)
 }

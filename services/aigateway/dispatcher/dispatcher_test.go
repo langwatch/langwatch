@@ -1,6 +1,8 @@
 package dispatcher
 
 import (
+	"bytes"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -60,7 +62,7 @@ func TestDomainRequest_PreservesBody(t *testing.T) {
 		Credential: domain.Credential{ProviderID: domain.ProviderOpenAI},
 	}
 	dr := domainRequest(req, nil)
-	if string(dr.Body) != string(body) {
+	if !bytes.Equal(dr.Body, body) {
 		t.Fatalf("body not preserved")
 	}
 	if dr.Type != domain.RequestTypeChat {
@@ -81,14 +83,14 @@ func TestDomainRequest_PassthroughCarriesHTTP(t *testing.T) {
 		Credential: domain.Credential{ProviderID: domain.ProviderGemini},
 	}
 	hp := &domain.PassthroughRequest{
-		Method: "POST", Path: "/models/gemini-2.5-flash:generateContent",
+		Method: http.MethodPost, Path: "/models/gemini-2.5-flash:generateContent",
 		Stream: false,
 	}
 	dr := domainRequest(req, hp)
 	if dr.Passthrough.Path != hp.Path {
 		t.Fatalf("passthrough path lost")
 	}
-	if dr.Passthrough.Method != "POST" {
+	if dr.Passthrough.Method != http.MethodPost {
 		t.Fatalf("passthrough method lost")
 	}
 }
