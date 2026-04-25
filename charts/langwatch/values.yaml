@@ -558,6 +558,9 @@ app:
 ## @section Workers
 workers:
 
+  ## @param workers.enabled [default: true] Deploy the workers Deployment + PDB.
+  enabled: true
+
   # Number of worker replicas
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param workers.replicaCount [default: 1] Number of worker replicas.
