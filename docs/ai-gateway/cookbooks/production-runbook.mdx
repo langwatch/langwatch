@@ -273,7 +273,7 @@ The three log lines form a ladder operators read in order:
 **Customer-facing behaviour during the grace window:**
 
 - Requests against any VK that resolved successfully **before** the outage continue to work transparently.
-- Requests against any VK **never seen by this pod** (cold) still fail — the gateway has no bundle to fall back to. Mitigation: enable `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` so every pod warms its L1 with all active VKs at startup. Pair with Redis L2 (`GATEWAY_REDIS_URL`) so HPA-scaled pods inherit the warm set.
+- Requests against any VK **never seen by this pod** (cold) still fail — the gateway has no bundle to fall back to. Today's mitigation is Redis L2 (`GATEWAY_REDIS_URL`): HPA-scaled pods inherit the warm set from L2 even while the control plane is unreachable. (`GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement to also pre-warm L1 from a `/bootstrap` snapshot on startup; the flag is reserved in env wiring but has no Go-side implementation today, so setting it is currently a no-op.)
 - Requests against any VK whose JWT was **revoked just before the outage** but the revocation `/changes` event hadn't propagated yet — these stay served until the cache entry crosses its hard cap. Acceptable trade-off for the grace; auth rejections from a healthy CP still evict instantly via `auth_cache_hard_evict reason=auth_rejection`.
 
 **Tune:**

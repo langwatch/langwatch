@@ -36,7 +36,7 @@ gateway:
     # Non-secret tuning — GATEWAY_* prefix.
     GATEWAY_CONTROL_PLANE_URL: "http://langwatch-app:5560"
     GATEWAY_REDIS_URL: redis://langwatch-redis:6379/2
-    GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS: "false"
+    GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS: "false"  # reserved; no-op today, see Config docs
 
   # Admin / pprof listener — loopback-bound by default.
   # kubectl port-forward is the supported access path in the default posture.
@@ -183,8 +183,8 @@ In-flight streaming requests pin a connection to a single replica; HPA should sc
 ## High availability
 
 - Run ≥2 replicas with a PodDisruptionBudget so rolling updates don't remove every pod simultaneously.
-- Enable `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` to have every replica load all active VKs into its L1 cache on startup — allows serving traffic if the control-plane is briefly offline.
-- Use Redis (`GATEWAY_REDIS_URL`) as L2 cache so a replica joining a running cluster warms up from shared cache rather than hammering the control-plane.
+- Use Redis (`GATEWAY_REDIS_URL`) as L2 cache so a replica joining a running cluster warms up from shared cache rather than hammering the control-plane. This is the primary mechanism for keeping replicas serving while the control plane is briefly offline — see [Auth-cache stale-while-error](/ai-gateway/self-hosting/config#auth-cache) for the soft/hard-grace knobs.
+- `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS=true` is a planned v1.1 enhancement to pre-warm L1 with every active VK on startup; the flag is wired in chart values but currently has no Go-side implementation, so setting it has no effect today. Use Redis L2 + the auth-cache stale-while-error grace window for cold-start coverage.
 
 ## Monitoring
 

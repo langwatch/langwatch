@@ -108,15 +108,13 @@ The error message names both accepted auth headers — `Authorization: Bearer lw
 ### `/startupz` and `/readyz` behavior at cold boot
 
 ```
-# /startupz — 503 until the gateway's first successful control-plane resolve
+# /startupz — 503 only during the brief window before MarkStarted fires
+# (initialisers + optional GATEWAY_STARTUP_NETCHECK_HOSTS probe), then 200
 HTTP/1.1 503 Service Unavailable
-
-# /readyz — 503 with details until auth cache has observed at least one revision
-HTTP/1.1 503 Service Unavailable
-{"status":"degraded","checks":{"control_plane_reachable":"ok","auth_cache_warm":"cache has not observed any revision yet"}}
+{"status":"degraded","checks":{"control_plane_reachable":"ok"}}
 ```
 
-`auth_cache_warm` flips to `ok` as soon as one VK resolves. This is normal — cold pods report unready until they've seen traffic. In Kubernetes the `startupProbe` covers this with `failureThreshold: 60` (2 min budget).
+`/startupz` and `/readyz` go to `200` as soon as the gateway has finished its startup initialisers and (if configured) the network-check probe has succeeded. They do NOT block on the auth cache observing a VK — a cold pod with no traffic and a fresh control-plane install with zero VKs will still go ready, and auth resolution happens on demand at request time.
 
 ### Graceful drain on SIGTERM
 
