@@ -117,8 +117,12 @@ func TestCredentialFromHeaders_Bedrock(t *testing.T) {
 	if cred.APIKey != "AKIA-TEST" {
 		t.Errorf("APIKey: %q", cred.APIKey)
 	}
-	if cred.Extra["aws_secret_access_key"] != "shh-secret" {
+	// Adapter translates aws_* litellm names → Bifrost-canonical names.
+	if cred.Extra["secret_key"] != "shh-secret" {
 		t.Errorf("secret key lost: %v", cred.Extra)
+	}
+	if cred.Extra["region"] != "us-east-1" {
+		t.Errorf("region lost: %v", cred.Extra)
 	}
 }
 
@@ -142,8 +146,12 @@ func TestCredentialFromHeaders_Vertex(t *testing.T) {
 	if cred.APIKey != saJSON {
 		t.Errorf("SA JSON not preserved as APIKey")
 	}
-	if cred.Extra["vertex_location"] != "us-central1" {
-		t.Errorf("vertex_location lost: %v", cred.Extra)
+	// Adapter translates vertex_* litellm names → Bifrost-canonical names.
+	if cred.Extra["region"] != "us-central1" {
+		t.Errorf("region (was vertex_location) lost: %v", cred.Extra)
+	}
+	if cred.Extra["project_id"] != "acme" {
+		t.Errorf("project_id (was vertex_project) lost: %v", cred.Extra)
 	}
 }
 

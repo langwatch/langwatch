@@ -82,9 +82,11 @@ func (a *Adapter) dispatch(ctx context.Context, req app.GatewayRequest, typ doma
 	if err != nil {
 		return nil, err
 	}
+	bare := bareModel(req.Model)
+	cred = withDeploymentMap(cred, bare)
 	resp, err := a.disp.Dispatch(ctx, dispatcher.Request{
 		Type:       typ,
-		Model:      bareModel(req.Model),
+		Model:      bare,
 		Body:       req.Body,
 		Credential: cred,
 	})
@@ -103,9 +105,11 @@ func (a *Adapter) dispatchStream(ctx context.Context, req app.GatewayRequest, ty
 	if err != nil {
 		return nil, err
 	}
+	bare := bareModel(req.Model)
+	cred = withDeploymentMap(cred, bare)
 	iter, err := a.disp.DispatchStream(ctx, dispatcher.Request{
 		Type:       typ,
-		Model:      bareModel(req.Model),
+		Model:      bare,
 		Body:       req.Body,
 		Credential: cred,
 	})
@@ -220,26 +224,35 @@ func anthropicCred(m map[string]string) domain.Credential {
 func azureCred(m map[string]any) domain.Credential {
 	apiKey, _ := m["api_key"].(string)
 	extra := make(map[string]string, len(m))
+	// Bifrost's Azure key reader expects Extra["endpoint"] and
+	// Extra["api_version"]. The Studio-side litellm_params shape names
+	// the endpoint "api_base" — translate so Bifrost picks it up. Any
+	// unrecognized fields are still passed through stringified for
+	// forward compatibility (e.g. extra_headers, use_azure_gateway).
 	for k, v := range m {
 		if k == "api_key" {
 			continue
 		}
+		dst := k
+		if k == "api_base" {
+			dst = "endpoint"
+		}
 		switch x := v.(type) {
 		case string:
-			extra[k] = x
+			extra[dst] = x
 		case map[string]any, []any:
 			b, err := json.Marshal(x)
 			if err == nil {
-				extra[k] = string(b)
+				extra[dst] = string(b)
 			}
 		case bool:
 			if x {
-				extra[k] = "true"
+				extra[dst] = "true"
 			} else {
-				extra[k] = "false"
+				extra[dst] = "false"
 			}
 		default:
-			extra[k] = fmt.Sprintf("%v", x)
+			extra[dst] = fmt.Sprintf("%v", x)
 		}
 	}
 	return domain.Credential{
@@ -251,20 +264,51 @@ func azureCred(m map[string]any) domain.Credential {
 }
 
 func bedrockCred(m map[string]string) domain.Credential {
+	// Bifrost's Bedrock key reader expects Extra keys "access_key",
+	// "secret_key", "session_token", "region". The Studio-side
+	// litellm_params names them aws_access_key_id / aws_secret_access_key
+	// / aws_session_token / aws_region_name. Translate at the boundary.
+	extra := map[string]string{}
+	if v := m["aws_access_key_id"]; v != "" {
+		extra["access_key"] = v
+	}
+	if v := m["aws_secret_access_key"]; v != "" {
+		extra["secret_key"] = v
+	}
+	if v := m["aws_session_token"]; v != "" {
+		extra["session_token"] = v
+	}
+	if v := m["aws_region_name"]; v != "" {
+		extra["region"] = v
+	}
+	if v := m["aws_bedrock_runtime_endpoint"]; v != "" {
+		extra["bedrock_runtime_endpoint"] = v
+	}
 	return domain.Credential{
 		ID:         inlineCredentialID(domain.ProviderBedrock),
 		ProviderID: domain.ProviderBedrock,
 		APIKey:     m["aws_access_key_id"],
-		Extra:      stringExtras(m, "aws_access_key_id"),
+		Extra:      extra,
 	}
 }
 
 func vertexCred(m map[string]string) domain.Credential {
+	// Bifrost's Vertex key reader expects Extra["project_id"],
+	// Extra["region"], and APIKey carrying the SA JSON. The
+	// litellm_params names the SA JSON "vertex_credentials" and uses
+	// vertex_project / vertex_location for routing.
+	extra := map[string]string{}
+	if v := m["vertex_project"]; v != "" {
+		extra["project_id"] = v
+	}
+	if v := m["vertex_location"]; v != "" {
+		extra["region"] = v
+	}
 	return domain.Credential{
 		ID:         inlineCredentialID(domain.ProviderVertex),
 		ProviderID: domain.ProviderVertex,
 		APIKey:     m["vertex_credentials"],
-		Extra:      stringExtras(m, "vertex_credentials"),
+		Extra:      extra,
 	}
 }
 
@@ -275,6 +319,31 @@ func geminiCred(m map[string]string) domain.Credential {
 		APIKey:     m["api_key"],
 		Extra:      stringExtras(m, "api_key"),
 	}
+}
+
+// withDeploymentMap adds a self-deployment entry on Azure / Bedrock /
+// Vertex credentials so Bifrost's per-key-config readers ("deployments
+// not set" otherwise) accept the call. In the Studio shape the model
+// id IS the deployment name (azure/gpt-5-mini → deployment "gpt-5-mini").
+// Bifrost's deployment lookup is keyed by model so a {model: model}
+// self-map suffices for inline-credential customers; aigateway HTTP
+// callers populate richer maps at the control plane layer.
+func withDeploymentMap(cred domain.Credential, bareModel string) domain.Credential {
+	if bareModel == "" {
+		return cred
+	}
+	switch cred.ProviderID {
+	case domain.ProviderAzure, domain.ProviderBedrock, domain.ProviderVertex:
+	default:
+		return cred
+	}
+	if cred.DeploymentMap == nil {
+		cred.DeploymentMap = map[string]string{}
+	}
+	if _, present := cred.DeploymentMap[bareModel]; !present {
+		cred.DeploymentMap[bareModel] = bareModel
+	}
+	return cred
 }
 
 // bareModel strips the langwatch-internal provider prefix
