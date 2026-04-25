@@ -68,6 +68,35 @@ func (e *UnsupportedNodeKindError) Error() string {
 	return fmt.Sprintf("planner: node %q has unsupported kind %q", e.NodeID, e.Kind)
 }
 
+// retiredKinds names node types that the LangWatch product no longer
+// supports. The planner rejects them with RetiredNodeKindError so the
+// Studio UI surfaces a clear "remove this node" error instead of
+// either falling back to Python (which also wouldn't run them) or
+// silently producing nothing.
+//
+// `retriever` was a v1 concept replaced by tool-call-based retrieval
+// inside signature nodes; `custom` was historically a placeholder
+// kind that never had a real executor.
+var retiredKinds = map[dsl.ComponentType]string{
+	dsl.ComponentType("retriever"): "retriever was retired; remove the node from the workflow",
+	dsl.ComponentType("custom"):    "custom node kind is not supported; replace with code/http/agent/signature/evaluator",
+}
+
+// RetiredNodeKindError signals the workflow contains a node kind that
+// LangWatch has formally retired. Distinct from
+// UnsupportedNodeKindError so the TS app can show a different message
+// (and not bother retrying via the Python upstream — it can't run
+// these either).
+type RetiredNodeKindError struct {
+	NodeID  string
+	Kind    dsl.ComponentType
+	Message string
+}
+
+func (e *RetiredNodeKindError) Error() string {
+	return fmt.Sprintf("planner: node %q has retired kind %q: %s", e.NodeID, e.Kind, e.Message)
+}
+
 // DuplicateNodeError signals two nodes share the same id.
 type DuplicateNodeError struct {
 	NodeID string
@@ -102,8 +131,13 @@ func New(w *dsl.Workflow) (*Plan, error) {
 		nodeIDs[n.ID] = n.Type
 	}
 
-	// 2. Unsupported kinds.
+	// 2. Retired + unsupported kinds. Retired comes first so a workflow
+	// that has both a retired node and an unsupported one gets the more
+	// actionable error.
 	for _, n := range w.Nodes {
+		if msg, retired := retiredKinds[n.Type]; retired {
+			return nil, &RetiredNodeKindError{NodeID: n.ID, Kind: n.Type, Message: msg}
+		}
 		if _, ok := supportedKinds[n.Type]; !ok {
 			return nil, &UnsupportedNodeKindError{NodeID: n.ID, Kind: n.Type}
 		}

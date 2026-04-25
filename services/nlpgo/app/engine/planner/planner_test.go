@@ -142,6 +142,61 @@ func TestPlan_RejectsUnsupportedNodeKind(t *testing.T) {
 	assert.Equal(t, dsl.ComponentAgent, unsup.Kind)
 }
 
+func TestPlan_RejectsRetiredKindRetriever(t *testing.T) {
+	w := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "Entry", Type: dsl.ComponentEntry},
+			{ID: "Retriever", Type: dsl.ComponentType("retriever")},
+		},
+		Edges: []dsl.Edge{{ID: "e1", Source: "Entry", Target: "Retriever"}},
+	}
+	_, err := planner.New(w)
+	require.Error(t, err)
+	var ret *planner.RetiredNodeKindError
+	require.True(t, errors.As(err, &ret), "want RetiredNodeKindError, got %T: %v", err, err)
+	assert.Equal(t, "Retriever", ret.NodeID)
+	assert.Equal(t, dsl.ComponentType("retriever"), ret.Kind)
+	assert.Contains(t, ret.Message, "retired")
+}
+
+func TestPlan_RejectsRetiredKindCustom(t *testing.T) {
+	w := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "Entry", Type: dsl.ComponentEntry},
+			{ID: "Custom", Type: dsl.ComponentType("custom")},
+		},
+		Edges: []dsl.Edge{{ID: "e1", Source: "Entry", Target: "Custom"}},
+	}
+	_, err := planner.New(w)
+	require.Error(t, err)
+	var ret *planner.RetiredNodeKindError
+	require.True(t, errors.As(err, &ret), "want RetiredNodeKindError, got %T: %v", err, err)
+	assert.Equal(t, "Custom", ret.NodeID)
+	assert.Contains(t, ret.Message, "not supported")
+}
+
+func TestPlan_RetiredTakesPriorityOverUnsupported(t *testing.T) {
+	// A workflow with both a retired (retriever) and an unsupported (agent)
+	// node should surface the more-actionable retired-kind error first.
+	// Reasoning: retired = the customer must remove/replace the node;
+	// unsupported = the customer waits for a future release.
+	w := &dsl.Workflow{
+		Nodes: []dsl.Node{
+			{ID: "Entry", Type: dsl.ComponentEntry},
+			{ID: "Retriever", Type: dsl.ComponentType("retriever")},
+			{ID: "Agent", Type: dsl.ComponentAgent},
+		},
+		Edges: []dsl.Edge{
+			{ID: "e1", Source: "Entry", Target: "Retriever"},
+			{ID: "e2", Source: "Entry", Target: "Agent"},
+		},
+	}
+	_, err := planner.New(w)
+	require.Error(t, err)
+	var ret *planner.RetiredNodeKindError
+	assert.True(t, errors.As(err, &ret), "expected retired error to win, got %T: %v", err, err)
+}
+
 func TestPlan_StableLayerOrdering(t *testing.T) {
 	// Three independent nodes should appear in their input order, not
 	// in map-iteration order.
