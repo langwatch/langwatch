@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
-import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOpsPermission } from "../hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
@@ -48,15 +47,6 @@ export const MainMenu = React.memo(function MainMenu({
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id },
-  );
-
-  // AI Gateway menu is feature-flagged pre-GA. Flip it on for internal
-  // dogfooding by setting FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_gateway_menu_enabled
-  // on the server (see featureFlagService.posthog.ts). Otherwise targeting
-  // is driven by PostHog release conditions.
-  const { enabled: gatewayMenuEnabled } = useFeatureFlag(
-    "release_ui_ai_gateway_menu_enabled",
-    { projectId: project?.id, enabled: !!project },
   );
 
   // In compact mode, show expanded view on hover
@@ -260,7 +250,7 @@ export const MainMenu = React.memo(function MainMenu({
               showLabel={showExpanded}
             />
 
-            {gatewayMenuEnabled && hasPermission("virtualKeys:view") && project && (
+            {hasPermission("virtualKeys:view") && project && (
               <>
                 {" "}
                 <HStack

@@ -64,29 +64,9 @@ export const startApp = async (dir = path.dirname(__dirname)) => {
   await verifyRedisReady();
 
   // Partial-config assertion on LW_VIRTUAL_KEY_PEPPER /
-  // LW_GATEWAY_INTERNAL_SECRET / LW_GATEWAY_JWT_SECRET now lives in
+  // LW_GATEWAY_INTERNAL_SECRET / LW_GATEWAY_JWT_SECRET lives in
   // env-create.mjs so workers.ts, CLI scripts, and every other entry
   // point that imports env get it at import time (was server-only here).
-  //
-  // Server-only dev hint: if the AI Gateway menu is force-flagged on but
-  // no secrets are set at all, the UI renders but /api/internal/gateway/*
-  // returns 503. That's an onboarding confusion that's specific to
-  // running `pnpm dev` with the flag, so the warning stays here.
-  const gatewayFlagForced = (process.env.FEATURE_FLAG_FORCE_ENABLE ?? "")
-    .split(",")
-    .map((s) => s.trim())
-    .includes("release_ui_ai_gateway_menu_enabled");
-  const gwSecretsUnset =
-    !process.env.LW_VIRTUAL_KEY_PEPPER &&
-    !process.env.LW_GATEWAY_INTERNAL_SECRET &&
-    !process.env.LW_GATEWAY_JWT_SECRET;
-  if (gatewayFlagForced && gwSecretsUnset) {
-    logger.warn(
-      "AI Gateway menu forced on via FEATURE_FLAG_FORCE_ENABLE, but no " +
-        "gateway secrets are set. The UI will render but /api/internal/gateway/* " +
-        "will return 503. See langwatch/.env.example for the required block.",
-    );
-  }
 
   // Dev: API server on PORT+1000 (default 6560).
   //      Vite dev server runs separately on PORT (default 5560) and proxies /api/* here.
