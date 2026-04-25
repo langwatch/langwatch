@@ -38,7 +38,9 @@ app:
     skipEnvValidation: true
 
 workers:
-  replicaCount: 0
+  # e2e.sh asserts the workers Deployment is absent when enabled=false
+  # (validates the gate added in c74fb13a3).
+  enabled: false
 
 langwatch_nlp:
   replicaCount: 0
