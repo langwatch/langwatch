@@ -1,10 +1,11 @@
 image:
-  # Default points at the public GHCR image published by gateway-ci's
-  # docker job on every push to main (see .github/workflows/gateway-ci.yaml).
+  # Default points at the public Docker Hub image published by the
+  # `ai-gateway` matrix entry in .github/workflows/publish-docker-app.yml
+  # on every `release.published` event for `langwatch@*` tags.
   # Self-hosters who mirror to an internal registry can override
   # `repository` without changing anything else.
-  repository: ghcr.io/langwatch/ai-gateway
-  tag: ""            # defaults to .Chart.AppVersion; main also publishes `latest` and `<sha12>`
+  repository: docker.io/langwatch/ai-gateway
+  tag: ""            # defaults to .Chart.AppVersion; releases also publish `latest` and `<short-sha>`
   pullPolicy: IfNotPresent
 
 replicaCount: 2

@@ -27,11 +27,19 @@ dependencies:
   # Auth is shared: LW_GATEWAY_INTERNAL_SECRET + LW_GATEWAY_JWT_SECRET
   # are materialised once by the umbrella and injected into both the
   # langwatch-app Deployment AND the gateway Deployment via
-  # valueFrom.secretKeyRef. Change on either side (shape / validation)
-  # must bump BOTH charts together — release-please is configured to
-  # treat services/gateway/** + src/server/gateway/** as co-bump paths.
+  # valueFrom.secretKeyRef.
+  #
+  # Versioning: gateway Chart.yaml `$.version` + `$.appVersion` are
+  # bumped in lockstep with the umbrella `langwatch` package by
+  # release-please (.github/release-please-config.json `.` package
+  # extra-files), so both sub-chart and umbrella always carry the
+  # same release version. The `>= 0.0.0` constraint here accepts
+  # whatever local-file version the gateway sub-chart currently
+  # carries — it intentionally does NOT pin a fixed version, since
+  # release-please bumps the sub-chart's Chart.yaml directly and a
+  # hard-pinned constraint would need a separate update path.
   - name: langwatch-gateway
     alias: gateway
-    version: 0.1.0
+    version: ">= 0.0.0"
     repository: file://../gateway
     condition: gateway.chartManaged
