@@ -125,14 +125,10 @@ afterAll(async () => {
   if (!exited) nlpgoProcess.kill("SIGKILL");
 });
 
-describe("nlpgoFetch end-to-end against live nlpgo subprocess", () => {
-  it("routes a Studio workflow to /go/studio/execute_sync and returns a real LLM result", async () => {
-    if (!process.env.OPENAI_API_KEY) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      true;
-      return; // soft skip
-    }
+const liveOpenAI = process.env.OPENAI_API_KEY ? it : it.skip;
 
+describe("nlpgoFetch end-to-end against live nlpgo subprocess", () => {
+  liveOpenAI("routes a Studio workflow to /go/studio/execute_sync and returns a real LLM result", async () => {
     const { nlpgoFetch } = await import("../nlpgoFetch");
 
     const workflow = {

@@ -1,12 +1,8 @@
-import json
 import os
-import random
-import re
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import pandas as pd
-import pytest
 from pathlib import Path
 
 import langevals_topic_clustering.batch_clustering as batch_clustering
