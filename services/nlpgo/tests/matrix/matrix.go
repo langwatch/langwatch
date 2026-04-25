@@ -11,48 +11,32 @@ import (
 	"testing"
 	"time"
 
-	"github.com/langwatch/langwatch/services/nlpgo/adapters/gatewayclient"
+	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/dispatcheradapter"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
 
-// matrixContext bundles env-var lookups so every cell can fail-skip with
-// one helper rather than each test re-checking the env. Live tests must
-// never fail for missing env — that's a `t.Skip` situation, not an
-// assertion error.
-type matrixContext struct {
-	GatewayURL string
-	Secret     string
-}
+// matrixContext is a placeholder kept for symmetry with per-provider
+// cells; the in-process dispatcher needs no per-test config beyond the
+// provider keys read inside each cell.
+type matrixContext struct{}
 
-// loadContext reads the gateway connection info common to every cell.
-// Skips the test if neither GATEWAY_URL nor LW_GATEWAY_INTERNAL_SECRET
-// are set — operators running the full matrix locally will have both.
-func loadContext(t *testing.T) matrixContext {
-	t.Helper()
-	url := os.Getenv("GATEWAY_URL")
-	if url == "" {
-		url = "http://localhost:5563"
-	}
-	secret := os.Getenv("LW_GATEWAY_INTERNAL_SECRET")
-	if secret == "" {
-		t.Skip("LW_GATEWAY_INTERNAL_SECRET not set — start the gateway and load langwatch/.env to run live matrix")
-	}
-	return matrixContext{GatewayURL: url, Secret: secret}
-}
+// loadContext is a no-op since the library pivot — kept only to give
+// per-provider cells a consistent setup hook.
+func loadContext(_ *testing.T) matrixContext { return matrixContext{} }
 
-// newExecutor returns a fully-wired LLM executor pointed at the running
-// gateway. Each cell can construct it once and reuse across sub-tests.
-func newExecutor(t *testing.T, mc matrixContext) *llmexecutor.Executor {
+// newExecutor returns a fully-wired LLM executor backed by the
+// in-process AI Gateway dispatcher. No HTTP, no HMAC — Bifrost lives
+// in the same process. Each cell calls the executor with real
+// provider credentials in the LLMRequest's litellm_params.
+func newExecutor(t *testing.T, _ matrixContext) *llmexecutor.Executor {
 	t.Helper()
-	gw, err := gatewayclient.New(gatewayclient.Options{
-		BaseURL:        mc.GatewayURL,
-		InternalSecret: mc.Secret,
-	})
+	disp, err := dispatcher.New(context.Background(), dispatcher.Options{})
 	if err != nil {
-		t.Fatalf("gatewayclient.New: %v", err)
+		t.Fatalf("dispatcher.New: %v", err)
 	}
-	return llmexecutor.New(gw)
+	return llmexecutor.New(dispatcheradapter.New(disp))
 }
 
 // requireEnv reads an env var, skipping the test if missing.

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/langwatch/langwatch/services/nlpgo/adapters/gatewayclient"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
 
@@ -203,7 +202,7 @@ func TestExecute_InlineCredentialsHeaderSetForBedrock(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	header := gw.lastReq.Headers[gatewayclient.HeaderInlineCredentials]
+	header := gw.lastReq.Headers[headerInlineCredentials]
 	raw, _ := base64.StdEncoding.DecodeString(header)
 	var parsed map[string]any
 	if err := json.Unmarshal(raw, &parsed); err != nil {
@@ -230,8 +229,8 @@ func TestExecute_OriginHeaderFromContext(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if gw.lastReq.Headers[gatewayclient.HeaderOrigin] != "evaluation" {
-		t.Errorf("expected origin header from context, got %q", gw.lastReq.Headers[gatewayclient.HeaderOrigin])
+	if gw.lastReq.Headers[headerOrigin] != "evaluation" {
+		t.Errorf("expected origin header from context, got %q", gw.lastReq.Headers[headerOrigin])
 	}
 }
 
@@ -245,7 +244,7 @@ func TestExecute_NoOriginInContextLeavesHeaderAbsent(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, present := gw.lastReq.Headers[gatewayclient.HeaderOrigin]; present {
+	if _, present := gw.lastReq.Headers[headerOrigin]; present {
 		t.Errorf("expected origin header absent when context has none")
 	}
 }

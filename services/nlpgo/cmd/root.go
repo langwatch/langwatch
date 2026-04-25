@@ -7,8 +7,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/contexts"
+	"github.com/langwatch/langwatch/services/aigateway/dispatcher"
 	"github.com/langwatch/langwatch/services/nlpgo"
-	"github.com/langwatch/langwatch/services/nlpgo/adapters/gatewayclient"
+	"github.com/langwatch/langwatch/services/nlpgo/adapters/dispatcheradapter"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
@@ -44,26 +45,17 @@ func Root(ctx context.Context, _ []string) error {
 		return err
 	}
 
-	// Gateway-backed LLM executor — only wired when both BaseURL and
-	// InternalSecret are configured. Without a gateway nlpgo can still
-	// serve /go/studio/execute_sync for non-LLM workflows; LLM nodes
-	// then surface llm_executor_unavailable so customers get a clear
-	// signal rather than a hung request.
-	var llm app.LLMClient
-	if cfg.Gateway.BaseURL != "" && cfg.Gateway.InternalSecret != "" {
-		gw, err := gatewayclient.New(gatewayclient.Options{
-			BaseURL:        cfg.Gateway.BaseURL,
-			InternalSecret: cfg.Gateway.InternalSecret,
-		})
-		if err != nil {
-			return err
-		}
-		llm = llmexecutor.New(gw)
-		deps.Logger.Info("nlpgo_llm_wired", zap.String("gateway_base_url", cfg.Gateway.BaseURL))
-	} else {
-		deps.Logger.Warn("nlpgo_llm_not_wired",
-			zap.String("reason", "LW_GATEWAY_BASE_URL or LW_GATEWAY_INTERNAL_SECRET unset"))
+	// In-process AI Gateway dispatcher. The library pivot: nlpgo no
+	// longer reaches the gateway over HTTP. Bifrost lives in the same
+	// Go process and dispatches directly to providers using the
+	// per-request credentials llmexecutor builds from the workflow's
+	// litellm_params. No HMAC, no fourth server, no public hop.
+	disp, err := dispatcher.New(ctx, dispatcher.Options{Logger: deps.Logger})
+	if err != nil {
+		return err
 	}
+	llm := llmexecutor.New(dispatcheradapter.New(disp))
+	deps.Logger.Info("nlpgo_llm_wired", zap.String("transport", "in_process_dispatcher"))
 
 	eng := engine.New(engine.Options{
 		HTTP: httpExec,

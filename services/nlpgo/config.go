@@ -19,23 +19,11 @@ type Config struct {
 	Log         clog.Config   `env:"LOG"`
 	OTel        config.OTel   `env:"OTEL"`
 
-	// AI Gateway connection — used by the LLM block executor and by
-	// /go/proxy/v1/*.
-	Gateway GatewayClientConfig `env:"LW_GATEWAY"`
-
 	// Child uvicorn process configuration.
 	Child UvicornChildConfig `env:"NLPGO_CHILD"`
 
 	// Engine knobs surfaced to operators.
 	Engine EngineConfig `env:"NLPGO_ENGINE"`
-}
-
-// GatewayClientConfig connects nlpgo to the AI Gateway. The gateway
-// resolves provider credentials itself, so nlpgo only needs to know
-// where to reach it and how to sign internal calls.
-type GatewayClientConfig struct {
-	BaseURL        string `env:"BASE_URL"`
-	InternalSecret string `env:"INTERNAL_SECRET"`
 }
 
 // UvicornChildConfig controls the langwatch_nlp Python child process.

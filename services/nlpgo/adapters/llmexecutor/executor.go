@@ -1,6 +1,6 @@
 // Package llmexecutor implements services/nlpgo/app.LLMClient by combining
-// the litellm-shape translator (services/nlpgo/adapters/litellm) and the
-// AI Gateway HTTP client (services/nlpgo/adapters/gatewayclient).
+// the litellm-shape translator (services/nlpgo/adapters/litellm) with a
+// pluggable app.GatewayClient.
 //
 // The LLM block in Sarah's engine talks to this executor. The executor:
 //   1. parses provider+model from the LLMRequest
@@ -8,14 +8,17 @@
 //   3. builds the OpenAI-shape request body (messages, tools, params)
 //   4. applies reasoning-model overrides + anthropic temperature clamp
 //   5. normalizes reasoning_effort spelling
-//   6. encodes inline credentials from litellm_params
-//   7. calls the gateway's /v1/chat/completions endpoint
+//   6. encodes inline credentials from litellm_params into the
+//      X-LangWatch-Inline-Credentials header that the GatewayClient
+//      consumes
+//   7. invokes the GatewayClient (in-process dispatcher in production
+//      since the library pivot)
 //   8. parses the response back into app.LLMResponse
 //
-// All providers route through /v1/chat/completions — the gateway's Bifrost
-// adapter handles native-format translation per provider downstream. This
-// matches the existing langwatch_nlp + LiteLLM behavior (everything went
-// through chat/completions).
+// All providers route through chat/completions — Bifrost's per-provider
+// adapter handles native-format translation downstream. This matches the
+// existing langwatch_nlp + LiteLLM behavior (everything went through
+// chat/completions).
 package llmexecutor
 
 import (
@@ -24,9 +27,18 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/langwatch/langwatch/services/nlpgo/adapters/gatewayclient"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/litellm"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
+)
+
+// Header names llmexecutor sets on the GatewayRequest. The active
+// GatewayClient implementation (today: dispatcheradapter) reads these
+// to assemble its in-process dispatcher.Request. The names match the
+// pre-library-pivot HTTP wire format so a future direct-Credential
+// refactor can drop them in lockstep with the consumer.
+const (
+	headerInlineCredentials = "X-LangWatch-Inline-Credentials"
+	headerOrigin            = "X-LangWatch-Origin"
 )
 
 // Executor implements app.LLMClient.
@@ -154,13 +166,13 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 	}
 
 	headers := map[string]string{
-		gatewayclient.HeaderInlineCredentials: credsHeader,
+		headerInlineCredentials: credsHeader,
 	}
 	for k, v := range req.Headers {
 		headers[k] = v
 	}
 	if origin, ok := originFromContext(ctx); ok {
-		headers[gatewayclient.HeaderOrigin] = origin
+		headers[headerOrigin] = origin
 	}
 
 	return app.GatewayRequest{
