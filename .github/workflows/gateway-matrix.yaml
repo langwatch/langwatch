@@ -17,9 +17,13 @@ name: gateway-matrix
 #   - langwatch/src/server/gateway/  (control plane)
 #   - langwatch/src/server/event-sourcing/pipelines/trace-processing/
 #     reactors/gatewayBudgetSync.reactor.ts
-# A nightly schedule catches drift in shared infrastructure (provider
-# SDK changes, billing tier shifts) without burning $20+/day in
-# per-PR runs.
+# Triggers:
+#   - PR push (path-filtered to gateway-relevant files only — doc-only
+#     PRs don't pay the ~$0.07 cost)
+#   - Nightly cron (catches drift in shared provider infra)
+#   - Manual workflow_dispatch (with optional provider-tag override)
+# Fork PRs without secrets: the per-job guard skips the live run
+# cleanly so external contributors don't see a phantom CI red.
 
 on:
   workflow_dispatch:
@@ -32,6 +36,20 @@ on:
         description: 'Optional label appended to trace tags for grep.'
         type: string
         default: ''
+  pull_request:
+    # Only fire when gateway-relevant code or this workflow itself
+    # changes — doc-only / unrelated PRs stay free.
+    paths:
+      - 'services/aigateway/**'
+      - 'pkg/**'
+      - 'cmd/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'langwatch/src/server/gateway/**'
+      - 'langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/gatewayBudgetSync.reactor.ts'
+      - 'langwatch/src/server/routes/gateway-internal.ts'
+      - 'charts/gateway/**'
+      - '.github/workflows/gateway-matrix.yaml'
   schedule:
     # 04:00 UTC daily — quiet provider tier, runs while EMEA is asleep
     - cron: '0 4 * * *'
@@ -50,6 +68,14 @@ jobs:
   matrix:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # Skip on draft PRs (cost discipline) and on fork PRs (GitHub
+    # deliberately strips secrets on `pull_request` from forks, so a
+    # live-credential matrix can never succeed there — running it
+    # would only produce phantom red checks for external contributors).
+    if: |
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.draft == false &&
+       github.event.pull_request.head.repo.fork == false)
     env:
       GATEWAY_URL: http://localhost:5563
       LW_BASE_URL: http://localhost:5560
