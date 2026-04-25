@@ -51,7 +51,34 @@ import { defaultVirtualKeyConfig } from "../src/server/gateway/virtualKey.config
 
 const prisma = new PrismaClient();
 
+type BudgetMode = "ci" | "breach";
+
+function parseBudgetMode(argv: string[]): BudgetMode {
+  // Accept either `--budget-mode=ci|breach` or `--budget-mode ci|breach`.
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i]!;
+    if (arg.startsWith("--budget-mode=")) {
+      const value = arg.slice("--budget-mode=".length);
+      if (value === "ci" || value === "breach") return value;
+      throw new Error(
+        `Invalid --budget-mode=${value} (allowed: ci, breach)`,
+      );
+    }
+    if (arg === "--budget-mode") {
+      const value = argv[i + 1];
+      if (value === "ci" || value === "breach") return value;
+      throw new Error(
+        `Invalid --budget-mode ${value} (allowed: ci, breach)`,
+      );
+    }
+  }
+  return "ci";
+}
+
 async function main() {
+  const budgetMode = parseBudgetMode(process.argv.slice(2));
+  console.log(`✓ budget mode: ${budgetMode}`);
+
   const apiKey = process.env.LANGWATCH_API_KEY;
   if (!apiKey) {
     throw new Error(
@@ -199,23 +226,41 @@ async function main() {
     });
   }
 
-  // Attach a generous $10 MONTH budget to the matrix-openai VK so the
-  // CH-fold path has a budget to land debit rows against. Sergey's
-  // `assertTraceCaptured` + follow-up `/budget/check` will see spend
-  // accumulate as the matrix runs.
-  const matrixOpenaiVk = matrixVks.find((v) => v.name === "matrix-openai")!;
-  await upsertBudget({
-    organizationId: project.team.organizationId,
-    scopeType: "VIRTUAL_KEY",
-    scopeId: matrixOpenaiVk.vkId,
-    virtualKeyScopedId: matrixOpenaiVk.vkId,
-    name: "matrix-openai monthly",
-    window: "MONTH",
-    limitUsd: "10",
-    spentUsd: "0",
-    onBreach: "WARN",
-    actorUserId,
-  });
+  // Attach a budget per matrix VK so the CH-fold path has a budget to
+  // land debit rows against — `assertTraceCaptured` + follow-up
+  // `/budget/check` see spend accumulate per provider as the matrix runs.
+  //
+  // Two modes for budget shape:
+  //   ci     — $10/MONTH per VK with onBreach: BLOCK. Generous enough
+  //            that a full matrix run (~$0.07 total spread across 6
+  //            VKs) won't trip any limit. Validates: budget COUNTING
+  //            works correctly across providers + scopes.
+  //   breach — $0.005/HOUR per VK with onBreach: BLOCK. Tight enough
+  //            that even one matrix-VK's typical 5-cell pass crosses
+  //            the limit, so the matrix surfaces a real 429
+  //            `budget_exceeded` mid-run. Validates: budget BREACH
+  //            enforcement actually rejects subsequent requests.
+  //
+  // Both modes use BLOCK (the production enforcement mode) rather than
+  // WARN — so the test exercises the real code path customers see.
+  const budgetParams =
+    budgetMode === "breach"
+      ? { window: "HOUR" as const, limitUsd: "0.005", suffix: "breach" }
+      : { window: "MONTH" as const, limitUsd: "10", suffix: "monthly" };
+  for (const matrixVk of matrixVks) {
+    await upsertBudget({
+      organizationId: project.team.organizationId,
+      scopeType: "VIRTUAL_KEY",
+      scopeId: matrixVk.vkId,
+      virtualKeyScopedId: matrixVk.vkId,
+      name: `${matrixVk.name} ${budgetParams.suffix}`,
+      window: budgetParams.window,
+      limitUsd: budgetParams.limitUsd,
+      spentUsd: "0",
+      onBreach: "BLOCK",
+      actorUserId,
+    });
+  }
 
   // VK #1: prod-openai — policy_rules + rate limits + tags
   const prodOpenaiSecret = await upsertVirtualKey({
