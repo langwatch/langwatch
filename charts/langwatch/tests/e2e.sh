@@ -299,6 +299,7 @@ test_external_clickhouse() {
     -f "$CHART_DIR/tests/values-e2e.yaml" \
     --set clickhouse.chartManaged=false \
     --set clickhouse.external.url.value="http://fake-ch:8123/default" \
+    --set gateway.chartManaged=false \
     --create-namespace --wait --atomic --timeout "${TIMEOUT}s"
   pass "helm install with external ClickHouse"
 
