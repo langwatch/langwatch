@@ -134,7 +134,7 @@ jobs:
 | `curl ... exit 7` | Gateway unreachable | Check the LB + DNS; `nslookup gateway.langwatch.ai` |
 | `curl ... 401` | VK secret didn't resolve at the gateway | Auth cache bootstrapped against a stale `/changes` feed; check control-plane-to-gateway HMAC agreement |
 | `curl ... 403 model_not_allowed` | VK's provider binding doesn't expose `gpt-5-mini` | Replace the model in the script with one your `$CI_GPC_ID` actually supports |
-| `FAIL: trace propagation` | @sergey's per-tenant OTel middleware is off | See [Observability → trace-id handshake](/ai-gateway/observability#trace-id-propagation--concrete-handshake) |
+| `FAIL: trace propagation` | Per-tenant OTel middleware is off | See [Observability → trace-id handshake](/ai-gateway/observability#trace-id-propagation--concrete-handshake) |
 | `FAIL: empty content` | Upstream returned no content — provider outage | Compare to raw response body saved in `$RESPONSE_FILE` |
 
 ## Running it against self-hosted

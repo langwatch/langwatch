@@ -20,7 +20,7 @@ Eight rows, top to bottom:
 | Streaming | active streams, usage-warning rate | streams that never reported usage = cost blind spot |
 | Cache (passthrough) | hits / bypass / forced — Anthropic discount proxy | cache outcome vs expectation |
 | Infrastructure | pod replicas, CPU, memory, goroutines | k8s-side correlates for everything above |
-| Lifecycle | draining pods, in-flight requests | iter 24: detect hung drains before SIGKILL |
+| Lifecycle | draining pods, in-flight requests | detect hung drains before SIGKILL |
 
 ## Prerequisites
 
@@ -360,7 +360,7 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana: **Dashboards �
 
     {
       "type": "row",
-      "title": "Lifecycle (iter 24 drain)",
+      "title": "Lifecycle (drain)",
       "gridPos": { "x": 0, "y": 70, "w": 24, "h": 1 }
     },
     {
@@ -423,7 +423,7 @@ When a page fires, the engineer lands on the dashboard, narrows the cause to a r
 
 ## Skipping panels you don't have metrics for
 
-If you haven't deployed Redis (iter 15), the L2 hit-rate line is flat at zero — harmless. If you haven't enabled `networkPolicy` (iter 18), the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
+If you haven't deployed Redis, the L2 hit-rate line is flat at zero — harmless. If you haven't enabled `networkPolicy`, the provider egress row doesn't need a custom panel since flow is unchanged. The JSON uses `label_values(...)` so missing labels degrade gracefully rather than breaking the dashboard.
 
 ## See also
 

@@ -398,7 +398,7 @@ This matters for testing: the BDD scenarios in `specs/ai-gateway/public-rest-api
 
 ## OpenAPI
 
-All REST routes are annotated with `hono-openapi`'s `describeRoute` schemas (shipped in Lane B iter 8 + hardened through iter 36). The generated OpenAPI 3.1 spec is served at `/api/gateway/v1/openapi.json` and renders inside the platform's API-reference UI. The CLI's `VirtualKeysApiService`, `GatewayBudgetsApiService`, `GatewayProvidersApiService` DTOs are hand-authored against the same schemas; a v1.1 improvement is to regenerate them from the OpenAPI output so drift fails at build time.
+All REST routes are annotated with `hono-openapi`'s `describeRoute` schemas. The generated OpenAPI 3.1 spec is served at `/api/gateway/v1/openapi.json` and renders inside the platform's API-reference UI. The CLI's `VirtualKeysApiService`, `GatewayBudgetsApiService`, `GatewayProvidersApiService` DTOs are hand-authored against the same schemas; a v1.1 improvement is to regenerate them from the OpenAPI output so drift fails at build time.
 
 ## See also
 

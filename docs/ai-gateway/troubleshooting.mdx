@@ -441,7 +441,7 @@ See [Policy Rules → RE2 syntax](/ai-gateway/policy-rules).
 1. **Body too large for the upstream's edge.** Some providers return HTML 4xx pages instead of JSON when the request body exceeds their per-request tolerance. Coding agents can balloon request bodies past 50 KiB with rich tool schemas + system prompts. **Fix**: reduce body — use `claude --bare --disable-slash-commands` to strip parent skills + plugins; for codex, lower `model_reasoning_effort` and avoid stuffing large `instructions` blocks.
 2. **Upstream auth failure.** Provider returned an HTML 401/403 page rather than JSON. Verify the gateway VK's underlying provider credential is valid (see Settings → Model Providers).
 3. **Upstream API rate limit / outage.** Provider is degraded; falls back via the VK chain if configured.
-4. **The streaming response was misclassified as non-streaming.** Was the cause for codex 0.122+ on `/v1/responses` until iter-110 — `stream:true` lived past the gateway's 32 KiB peek window and `PeekStream(peek)` returned false. Fixed by widening the peek window for `/v1/responses` to 256 KiB.
+4. **The streaming response was misclassified as non-streaming.** Was historically the cause for codex 0.122+ on `/v1/responses` — `stream:true` lived past the gateway's 32 KiB peek window and `PeekStream(peek)` returned false. Fixed by widening the peek window for `/v1/responses` to 256 KiB.
 
 ## `504 failed to unmarshal response from provider API`
 
