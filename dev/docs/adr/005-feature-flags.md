@@ -92,9 +92,18 @@ Cache key format: `{flagKey}:{distinctId}:{projectId}:{organizationId}`
 
 ### Local evaluation (PostHog)
 
-When `POSTHOG_FEATURE_FLAGS_KEY` (Feature Flags Secure key, `phs_*`) is set, `posthog-node` is initialised with `personalApiKey` + `featureFlagsPollingInterval` (default 5 min). The SDK polls flag definitions in the background and resolves `isFeatureEnabled` in-process — no `/flags` request per call.
+When `POSTHOG_FEATURE_FLAGS_KEY` is set, `posthog-node` is initialised with `personalApiKey` + `featureFlagsPollingInterval` (default 5 min). The SDK polls flag definitions in the background and resolves `isFeatureEnabled` in-process — no `/flags` request per call.
 
-This collapses the cost of per-span killswitch checks: without local evaluation each cache miss is one billable PostHog request; with it, the only billable traffic is the polling itself (10 evaluations × 1 poll per 5 min × 1 server ≈ ~86 k/month/server).
+The env var accepts either:
+- a Feature Flags Secure key (`phs_*`) — the current PostHog recommendation, scoped to flag evaluation only, **or**
+- a legacy Personal API key (`phx_*`) — supported for backward compatibility.
+
+This collapses the cost of per-span killswitch checks. Without local evaluation, each cache miss is one billable PostHog request; with it, the only billable traffic is the polling itself, **independent of evaluation volume**.
+
+PostHog bills each local-evaluation poll as 10 feature-flag requests (a single poll fetches all flag definitions in one HTTP request, but the billing multiplier is 10×). At the default 5 min interval:
+
+- 12 polls/hour × 24 × 30 ≈ **8.6 k poll requests / server / month** (HTTP)
+- × 10 billing multiplier ≈ **86 k billable units / server / month**
 
 Set `POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS` to lower the poll interval if you need flag changes to propagate faster than 5 min.
 
