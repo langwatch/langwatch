@@ -38,16 +38,16 @@ gateway:
     GATEWAY_REDIS_URL: redis://langwatch-redis:6379/2
     GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS: "false"
 
-  # Admin / pprof listener (Lane A iter 14) — loopback-bound by default.
+  # Admin / pprof listener — loopback-bound by default.
   # kubectl port-forward is the supported access path in the default posture.
   # For non-k8s deploys that can't port-forward, bind non-loopback AND supply
-  # an existingAuthSecretName to gate the listener with a bearer token (iter 22).
+  # an existingAuthSecretName to gate the listener with a bearer token.
   admin:
     addr: "127.0.0.1:6060"   # set to "" to disable pprof entirely
     # existingAuthSecretName: gateway-admin-token  # optional bearer gate
     # authSecretKey: token                         # default "token"
 
-  # Graceful drain on SIGTERM (Lane A iter 24)
+  # Graceful drain on SIGTERM
   # preDrainWait + timeout + slack MUST be ≤ terminationGracePeriodSeconds.
   # Default 5 + 15 + 10 = 30 matches the chart's terminationGracePeriodSeconds.
   shutdown:
@@ -55,10 +55,10 @@ gateway:
     timeout: 15s        # max wait for in-flight handlers to finish
   terminationGracePeriodSeconds: 30
 
-  # Edge protection (Lane A iter 23 + iter 26).
+  # Edge protection.
   # maxRequestBodyBytes: enforced before auth; a 1 GB drive-by scan can't
   #   pressure pod memory or the auth cache. Raise for vision workloads.
-  # Server timeouts (iter 26) close slowloris-style attacks. WriteTimeout
+  # Server timeouts close slowloris-style attacks. WriteTimeout
   #   is DELIBERATELY NOT EXPOSED — whole-response caps kill SSE; per-chunk
   #   deadlines live in the dispatcher. IdleTimeout MUST exceed your
   #   nginx-ingress keepalive_timeout (typical 75s) so nginx closes first.
@@ -68,14 +68,14 @@ gateway:
     readTimeout: 60s
     idleTimeout: 120s
 
-  # Budget outbox tuning (Lane A iter 16)
+  # Budget outbox tuning
   budget:
     outboxFlushInterval: "1s"
     outboxMaxRetries: 8
     liveThresholdPct: 90      # trigger tier-2 live /budget/check at ≥ this % of cap
     liveTimeout: "200ms"      # Go duration; fail-open on timeout
 
-  # Per-direction guardrail budgets (Lane A iter 16)
+  # Per-direction guardrail budgets
   guardrails:
     preTimeout: "1500ms"        # fail-closed unless guardrails.request_fail_open=true on VK
     postTimeout: "1500ms"       # fail-closed unless guardrails.response_fail_open=true on VK
@@ -95,7 +95,7 @@ gateway:
       failureThreshold: 30
 ```
 
-<Note>The chart ships defaults for every new field (admin / budget / guardrails) — `helm upgrade` from an earlier chart version works without overrides. Lane A iter 16 (`a09af36`) closed the drift where iters 3–15 env knobs weren't exposed in values.yaml.</Note>
+<Note>The chart ships defaults for every new field (admin / budget / guardrails) — `helm upgrade` from an earlier chart version works without overrides.</Note>
 
 Apply:
 
@@ -120,7 +120,7 @@ Then mirror the same values into the LangWatch app's secret (`LW_GATEWAY_INTERNA
 
 `LW_VIRTUAL_KEY_PEPPER` is control-plane-only and should never appear in gateway secrets.
 
-### Secret rotation (iter 25, `921365f`)
+### Secret rotation
 
 Rotate `LW_GATEWAY_JWT_SECRET` (and `LW_GATEWAY_INTERNAL_SECRET`) without downtime using the dual-key overlap pattern. The chart exposes the retired key via a second secret reference:
 
@@ -153,7 +153,7 @@ kubectl logs -n langwatch deploy/langwatch-gateway | \
 
 `LW_GATEWAY_INTERNAL_SECRET` rotation uses the identical pattern (`internalSecretPreviousKey`) — the HMAC verifier accepts both secrets during the overlap window. Rotate both together in one operation.
 
-See [Config → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation-iter-25-921365f) for the env-var contract.
+See [Config → Secret rotation](/ai-gateway/self-hosting/config#secret-rotation) for the env-var contract.
 
 ## Networking
 
@@ -216,13 +216,13 @@ Three Kubernetes probes are provided; all hit the gateway's own `/healthz`, `/re
 
 - **Liveness (`/healthz`)** — returns `200 {"status":"ok"}` as long as the process is alive. Never calls the control-plane.
 - **Readiness (`/readyz`)** — only `200` when: bifrost/core is initialised, at least one provider credential resolves successfully, the control-plane's `/api/internal/gateway/resolve-key` is reachable (or bootstrap cache is populated), and the `/changes` long-poll goroutine is running. Returns `503` with a JSON body listing failed checks otherwise.
-- **Startup (`/startupz`)** — similar to readiness but lenient on bootstrap duration for large VK populations. Optionally runs a one-shot network connectivity probe (iter 20, see below) against a configured host list; if any host fails to resolve or dial, `/startupz` never flips green and k8s recycles the pod.
+- **Startup (`/startupz`)** — similar to readiness but lenient on bootstrap duration for large VK populations. Optionally runs a one-shot network connectivity probe (see below) against a configured host list; if any host fails to resolve or dial, `/startupz` never flips green and k8s recycles the pod.
 
 The readiness definition is strict on purpose — a pod should not be hit by the Service until every dependency is usable, otherwise the first requests after a rollout fail.
 
-### Startup network check (iter 20, `f7901b3`)
+### Startup network check
 
-When `NetworkPolicy` is enabled (iter 18), a subtly-broken egress rule — typically a missing DNS entry or a provider CIDR typo — passes `/livez` and `/healthz` (which never dial outbound) but causes the first customer request to fail. The startup netcheck closes that gap by running a one-shot DNS-resolve + TCP-dial against a configured host list **before** `MarkStarted` fires, failing the pod at deploy time rather than first request.
+When `NetworkPolicy` is enabled, a subtly-broken egress rule — typically a missing DNS entry or a provider CIDR typo — passes `/livez` and `/healthz` (which never dial outbound) but causes the first customer request to fail. The startup netcheck closes that gap by running a one-shot DNS-resolve + TCP-dial against a configured host list **before** `MarkStarted` fires, failing the pod at deploy time rather than first request.
 
 ```yaml
 gateway:
@@ -243,9 +243,9 @@ Failure-class distinction (the key operational value): the probe separates DNS r
 kubectl logs -n langwatch deploy/langwatch-gateway | grep -E 'dns resolution failed|tcp dial failed'
 ```
 
-The probe is disabled by default (empty list) so greenfield and air-gapped-via-forward-proxy deploys are unaffected. `helm upgrade` on an existing deploy without overriding `startup.netcheckHosts` renders the same ConfigMap it would have pre-iter-20.
+The probe is disabled by default (empty list) so greenfield and air-gapped-via-forward-proxy deploys are unaffected. `helm upgrade` on an existing deploy without overriding `startup.netcheckHosts` renders the same ConfigMap that earlier chart versions did.
 
-## Admin listener (iter 22, `af796b8`)
+## Admin listener
 
 The gateway's `net/http/pprof` diagnostic surface ships behind a dedicated listener. Three deployment postures, pick the one that matches your cluster:
 
@@ -332,7 +332,7 @@ The startup log line is enriched with `auth_required` and `loopback_only` boolea
 
 Grep for this in your log pipeline if you want to assert on it in a compliance check.
 
-## NetworkPolicy (iter 18, `cd0506a`)
+## NetworkPolicy
 
 The gateway chart ships an optional Kubernetes `NetworkPolicy` that implements deny-by-default ingress + egress on the gateway pod. It's **off by default** so dev clusters (which often run without a CNI that supports `NetworkPolicy`) aren't broken by `helm upgrade`. Flip it on in production:
 
@@ -361,7 +361,7 @@ gateway:
 - `ingress-nginx` namespace → port `5590` (customer traffic via your Ingress).
 - `monitoring` namespace Prometheus pod → port `5590` `/metrics`.
 
-Everything else is rejected — including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The pprof admin listener (iter 14) is loopback-bound on `127.0.0.1:6060` and is unaffected by `NetworkPolicy` because `kubectl port-forward` tunnels through the Kubernetes API server, not the pod network.
+Everything else is rejected — including traffic from other namespaces, lateral pod-to-pod dials, and direct NodePort hits. The pprof admin listener is loopback-bound on `127.0.0.1:6060` and is unaffected by `NetworkPolicy` because `kubectl port-forward` tunnels through the Kubernetes API server, not the pod network.
 
 **Egress**:
 
@@ -382,7 +382,7 @@ helm template langwatch langwatch/langwatch \
   | grep -A2 'kind: NetworkPolicy'
 ```
 
-Should emit exactly one `NetworkPolicy` with name `langwatch-gateway`. With `enabled=false` (the default), no `NetworkPolicy` object renders. The gateway CI gate (iter 19) asserts both invariants on every PR.
+Should emit exactly one `NetworkPolicy` with name `langwatch-gateway`. With `enabled=false` (the default), no `NetworkPolicy` object renders. The gateway CI gate asserts both invariants on every PR.
 
 ### Inside the pod
 
@@ -399,7 +399,7 @@ kubectl exec -n langwatch deploy/langwatch-gateway -- \
 
 If egress fails with DNS resolution errors, verify the kube-system selector in the chart matches your cluster's DNS namespace (some clusters use `kube-dns` in `kube-system`, others use a custom namespace).
 
-## Graceful drain (iter 24, `ea167ca`)
+## Graceful drain
 
 Rolling deploys, HPA scale-downs, and voluntary pod evictions all invoke SIGTERM. The gateway's four-phase drain makes sure in-flight requests finish and new requests route to surviving replicas:
 
@@ -446,7 +446,7 @@ Pairing the two during drain gives two operationally distinct patterns:
 
 See [Production runbook → Recipe 7](/ai-gateway/cookbooks/production-runbook#recipe-7--stuck-drain) for the diagnostic ladder when handlers don't exit within the grace.
 
-## Security (iter 23, `79b46bf`)
+## Security
 
 Edge protection lives under a dedicated `security` stanza separate from per-upstream budgets or the debit outbox. First (and currently only) knob is the request body cap:
 
@@ -458,10 +458,10 @@ gateway:
 
 Why not `budget` or `upstream`? These three concerns fail in different directions and alert differently:
 - `security` — edge, fails fast with 413, operator bumps when large base64 images are legitimate;
-- `budget` — accounting, fails async via outbox, operator investigates debit flow (see [iter 21](/ai-gateway/cookbooks/production-runbook#recipe-6--debit-outbox-backlog));
+- `budget` — accounting, fails async via outbox, operator investigates debit flow (see [Recipe 6](/ai-gateway/cookbooks/production-runbook#recipe-6--debit-outbox-backlog));
 - `upstream` — per-provider, fails mid-flight with circuit-breaker trips.
 
-The chart's ConfigMap renders the int as `%d` (iter 23 caught a YAML scientific-notation gotcha via test render — Go's `ParseInt` rejects `1.048576e+07`). If you override this value in a custom `values.yaml`, write integer literals, not floats.
+The chart's ConfigMap renders the int as `%d` (the chart's test render catches a YAML scientific-notation gotcha — Go's `ParseInt` rejects `1.048576e+07`). If you override this value in a custom `values.yaml`, write integer literals, not floats.
 
 ### When to tune
 
@@ -469,9 +469,9 @@ The chart's ConfigMap renders the int as `%d` (iter 23 caught a YAML scientific-
 - **Raise** to ~50 MiB when a customer's workload includes large base64-encoded images in `vision` messages. You'll know you need it when legitimate requests start returning `413 payload_too_large`; the troubleshooting entry in [Troubleshooting](/ai-gateway/troubleshooting#413-payload_too_large) tells users exactly which env var to bump.
 - **Do not disable**. A body cap is the single cheapest defence against drive-by memory pressure on a public endpoint.
 
-### HTTP server timeouts (iter 26, `87608d5`)
+### HTTP server timeouts
 
-Slowloris-style attacks complete TLS + headers, then trickle the body at 1 B/s holding the handler goroutine indefinitely. Iter 26 closed the gap with three explicit timeouts on the `http.Server`:
+Slowloris-style attacks complete TLS + headers, then trickle the body at 1 B/s holding the handler goroutine indefinitely. Three explicit timeouts on the `http.Server` close the gap:
 
 ```yaml
 gateway:
@@ -486,9 +486,9 @@ Notable omissions:
 - **`writeTimeout` is NOT exposed.** It would bound the whole response, which terminates long SSE streams (reasoning models, Claude thinking traces) at the cap. Per-chunk streaming deadlines live in the dispatcher, not here. If you're behind an ingress that enforces its own `proxy_read_timeout`, match it there instead.
 - **`idleTimeout` MUST exceed your nginx-ingress `keepalive_timeout`** (typical 75 s). If the gateway closes first, nginx's pool has dead sockets and a request fails mid-flight. The chart default 120 s is safe under the typical 75 s nginx value; if you run a custom ingress with a longer keepalive, bump this value proportionally.
 
-All three timeouts apply to the public listener and the admin listener (iter 22) identically.
+All three timeouts apply to the public listener and the admin listener identically.
 
-## Chart and data-plane CI (iter 19, `1fd1fc3`)
+## Chart and data-plane CI
 
 The upstream repo runs a dedicated `gateway-ci` workflow against every PR that touches `services/gateway/**` or `charts/gateway/**` (paths-filter gated so unrelated PRs don't trigger it). What it guarantees on the chart you're installing:
 
