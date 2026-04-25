@@ -109,6 +109,8 @@ func NewDeps(ctx context.Context, cfg Config) (context.Context, *Deps, error) {
 		Resolver:      cpClient,
 		ConfigFetcher: cpClient,
 		Logger:        logger,
+		SoftBump:      cfg.AuthCache.SoftBump,
+		HardGrace:     cfg.AuthCache.HardGrace,
 	})
 	if err != nil {
 		return ctx, nil, fmt.Errorf("auth service init: %w", err)

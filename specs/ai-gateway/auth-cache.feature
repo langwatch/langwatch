@@ -36,14 +36,100 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And /readyz still reports control_plane_reachable as degraded but /healthz is 200
 
     @integration
-    Scenario: control plane down and cached JWT near expiry -> proactive refresh fails gracefully
+    Scenario: control plane down and cached JWT near expiry -> proactive refresh bumps soft expiry
       Given the cache holds a JWT with exp = now + 30 seconds
       And the control plane is unreachable
       When I send a request with that VK
       Then the gateway verifies the JWT locally (still valid)
       And the request succeeds
       And a proactive refresh is attempted in background
-      And the failure is logged with level=debug (no user-visible effect)
+      And the failure is classified as transport (not rejection)
+      And the entry's soft expiry is bumped by 5 minutes (operator visibility, no user effect)
+      And the failure is logged with level=warn
+
+  Rule: Cached JWT serves stale-while-error past natural expiry on transport failure
+    The gateway must not hard-reject traffic just because the control plane is
+    briefly unreachable. When a cached entry crosses its JWT exp AND the
+    control-plane refresh fails for transport reasons (network error, dial
+    timeout, 5xx, connection refused, malformed/unparseable response), the
+    gateway extends the entry's soft expiry by a short grace window (default
+    5 minutes) and continues serving, up to a hard expiry cap (default 30
+    minutes past the original JWT exp). On any auth-class rejection
+    (401/403/404 from /resolve-key), the entry is evicted immediately and
+    the request is rejected — bad credentials must never get a grace window.
+
+    @unit
+    Scenario Outline: expired entry + transport failure -> serve stale, bump soft
+      Given the cache holds an entry whose JWT expired 30 seconds ago
+      And the control plane is failing with <failure>
+      When I send a request with that VK
+      Then the gateway serves the cached bundle
+      And the entry's soft expiry is bumped by 5 minutes
+      And the entry's hard expiry cap is unchanged
+      And the failure is logged with level=warn
+
+      Examples:
+        | failure                            |
+        | dial timeout                       |
+        | read timeout mid-response          |
+        | 500 Internal Server Error          |
+        | 502 Bad Gateway                    |
+        | 503 Service Unavailable            |
+        | 504 Gateway Timeout                |
+        | TCP connection refused             |
+        | DNS resolution error               |
+        | unparseable JWT response body      |
+        | JWT signature verification failure |
+
+    @unit
+    Scenario Outline: expired entry + auth rejection -> evict and reject (no grace window)
+      Given the cache holds an entry whose JWT expired 30 seconds ago
+      And the control plane returns <status>
+      When I send a request with that VK
+      Then the gateway evicts the cached entry
+      And the request is rejected with error.type "<error_type>"
+      And the entry's soft expiry is NOT bumped
+
+      Examples:
+        | status                | error_type            |
+        | 401 Unauthorized      | invalid_api_key       |
+        | 404 Not Found         | invalid_api_key       |
+        | 403 Forbidden         | virtual_key_revoked   |
+
+    @unit
+    Scenario: hard expiry cap stops the stale-while-error chain
+      Given the cache holds an entry stale-extended for 30 minutes past its JWT exp
+      And the control plane is still unreachable
+      When I send a request with that VK
+      Then the gateway evicts the cached entry
+      And the request is rejected with error.type "auth_upstream_unavailable"
+      And no further soft-bump is applied
+      And the failure is logged with level=error (operator must investigate)
+
+    @unit
+    Scenario: successful refresh resets soft expiry to fresh JWT exp
+      Given the cache holds an entry stale-extended by 10 minutes past its JWT exp
+      And the control plane recovers and signs a fresh JWT
+      When I send a request with that VK
+      Then the cache entry is replaced with the fresh bundle
+      And the soft expiry tracks the new JWT's exp
+      And the hard expiry cap is recomputed relative to the new bundle
+
+    @unit
+    Scenario: background refresh near soft-expiry on transport failure bumps the entry
+      Given the cache holds an entry whose JWT is 30 seconds from expiring
+      And the control plane is unreachable
+      When the near-expiry background refresh fires
+      Then the entry's soft expiry is bumped by 5 minutes
+      And the failure is logged with level=warn
+
+    @unit
+    Scenario: background refresh near soft-expiry on auth rejection evicts the entry
+      Given the cache holds an entry whose JWT is 30 seconds from expiring
+      And the control plane returns 403 Forbidden
+      When the near-expiry background refresh fires
+      Then the entry is evicted from L1 (and L2 if configured)
+      And the next request with that VK calls /resolve-key fresh and is rejected
 
   Rule: Short-lived JWT is refreshed before expiry
 

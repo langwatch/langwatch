@@ -2,6 +2,7 @@ package aigateway
 
 import (
 	"context"
+	"time"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
@@ -13,6 +14,7 @@ type Config struct {
 	Server       config.Server      `env:"SERVER"`
 	Log          clog.Config        `env:"LOG"`
 	ControlPlane ControlPlaneConfig `env:"LW_GATEWAY"`
+	AuthCache    AuthCacheConfig    `env:"LW_GATEWAY_AUTH_CACHE"`
 	CustomerTraceBridge CustomerTraceBridgeConfig `env:"CUSTOMER_TRACE_BRIDGE"`
 	OTel         config.OTel        `env:"OTEL"`
 }
@@ -23,6 +25,21 @@ type ControlPlaneConfig struct {
 	InternalSecret string `env:"INTERNAL_SECRET"     validate:"required"`
 	JWTSecret      string `env:"JWT_SECRET"          validate:"required"`
 	JWTSecretPrev  string `env:"JWT_SECRET_PREVIOUS"`
+}
+
+// AuthCacheConfig governs the resolver's stale-while-error behavior. The
+// gateway is on the hot path of every LLM request, so a brief control-plane
+// outage must not translate into mass authentication rejection. When a
+// cached entry crosses its JWT exp AND the refresh fails for transport
+// reasons (network/timeout/5xx/parse error), the entry's soft expiry is
+// extended by SoftBump and the cached bundle continues to serve, up to a
+// hard cap of (JWT exp + HardGrace). Any auth-class rejection from the
+// control plane (401/403/404) evicts immediately — no grace window for
+// known-bad credentials. Setting HardGrace=0 disables stale-while-error
+// entirely (legacy behavior).
+type AuthCacheConfig struct {
+	SoftBump  time.Duration `env:"SOFT_BUMP"`
+	HardGrace time.Duration `env:"HARD_GRACE"`
 }
 
 // CustomerTraceBridgeConfig holds customer trace bridge settings.
