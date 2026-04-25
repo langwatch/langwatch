@@ -250,6 +250,7 @@ describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake
                 { identifier: "score", type: "float" },
                 { identifier: "passed", type: "bool" },
                 { identifier: "details", type: "str" },
+                { identifier: "cost", type: "dict" },
               ],
             },
           },
@@ -261,6 +262,7 @@ describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake
                 { identifier: "score", type: "float" },
                 { identifier: "passed", type: "bool" },
                 { identifier: "details", type: "str" },
+                { identifier: "cost", type: "dict" },
               ],
             },
           },
@@ -322,6 +324,14 @@ describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake
             targetHandle: "details",
             type: "default",
           },
+          {
+            id: "e8",
+            source: "eval",
+            sourceHandle: "cost",
+            target: "end",
+            targetHandle: "cost",
+            type: "default",
+          },
         ],
         state: {},
       };
@@ -354,11 +364,12 @@ describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake
       expect(events.find((e) => e.type === "done")).toBeDefined();
 
       // Evaluator node must surface a final state-change carrying the
-      // canned score / passed / details. The `cost` field comes back as
-      // an object on the upstream wire; the engine doesn't currently
-      // surface it on per-node outputs (cost lives on the workflow-level
-      // total), so we don't assert on per-node cost — but we do assert
-      // upstream call shape below to prove cost reached the engine.
+      // canned score / passed / details / cost. Cost is the tricky one
+      // owner explicitly called out as load-bearing — engine projects
+      // upstream's {currency, amount} dict onto the per-node outputs
+      // when the workflow declares `cost` as an output, AND surfaces
+      // the amount on `execution_state.cost` for the workflow-level
+      // total accumulator.
       const componentChanges = events.filter(
         (e): e is Extract<StudioServerEvent, { type: "component_state_change" }> =>
           e.type === "component_state_change",
@@ -380,9 +391,17 @@ describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake
       expect(evalOutputs.score).toBeCloseTo(0.91, 5);
       expect(evalOutputs.passed).toBe(true);
       expect(evalOutputs.details).toContain("looks good");
+      expect(evalOutputs.cost).toEqual({ currency: "USD", amount: 0.000123 });
+      // The workflow-level cost field on execution_state surfaces the
+      // numeric amount so trace + billing aggregators don't have to
+      // unpack the {currency, amount} dict.
+      expect(
+        (finalEvalChange?.payload.execution_state as any)?.cost,
+      ).toBeCloseTo(0.000123, 9);
 
-      // End node must produce the same score/passed/details as outputs
-      // (proves the edge wiring of evaluator → end works end-to-end).
+      // End node must produce the same score/passed/details/cost as
+      // outputs (proves the edge wiring of all four evaluator → end
+      // edges works end-to-end).
       const finalEndChange = [...componentChanges]
         .reverse()
         .find((e) => e.payload.component_id === "end");
@@ -391,6 +410,7 @@ describe("Studio post_event SSE: signature → evaluator e2e (real OpenAI + fake
         ?.outputs;
       expect(endOutputs.score).toBeCloseTo(0.91, 5);
       expect(endOutputs.passed).toBe(true);
+      expect(endOutputs.cost).toEqual({ currency: "USD", amount: 0.000123 });
 
       // Wire validation: exactly one evaluator HTTP call landed at the
       // fake LangWatch with the right URL, project apiKey on
