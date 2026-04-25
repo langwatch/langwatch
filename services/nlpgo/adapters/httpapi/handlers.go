@@ -38,59 +38,16 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 			return
 		}
 
-		// Decode into a permissive envelope first so we can extract
-		// trace_id / inputs / origin without parsing the whole workflow
-		// twice. The workflow itself stays as raw JSON until the engine
-		// (which holds the dsl package) decodes it.
-		var env struct {
-			TraceID  string         `json:"trace_id"`
-			Workflow json.RawMessage `json:"workflow"`
-			Inputs   any            `json:"inputs,omitempty"`
-			Origin   string         `json:"origin,omitempty"`
-			ProjectID string        `json:"project_id,omitempty"`
-		}
-		if err := json.Unmarshal(body, &env); err != nil {
-			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
-				"reason": "parse_envelope",
-			}, err))
+		req, herrErr := decodeStudioClientEvent(r, body)
+		if herrErr != nil {
+			herr.WriteHTTP(w, *herrErr)
 			return
 		}
-		if len(env.Workflow) == 0 {
-			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
-				"reason": "missing_workflow",
-			}, errors.New("'workflow' field required")))
-			return
-		}
-
-		// Origin: prefer explicit body field, fall back to header. The
-		// header path is what the TS app uses by default; the body
-		// field is for tests + manual invocation.
-		origin := env.Origin
-		if origin == "" {
-			origin = r.Header.Get("X-LangWatch-Origin")
-		}
-
-		// Inputs: Python accepts either a single dict (component
-		// execution) or a list of dicts (flow execution). For sync the
-		// most common shape is a single dict; if a list arrives we use
-		// the first element. Multi-record streaming is the SSE path.
-		inputs := normalizeInputs(env.Inputs)
-
-		// Attach origin to ctx so the LLM executor (and gateway HTTP
-		// calls underneath) propagate X-LangWatch-Origin downstream.
-		// Without this every Studio LLM call lands on the gateway
-		// untagged and origin-based attribution breaks.
 		ctx := r.Context()
-		if origin != "" {
-			ctx = withOrigin(ctx, origin)
+		if req.Origin != "" {
+			ctx = withOrigin(ctx, req.Origin)
 		}
-		result, err := executor.Execute(ctx, app.WorkflowRequest{
-			WorkflowJSON: env.Workflow,
-			Inputs:       inputs,
-			Origin:       origin,
-			TraceID:      env.TraceID,
-			ProjectID:    env.ProjectID,
-		})
+		result, err := executor.Execute(ctx, *req)
 		if err != nil {
 			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
 				"reason": "engine_error",
@@ -101,6 +58,85 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(result)
 	}
+}
+
+// decodeStudioClientEvent parses the inbound body in either of the two
+// shapes the Studio client emits:
+//
+//  1. Discriminated event (preferred — matches the Python
+//     StudioClientEvent union sent by langwatch/src/server/workflows/
+//     runWorkflow.ts):
+//     {"type":"execute_flow"|"execute_component"|"execute_evaluation",
+//      "payload":{trace_id, workflow, inputs?, origin?, ...}}
+//
+//  2. Flat envelope (used by tests + manual curl):
+//     {trace_id, workflow, inputs?, origin?, project_id?}
+//
+// Both decode into the same WorkflowRequest. execute_optimization is
+// rejected per the FF-on contract (optimization is dead — see
+// specs/nlp-go/feature-flag.feature).
+func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest, *herr.E) {
+	// Peek the type field. The discriminated form has a top-level
+	// "type" with payload nested under "payload"; the flat form
+	// usually has neither but may have just "type" if the caller
+	// already produced that shape — we treat absent or empty type as
+	// "flat".
+	var peek struct {
+		Type    string          `json:"type"`
+		Payload json.RawMessage `json:"payload"`
+	}
+	if err := json.Unmarshal(body, &peek); err != nil {
+		e := herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"reason": "parse_envelope",
+		}, err)
+		return nil, &e
+	}
+
+	if peek.Type == "execute_optimization" {
+		e := herr.New(r.Context(), domain.ErrUnsupportedNodeKind, herr.M{
+			"reason": "optimization_disabled_on_go_path",
+		}, errors.New("execute_optimization is unsupported on the Go engine path; the Studio Optimize button is hidden when the FF is on"))
+		return nil, &e
+	}
+
+	// Use payload bytes if discriminated; otherwise the whole body is
+	// the flat shape.
+	innerBytes := []byte(peek.Payload)
+	if len(innerBytes) == 0 {
+		innerBytes = body
+	}
+
+	var inner struct {
+		TraceID   string          `json:"trace_id"`
+		Workflow  json.RawMessage `json:"workflow"`
+		Inputs    any             `json:"inputs,omitempty"`
+		Origin    string          `json:"origin,omitempty"`
+		ProjectID string          `json:"project_id,omitempty"`
+	}
+	if err := json.Unmarshal(innerBytes, &inner); err != nil {
+		e := herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"reason": "parse_payload",
+		}, err)
+		return nil, &e
+	}
+	if len(inner.Workflow) == 0 {
+		e := herr.New(r.Context(), domain.ErrBadRequest, herr.M{
+			"reason": "missing_workflow",
+		}, errors.New("'workflow' field required"))
+		return nil, &e
+	}
+
+	origin := inner.Origin
+	if origin == "" {
+		origin = r.Header.Get("X-LangWatch-Origin")
+	}
+	return &app.WorkflowRequest{
+		WorkflowJSON: inner.Workflow,
+		Inputs:       normalizeInputs(inner.Inputs),
+		Origin:       origin,
+		TraceID:      inner.TraceID,
+		ProjectID:    inner.ProjectID,
+	}, nil
 }
 
 // withOrigin is a small wrapper around llmexecutor.WithOrigin so the
@@ -150,32 +186,14 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 			}, err))
 			return
 		}
-		var env struct {
-			TraceID   string          `json:"trace_id"`
-			Workflow  json.RawMessage `json:"workflow"`
-			Inputs    any             `json:"inputs,omitempty"`
-			Origin    string          `json:"origin,omitempty"`
-			ProjectID string          `json:"project_id,omitempty"`
-		}
-		if err := json.Unmarshal(body, &env); err != nil {
-			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
-				"reason": "parse_envelope",
-			}, err))
+		req, herrErr := decodeStudioClientEvent(r, body)
+		if herrErr != nil {
+			herr.WriteHTTP(w, *herrErr)
 			return
-		}
-		if len(env.Workflow) == 0 {
-			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
-				"reason": "missing_workflow",
-			}, errors.New("'workflow' field required")))
-			return
-		}
-		origin := env.Origin
-		if origin == "" {
-			origin = r.Header.Get("X-LangWatch-Origin")
 		}
 		ctx := r.Context()
-		if origin != "" {
-			ctx = withOrigin(ctx, origin)
+		if req.Origin != "" {
+			ctx = withOrigin(ctx, req.Origin)
 		}
 
 		w.Header().Set("Content-Type", "text/event-stream")
@@ -202,13 +220,7 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 			cancel()
 		}()
 
-		events, err := executor.ExecuteStream(streamCtx, app.WorkflowRequest{
-			WorkflowJSON: env.Workflow,
-			Inputs:       normalizeInputs(env.Inputs),
-			Origin:       origin,
-			TraceID:      env.TraceID,
-			ProjectID:    env.ProjectID,
-		}, app.WorkflowStreamOptions{
+		events, err := executor.ExecuteStream(streamCtx, *req, app.WorkflowStreamOptions{
 			Heartbeat: streamHeartbeat(r),
 		})
 		if err != nil {
