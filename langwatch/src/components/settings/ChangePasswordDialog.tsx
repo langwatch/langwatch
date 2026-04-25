@@ -1,6 +1,6 @@
 import { Button, Field, HStack, Input, Stack, Text } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { Dialog } from "../ui/dialog";
@@ -42,8 +42,16 @@ export function ChangePasswordDialog({
   requireCurrentPassword,
 }: ChangePasswordDialogProps) {
   const changePasswordMutation = api.user.changePassword.useMutation();
+  // Memoize the resolver so we're not building a fresh Zod schema +
+  // ZodEffects instance on every render. `requireCurrentPassword` is
+  // effectively static per dialog mount but RHF's stable-resolver
+  // contract is cheaper this way.
+  const resolver = useMemo(
+    () => zodResolver(buildSchema(requireCurrentPassword)),
+    [requireCurrentPassword],
+  );
   const form = useForm<ChangePasswordFormValues>({
-    resolver: zodResolver(buildSchema(requireCurrentPassword)),
+    resolver,
     defaultValues: {
       currentPassword: "",
       newPassword: "",
