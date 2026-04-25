@@ -180,7 +180,6 @@ jobs:
           done
 
       - name: Start gateway (background)
-        working-directory: services/aigateway
         run: |
           go build -o /tmp/aigateway ./cmd/service
           /tmp/aigateway aigateway > /tmp/aigateway.log 2>&1 &
