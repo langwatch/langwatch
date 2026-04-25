@@ -29,11 +29,11 @@ export type ScopeRef =
 /**
  * A principal is the entity whose permissions are being checked.
  * - "user": a human user (supports group memberships)
- * - "pat": a personal access token (no groups)
+ * - "apiKey": an API key (no groups)
  */
 export type Principal =
   | { type: "user"; id: string }
-  | { type: "pat"; id: string };
+  | { type: "apiKey"; id: string };
 
 type ResolvedBinding = {
   role: TeamUserRole;
@@ -91,8 +91,8 @@ async function collectBindingsForScope({
   organizationId: string;
   scope: ScopeRef;
 }): Promise<ResolvedBinding[]> {
-  if (principal.type === "pat") {
-    return collectBindingsForPat({ prisma, patId: principal.id, organizationId, scope });
+  if (principal.type === "apiKey") {
+    return collectBindingsForApiKey({ prisma, apiKeyId: principal.id, organizationId, scope });
   }
 
   return collectBindingsForUser({ prisma, userId: principal.id, organizationId, scope });
@@ -135,19 +135,19 @@ async function collectBindingsForUser({
     .map((b) => ({ role: b.role, customRoleId: b.customRoleId, scopeType: b.scopeType }));
 }
 
-async function collectBindingsForPat({
+async function collectBindingsForApiKey({
   prisma,
-  patId,
+  apiKeyId,
   organizationId,
   scope,
 }: {
   prisma: PrismaClient;
-  patId: string;
+  apiKeyId: string;
   organizationId: string;
   scope: ScopeRef;
 }): Promise<ResolvedBinding[]> {
   const bindings = await prisma.roleBinding.findMany({
-    where: { organizationId, patId },
+    where: { organizationId, apiKeyId },
     select: { role: true, customRoleId: true, scopeType: true, scopeId: true },
   });
 
@@ -203,7 +203,7 @@ export async function checkRoleBindingPermission({
         select: { permissions: true },
       });
       // Use the shared parser so shape validation is consistent with the
-      // PAT-create ceiling path. On malformed data we fail safe here (the
+      // API-key-create ceiling path. On malformed data we fail safe here (the
       // caller is a permission check — deny, log, move on) rather than
       // bubbling the error up, because unrelated principals should not be
       // blocked by one corrupted custom role.
@@ -252,38 +252,38 @@ export async function checkRoleBindingPermission({
 }
 
 /**
- * Resolution-time ceiling enforcement for PATs.
+ * Resolution-time ceiling enforcement for API keys.
  *
- * effective_permissions = PAT.roleBindings(scope) ∩ user.roleBindings(scope)
+ * effective_permissions = ApiKey.roleBindings(scope) ∩ user.roleBindings(scope)
  *
- * Returns true only if BOTH the PAT's own bindings AND the owning user's
+ * Returns true only if BOTH the API key's own bindings AND the owning user's
  * current bindings grant the requested permission. If the user's role has been
- * downgraded, the PAT auto-degrades immediately.
+ * downgraded, the API key auto-degrades immediately.
  */
-export async function resolvePatPermission({
+export async function resolveApiKeyPermission({
   prisma,
-  patId,
+  apiKeyId,
   userId,
   organizationId,
   scope,
   permission,
 }: {
   prisma: PrismaClient;
-  patId: string;
+  apiKeyId: string;
   userId: string;
   organizationId: string;
   scope: ScopeRef;
   permission: Permission;
 }): Promise<boolean> {
-  // 1. Check PAT's own bindings
-  const patAllowed = await checkRoleBindingPermission({
+  // 1. Check API key's own bindings
+  const apiKeyAllowed = await checkRoleBindingPermission({
     prisma,
-    principal: { type: "pat", id: patId },
+    principal: { type: "apiKey", id: apiKeyId },
     organizationId,
     scope,
     permission,
   });
-  if (!patAllowed) return false;
+  if (!apiKeyAllowed) return false;
 
   // 2. Check owning user's current bindings (ceiling)
   return checkRoleBindingPermission({

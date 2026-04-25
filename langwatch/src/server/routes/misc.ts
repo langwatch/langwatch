@@ -78,32 +78,32 @@ import { createLogger } from "~/utils/logger/server";
 import { findOrCreateExperiment } from "~/pages/api/experiment/init";
 import {
   createUnifiedAuthMiddleware,
-  requirePatPermission,
+  requireApiKeyPermission,
   type UnifiedAuthVariables,
-} from "~/server/pat/auth-middleware";
+} from "~/server/api-key/auth-middleware";
 
 const logger = createLogger("langwatch:misc");
 // Shared auth middlewares for every PAT-aware handler in this file.
 // `createUnifiedAuthMiddleware` runs the extractCredentials → TokenResolver
-// → setContext → late markUsed pipeline once; `requirePatPermission`
+// → setContext → late markUsed pipeline once; `requireApiKeyPermission`
 // enforces the per-route ceiling and returns 403 on denial.
 const authMiddleware = createUnifiedAuthMiddleware({ prisma });
-const requireAnalyticsView = requirePatPermission({
+const requireAnalyticsView = requireApiKeyPermission({
   prisma,
   permission: "analytics:view",
 });
 // TODO(pat): move DSPy steps under a dedicated experiments permission once
 // the RBAC catalog has one. `workflows:manage` is the closest existing
 // ceiling — VIEWER blocked, ADMIN/MEMBER allowed.
-const requireWorkflowsManage = requirePatPermission({
+const requireWorkflowsManage = requireApiKeyPermission({
   prisma,
   permission: "workflows:manage",
 });
-const requireTracesCreate = requirePatPermission({
+const requireTracesCreate = requireApiKeyPermission({
   prisma,
   permission: "traces:create",
 });
-const requireTriggersManage = requirePatPermission({
+const requireTriggersManage = requireApiKeyPermission({
   prisma,
   permission: "triggers:manage",
 });
@@ -176,7 +176,7 @@ const RAG_SYSTEM_PROMPT =
   "You are a restaurant expert knowing the best around town.";
 
 // NOTE(pat): /demo/hotel_bot is intentionally NOT migrated to the unified
-// extractCredentials + TokenResolver + enforcePatCeiling pipeline. It is a
+// extractCredentials + TokenResolver + enforceApiKeyCeiling pipeline. It is a
 // demo fixture that only forwards the caller's token onward to /api/collector,
 // which performs full PAT/legacy auth + ceiling enforcement itself. Adding a
 // second layer here would double-validate the same token and require a

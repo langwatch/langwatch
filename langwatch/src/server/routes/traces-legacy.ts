@@ -28,11 +28,11 @@ import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations"
 import type { Span, Trace } from "~/server/tracer/types";
 import type { Permission } from "~/server/api/rbac";
 import {
-  enforcePatCeiling,
+  enforceApiKeyCeiling,
   extractCredentials,
-  patCeilingDenialResponse,
-} from "~/server/pat/auth-middleware";
-import { TokenResolver } from "~/server/pat/token-resolver";
+  apiKeyCeilingDenialResponse,
+} from "~/server/api-key/auth-middleware";
+import { TokenResolver } from "~/server/api-key/token-resolver";
 
 const tokenResolver = TokenResolver.create(prisma);
 
@@ -63,15 +63,15 @@ async function authenticateRequest(c: Context, permission: Permission) {
   }
 
   try {
-    await enforcePatCeiling({ prisma, resolved, permission });
+    await enforceApiKeyCeiling({ prisma, resolved, permission });
   } catch (error) {
-    const denial = patCeilingDenialResponse(error);
+    const denial = apiKeyCeilingDenialResponse(error);
     return { error: denial.message, status: denial.status };
   }
 
   const markUsed = () => {
-    if (resolved.type === "pat") {
-      tokenResolver.markUsed({ patId: resolved.patId });
+    if (resolved.type === "apiKey") {
+      tokenResolver.markUsed({ apiKeyId: resolved.apiKeyId });
     }
   };
 

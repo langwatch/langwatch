@@ -1,22 +1,26 @@
-import type { PrismaClient, PersonalAccessToken } from "@prisma/client";
+import type { PrismaClient, ApiKey } from "@prisma/client";
 import { RoleBindingScopeType, TeamUserRole } from "@prisma/client";
-import { PatRepository, type PatWithBindings } from "./pat.repository";
+import { ApiKeyRepository, type ApiKeyWithBindings } from "./api-key.repository";
 import {
-  generatePatToken,
-  splitPatToken,
+  generateApiKeyToken,
+  splitApiKeyToken,
   verifySecret,
-} from "./pat-token.utils";
+} from "./api-key-token.utils";
 import {
-  PatAlreadyRevokedError,
-  PatNotFoundError,
-  PatNotOwnedError,
-  PatScopeViolationError,
+  ApiKeyAlreadyRevokedError,
+  ApiKeyNotFoundError,
+  ApiKeyNotOwnedError,
+  ApiKeyScopeViolationError,
 } from "./errors";
 import type { Permission } from "~/server/api/rbac";
 import { checkRoleBindingPermission } from "~/server/rbac/role-binding-resolver";
+import {
+  parseCustomRolePermissions,
+  MalformedCustomRolePermissionsError,
+} from "~/server/rbac/custom-role-permissions";
 import { createLogger } from "~/utils/logger/server";
 
-const logger = createLogger("langwatch:pat:service");
+const logger = createLogger("langwatch:api-key:service");
 
 type RoleBindingInput = {
   role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
@@ -35,69 +39,78 @@ type CreatorScope =
   | { type: "team"; id: string }
   | { type: "project"; id: string; teamId: string };
 
-export class PatService {
-  private readonly repo: PatRepository;
+export class ApiKeyService {
+  private readonly repo: ApiKeyRepository;
   private readonly prisma: PrismaClient;
 
   constructor(prisma: PrismaClient) {
     this.prisma = prisma;
-    this.repo = PatRepository.create(prisma);
+    this.repo = ApiKeyRepository.create(prisma);
   }
 
-  static create(prisma: PrismaClient): PatService {
-    return new PatService(prisma);
+  static create(prisma: PrismaClient): ApiKeyService {
+    return new ApiKeyService(prisma);
   }
 
   /**
-   * Creates a new PAT with the given role bindings inside a transaction.
+   * Creates a new API key with the given role bindings inside a transaction.
    * Returns the plaintext token (shown once) plus the persisted record.
    *
    * Enforces two invariants before persisting:
-   *   1. The creator is a member of the target organization.
-   *   2. Every requested binding is within the creator's own ceiling — a user
-   *      cannot mint a PAT that grants permissions they do not themselves
-   *      hold at the requested scope. Violations throw `PatScopeViolationError`.
+   *   1. The target user is a member of the target organization.
+   *   2. Every requested binding is within the target user's own ceiling — a
+   *      key cannot grant permissions the user does not themselves hold at the
+   *      requested scope. Violations throw `ApiKeyScopeViolationError`.
+   *
+   * When `assignedToUserId` is provided, the key is owned by that user
+   * (their permissions act as the ceiling). The caller must be an org admin.
    */
   async create({
     name,
     description,
     userId,
+    createdByUserId,
     organizationId,
     expiresAt,
+    permissionMode,
     bindings,
   }: {
     name: string;
     description?: string | null;
     userId: string;
+    createdByUserId?: string | null;
     organizationId: string;
     expiresAt?: Date | null;
+    permissionMode: string;
     bindings: RoleBindingInput[];
-  }): Promise<{ token: string; pat: PersonalAccessToken }> {
+  }): Promise<{ token: string; apiKey: ApiKey }> {
     await this.assertOrgMembership({ userId, organizationId });
     await this.assertBindingsWithinCeiling({
-      creatorUserId: userId,
+      ceilingUserId: userId,
       organizationId,
       bindings,
     });
 
-    const { token, lookupId, hashedSecret } = generatePatToken();
+    const { token, lookupId, hashedSecret } = generateApiKeyToken();
 
-    const pat = await this.prisma.$transaction(async (tx) => {
-      const txRepo = PatRepository.create(tx);
+    const apiKey = await this.prisma.$transaction(async (tx) => {
+      const txRepo = ApiKeyRepository.create(tx);
 
       const created = await txRepo.create({
         name,
         description,
         lookupId,
         hashedSecret,
+        permissionMode,
         userId,
+        createdByUserId,
         organizationId,
         expiresAt,
       });
 
       if (bindings.length > 0) {
         await txRepo.createRoleBindings({
-          patId: created.id,
+          apiKeyId: created.id,
           organizationId,
           bindings,
         });
@@ -106,13 +119,86 @@ export class PatService {
       return created;
     });
 
-    return { token, pat };
+    return { token, apiKey };
   }
 
   /**
-   * Verifies the creator is a member of the org before a PAT can be minted.
-   * The router's RBAC middleware is intentionally skipped (users create PATs
-   * for their own orgs), so this is the authoritative membership check.
+   * Updates an API key's metadata and/or role bindings.
+   * The token itself is NOT changed — only name, description, permissionMode,
+   * and bindings can be updated.
+   *
+   * For non-admins: only the key owner can update.
+   * For admins: can update any key in the organization.
+   *
+   * Binding changes are validated against the key owner's ceiling.
+   */
+  async update({
+    id,
+    callerUserId,
+    callerIsAdmin,
+    organizationId,
+    name,
+    description,
+    permissionMode,
+    bindings,
+  }: {
+    id: string;
+    callerUserId: string;
+    callerIsAdmin: boolean;
+    organizationId: string;
+    name?: string;
+    description?: string | null;
+    permissionMode?: string;
+    bindings?: RoleBindingInput[];
+  }): Promise<ApiKeyWithBindings> {
+    const existing = await this.repo.findById({ id });
+    if (!existing) throw new ApiKeyNotFoundError(id);
+    if (existing.organizationId !== organizationId) {
+      throw new ApiKeyNotFoundError(id);
+    }
+
+    // Non-admins can only update their own keys
+    if (!callerIsAdmin && existing.userId !== callerUserId) {
+      throw new ApiKeyNotOwnedError(id);
+    }
+
+    if (existing.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
+
+    // Validate new bindings against the key owner's ceiling
+    if (bindings) {
+      await this.assertBindingsWithinCeiling({
+        ceilingUserId: existing.userId,
+        organizationId,
+        bindings,
+      });
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      const txRepo = ApiKeyRepository.create(tx);
+
+      await txRepo.update({
+        id,
+        name,
+        description,
+        permissionMode,
+      });
+
+      if (bindings) {
+        await txRepo.replaceRoleBindings({
+          apiKeyId: id,
+          organizationId,
+          bindings,
+        });
+      }
+
+      const updated = await txRepo.findById({ id });
+      if (!updated) throw new ApiKeyNotFoundError(id);
+      return updated;
+    });
+  }
+
+  /**
+   * Verifies the creator is a member of the org before an API key can be minted.
    */
   private async assertOrgMembership({
     userId,
@@ -126,29 +212,21 @@ export class PatService {
       select: { userId: true },
     });
     if (!orgUser) {
-      throw new PatScopeViolationError("Not a member of this organization", {
+      throw new ApiKeyScopeViolationError("Not a member of this organization", {
         meta: { userId, organizationId },
       });
     }
   }
 
   /**
-   * Validates every requested binding against the creator's own permissions.
-   *
-   * For each binding we resolve the target scope (ORG / TEAM / PROJECT),
-   * verifying the scope actually belongs to the enclosing organization so
-   * users cannot cross-tenant grant. Then we check the creator holds the
-   * permission the PAT would receive — for CUSTOM roles this means walking
-   * every permission in the custom role's permission set; for built-in roles
-   * it means checking a representative ceiling permission (ADMIN → manage,
-   * MEMBER → create, VIEWER → view).
+   * Validates every requested binding against the ceiling user's permissions.
    */
   private async assertBindingsWithinCeiling({
-    creatorUserId,
+    ceilingUserId,
     organizationId,
     bindings,
   }: {
-    creatorUserId: string;
+    ceilingUserId: string;
     organizationId: string;
     bindings: RoleBindingInput[];
   }): Promise<void> {
@@ -160,14 +238,14 @@ export class PatService {
 
       if (binding.role === TeamUserRole.CUSTOM) {
         await this.assertCustomRoleWithinCeiling({
-          creatorUserId,
+          ceilingUserId,
           organizationId,
           scope,
           customRoleId: binding.customRoleId ?? null,
         });
       } else {
         await this.assertBuiltinRoleWithinCeiling({
-          creatorUserId,
+          ceilingUserId,
           organizationId,
           scope,
           role: binding.role,
@@ -185,8 +263,8 @@ export class PatService {
   }): Promise<CreatorScope> {
     if (binding.scopeType === RoleBindingScopeType.ORGANIZATION) {
       if (binding.scopeId !== organizationId) {
-        throw new PatScopeViolationError(
-          "Organization scope must match the PAT's organization",
+        throw new ApiKeyScopeViolationError(
+          "Organization scope must match the API key's organization",
           { meta: { scopeId: binding.scopeId, organizationId } },
         );
       }
@@ -199,7 +277,7 @@ export class PatService {
         select: { id: true },
       });
       if (!team) {
-        throw new PatScopeViolationError(
+        throw new ApiKeyScopeViolationError(
           `Team ${binding.scopeId} not found in this organization`,
           { meta: { teamId: binding.scopeId, organizationId } },
         );
@@ -212,13 +290,13 @@ export class PatService {
       include: { team: { select: { id: true, organizationId: true } } },
     });
     if (!project) {
-      throw new PatScopeViolationError(
+      throw new ApiKeyScopeViolationError(
         `Project ${binding.scopeId} not found or archived`,
         { meta: { projectId: binding.scopeId } },
       );
     }
     if (project.team.organizationId !== organizationId) {
-      throw new PatScopeViolationError(
+      throw new ApiKeyScopeViolationError(
         `Project ${binding.scopeId} does not belong to this organization`,
         { meta: { projectId: binding.scopeId, organizationId } },
       );
@@ -227,42 +305,57 @@ export class PatService {
   }
 
   private async assertCustomRoleWithinCeiling({
-    creatorUserId,
+    ceilingUserId,
     organizationId,
     scope,
     customRoleId,
   }: {
-    creatorUserId: string;
+    ceilingUserId: string;
     organizationId: string;
     scope: CreatorScope;
     customRoleId: string | null;
   }): Promise<void> {
     if (!customRoleId) {
-      throw new PatScopeViolationError("CUSTOM role requires a customRoleId");
+      throw new ApiKeyScopeViolationError("CUSTOM role requires a customRoleId");
     }
     const customRole = await this.prisma.customRole.findUnique({
       where: { id: customRoleId, organizationId },
       select: { permissions: true },
     });
     if (!customRole) {
-      throw new PatScopeViolationError(
+      throw new ApiKeyScopeViolationError(
         `Custom role ${customRoleId} not found`,
         { meta: { customRoleId, organizationId } },
       );
     }
-    const perms = Array.isArray(customRole.permissions)
-      ? (customRole.permissions as string[])
-      : [];
+    let perms: string[];
+    try {
+      perms = parseCustomRolePermissions({
+        customRoleId,
+        permissions: customRole.permissions,
+      });
+    } catch (err) {
+      if (err instanceof MalformedCustomRolePermissionsError) {
+        throw new ApiKeyScopeViolationError(
+          `Custom role ${customRoleId} has malformed permissions`,
+          {
+            meta: { customRoleId, organizationId },
+            reasons: [err],
+          },
+        );
+      }
+      throw err;
+    }
     for (const perm of perms) {
       const userHas = await checkRoleBindingPermission({
         prisma: this.prisma,
-        principal: { type: "user", id: creatorUserId },
+        principal: { type: "user", id: ceilingUserId },
         organizationId,
         scope,
         permission: perm as Permission,
       });
       if (!userHas) {
-        throw new PatScopeViolationError(
+        throw new ApiKeyScopeViolationError(
           `Cannot grant permission "${perm}" — exceeds your own access`,
           { meta: { permission: perm, scope } },
         );
@@ -271,12 +364,12 @@ export class PatService {
   }
 
   private async assertBuiltinRoleWithinCeiling({
-    creatorUserId,
+    ceilingUserId,
     organizationId,
     scope,
     role,
   }: {
-    creatorUserId: string;
+    ceilingUserId: string;
     organizationId: string;
     scope: CreatorScope;
     role: "ADMIN" | "MEMBER" | "VIEWER";
@@ -291,22 +384,22 @@ export class PatService {
 
     const userHasPermission = await checkRoleBindingPermission({
       prisma: this.prisma,
-      principal: { type: "user", id: creatorUserId },
+      principal: { type: "user", id: ceilingUserId },
       organizationId,
       scope,
       permission: representativePermission,
     });
 
     if (!userHasPermission) {
-      throw new PatScopeViolationError(
-        `Cannot create PAT with ${role} permissions — exceeds your own access at ${scope.type}:${scope.id}`,
+      throw new ApiKeyScopeViolationError(
+        `Cannot create API key with ${role} permissions — exceeds your own access at ${scope.type}:${scope.id}`,
         { meta: { role, scope } },
       );
     }
   }
 
   /**
-   * Verifies a PAT token string and returns the token record if valid.
+   * Verifies an API key token string and returns the key record if valid.
    * Returns null if the token is invalid, revoked, or not found.
    *
    * Does NOT update lastUsedAt — callers should call markUsed() after
@@ -316,43 +409,39 @@ export class PatService {
     token,
   }: {
     token: string;
-  }): Promise<PatWithBindings | null> {
-    const parts = splitPatToken(token);
+  }): Promise<ApiKeyWithBindings | null> {
+    const parts = splitApiKeyToken(token);
     if (!parts) return null;
 
-    const pat = await this.repo.findByLookupId({ lookupId: parts.lookupId });
-    if (!pat) return null;
+    const apiKey = await this.repo.findByLookupId({ lookupId: parts.lookupId });
+    if (!apiKey) return null;
 
     // Revoked tokens are rejected
-    if (pat.revokedAt) return null;
+    if (apiKey.revokedAt) return null;
 
     // Expired tokens are rejected
-    if (pat.expiresAt && pat.expiresAt < new Date()) return null;
+    if (apiKey.expiresAt && apiKey.expiresAt < new Date()) return null;
 
     // Verify the secret portion
-    if (!verifySecret(parts.secret, pat.hashedSecret)) return null;
+    if (!verifySecret(parts.secret, apiKey.hashedSecret)) return null;
 
-    return pat;
+    return apiKey;
   }
 
   /**
    * Fire-and-forget lastUsedAt update. Call after full authorization succeeds.
-   *
-   * Errors are logged rather than swallowed silently so lastUsedAt drift
-   * between the DB and the token's true usage is visible in operational
-   * logs (disk pressure, connection churn, migrations in flight, etc.).
    */
   markUsed({ id }: { id: string }): void {
     this.repo.updateLastUsedAt({ id }).catch((err: unknown) => {
       logger.warn(
-        { err, patId: id },
-        "failed to update PAT lastUsedAt (fire-and-forget)",
+        { err, apiKeyId: id },
+        "failed to update API key lastUsedAt (fire-and-forget)",
       );
     });
   }
 
   /**
-   * Lists all PATs for a user within an organization.
+   * Lists all API keys for a user within an organization.
    */
   async list({
     userId,
@@ -360,33 +449,48 @@ export class PatService {
   }: {
     userId: string;
     organizationId: string;
-  }): Promise<PatWithBindings[]> {
+  }): Promise<ApiKeyWithBindings[]> {
     return this.repo.findAllByUser({ userId, organizationId });
   }
 
   /**
-   * Revokes a PAT by setting revokedAt. Never hard-deletes.
+   * Lists ALL API keys in an organization (admin only).
+   */
+  async listAll({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<ApiKeyWithBindings[]> {
+    return this.repo.findAllByOrganization({ organizationId });
+  }
+
+  /**
+   * Revokes an API key by setting revokedAt. Never hard-deletes.
+   * Admins can revoke any key in the org. Non-admins can only revoke their own.
    */
   async revoke({
     id,
-    userId,
+    callerUserId,
+    callerIsAdmin,
   }: {
     id: string;
-    userId: string;
-  }): Promise<PersonalAccessToken> {
-    // Verify ownership
-    const pat = await this.repo.findById({ id });
-    if (!pat) throw new PatNotFoundError(id);
-    if (pat.userId !== userId) throw new PatNotOwnedError(id);
-    if (pat.revokedAt) throw new PatAlreadyRevokedError(id);
+    callerUserId: string;
+    callerIsAdmin: boolean;
+  }): Promise<ApiKey> {
+    const apiKey = await this.repo.findById({ id });
+    if (!apiKey) throw new ApiKeyNotFoundError(id);
+    if (!callerIsAdmin && apiKey.userId !== callerUserId) {
+      throw new ApiKeyNotOwnedError(id);
+    }
+    if (apiKey.revokedAt) throw new ApiKeyAlreadyRevokedError(id);
 
     return this.repo.revoke({ id });
   }
 
   /**
-   * Gets a single PAT by ID (for display, not verification).
+   * Gets a single API key by ID (for display, not verification).
    */
-  async getById({ id }: { id: string }): Promise<PatWithBindings | null> {
+  async getById({ id }: { id: string }): Promise<ApiKeyWithBindings | null> {
     return this.repo.findById({ id });
   }
 }
