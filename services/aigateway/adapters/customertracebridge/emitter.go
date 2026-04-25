@@ -106,6 +106,7 @@ func (e *Emitter) BeginSpan(ctx context.Context, projectID string, reqType domai
 	traceparent := formatTraceparent(sc)
 
 	_ = spanCtx // span lifecycle managed via activeSpan context key
+	//nolint:spancheck // span ends in EndSpan, retrieved via activeSpan context key.
 	return ctx, traceparent
 }
 
