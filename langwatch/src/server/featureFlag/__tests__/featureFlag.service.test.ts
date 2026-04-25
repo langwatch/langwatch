@@ -175,7 +175,7 @@ describe("FeatureFlagService", () => {
       });
 
       it("runs at the top level so dev memory sub-service is bypassed", async () => {
-        process.env.FEATURE_FLAG_FORCE_ENABLE = "release_ui_dark_mode_enabled";
+        process.env.FEATURE_FLAG_FORCE_ENABLE = "release_ui_ai_gateway_menu_enabled";
         delete process.env.POSTHOG_KEY;
         const service = FeatureFlagService.create();
         const mockMemorySub = { isEnabled: vi.fn().mockResolvedValue(false) };
@@ -184,7 +184,7 @@ describe("FeatureFlagService", () => {
         );
 
         const result = await service.isEnabled(
-          "release_ui_dark_mode_enabled",
+          "release_ui_ai_gateway_menu_enabled",
           "u",
           false,
         );

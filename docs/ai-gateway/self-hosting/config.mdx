@@ -210,7 +210,7 @@ These are gated env vars used during dev / triage. Never enable in production �
 |---|---|---|
 | `LW_LOG_MESSAGE_BODY` | unset | Set to `1` to log a peek of every inbound `/v1/messages` and `/v1/responses` request body at INFO level. Useful for diagnosing CLI-shape-specific provider rejections (e.g. exact body structure that trips Anthropic's edge HTML response) |
 | `LW_GATEWAY_OUTBOUND_PROXY` | unset | Set to an `http://host:port` URL to route all outbound provider HTTP traffic through a logging proxy (mitmproxy, mitmdump, etc.). Bifrost's `ProxyConfig` is wired from this; covers OpenAI / Anthropic / Gemini / Azure (Bedrock uses the AWS SDK and bypasses HTTP proxy). Use to capture exact outbound URL + headers + body for cache-key-hash debugging or upstream-quirk diagnosis |
-| `FEATURE_FLAG_FORCE_ENABLE` | unset | Comma-separated list of feature flags to force-enable, bypassing PostHog. Read by the control plane on boot — restart `pnpm dev` after changing. The AI Gateway menu is no longer flag-gated post-GA; this knob remains for dev-time toggling of other release flags |
+| `FEATURE_FLAG_FORCE_ENABLE` | unset | Comma-separated list of feature flags to force-enable, bypassing PostHog. Most common in dev: `release_ui_ai_gateway_menu_enabled` to make the AI Gateway menu visible without a PostHog distinct-id match. Read by the control plane on boot — restart `pnpm dev` after changing |
 
 Worked example — capturing outbound provider traffic to debug a cache-hit hash mismatch:
 

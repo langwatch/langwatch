@@ -492,6 +492,8 @@ Restart the entry point (the validator runs at import time, so no incremental re
 
 **If you don't run the AI Gateway at all**, leave all three unset — the validator only fires when at least one is set. The control plane runs cleanly without them; the AI Gateway routes return `503` until the secrets are populated and the gateway pod boots.
 
+**Related dev hint** (warning, not failure): if `FEATURE_FLAG_FORCE_ENABLE` lists `release_ui_ai_gateway_menu_enabled` AND all three secrets are missing, the dev server logs a one-time WARN that the AI Gateway menu will be visible but non-functional until the secrets are populated. This is intentional — it lets you preview the UI without wiring the gateway yet.
+
 ## See also
 
 - [API: Errors](/ai-gateway/api/errors) — full error-type enum and HTTP status mapping.
