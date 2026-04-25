@@ -2,10 +2,6 @@ import { AnalyticsBrowser } from "@customerio/cdp-analytics-browser";
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router";
 
-// Module-level singleton — initialized once, reused across renders.
-// Same pattern as posthog-js (usePostHog.ts).
-let cioInstance: AnalyticsBrowser | null = null;
-
 /**
  * Initializes the Customer.io client-side SDK for in-app messaging.
  *
@@ -33,12 +29,17 @@ export function useCustomerIo({
 }) {
   const location = useLocation();
   const identifiedUserRef = useRef<string | null>(null);
+  // Track the SDK instance in a ref so effects can depend on it
+  // explicitly instead of reading a bare module-level variable.
+  const instanceRef = useRef<AnalyticsBrowser | null>(null);
 
   // 1. Initialize SDK (once, guarded against impersonation and missing config)
   useEffect(() => {
-    if (!enabled || isImpersonating || cioInstance) return;
+    if (!enabled || isImpersonating || instanceRef.current) return;
 
-    cioInstance = AnalyticsBrowser.load(
+    // Hardcoded EU CDN — our Customer.io workspace is EU, matching the
+    // server-side NurturingService default. No need for region config.
+    instanceRef.current = AnalyticsBrowser.load(
       { writeKey, cdnURL: "https://cdp-eu.customer.io" },
       {
         integrations: {
@@ -50,20 +51,21 @@ export function useCustomerIo({
 
   // 2. Identify user (re-runs on user/org change, handles logout/switch)
   useEffect(() => {
-    if (!enabled || !cioInstance) return;
+    const cio = instanceRef.current;
+    if (!enabled || !cio) return;
 
     if (isImpersonating) {
-      cioInstance.reset();
+      cio.reset();
       identifiedUserRef.current = null;
       return;
     }
 
     const prevUserId = identifiedUserRef.current;
     if (prevUserId && prevUserId !== user.id) {
-      cioInstance.reset();
+      cio.reset();
     }
 
-    cioInstance.identify(user.id, {
+    cio.identify(user.id, {
       email: user.email ?? undefined,
       name: user.name ?? undefined,
       ...(organization
@@ -86,7 +88,8 @@ export function useCustomerIo({
 
   // 3. Page tracking (SPA route changes)
   useEffect(() => {
-    if (!enabled || isImpersonating || !cioInstance) return;
-    cioInstance.page();
+    const cio = instanceRef.current;
+    if (!enabled || isImpersonating || !cio) return;
+    cio.page();
   }, [location.pathname, isImpersonating, enabled]);
 }

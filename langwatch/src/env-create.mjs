@@ -158,7 +158,9 @@ export function createEnvConfig() {
       HUBSPOT_REACHED_LIMIT_FORM_ID: z.string().optional(),
       HUBSPOT_FORM_ID: z.string().optional(),
 
-      // Customer.io Nurturing
+      // Customer.io CDP write key — used by both the server-side Pipelines
+      // API (NurturingService) and the client-side SDK (in-app messaging).
+      // This is a write-only key safe for browser exposure, same as POSTHOG_KEY.
       CUSTOMER_IO_API_KEY: z.string().optional(),
       CUSTOMER_IO_REGION: z.enum(["us", "eu"]).optional(),
       // Customer.io In-App Messaging (Track API site ID from workspace settings)
