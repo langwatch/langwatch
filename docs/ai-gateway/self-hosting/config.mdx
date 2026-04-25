@@ -15,9 +15,9 @@ These MUST be provided via a Kubernetes Secret (or the equivalent on non-Kuberne
 | `LW_GATEWAY_INTERNAL_SECRET` | HMAC secret used for `/api/internal/gateway/*` calls between gateway and LangWatch control plane | Yes — same value in both |
 | `LW_GATEWAY_JWT_SECRET` | HS256 secret for signing the short-lived JWT returned by `/resolve-key` | Yes |
 | `LW_VIRTUAL_KEY_PEPPER` | Peppered HMAC secret used to hash virtual-key secrets at rest | Control plane only; gateway never sees it |
-| `GATEWAY_REDIS_URL` | Optional L2 cache for resolved VKs, shared across gateway replicas. On HPA scale-out, new pods warm from L2 (~2 ms) instead of round-tripping `/resolve-key` (~30 ms); shipped in Lane A iter 15 (`6ebeecf`). TTL floored at 30 s; poison entries (decode errors) are `DEL`'d. See [Scaling → Redis L2](/ai-gateway/self-hosting/scaling#redis-l2-optional) | Gateway only |
+| `GATEWAY_REDIS_URL` | Optional L2 cache for resolved VKs, shared across gateway replicas. On HPA scale-out, new pods warm from L2 (~2 ms) instead of round-tripping `/resolve-key` (~30 ms). TTL floored at 30 s; poison entries (decode errors) are `DEL`'d. See [Scaling → Redis L2](/ai-gateway/self-hosting/scaling#redis-l2-optional) | Gateway only |
 
-Rotate `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` together via the dual-key overlap flow (iter 25, `921365f`) — the gateway's JWT resolver accepts both `LW_GATEWAY_JWT_SECRET` (current) and `LW_GATEWAY_JWT_SECRET_PREVIOUS` (the retired key) via `jwt.VerificationKeySet` while both are set; see [Secret rotation](#secret-rotation-iter-25-921365f) below.
+Rotate `LW_GATEWAY_INTERNAL_SECRET` and `LW_GATEWAY_JWT_SECRET` together via the dual-key overlap flow — the gateway's JWT resolver accepts both `LW_GATEWAY_JWT_SECRET` (current) and `LW_GATEWAY_JWT_SECRET_PREVIOUS` (the retired key) via `jwt.VerificationKeySet` while both are set; see [Secret rotation](#secret-rotation) below.
 
 ## Routing
 
@@ -27,11 +27,11 @@ Source of truth: `services/gateway/internal/config/config.go` `Load()`.
 |---|---|---|
 | `GATEWAY_LISTEN_ADDR` | `:5563` | Public HTTP listen addr. LangWatch port convention: app=5560, nlp=5561, langevals=5562, gateway=5563 |
 | `GATEWAY_ADMIN_ADDR` | `127.0.0.1:6060` | Loopback-bound admin listener (pprof / diagnostics). Binding off-loopback requires `GATEWAY_ADMIN_AUTH_TOKEN` or startup fails |
-| `GATEWAY_ADMIN_AUTH_TOKEN` | *(unset)* | Bearer token required for admin listener when bound off-loopback (iter 22, `af796b8`) |
+| `GATEWAY_ADMIN_AUTH_TOKEN` | *(unset)* | Bearer token required for admin listener when bound off-loopback |
 | `GATEWAY_LOG_LEVEL` | `info` | `debug` / `info` / `warn` / `error` |
 | `GATEWAY_CONTROL_PLANE_URL` | `http://localhost:5560` | Base URL for `/api/internal/gateway/*` calls (HMAC-signed) |
 | `GATEWAY_CONTROL_PLANE_TIMEOUT` | `2s` | Per-call timeout for the control-plane HTTP client |
-| `GATEWAY_LONG_POLL_TIMEOUT` | `25s` | `/api/internal/gateway/changes` long-poll deadline. Per-org scoped; one goroutine per organization observed on this pod (iter 17, `5119261`) |
+| `GATEWAY_LONG_POLL_TIMEOUT` | `25s` | `/api/internal/gateway/changes` long-poll deadline. Per-org scoped; one goroutine per organization observed on this pod |
 | `GATEWAY_NODE_ID` | auto-generated ULID | Unique id for this replica, surfaced in the HMAC `X-LangWatch-Gateway-Node` header |
 
 ## Auth cache
@@ -39,7 +39,7 @@ Source of truth: `services/gateway/internal/config/config.go` `Load()`.
 | Var | Default | Purpose |
 |---|---|---|
 | `GATEWAY_CACHE_LRU_SIZE` | `50000` | L1 LRU capacity (per replica) |
-| `GATEWAY_REDIS_URL` | *(unset)* | Optional L2 cache URL for JWT-serialised VK bundles. HPA scale-out pods warm from L2 (~2 ms) instead of round-tripping `/resolve-key`. TTL floored at 30 s; poison entries `DEL`'d (iter 15, `6ebeecf`) |
+| `GATEWAY_REDIS_URL` | *(unset)* | Optional L2 cache URL for JWT-serialised VK bundles. HPA scale-out pods warm from L2 (~2 ms) instead of round-tripping `/resolve-key`. TTL floored at 30 s; poison entries `DEL`'d |
 | `GATEWAY_CACHE_REFRESH_INTERVAL` | `60s` | Background refresh interval for warm L1 entries |
 | `GATEWAY_CACHE_BOOTSTRAP_ALL_KEYS` | `false` | On startup, pre-warm L1 via `/bootstrap` (all-keys snapshot). Off by default — large orgs opt in |
 | `GATEWAY_JWT_REFRESH_THRESHOLD` | `5m` | Refresh JWT when within this window of expiry; backgrounded so the hot path doesn't block |
@@ -67,7 +67,7 @@ Provider credentials are managed from the UI (Gateway → Providers), not env va
 
 ### Per-project routing (no customer config)
 
-The gateway ALWAYS reads `project_id` from each resolved VK bundle and tags every span with `langwatch.project_id` (plus team, org, principal). Traces are shipped to `GATEWAY_OTEL_DEFAULT_ENDPOINT`; LangWatch ingest uses the span attribute to file each trace under the owning project. Shipped in `5fe8486` (@sergey Lane A iter 4 pt4), wired to the GatewayConfig bundle (@alexis Lane B iter 6 `6cda472ec`); customer-override surface removed in @alexis Lane B iter 25 / @sergey Lane A iter 34 (`0ed2910fc`).
+The gateway ALWAYS reads `project_id` from each resolved VK bundle and tags every span with `langwatch.project_id` (plus team, org, principal). Traces are shipped to `GATEWAY_OTEL_DEFAULT_ENDPOINT`; LangWatch ingest uses the span attribute to file each trace under the owning project.
 
 There is no env-var override — LangWatch sells observability, so all traces are routed to the LangWatch pipeline by design.
 
@@ -83,15 +83,15 @@ There is no env-var override — LangWatch sells observability, so all traces ar
 | `LW_GATEWAY_BUDGET_LIVE_THRESHOLD` | `0.9` | Trigger live `/budget/check` reconciliation when cached-spend ≥ this fraction of the cap |
 | `LW_GATEWAY_BUDGET_LIVE_TIMEOUT` | `200ms` | Per-call timeout for the live `/budget/check`. Fails open if the control plane doesn't respond in time |
 
-## Edge protection (iter 23 + 26)
+## Edge protection
 
-### Request body cap (iter 23, `79b46bf`)
+### Request body cap
 
 | Var | Default | Purpose |
 |---|---|---|
 | `GATEWAY_MAX_REQUEST_BODY_BYTES` | `10485760` (10 MiB) | Maximum request body size. Enforced by `httpx.MaxBodyBytes` middleware wired **before** auth: a 1 GB drive-by scan never pressures the pod memory limit (512 Mi default) or the auth cache. Declared `Content-Length` above the cap gets 413 immediately (socket is not drained). Unknown-length bodies (chunked) hit `*http.MaxBytesError` at the cap. 10 MiB was chosen to fit ~3 MB of prompt text + base64 images + headroom, comfortably under a 512 Mi pod cap. Raise for orgs shipping large base64 image arrays; lower for edge deployments with known small payload ceilings |
 
-### HTTP server timeouts (iter 26, `87608d5`)
+### HTTP server timeouts
 
 Slowloris-style attacks (byte-trickle, idle-keep-alive flood) are closed by four explicit `http.Server` timeout knobs. The gateway ships safe defaults; operators tune when their LB has different expectations.
 
@@ -102,17 +102,17 @@ Slowloris-style attacks (byte-trickle, idle-keep-alive flood) are closed by four
 | `GATEWAY_SERVER_IDLE_TIMEOUT` | `120s` | Keep-alive cap. **Invariant**: must be longer than your nginx-ingress `keepalive_timeout` (typical 75 s) so nginx closes first. Otherwise the gateway holds dead sockets after the LB moved on |
 | `GATEWAY_SERVER_WRITE_TIMEOUT` | *(deliberately unset)* | Would bound whole-response lifetime, which kills long SSE streams (reasoning models, Claude thinking traces). Per-chunk streaming deadlines live in the dispatcher; whole-response caps belong at your ingress, not here |
 
-All four apply identically to the public listener and the admin listener (iter 22). See [Helm → Security](/ai-gateway/self-hosting/helm#security-iter-23-79b46bf) for the values stanza.
+All four apply identically to the public listener and the admin listener. See [Helm → Security](/ai-gateway/self-hosting/helm#security) for the values stanza.
 
 The `Security` config struct is intentionally separate from `Upstream` (per-provider budgets) and `Budget` (spend outbox). Edge protection is a distinct concern and its values belong in their own Helm stanza.
 
-## Secret rotation (iter 25, `921365f`)
+## Secret rotation
 
 ### `LW_GATEWAY_JWT_SECRET` zero-downtime rotation
 
-Before iter 25, rotating `LW_GATEWAY_JWT_SECRET` invalidated every outstanding bundle (~15 min TTL) instantly — every in-flight customer request got 401 `invalid_api_key`. No safe rotation short of an announced maintenance window.
+Before the dual-key overlap shipped, rotating `LW_GATEWAY_JWT_SECRET` invalidated every outstanding bundle (~15 min TTL) instantly — every in-flight customer request got 401 `invalid_api_key`. No safe rotation short of an announced maintenance window.
 
-With iter 25, the resolver's `Keyfunc` returns `jwt.VerificationKeySet{current, previous}` whenever `LW_GATEWAY_JWT_SECRET_PREVIOUS` is set. `golang-jwt/jwt/v5` natively tries each key in order; current is first so it's the fast path in steady state.
+Today, the resolver's `Keyfunc` returns `jwt.VerificationKeySet{current, previous}` whenever `LW_GATEWAY_JWT_SECRET_PREVIOUS` is set. `golang-jwt/jwt/v5` natively tries each key in order; current is first so it's the fast path in steady state.
 
 The 4-step zero-downtime rotation flow:
 
@@ -127,13 +127,13 @@ The gateway emits a `jwt_secret_rotation_active` WARN log on boot whenever `JWTS
 |---|---|---|
 | `LW_GATEWAY_JWT_SECRET_PREVIOUS` | *(empty)* | Retired JWT signing secret. Set during step 2 of the rotation; remove after step 4. Empty = strict mode (default / steady state) |
 
-See [Helm → Secret rotation](/ai-gateway/self-hosting/helm#secret-rotation-iter-25-921365f) for the `values.yaml` shape.
+See [Helm → Secret rotation](/ai-gateway/self-hosting/helm#secret-rotation) for the `values.yaml` shape.
 
 ### `LW_GATEWAY_INTERNAL_SECRET` rotation
 
 The HMAC signing secret for `/api/internal/gateway/*` calls uses the same dual-secret pattern — `LW_GATEWAY_INTERNAL_SECRET_PREVIOUS` is accepted alongside the current value during the rolling window, then removed. The mechanics are identical; both secrets can be rotated in the same operation.
 
-## Graceful shutdown (iter 24, `ea167ca`)
+## Graceful shutdown
 
 | Var | Default | Purpose |
 |---|---|---|
@@ -148,15 +148,15 @@ During drain: `/livez` and `/startupz` are deliberately unaffected (pod is alive
 
 | Var | Default | Purpose |
 |---|---|---|
-| `GATEWAY_STARTUP_NETCHECK_HOSTS` | *(empty)* | Comma-separated `host:port` list. On startup, the gateway resolves DNS + dials TCP for each entry; any failure causes `/startupz` to stay red, which makes k8s recycle the pod **before** `MarkStarted` fires. Designed to catch `NetworkPolicy` misconfig at deploy time, not first customer request. DNS-class and TCP-class failures are distinguished in the error string so operators can pinpoint which egress rule is wrong. Iter 20 (`f7901b3`). See [Helm → Startup network check](/ai-gateway/self-hosting/helm#startup-network-check-iter-20-f7901b3) |
+| `GATEWAY_STARTUP_NETCHECK_HOSTS` | *(empty)* | Comma-separated `host:port` list. On startup, the gateway resolves DNS + dials TCP for each entry; any failure causes `/startupz` to stay red, which makes k8s recycle the pod **before** `MarkStarted` fires. Designed to catch `NetworkPolicy` misconfig at deploy time, not first customer request. DNS-class and TCP-class failures are distinguished in the error string so operators can pinpoint which egress rule is wrong. See [Helm → Startup network check](/ai-gateway/self-hosting/helm#startup-network-check) |
 | `GATEWAY_STARTUP_NETCHECK_TIMEOUT` | `2s` | Per-host timeout (DNS + TCP combined). Stop-on-first-failure — the probe exits as soon as one host is unreachable |
 
 ## Admin / operator endpoints
 
 | Var | Default | Purpose |
 |---|---|---|
-| `GATEWAY_ADMIN_ADDR` | `127.0.0.1:6060` | Listener exposing Go `net/http/pprof` for heap / goroutine / profile / allocs / mutex / block dumps. Default is loopback-only — reachable exclusively via `kubectl port-forward`. Set to empty string to disable the listener entirely. Set to `0.0.0.0:6060` (or similar) to listen non-loopback; **in that case a bearer token is required** (iter 22) |
-| `GATEWAY_ADMIN_AUTH_TOKEN` | *(empty)* | Bearer token guarding the admin listener (iter 22, `af796b8`). Compared via `crypto/subtle.ConstantTimeCompare`. Required whenever `GATEWAY_ADMIN_ADDR` is non-loopback and `GATEWAY_ALLOW_INSECURE` is unset; the gateway refuses to start otherwise with a clear error naming both env vars |
+| `GATEWAY_ADMIN_ADDR` | `127.0.0.1:6060` | Listener exposing Go `net/http/pprof` for heap / goroutine / profile / allocs / mutex / block dumps. Default is loopback-only — reachable exclusively via `kubectl port-forward`. Set to empty string to disable the listener entirely. Set to `0.0.0.0:6060` (or similar) to listen non-loopback; **in that case a bearer token is required** |
+| `GATEWAY_ADMIN_AUTH_TOKEN` | *(empty)* | Bearer token guarding the admin listener. Compared via `crypto/subtle.ConstantTimeCompare`. Required whenever `GATEWAY_ADMIN_ADDR` is non-loopback and `GATEWAY_ALLOW_INSECURE` is unset; the gateway refuses to start otherwise with a clear error naming both env vars |
 | `GATEWAY_ALLOW_INSECURE` | `false` | Escape hatch to run a non-loopback admin listener without a bearer token. Exists for test harnesses — never set this in production |
 
 Three deployment postures for the admin listener:
@@ -167,7 +167,7 @@ Three deployment postures for the admin listener:
 
 **3. Bearer-gated non-loopback.** `GATEWAY_ADMIN_ADDR=0.0.0.0:6060` + `GATEWAY_ADMIN_AUTH_TOKEN` in a Kubernetes Secret. Pick this for non-k8s deployments (systemd / Nomad / plain Docker) where port-forward isn't available, or when you want direct access through your cluster's internal LB.
 
-See [Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener-iter-22-af796b8) for the Helm values shape.
+See [Helm → Admin listener](/ai-gateway/self-hosting/helm#admin-listener) for the Helm values shape.
 
 Operator workflow (loopback posture, safe-by-default because the port isn't in any Service):
 
@@ -219,4 +219,4 @@ export LW_LOG_MESSAGE_BODY=1
 make service svc=aigateway   # restart picks up both env vars
 ```
 
-Replay the failing request via your client; the mitmdump session shows the exact bytes the gateway sends to `api.anthropic.com` (or any other provider), and the gateway log line `peek=...` shows what the client sent in. Diff side-by-side to localise body-mutation bugs (this exact recipe found the iter-110 cache-rule wire-DTO matcher bug — `disable-cache-evals` rule was matching every VK and stripping `cache_control` from outbound bodies, narrowed via 40-byte byte-diff).
+Replay the failing request via your client; the mitmdump session shows the exact bytes the gateway sends to `api.anthropic.com` (or any other provider), and the gateway log line `peek=...` shows what the client sent in. Diff side-by-side to localise body-mutation bugs (this exact recipe found a cache-rule wire-DTO matcher bug — `disable-cache-evals` rule was matching every VK and stripping `cache_control` from outbound bodies, narrowed via 40-byte byte-diff).
