@@ -90,6 +90,33 @@ type executorAdapter struct {
 	eng *engine.Engine
 }
 
+func (a executorAdapter) ExecuteStream(ctx context.Context, req app.WorkflowRequest, opts app.WorkflowStreamOptions) (<-chan app.WorkflowStreamEvent, error) {
+	wf, err := dsl.ParseWorkflow(req.WorkflowJSON)
+	if err != nil {
+		ch := make(chan app.WorkflowStreamEvent, 1)
+		ch <- app.WorkflowStreamEvent{Type: "error", Payload: map[string]any{"message": err.Error()}}
+		close(ch)
+		return ch, nil
+	}
+	in, err := a.eng.ExecuteStream(ctx, engine.ExecuteRequest{
+		Workflow: wf, Inputs: req.Inputs, Origin: req.Origin, TraceID: req.TraceID,
+	}, engine.ExecuteStreamOptions{Heartbeat: opts.Heartbeat})
+	if err != nil {
+		ch := make(chan app.WorkflowStreamEvent, 1)
+		ch <- app.WorkflowStreamEvent{Type: "error", Payload: map[string]any{"message": err.Error()}}
+		close(ch)
+		return ch, nil
+	}
+	out := make(chan app.WorkflowStreamEvent, 16)
+	go func() {
+		defer close(out)
+		for ev := range in {
+			out <- app.WorkflowStreamEvent{Type: ev.Type, TraceID: ev.TraceID, Payload: ev.Payload}
+		}
+	}()
+	return out, nil
+}
+
 func (a executorAdapter) Execute(ctx context.Context, req app.WorkflowRequest) (*app.WorkflowResult, error) {
 	wf, err := dsl.ParseWorkflow(req.WorkflowJSON)
 	if err != nil {

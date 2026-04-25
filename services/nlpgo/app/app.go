@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/zap"
 )
@@ -25,6 +26,21 @@ type App struct {
 // import the engine package directly (cleaner test surface).
 type WorkflowExecutor interface {
 	Execute(ctx context.Context, req WorkflowRequest) (*WorkflowResult, error)
+	ExecuteStream(ctx context.Context, req WorkflowRequest, opts WorkflowStreamOptions) (<-chan WorkflowStreamEvent, error)
+}
+
+// WorkflowStreamOptions tunes the streaming endpoint per request.
+type WorkflowStreamOptions struct {
+	Heartbeat time.Duration
+}
+
+// WorkflowStreamEvent is one frame on the streaming endpoint. Mirrors
+// the Python StudioServerEvent discriminated union one-for-one so the
+// SSE handler can serialize verbatim.
+type WorkflowStreamEvent struct {
+	Type    string         `json:"type"` // is_alive | execution_state_change | done | error
+	TraceID string         `json:"trace_id,omitempty"`
+	Payload map[string]any `json:"payload,omitempty"`
 }
 
 // WorkflowRequest is the shape passed to the engine. Mirrors the engine
