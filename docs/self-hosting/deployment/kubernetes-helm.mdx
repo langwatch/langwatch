@@ -369,6 +369,25 @@ clickhouse:
 
 You only need to set these two values — the subchart computes optimal settings for query limits, merge threads, insert batching, and S3 download parallelism.
 
+### AI Gateway sub-chart (optional)
+
+The umbrella chart bundles the AI Gateway as an opt-in sub-chart that runs alongside the core LangWatch app. Enabling it gives you virtual keys, hierarchical budgets, multi-provider routing via Bifrost, guardrails, and prompt caching — all governed by the same control plane.
+
+Minimum viable opt-in:
+
+```yaml
+gateway:
+  enabled: true
+```
+
+That ships sane defaults (2 replicas, ClusterIP service, no ingress). For per-environment tuning (replicas, autoscaling, ingress hostname + TLS, image registry mirror, secrets injection) see [AI Gateway → Self-hosting → Helm](/ai-gateway/self-hosting/helm).
+
+Three things to know before flipping it on:
+
+1. **Shared secrets must exist before install.** The gateway and the LangWatch app both mount `LW_GATEWAY_INTERNAL_SECRET` + `LW_GATEWAY_JWT_SECRET` (and the app additionally reads `LW_VIRTUAL_KEY_PEPPER`) — same byte-for-byte values. Pre-create the `langwatch-gateway-auth` Kubernetes Secret before `helm install`, otherwise the gateway pod loops on `secret not found` until the install timeout. See [AI Gateway → Self-hosting → Config → Secrets](/ai-gateway/self-hosting/config#secrets) for the recipe.
+2. **Public ingress needs DNS + TLS.** The gateway is what your LLM clients hit, so it usually wants its own hostname (e.g. `gateway.your-corp.com`) — separate cert, separate ingress rule. See [AI Gateway → Self-hosting → DNS & TLS](/ai-gateway/self-hosting/dns-and-tls).
+3. **Worker pods must be running.** Budget enforcement reads from a ClickHouse rollup that the trace-processing reactor folds into. If you deploy with `workers.enabled=false`, budgets stop accumulating spend and breach enforcement silently degrades. The default `workers.enabled=true` is correct for production.
+
 ## Upgrade
 
 ```bash
