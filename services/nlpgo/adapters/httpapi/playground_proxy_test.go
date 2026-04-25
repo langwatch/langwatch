@@ -228,6 +228,41 @@ func TestPlaygroundProxy_DispatcherErrorReturns502(t *testing.T) {
 	}
 }
 
+func TestPlaygroundProxy_PassthroughPathReturns500_NotImplemented(t *testing.T) {
+	// /v1beta/* paths classify as RequestTypePassthrough but the current
+	// shimAdapter doesn't pipe HTTPPath through to dispatcher.Passthrough;
+	// rather than silently calling Dispatch with type=passthrough and
+	// failing opaquely downstream, the handler returns a typed
+	// not-implemented error. Documents the gap until passthrough is wired
+	// for real (separate follow-up).
+	fake := &fakeProxy{}
+	srv := newProxyTestServer(t, fake)
+
+	body := `{"model":"vertex_ai/gemini-2.5-flash","contents":[]}`
+	req, _ := http.NewRequest(http.MethodPost, srv.URL+"/go/proxy/v1beta/models/gemini-2.5-flash:generateContent", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-litellm-model", "vertex_ai/gemini-2.5-flash")
+	req.Header.Set("x-litellm-vertex_credentials", `{"type":"service_account"}`)
+	req.Header.Set("x-litellm-vertex_project", "p")
+	req.Header.Set("x-litellm-vertex_location", "us-central1")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("Do: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusInternalServerError {
+		t.Errorf("status = %d, want 500 (passthrough_not_implemented)", resp.StatusCode)
+	}
+	respBody, _ := io.ReadAll(resp.Body)
+	if !bytes.Contains(respBody, []byte("passthrough_not_implemented")) {
+		t.Errorf("body should mention passthrough_not_implemented, got: %s", respBody)
+	}
+	if fake.called != 0 {
+		t.Errorf("dispatcher must not be called for passthrough yet (got %d calls)", fake.called)
+	}
+}
+
 func TestPlaygroundProxy_PathClassification(t *testing.T) {
 	cases := map[string]domain.RequestType{
 		"/go/proxy/v1/chat/completions":                 domain.RequestTypeChat,

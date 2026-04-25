@@ -88,6 +88,23 @@ func playgroundProxyDispatch(proxy PlaygroundProxy) http.HandlerFunc {
 		bareModel := gatewayproxy.BareModel(model)
 
 		reqType, httpPath := classifyPath(r.URL.Path)
+
+		// /v1beta/* etc. → RequestTypePassthrough. Wiring it through the
+		// dispatcher requires constructing dispatcher.PassthroughRequest
+		// (HTTP path + method + headers), which the current shimAdapter
+		// doesn't surface. Until that's plumbed, return a typed
+		// not-implemented error rather than silently calling Dispatch
+		// with type=passthrough and letting the provider fail with an
+		// opaque "missing path" downstream.
+		if reqType == domain.RequestTypePassthrough {
+			herr.WriteHTTP(w, herr.New(ctx, nlpgodomain.ErrInternal, herr.M{
+				"reason": "passthrough_not_implemented",
+				"path":   r.URL.Path,
+				"hint":   "/v1beta/* and other raw-forward paths are tracked as a separate follow-up; for now use /v1/chat/completions, /v1/messages, /v1/embeddings, or /v1/responses",
+			}))
+			return
+		}
+
 		req := playgroundProxyRequest{
 			Type:       reqType,
 			Model:      bareModel,
