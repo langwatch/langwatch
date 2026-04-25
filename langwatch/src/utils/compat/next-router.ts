@@ -14,7 +14,7 @@
  * - router.back()
  * - router.events (fires routeChangeComplete on navigation for PostHog/activity tracking)
  */
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo } from "react";
 import {
   useLocation,
   useNavigate,
@@ -129,6 +129,17 @@ const routerEvents = {
     routerEventListeners.get(event)?.forEach((handler) => handler(...args));
   },
 };
+
+// Module-level dedup for routeChangeComplete. Without this, every mounted
+// useRouter() instance (~120+) would emit the event independently, fanning
+// each navigation out to N×listeners — which previously multiplied PostHog
+// $pageview captures by the size of the React tree.
+let _lastEmittedPath: string | null = null;
+function emitRouteChangeOnce(path: string): void {
+  if (_lastEmittedPath === path) return;
+  _lastEmittedPath = path;
+  routerEvents.emit("routeChangeComplete", path);
+}
 
 // Alias for code that imports `NextRouter` type from next/router
 export type NextRouter = CompatRouter;
@@ -343,14 +354,11 @@ export function useRouter(): CompatRouter {
   const params = useParams();
   const [searchParams] = useSearchParams();
 
-  // Fire routeChangeComplete when location changes (for PostHog, activity tracking)
-  const prevPathRef = useRef(location.pathname + location.search);
+  // Fire routeChangeComplete exactly once per location change, not once per
+  // useRouter() instance. The dedup is at module scope (emitRouteChangeOnce)
+  // so the count is independent of how many components subscribe to useRouter.
   useEffect(() => {
-    const currentPath = location.pathname + location.search;
-    if (prevPathRef.current !== currentPath) {
-      prevPathRef.current = currentPath;
-      routerEvents.emit("routeChangeComplete", currentPath);
-    }
+    emitRouteChangeOnce(location.pathname + location.search);
   }, [location.pathname, location.search]);
 
   return useMemo(() => {

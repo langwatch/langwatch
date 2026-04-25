@@ -83,6 +83,7 @@ describe("isComponentDisabled", () => {
         "es-trace-command-recordSpan-killswitch",
         "tenant-1",
         false,
+        expect.objectContaining({ cacheTtlMs: expect.any(Number) }),
       );
     });
 
@@ -138,6 +139,7 @@ describe("isComponentDisabled", () => {
         "my-custom-flag",
         "tenant-1",
         false,
+        expect.objectContaining({ cacheTtlMs: expect.any(Number) }),
       );
     });
   });

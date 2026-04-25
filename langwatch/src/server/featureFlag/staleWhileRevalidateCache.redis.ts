@@ -24,17 +24,41 @@ interface CacheEntry {
 export class StaleWhileRevalidateCache {
   private readonly staleThresholdMs: number;
   private readonly refreshThresholdMs: number;
+  private readonly maxTtlMs: number;
   private readonly cache: TtlCache<CacheEntry>;
 
-  constructor(staleThresholdMs: number, refreshThresholdMs: number) {
+  /**
+   * @param staleThresholdMs default staleness threshold (returned to callers
+   *   that don't pass an override). Frontend flags use this.
+   * @param refreshThresholdMs background refresh threshold.
+   * @param maxTtlMs underlying storage TTL — must be >= the longest
+   *   per-call ttlOverrideMs any caller might pass, so Redis doesn't evict
+   *   the entry before the override window expires. Defaults to staleThresholdMs.
+   */
+  constructor(
+    staleThresholdMs: number,
+    refreshThresholdMs: number,
+    maxTtlMs: number = staleThresholdMs,
+  ) {
     this.staleThresholdMs = staleThresholdMs;
     this.refreshThresholdMs = refreshThresholdMs;
-    this.cache = new TtlCache<CacheEntry>(staleThresholdMs, "feature_flag:");
+    this.maxTtlMs = Math.max(staleThresholdMs, maxTtlMs);
+    this.cache = new TtlCache<CacheEntry>(this.maxTtlMs, "feature_flag:");
   }
 
-  async get(key: string): Promise<CacheEntry | undefined> {
+  /**
+   * @param key cache key
+   * @param ttlOverrideMs optional caller-provided staleness threshold. Used by
+   *   hot-path callers (kill switches) to extend the cache window without
+   *   changing the global default that user-facing flags rely on.
+   */
+  async get(
+    key: string,
+    ttlOverrideMs?: number,
+  ): Promise<CacheEntry | undefined> {
     const entry = await this.cache.get(key);
-    if (entry && this.isStale(entry)) {
+    const threshold = ttlOverrideMs ?? this.staleThresholdMs;
+    if (entry && Date.now() - entry.timestamp > threshold) {
       await this.cache.delete(key);
       return undefined;
     }
