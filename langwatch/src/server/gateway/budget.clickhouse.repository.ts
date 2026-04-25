@@ -66,17 +66,52 @@ export class GatewayBudgetClickHouseRepository {
   constructor(private readonly resolveClient: ClickHouseClientResolver) {}
 
   /**
-   * Insert one debit row per applicable budget. Idempotency is structural:
-   * (TenantId, BudgetId, GatewayRequestId) is the ORDER BY on the
-   * ReplacingMergeTree, so replays collapse on merge.
+   * Insert one debit row per applicable budget. Idempotency is structural at
+   * the ledger table level (ReplacingMergeTree on (TenantId, BudgetId,
+   * GatewayRequestId) collapses replays on merge), but the
+   * gateway_budget_scope_totals materialised view aggregates at INSERT time
+   * and does NOT dedup. Without a pre-insert guard, replaying the same
+   * gateway_request_id multiplies the rollup totals (3 fires of $0.0125 →
+   * $0.0375 visible to /budget/check until the merge eventually fires —
+   * which can be hours later or never if the ledger sees no further
+   * activity).
+   *
+   * App-side dedup: skip the insert entirely if any row for this
+   * (TenantId, GatewayRequestId) already exists in the ledger. The ledger
+   * ORDER BY is `(TenantId, BudgetId, GatewayRequestId)` so this query
+   * hits the index and is sub-millisecond. All rows in a single insertDebit
+   * call share the same gateway_request_id (one reactor fire = one VK
+   * trace = one batch covering every applicable budget) so a single
+   * existence probe covers the whole batch.
    */
   async insertDebit(rows: BudgetDebitRow[]): Promise<void> {
     if (rows.length === 0) return;
     const tenantId = rows[0]!.tenantId;
+    const gatewayRequestId = rows[0]!.gatewayRequestId;
     if (rows.some((r) => r.tenantId !== tenantId)) {
       throw new Error(
         "GatewayBudgetClickHouseRepository.insertDebit: rows span multiple tenants",
       );
+    }
+    if (rows.some((r) => r.gatewayRequestId !== gatewayRequestId)) {
+      throw new Error(
+        "GatewayBudgetClickHouseRepository.insertDebit: rows span multiple gateway_request_ids",
+      );
+    }
+
+    const client = await this.resolveClient(tenantId);
+    const probe = await client.query({
+      query: `SELECT 1 FROM ${EVENTS_TABLE} WHERE TenantId = {tenantId:String} AND GatewayRequestId = {gatewayRequestId:String} LIMIT 1`,
+      query_params: { tenantId, gatewayRequestId },
+      format: "JSONEachRow",
+    });
+    const probeRows = (await probe.json()) as unknown[];
+    if (probeRows.length > 0) {
+      logger.debug(
+        { tenantId, gatewayRequestId, batchSize: rows.length },
+        "skipping replay — gateway_request_id already in ledger",
+      );
+      return;
     }
 
     const records = rows.map((r) => ({
@@ -102,7 +137,6 @@ export class GatewayBudgetClickHouseRepository {
     }));
 
     try {
-      const client = await this.resolveClient(tenantId);
       await client.insert({
         table: EVENTS_TABLE,
         values: records,
