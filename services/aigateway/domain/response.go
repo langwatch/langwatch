@@ -22,8 +22,8 @@ type Usage struct {
 	PromptTokens     int
 	CompletionTokens int
 	TotalTokens      int
-	CostMicroUSD int64  // cost in microdollars (1/1_000_000 USD)
-	Model        string // resolved model name from the request
+	CostMicroUSD     int64  // cost in microdollars (1/1_000_000 USD)
+	Model            string // resolved model name from the request
 }
 
 // StreamIterator provides pull-based iteration over streaming response chunks.

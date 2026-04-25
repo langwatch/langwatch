@@ -56,7 +56,7 @@ type BundleConfig struct {
 	// secret. Sourced from the control-plane config payload.
 	VKDisplayPrefix string
 
-	// VKTags carries VK-level labels honoured by cache rule matchers
+	// VKTags carries VK-level labels honored by cache rule matchers
 	// (vk_tags). Currently always empty — the schema doesn't store tags
 	// yet — but plumbed end-to-end so future tag wiring is a one-line add
 	// in the control-plane materialiser.
@@ -77,10 +77,10 @@ type FallbackConfig struct {
 
 // GuardrailsConfig holds per-direction guardrail policies.
 type GuardrailsConfig struct {
-	Pre             []GuardrailEntry
-	Post            []GuardrailEntry
-	StreamChunk     []GuardrailEntry
-	RequestFailOpen bool
+	Pre              []GuardrailEntry
+	Post             []GuardrailEntry
+	StreamChunk      []GuardrailEntry
+	RequestFailOpen  bool
 	ResponseFailOpen bool
 }
 

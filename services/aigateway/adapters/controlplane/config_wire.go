@@ -4,23 +4,23 @@ import "github.com/langwatch/langwatch/services/aigateway/domain"
 
 // configWire matches the JSON shape returned by GET /api/internal/gateway/config/:vk_id.
 type configWire struct {
-	ProjectOTLPToken string              `json:"project_otlp_token"`
-	DisplayPrefix    string              `json:"display_prefix"`
-	Providers        []providerSlotWire  `json:"providers"`
-	Fallback         fallbackWire        `json:"fallback"`
-	ModelAliases     map[string]string   `json:"model_aliases"`
-	ModelsAllowed    []string            `json:"models_allowed"`
-	RateLimits       rateLimitsWire      `json:"rate_limits"`
-	Guardrails       guardrailsWire      `json:"guardrails"`
-	PolicyRules      policyRulesWire     `json:"policy_rules"`
-	Budgets          []budgetWire        `json:"budgets"`
-	CacheRules       []cacheRuleWire     `json:"cache_rules"`
+	ProjectOTLPToken string             `json:"project_otlp_token"`
+	DisplayPrefix    string             `json:"display_prefix"`
+	Providers        []providerSlotWire `json:"providers"`
+	Fallback         fallbackWire       `json:"fallback"`
+	ModelAliases     map[string]string  `json:"model_aliases"`
+	ModelsAllowed    []string           `json:"models_allowed"`
+	RateLimits       rateLimitsWire     `json:"rate_limits"`
+	Guardrails       guardrailsWire     `json:"guardrails"`
+	PolicyRules      policyRulesWire    `json:"policy_rules"`
+	Budgets          []budgetWire       `json:"budgets"`
+	CacheRules       []cacheRuleWire    `json:"cache_rules"`
 }
 
 type providerSlotWire struct {
-	ID            string                 `json:"id"`
-	Type          string                 `json:"type"`
-	Credentials   map[string]interface{} `json:"credentials"`
+	ID          string                 `json:"id"`
+	Type        string                 `json:"type"`
+	Credentials map[string]interface{} `json:"credentials"`
 	// DeploymentMap maps public model ids to provider-native deployment
 	// names (Azure routes on deployment, Bedrock on inference profile,
 	// etc.). Emitted by the control-plane materialiser as a top-level
@@ -55,9 +55,9 @@ type guardrailEntryWire struct {
 }
 
 type policyRulesWire struct {
-	Tools policyRuleSetWire `json:"tools"`
-	MCP   policyRuleSetWire `json:"mcp"`
-	URLs  policyRuleSetWire `json:"urls"`
+	Tools  policyRuleSetWire `json:"tools"`
+	MCP    policyRuleSetWire `json:"mcp"`
+	URLs   policyRuleSetWire `json:"urls"`
 	Models policyRuleSetWire `json:"models"`
 }
 
@@ -86,7 +86,7 @@ type cacheRuleWire struct {
 
 // cacheMatchersWire mirrors the matchers shape emitted by the control-plane
 // materialiser (langwatch/src/server/gateway/config.materialiser.ts:121-128).
-// Every recognised matcher must have an explicit field — silently dropping a
+// Every recognized matcher must have an explicit field — silently dropping a
 // matcher at unmarshal collapses the rule's effective scope to "match all"
 // and was the iter-110 root cause of the matrix anthropic/bedrock cache cells
 // returning cache_creation=0 / cache_read=0 (the seed's `disable-cache-evals`
@@ -194,7 +194,8 @@ func buildPolicyRules(pr policyRulesWire) []domain.PolicyRule {
 
 func buildCacheRules(wires []cacheRuleWire) []domain.CacheRule {
 	rules := make([]domain.CacheRule, len(wires))
-	for i, w := range wires {
+	for i := range wires {
+		w := &wires[i]
 		var models []string
 		if w.Matchers.Model != "" {
 			models = []string{w.Matchers.Model}
@@ -218,7 +219,7 @@ func buildCacheRules(wires []cacheRuleWire) []domain.CacheRule {
 		// route it through the same fail-safe as VKTags by collapsing it
 		// into a never-matchable VKTag sentinel. Drops the rule instead
 		// of misapplying it.
-		var vkTags []string = w.Matchers.VKTags
+		vkTags := w.Matchers.VKTags
 		if len(w.Matchers.RequestMetadata) > 0 {
 			vkTags = append(vkTags, "__unsupported_matcher_request_metadata__")
 		}

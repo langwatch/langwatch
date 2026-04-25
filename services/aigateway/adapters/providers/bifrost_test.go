@@ -1,6 +1,7 @@
 package providers
 
 import (
+	"bytes"
 	"encoding/json"
 	"testing"
 
@@ -22,7 +23,7 @@ func TestExtractRawResponseBytes_RawMessage(t *testing.T) {
 	if !ok {
 		t.Fatalf("extractRawResponseBytes returned ok=false for non-empty json.RawMessage")
 	}
-	if string(got) != string(jsonBytes) {
+	if !bytes.Equal(got, jsonBytes) {
 		t.Fatalf("byte mismatch: got %q, want %q", got, jsonBytes)
 	}
 }
@@ -69,8 +70,8 @@ func TestEnsureStreamIncludeUsage(t *testing.T) {
 	cases := []struct {
 		name        string
 		in          string
-		wantInclude bool      // true = body must have stream_options.include_usage=true
-		wantChanged bool      // true = body bytes must differ from input
+		wantInclude bool // true = body must have stream_options.include_usage=true
+		wantChanged bool // true = body bytes must differ from input
 		assertExtra func(t *testing.T, out []byte)
 	}{
 		{
@@ -91,6 +92,7 @@ func TestEnsureStreamIncludeUsage(t *testing.T) {
 			wantInclude: false,
 			wantChanged: false,
 			assertExtra: func(t *testing.T, out []byte) {
+				t.Helper()
 				if gjson.GetBytes(out, "stream_options.include_usage").Bool() {
 					t.Fatalf("caller opted OUT of usage; gateway must not overwrite")
 				}
@@ -102,6 +104,7 @@ func TestEnsureStreamIncludeUsage(t *testing.T) {
 			wantInclude: false,
 			wantChanged: false,
 			assertExtra: func(t *testing.T, out []byte) {
+				t.Helper()
 				if gjson.GetBytes(out, "stream_options").Exists() {
 					t.Fatalf("stream=false must not grow a stream_options field")
 				}
@@ -113,6 +116,7 @@ func TestEnsureStreamIncludeUsage(t *testing.T) {
 			wantInclude: false,
 			wantChanged: false,
 			assertExtra: func(t *testing.T, out []byte) {
+				t.Helper()
 				if gjson.GetBytes(out, "stream_options").Exists() {
 					t.Fatalf("no stream flag must not grow a stream_options field")
 				}
@@ -131,10 +135,10 @@ func TestEnsureStreamIncludeUsage(t *testing.T) {
 			in := []byte(tc.in)
 			out := ensureStreamIncludeUsage(in)
 
-			if tc.wantChanged && string(out) == string(in) {
+			if tc.wantChanged && bytes.Equal(out, in) {
 				t.Fatalf("expected body to be rewritten, but bytes are identical:\n%s", string(out))
 			}
-			if !tc.wantChanged && string(out) != string(in) {
+			if !tc.wantChanged && !bytes.Equal(out, in) {
 				t.Fatalf("expected body to be unchanged, got:\nin=%s\nout=%s", string(in), string(out))
 			}
 			if tc.wantInclude && !gjson.GetBytes(out, "stream_options.include_usage").Bool() {

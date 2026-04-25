@@ -128,7 +128,7 @@ func parseOpenAIChatRequest(body []byte) ([]bfschemas.ChatMessage, *bfschemas.Ch
 }
 
 // chatExtensionKeys enumerates the provider-extension fields the gateway
-// recognises on the inbound /v1/chat/completions body and forwards via
+// recognizes on the inbound /v1/chat/completions body and forwards via
 // ChatParameters.ExtraParams. Bifrost's per-provider translators read these
 // off ExtraParams and lift them onto the provider-native request shape.
 //
@@ -141,8 +141,8 @@ func parseOpenAIChatRequest(body []byte) ([]bfschemas.ChatMessage, *bfschemas.Ch
 //   - labels: Gemini per-request labels (providers/gemini/chat.go:57-62).
 //
 // Add new keys here only when a Bifrost translator reads them from
-// ExtraParams — silently lifting an unrecognised field leaks vendor
-// jargon into providers that won't recognise it.
+// ExtraParams — silently lifting an unrecognized field leaks vendor
+// jargon into providers that won't recognize it.
 var chatExtensionKeys = []string{
 	"cached_content",
 	"safety_settings",

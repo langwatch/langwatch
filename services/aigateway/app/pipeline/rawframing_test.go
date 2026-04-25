@@ -73,8 +73,8 @@ type rawFramerStub struct {
 }
 
 func (*rawFramerStub) Next(_ context.Context) bool { return false }
-func (*rawFramerStub) Chunk() []byte                { return nil }
-func (*rawFramerStub) Usage() domain.Usage          { return domain.Usage{} }
-func (*rawFramerStub) Err() error                   { return nil }
-func (*rawFramerStub) Close() error                 { return nil }
-func (s *rawFramerStub) RawFraming() bool           { return s.raw }
+func (*rawFramerStub) Chunk() []byte               { return nil }
+func (*rawFramerStub) Usage() domain.Usage         { return domain.Usage{} }
+func (*rawFramerStub) Err() error                  { return nil }
+func (*rawFramerStub) Close() error                { return nil }
+func (s *rawFramerStub) RawFraming() bool          { return s.raw }

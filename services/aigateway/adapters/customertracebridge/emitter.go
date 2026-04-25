@@ -89,6 +89,7 @@ func (e *Emitter) BeginSpan(ctx context.Context, projectID string, reqType domai
 	tp := TraceParent(ctx)
 	spanCtx := e.customerSpanContext(tp)
 
+	//nolint:spancheck // span lifecycle is split across BeginSpan/EndSpan via activeSpan context key by design.
 	spanCtx, span := e.tracer.Start(spanCtx, "gen_ai."+string(reqType),
 		trace.WithSpanKind(trace.SpanKindClient),
 		trace.WithAttributes(

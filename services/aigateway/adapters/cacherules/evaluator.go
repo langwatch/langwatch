@@ -31,7 +31,8 @@ func (e *Evaluator) Evaluate(_ context.Context, rules []domain.CacheRule, eval d
 		return sorted[i].Priority < sorted[j].Priority
 	})
 
-	for _, rule := range sorted {
+	for i := range sorted {
+		rule := &sorted[i]
 		if matchesRule(rule.Match, eval) {
 			return &domain.CacheDecision{
 				Action: rule.Action,

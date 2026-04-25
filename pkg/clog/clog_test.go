@@ -54,4 +54,3 @@ func TestNew_StampsServiceInfo(t *testing.T) {
 	bare := New(context.Background(), Config{Level: "info"})
 	assert.NotSame(t, bare, logger)
 }
-

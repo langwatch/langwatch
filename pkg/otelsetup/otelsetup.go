@@ -28,7 +28,7 @@ import (
 // seconds of startup. The gateway commonly races its OTel exporter
 // against control-plane readiness — the first few batches hit 401/503
 // while auth is still being minted — and the default handler logs each
-// batch as a WARN. Once we've seen a single successful export (signalled
+// batch as a WARN. Once we've seen a single successful export (signaled
 // by `markHealthy`), the filter unlocks and every error flows through
 // normally again.
 type startupErrorHandler struct {
@@ -80,11 +80,11 @@ func isTransportAuthError(err error) bool {
 // Options configures the telemetry provider. Fields left empty are filled from
 // the context's ServiceInfo when available.
 type Options struct {
-	NodeID        string
+	NodeID       string
 	OTLPEndpoint string            // OTLP HTTP endpoint (empty = noop)
 	OTLPHeaders  map[string]string // auth headers for the collector
-	BatchTimeout  time.Duration
-	MaxQueueSize  int
+	BatchTimeout time.Duration
+	MaxQueueSize int
 	// SampleRatio controls the fraction of traces sampled (0.0–1.0).
 	// 0 means "use default" (AlwaysSample). Set explicitly via config.
 	SampleRatio float64

@@ -20,8 +20,8 @@ type capturingHandler struct {
 func (c *capturingHandler) Handle(err error) { c.errs = append(c.errs, err) }
 
 func TestStartupErrorHandler_SuppressesTransportAuthErrorsInGraceWindow(t *testing.T) {
-	cap := &capturingHandler{}
-	h := newStartupErrorHandler(cap, 10*time.Second)
+	captured := &capturingHandler{}
+	h := newStartupErrorHandler(captured, 10*time.Second)
 
 	// All of these should be suppressed: the gateway races its OTLP
 	// exporter against the control-plane coming up, and the default
@@ -31,28 +31,28 @@ func TestStartupErrorHandler_SuppressesTransportAuthErrorsInGraceWindow(t *testi
 	h.Handle(errors.New(`no such host: langwatch-saas.internal`))
 	h.Handle(errors.New(`exporter returned 403`))
 
-	if len(cap.errs) != 0 {
-		t.Fatalf("expected all startup-noise errors to be suppressed, got %d: %v", len(cap.errs), cap.errs)
+	if len(captured.errs) != 0 {
+		t.Fatalf("expected all startup-noise errors to be suppressed, got %d: %v", len(captured.errs), captured.errs)
 	}
 }
 
 func TestStartupErrorHandler_PassesRealErrorsThroughEvenInGraceWindow(t *testing.T) {
-	cap := &capturingHandler{}
-	h := newStartupErrorHandler(cap, 10*time.Second)
+	captured := &capturingHandler{}
+	h := newStartupErrorHandler(captured, 10*time.Second)
 
 	// Non-transport errors are always surfaced — an OTLP protocol-level
 	// issue isn't startup noise, it's a real bug that needs to page.
 	realErr := errors.New("sdk/trace: span exporter returned nil context")
 	h.Handle(realErr)
 
-	if len(cap.errs) != 1 || cap.errs[0] != realErr {
-		t.Fatalf("expected real error to propagate, got: %v", cap.errs)
+	if len(captured.errs) != 1 || !errors.Is(captured.errs[0], realErr) {
+		t.Fatalf("expected real error to propagate, got: %v", captured.errs)
 	}
 }
 
 func TestStartupErrorHandler_PassesAuthErrorsAfterGraceWindowElapses(t *testing.T) {
-	cap := &capturingHandler{}
-	h := newStartupErrorHandler(cap, 10*time.Millisecond)
+	captured := &capturingHandler{}
+	h := newStartupErrorHandler(captured, 10*time.Millisecond)
 
 	// After the grace window lapses, 401s become real and must surface —
 	// they likely mean credentials rotated / got revoked at runtime.
@@ -60,18 +60,18 @@ func TestStartupErrorHandler_PassesAuthErrorsAfterGraceWindowElapses(t *testing.
 	authErr := errors.New(`POST /v1/traces returned 401 Unauthorized`)
 	h.Handle(authErr)
 
-	if len(cap.errs) != 1 || cap.errs[0] != authErr {
-		t.Fatalf("expected post-grace auth error to surface, got: %v", cap.errs)
+	if len(captured.errs) != 1 || !errors.Is(captured.errs[0], authErr) {
+		t.Fatalf("expected post-grace auth error to surface, got: %v", captured.errs)
 	}
 }
 
 func TestStartupErrorHandler_MarkHealthyFlipsFilterOff(t *testing.T) {
-	cap := &capturingHandler{}
-	h := newStartupErrorHandler(cap, 1*time.Hour) // effectively never expires
+	captured := &capturingHandler{}
+	h := newStartupErrorHandler(captured, 1*time.Hour) // effectively never expires
 
 	h.Handle(errors.New(`POST /v1/traces returned 401 Unauthorized`))
-	if len(cap.errs) != 0 {
-		t.Fatalf("expected 401 to be swallowed before markHealthy, got: %v", cap.errs)
+	if len(captured.errs) != 0 {
+		t.Fatalf("expected 401 to be swallowed before markHealthy, got: %v", captured.errs)
 	}
 
 	h.markHealthy()
@@ -80,8 +80,8 @@ func TestStartupErrorHandler_MarkHealthyFlipsFilterOff(t *testing.T) {
 	// something new is wrong, not just startup race.
 	newAuthErr := errors.New(`POST /v1/traces returned 401 Unauthorized`)
 	h.Handle(newAuthErr)
-	if len(cap.errs) != 1 || cap.errs[0] != newAuthErr {
-		t.Fatalf("expected post-healthy 401 to surface, got: %v", cap.errs)
+	if len(captured.errs) != 1 || !errors.Is(captured.errs[0], newAuthErr) {
+		t.Fatalf("expected post-healthy 401 to surface, got: %v", captured.errs)
 	}
 }
 

@@ -698,6 +698,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			// response.completed event's nested Response object.
 			data, _ := sonic.Marshal(chunk.BifrostResponsesStreamResponse)
 			it.current = data
+			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
 			if resp := chunk.BifrostResponsesStreamResponse.Response; resp != nil && resp.Usage != nil {
 				u := resp.Usage
 				it.usage = domain.Usage{
@@ -711,6 +712,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			// (Gemini streamGenerateContent already emits proper
 			// `event:/data:` SSE framing). Forward verbatim — the
 			// writer side knows not to re-wrap when rawFraming is set.
+			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
 			it.current = chunk.BifrostPassthroughResponse.Body
 			// Parse Gemini-native usageMetadata out of the chunk body so
 			// the trace wrapper can stamp prompt/completion/cached
@@ -720,6 +722,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			// non-final chunk omits usageMetadata; we keep the last
 			// non-zero values seen so the iterator's Usage() reports
 			// the FINAL token totals at stream close.
+			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
 			if u, ok := parseGeminiPassthroughUsage(chunk.BifrostPassthroughResponse.Body); ok {
 				it.usage = u
 			}
@@ -783,11 +786,11 @@ type bifrostLogger struct {
 	logger *zap.Logger
 }
 
-func (l *bifrostLogger) Debug(msg string, args ...any) { l.logger.Debug(fmt.Sprintf(msg, args...)) }
-func (l *bifrostLogger) Info(msg string, args ...any)  { l.logger.Info(fmt.Sprintf(msg, args...)) }
-func (l *bifrostLogger) Warn(msg string, args ...any)  { l.logger.Warn(fmt.Sprintf(msg, args...)) }
-func (l *bifrostLogger) Error(msg string, args ...any) { l.logger.Error(fmt.Sprintf(msg, args...)) }
-func (l *bifrostLogger) Fatal(msg string, args ...any) { l.logger.Fatal(fmt.Sprintf(msg, args...)) }
+func (l *bifrostLogger) Debug(msg string, args ...any)              { l.logger.Debug(fmt.Sprintf(msg, args...)) }
+func (l *bifrostLogger) Info(msg string, args ...any)               { l.logger.Info(fmt.Sprintf(msg, args...)) }
+func (l *bifrostLogger) Warn(msg string, args ...any)               { l.logger.Warn(fmt.Sprintf(msg, args...)) }
+func (l *bifrostLogger) Error(msg string, args ...any)              { l.logger.Error(fmt.Sprintf(msg, args...)) }
+func (l *bifrostLogger) Fatal(msg string, args ...any)              { l.logger.Fatal(fmt.Sprintf(msg, args...)) }
 func (l *bifrostLogger) SetLevel(_ bfschemas.LogLevel)              {}
 func (l *bifrostLogger) SetOutputType(_ bfschemas.LoggerOutputType) {}
 func (l *bifrostLogger) LogHTTPRequest(_ bfschemas.LogLevel, _ string) bfschemas.LogEventBuilder {

@@ -10,13 +10,13 @@ import (
 
 // Config is the top-level service configuration.
 type Config struct {
-	Environment  string             `env:"ENVIRONMENT"`
-	Server       config.Server      `env:"SERVER"`
-	Log          clog.Config        `env:"LOG"`
-	ControlPlane ControlPlaneConfig `env:"LW_GATEWAY"`
-	AuthCache    AuthCacheConfig    `env:"LW_GATEWAY_AUTH_CACHE"`
+	Environment         string                    `env:"ENVIRONMENT"`
+	Server              config.Server             `env:"SERVER"`
+	Log                 clog.Config               `env:"LOG"`
+	ControlPlane        ControlPlaneConfig        `env:"LW_GATEWAY"`
+	AuthCache           AuthCacheConfig           `env:"LW_GATEWAY_AUTH_CACHE"`
 	CustomerTraceBridge CustomerTraceBridgeConfig `env:"CUSTOMER_TRACE_BRIDGE"`
-	OTel         config.OTel        `env:"OTEL"`
+	OTel                config.OTel               `env:"OTEL"`
 }
 
 // ControlPlaneConfig holds control plane connection settings.
@@ -48,7 +48,6 @@ type CustomerTraceBridgeConfig struct {
 	// Defaults to ControlPlane.BaseURL if not set.
 	BaseURL string `env:"BASE_URL"`
 }
-
 
 func defaultConfig() Config {
 	return Config{
@@ -85,4 +84,3 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	}
 	return cfg, nil
 }
-

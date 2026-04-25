@@ -41,7 +41,7 @@ type RouterDeps struct {
 	// enterprise deployments that send full-context 1M Gemini / multi-image
 	// vision payloads; lower on public edge deployments to tighten DDoS
 	// protection.
-	MaxRequestBodyBytes   int64
+	MaxRequestBodyBytes int64
 }
 
 // NewRouter creates the chi router with all gateway routes mounted.
@@ -480,8 +480,8 @@ func readAndPeekBodySized(w http.ResponseWriter, r *http.Request, maxBytes int64
 }
 
 type lazyPooledBody struct {
-	reader io.Reader
-	buf    *bytes.Buffer
+	reader  io.Reader
+	buf     *bytes.Buffer
 	release func()
 }
 

@@ -67,10 +67,10 @@ func Budget(precheck BudgetPrecheckFunc, debit BudgetDebitFunc, logger *zap.Logg
 					return nil, err
 				}
 				return &budgetStreamWrapper{
-					inner: iter,
-					debit: debit,
+					inner:  iter,
+					debit:  debit,
 					bundle: call.Bundle,
-					model: call.Request.Model,
+					model:  call.Request.Model,
 				}, nil
 			}
 		},

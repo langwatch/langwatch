@@ -420,7 +420,7 @@ func TestEntry_BumpSoft_ConcurrentSafe(t *testing.T) {
 	}
 	wg.Wait()
 	// If the test ran without a -race trigger we're good; the only
-	// behavioural assertion is that softExpiresAt advanced from before.
+	// behavioral assertion is that softExpiresAt advanced from before.
 	_, soft, _ := e.snapshot()
 	if !soft.After(now) {
 		t.Fatal("expected soft to be in the future after concurrent bumps")

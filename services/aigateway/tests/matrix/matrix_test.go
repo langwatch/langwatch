@@ -1,3 +1,5 @@
+//go:build live_openai || live_anthropic || live_gemini || live_bedrock || live_azure || live_vertex
+
 // Package matrix runs the provider × scenario coverage matrix against a live
 // gateway + control plane + real provider credentials. Build-tagged per
 // provider (live_openai, live_anthropic, …) so CI's default `go test ./...`
@@ -302,7 +304,7 @@ func fireAndAssert(t *testing.T, rc resolvedCell) string {
 	t.Helper()
 
 	body := rc.body(rc.model)
-	req, err := http.NewRequest("POST", gatewayURL()+"/v1/chat/completions", bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, gatewayURL()+"/v1/chat/completions", bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("build request: %v", err)
 	}
@@ -320,7 +322,7 @@ func fireAndAssert(t *testing.T, rc resolvedCell) string {
 	defer resp.Body.Close()
 
 	raw, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != http.StatusOK {
 		t.Fatalf("want 200, got %d\nbody: %s", resp.StatusCode, raw)
 	}
 
@@ -366,11 +368,11 @@ func assertTraceCaptured(t *testing.T, traceID string) float64 {
 	url := lwBaseURL() + "/api/trace/" + traceID
 
 	for {
-		req, _ := http.NewRequest("GET", url, nil)
+		req, _ := http.NewRequest(http.MethodGet, url, nil)
 		req.Header.Set("X-Auth-Token", apiKey)
 		client := &http.Client{Timeout: 10 * time.Second}
 		resp, err := client.Do(req)
-		if err == nil && resp.StatusCode == 200 {
+		if err == nil && resp.StatusCode == http.StatusOK {
 			body, _ := io.ReadAll(resp.Body)
 			resp.Body.Close()
 			// /api/trace/:id returns a flat trace envelope; metrics sits at
@@ -443,7 +445,7 @@ func cacheReadFromResponse(body []byte) int {
 // extractTraceID pulls the 32-hex trace_id out of the standard W3C
 // `traceparent` header (format: `00-{trace-id}-{span-id}-{flags}`). The
 // aigateway restructure dropped the legacy `X-LangWatch-Trace-Id` header
-// in favour of W3C-only propagation, so tests read from traceparent.
+// in favor of W3C-only propagation, so tests read from traceparent.
 // Returns "" when the header is absent or malformed.
 func extractTraceID(h http.Header) string {
 	tp := h.Get("Traceparent")
@@ -466,7 +468,7 @@ func fireForBody(t *testing.T, rc resolvedCell, body []byte) (int, []byte, strin
 	if endpoint == "" {
 		endpoint = "/v1/chat/completions"
 	}
-	req, err := http.NewRequest("POST", gatewayURL()+endpoint, bytes.NewReader(body))
+	req, err := http.NewRequest(http.MethodPost, gatewayURL()+endpoint, bytes.NewReader(body))
 	if err != nil {
 		t.Fatalf("build request: %v", err)
 	}

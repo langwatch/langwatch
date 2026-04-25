@@ -42,7 +42,7 @@ type GuardrailTimeouts struct {
 // guardrail evaluation, and budget debit.
 type Client struct {
 	baseURL           string
-	userAgent string
+	userAgent         string
 	sign              func(req *http.Request, body []byte)
 	verifier          *jwtverify.JWTVerifier
 	client            *http.Client

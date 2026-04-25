@@ -38,7 +38,7 @@ type AITraceParams struct {
 	Usage       Usage
 	RequestType RequestType
 
-	// VirtualKeyID is the id of the VK that authorised this request. Stamped
+	// VirtualKeyID is the id of the VK that authorized this request. Stamped
 	// on the customer span so the control plane's trace-processing pipeline
 	// can fold per-budget spend back into ClickHouse idempotently.
 	VirtualKeyID string

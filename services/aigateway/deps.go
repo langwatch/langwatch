@@ -182,4 +182,3 @@ func resolveNodeID(ctx context.Context) string {
 	}
 	return hostname
 }
-

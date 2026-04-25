@@ -18,7 +18,7 @@ func BenchmarkSign(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		req, _ := http.NewRequest("POST", "http://cp/api/internal/gateway/resolve-key", nil)
+		req, _ := http.NewRequest(http.MethodPost, "http://cp/api/internal/gateway/resolve-key", nil)
 		s.Sign(req, body)
 	}
 }
@@ -34,7 +34,7 @@ func BenchmarkSign_EmptyBody(b *testing.B) {
 	b.ResetTimer()
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
-		req, _ := http.NewRequest("GET", "http://cp/api/internal/gateway/config/vk_01", nil)
+		req, _ := http.NewRequest(http.MethodGet, "http://cp/api/internal/gateway/config/vk_01", nil)
 		s.Sign(req, nil)
 	}
 }

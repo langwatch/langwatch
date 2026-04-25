@@ -45,10 +45,10 @@ type PassthroughRequest struct {
 type RequestType string
 
 const (
-	RequestTypeChat        RequestType = "chat"
-	RequestTypeMessages    RequestType = "messages"
-	RequestTypeEmbeddings  RequestType = "embeddings"
-	RequestTypeResponses   RequestType = "responses"
+	RequestTypeChat       RequestType = "chat"
+	RequestTypeMessages   RequestType = "messages"
+	RequestTypeEmbeddings RequestType = "embeddings"
+	RequestTypeResponses  RequestType = "responses"
 	// RequestTypePassthrough routes the body verbatim to the provider's
 	// native HTTP endpoint. Used for Gemini-native /v1beta paths where
 	// the inbound shape (Google GenAI SDK, gemini-cli) doesn't match any

@@ -78,7 +78,7 @@ func TestEvaluate_ReturnsAction(t *testing.T) {
 // VKPrefix matcher — iter-110 root cause regression. The seed's
 // `disable-cache-evals` rule (vk_prefix=lw_vk_eval_) was matching every VK
 // because the wire DTO silently dropped the matcher and collapsed it to
-// "match all". Verify the matcher is honoured: a rule gated on
+// "match all". Verify the matcher is honored: a rule gated on
 // vk_prefix=lw_vk_eval_ must NOT match a lw_vk_live_* matrix VK.
 func TestEvaluate_VKPrefix_NoMatch(t *testing.T) {
 	e := NewEvaluator()

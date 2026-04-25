@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/thessem/zap-prettyconsole"
+	prettyconsole "github.com/thessem/zap-prettyconsole"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 
@@ -62,7 +62,7 @@ type Config struct {
 	Format string `env:"FORMAT"` // "json" (default), "pretty"
 }
 
-// Validate checks that config values are recognised.
+// Validate checks that config values are recognized.
 func (c Config) Validate() error {
 	switch c.Format {
 	case "", "json", "pretty":
@@ -88,4 +88,3 @@ func (c Config) zapLevel() zapcore.Level {
 	_ = lvl.UnmarshalText([]byte(c.Level))
 	return lvl
 }
-

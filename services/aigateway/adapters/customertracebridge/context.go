@@ -34,7 +34,7 @@ func TraceParent(ctx context.Context) string {
 }
 
 // withActiveSpan stores the in-flight customer span on the context so EndSpan
-// can retrieve and finalise it.
+// can retrieve and finalize it.
 func withActiveSpan(ctx context.Context, span trace.Span) context.Context {
 	return context.WithValue(ctx, spanCtxKey{}, span)
 }

@@ -510,10 +510,10 @@ func (m *mockStreamProvider) DispatchStream(ctx context.Context, req *domain.Req
 type emptyStreamIter struct{}
 
 func (*emptyStreamIter) Next(_ context.Context) bool { return false }
-func (*emptyStreamIter) Chunk() []byte                { return nil }
-func (*emptyStreamIter) Usage() domain.Usage          { return domain.Usage{} }
-func (*emptyStreamIter) Err() error                   { return nil }
-func (*emptyStreamIter) Close() error                 { return nil }
+func (*emptyStreamIter) Chunk() []byte               { return nil }
+func (*emptyStreamIter) Usage() domain.Usage         { return domain.Usage{} }
+func (*emptyStreamIter) Err() error                  { return nil }
+func (*emptyStreamIter) Close() error                { return nil }
 
 func TestGeminiModelFromPath(t *testing.T) {
 	cases := []struct {
