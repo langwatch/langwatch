@@ -191,7 +191,11 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 }
 
 func (e *Engine) runEntry(node *dsl.Node, req ExecuteRequest) (map[string]any, *NodeError) {
-	if req.Inputs != nil {
+	// An empty `inputs` map (e.g. ExecuteFlowPayload's `inputs: [{}]`)
+	// means "use the workflow's dataset", not "set entry outputs to
+	// the empty map". Only honor explicit non-empty inputs as a
+	// dataset override.
+	if len(req.Inputs) > 0 {
 		return req.Inputs, nil
 	}
 	if node.Data.Dataset == nil || node.Data.Dataset.Inline == nil {
