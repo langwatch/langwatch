@@ -53,22 +53,58 @@ Awaiting rchaves's confirmation before ripping out `LW_NLPGO_INTERNAL_SECRET`.
 - If rchaves confirms drop-HMAC: TS sign.ts, nlpgo httpapi/middleware.go HMAC,
   middleware_test.go all roll back.
 
-**Status (2026-04-25, end of iteration):**
-- ash + sarah converged on quirks-stay-in-nlpgo (rchaves's "fail naturally"
-  was aspirational; the prime directive "customers with crazy existing
-  workflows must keep working perfectly" wins).
-- ✅ **A — dot→dash at the source** landed as PR #459 on langwatch-saas:
-  https://github.com/langwatch/langwatch-saas/pull/459 (Anthropic-only,
-  8 affected ids, 20 unit tests, follow-up tracked).
-- ✅ **E — SSE round-trip test for legacy /studio/* via proxypass**
-  landed by sarah at c9e3b7243.
-- ⏸ **B — drop LW_NLPGO_INTERNAL_SECRET + revert HMAC code** queued.
-- ⏸ **C — refactor aigateway to expose a dispatcher package + rip
-  gatewayclient/llmexecutor on nlpgo side** queued.
-- ⏸ **D — translator strip-down to DSL→ProviderRequest** queued (ash).
-- All B/C/D items hold pending **explicit rchaves ack** on:
-  1. Library not HTTP for nlpgo→gateway
-  2. Drop LW_NLPGO_INTERNAL_SECRET on TS→nlpgo
+**Status (2026-04-25, end of multi-iteration session):**
+
+Architectural pivots that landed (per rchaves's loop guidance):
+- **library not HTTP** for nlpgo→aigateway (Lambda VPC isolation forces it)
+- **drop LW_NLPGO_INTERNAL_SECRET** + all HMAC bridges (matches today's
+  no-auth Python posture; library mode obviates the need)
+- **provider quirks STAY in nlpgo** as temporary parity hacks (rchaves's
+  "fail naturally" was aspirational; prime directive "customers with crazy
+  existing workflows must keep working" wins)
+- **dot→dash fixed at source** in the langwatch-saas openrouter ingest
+  (Anthropic-only — other providers' dotted ids accepted as-is)
+- **topic clustering moves to langevals** (Python+sklearn+LiteLLM stays
+  intact; only hosting service changes; long-term goal: all Python in one
+  place, langwatch_nlp deletable)
+
+Commits on `feat/nlp-go-migration`:
+- ✅ `27238ce28` server-side optimize 410 guard (UI hide already wired)
+- ✅ `0954724bd` evaluation runs tagged origin=evaluation (was misattributed)
+- ✅ `fea1e5151` (sarah) drop HMAC bridge end-to-end + revert topic-naming gateway path
+- ✅ `7fa461e7d` (sarah) services/aigateway/dispatcher/ in-process Dispatch + tests
+- ✅ `c9e3b7243` (sarah) SSE round-trip tests for proxypass
+- ✅ `195e9f888` topic_clustering as a langevals workspace member (1476 LOC)
+- ✅ `922de1ec6` TS topic-clustering flag-fork to langevals when flag on
+
+External PR:
+- ✅ langwatch-saas#459 — fix(model-registry): normalize Anthropic version
+  dots at ingest. https://github.com/langwatch/langwatch-saas/pull/459
+
+In progress / queued:
+- ⏳ sarah — C consumer swap: replace nlpgo's HTTP gatewayclient with a
+  thin adapter over the new dispatcher pkg (~20min ETA at last check)
+- ⏳ ash — port topic_clustering tests from langwatch_nlp/tests/ to
+  langevals/evaluators/topic_clustering/tests
+- ⏳ ash — sister PR on langwatch-saas/infrastructure (memory tier 3072MB
+  for topic_clustering Lambda + run the lambda generator)
+- ⏳ next iteration — end-to-end QA: dogfood a real workflow run on the
+  Go path through a flagged project, then a real topic clustering run via
+  langevals, then push the PR for CodeRabbit review
+
+Open questions for next iteration:
+- Is dispatcher.Dispatcher's interface stable now that sarah's adapter swap
+  is landing? need to verify the matrix tests still pass after the swap
+- LANGEVALS_ENDPOINT env in production points where today? Need to confirm
+  langevals API Gateway base URL is what TS app reads (it is, via
+  evaluationsWorker.ts:652 pattern), but topic_clustering paths /topics/*
+  need to be added to langevals_api_gateway.tf path-routing
+
+The PR is *not* ready to ship until:
+- All tests green (Go matrix + ts unit + langevals package)
+- A live QA run end-to-end through a flag-on project
+- Screenshots in the PR description (per orchestrate skill)
+- CodeRabbit review addressed
 
 ## Goal
 
