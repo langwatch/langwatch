@@ -1,14 +1,13 @@
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { addEnvs } from "../../optimization_studio/server/addEnvs";
-import { getProjectLambdaArn } from "../../optimization_studio/server/lambda";
 import type {
   ExecutionStatus,
   Workflow,
 } from "../../optimization_studio/types/dsl";
 import type { StudioClientEvent } from "../../optimization_studio/types/events";
 import { getEntryInputs } from "../../optimization_studio/utils/nodeUtils";
-import { lambdaFetch } from "../../utils/lambdaFetch";
+import { nlpgoFetch } from "../nlpgo/nlpgoFetch";
 import { getProjectModelProviders } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators.generated";
@@ -214,19 +213,15 @@ export async function runWorkflow(
   };
 
   const event = await addEnvs(messageWithoutEnvs, projectId);
-  const functionArn = process.env.LANGWATCH_NLP_LAMBDA_CONFIG
-    ? await getProjectLambdaArn(projectId)
-    : process.env.LANGWATCH_NLP_SERVICE!;
 
-  const response = await lambdaFetch<{
+  const response = await nlpgoFetch<{
     result: any;
     status: ExecutionStatus;
-  }>(functionArn, "/studio/execute_sync", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(event),
+  }>({
+    projectId,
+    path: "/studio/execute_sync",
+    body: event,
+    origin: "workflow",
   });
 
   if (!response.ok) {
