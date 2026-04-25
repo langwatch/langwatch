@@ -50,6 +50,9 @@ langevals:
 clickhouse:
   chartManaged: true
   image:
+    # Workflow builds the local clickhouse-serverless image as `:next`;
+    # chart default `:0.2.0` would ErrImageNeverPull under pullPolicy: Never.
+    tag: "next"
     pullPolicy: Never
   replicas: 1
   memory: 2Gi

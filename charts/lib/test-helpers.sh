@@ -79,6 +79,17 @@ hc() {
 }
 
 helm_install() {
+  # The chart expects an out-of-band gateway-auth Secret (see
+  # gateway.secrets.existingSecretName, defaults to langwatch-gateway-auth).
+  # Pre-create it before helm install so the gateway pod doesn't
+  # CrashLoop waiting for the env vars. Idempotent — safe across suites.
+  kubectl --context "$KUBE_CTX" create namespace "${NAMESPACE}" \
+    --dry-run=client -o yaml | kubectl --context "$KUBE_CTX" apply -f -
+  kubectl --context "$KUBE_CTX" -n "${NAMESPACE}" create secret generic langwatch-gateway-auth \
+    --from-literal=LW_GATEWAY_INTERNAL_SECRET="ci-internal-$(date +%s)" \
+    --from-literal=LW_GATEWAY_JWT_SECRET="ci-jwt-$(date +%s)" \
+    --dry-run=client -o yaml | kubectl --context "$KUBE_CTX" apply -f -
+
   hc upgrade --install "${RELEASE}" "${CHART_DIR}" \
     --create-namespace \
     --wait --timeout "${TIMEOUT}s" \
