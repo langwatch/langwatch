@@ -20,7 +20,10 @@ vi.mock("~/utils/compat/next-router", async () =>
   await vi.importActual<object>("~/utils/compat/next-router"),
 );
 
-import Router, { useRouter } from "~/utils/compat/next-router";
+import Router, {
+  __resetRouteEmitDedupForTests,
+  useRouter,
+} from "~/utils/compat/next-router";
 
 function ConsumerA() {
   // Component that just calls useRouter — analogous to the ~120 components
@@ -78,6 +81,10 @@ describe("next-router compat: routeChangeComplete dedup", () => {
   let onRouteChange: ReturnType<typeof vi.fn<(path: string) => void>>;
 
   beforeEach(() => {
+    // Reset the module-scoped _lastEmittedPath so tests can re-use paths
+    // (e.g. "/a", "/b") without an earlier test silently de-duping the
+    // first emit of a later test.
+    __resetRouteEmitDedupForTests();
     onRouteChange = vi.fn<(path: string) => void>();
     Router.events.on("routeChangeComplete", onRouteChange);
   });

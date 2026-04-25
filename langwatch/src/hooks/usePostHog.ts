@@ -12,15 +12,21 @@ export function usePostHog() {
     const posthogHost = publicEnv.data?.POSTHOG_HOST;
 
     if (posthogKey) {
-      // posthog-js auto-captures $pageview on History API navigation in SPAs
-      // (capture_pageview defaults to "history_change"). We deliberately do not
-      // also call posthog.capture("$pageview") on routeChangeComplete — doing
-      // both used to double-count, and prior to the next-router compat dedup
-      // it multiplied pageviews by every mounted useRouter() consumer.
+      // capture_pageview: "history_change" tells posthog-js to capture
+      // $pageview on every History API navigation (pushState / popstate),
+      // not just on initial page load. In posthog-js 1.369 this defaults
+      // to true (initial load only) unless `defaults` is set to >=
+      // '2025-05-24', so we set it explicitly to avoid silently dropping
+      // SPA pageviews after the migration off Next.js.
+      // We deliberately do NOT also call posthog.capture("$pageview") on
+      // routeChangeComplete — letting posthog-js handle it avoids the
+      // multiplier bug from the next-router compat layer (every mounted
+      // useRouter() instance used to fan out one capture per consumer).
       posthog.init(posthogKey, {
         api_host: posthogHost ?? "https://eu.i.posthog.com",
         person_profiles: "always",
         autocapture: true,
+        capture_pageview: "history_change",
         capture_exceptions: true,
         session_recording: {
           recordCrossOriginIframes: true,

@@ -121,7 +121,12 @@ export function createEnvConfig() {
       // Polling interval (ms) for local flag definition refresh. PostHog default
       // is 30s; we default to 5min because each poll counts as 10 flag evaluations
       // for billing. Lower this if you need flag changes to propagate faster.
-      POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS: z.coerce.number().int().positive().optional(),
+      // Empty-string values in .env are coerced to undefined so they fall back
+      // to the runtime default instead of failing .positive() with 0.
+      POSTHOG_FEATURE_FLAGS_POLLING_INTERVAL_MS: z.preprocess(
+        (value) => (value === "" ? undefined : value),
+        z.coerce.number().int().positive().optional(),
+      ),
       DISABLE_USAGE_STATS: z.boolean().optional(),
       LANGWATCH_NLP_LAMBDA_CONFIG: z.string().optional(),
 

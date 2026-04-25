@@ -141,6 +141,16 @@ function emitRouteChangeOnce(path: string): void {
   routerEvents.emit("routeChangeComplete", path);
 }
 
+/**
+ * Reset module-level dedup state. Test-only — production code never calls
+ * this. Lets test files use a clean state without juggling vi.resetModules().
+ *
+ * @internal
+ */
+export function __resetRouteEmitDedupForTests(): void {
+  _lastEmittedPath = null;
+}
+
 // Alias for code that imports `NextRouter` type from next/router
 export type NextRouter = CompatRouter;
 

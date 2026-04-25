@@ -51,15 +51,28 @@ export class StaleWhileRevalidateCache {
    * @param ttlOverrideMs optional caller-provided staleness threshold. Used by
    *   hot-path callers (kill switches) to extend the cache window without
    *   changing the global default that user-facing flags rely on.
+   *
+   * Eviction rule: physically delete only when the absolute storage TTL
+   * (maxTtlMs) is exceeded. For shorter per-caller thresholds, return
+   * `undefined` silently — that way a short-window caller hitting a still-
+   * valid entry doesn't evict it from under a long-window caller. This
+   * matters if the same cache key is read from both a 5 s consumer and a
+   * 60 s consumer; without it, the short-window read would defeat the
+   * override the long-window caller asked for.
    */
   async get(
     key: string,
     ttlOverrideMs?: number,
   ): Promise<CacheEntry | undefined> {
     const entry = await this.cache.get(key);
-    const threshold = ttlOverrideMs ?? this.staleThresholdMs;
-    if (entry && Date.now() - entry.timestamp > threshold) {
+    if (!entry) return undefined;
+    const age = Date.now() - entry.timestamp;
+    if (age > this.maxTtlMs) {
       await this.cache.delete(key);
+      return undefined;
+    }
+    const threshold = ttlOverrideMs ?? this.staleThresholdMs;
+    if (age > threshold) {
       return undefined;
     }
     return entry;
