@@ -28,18 +28,23 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
   bus.emit({ type: "starting", service: "pnpm:langwatch" as never });
   const start = Date.now();
 
-  // Run install + prepare in the langwatch dir. Use corepack-vended pnpm so
-  // the user doesn't need a global pnpm install.
+  // Run install + prisma generate in the langwatch dir. Use corepack-vended
+  // pnpm so the user doesn't need a global pnpm install. We deliberately do
+  // NOT run `pnpm run start:prepare:files` here — that would chain into
+  // copy:langevals-types which expects langevals/ts-integration/
+  // evaluators.generated.ts (a build artifact, not source). The published
+  // npm tarball ships those generated files; on a fresh local checkout
+  // start.sh's start:prepare:db is the only generator we need at boot
+  // time, and it just runs prisma migrate + clickhouse migrate.
   const pnpm = await resolvePnpm();
   await execa(pnpm.command, [...pnpm.args, "install", "--prod=false", "--frozen-lockfile"], {
     cwd: langwatchDir,
     stdio: "inherit",
   });
 
-  // start:prepare:files generates prisma client, zod types, sdk versions,
-  // langevals types, and builds the mcp-server. langwatch app boot reads
-  // every one of these — without them, pnpm start crashes with module-not-found.
-  await execa(pnpm.command, [...pnpm.args, "run", "start:prepare:files"], {
+  // Prisma client lives at node_modules/.prisma/client, regenerated explicitly
+  // since langwatch/postinstall doesn't trigger it.
+  await execa(pnpm.command, [...pnpm.args, "exec", "prisma", "generate"], {
     cwd: langwatchDir,
     stdio: "inherit",
   });
