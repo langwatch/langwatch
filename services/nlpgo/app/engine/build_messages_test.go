@@ -92,3 +92,108 @@ func TestBuildMessages_PreservesUserPromptVerbatim(t *testing.T) {
 	require.Len(t, msgs, 2)
 	assert.Equal(t, "What is {{ x }}?", msgs[1].Content)
 }
+
+// TestBuildMessages_AcceptsChatMessagesFromJSON pins the
+// chat_messages-from-JSON regression contract.md §10 (commit cb76144a6)
+// guards against. When chat history flows from one node's output into a
+// downstream signature node's input, it round-trips through JSON
+// (state.recordOutputs → state.resolveInputs) and arrives as
+// []any of map[string]any — NOT as []app.ChatMessage. The original
+// type-asserted check `inputs["chat_messages"].([]app.ChatMessage)`
+// silently failed on this real-world shape and the engine fell through
+// to composeUserPrompt, dropping all multi-turn context.
+func TestBuildMessages_AcceptsChatMessagesFromJSON(t *testing.T) {
+	node := signatureNode(t, "Continue the conversation.")
+	// Same shape the JSON unmarshaller would produce after a node
+	// boundary: []any of map[string]any.
+	history := []any{
+		map[string]any{"role": "user", "content": "First user turn"},
+		map[string]any{"role": "assistant", "content": "First assistant reply"},
+		map[string]any{"role": "user", "content": "Second user turn"},
+	}
+	msgs := buildMessages(node, map[string]any{"chat_messages": history})
+
+	// All three turns must survive — that's the load-bearing claim.
+	require.Len(t, msgs, 3, "all chat history turns must be preserved through JSON round-trip")
+	assert.Equal(t, "user", msgs[0].Role)
+	assert.Equal(t, "First user turn", msgs[0].Content)
+	assert.Equal(t, "assistant", msgs[1].Role)
+	assert.Equal(t, "First assistant reply", msgs[1].Content)
+	assert.Equal(t, "user", msgs[2].Role)
+	assert.Equal(t, "Second user turn", msgs[2].Content)
+}
+
+// TestBuildMessages_PreservesToolCallsThroughJSON is the structural
+// counterpart to the simple multi-turn test above. tool_calls travels
+// nested under the assistant message; if buildMessages drops or
+// re-shapes them, downstream gateway calls lose the tool_call_id
+// linkage and the conversation breaks.
+func TestBuildMessages_PreservesToolCallsThroughJSON(t *testing.T) {
+	node := signatureNode(t, "")
+	history := []any{
+		map[string]any{
+			"role": "assistant",
+			"tool_calls": []any{
+				map[string]any{
+					"id":   "call_abc",
+					"type": "function",
+					"function": map[string]any{
+						"name":      "lookup",
+						"arguments": `{"q":"weather"}`,
+					},
+				},
+			},
+		},
+		map[string]any{
+			"role":         "tool",
+			"tool_call_id": "call_abc",
+			"name":         "lookup",
+			"content":      "sunny",
+		},
+	}
+	msgs := buildMessages(node, map[string]any{"chat_messages": history})
+	require.Len(t, msgs, 2)
+
+	// Assistant turn keeps its tool_calls structurally.
+	require.Len(t, msgs[0].ToolCalls, 1, "assistant tool_calls must survive JSON round-trip")
+	tc := msgs[0].ToolCalls[0]
+	assert.Equal(t, "call_abc", tc.ID)
+	assert.Equal(t, "function", tc.Type)
+	assert.Equal(t, "lookup", tc.Function["name"])
+	assert.Equal(t, `{"q":"weather"}`, tc.Function["arguments"])
+
+	// Tool turn keeps its linkage to the assistant call.
+	assert.Equal(t, "tool", msgs[1].Role)
+	assert.Equal(t, "call_abc", msgs[1].ToolCallID)
+	assert.Equal(t, "lookup", msgs[1].Name)
+	assert.Equal(t, "sunny", msgs[1].Content)
+}
+
+// TestBuildMessages_AcceptsLegacyMessagesKey keeps the legacy
+// "messages" input name working — some workflows in the wild populate
+// it instead of chat_messages and the existing pre-fix code path
+// supported it for the JSON shape only.
+func TestBuildMessages_AcceptsLegacyMessagesKey(t *testing.T) {
+	node := signatureNode(t, "")
+	msgs := buildMessages(node, map[string]any{
+		"messages": []any{
+			map[string]any{"role": "user", "content": "hi"},
+		},
+	})
+	require.Len(t, msgs, 1)
+	assert.Equal(t, "user", msgs[0].Role)
+	assert.Equal(t, "hi", msgs[0].Content)
+}
+
+// TestBuildMessages_AcceptsTypedChatMessagesSlice keeps the in-memory
+// pre-JSON path working for callers (mostly tests) that build the
+// typed slice directly.
+func TestBuildMessages_AcceptsTypedChatMessagesSlice(t *testing.T) {
+	node := signatureNode(t, "")
+	typed := []app.ChatMessage{
+		{Role: "user", Content: "from typed slice"},
+	}
+	msgs := buildMessages(node, map[string]any{"chat_messages": typed})
+	require.Len(t, msgs, 1)
+	assert.Equal(t, "from typed slice", msgs[0].Content)
+}

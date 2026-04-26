@@ -757,21 +757,21 @@ func splitModel(s string) (model, provider string) {
 // list use it verbatim; else fold each scalar input into a single
 // user-role message so simple text-in/text-out signatures work
 // without explicit chat structure.
+//
+// Multi-turn preservation contract (contract.md §10, regression
+// cb76144a6): chat_messages must round-trip through JSON without
+// losing role / content / tool_calls. A node receiving chat_messages
+// from an upstream node sees them via state.recordOutputs +
+// state.resolveInputs, where they are []any of map[string]any after
+// going through json.Unmarshal — NOT the in-memory []app.ChatMessage
+// type. We accept both shapes; the legacy `messages` key is also
+// accepted for callers that pre-populate explicit history.
 func buildMessages(node *dsl.Node, inputs map[string]any) []app.ChatMessage {
-	if msgs, ok := inputs["chat_messages"].([]app.ChatMessage); ok {
+	if msgs := coerceChatMessages(inputs["chat_messages"]); msgs != nil {
 		return msgs
 	}
-	if raw, ok := inputs["messages"].([]any); ok {
-		out := make([]app.ChatMessage, 0, len(raw))
-		for _, m := range raw {
-			mm, ok := m.(map[string]any)
-			if !ok {
-				continue
-			}
-			role, _ := mm["role"].(string)
-			out = append(out, app.ChatMessage{Role: role, Content: mm["content"]})
-		}
-		return out
+	if msgs := coerceChatMessages(inputs["messages"]); msgs != nil {
+		return msgs
 	}
 	if instr := paramString(node.Data.Parameters, "instructions"); instr != "" {
 		// Render Liquid-subset placeholders against the upstream
@@ -788,6 +788,82 @@ func buildMessages(node *dsl.Node, inputs map[string]any) []app.ChatMessage {
 		}
 	}
 	return []app.ChatMessage{{Role: "user", Content: composeUserPrompt(inputs)}}
+}
+
+// coerceChatMessages accepts the two shapes a chat-history value can
+// arrive in and returns it as []app.ChatMessage. Returns nil when the
+// value is anything else (so the caller can fall through to the next
+// branch).
+//
+// Shape 1: []app.ChatMessage — literal Go value, used by in-process
+// callers (mostly tests).
+//
+// Shape 2: []any of map[string]any — JSON-unmarshalled form. tool_calls
+// arrive as []any of map[string]any too; we preserve them verbatim on
+// the message struct's ToolCalls field so the gateway sees the same
+// structured tool-call list the upstream model emitted.
+func coerceChatMessages(v any) []app.ChatMessage {
+	switch x := v.(type) {
+	case []app.ChatMessage:
+		return x
+	case []any:
+		if len(x) == 0 {
+			return nil
+		}
+		out := make([]app.ChatMessage, 0, len(x))
+		for _, m := range x {
+			mm, ok := m.(map[string]any)
+			if !ok {
+				continue
+			}
+			role, _ := mm["role"].(string)
+			msg := app.ChatMessage{Role: role, Content: mm["content"]}
+			if name, ok := mm["name"].(string); ok {
+				msg.Name = name
+			}
+			if tcid, ok := mm["tool_call_id"].(string); ok {
+				msg.ToolCallID = tcid
+			}
+			if rawTC, ok := mm["tool_calls"].([]any); ok && len(rawTC) > 0 {
+				msg.ToolCalls = coerceToolCalls(rawTC)
+			}
+			out = append(out, msg)
+		}
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	}
+	return nil
+}
+
+// coerceToolCalls converts the JSON-unmarshalled []any slice into a
+// typed []app.ToolCall, preserving the function name + raw arguments
+// JSON. The arguments map is kept as-is so the gateway sees the same
+// bytes the upstream model emitted (canonical JSON, no re-encoding).
+func coerceToolCalls(raw []any) []app.ToolCall {
+	out := make([]app.ToolCall, 0, len(raw))
+	for _, r := range raw {
+		rm, ok := r.(map[string]any)
+		if !ok {
+			continue
+		}
+		tc := app.ToolCall{}
+		if id, ok := rm["id"].(string); ok {
+			tc.ID = id
+		}
+		if typ, ok := rm["type"].(string); ok {
+			tc.Type = typ
+		}
+		if fn, ok := rm["function"].(map[string]any); ok {
+			tc.Function = fn
+		}
+		out = append(out, tc)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func composeUserPrompt(inputs map[string]any) string {
