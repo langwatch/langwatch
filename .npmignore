@@ -35,9 +35,9 @@ langevals/notebooks/
 **/*.map
 **/*.tsbuildinfo
 
-# Saas-only mounts.
-langwatch/saas-src/
-langwatch/ee/
+# langwatch/ee/ used to be excluded as "saas-only" — it isn't, the langwatch
+# app's source has unconditional imports into it. langwatch/saas-src/ never
+# existed in the OSS tree, so no exclusion needed for either.
 
 # Editor + OS detritus.
 **/.DS_Store

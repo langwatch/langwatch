@@ -159,6 +159,11 @@ jobs:
             # so the tarball must ship python-sdk/pyproject.toml + src/.
             "package/python-sdk/pyproject.toml"
             "package/python-sdk/src"
+            # langwatch's pnpm-workspace.yaml lists "../mcp-server" as a
+            # workspace package; without the prebuilt dist the langwatch app
+            # crashes loading "@langwatch/mcp-server/create-mcp-server".
+            "package/mcp-server/package.json"
+            "package/mcp-server/dist/create-mcp-server.js"
           )
           forbidden=(
             "package/langwatch/node_modules"

@@ -37,6 +37,7 @@
     "langwatch_nlp/",
     "langevals/",
     "python-sdk/",
+    "mcp-server/",
     "scripts/",
     "go.mod",
     "go.sum",

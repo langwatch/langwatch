@@ -35,15 +35,16 @@ e2e/auth.json
 # Source maps from build (large, not needed at runtime).
 **/*.map
 
-# Saas-only mount (not present in OSS builds).
-saas-src/
-
-# Note: langwatch/ee/ is intentionally INCLUDED in the tarball even
-# though the comment used to call it "saas-only". The langwatch app's
-# source has unconditional relative-path imports into ee/ (e.g.
+# langwatch/ee/ is intentionally INCLUDED in the tarball. The langwatch
+# app's source has unconditional relative-path imports into ee/ (e.g.
 # src/server/event-sourcing/projections/global/billingMeterDispatch.reactor.ts
 # imports ../../../../../ee/billing/services/billableEventsQuery), so
-# without ee/ the npx flow crashes at boot. Total size is ~1MB.
+# without ee/ the npx flow crashes at boot. Licensing model is
+# Apache-2.0 + ee/ enterprise modules shipped together (Langfuse-style).
+# Total size is ~1MB.
+#
+# langwatch/saas-src/ was previously listed as a no-op exclusion — the
+# directory never existed in OSS. Removed.
 
 # Local secrets / env.
 .env
