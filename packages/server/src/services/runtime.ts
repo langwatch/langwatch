@@ -16,6 +16,7 @@ import { startLangevals } from "./langevals.ts";
 import { startLangwatch } from "./langwatch.ts";
 import { startLangwatchNlp } from "./langwatch-nlp.ts";
 import { runMigrations } from "./migrate.ts";
+import { ensureLangwatchDeps } from "./node-deps.ts";
 import { startPostgres } from "./postgres.ts";
 import { startRedis } from "./redis.ts";
 import { syncVenvs } from "./venvs.ts";
@@ -41,7 +42,13 @@ const runtimeImpl: RuntimeApi = {
 
   async installServices(ctx) {
     const bus = busFor(ctx);
-    await syncVenvs(ctx, bus);
+    // uv sync + langwatch node_modules + prepare:files run in parallel.
+    // Each helper is idempotent and prints "already cached" + early-returns
+    // when its lockfile hash matches the previous run.
+    await Promise.all([
+      syncVenvs(ctx, bus),
+      ensureLangwatchDeps(ctx, bus),
+    ]);
   },
 
   async startAll(ctx) {

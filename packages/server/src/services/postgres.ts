@@ -70,6 +70,8 @@ export async function startPostgres(ctx: RuntimeContext, bus: EventBus): Promise
     check: execCheck(layout.psql.replace(/psql$/, "pg_isready"), [
       "-h", "127.0.0.1",
       "-p", String(ctx.ports.postgres),
+      "-U", DB_USER,
+      "-d", "postgres",
       "-q",
     ]),
     timeoutMs: 30_000,
