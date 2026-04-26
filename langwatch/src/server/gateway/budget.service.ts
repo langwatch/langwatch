@@ -393,7 +393,7 @@ export class GatewayBudgetService {
           organizationId: input.organizationId,
           projectId,
           actorUserId: input.actorUserId,
-          action: "BUDGET_CREATED",
+          action: "gateway.budget.created",
           targetKind: "budget",
           targetId: row.id,
           after: serializeRowForAudit(row),
@@ -441,7 +441,7 @@ export class GatewayBudgetService {
         {
           organizationId: input.organizationId,
           actorUserId: input.actorUserId,
-          action: "BUDGET_UPDATED",
+          action: "gateway.budget.updated",
           targetKind: "budget",
           targetId: updated.id,
           before,
@@ -475,7 +475,7 @@ export class GatewayBudgetService {
         {
           organizationId: input.organizationId,
           actorUserId: input.actorUserId,
-          action: "BUDGET_DELETED",
+          action: "gateway.budget.deleted",
           targetKind: "budget",
           targetId: updated.id,
           before,

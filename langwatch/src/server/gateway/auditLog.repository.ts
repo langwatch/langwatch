@@ -10,21 +10,25 @@
  */
 import { Prisma, type PrismaClient } from "@prisma/client";
 
+// Dotted-lowercase past-tense convention (Stripe / GitHub / Vercel / Datadog).
+// Namespaced under `gateway.` so a single `LIKE 'gateway.%'` filter scopes
+// SIEM exports to the entire gateway surface. See docs/ai-gateway/audit.mdx
+// for the full code table + rationale.
 export const GATEWAY_AUDIT_ACTIONS = [
-  "VIRTUAL_KEY_CREATED",
-  "VIRTUAL_KEY_UPDATED",
-  "VIRTUAL_KEY_ROTATED",
-  "VIRTUAL_KEY_REVOKED",
-  "VIRTUAL_KEY_DELETED",
-  "BUDGET_CREATED",
-  "BUDGET_UPDATED",
-  "BUDGET_DELETED",
-  "PROVIDER_BINDING_CREATED",
-  "PROVIDER_BINDING_UPDATED",
-  "PROVIDER_BINDING_DELETED",
-  "CACHE_RULE_CREATED",
-  "CACHE_RULE_UPDATED",
-  "CACHE_RULE_DELETED",
+  "gateway.virtual_key.created",
+  "gateway.virtual_key.updated",
+  "gateway.virtual_key.rotated",
+  "gateway.virtual_key.revoked",
+  "gateway.virtual_key.deleted",
+  "gateway.budget.created",
+  "gateway.budget.updated",
+  "gateway.budget.deleted",
+  "gateway.provider_binding.created",
+  "gateway.provider_binding.updated",
+  "gateway.provider_binding.deleted",
+  "gateway.cache_rule.created",
+  "gateway.cache_rule.updated",
+  "gateway.cache_rule.deleted",
 ] as const;
 
 export type GatewayAuditAction = (typeof GATEWAY_AUDIT_ACTIONS)[number];

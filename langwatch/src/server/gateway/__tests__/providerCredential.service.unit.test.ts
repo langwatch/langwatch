@@ -148,7 +148,7 @@ describe("GatewayProviderCredentialService.create", () => {
       expect(data.rotationPolicy).toBe("MANUAL");
     });
 
-    it("emits a PROVIDER_BINDING_UPDATED change-event + PROVIDER_BINDING_CREATED audit entry", async () => {
+    it("emits a PROVIDER_BINDING_UPDATED change-event + gateway.provider_binding.created audit entry", async () => {
       const { prisma, changeEventCreate, auditCreate } = mockPrisma({
         modelProvider: stubModelProvider(),
       });
@@ -159,7 +159,7 @@ describe("GatewayProviderCredentialService.create", () => {
       expect(changeEventCreate).toHaveBeenCalledOnce();
       expect(auditCreate).toHaveBeenCalledOnce();
       expect(auditCreate.mock.calls[0]?.[0].data.action).toBe(
-        "PROVIDER_BINDING_CREATED",
+        "gateway.provider_binding.created",
       );
     });
   });
@@ -229,7 +229,7 @@ describe("GatewayProviderCredentialService.update", () => {
 
 describe("GatewayProviderCredentialService.disable", () => {
   describe("when the binding exists", () => {
-    it("sets disabledAt + emits audit with PROVIDER_BINDING_UPDATED action", async () => {
+    it("sets disabledAt + emits audit with gateway.provider_binding.updated action", async () => {
       const existing = stubRow({ disabledAt: null });
       const { prisma, updateArgs, auditCreate } = mockPrisma({ existing });
       const sut = GatewayProviderCredentialService.create(prisma);
@@ -245,7 +245,7 @@ describe("GatewayProviderCredentialService.disable", () => {
         Date,
       );
       expect(auditCreate.mock.calls[0]?.[0].data.action).toBe(
-        "PROVIDER_BINDING_UPDATED",
+        "gateway.provider_binding.updated",
       );
     });
   });

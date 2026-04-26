@@ -848,7 +848,7 @@ async function seedAuditLog(args: {
 }) {
   // Idempotency guard: AuditLog has no natural unique key for gateway-shape
   // rows (PK=cuid, no composite constraint on target + action + day), so
-  // a second run of this seed would pile on synthetic VIRTUAL_KEY_CREATED
+  // a second run of this seed would pile on synthetic gateway.virtual_key.created
   // rows and make the Audit page show two (or more) 'created' events per
   // VK. @ariana finding #10. If the first seeded VK already has any
   // audit rows attached, assume the full replay ran before and skip.
@@ -859,12 +859,12 @@ async function seedAuditLog(args: {
         organizationId: args.organizationId,
         targetKind: "virtual_key",
         targetId: firstVkId,
-        action: "VIRTUAL_KEY_CREATED",
+        action: "gateway.virtual_key.created",
       },
     });
     if (alreadySeeded > 0) {
       console.log(
-        "· audit log already seeded (found VIRTUAL_KEY_CREATED for first VK) — skipping replay",
+        "· audit log already seeded (found gateway.virtual_key.created for first VK) — skipping replay",
       );
       return;
     }
@@ -878,7 +878,7 @@ async function seedAuditLog(args: {
       organizationId: args.organizationId,
       projectId: args.projectId,
       userId: args.actorUserId,
-      action: "VIRTUAL_KEY_CREATED",
+      action: "gateway.virtual_key.created",
       targetKind: "virtual_key",
       targetId: vk.id,
       before: Prisma.JsonNull,
@@ -891,7 +891,7 @@ async function seedAuditLog(args: {
     organizationId: args.organizationId,
     projectId: args.projectId,
     userId: args.actorUserId,
-    action: "VIRTUAL_KEY_UPDATED",
+    action: "gateway.virtual_key.updated",
     targetKind: "virtual_key",
     targetId: args.virtualKeys[0]?.id ?? "vk_unknown",
     before: { rateLimits: { rpm: 300 } } as Prisma.InputJsonValue,
@@ -902,7 +902,7 @@ async function seedAuditLog(args: {
     organizationId: args.organizationId,
     projectId: args.projectId,
     userId: args.actorUserId,
-    action: "VIRTUAL_KEY_ROTATED",
+    action: "gateway.virtual_key.rotated",
     targetKind: "virtual_key",
     targetId: args.virtualKeys[1]?.id ?? "vk_unknown",
     before: { displayPrefix: "lw_vk_a1b2c3" } as Prisma.InputJsonValue,
@@ -916,7 +916,7 @@ async function seedAuditLog(args: {
       organizationId: args.organizationId,
       projectId: args.projectId,
       userId: args.actorUserId,
-      action: "VIRTUAL_KEY_REVOKED",
+      action: "gateway.virtual_key.revoked",
       targetKind: "virtual_key",
       targetId: revoked.id,
       before: { status: "ACTIVE" } as Prisma.InputJsonValue,
@@ -929,7 +929,7 @@ async function seedAuditLog(args: {
       organizationId: args.organizationId,
       projectId: args.projectId,
       userId: args.actorUserId,
-      action: "BUDGET_CREATED",
+      action: "gateway.budget.created",
       targetKind: "budget",
       targetId: b.id,
       before: Prisma.JsonNull,
@@ -943,7 +943,7 @@ async function seedAuditLog(args: {
       organizationId: args.organizationId,
       projectId: args.projectId,
       userId: args.actorUserId,
-      action: "BUDGET_UPDATED",
+      action: "gateway.budget.updated",
       targetKind: "budget",
       targetId: args.budgets[0].id,
       before: { limitUsd: "3000", onBreach: "WARN" } as Prisma.InputJsonValue,
@@ -956,7 +956,7 @@ async function seedAuditLog(args: {
       organizationId: args.organizationId,
       projectId: args.projectId,
       userId: args.actorUserId,
-      action: "PROVIDER_BINDING_CREATED",
+      action: "gateway.provider_binding.created",
       targetKind: "provider_binding",
       targetId: pb.id,
       before: Prisma.JsonNull,
@@ -969,7 +969,7 @@ async function seedAuditLog(args: {
       organizationId: args.organizationId,
       projectId: args.projectId,
       userId: args.actorUserId,
-      action: "CACHE_RULE_CREATED",
+      action: "gateway.cache_rule.created",
       targetKind: "cache_rule",
       targetId: cr.id,
       before: Prisma.JsonNull,
@@ -982,7 +982,7 @@ async function seedAuditLog(args: {
       organizationId: args.organizationId,
       projectId: args.projectId,
       userId: args.actorUserId,
-      action: "CACHE_RULE_UPDATED",
+      action: "gateway.cache_rule.updated",
       targetKind: "cache_rule",
       targetId: args.cacheRules[0].id,
       before: { priority: 200, "action.ttl": 300 } as Prisma.InputJsonValue,

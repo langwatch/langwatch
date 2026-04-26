@@ -114,14 +114,14 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
   describe("when the gateway audit adapter writes a VK row", () => {
     it("creates an AuditLog row in gateway shape (targetKind + before/after)", async () => {
       const before = await prisma.auditLog.count({
-        where: { organizationId: ORG_ID, action: "VIRTUAL_KEY_CREATED" },
+        where: { organizationId: ORG_ID, action: "gateway.virtual_key.created" },
       });
 
       await auditLog.append({
         organizationId: ORG_ID,
         projectId: PROJECT_ID,
         actorUserId: ACTOR_USER_ID,
-        action: "VIRTUAL_KEY_CREATED",
+        action: "gateway.virtual_key.created",
         targetKind: "virtual_key",
         targetId: VK_ID,
         before: null,
@@ -133,7 +133,7 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
           organizationId: ORG_ID,
           targetKind: "virtual_key",
           targetId: VK_ID,
-          action: "VIRTUAL_KEY_CREATED",
+          action: "gateway.virtual_key.created",
         },
         orderBy: { createdAt: "desc" },
       });
@@ -149,9 +149,9 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
       expect(row.after).not.toBeNull();
       expect(row.after).toMatchObject({ status: "active" });
 
-      // Sanity: total VIRTUAL_KEY_CREATED rows for this org went up by 1.
+      // Sanity: total gateway.virtual_key.created rows for this org went up by 1.
       const after = await prisma.auditLog.count({
-        where: { organizationId: ORG_ID, action: "VIRTUAL_KEY_CREATED" },
+        where: { organizationId: ORG_ID, action: "gateway.virtual_key.created" },
       });
       expect(after).toBe(before + 1);
     });
@@ -161,7 +161,7 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
         organizationId: ORG_ID,
         projectId: PROJECT_ID,
         actorUserId: ACTOR_USER_ID,
-        action: "BUDGET_UPDATED",
+        action: "gateway.budget.updated",
         targetKind: "budget",
         targetId: BUDGET_ID,
         before: { limitUsd: "500" },
@@ -173,7 +173,7 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
           organizationId: ORG_ID,
           targetKind: "budget",
           targetId: BUDGET_ID,
-          action: "BUDGET_UPDATED",
+          action: "gateway.budget.updated",
         },
         orderBy: { createdAt: "desc" },
       });
