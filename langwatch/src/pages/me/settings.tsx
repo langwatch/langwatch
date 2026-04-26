@@ -4,12 +4,13 @@ import {
   Button,
   Heading,
   HStack,
+  Input,
   Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import {
-  KeyRound,
+  Copy,
   Laptop,
   Monitor,
   Server,
@@ -22,6 +23,8 @@ import {
   type PersonalApiKeyRow,
   usePersonalContext,
 } from "~/components/me/usePersonalContext";
+import { toaster } from "~/components/ui/toaster";
+import { api } from "~/utils/api";
 
 const fmtRelative = (iso: string | null): string => {
   if (!iso) return "Never";
@@ -45,6 +48,75 @@ const fmtUsd = (amount: number): string =>
 export default function MySettingsPage() {
   const ctx = usePersonalContext();
   const [prefs, setPrefs] = useState(ctx.notificationPrefs);
+  const [newKeyLabel, setNewKeyLabel] = useState("");
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [revealedSecret, setRevealedSecret] = useState<{
+    label: string;
+    secret: string;
+    baseUrl: string;
+  } | null>(null);
+  const [pendingRevokeId, setPendingRevokeId] = useState<string | null>(null);
+
+  const utils = api.useUtils();
+  const issueMutation = api.personalVirtualKeys.issuePersonal.useMutation({
+    onSuccess: (issued) => {
+      setRevealedSecret({
+        label: issued.label,
+        secret: issued.secret,
+        baseUrl: issued.baseUrl,
+      });
+      setNewKeyLabel("");
+      setShowAddForm(false);
+      void utils.personalVirtualKeys.list.invalidate({
+        organizationId: ctx.organizationId,
+      });
+      toaster.create({
+        title: `Issued personal key '${issued.label}'`,
+        type: "success",
+      });
+    },
+    onError: (err) => {
+      toaster.create({
+        title: "Failed to issue key",
+        description: err.message,
+        type: "error",
+      });
+    },
+  });
+
+  const revokeMutation = api.personalVirtualKeys.revokePersonal.useMutation({
+    onSuccess: () => {
+      void utils.personalVirtualKeys.list.invalidate({
+        organizationId: ctx.organizationId,
+      });
+      setPendingRevokeId(null);
+      toaster.create({
+        title: "Key revoked",
+        description: "The CLI/tool using this key will fail immediately.",
+        type: "success",
+      });
+    },
+    onError: (err) => {
+      toaster.create({
+        title: "Failed to revoke key",
+        description: err.message,
+        type: "error",
+      });
+    },
+  });
+
+  const onIssue = () => {
+    if (!newKeyLabel.trim() || !ctx.organizationId) return;
+    issueMutation.mutate({
+      organizationId: ctx.organizationId,
+      label: newKeyLabel.trim(),
+    });
+  };
+
+  const onRevoke = (id: string) => {
+    if (!ctx.organizationId) return;
+    revokeMutation.mutate({ organizationId: ctx.organizationId, id });
+  };
 
   return (
     <>
@@ -95,11 +167,70 @@ export default function MySettingsPage() {
           title="Personal API Keys"
           description="These keys let your CLI tools (Claude Code, Cursor, etc.) talk to LangWatch."
           action={
-            <Button size="sm" variant="outline" disabled title="Coming next iteration">
-              + Add a new key
-            </Button>
+            !showAddForm && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setShowAddForm(true)}
+              >
+                + Add a new key
+              </Button>
+            )
           }
         >
+          {revealedSecret && (
+            <RevealedSecretBanner
+              secret={revealedSecret}
+              onDismiss={() => setRevealedSecret(null)}
+            />
+          )}
+
+          {showAddForm && (
+            <Box
+              borderWidth="1px"
+              borderColor="border.muted"
+              borderRadius="sm"
+              padding={3}
+              marginBottom={3}
+            >
+              <VStack align="stretch" gap={2}>
+                <Text fontSize="sm" fontWeight="medium">
+                  New personal key
+                </Text>
+                <Input
+                  placeholder="e.g. jane-laptop-2"
+                  size="sm"
+                  value={newKeyLabel}
+                  onChange={(e) => setNewKeyLabel(e.target.value)}
+                />
+                <Text fontSize="xs" color="fg.muted">
+                  Lowercase letters, numbers, dash, underscore. The secret is
+                  shown once on creation.
+                </Text>
+                <HStack gap={2}>
+                  <Button
+                    size="sm"
+                    onClick={onIssue}
+                    loading={issueMutation.isPending}
+                    disabled={!newKeyLabel.trim()}
+                  >
+                    Create key
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setShowAddForm(false);
+                      setNewKeyLabel("");
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </HStack>
+              </VStack>
+            </Box>
+          )}
+
           {ctx.apiKeys.length === 0 ? (
             <Text fontSize="sm" color="fg.muted">
               No personal keys yet. Run <code>langwatch login</code> in your
@@ -108,7 +239,17 @@ export default function MySettingsPage() {
           ) : (
             <VStack align="stretch" gap={2}>
               {ctx.apiKeys.map((key) => (
-                <ApiKeyRow key={key.id} apiKey={key} />
+                <ApiKeyRow
+                  key={key.id}
+                  apiKey={key}
+                  isPendingRevoke={pendingRevokeId === key.id}
+                  isRevoking={
+                    revokeMutation.isPending && pendingRevokeId === key.id
+                  }
+                  onRequestRevoke={() => setPendingRevokeId(key.id)}
+                  onCancelRevoke={() => setPendingRevokeId(null)}
+                  onConfirmRevoke={() => onRevoke(key.id)}
+                />
               ))}
             </VStack>
           )}
@@ -236,7 +377,21 @@ function Field({
   );
 }
 
-function ApiKeyRow({ apiKey }: { apiKey: PersonalApiKeyRow }) {
+function ApiKeyRow({
+  apiKey,
+  isPendingRevoke,
+  isRevoking,
+  onRequestRevoke,
+  onCancelRevoke,
+  onConfirmRevoke,
+}: {
+  apiKey: PersonalApiKeyRow;
+  isPendingRevoke: boolean;
+  isRevoking: boolean;
+  onRequestRevoke: () => void;
+  onCancelRevoke: () => void;
+  onConfirmRevoke: () => void;
+}) {
   const Icon =
     apiKey.os === "macOS" || apiKey.os === "Windows"
       ? Laptop
@@ -245,37 +400,138 @@ function ApiKeyRow({ apiKey }: { apiKey: PersonalApiKeyRow }) {
         : Server;
 
   return (
-    <HStack
+    <VStack
+      align="stretch"
+      gap={2}
       borderWidth="1px"
-      borderColor="border.muted"
+      borderColor={isPendingRevoke ? "red.300" : "border.muted"}
       borderRadius="sm"
       padding={3}
-      gap={3}
     >
-      <Box>
-        <Icon size={20} />
-      </Box>
-      <VStack align="start" gap={0} flex={1}>
-        <Text fontSize="sm" fontWeight="medium">
-          {apiKey.label}
+      <HStack gap={3}>
+        <Box>
+          <Icon size={20} />
+        </Box>
+        <VStack align="start" gap={0} flex={1}>
+          <Text fontSize="sm" fontWeight="medium">
+            {apiKey.label}
+          </Text>
+          <Text fontSize="xs" color="fg.muted">
+            {apiKey.deviceHint} · Last used {fmtRelative(apiKey.lastUsedAt)}
+          </Text>
+          <Text fontSize="xs" color="fg.muted">
+            Created {apiKey.createdAt}
+          </Text>
+        </VStack>
+        {!isPendingRevoke && (
+          <Button
+            size="sm"
+            variant="outline"
+            colorPalette="red"
+            onClick={onRequestRevoke}
+          >
+            Revoke
+          </Button>
+        )}
+      </HStack>
+      {isPendingRevoke && (
+        <HStack
+          gap={2}
+          paddingY={2}
+          paddingX={3}
+          backgroundColor="red.50"
+          borderRadius="sm"
+        >
+          <Text fontSize="xs" color="red.700" flex={1}>
+            Revoke this key? Any tool using it will start failing immediately.
+          </Text>
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={onCancelRevoke}
+            disabled={isRevoking}
+          >
+            Cancel
+          </Button>
+          <Button
+            size="xs"
+            colorPalette="red"
+            onClick={onConfirmRevoke}
+            loading={isRevoking}
+          >
+            Confirm revoke
+          </Button>
+        </HStack>
+      )}
+    </VStack>
+  );
+}
+
+function RevealedSecretBanner({
+  secret,
+  onDismiss,
+}: {
+  secret: { label: string; secret: string; baseUrl: string };
+  onDismiss: () => void;
+}) {
+  return (
+    <Box
+      borderWidth="1px"
+      borderColor="green.300"
+      backgroundColor="green.50"
+      borderRadius="md"
+      padding={3}
+      marginBottom={3}
+    >
+      <VStack align="stretch" gap={2}>
+        <HStack>
+          <Text fontWeight="semibold" color="green.800">
+            New key '{secret.label}' created
+          </Text>
+          <Spacer />
+          <Button size="xs" variant="ghost" onClick={onDismiss}>
+            Dismiss
+          </Button>
+        </HStack>
+        <Text fontSize="xs" color="green.800">
+          Copy the secret now — you won't be able to see it again.
         </Text>
-        <Text fontSize="xs" color="fg.muted">
-          {apiKey.deviceHint} · Last used {fmtRelative(apiKey.lastUsedAt)}
-        </Text>
-        <Text fontSize="xs" color="fg.muted">
-          Created {apiKey.createdAt}
+        <HStack
+          gap={2}
+          paddingX={2}
+          paddingY={2}
+          backgroundColor="white"
+          borderRadius="sm"
+          borderWidth="1px"
+          borderColor="border.muted"
+        >
+          <Text
+            fontSize="xs"
+            fontFamily="mono"
+            flex={1}
+            wordBreak="break-all"
+          >
+            {secret.secret}
+          </Text>
+          <Button
+            size="xs"
+            variant="ghost"
+            onClick={() => {
+              void navigator.clipboard.writeText(secret.secret);
+              toaster.create({
+                title: "Secret copied to clipboard",
+                type: "success",
+              });
+            }}
+          >
+            <Copy size={14} /> Copy
+          </Button>
+        </HStack>
+        <Text fontSize="xs" color="green.800">
+          Gateway base URL: <code>{secret.baseUrl}</code>
         </Text>
       </VStack>
-      <Button
-        size="sm"
-        variant="outline"
-        colorPalette="red"
-        disabled
-        title="Coming next iteration"
-      >
-        Revoke
-      </Button>
-    </HStack>
+    </Box>
   );
 }
 

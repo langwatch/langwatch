@@ -145,7 +145,10 @@ export function usePersonalContext(): PersonalContext {
     ready: !!session && !!organization,
     email: userEmail,
     fullName: userName,
-    joinedOn: "—",
+    joinedOn:
+      personalContextQuery.data?.workspace.team.createdAt
+        ?.toISOString()
+        ?.slice(0, 10) ?? "—",
     organizationName: orgName,
     organizationId: orgId,
     routingPolicyName: personalContextQuery.data?.routingPolicy?.name ?? null,
