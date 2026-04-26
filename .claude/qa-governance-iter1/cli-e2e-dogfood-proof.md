@@ -2,10 +2,44 @@
 
 **Date:** 2026-04-26
 **Branch:** `feat/governance-platform`
-**HEAD at original proof:** `58f417771 fix(gateway): include projectId in routingPolicyId-bind update where clause`
-**Subsequent fixes incorporated:** `e552d3f1a` (RoutingPolicyService provider org-ownership validation + PVK integration-test fixture), `f5d99106d` (Vite router fix — see §6 "Browser /cli/auth path" below)
 **Worktree:** `wise-mixing-zebra`
 **Servers:** pnpm dev `:5660` (Vite frontend + API), aigateway `:5563`
+
+## ⚠️ POST-AUDIT NOTE — read this first
+
+The original proof below was captured against a **Go CLI at
+`services/cli/`** that has since been **deleted in its entirety**.
+@rchaves's review correctly flagged it as a duplicate of the
+unified `langwatch` CLI that already lives at `typescript-sdk/`.
+The wire shape, env-var injection map, exit codes, and Screen-8
+budget rendering are unchanged — they're all encoded in
+`specs/ai-gateway/governance/*.feature` and ported into
+`typescript-sdk/src/cli/commands/{login,whoami,dashboard,
+request-increase,wrap,logout-device,init-shell}.ts` plus
+`typescript-sdk/src/cli/utils/governance/{device-flow,config,
+budget,wrapper}.ts`.
+
+Status of the unified TS CLI port (10/11 subcommands):
+| Subcommand | Status |
+|---|---|
+| `langwatch login --device` | ✅ ported |
+| `langwatch whoami` | ✅ ported |
+| `langwatch dashboard --trace` | ✅ ported |
+| `langwatch request-increase` | ✅ ported |
+| `langwatch claude` / `codex` / `cursor` / `gemini` | ✅ ported |
+| `langwatch logout-device` | ✅ ported |
+| `langwatch init-shell <zsh\|bash\|fish\|cmd\|pwsh>` | ✅ ported |
+| `langwatch shell` (spawn subshell) | ⏳ deferred (nice-to-have) |
+
+36 vitest cases passing across the four governance utility modules.
+Re-running this dogfood proof against the TS CLI is the next
+verification slice — what's below stands as the design proof and
+the bug-discovery record.
+
+---
+
+**HEAD at original Go-CLI proof:** `58f417771 fix(gateway): include projectId in routingPolicyId-bind update where clause`
+**Subsequent fixes incorporated:** `e552d3f1a` (RoutingPolicyService provider org-ownership validation + PVK integration-test fixture), `f5d99106d` (Vite router fix — see §6 "Browser /cli/auth path" below)
 
 ## 1. Pre-state — fresh terminal, no config
 
