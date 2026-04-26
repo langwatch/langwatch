@@ -131,56 +131,8 @@ Feature: Evaluation execution - Backend
     Then the evaluator result has passed=false
 
   # ==========================================================================
-  # Result Mapper
-  # ==========================================================================
-
-  @unimplemented
-  Scenario: Map target result from NLP event
-    Given an NLP event component_state_change for node "target-1"
-    And the event has status "completed" with output "Hello world"
-    When I map the result
-    Then I get a target_result with:
-      | targetId | target-1    |
-      | output   | Hello world |
-
-  @unimplemented
-  Scenario: Map evaluator result from NLP event
-    Given an NLP event component_state_change for node "target-1.eval-1"
-    And the event has evaluator output with passed=true
-    When I map the result
-    Then I get an evaluator_result with:
-      | targetId    | target-1 |
-      | evaluatorId | eval-1   |
-      | passed      | true     |
-
-  @unimplemented
-  Scenario: Map target error from NLP event
-    Given an NLP event component_state_change for node "target-1"
-    And the event has status "error" with error "API key invalid"
-    When I map the result
-    Then I get a target_result with:
-      | targetId | target-1        |
-      | error    | API key invalid |
-
-  @unimplemented
-  Scenario: Extract targetId and evaluatorId from composite node ID
-    Given node ID "target-abc.evaluator-xyz"
-    When I parse the node ID
-    Then targetId is "target-abc"
-    And evaluatorId is "evaluator-xyz"
-
-  # ==========================================================================
   # Orchestrator - Core
   # ==========================================================================
-
-  @unimplemented
-  Scenario: Orchestrator iterates all cells for full execution
-    Given execution scope is "full"
-    And 3 dataset rows
-    And 2 targets
-    When the orchestrator runs
-    Then it executes 6 cells (3 rows × 2 targets)
-
   @unimplemented
   Scenario: Orchestrator iterates single row
     Given execution scope is row index 1
@@ -188,20 +140,6 @@ Feature: Evaluation execution - Backend
     And 2 targets
     When the orchestrator runs
     Then it executes 2 cells (1 row × 2 targets)
-
-  @unimplemented
-  Scenario: Orchestrator iterates single target
-    Given execution scope is target "target-1"
-    And 3 dataset rows
-    And 2 targets
-    When the orchestrator runs
-    Then it executes 3 cells (3 rows × 1 target)
-
-  @unimplemented
-  Scenario: Orchestrator iterates single cell
-    Given execution scope is cell (row 0, target "target-1")
-    When the orchestrator runs
-    Then it executes 1 cell
 
   @unimplemented
   Scenario: Orchestrator emits execution_started event
@@ -269,46 +207,6 @@ Feature: Evaluation execution - Backend
     Then at most 5 cells execute simultaneously
     And all 10 cells eventually complete
 
-  @unimplemented
-  Scenario: Rate limiting respects semaphore
-    Given max concurrency is 3
-    When 10 cells are queued
-    Then the semaphore limits concurrent executions to 3
-
-  # ==========================================================================
-  # Abort Manager
-  # ==========================================================================
-
-  @unimplemented
-  Scenario: Request abort sets Redis flag
-    Given run ID "run-123"
-    When I request abort for "run-123"
-    Then Redis key "eval_v3_abort:run-123" is set to "1"
-
-  @unimplemented
-  Scenario: Check abort returns true when flag set
-    Given run ID "run-123"
-    And abort was requested for "run-123"
-    When I check if "run-123" is aborted
-    Then it returns true
-
-  @unimplemented
-  Scenario: Check abort returns false when no flag
-    Given run ID "run-456" with no abort flag
-    When I check if "run-456" is aborted
-    Then it returns false
-
-  @unimplemented
-  Scenario: Clear abort removes Redis flag
-    Given abort was requested for "run-123"
-    When I clear abort for "run-123"
-    Then Redis key "eval_v3_abort:run-123" does not exist
-
-  @unimplemented
-  Scenario: Abort flag has TTL for auto-cleanup
-    When I request abort for "run-123"
-    Then Redis key has TTL of 3600 seconds
-
   # ==========================================================================
   # Orchestrator - Abort Integration
   # ==========================================================================
@@ -336,58 +234,6 @@ Feature: Evaluation execution - Backend
     Then the stream reader is cancelled immediately
     And no more events are processed from that stream
     And the cell is marked as stopped
-
-  @unimplemented
-  Scenario: Abort responds quickly even with many queued cells
-    Given 100 cells are queued for execution
-    And only 5 are currently in-flight
-    When abort is requested immediately
-    Then execution stops within seconds
-    And at most 5-10 cells complete (those in-flight)
-    And the remaining 90+ cells never start
-
-  # ==========================================================================
-  # Elasticsearch Storage
-  # ==========================================================================
-
-  @unimplemented
-  Scenario: Store results with target_id
-    Given a completed cell for target "target-1" row 0
-    When I store the result in Elasticsearch
-    Then ESBatchEvaluation.dataset entry has target_id="target-1"
-    And ESBatchEvaluation.evaluations entries have target_id="target-1"
-
-  @unimplemented
-  Scenario: Upsert results incrementally
-    Given run ID "run-123"
-    When cell 0 completes
-    Then Elasticsearch document is created with run_id="run-123"
-    When cell 1 completes
-    Then Elasticsearch document is updated (not duplicated)
-
-  @unimplemented
-  Scenario: Set finished_at on completion
-    Given all cells complete
-    When I finalize the Elasticsearch document
-    Then timestamps.finished_at is set
-
-  @unimplemented
-  Scenario: Set stopped_at on abort
-    Given execution was aborted
-    When I finalize the Elasticsearch document
-    Then timestamps.stopped_at is set
-    And timestamps.finished_at is NOT set
-
-  @unimplemented
-  Scenario: Store evaluator results in evaluations array
-    Given evaluator "exact_match" completed with passed=true
-    When I store the result
-    Then ESBatchEvaluation.evaluations contains:
-      | evaluator    | exact_match |
-      | target_id    | target-1    |
-      | status       | processed   |
-      | passed       | true        |
-      | index        | 0           |
 
   # ==========================================================================
   # Hono SSE Endpoint
@@ -455,19 +301,6 @@ Feature: Evaluation execution - Backend
     And the evaluator node has outputs: passed, score, label
 
   @unimplemented
-  Scenario: Evaluator target node ID is not composite
-    Given an evaluator target "target-123" with dbEvaluatorId "eval-abc"
-    When I build the workflow
-    Then the evaluator node id is "target-123"
-    And the node id does NOT contain a dot separator
-
-  @unimplemented
-  Scenario: Evaluator target uses evaluators/{id} path
-    Given an evaluator target with dbEvaluatorId "eval-abc"
-    When I build the workflow
-    Then the evaluator node has evaluator path "evaluators/eval-abc"
-
-  @unimplemented
   Scenario: Build workflow resolves evaluator target input mappings
     Given an evaluator target with inputs ["output", "expected_output"]
     And dataset columns ["response", "expected"]
@@ -483,13 +316,6 @@ Feature: Evaluation execution - Backend
       | input           | value       |
       | output          | Hello world |
       | expected_output | Hello world |
-
-  @unimplemented
-  Scenario: Evaluator target with value mappings
-    Given an evaluator target with input "threshold"
-    And a value mapping for "threshold" = "0.8"
-    When I build the workflow
-    Then the evaluator node has input "threshold" with value "0.8"
 
   # ==========================================================================
   # Result Mapper - Evaluator Targets
@@ -527,13 +353,6 @@ Feature: Evaluation execution - Backend
     When I build the workflow
     Then the workflow contains nodes: entry, target-eval-1, target-eval-1.meta-eval
     And edge connects "target-eval-1" output "score" to "target-eval-1.meta-eval" input "value"
-
-  @unimplemented
-  Scenario: Downstream evaluator receives evaluator target output
-    Given evaluator target "target-eval-1" completed with score=0.95
-    And downstream evaluator "meta-eval" maps input "value" to target output "score"
-    When the downstream evaluator executes
-    Then it receives input "value" with value 0.95
 
   # ==========================================================================
   # Data Loading - Evaluator Targets
