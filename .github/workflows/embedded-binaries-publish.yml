@@ -207,19 +207,19 @@ jobs:
           # MALLOC=libc avoids jemalloc (which has its own build deps and
           # causes alpine pain). BUILD_TLS=no — runtime listens on 127.0.0.1
           # only, no need to compile TLS.
-          # Build deps (bundled lua, hiredis, hdr_histogram) first then the
-          # binaries. Redis's parallel Makefile races between redis-server
-          # link and lua compilation on arm64 ("undefined reference to
-          # luaopen_base"); -j1 deps + then -j(nproc) redis-server fixes it.
+          # `make distclean` first to wipe any cached partial build state
+          # (redis's bundled lua otherwise sometimes links partially with
+          # hidden symbols on arm64 / under LTO, producing "undefined
+          # reference to luaopen_base").
+          # `-j1 -C deps` so the bundled lua/hiredis/linenoise/hdr_histogram
+          # build serially (their inter-target deps in deps/Makefile aren't
+          # parallel-safe), then -jN for src.
           # Build BOTH redis-server and redis-cli — supervisor's health
           # check shells out to `redis-cli PING`.
-          if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then
-            make BUILD_TLS=no MALLOC=libc -j$(sysctl -n hw.ncpu) -C deps lua hiredis hdr_histogram
-            make BUILD_TLS=no MALLOC=libc -j$(sysctl -n hw.ncpu) redis-server redis-cli
-          else
-            make BUILD_TLS=no MALLOC=libc -j$(nproc) -C deps lua hiredis hdr_histogram
-            make BUILD_TLS=no MALLOC=libc -j$(nproc) redis-server redis-cli
-          fi
+          jobs="$(if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then sysctl -n hw.ncpu; else nproc; fi)"
+          make distclean
+          make BUILD_TLS=no MALLOC=libc -j1 -C deps lua hiredis linenoise hdr_histogram
+          make BUILD_TLS=no MALLOC=libc -j"$jobs" redis-server redis-cli
           strip src/redis-server src/redis-cli 2>/dev/null || true
           # Tarball: redis-server + redis-cli at the root.
           tar czf "../redis-${REDIS_VERSION}-${{ matrix.target.platform }}.tar.gz" -C src redis-server redis-cli
