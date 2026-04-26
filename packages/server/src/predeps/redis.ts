@@ -90,10 +90,24 @@ export const redisPredep: Predep = {
     task.output = "extracting";
     // Tarball contains redis-server + redis-cli at the root. Both are
     // needed: the supervisor uses redis-cli for the readiness probe.
-    await tar.x({ file: tmp, cwd: paths.bin });
-    chmodSync(join(paths.bin, "redis-server"), 0o755);
-    chmodSync(join(paths.bin, "redis-cli"), 0o755);
-    const version = (await resolveVersion(join(paths.bin, "redis-server"))) ?? "unknown";
-    return { version, resolvedPath: join(paths.bin, "redis-server") };
+    // sync: true so files are fully flushed before we chmod — async tar.x
+    // resolved while redis-cli was still in-flight on a CI run, and the
+    // subsequent chmodSync hit ENOENT. Sync extraction blocks until every
+    // entry is on disk and stat-visible.
+    tar.x({ sync: true, file: tmp, cwd: paths.bin });
+    const serverBin = join(paths.bin, "redis-server");
+    const cliBin = join(paths.bin, "redis-cli");
+    if (!existsSync(serverBin) || !existsSync(cliBin)) {
+      throw new Error(
+        `redis tarball ${url} extracted incompletely — expected both redis-server and redis-cli, got ${[
+          existsSync(serverBin) ? "redis-server" : null,
+          existsSync(cliBin) ? "redis-cli" : null,
+        ].filter(Boolean).join(", ") || "neither"}`,
+      );
+    }
+    chmodSync(serverBin, 0o755);
+    chmodSync(cliBin, 0o755);
+    const version = (await resolveVersion(serverBin)) ?? "unknown";
+    return { version, resolvedPath: serverBin };
   },
 };

@@ -97,8 +97,14 @@ export const postgresPredep: Predep = {
     task.output = "extracting";
     // Tarball layout: bin/, lib/, share/, include/ rooted at the tarball
     // top — matches what publish.yml produces with `tar czf ... -C prefix .`.
-    await tar.x({ file: tmp, cwd: target });
+    // sync: true to avoid races between extract completion and downstream
+    // file checks (the postgres tarball has 2000+ entries; async resolve
+    // can return before the final entries are stat-visible on slow CI fs).
+    tar.x({ sync: true, file: tmp, cwd: target });
     const bin = join(target, "bin", "postgres");
+    if (!existsSync(bin)) {
+      throw new Error(`postgres tarball ${url} extracted incompletely — ${bin} not found after extract`);
+    }
     const version = (await resolveVersion(bin)) ?? "unknown";
     return { version, resolvedPath: bin };
   },
