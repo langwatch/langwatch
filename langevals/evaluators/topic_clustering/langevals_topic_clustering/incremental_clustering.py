@@ -147,7 +147,8 @@ def maybe_create_new_topics_and_subtopics_from_unassigned_traces(
     ]
     logger.info("Found unassigned traces", unassigned_count=len(new_traces_to_assign))
 
-    new_topics, new_subtopics, new_traces_to_assign = ([], [], [])
+    new_topics: list[Topic] = []
+    new_subtopics: list[Subtopic] = []
     if len(new_traces_to_assign) > MINIMUM_UNASSIGNED_TRACES_TO_CREATE_NEW_TOPIC:
         logger.info(
             "Creating new topics from unassigned traces",

@@ -105,10 +105,22 @@ def generate_topic_names(
         response.choices[0].message.tool_calls[0].function.arguments  # type: ignore
     )
 
-    topic_names: list[str] = list(topic_names_dict.values())
-    topic_names = topic_names[0 : len(topic_examples)]
-    if len(topic_names) != len(topic_examples):
-        raise ValueError("topic_names and topic_examples must have the same length.")
+    # Look up by the explicit `topic_{idx}` keys we sent in the tool
+    # schema instead of trusting json.loads() to preserve the model's
+    # output order. Insertion order is well-defined in CPython but
+    # the LLM is free to reorder fields in its JSON, which would
+    # silently mis-pair names with topics.
+    missing = [
+        idx for idx in range(len(topic_examples))
+        if not topic_names_dict.get(f"topic_{idx}")
+    ]
+    if missing:
+        raise ValueError(
+            f"Missing topic names for indexes {missing}; got keys {list(topic_names_dict.keys())}"
+        )
+    topic_names: list[str] = [
+        topic_names_dict[f"topic_{idx}"] for idx in range(len(topic_examples))
+    ]
 
     return topic_names, Money(amount=total_cost, currency="USD")
 

@@ -56,7 +56,7 @@ class TopicClusteringTopicNamingTestCase(unittest.IsolatedAsyncioTestCase):
         reason="AZURE_OPENAI_ENDPOINT environment variable not set"
     )
     async def test_it_avoid_already_existing_topic_names(self):
-        topic_names = generate_topic_names(
+        topic_names, _cost = generate_topic_names(
             {
                 "model": "azure/gpt-4-1106-preview",
                 "api_base": os.environ["AZURE_OPENAI_ENDPOINT"],
