@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"os/exec"
 	"runtime"
@@ -45,12 +46,23 @@ func runLogin(ctx context.Context, _ []string) error {
 		return fmt.Errorf("start device flow: %w", err)
 	}
 
-	verifyURL := dc.VerificationURI
-	if !strings.Contains(verifyURL, dc.UserCode) {
-		// servers SHOULD return a verification_uri_complete that already
-		// includes the code; if they don't, fall back to the bare URL +
-		// instruct the user to type their code.
-		verifyURL = strings.TrimRight(verifyURL, "/") + "?code=" + dc.UserCode
+	// RFC 8628 §3.3.1 says servers SHOULD return verification_uri_complete
+	// with the user_code already encoded in the URL — saving the user a
+	// copy/paste step. Prefer that when present; fall back to constructing
+	// it ourselves with the spec-canonical `user_code` query param the
+	// browser-side /cli/auth page reads (NOT `code` — that's a common
+	// mistake that lands users on a 404 because the page reads
+	// router.query.user_code, not router.query.code).
+	verifyURL := dc.VerificationURIComplete
+	if verifyURL == "" {
+		verifyURL = dc.VerificationURI
+		if !strings.Contains(verifyURL, dc.UserCode) {
+			sep := "?"
+			if strings.Contains(verifyURL, "?") {
+				sep = "&"
+			}
+			verifyURL = strings.TrimRight(verifyURL, "/") + sep + "user_code=" + url.QueryEscape(dc.UserCode)
+		}
 	}
 
 	fmt.Printf("Opening browser to authenticate...\n")
@@ -159,21 +171,84 @@ func runWhoami(_ context.Context, _ []string) error {
 	return nil
 }
 
-func openBrowser(url string) error {
+// openBrowser launches a browser pointed at url, honoring the
+// LANGWATCH_BROWSER override (and the de-facto Unix BROWSER env var)
+// so dogfood + screenshot runs can pin a controllable browser like
+// Chrome/Chromium even when the OS default is Firefox or Safari.
+//
+// LANGWATCH_BROWSER values:
+//   "none"           don't try to open anything (CLI prints the URL and code)
+//   "chrome"|"google-chrome"
+//                    macOS: open -a 'Google Chrome' <url>
+//                    Linux: google-chrome <url>
+//                    Windows: start "" chrome <url>
+//   "chromium"       same shape, chromium binary
+//   "firefox"        same shape, firefox binary
+//   "safari"         macOS-only; open -a Safari
+//   absolute path or just a binary on PATH: invoked with <url> as the arg
+//
+// Falls back to OS default browser launcher (open / xdg-open / rundll32)
+// when no override is set.
+func openBrowser(rawURL string) error {
+	override := os.Getenv("LANGWATCH_BROWSER")
+	if override == "" {
+		override = os.Getenv("BROWSER")
+	}
+	if override == "none" {
+		return nil // explicit opt-out
+	}
+	if override != "" {
+		return openBrowserOverride(override, rawURL)
+	}
 	var name string
 	var args []string
 	switch runtime.GOOS {
 	case "darwin":
 		name = "open"
-		args = []string{url}
+		args = []string{rawURL}
 	case "windows":
 		name = "rundll32"
-		args = []string{"url.dll,FileProtocolHandler", url}
+		args = []string{"url.dll,FileProtocolHandler", rawURL}
 	default:
 		name = "xdg-open"
-		args = []string{url}
+		args = []string{rawURL}
 	}
 	return exec.Command(name, args...).Start()
+}
+
+func openBrowserOverride(override, rawURL string) error {
+	canonical := strings.ToLower(override)
+	switch runtime.GOOS {
+	case "darwin":
+		switch canonical {
+		case "chrome", "google-chrome":
+			return exec.Command("open", "-a", "Google Chrome", rawURL).Start()
+		case "chromium":
+			return exec.Command("open", "-a", "Chromium", rawURL).Start()
+		case "firefox":
+			return exec.Command("open", "-a", "Firefox", rawURL).Start()
+		case "safari":
+			return exec.Command("open", "-a", "Safari", rawURL).Start()
+		}
+	case "windows":
+		switch canonical {
+		case "chrome", "google-chrome":
+			return exec.Command("cmd", "/c", "start", "", "chrome", rawURL).Start()
+		case "firefox":
+			return exec.Command("cmd", "/c", "start", "", "firefox", rawURL).Start()
+		}
+	default:
+		switch canonical {
+		case "chrome", "google-chrome":
+			return exec.Command("google-chrome", rawURL).Start()
+		case "chromium":
+			return exec.Command("chromium", rawURL).Start()
+		case "firefox":
+			return exec.Command("firefox", rawURL).Start()
+		}
+	}
+	// Treat the override as either an absolute path or a $PATH name.
+	return exec.Command(override, rawURL).Start()
 }
 
 func spinner(done <-chan struct{}) {
