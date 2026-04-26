@@ -88,9 +88,11 @@ export const redisPredep: Predep = {
     }
 
     task.output = "extracting";
-    // Tarball contains a single redis-server binary at the root.
+    // Tarball contains redis-server + redis-cli at the root. Both are
+    // needed: the supervisor uses redis-cli for the readiness probe.
     await tar.x({ file: tmp, cwd: paths.bin });
     chmodSync(join(paths.bin, "redis-server"), 0o755);
+    chmodSync(join(paths.bin, "redis-cli"), 0o755);
     const version = (await resolveVersion(join(paths.bin, "redis-server"))) ?? "unknown";
     return { version, resolvedPath: join(paths.bin, "redis-server") };
   },

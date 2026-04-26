@@ -211,14 +211,17 @@ jobs:
           # MALLOC=libc avoids jemalloc (which has its own build deps and
           # causes alpine pain). BUILD_TLS=no — runtime listens on 127.0.0.1
           # only, no need to compile TLS.
+          # Build BOTH redis-server (the daemon) and redis-cli — the
+          # supervisor's health check shells out to `redis-cli PING` to
+          # confirm readiness, so we ship both binaries.
           if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then
-            make BUILD_TLS=no MALLOC=libc -j$(sysctl -n hw.ncpu) redis-server
+            make BUILD_TLS=no MALLOC=libc -j$(sysctl -n hw.ncpu) redis-server redis-cli
           else
-            make BUILD_TLS=no MALLOC=libc -j$(nproc) redis-server
+            make BUILD_TLS=no MALLOC=libc -j$(nproc) redis-server redis-cli
           fi
-          strip src/redis-server 2>/dev/null || true
-          # Tarball contains a single redis-server binary at the root.
-          tar czf "../redis-${REDIS_VERSION}-${{ matrix.target.platform }}.tar.gz" -C src redis-server
+          strip src/redis-server src/redis-cli 2>/dev/null || true
+          # Tarball: redis-server + redis-cli at the root.
+          tar czf "../redis-${REDIS_VERSION}-${{ matrix.target.platform }}.tar.gz" -C src redis-server redis-cli
 
       # ===========================================================
       # SHA256 + UPLOAD
