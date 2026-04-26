@@ -1,0 +1,274 @@
+# Builds portable postgres + redis binaries from upstream source for every
+# platform the `npx @langwatch/server` CLI supports, and uploads them (with
+# sha256 sidecars) to s3://langwatch-embedded-binaries (served at
+# https://embeds.langwatch.ai).
+#
+# Versions live in packages/server/embeds.versions.json — bump there, run
+# this workflow manually, predeps in the CLI auto-pick the new tarballs on
+# next user invocation.
+#
+# Trigger policy:
+# - workflow_dispatch (manual) — keep it intentional. We don't auto-publish
+#   on every push because uploads are append-only (no s3:DeleteObject for
+#   the publisher) and we don't want to spam tarballs.
+# - Optional inputs let the operator scope the run to a single binary or a
+#   single platform when iterating on build issues without burning the full
+#   12-job matrix.
+
+name: embedded-binaries-publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      only_binary:
+        description: "Build only this binary (postgres, redis, or empty for both)"
+        required: false
+        default: ""
+      only_platform:
+        description: "Build only this platform (e.g. linux-x64-musl) or empty for all"
+        required: false
+        default: ""
+      dry_run:
+        description: "Build + sha256 but skip the s3 upload"
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  # Two simultaneous publish runs would race on identical s3 keys (versioning
+  # would save us, but we'd needlessly double-build).
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: build ${{ matrix.binary }} for ${{ matrix.target.platform }}
+    if: |
+      (github.event.inputs.only_binary == '' || github.event.inputs.only_binary == matrix.binary) &&
+      (github.event.inputs.only_platform == '' || github.event.inputs.only_platform == matrix.target.platform)
+    runs-on: ${{ matrix.target.runner }}
+    container: ${{ matrix.target.container || null }}
+    timeout-minutes: 30
+
+    strategy:
+      fail-fast: false
+      matrix:
+        binary: [postgres, redis]
+        target:
+          # Native runners (no container).
+          - { platform: darwin-arm64,      runner: macos-latest,      container: "" }
+          - { platform: darwin-x64,        runner: macos-13,          container: "" }
+          - { platform: linux-x64,         runner: ubuntu-22.04,      container: "" }
+          - { platform: linux-arm64,       runner: ubuntu-22.04-arm,  container: "" }
+          # Alpine (musl) builds: run inside the alpine container so libc
+          # links to musl, not glibc. Using 3.19 specifically — older musl
+          # versions miss some pthread features postgres uses.
+          - { platform: linux-x64-musl,    runner: ubuntu-latest,     container: "alpine:3.19" }
+          - { platform: linux-arm64-musl,  runner: ubuntu-24.04-arm,  container: "alpine:3.19" }
+
+    env:
+      AWS_REGION: eu-central-1
+      S3_BUCKET: langwatch-embedded-binaries
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Read pinned versions
+        id: versions
+        shell: bash
+        run: |
+          set -e
+          # jq isn't in alpine:3.19 by default — install if missing.
+          command -v jq >/dev/null 2>&1 || (
+            if [ -f /etc/alpine-release ]; then apk add --no-cache jq
+            elif command -v apt-get >/dev/null 2>&1; then sudo apt-get update && sudo apt-get install -y jq
+            elif command -v brew >/dev/null 2>&1; then brew install jq
+            fi
+          )
+          POSTGRES_VERSION=$(jq -r '.postgres.version' packages/server/embeds.versions.json)
+          REDIS_VERSION=$(jq -r '.redis.version' packages/server/embeds.versions.json)
+          echo "postgres=$POSTGRES_VERSION" >> "$GITHUB_OUTPUT"
+          echo "redis=$REDIS_VERSION" >> "$GITHUB_OUTPUT"
+          echo "Pinned: postgres=$POSTGRES_VERSION redis=$REDIS_VERSION"
+
+      - name: Install build dependencies
+        shell: bash
+        run: |
+          set -e
+          case "${{ matrix.target.platform }}" in
+            darwin-*)
+              brew install bison flex icu4c openssl@3 readline
+              ;;
+            linux-*-musl)
+              # alpine:3.19 ships busybox tools but not the build chain —
+              # also need bash itself (this very `shell: bash` step).
+              apk add --no-cache \
+                bash gcc g++ make musl-dev linux-headers \
+                bison flex perl pkgconfig \
+                icu-dev openssl-dev readline-dev zlib-dev \
+                tar gzip curl ca-certificates
+              ;;
+            linux-*)
+              sudo apt-get update
+              sudo apt-get install -y --no-install-recommends \
+                build-essential bison flex perl pkg-config \
+                libicu-dev libssl-dev libreadline-dev zlib1g-dev \
+                ca-certificates
+              ;;
+          esac
+
+      # ===========================================================
+      # POSTGRES
+      # ===========================================================
+      - name: Build postgres
+        if: matrix.binary == 'postgres'
+        shell: bash
+        env:
+          PG_VERSION: ${{ steps.versions.outputs.postgres }}
+        run: |
+          set -euo pipefail
+          src="postgresql-${PG_VERSION}.tar.bz2"
+          # Download from postgresql.org's official mirror (directly
+          # publishes signed source tarballs per major.minor).
+          curl -fsSL "https://ftp.postgresql.org/pub/source/v${PG_VERSION}/${src}" -o "${src}"
+
+          # Optional: integrity check via the published .sha256. The mirror
+          # provides one, but not every release has a stable checksum file
+          # — fail soft here, the hash WE produce on the output tarball is
+          # what predeps verify.
+          if curl -fsSL --max-time 30 "https://ftp.postgresql.org/pub/source/v${PG_VERSION}/${src}.sha256" -o "${src}.sha256" 2>/dev/null; then
+            if command -v sha256sum >/dev/null 2>&1; then
+              sha256sum -c "${src}.sha256" || (echo "upstream sha256 mismatch — refusing to build" && exit 1)
+            else
+              shasum -a 256 -c "${src}.sha256" || (echo "upstream sha256 mismatch — refusing to build" && exit 1)
+            fi
+          fi
+
+          tar xjf "${src}"
+          cd "postgresql-${PG_VERSION}"
+          install_prefix="$PWD/_install"
+          mkdir -p "$install_prefix"
+          # --without-icu would shrink the tarball ~30MB but breaks ICU
+          # collations, which Prisma migrations sometimes use. Keep ICU on.
+          # --without-readline because the runtime never opens an interactive
+          # psql; lops 2MB and one library off.
+          ./configure --prefix="$install_prefix" \
+            --without-readline \
+            --with-openssl
+          if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then
+            make -j$(sysctl -n hw.ncpu) world-bin
+          else
+            make -j$(nproc) world-bin
+          fi
+          make install-world-bin
+          # Strip debug info from the executables to halve the tarball size.
+          find "$install_prefix/bin" -type f -exec strip {} + 2>/dev/null || true
+          # Pack contents of _install (bin/, lib/, share/, include/) at the
+          # tarball root — predep extracts directly into <paths.bin>/postgres.
+          tar czf "../postgres-${PG_VERSION}-${{ matrix.target.platform }}.tar.gz" -C "$install_prefix" .
+
+      # ===========================================================
+      # REDIS
+      # ===========================================================
+      - name: Build redis
+        if: matrix.binary == 'redis'
+        shell: bash
+        env:
+          REDIS_VERSION: ${{ steps.versions.outputs.redis }}
+        run: |
+          set -euo pipefail
+          src="redis-${REDIS_VERSION}.tar.gz"
+          curl -fsSL "https://github.com/redis/redis/archive/refs/tags/${REDIS_VERSION}.tar.gz" -o "${src}"
+          tar xzf "${src}"
+          cd "redis-${REDIS_VERSION}"
+          # MALLOC=libc avoids jemalloc (which has its own build deps and
+          # causes alpine pain). BUILD_TLS=no — runtime listens on 127.0.0.1
+          # only, no need to compile TLS.
+          if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then
+            make BUILD_TLS=no MALLOC=libc -j$(sysctl -n hw.ncpu) redis-server
+          else
+            make BUILD_TLS=no MALLOC=libc -j$(nproc) redis-server
+          fi
+          strip src/redis-server 2>/dev/null || true
+          # Tarball contains a single redis-server binary at the root.
+          tar czf "../redis-${REDIS_VERSION}-${{ matrix.target.platform }}.tar.gz" -C src redis-server
+
+      # ===========================================================
+      # SHA256 + UPLOAD
+      # ===========================================================
+      - name: Compute sha256
+        id: hash
+        shell: bash
+        env:
+          BIN: ${{ matrix.binary }}
+          PLAT: ${{ matrix.target.platform }}
+          PG_VERSION: ${{ steps.versions.outputs.postgres }}
+          REDIS_VERSION: ${{ steps.versions.outputs.redis }}
+        run: |
+          set -e
+          if [ "$BIN" = "postgres" ]; then
+            tarball="postgres-${PG_VERSION}-${PLAT}.tar.gz"
+          else
+            tarball="redis-${REDIS_VERSION}-${PLAT}.tar.gz"
+          fi
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "$tarball" > "${tarball}.sha256"
+          else
+            shasum -a 256 "$tarball" > "${tarball}.sha256"
+          fi
+          ls -lh "$tarball" "${tarball}.sha256"
+          cat "${tarball}.sha256"
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+
+      - name: Configure AWS credentials
+        if: ${{ !inputs.dry_run }}
+        uses: aws-actions/configure-aws-credentials@e3dd6a429d7300a6a4c196c26e071d42e0343502 # v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          aws-access-key-id: ${{ secrets.EMBEDS_AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.EMBEDS_AWS_SECRET_ACCESS_KEY }}
+
+      - name: Upload to S3 (and verify via embeds.langwatch.ai)
+        if: ${{ !inputs.dry_run }}
+        shell: bash
+        env:
+          TARBALL: ${{ steps.hash.outputs.tarball }}
+        run: |
+          set -e
+          # Cache forever (versioned key, content-addressed) — CloudFront
+          # default TTL is also 1 year, so this just makes the response
+          # explicit to direct-to-S3 fetchers if any exist.
+          aws s3 cp "$TARBALL"           "s3://${S3_BUCKET}/${TARBALL}"           --cache-control "public, max-age=31536000, immutable"
+          aws s3 cp "${TARBALL}.sha256"  "s3://${S3_BUCKET}/${TARBALL}.sha256"    --cache-control "public, max-age=31536000, immutable" --content-type "text/plain"
+
+          # Best-effort sanity probe through the CDN. CloudFront propagation
+          # is usually <30s but can be longer; don't fail the job on miss.
+          sleep 5
+          for i in 1 2 3 4 5 6; do
+            if curl -fsSI "https://embeds.langwatch.ai/${TARBALL}" >/dev/null 2>&1; then
+              echo "✓ https://embeds.langwatch.ai/${TARBALL} live"
+              break
+            fi
+            echo "  (probe $i: not yet propagated)"
+            sleep 5
+          done
+
+  publish-summary:
+    name: publish summary
+    needs: build
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print result links
+        shell: bash
+        run: |
+          echo "Run finished. If matrix.build all succeeded the following keys are now live:"
+          echo ""
+          echo "  https://embeds.langwatch.ai/postgres-<v>-{darwin-arm64,darwin-x64,linux-arm64,linux-x64,linux-arm64-musl,linux-x64-musl}.tar.gz"
+          echo "  https://embeds.langwatch.ai/redis-<v>-{darwin-arm64,darwin-x64,linux-arm64,linux-x64,linux-arm64-musl,linux-x64-musl}.tar.gz"
+          echo ""
+          echo "Each .tar.gz has a .sha256 sidecar at the same path."

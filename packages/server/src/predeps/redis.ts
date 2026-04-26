@@ -1,23 +1,25 @@
 import { execa } from "execa";
-import { chmodSync, createWriteStream, existsSync, mkdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chmodSync, createReadStream, createWriteStream, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
+import embedsVersions from "../../embeds.versions.json" with { type: "json" };
 import type { Predep } from "./types.ts";
 
-// We pull redis as a single statically-linked binary from the LangWatch
-// releases bucket. The bucket is built nightly from the upstream Redis
-// source against musl on linux and a CI-built clang on macOS, both stripped.
-// It ships only redis-server (we don't need redis-cli for the runtime).
+// Embedded redis-server is built from upstream redis.io source against
+// musl/glibc per platform by .github/workflows/embedded-binaries-publish.yml
+// and uploaded to https://embeds.langwatch.ai. The tarball ships only the
+// redis-server binary (we don't need redis-cli for the runtime) plus a
+// .sha256 sidecar.
+//
+// Pinned to 7.4.x (BSD-3-Clause). Redis 8.x switched to AGPLv3 + RSAL —
+// keeping 7.4 sidesteps the licensing implications of redistributing a
+// dual-licensed AGPL/RSAL binary inside a self-hostable tarball.
+const REDIS_VERSION = embedsVersions.redis.version;
+const EMBEDS_BASE = "https://embeds.langwatch.ai";
+
 function downloadUrl(platform: string): string {
-  const map: Record<string, string> = {
-    "darwin-arm64": "https://releases.langwatch.ai/embedded/redis-7.4.1-darwin-arm64.tar.gz",
-    "darwin-x64": "https://releases.langwatch.ai/embedded/redis-7.4.1-darwin-amd64.tar.gz",
-    "linux-arm64": "https://releases.langwatch.ai/embedded/redis-7.4.1-linux-arm64.tar.gz",
-    "linux-x64": "https://releases.langwatch.ai/embedded/redis-7.4.1-linux-amd64.tar.gz",
-  };
-  const url = map[platform];
-  if (!url) throw new Error(`No embedded redis build for ${platform}`);
-  return url;
+  return `${EMBEDS_BASE}/redis-${REDIS_VERSION}-${platform}.tar.gz`;
 }
 
 async function resolveVersion(bin: string): Promise<string | null> {
@@ -27,6 +29,12 @@ async function resolveVersion(bin: string): Promise<string | null> {
   } catch {
     return null;
   }
+}
+
+async function sha256OfFile(path: string): Promise<string> {
+  const hash = createHash("sha256");
+  await pipeline(createReadStream(path), hash);
+  return hash.digest("hex");
 }
 
 export const redisPredep: Predep = {
@@ -56,14 +64,32 @@ export const redisPredep: Predep = {
   async install({ platform, paths, task }) {
     mkdirSync(paths.bin, { recursive: true });
     const url = downloadUrl(platform);
-    task.output = `downloading ${url}`;
+    task.output = `downloading redis ${REDIS_VERSION} (${platform}) from embeds.langwatch.ai`;
     const tar = await import("tar");
+    const tmp = join(paths.bin, `.redis-${REDIS_VERSION}-${platform}.tar.gz`);
+
     const res = await fetch(url);
-    if (!res.ok || !res.body) throw new Error(`redis download failed: HTTP ${res.status}`);
-    const tmp = join(paths.bin, ".redis.tar.gz");
+    if (!res.ok || !res.body) {
+      throw new Error(`redis download failed (${url}): HTTP ${res.status}`);
+    }
     await pipeline(res.body as unknown as NodeJS.ReadableStream, createWriteStream(tmp));
+
+    task.output = "verifying sha256";
+    const expectedRes = await fetch(`${url}.sha256`);
+    if (!expectedRes.ok) {
+      throw new Error(`redis sha256 sidecar missing (${url}.sha256): HTTP ${expectedRes.status}`);
+    }
+    const expected = (await expectedRes.text()).trim().split(/\s+/)[0]!;
+    const actual = await sha256OfFile(tmp);
+    if (expected !== actual) {
+      throw new Error(
+        `redis sha256 mismatch for ${platform}: expected ${expected}, got ${actual}. Refusing to install — the tarball at ${url} may be tampered or partially downloaded.`,
+      );
+    }
+
     task.output = "extracting";
-    await tar.x({ file: tmp, cwd: paths.bin, strip: 1 });
+    // Tarball contains a single redis-server binary at the root.
+    await tar.x({ file: tmp, cwd: paths.bin });
     chmodSync(join(paths.bin, "redis-server"), 0o755);
     const version = (await resolveVersion(join(paths.bin, "redis-server"))) ?? "unknown";
     return { version, resolvedPath: join(paths.bin, "redis-server") };
