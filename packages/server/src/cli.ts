@@ -21,8 +21,11 @@ async function loadRuntime(): Promise<RuntimeApi> {
   try {
     // services/runtime.ts is julia's lane — see specs/npx-installer/03-services.feature.
     const real = await import("./services/runtime.ts" as any);
-    return real.runtime ?? placeholderRuntime;
-  } catch {
+    if (real?.runtime) return real.runtime;
+    console.warn(chalk.yellow("⚠ services/runtime.ts loaded but does not export `runtime` — falling back to placeholder"));
+    return placeholderRuntime;
+  } catch (err) {
+    console.warn(chalk.yellow(`⚠ failed to load services/runtime.ts: ${(err as Error).message}`));
     return placeholderRuntime;
   }
 }

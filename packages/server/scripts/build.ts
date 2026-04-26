@@ -15,9 +15,20 @@ await build({
   target: "node20",
   format: "cjs",
   outfile: resolve(__dirname, "../dist/cli.cjs"),
-  banner: { js: "#!/usr/bin/env node" },
+  // The `__cli_url` banner constant lets every bundled module resolve
+  // `import.meta.url` correctly — esbuild's CJS output otherwise leaves
+  // `import.meta.url` as `undefined`, which trips `fileURLToPath(...)`
+  // call sites (services/migrate.ts, predeps/aigateway.ts, …). In ESM
+  // tests the per-file `import.meta.url` keeps working unchanged.
+  banner: {
+    js: [
+      "#!/usr/bin/env node",
+      'const __cli_url = require("node:url").pathToFileURL(__filename).href;',
+    ].join("\n"),
+  },
   define: {
     __LANGWATCH_VERSION__: JSON.stringify(rootPkg.version),
+    "import.meta.url": "__cli_url",
   },
   minify: false,
   sourcemap: false,
