@@ -1,0 +1,155 @@
+# Publish `@langwatch/server` to npm. Hooked to the same release event as
+# the helm chart and docker images so every LangWatch release ships a
+# matching `npx @langwatch/server` version.
+#
+# Trigger policy:
+# - `release.published` on a release whose tag is the main langwatch
+#   release (matches the existing release-langwatch-chart workflow's
+#   "release" event filter).
+# - `workflow_dispatch` with `force=true` for break-glass / first publish.
+#
+# Version lock: the package.json `version` MUST match the release tag.
+# A pre-publish step asserts it; mismatch fails fast with "version mismatch".
+
+name: npx-server-publish
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Publish without a release tag (manual override)"
+        required: false
+        default: "false"
+
+permissions:
+  contents: read
+  id-token: write # for npm provenance
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'release' ||
+      (github.event_name == 'workflow_dispatch' && inputs.force == 'true')
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+        with:
+          version: 10.24.0
+          run_install: false
+
+      - name: Resolve and verify versions
+        id: versions
+        run: |
+          set -e
+          pkg_version="$(node -p "require('./package.json').version")"
+          app_version="$(node -p "require('./langwatch/package.json').version")"
+          tag="${GITHUB_REF_NAME:-}"
+          echo "package.json version:           $pkg_version"
+          echo "langwatch/package.json version: $app_version"
+          echo "release tag (if any):           $tag"
+
+          if [ "$pkg_version" != "$app_version" ]; then
+            echo "✗ version mismatch: root=$pkg_version langwatch=$app_version"
+            exit 1
+          fi
+
+          if [ "${{ github.event_name }}" = "release" ]; then
+            # Strip leading 'v' if present so v3.1.0 matches 3.1.0.
+            tag_version="${tag#v}"
+            if [ "$tag_version" != "$pkg_version" ]; then
+              echo "✗ version mismatch: tag=$tag package.json=$pkg_version"
+              exit 1
+            fi
+          fi
+
+          echo "version=$pkg_version" >> "$GITHUB_OUTPUT"
+
+      - name: Install pnpm dependencies (workspace)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build @langwatch/server CLI
+        run: pnpm --filter @langwatch/server-cli build
+
+      - name: Pack the npm tarball
+        id: pack
+        run: |
+          mkdir -p _pack
+          pnpm pack --pack-destination "$GITHUB_WORKSPACE/_pack"
+          tarball="$(ls "$GITHUB_WORKSPACE/_pack"/langwatch-server-*.tgz | head -n1)"
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+          echo "tarball size:"; ls -lh "$tarball"
+          echo ""
+          echo "first 50 paths in tarball:"
+          tar -tzf "$tarball" | head -n 50
+
+      - name: Sanity-check tarball contents
+        run: |
+          set -e
+          tarball="${{ steps.pack.outputs.tarball }}"
+          required=(
+            "package/packages/server/dist/cli.cjs"
+            "package/langwatch/package.json"
+            "package/langwatch_nlp/pyproject.toml"
+            "package/langevals/pyproject.toml"
+          )
+          forbidden=(
+            "package/langwatch/node_modules"
+            "package/langwatch_nlp/.venv"
+            "package/langwatch/.next/cache"
+            "package/.env"
+          )
+          listing="$(mktemp)"
+          tar -tzf "$tarball" > "$listing"
+          for path in "${required[@]}"; do
+            if ! grep -qE "^${path}(/|$)" "$listing"; then
+              echo "✗ tarball missing required path: $path"; exit 1
+            fi
+          done
+          for path in "${forbidden[@]}"; do
+            if grep -qE "^${path}(/|$)" "$listing"; then
+              echo "✗ tarball contains forbidden path: $path"; exit 1
+            fi
+          done
+          # Tarball gzipped should be < 300 MB.
+          size_bytes="$(stat -c%s "$tarball" 2>/dev/null || stat -f%z "$tarball")"
+          echo "size=$size_bytes bytes"
+          if [ "$size_bytes" -gt $((300 * 1024 * 1024)) ]; then
+            echo "✗ tarball too large (>300 MB)"; exit 1
+          fi
+
+      - name: Publish to npm with provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_API_TOKEN }}
+        run: |
+          set -e
+          tarball="${{ steps.pack.outputs.tarball }}"
+          npm publish "$tarball" --access public --provenance
+
+      - name: Notify Slack
+        if: always() && github.event_name == 'release'
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+          STATUS: ${{ job.status }}
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: |
+          if [ -z "$SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL" ]; then exit 0; fi
+          if [ "$STATUS" = "success" ]; then
+            text="✅ @langwatch/server@${VERSION} published to npm — \`npx @langwatch/server\` ready"
+          else
+            text="✗ @langwatch/server@${VERSION} publish failed — see ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          fi
+          curl -sS -X POST -H 'Content-Type: application/json' \
+            -d "$(printf '{"text":"%s"}' "$text")" \
+            "$SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL"
