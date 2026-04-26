@@ -212,6 +212,79 @@ export class EvaluationRunClickHouseRepository
     }
   }
 
+  async findByTraceId(
+    tenantId: string,
+    traceId: string,
+  ): Promise<EvaluationRunData[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "EvaluationRunClickHouseRepository.findByTraceId",
+    );
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
+        query: `
+          SELECT
+            ProjectionId,
+            TenantId,
+            EvaluationId,
+            Version,
+            EvaluatorId,
+            EvaluatorType,
+            EvaluatorName,
+            TraceId,
+            IsGuardrail,
+            Status,
+            Score,
+            Passed,
+            Label,
+            Details,
+            Inputs,
+            Error,
+            ErrorDetails,
+            toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
+            toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
+            toUnixTimestamp64Milli(ArchivedAt) AS ArchivedAt,
+            toUnixTimestamp64Milli(ScheduledAt) AS ScheduledAt,
+            toUnixTimestamp64Milli(StartedAt) AS StartedAt,
+            toUnixTimestamp64Milli(CompletedAt) AS CompletedAt,
+            CostId,
+            LastProcessedEventId,
+            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND ScheduledAt >= now() - INTERVAL 7 DAY
+            AND TraceId = {traceId:String}
+          ORDER BY UpdatedAt DESC
+        `,
+        query_params: { tenantId, traceId },
+        format: "JSONEachRow",
+      });
+
+      const rows = await result.json<ClickHouseEvaluationRunRecord>();
+
+      // Deduplicate by EvaluationId (take latest UpdatedAt per evaluation)
+      const seen = new Set<string>();
+      const deduped: EvaluationRunData[] = [];
+      for (const row of rows) {
+        if (seen.has(row.EvaluationId)) continue;
+        seen.add(row.EvaluationId);
+        deduped.push(this.fromClickHouseRecord(row));
+      }
+
+      return deduped;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(
+        { tenantId, traceId, error: errorMessage },
+        "Failed to find evaluation runs by trace ID in ClickHouse",
+      );
+      throw error;
+    }
+  }
+
   private fromClickHouseRecord(
     record: ClickHouseEvaluationRunRecord,
   ): EvaluationRunData {

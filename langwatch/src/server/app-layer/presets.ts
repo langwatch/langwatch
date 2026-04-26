@@ -25,6 +25,9 @@ import { EvaluationRunClickHouseRepository } from "./evaluations/repositories/ev
 import { NullEvaluationRunRepository } from "./evaluations/repositories/evaluation-run.repository";
 import { MonitorService } from "./monitors/monitor.service";
 import { PrismaMonitorRepository } from "./monitors/repositories/monitor.prisma.repository";
+import { TriggerService } from "./triggers/trigger.service";
+import { PrismaTriggerRepository } from "./triggers/repositories/trigger.prisma.repository";
+import { NullTriggerRepository } from "./triggers/repositories/trigger.repository";
 import { ExperimentService } from "../experiments/experiment.service";
 import { OrganizationService } from "./organizations/organization.service";
 import { PrismaOrganizationRepository } from "./organizations/repositories/organization.prisma.repository";
@@ -287,6 +290,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     new MonitorService(new PrismaMonitorRepository(prisma)),
     "MonitorService",
   );
+  const triggers = new TriggerService(new PrismaTriggerRepository(prisma));
   const tokenizer = new TokenizerService(
     config.disableTokenization ? new NullTokenizerClient() : new TiktokenClient(),
   );
@@ -350,6 +354,8 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     broadcast,
     projects,
     monitors,
+    triggers,
+    prisma,
     organizations,
     traces: { summary: traceSummary, spans: spanStorage },
     evaluations: { runs: evaluations.runs, execution: evaluations.execution },
@@ -478,6 +484,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     traces,
     evaluations,
     experiments,
+    triggers,
     dspySteps: { steps: dspySteps },
     simulations: { runs: simulationReads },
     suiteRuns: { runs: suiteRunService },
@@ -555,6 +562,7 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
     },
     dspySteps: { steps: new DspyStepService(new NullDspyStepRepository()) },
     experiments: ExperimentService.create(testPrisma),
+    triggers: new TriggerService(new NullTriggerRepository()),
     simulations: { runs: SimulationRunService.create(null) },
     suiteRuns: { runs: SuiteRunService.create({ resolveClickHouseClient: null, startSuiteRun: noop, queueSimulationRun: noop }) },
     organizations: nullOrganizations,

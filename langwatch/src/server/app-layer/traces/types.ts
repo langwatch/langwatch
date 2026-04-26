@@ -81,6 +81,13 @@ export const traceSummaryDataSchema = z.object({
   scenarioRoleSpans: z.record(z.string(), z.string()).optional(),
   /** Per-span costs for retroactive role assignment when parent arrives after children. Internal bookkeeping. */
   spanCosts: z.record(z.string(), z.number()).optional(),
+  /** LangWatch SDK events hoisted from spans during fold projection. */
+  events: z.array(z.object({
+    spanId: z.string(),
+    timestamp: z.number(),
+    name: z.string(),
+    attributes: z.record(z.string(), z.string()),
+  })).optional(),
   occurredAt: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),
