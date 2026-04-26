@@ -18,14 +18,6 @@ Feature: New Evaluation Menu
       | New Guardrail         | Block dangerous requests and harmful outputs       |
 
   @unimplemented
-  Scenario: New Experiment opens dialog and creates experiment
-    Given the dropdown menu is open
-    When I click "New Experiment"
-    Then a dialog should appear asking for experiment name
-    And the dialog should have a text input field
-    And the dialog should have a "Create" button
-
-  @unimplemented
   Scenario: Create experiment with name
     Given I click "New Experiment" from the menu
     And a dialog appears asking for name
@@ -34,43 +26,3 @@ Feature: New Evaluation Menu
     And the experiment slug should contain "my-experiment"
     And I should be redirected to /evaluations/v3/[slug]
 
-  @unimplemented
-  Scenario: Create experiment with empty name
-    Given the new experiment dialog is open
-    When I try to submit with an empty name
-    Then the Create button should be disabled
-    Or a validation error should appear
-
-  @unimplemented
-  Scenario: Cancel experiment creation
-    Given the new experiment dialog is open
-    When I click Cancel or close the dialog
-    Then no experiment should be created
-    And I should remain on the evaluations page
-
-  @unimplemented
-  Scenario: New Online Evaluation opens drawer
-    Given the dropdown menu is open
-    When I click "New Online Evaluation"
-    Then the Online Evaluation drawer should open
-    And the drawer should have trace/thread level selector
-
-  @unimplemented
-  Scenario: New Guardrail opens evaluator list
-    Given the dropdown menu is open
-    When I click "New Guardrail"
-    Then the evaluator list drawer should open
-    And the guardrails flow should begin
-
-  @unimplemented
-  Scenario: Menu closes on outside click
-    Given the dropdown menu is open
-    When I click outside the menu
-    Then the menu should close
-
-  @unimplemented
-  Scenario: Menu closes after option selection
-    Given the dropdown menu is open
-    When I click any option
-    Then the menu should close
-    And the corresponding action should be triggered

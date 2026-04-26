@@ -1,0 +1,63 @@
+# Monitors cull notes
+
+Removed 57 of 57 DELETE/DUPLICATE scenarios.
+
+## Per-row log
+
+- DELETE specs/monitors/evaluator-slug.feature :: Same name allowed in different projects
+- DELETE specs/monitors/evaluator-slug.feature :: Retry on unique constraint violation
+- DELETE specs/monitors/guardrails-api-compatibility.feature :: Name can be overridden even with slug
+- DELETE specs/monitors/guardrails-api-compatibility.feature :: Slug with special characters
+- DELETE specs/monitors/guardrails-api-compatibility.feature :: API rate limiting applies to both methods
+- DUPLICATE specs/monitors/guardrails-drawer.feature :: Open evaluator list directly from menu
+- DELETE specs/monitors/guardrails-drawer.feature :: Create new evaluator during guardrail setup
+- DELETE specs/monitors/guardrails-drawer.feature :: Evaluator without slug shows ID (fallback)
+- DELETE specs/monitors/guardrails-drawer.feature :: Project-specific API endpoint
+- DELETE specs/monitors/guardrails-drawer.feature :: Show evaluator description in drawer
+- DELETE specs/monitors/monitor-execution-backend.feature :: Fetch evaluator in single query with monitor
+- DELETE specs/monitors/monitor-execution-backend.feature :: Handle archived evaluator
+- DUPLICATE specs/monitors/monitor-execution-backend.feature :: Preconditions filter traces
+- DELETE specs/monitors/monitor-execution-backend.feature :: Evaluation worker timeout
+- DELETE specs/monitors/monitor-execution-backend.feature :: LangEvals API call structure
+- DUPLICATE specs/monitors/monitor-trace-mappings.feature :: Standard fields auto-inference
+- DUPLICATE specs/monitors/monitor-trace-mappings.feature :: Custom field cannot be auto-inferred
+- DUPLICATE specs/monitors/monitor-trace-mappings.feature :: Nested metadata field selection
+- DUPLICATE specs/monitors/monitor-trace-mappings.feature :: Nested span field selection
+- DUPLICATE specs/monitors/monitor-trace-mappings.feature :: Thread level traces mapping
+- DUPLICATE specs/monitors/monitor-trace-mappings.feature :: Thread level always requires manual mapping
+- DUPLICATE specs/monitors/nested-trace-mapping-ui.feature :: Select field with one level of nesting (metadata)
+- DUPLICATE specs/monitors/nested-trace-mapping-ui.feature :: Select field with two levels of nesting (spans)
+- DUPLICATE specs/monitors/nested-trace-mapping-ui.feature :: Thread level traces mapping with multi-select
+- DELETE specs/monitors/nested-trace-mapping-ui.feature :: Visual connector between badges
+- DELETE specs/monitors/nested-trace-mapping-ui.feature :: Hover state on badges
+- DELETE specs/monitors/new-evaluation-menu.feature :: New Experiment opens dialog and creates experiment
+- DELETE specs/monitors/new-evaluation-menu.feature :: Create experiment with empty name
+- DELETE specs/monitors/new-evaluation-menu.feature :: Cancel experiment creation
+- DUPLICATE specs/monitors/new-evaluation-menu.feature :: New Online Evaluation opens drawer
+- DUPLICATE specs/monitors/new-evaluation-menu.feature :: New Guardrail opens evaluator list
+- DELETE specs/monitors/new-evaluation-menu.feature :: Menu closes on outside click
+- DELETE specs/monitors/new-evaluation-menu.feature :: Menu closes after option selection
+- DUPLICATE specs/monitors/online-evaluation-drawer-flow.feature :: Remove evaluator shows pending state
+- DUPLICATE specs/monitors/online-evaluation-drawer-flow.feature :: Edit existing online evaluation
+- DUPLICATE specs/monitors/online-evaluation-drawer-flow.feature :: Create new evaluator on the spot
+- DUPLICATE specs/monitors/online-evaluation-drawer-flow.feature :: Cancel online evaluation creation
+- DUPLICATE specs/monitors/online-evaluation-drawer-flow.feature :: Drawer preserves state during sub-drawer navigation
+- DUPLICATE specs/monitors/online-evaluation-drawer-flow.feature :: Validation errors prevent save
+- DUPLICATE specs/monitors/online-evaluation-drawer.feature :: Open drawer from menu
+- DELETE specs/monitors/online-evaluation-drawer.feature :: Default state is trace level
+- DUPLICATE specs/monitors/online-evaluation-drawer.feature :: Open evaluator list from selection box
+- DUPLICATE specs/monitors/online-evaluation-drawer.feature :: Select evaluator with auto-mapped fields
+- DUPLICATE specs/monitors/online-evaluation-drawer.feature :: Select evaluator with pending mappings
+- DUPLICATE specs/monitors/online-evaluation-drawer.feature :: Name field defaults to evaluator name
+- DUPLICATE specs/monitors/online-evaluation-drawer.feature :: Configure preconditions
+- DUPLICATE specs/monitors/online-evaluation-drawer.feature :: Preconditions filter trace execution
+- DUPLICATE specs/monitors/online-evaluation-drawer.feature :: Save online evaluation
+- DUPLICATE specs/monitors/online-evaluation-drawer.feature :: Cannot save without evaluator
+- DUPLICATE specs/monitors/online-evaluation-drawer.feature :: Cannot save without name
+- DUPLICATE specs/monitors/online-evaluation-drawer.feature :: Clear selected evaluator
+- DELETE specs/monitors/online-evaluation-preconditions.feature :: Origin "is" application matches only explicit application origin
+- DELETE specs/monitors/online-evaluation-preconditions.feature :: Sentiment filter matches satisfaction score ranges
+- DUPLICATE specs/monitors/online-evaluation-preconditions.feature :: Clicking add precondition expands the form
+- DELETE specs/monitors/pending-mappings-validation.feature :: Thread level always opens editor
+- DUPLICATE specs/monitors/workflow-evaluator-mappings.feature :: Workflow evaluator at thread level uses thread sources
+- DUPLICATE specs/monitors/workflow-evaluator-mappings.feature :: Switching levels clears and re-infers mappings

@@ -18,33 +18,6 @@ Feature: Nested Trace Mapping UI
     And the mapping should be complete
 
   @unimplemented
-  Scenario: Select field with one level of nesting (metadata)
-    Given I'm mapping the "customer_type" evaluator field
-    When I click the mapping input
-    And I select "metadata" from trace sources
-    Then a badge "metadata" should appear
-    And a second dropdown should appear with available metadata keys
-    When I select "customer_type" from the nested dropdown
-    Then a second badge "customer_type" should appear
-    And the mapping should be complete
-    And the value should be { source: "metadata", key: "customer_type" }
-
-  @unimplemented
-  Scenario: Select field with two levels of nesting (spans)
-    Given I'm mapping the "llm_output" evaluator field
-    And traces have spans from multiple models
-    When I select "spans" from trace sources
-    Then a badge "spans" should appear
-    And a dropdown with span names should appear
-    When I select "gpt-4o" from the span names
-    Then a badge "gpt-4o" should appear
-    And a dropdown with span fields should appear
-    When I select "output" from span fields
-    Then a badge "output" should appear
-    And the mapping should be complete
-    And the value should be { source: "spans", key: "gpt-4o", subkey: "output" }
-
-  @unimplemented
   Scenario: Remove nested badge to re-select
     Given I have mapped "metadata -> customer_type"
     When I click the X on the "customer_type" badge
@@ -69,17 +42,6 @@ Feature: Nested Trace Mapping UI
     And span names dropdown should reappear
 
   @unimplemented
-  Scenario: Thread level traces mapping with multi-select
-    Given I'm mapping "conversation" for thread level
-    And thread sources are available
-    When I select "traces" from thread sources
-    Then a badge "traces" should appear
-    And a multi-select dropdown should appear with trace field options
-    When I select "input" and "output" fields
-    Then badges for "input" and "output" should appear inside the multi-select
-    And the mapping should include selectedFields: ["input", "output"]
-
-  @unimplemented
   Scenario: Keyboard navigation in dropdown
     Given the mapping dropdown is open
     When I press Arrow Down
@@ -95,25 +57,11 @@ Feature: Nested Trace Mapping UI
     And "metadata" should be in the filtered list
 
   @unimplemented
-  Scenario: Visual connector between badges
-    Given I have selected "metadata" as the source
-    And the nested dropdown is visible
-    Then there should be an L-shaped connector
-    And the connector should visually link the badges
-
-  @unimplemented
   Scenario: Dropdown closes on outside click
     Given the mapping dropdown is open
     When I click outside the dropdown
     Then the dropdown should close
     And my current selection should be preserved
-
-  @unimplemented
-  Scenario: Hover state on badges
-    Given I have a badge "metadata" displayed
-    When I hover over the badge
-    Then the X button should become more visible
-    And the badge should have a hover state
 
   @unimplemented
   Scenario: Empty state with no sources

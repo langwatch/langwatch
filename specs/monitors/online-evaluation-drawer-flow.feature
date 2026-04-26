@@ -49,15 +49,6 @@ Feature: Online Evaluation Drawer Complete Flow
     Then the evaluator editor should re-open
 
   @unimplemented
-  Scenario: Remove evaluator shows pending state
-    Given I have selected an evaluator with all mappings complete
-    When I click the X button on the evaluator box
-    Then the evaluator should be removed
-    And the evaluator box should show "Select Evaluator"
-    And the Save button should be disabled
-    And a subtle message should say "Select an evaluator to continue"
-
-  @unimplemented
   Scenario: Switch from trace to thread level
     Given I have selected an evaluator at trace level
     And mappings are auto-completed
@@ -75,53 +66,11 @@ Feature: Online Evaluation Drawer Complete Flow
     And the editor may open if there are pending mappings
 
   @unimplemented
-  Scenario: Edit existing online evaluation
-    Given a monitor "My PII Check" exists
-    When I click edit on the monitor
-    Then the Online Evaluation drawer should open
-    And the level should be pre-selected based on existing mappings
-    And the evaluator box should show the linked evaluator
-    And name should be "My PII Check"
-    And sampling should show the configured value
-    And preconditions should be pre-filled
-    When I change sampling to 75%
-    And I click Save
-    Then the monitor should be updated
-
-  @unimplemented
   Scenario: Evaluator has no required fields
     Given I select an evaluator with no required fields
     Then no mappings UI should be shown
     And no editor should open automatically
     And I should be able to save immediately
-
-  @unimplemented
-  Scenario: Create new evaluator on the spot
-    Given I open the Online Evaluation drawer
-    When I click "Select Evaluator"
-    And the evaluator list opens
-    When I click "Create New Evaluator"
-    Then I should be able to create a new evaluator
-    When I save the new evaluator
-    Then I should return with the new evaluator selected
-
-  @unimplemented
-  Scenario: Cancel online evaluation creation
-    Given I have partially configured an online evaluation
-    When I click Cancel or close the drawer
-    Then no monitor should be created
-    And my changes should be discarded
-
-  @unimplemented
-  Scenario: Drawer preserves state during sub-drawer navigation
-    Given I have selected trace level
-    And I have set sampling to 50%
-    When I open the evaluator list drawer
-    And I browse evaluators without selecting
-    And I close the evaluator list
-    Then I should return to Online Evaluation drawer
-    And trace level should still be selected
-    And sampling should still be 50%
 
   @unimplemented
   Scenario: Configure all options before save
@@ -139,10 +88,3 @@ Feature: Online Evaluation Drawer Complete Flow
       | preconditions| [input contains PII]     |
       | evaluatorId  | [selected evaluator id]  |
 
-  @unimplemented
-  Scenario: Validation errors prevent save
-    Given I have an evaluator selected
-    But the name field is empty
-    When I try to save
-    Then the Save button should be disabled
-    Or a validation error should appear on the name field

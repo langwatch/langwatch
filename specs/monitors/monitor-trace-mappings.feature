@@ -9,14 +9,6 @@ Feature: Monitor Trace Mappings
     And trace level is selected
 
   @unimplemented
-  Scenario: Standard fields auto-inference
-    Given an evaluator with required fields "input", "output"
-    When auto-inference runs for trace level
-    Then "input" should map to trace.input
-    And "output" should map to trace.output
-    And no pending mappings should exist
-
-  @unimplemented
   Scenario: Contexts field auto-inference
     Given an evaluator with required field "contexts"
     When auto-inference runs for trace level
@@ -29,49 +21,6 @@ Feature: Monitor Trace Mappings
     And traces have metadata.expected_output available
     When auto-inference runs
     Then "expected_output" should map to metadata.expected_output
-
-  @unimplemented
-  Scenario: Custom field cannot be auto-inferred
-    Given an evaluator with required field "custom_criteria"
-    When auto-inference runs
-    Then "custom_criteria" should remain unmapped
-    And "custom_criteria" should be marked as pending
-
-  @unimplemented
-  Scenario: Nested metadata field selection
-    Given an evaluator with required field "customer_type"
-    And traces have metadata.customer_type available
-    When I map "customer_type" to metadata source
-    Then I should be able to select "customer_type" as the nested key
-    And the mapping should be stored as { source: "metadata", key: "customer_type" }
-
-  @unimplemented
-  Scenario: Nested span field selection
-    Given an evaluator with required field "llm_output"
-    And traces have spans including "gpt-4o"
-    When I map "llm_output" to spans source
-    Then I should see available span names including "gpt-4o"
-    When I select "gpt-4o"
-    Then I should see subkey options: input, output, params
-    When I select "output"
-    Then the mapping should be { source: "spans", key: "gpt-4o", subkey: "output" }
-
-  @unimplemented
-  Scenario: Thread level traces mapping
-    Given thread level is selected
-    And an evaluator with required field "conversation"
-    When I map "conversation" to traces source
-    Then I should see a multi-select for trace fields
-    When I select "input" and "output" fields
-    Then the mapping should include selectedFields: ["input", "output"]
-
-  @unimplemented
-  Scenario: Thread level always requires manual mapping
-    Given thread level is selected
-    And an evaluator with required fields "input", "output"
-    When the evaluator is selected
-    Then auto-inference should not apply
-    And the evaluator editor should open for manual configuration
 
   @unimplemented
   Scenario: Mapping to evaluations results

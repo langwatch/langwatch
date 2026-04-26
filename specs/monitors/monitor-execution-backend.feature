@@ -36,25 +36,11 @@ Feature: Monitor Execution with Evaluator Reference
     And monitor parameters should be ignored
 
   @unimplemented
-  Scenario: Fetch evaluator in single query with monitor
-    Given a monitor with evaluatorId
-    When the worker processes the evaluation job
-    Then the evaluator should be fetched with the monitor in a join
-    To minimize database queries
-
-  @unimplemented
   Scenario: Handle missing evaluator gracefully
     Given a monitor with evaluatorId pointing to deleted evaluator
     When a trace is processed
     Then the evaluation should fail with a clear error
     And the error should indicate "Evaluator not found"
-
-  @unimplemented
-  Scenario: Handle archived evaluator
-    Given a monitor with evaluatorId pointing to archived evaluator
-    When a trace is processed
-    Then the evaluation should still execute
-    Because archived evaluators should remain functional for existing monitors
 
   @unimplemented
   Scenario: Thread-level evaluation fetches thread traces
@@ -80,14 +66,6 @@ Feature: Monitor Execution with Evaluator Reference
     Given a monitor with sample rate 0.5
     When 100 traces are processed
     Then approximately 50 evaluations should be scheduled
-
-  @unimplemented
-  Scenario: Preconditions filter traces
-    Given a monitor with precondition "input contains PII"
-    When a trace with input "Hello, my SSN is 123-45-6789" is processed
-    Then the evaluation should be scheduled
-    When a trace with input "Hello world" is processed
-    Then the evaluation should NOT be scheduled
 
   @unimplemented
   Scenario: Evaluation results stored correctly
@@ -119,19 +97,3 @@ Feature: Monitor Execution with Evaluator Reference
     Then all matching evaluations should be scheduled
     And they should run in parallel
 
-  @unimplemented
-  Scenario: Evaluation worker timeout
-    Given an evaluator that takes a long time
-    When the evaluation runs
-    Then it should timeout after 5 minutes
-    And the status should reflect the timeout
-
-  @unimplemented
-  Scenario: LangEvals API call structure
-    Given a monitor with evaluatorId
-    When the evaluation runs
-    Then the LangEvals API should be called with:
-      | field    | value                          |
-      | endpoint | /{evaluatorType}/evaluate      |
-      | settings | from evaluator.config.settings |
-      | data     | mapped from trace              |

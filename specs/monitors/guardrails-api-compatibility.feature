@@ -34,14 +34,6 @@ Feature: Guardrails API Backward Compatibility
     Then the result should include name "PII Check"
 
   @unimplemented
-  Scenario: Name can be overridden even with slug
-    Given an evaluator "PII Check" with slug "pii-check-abc12"
-    When I call the guardrails API with:
-      | evaluator                  | name              |
-      | evaluators/pii-check-abc12 | Custom Name       |
-    Then the result should include name "Custom Name"
-
-  @unimplemented
   Scenario: Slug lookup fails gracefully
     When I call the guardrails API with evaluator "evaluators/nonexistent-slug"
     Then the API should return a 404 error
@@ -52,12 +44,6 @@ Feature: Guardrails API Backward Compatibility
     When I call the guardrails API with evaluator "langevals/exact_match"
     Then the API should use the legacy behavior
     And settings should be read from the request body
-
-  @unimplemented
-  Scenario: Slug with special characters
-    Given an evaluator with slug "my-eval-test-12345"
-    When I call the guardrails API with evaluator "evaluators/my-eval-test-12345"
-    Then the evaluation should work correctly
 
   @unimplemented
   Scenario: Project scoping for slug lookup
@@ -80,13 +66,6 @@ Feature: Guardrails API Backward Compatibility
     And I call the API with legacy raw evaluator
     Then both responses should have the same format
     And both should include: status, score/passed, details
-
-  @unimplemented
-  Scenario: API rate limiting applies to both methods
-    Given rate limiting is configured
-    When I make many calls with slug-based evaluators
-    And I make many calls with legacy evaluators
-    Then rate limits should apply consistently to both
 
   @unimplemented
   Scenario: Evaluation cost tracking with slug

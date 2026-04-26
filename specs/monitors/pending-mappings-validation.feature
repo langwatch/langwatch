@@ -44,15 +44,6 @@ Feature: Pending Mappings Validation
     And the pending field should still be highlighted
 
   @unimplemented
-  Scenario: Thread level always opens editor
-    Given I have an evaluator with auto-mappable fields "input", "output"
-    And I have selected it at trace level (auto-mapped)
-    When I switch to "Thread" level
-    Then the evaluator editor should open automatically
-    Because thread mappings cannot be auto-inferred
-    And the mapping sources should now show thread options
-
-  @unimplemented
   Scenario: Cannot save with pending mappings
     Given I have pending mappings for "expected_output"
     Then the Save button should be disabled

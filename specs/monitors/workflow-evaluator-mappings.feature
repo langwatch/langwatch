@@ -93,18 +93,3 @@ Feature: Workflow evaluator mappings in Online Evaluation
   # Thread level mappings
   # ============================================================================
 
-  @unimplemented
-  Scenario: Workflow evaluator at thread level uses thread sources
-    Given the online evaluation drawer is open at thread level
-    When I select workflow evaluator "My Scorer"
-    Then the mapping sources should show thread options
-    And "traces" array should be available as a source
-    And auto-mapping should use thread-appropriate defaults
-
-  @unimplemented
-  Scenario: Switching levels clears and re-infers mappings
-    Given I have workflow evaluator "My Scorer" selected at trace level
-    And mappings are configured for trace sources
-    When I switch to thread level
-    Then mappings should be reset
-    And auto-inference should run with thread sources

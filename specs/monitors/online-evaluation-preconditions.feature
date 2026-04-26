@@ -55,18 +55,6 @@ Feature: Online Evaluation Preconditions Renewal
   # ────────────────────────────────────────────
 
   @unit @unimplemented
-  Scenario: Origin "is" application matches only explicit application origin
-    Given a precondition: traces.origin is "application"
-    When a trace arrives with langwatch.origin = "application"
-    Then the precondition passes
-    When a trace arrives with no langwatch.origin attribute
-    Then the precondition fails
-    When a trace arrives with langwatch.origin = ""
-    Then the precondition fails
-    When a trace arrives with langwatch.origin = "evaluation"
-    Then the precondition fails
-
-  @unit @unimplemented
   Scenario: "is" rule on text fields does case-insensitive exact match
     Given a precondition: input is "Hello World"
     When a trace arrives with input "hello world"
@@ -127,14 +115,6 @@ Feature: Online Evaluation Preconditions Renewal
     Then the precondition fails
 
   @unit @unimplemented
-  Scenario: Sentiment filter matches satisfaction score ranges
-    Given a precondition: sentiment.input_sentiment is "positive"
-    When a trace arrives with satisfaction_score 0.5
-    Then the precondition passes
-    When a trace arrives with satisfaction_score -0.5
-    Then the precondition fails
-
-  @unit @unimplemented
   Scenario: All preconditions must pass (AND logic)
     Given preconditions:
       | field         | rule     | value       |
@@ -188,13 +168,6 @@ Feature: Online Evaluation Preconditions Renewal
     When I view the preconditions section
     Then I see the text "This evaluation will run on every application trace"
     And I see an "Add precondition" button
-
-  @integration @unimplemented
-  Scenario: Clicking add precondition expands the form
-    Given the preconditions section is in collapsed state
-    When I click "Add precondition"
-    Then the precondition form fields are shown
-    And a new empty precondition row is added
 
   @integration @unimplemented
   Scenario: Multiple preconditions always show expanded form

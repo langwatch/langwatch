@@ -21,13 +21,6 @@ Feature: Evaluator Slug Generation
     Then the new evaluator should have a different slug due to unique nanoid suffix
 
   @unimplemented
-  Scenario: Same name allowed in different projects
-    Given an evaluator with name "Exact Match" exists in project "proj1"
-    When creating an evaluator with name "Exact Match" in project "proj2"
-    Then creation should succeed
-    And both evaluators may have the same slug pattern
-
-  @unimplemented
   Scenario: Handle special characters in name
     Given a new evaluator with name "LLM Judge (v2.0) - Beta!"
     When the evaluator is created
@@ -54,10 +47,3 @@ Feature: Evaluator Slug Generation
     When the evaluator is created
     Then creation should fail with validation error
 
-  @unimplemented
-  Scenario: Retry on unique constraint violation
-    Given an evaluator with slug "exact-match-abc12" exists
-    And the nanoid generator would return "abc12" first
-    When creating an evaluator that would generate the same slug
-    Then the system should retry with a new nanoid suffix
-    And creation should eventually succeed with a different slug
