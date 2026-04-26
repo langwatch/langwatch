@@ -4,10 +4,9 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { api } from "~/utils/api";
 
-import type {
-  WorkspaceSwitcherProps,
-  WorkspaceSwitcherCurrent,
-} from "../WorkspaceSwitcher";
+import { useWorkspaceData } from "../useWorkspaceData";
+
+import type { WorkspaceSwitcherProps } from "../WorkspaceSwitcher";
 
 export type PersonalSummary = {
   spentThisMonthUsd: number;
@@ -68,7 +67,7 @@ export type PersonalContext = {
  */
 export function usePersonalContext(): PersonalContext {
   const { data: session } = useRequiredSession();
-  const { organization, organizations } = useOrganizationTeamProject({
+  const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
 
@@ -105,46 +104,11 @@ export function usePersonalContext(): PersonalContext {
     }));
   }, [personalKeysQuery.data]);
 
-  const switcher = useMemo<WorkspaceSwitcherProps>(() => {
-    const personal = {
-      kind: "personal" as const,
-      href: "/me",
-      label: "My Workspace",
-      subtitle: "Personal usage, personal budget",
-    };
-
-    const teams = (organizations ?? [])
-      .flatMap((org) =>
-        (org.teams ?? []).map((team) => ({
-          kind: "team" as const,
-          teamId: team.id,
-          teamSlug: team.slug,
-          href: `/settings/teams/${team.slug}`,
-          label: team.name,
-          subtitle: "Team I'm part of",
-        })),
-      )
-      .sort((a, b) => a.label.localeCompare(b.label));
-
-    const projects = (organizations ?? [])
-      .flatMap((org) =>
-        (org.teams ?? []).flatMap((team) =>
-          (team.projects ?? []).map((project) => ({
-            kind: "project" as const,
-            projectId: project.id,
-            projectSlug: project.slug,
-            href: `/${project.slug}`,
-            label: project.name,
-            subtitle: "Project I work on",
-          })),
-        ),
-      )
-      .sort((a, b) => a.label.localeCompare(b.label));
-
-    const current: WorkspaceSwitcherCurrent = { kind: "personal" };
-
-    return { personal, teams, projects, current };
-  }, [organizations]);
+  const switcherData = useWorkspaceData();
+  const switcher = useMemo<WorkspaceSwitcherProps>(
+    () => ({ ...switcherData, current: { kind: "personal" } }),
+    [switcherData],
+  );
 
   return {
     ready: !!session && !!organization,
