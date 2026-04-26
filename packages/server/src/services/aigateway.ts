@@ -24,8 +24,10 @@ export async function startAigateway(
       env: {
         ...process.env,
         ...envFromFile,
-        PORT: String(ctx.ports.aigateway),
-        LW_GATEWAY_PORT: String(ctx.ports.aigateway),
+        // The Go gateway reads SERVER_ADDR for its listen address (see
+        // services/aigateway/README.md and pkg/config/validate_test.go).
+        // PORT alone is ignored — that's a Node convention, not Go.
+        SERVER_ADDR: `:${ctx.ports.aigateway}`,
         LW_GATEWAY_BASE_URL: `http://127.0.0.1:${ctx.ports.langwatch}`,
         LOG_FORMAT: "pretty",
       },
