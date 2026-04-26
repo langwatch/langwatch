@@ -70,7 +70,7 @@ const runtimeImpl: RuntimeApi = {
     // the langwatch app's existing pnpm scripts so we stay in lockstep with
     // helm/docker.
     try {
-      await runMigrations(ctx, bus);
+      await runMigrations(ctx, bus, envFromFile);
     } catch (err) {
       await stopHandles(handles);
       throw err;

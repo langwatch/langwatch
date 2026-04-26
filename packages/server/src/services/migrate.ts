@@ -11,8 +11,18 @@ import { locateLangwatchDir } from "./node-deps.ts";
  *
  * Idempotent — Prisma reports "Already in sync" and goose reports "no
  * migrations to run" when the schema is current.
+ *
+ * envFromFile is the `.env` we scaffold into LANGWATCH_HOME — the langwatch
+ * app's pnpm scripts go through `@t3-oss/env-core`, which validates the
+ * full env schema (BASE_HOST, NEXTAUTH_SECRET, etc.) at module-load time
+ * even for migrate-only invocations. Without this overlay, the script
+ * exits 1 before goose ever runs.
  */
-export async function runMigrations(ctx: RuntimeContext, bus: EventBus): Promise<void> {
+export async function runMigrations(
+  ctx: RuntimeContext,
+  bus: EventBus,
+  envFromFile: Record<string, string>,
+): Promise<void> {
   const langwatchDir = locateLangwatchDir();
   if (!langwatchDir) {
     throw new Error(
@@ -25,6 +35,7 @@ export async function runMigrations(ctx: RuntimeContext, bus: EventBus): Promise
 
   const env: NodeJS.ProcessEnv = {
     ...process.env,
+    ...envFromFile,
     DATABASE_URL: `postgresql://langwatch@127.0.0.1:${ctx.ports.postgres}/langwatch_db?schema=langwatch_db&connection_limit=5`,
     CLICKHOUSE_URL: `http://127.0.0.1:${ctx.ports.clickhouseHttp}/langwatch`,
     SKIP_PRISMA_MIGRATE: "false",
