@@ -101,9 +101,6 @@ function writeClickhouseConfig(path: string, ctx: RuntimeContext): void {
     </default>
   </profiles>
   <quotas><default/></quotas>
-  <user_directories>
-    <users_xml><path>users.xml</path></users_xml>
-  </user_directories>
 </clickhouse>
 `;
   writeFileSync(path, xml);
