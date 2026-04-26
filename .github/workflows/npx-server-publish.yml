@@ -155,6 +155,10 @@ jobs:
             "package/langwatch/dist/scenario-child-process.js"
             "package/langwatch_nlp/pyproject.toml"
             "package/langevals/pyproject.toml"
+            # langwatch_nlp pins the python SDK via `editable = "../python-sdk"`
+            # so the tarball must ship python-sdk/pyproject.toml + src/.
+            "package/python-sdk/pyproject.toml"
+            "package/python-sdk/src"
           )
           forbidden=(
             "package/langwatch/node_modules"

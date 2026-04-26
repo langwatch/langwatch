@@ -16,6 +16,6 @@ const ASCII_ART = [
 export function printBanner(version: string): void {
   console.log("");
   for (const line of ASCII_ART) console.log(chalk.bold.cyan(line));
-  console.log(chalk.dim(`v${version} — observability, evaluations, and prompt-ops for your LLM stack.`));
+  console.log(chalk.dim(`v${version} — gateway, observability, evaluations and agent simulations for your LLM stack.`));
   console.log("");
 }

@@ -18,6 +18,11 @@ node_modules/
 .turbo/
 .vercel/
 
+# Internal dev tooling — used only during langwatch development, never at
+# runtime by `npx @langwatch/server`. Keeping these out matters; deja-view
+# alone is ~1MB.
+packages/
+
 # Test artifacts.
 coverage/
 test-results/

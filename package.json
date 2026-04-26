@@ -36,6 +36,7 @@
     "langwatch/",
     "langwatch_nlp/",
     "langevals/",
+    "python-sdk/",
     "scripts/",
     "go.mod",
     "go.sum",
