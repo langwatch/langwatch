@@ -1,0 +1,48 @@
+# What goes in the @langwatch/server tarball — anything not in `files` from
+# package.json gets dropped by default; this file trims further inside the
+# directories that ARE included (langwatch/, langwatch_nlp/, langevals/).
+#
+# The CLI bundle (packages/server/dist/cli.cjs) ships unmodified.
+
+# Internal dev tooling — used only during langwatch development, never at
+# runtime by `npx @langwatch/server`. Keeping these out cuts the tarball
+# in half (deja-view alone is ~1MB).
+langwatch/packages/
+
+# Jupyter notebooks — exploration artifacts, not runtime code.
+langwatch_nlp/notebooks/
+langevals/notebooks/
+
+# Tests, fixtures, and dev-only configs.
+**/tests/
+**/__tests__/
+**/test/
+**/__pycache__/
+**/.pytest_cache/
+**/.venv/
+**/node_modules/
+
+# CI + container files that don't apply when running locally via npx.
+**/Dockerfile*
+**/.dockerignore
+**/.github/
+
+# Source maps + tsbuildinfo
+**/*.map
+**/*.tsbuildinfo
+
+# Saas-only mounts.
+langwatch/saas-src/
+langwatch/ee/
+
+# Editor + OS detritus.
+**/.DS_Store
+**/.vscode/
+**/.idea/
+**/.cursorignore
+**/.cursorrules
+
+# Loose dotfiles already covered by .gitignore but worth being explicit.
+**/.env
+**/.env.local
+**/.env.*.local
