@@ -6,7 +6,7 @@
  * WAITING_APPROVAL) must be rejected with BAD_REQUEST.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { organizationRouter } from "../organization";
+import { inviteRouter } from "../invite";
 import { createInnerTRPCContext } from "../../trpc";
 import {
   INVITE_ALREADY_ACCEPTED_MESSAGE,
@@ -87,7 +87,7 @@ describe("organization.acceptInvite", () => {
       project: { findFirst: vi.fn().mockResolvedValue(null) },
       $transaction: transactionMock,
     };
-    return organizationRouter.createCaller(ctx);
+    return inviteRouter.createCaller(ctx);
   }
 
   describe("when invite status is PENDING", () => {
