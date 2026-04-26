@@ -99,7 +99,7 @@ func LoadConfig(ctx context.Context) (Config, error) {
 // on dev defaults (ControlPlane.BaseURL = http://localhost:5560) in any pod
 // — passing /healthz but failing every real VK call with auth_upstream_unavailable.
 //
-// DEPRECATE: remove once all chart users + saas terraform have migrated to
+// Deprecated: remove once all chart users + saas terraform have migrated to
 // canonical names. Track via the existence of GATEWAY_LISTEN_ADDR / friends
 // in any deployed configmap or terraform; safe to drop when grep returns
 // zero hits across deployment manifests.
