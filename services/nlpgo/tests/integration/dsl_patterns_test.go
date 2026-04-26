@@ -61,6 +61,7 @@
 //   pattern_010_custom_safety  — custom node kind → typed unsupported error    ✅
 //   pattern_011_workflow_agent — sig → agent[type=workflow] sub-workflow chain ✅
 //   pattern_012_json_schema_out — single output typed json_schema + inline shape ✅
+//   pattern_013_falsy_settings — evaluator settings: 0 / "" / false / [] preserved ✅
 //
 // See feedback memory entry "No customer names in public repo".
 
@@ -1492,6 +1493,136 @@ func normalizeRequired(t *testing.T, raw any) []string {
 		return out
 	}
 	return nil
+}
+
+// TestPattern013_FalsyEvaluatorSettingsPreserved pins the parity
+// contract derived from langwatch_nlp commit a2dee8016 ("fix: evaluator
+// setting fields that were being ignored for being falsy"). The Python
+// fix changed `if field.value` to `if field.value is not None` because
+// the truthiness check was filtering out *valid* falsy values — 0, "",
+// false, [] — and silently dropping them from the dict handed to the
+// langevals service.
+//
+// Concrete failure mode that bug produced:
+//
+//   - An evaluator with `max_tokens: 0` (legitimate "unbounded" value
+//     for some providers) → settings dict missing max_tokens.
+//   - An exact_match evaluator with `remove_punctuation: false` →
+//     settings dict drops the field, langevals defaults to true,
+//     evaluator silently uses the wrong matcher.
+//   - A category evaluator with `categories: []` (deliberately empty
+//     for the "no candidates" branch) → settings dict drops categories,
+//     langevals 422s on the missing field.
+//
+// Go uses json.Unmarshal for paramAnyMap, which preserves all JSON
+// types including falsy primitives. This test pins that promise via
+// the public engine surface so structural drift can't reintroduce the
+// Python-style truthiness filter.
+//
+// Generic concept (synthetic settings); zero customer content.
+func TestPattern013_FalsyEvaluatorSettingsPreserved(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(_ app.LLMRequest) (*app.LLMResponse, error) {
+			return &app.LLMResponse{Content: "answer"}, nil
+		},
+	}
+	url, lwRequests := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status":  "processed",
+			"score":   0.0,
+			"passed":  false,
+			"details": "",
+		})
+	})
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-013",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"sk-pattern-013","spec_version":"1.3",
+	      "name":"Pattern013","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"q","type":"str"}],
+	          "dataset":{"inline":{"records":{"q":["x"]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"answer","type":"signature","data":{
+	          "name":"Answer",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Reply briefly: {{ q }}"}
+	          ],
+	          "inputs":[{"identifier":"q","type":"str"}],
+	          "outputs":[{"identifier":"answer","type":"str"}]
+	        }},
+	        {"id":"judge","type":"evaluator","data":{
+	          "parameters":[
+	            {"identifier":"evaluator","type":"str","value":"langevals/llm_boolean"},
+	            {"identifier":"name","type":"str","value":"falsy-settings-pin"},
+	            {"identifier":"settings","type":"dict","value":{
+	              "model":"openai/gpt-5-mini",
+	              "max_tokens":0,
+	              "prompt":"",
+	              "remove_punctuation":false,
+	              "categories":[]
+	            }}
+	          ],
+	          "outputs":[
+	            {"identifier":"score","type":"float"},
+	            {"identifier":"passed","type":"bool"}
+	          ]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[
+	          {"identifier":"score","type":"float"},
+	          {"identifier":"passed","type":"bool"}
+	        ]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.q","target":"answer","targetHandle":"inputs.q","type":"default"},
+	        {"id":"e2","source":"answer","sourceHandle":"outputs.answer","target":"judge","targetHandle":"inputs.output","type":"default"},
+	        {"id":"e3","source":"judge","sourceHandle":"outputs.score","target":"end","targetHandle":"inputs.score","type":"default"},
+	        {"id":"e4","source":"judge","sourceHandle":"outputs.passed","target":"end","targetHandle":"inputs.passed","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	require.Len(t, *lwRequests, 1, "expected exactly one evaluator HTTP call")
+	settings, ok := (*lwRequests)[0]["body"].(map[string]any)["settings"].(map[string]any)
+	require.True(t, ok, "evaluator request must carry a settings object")
+
+	// Every falsy field must be present in the settings dict, with its
+	// original falsy value. The exact assertion shape matters: a
+	// truthiness-style filter would drop these keys entirely, so the
+	// `Contains` check is load-bearing — `Equal` on a missing key
+	// returns nil and trivially "matches" some falsy expectations.
+	require.Contains(t, settings, "max_tokens", "max_tokens=0 must NOT be filtered out")
+	assert.InDelta(t, 0.0, settings["max_tokens"], 1e-9, "max_tokens must round-trip as 0, not be missing")
+
+	require.Contains(t, settings, "prompt", "prompt=\"\" must NOT be filtered out")
+	assert.Equal(t, "", settings["prompt"])
+
+	require.Contains(t, settings, "remove_punctuation", "remove_punctuation=false must NOT be filtered out")
+	assert.Equal(t, false, settings["remove_punctuation"])
+
+	require.Contains(t, settings, "categories", "categories=[] must NOT be filtered out")
+	cats, ok := settings["categories"].([]any)
+	require.True(t, ok, "categories must round-trip as a list, even when empty")
+	assert.Empty(t, cats, "categories must arrive empty (not absent, not nil)")
+
+	// And the model field (truthy control) is also present — to rule
+	// out the test passing because settings is a totally different
+	// shape than expected.
+	assert.Equal(t, "openai/gpt-5-mini", settings["model"])
 }
 
 // TestPattern011_WorkflowAsEvaluatorChain — signature → agent
