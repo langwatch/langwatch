@@ -1,6 +1,6 @@
 import { execa } from "execa";
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Predep } from "./types.ts";
 
