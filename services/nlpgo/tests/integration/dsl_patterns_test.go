@@ -50,9 +50,9 @@
 // Coverage map (filled in as patterns land):
 //
 //   pattern_001_linear_chain   — entry → signature(template) → evaluator → end ✅
-//   pattern_002_branching      — TBD once data lands
-//   pattern_003_liquid_in_sig  — TBD once data lands
-//   pattern_004_chain_eval     — TBD once data lands
+//   pattern_002_branching      — entry → 2× parallel signature → end           ✅
+//   pattern_003_liquid_in_sig  — multi-var, dot-path, array-index in one prompt ✅
+//   pattern_004_chain_eval     — signature → signature → evaluator chain        ✅
 //
 // See feedback memory entry "No customer names in public repo".
 
@@ -309,4 +309,354 @@ func TestPattern001_LinearChain_SignatureWithTemplateThenEvaluator(t *testing.T)
 		require.True(t, ok, "missing node %q in result.nodes", id)
 		assert.Equal(t, "success", node["status"], "node %q expected success", id)
 	}
+}
+
+// TestPattern002_BranchingParallelSignatures — entry → 2 parallel
+// signature siblings → end with both outputs. Customer-style fan-out
+// where one input is processed by two independent LLM calls (e.g. a
+// "summary" and a "sentiment" computed from the same source text)
+// and both results are returned.
+//
+// What this proves:
+//
+//   1. The planner places the two signatures in the SAME layer (they
+//      share inputs, no dependency on each other) — verified by the
+//      fact that both LLM calls are observed and both end-node fields
+//      populate.
+//   2. The engine's per-layer concurrency (one goroutine per node)
+//      does not corrupt the per-node Inputs/Outputs maps when two
+//      signature nodes run side-by-side. Each fake LLM call sees the
+//      shared input and produces an independent output.
+//   3. End node merges both signature outputs into result.
+func TestPattern002_BranchingParallelSignatures(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(req app.LLMRequest) (*app.LLMResponse, error) {
+			// Distinguish which sibling is calling by inspecting the
+			// system prompt — pattern_001 already proved templating
+			// reaches here, so it's the cleanest discriminator.
+			var sys string
+			for _, m := range req.Messages {
+				if m.Role == "system" {
+					sys, _ = m.Content.(string)
+					break
+				}
+			}
+			content := "default"
+			switch {
+			case stringContains(sys, "sentiment"):
+				content = "positive"
+			case stringContains(sys, "summary"):
+				content = "two-line summary of the input"
+			}
+			return &app.LLMResponse{Content: content}, nil
+		},
+	}
+	url, _ := setupPatternStack(t, llm, func(http.ResponseWriter, *http.Request) {})
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-002",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"k","spec_version":"1.3",
+	      "name":"Pattern002","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"text","type":"str"}],
+	          "dataset":{"inline":{"records":{"text":["A pleasant afternoon by the river."]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"sentiment","type":"signature","data":{
+	          "name":"Sentiment",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Classify the sentiment of: {{ text }}"}
+	          ],
+	          "inputs":[{"identifier":"text","type":"str"}],
+	          "outputs":[{"identifier":"sentiment","type":"str"}]
+	        }},
+	        {"id":"summary","type":"signature","data":{
+	          "name":"Summary",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Write a one-sentence summary of: {{ text }}"}
+	          ],
+	          "inputs":[{"identifier":"text","type":"str"}],
+	          "outputs":[{"identifier":"summary","type":"str"}]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[
+	          {"identifier":"sentiment","type":"str"},
+	          {"identifier":"summary","type":"str"}
+	        ]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.text","target":"sentiment","targetHandle":"inputs.text","type":"default"},
+	        {"id":"e2","source":"entry","sourceHandle":"outputs.text","target":"summary","targetHandle":"inputs.text","type":"default"},
+	        {"id":"e3","source":"sentiment","sourceHandle":"outputs.sentiment","target":"end","targetHandle":"inputs.sentiment","type":"default"},
+	        {"id":"e4","source":"summary","sourceHandle":"outputs.summary","target":"end","targetHandle":"inputs.summary","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	// Both LLM calls happened (one per sibling), and the engine merged
+	// both outputs into the workflow result.
+	llm.mu.Lock()
+	got := len(llm.requests)
+	llm.mu.Unlock()
+	assert.Equal(t, 2, got, "expected exactly two LLM Execute calls (one per parallel signature)")
+
+	require.NotNil(t, res.Result)
+	assert.Equal(t, "positive", res.Result["sentiment"])
+	assert.Equal(t, "two-line summary of the input", res.Result["summary"])
+
+	require.NotNil(t, res.Nodes)
+	for _, id := range []string{"entry", "sentiment", "summary", "end"} {
+		node, ok := res.Nodes[id].(map[string]any)
+		require.True(t, ok, "missing node %q", id)
+		assert.Equal(t, "success", node["status"], "node %q expected success", id)
+	}
+}
+
+// TestPattern003_HeavyLiquidTemplating — single signature whose
+// instructions exercise multiple liquid forms in one render: simple
+// {{ var }}, dot-path {{ x.y }}, array-index {{ arr[0] }}. Customers
+// stack these freely; this fixture catches partial-render regressions
+// where one form works but another silently doesn't.
+func TestPattern003_HeavyLiquidTemplating(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(_ app.LLMRequest) (*app.LLMResponse, error) {
+			return &app.LLMResponse{Content: "ok"}, nil
+		},
+	}
+	url, _ := setupPatternStack(t, llm, func(http.ResponseWriter, *http.Request) {})
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-003",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"k","spec_version":"1.3",
+	      "name":"Pattern003","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[
+	            {"identifier":"task","type":"str"},
+	            {"identifier":"profile","type":"dict"},
+	            {"identifier":"tags","type":"list"}
+	          ],
+	          "dataset":{"inline":{"records":{
+	            "task":["Translate to French"],
+	            "profile":[{"name":"Ada","tier":"pro"}],
+	            "tags":[["urgent","french","short"]]
+	          },"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"answer","type":"signature","data":{
+	          "name":"Answer",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Hello {{ profile.name }} (tier: {{ profile.tier }}). Your task: {{ task }}. Top tag: {{ tags[0] }}."}
+	          ],
+	          "inputs":[
+	            {"identifier":"task","type":"str"},
+	            {"identifier":"profile","type":"dict"},
+	            {"identifier":"tags","type":"list"}
+	          ],
+	          "outputs":[{"identifier":"answer","type":"str"}]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[{"identifier":"answer","type":"str"}]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.task","target":"answer","targetHandle":"inputs.task","type":"default"},
+	        {"id":"e2","source":"entry","sourceHandle":"outputs.profile","target":"answer","targetHandle":"inputs.profile","type":"default"},
+	        {"id":"e3","source":"entry","sourceHandle":"outputs.tags","target":"answer","targetHandle":"inputs.tags","type":"default"},
+	        {"id":"e4","source":"answer","sourceHandle":"outputs.answer","target":"end","targetHandle":"inputs.answer","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	llmReq := llm.lastRequest(t)
+	var sys string
+	for _, m := range llmReq.Messages {
+		if m.Role == "system" {
+			sys, _ = m.Content.(string)
+			break
+		}
+	}
+	// Every liquid form must have rendered.
+	assert.Contains(t, sys, "Hello Ada", "{{ profile.name }} should render")
+	assert.Contains(t, sys, "tier: pro", "{{ profile.tier }} should render")
+	assert.Contains(t, sys, "Translate to French", "{{ task }} should render")
+	assert.Contains(t, sys, "Top tag: urgent", "{{ tags[0] }} should render")
+	assert.NotContains(t, sys, "{{", "no raw {{ }} markers should remain")
+	assert.NotContains(t, sys, "}}", "no raw {{ }} markers should remain")
+}
+
+// TestPattern004_SignatureChainThenEvaluator — two signatures wired
+// in series, feeding an evaluator. Customer-style refinement shape:
+// a draft step then a polish step before grading.
+//
+// What this proves:
+//
+//   1. The planner orders the two signatures in distinct layers
+//      (refine depends on draft); both LLM calls happen and the second
+//      sees the first's output as input.
+//   2. The signature output → next signature input edge resolves
+//      correctly (no DSL parser regression on chained signature-only
+//      paths).
+//   3. The evaluator at the tail reads the final refined answer and
+//      grades it.
+func TestPattern004_SignatureChainThenEvaluator(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(req app.LLMRequest) (*app.LLMResponse, error) {
+			var sys string
+			for _, m := range req.Messages {
+				if m.Role == "system" {
+					sys, _ = m.Content.(string)
+					break
+				}
+			}
+			switch {
+			case stringContains(sys, "Draft"):
+				return &app.LLMResponse{Content: "rough draft about apples"}, nil
+			case stringContains(sys, "Refine"):
+				// Refiner sees the draft as its input — verifies the
+				// signature→signature edge round-tripped via {{ draft }}.
+				assert.Contains(t, sys, "rough draft about apples",
+					"refine prompt should contain the draft via {{ draft }}, got %q", sys)
+				return &app.LLMResponse{Content: "polished answer about apples"}, nil
+			}
+			return &app.LLMResponse{Content: "fallback"}, nil
+		},
+	}
+	url, lwRequests := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status":  "processed",
+			"score":   0.8,
+			"passed":  true,
+			"details": "polished",
+			"cost":    map[string]any{"currency": "USD", "amount": 0.0001},
+		})
+	})
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-004",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"k","spec_version":"1.3",
+	      "name":"Pattern004","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"topic","type":"str"}],
+	          "dataset":{"inline":{"records":{"topic":["apples"]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"draft","type":"signature","data":{
+	          "name":"Draft",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Draft a short paragraph about: {{ topic }}"}
+	          ],
+	          "inputs":[{"identifier":"topic","type":"str"}],
+	          "outputs":[{"identifier":"draft","type":"str"}]
+	        }},
+	        {"id":"refine","type":"signature","data":{
+	          "name":"Refine",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Refine this draft: {{ draft }}"}
+	          ],
+	          "inputs":[{"identifier":"draft","type":"str"}],
+	          "outputs":[{"identifier":"answer","type":"str"}]
+	        }},
+	        {"id":"grade","type":"evaluator","data":{
+	          "parameters":[
+	            {"identifier":"evaluator","type":"str","value":"langevals/llm_judge"},
+	            {"identifier":"name","type":"str","value":"polish-judge"},
+	            {"identifier":"settings","type":"dict","value":{"criteria":"clarity"}}
+	          ],
+	          "outputs":[
+	            {"identifier":"score","type":"float"},
+	            {"identifier":"passed","type":"bool"},
+	            {"identifier":"details","type":"str"}
+	          ]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[
+	          {"identifier":"score","type":"float"},
+	          {"identifier":"passed","type":"bool"},
+	          {"identifier":"details","type":"str"}
+	        ]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.topic","target":"draft","targetHandle":"inputs.topic","type":"default"},
+	        {"id":"e2","source":"draft","sourceHandle":"outputs.draft","target":"refine","targetHandle":"inputs.draft","type":"default"},
+	        {"id":"e3","source":"refine","sourceHandle":"outputs.answer","target":"grade","targetHandle":"inputs.output","type":"default"},
+	        {"id":"e4","source":"grade","sourceHandle":"outputs.score","target":"end","targetHandle":"inputs.score","type":"default"},
+	        {"id":"e5","source":"grade","sourceHandle":"outputs.passed","target":"end","targetHandle":"inputs.passed","type":"default"},
+	        {"id":"e6","source":"grade","sourceHandle":"outputs.details","target":"end","targetHandle":"inputs.details","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	// Two LLM calls (draft + refine), in order. Order is enforced by
+	// the dependency edge — the refiner can't run before draft completes.
+	llm.mu.Lock()
+	got := len(llm.requests)
+	llm.mu.Unlock()
+	assert.Equal(t, 2, got, "expected two LLM Execute calls (draft + refine)")
+
+	// Evaluator received the refined output.
+	require.Len(t, *lwRequests, 1)
+	data := (*lwRequests)[0]["body"].(map[string]any)["data"].(map[string]any)
+	assert.Equal(t, "polished answer about apples", data["output"])
+
+	// Workflow result + node states.
+	require.NotNil(t, res.Result)
+	assert.InDelta(t, 0.8, res.Result["score"], 1e-9)
+	assert.Equal(t, true, res.Result["passed"])
+	for _, id := range []string{"entry", "draft", "refine", "grade", "end"} {
+		node, ok := res.Nodes[id].(map[string]any)
+		require.True(t, ok, "missing node %q", id)
+		assert.Equal(t, "success", node["status"], "node %q expected success", id)
+	}
+}
+
+// stringContains is a tiny case-sensitive substring helper to avoid
+// pulling strings just for these branch discriminators.
+func stringContains(s, sub string) bool {
+	if len(sub) == 0 {
+		return true
+	}
+	if len(s) < len(sub) {
+		return false
+	}
+	for i := 0; i+len(sub) <= len(s); i++ {
+		if s[i:i+len(sub)] == sub {
+			return true
+		}
+	}
+	return false
 }
