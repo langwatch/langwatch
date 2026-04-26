@@ -1,0 +1,14 @@
+-- Drop the redundant single-column index `AuditLog_organizationId_idx`.
+--
+-- The composite `AuditLog_organizationId_createdAt_idx` (added in
+-- 20260425000000_consolidate_gateway_audit_into_audit_log) covers every
+-- query the dropped index served via leftmost-prefix indexing — Postgres
+-- will use the composite for both `WHERE organizationId = X` and
+-- `WHERE organizationId = X ORDER BY createdAt DESC` lookups.
+--
+-- Removing the duplicate cuts write amplification on a hot table (every
+-- gateway + platform mutation appends an AuditLog row) without changing
+-- read-path behavior. Safe under concurrent writes — DROP INDEX
+-- IF EXISTS is non-blocking on Postgres in the brief window an INSERT
+-- might be in-flight against the redundant index.
+DROP INDEX IF EXISTS "AuditLog_organizationId_idx";

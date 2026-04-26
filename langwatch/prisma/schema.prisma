@@ -985,7 +985,6 @@ model AuditLog {
     @@index([createdAt])
     @@index([userId])
     @@index([projectId])
-    @@index([organizationId])
     @@index([action])
     @@index([ipAddress])
     @@index([organizationId, createdAt])
