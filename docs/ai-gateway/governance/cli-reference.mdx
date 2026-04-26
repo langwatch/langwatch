@@ -272,6 +272,102 @@ The reference server passes all of:
 - `/logout` is idempotent — passing an unknown / already-revoked refresh
   token still returns `200 { ok: true }`
 
+## Verifying a fresh install end-to-end
+
+After deploying a self-hosted LangWatch instance, run this five-step
+smoke test to prove the governance plane is wired correctly. Replace
+`https://app.langwatch.example.com` with your control-plane URL.
+
+<Steps>
+  <Step title="Start the device flow from the CLI">
+    ```bash
+    LANGWATCH_URL=https://app.langwatch.example.com \
+      LANGWATCH_GATEWAY_URL=https://gateway.langwatch.example.com \
+      langwatch login
+    ```
+    Expected output:
+    ```
+    Opening browser to authenticate...
+    Verification URL: https://app.langwatch.example.com/cli/auth?user_code=XXXX-YYYY
+    ⠋ Waiting for you to log in
+    ```
+  </Step>
+  <Step title="Complete SSO + approve in the browser">
+    The browser opens to `/cli/auth?user_code=XXXX-YYYY`. If you
+    aren't signed in yet, you'll be bounced through your IdP. After
+    sign-in, confirm the device code matches and click **Approve**.
+
+    Behind the scenes the platform:
+    1. Creates the user's personal Team + Project (idempotent —
+       no-op on re-login)
+    2. Resolves the org's default `RoutingPolicy` (or team-level
+       override)
+    3. Mints a personal `lw_vk_live_…` Virtual Key against that
+       policy
+    4. Marks the device code `approved` in Redis with the VK payload
+  </Step>
+  <Step title="Watch the CLI complete the exchange">
+    The polling `langwatch login` returns:
+    ```
+    ✓ Logged in as you@yourcompany.com
+      Organization: Your Org
+      Gateway: https://gateway.langwatch.example.com
+
+    Try it:
+      langwatch claude         # use Claude Code
+      langwatch codex          # use Codex
+      langwatch cursor         # use Cursor
+    ```
+    The config is now persisted at `~/.langwatch/config.json` (mode
+    0600). The personal VK secret lives only in this file — the
+    server hashes it at rest and cannot recover the original.
+  </Step>
+  <Step title="Verify whoami + env injection">
+    ```bash
+    $ langwatch whoami
+    User:         you@yourcompany.com
+    Name:         …
+    Organization: Your Org
+    Gateway:      https://gateway.langwatch.example.com
+    Dashboard:    https://app.langwatch.example.com
+    Personal VK:  lw_vk_live_01HZ…
+
+    $ langwatch init zsh
+    export ANTHROPIC_BASE_URL=https://gateway.langwatch.example.com/api/v1/anthropic
+    export ANTHROPIC_AUTH_TOKEN=lw_vk_live_…
+    export OPENAI_BASE_URL=https://gateway.langwatch.example.com/api/v1/openai
+    export OPENAI_API_KEY=lw_vk_live_…
+    export GOOGLE_GENAI_API_BASE=https://gateway.langwatch.example.com/api/v1/gemini
+    export GEMINI_API_KEY=lw_vk_live_…
+    ```
+    The wrapper subcommands inject the same env vars before
+    `exec`'ing the underlying tool — `langwatch claude` is the
+    end-user demo command.
+  </Step>
+  <Step title="Smoke-test a real call">
+    With the env vars exported (or via `langwatch claude`), make
+    one round-trip through the gateway to prove provider
+    credentials resolve and trace attribution lands on the
+    personal project:
+    ```bash
+    $ langwatch shell
+    » Entering langwatch shell. Type `exit` to leave.
+    $ curl https://gateway.langwatch.example.com/api/v1/chat/completions \
+        -H "Authorization: Bearer $OPENAI_API_KEY" \
+        -d '{"model":"gpt-5-mini","messages":[{"role":"user","content":"hi"}]}'
+    ```
+    Then visit `<dashboard>/me` and confirm the trace appears in
+    "Recent activity" with the correct cost and the `most-used model`
+    card increments. (Per-user cost rollups land within ~5s on the
+    default ClickHouse aggregation cadence.)
+  </Step>
+</Steps>
+
+If any step fails, see [Troubleshooting](#troubleshooting) below or
+the [admin setup guide](/ai-gateway/governance/admin-setup) for the
+common config gaps (no provider credentials, no default routing
+policy, IdP callback URL not on the allowlist).
+
 ## Troubleshooting
 
 <AccordionGroup>
