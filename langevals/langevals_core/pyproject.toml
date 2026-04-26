@@ -32,3 +32,6 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["langevals_core"]
+
+[tool.uv]
+exclude-newer = "7 days"

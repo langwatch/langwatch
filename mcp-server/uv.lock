@@ -6,6 +6,10 @@ resolution-markers = [
     "python_full_version < '3.12'",
 ]
 
+[options]
+exclude-newer = "2026-04-19T17:07:22.760702Z"
+exclude-newer-span = "P7D"
+
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.6.1"
@@ -908,7 +912,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.19.0"
+version = "0.22.0"
 source = { editable = "../python-sdk" }
 dependencies = [
     { name = "attrs" },
@@ -929,6 +933,7 @@ dependencies = [
     { name = "python-liquid" },
     { name = "pyyaml" },
     { name = "retry" },
+    { name = "tenacity" },
     { name = "termcolor" },
 ]
 
@@ -959,6 +964,7 @@ requires-dist = [
     { name = "pyyaml", specifier = ">=6.0.2" },
     { name = "retry", specifier = ">=0.9.2" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.11.1" },
+    { name = "tenacity", specifier = ">=8.0.0" },
     { name = "termcolor", specifier = ">=3.0.1" },
 ]
 provides-extras = ["langchain", "dspy", "litellm", "dev", "tests"]
