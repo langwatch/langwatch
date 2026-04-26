@@ -125,7 +125,7 @@ The **/gateway/budgets** list shows every budget with a utilization bar, hard ca
 
 Clicking a row opens **/gateway/budgets/[id]** — a detail page mirroring the VK detail layout:
 
-- **Header action bar**: **Audit history** (deep-links to `/gateway/audit?targetKind=budget&targetId=<budget_id>` pre-filtered to this budget's events; stays visible on archived budgets so forensic investigations can start from the archived state), **Edit**, **Archive**.
+- **Header action bar**: **Audit history** (deep-links to `/settings/audit-log?targetKind=budget&targetId=<budget_id>` pre-filtered to this budget's events; stays visible on archived budgets so forensic investigations can start from the archived state), **Edit**, **Archive**.
 - **Utilization header**: hard cap, spent, remaining, `on_breach` mode.
 - **Identity**: name, description, window, timezone, created/updated timestamps.
 - **Resolved scope target**: same resolution as the list Scope column, plus a full-width link card to the target resource.

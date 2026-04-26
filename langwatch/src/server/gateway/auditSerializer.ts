@@ -6,8 +6,8 @@
  * carrying a BigInt column (VK.revision, GatewayChangeEvent.revision).
  * Caught via unit test — see virtualKey.service.unit.test.ts.
  *
- * All gateway services that write to `GatewayAuditLog.before` /
- * `GatewayAuditLog.after` should go through this helper instead of reaching
+ * All gateway services that write to `AuditLog.before` /
+ * `AuditLog.after` should go through this helper instead of reaching
  * for JSON.parse(JSON.stringify(row)) directly — it also keeps the
  * over-the-wire representation (decimal string for BigInt) consistent with
  * `GatewayConfigPayload.revision` so operators see the same shape whether

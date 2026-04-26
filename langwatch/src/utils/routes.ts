@@ -204,11 +204,6 @@ export const projectRoutes = {
     title: "Usage",
     parent: "gateway",
   },
-  gateway_audit: {
-    path: "/[project]/gateway/audit",
-    title: "Audit log",
-    parent: "gateway",
-  },
   gateway_cache_rules: {
     path: "/[project]/gateway/cache-rules",
     title: "Cache Rules",

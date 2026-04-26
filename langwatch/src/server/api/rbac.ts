@@ -55,11 +55,19 @@ export const Resources = {
   SECRETS: "secrets",
   PLAYGROUND: "playground",
   OPS: "ops",
+  // Platform audit log — covers both the legacy AuditLog stream AND the
+  // gateway-resource rows folded into it by the audit consolidation.
+  // Lives outside the gateway permission family because it gates a
+  // platform settings page (/settings/audit-log), not a gateway sub-page.
+  AUDIT_LOG: "auditLog",
   // AI Gateway resources — see specs/ai-gateway/_shared/contract.md §10
   VIRTUAL_KEYS: "virtualKeys",
   GATEWAY_BUDGETS: "gatewayBudgets",
   GATEWAY_PROVIDERS: "gatewayProviders",
   GATEWAY_GUARDRAILS: "gatewayGuardrails",
+  // Deprecated (kept for backwards-compat): pre-consolidation perm that
+  // gated /[project]/gateway/audit. The page is gone; auditLog:view is
+  // the live permission. Safe to drop in a future breaking-change pass.
   GATEWAY_LOGS: "gatewayLogs",
   GATEWAY_USAGE: "gatewayUsage",
   GATEWAY_CACHE_RULES: "gatewayCacheRules",
@@ -145,6 +153,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "gatewayGuardrails:detach",
     "gatewayGuardrails:manage",
     "gatewayLogs:view",
+    "auditLog:view",
     "gatewayUsage:view",
     "gatewayCacheRules:view",
     "gatewayCacheRules:create",
@@ -200,6 +209,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "gatewayProviders:view",
     "gatewayGuardrails:view",
     "gatewayLogs:view",
+    "auditLog:view",
     "gatewayUsage:view",
     "gatewayCacheRules:view",
   ],
@@ -232,6 +242,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "gatewayProviders:view",
     "gatewayGuardrails:view",
     "gatewayLogs:view",
+    "auditLog:view",
     "gatewayUsage:view",
     "gatewayCacheRules:view",
   ],
@@ -265,6 +276,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "gatewayProviders:view",
     "gatewayGuardrails:view",
     "gatewayLogs:view",
+    "auditLog:view",
     "gatewayUsage:view",
     "gatewayCacheRules:view",
   ],

@@ -51,7 +51,6 @@ import { roleBindingRouter } from "./routers/roleBinding";
 import { personalAccessTokenRouter } from "./routers/personalAccessToken";
 import { groupRouter } from "./routers/group";
 import { userRouter } from "./routers/user";
-import { gatewayAuditRouter } from "./routers/gatewayAudit";
 import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
 import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
 import { gatewayUsageRouter } from "./routers/gatewayUsage";
@@ -118,7 +117,6 @@ const coreRouters = {
   gatewayBudgets: gatewayBudgetsRouter,
   gatewayCacheRules: gatewayCacheRulesRouter,
   gatewayUsage: gatewayUsageRouter,
-  gatewayAudit: gatewayAuditRouter,
 };
 
 const eeRouters = {

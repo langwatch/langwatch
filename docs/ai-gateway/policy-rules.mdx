@@ -187,7 +187,7 @@ Use patterns for deterministic rules (tool names, URL allowlists) and guardrails
 
 Every block emits:
 
-- `GatewayAuditLog` row with actor principal, VK id, policy kind, matched pattern, offending value (truncated to 64 chars), request id.
+- `AuditLog` row (gateway shape) with actor (user or service principal — service-account VKs use `actor=svc_<projectId>`), VK id, policy kind, matched pattern, offending value (truncated to 64 chars), request id.
 - `X-LangWatch-Request-Id` response header for joining the 403 back to the trace stream.
 
 (A dedicated `langwatch.policy.violation=<kind>:<pattern>` span attribute is tracked as a v1.1 observability follow-up. In v1, use the audit log + request-id correlation to identify repeat offenders and tune patterns.)

@@ -29,6 +29,9 @@ See [Kubernetes (Helm)](/self-hosting/deployment/kubernetes-helm) for full setup
 ```mermaid
 graph LR
     SDK["Your LLM App"] -->|"OTel / REST"| App["LangWatch App"]
+    Client["LLM Client / IDE"] -->|"virtual key"| Gateway["AI Gateway<br/>(optional)"]
+    Gateway -->|"resolve VK<br/>+ budget check<br/>+ OTel"| App
+    Gateway -->|"completions"| Providers["LLM Providers<br/>(OpenAI / Anthropic / Bedrock / …)"]
     App -->|"enqueue"| Redis["Redis"]
     Redis -->|"consume"| Workers["LangWatch Workers"]
     Workers -->|"events &<br/>projections"| CH["ClickHouse"]
@@ -39,7 +42,7 @@ graph LR
     CH -->|"cold storage"| S3["S3"]
 ```
 
-See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers.
+See [Architecture & Infrastructure](/self-hosting/infrastructure/architecture) for a detailed breakdown of networking, scaling, and storage tiers, and [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm) for the gateway sub-chart setup if you want to terminate LLM traffic on your own perimeter.
 
 ## Deployment Models
 
@@ -119,7 +122,8 @@ Choose the deployment method that fits your environment.
 - **Native ClickHouse backup/restore** simplifies disaster recovery without third-party tooling.
 - **Auto-tuned ClickHouse** via the `clickhouse-serverless` subchart adapts resource allocation to your workload.
 - **Composable Helm chart overlays** let you customize deployments without forking the chart.
-- **Deep OpenTelemetry integration** — ingest traces via OTLP, export platform metrics and logs via OTel for infrastructure monitoring
+- **Deep OpenTelemetry integration** — ingest traces via OTLP, export platform metrics and logs via OTel for infrastructure monitoring.
+- **AI Gateway sub-chart** (optional) — terminate LLM traffic on your own perimeter with virtual keys, hierarchical budgets, multi-provider routing, guardrails, and prompt caching. Same Helm install, opt in via `gateway.enabled=true`. See [AI Gateway → Self-hosting](/ai-gateway/self-hosting/helm).
 
 ## Enterprise
 

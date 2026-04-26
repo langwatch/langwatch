@@ -193,7 +193,7 @@ Feature: AI Gateway — Virtual Keys
     And I confirm the rotation
     Then a new secret "lw_vk_live_01HZX9K3MB…" is generated and shown once
     And the previous secret stays valid for 24 hours (grace window) so clients can roll over
-    And an audit log entry "VIRTUAL_KEY_ROTATED" is recorded
+    And an audit log entry "gateway.virtual_key.rotated" is recorded
 
   @integration
   Scenario: Rotate secret-reveal dialog surfaces the 24h grace window
@@ -261,7 +261,7 @@ Feature: AI Gateway — Virtual Keys
   Scenario: VK detail has a deep-link Audit history button that pre-filters the log
     Given virtual key "prod-key" has 4 audit entries (created, updated, rotated, revoked)
     When I open the VK detail page and click "Audit history"
-    Then I land on /gateway/audit?targetKind=virtual_key&targetId=vk_…
+    Then I land on /settings/audit-log?targetKind=virtual_key&targetId=vk_…
     And the audit page shows only the 4 entries for that VK
     And I see a clickable "target = vk_…" chip that clears the filter when ×-tapped
 

@@ -232,7 +232,7 @@ Feature: Public REST API — /api/gateway/v1/*
     Then the response status is 200 and `virtual_key.status` is "REVOKED"
     When I send the same revoke call again
     Then the response status is 200 and `virtual_key.status` is still "REVOKED"
-    And a GatewayAuditLog entry exists for each of the two revoke calls
+    And an AuditLog entry (gateway shape) exists for each of the two revoke calls
 
   # ============================================================================
   # Budgets
@@ -317,13 +317,13 @@ Feature: Public REST API — /api/gateway/v1/*
   # ============================================================================
 
   @integration @audit
-  Scenario: Writes from REST are attributed to the project API token, not a user
-    Given API token "sess_abc" was issued without an associated user (service token)
+  Scenario: Writes from REST are attributed to the resolved API-token user
+    Given API token "sess_abc" maps to user "alice@example.com"
     When I send `POST /api/gateway/v1/virtual-keys` to create a key
-    Then a GatewayAuditLog entry is written with `actorUserId` = null
-    And `actor` = "svc_<projectId>"
-    And `action` = "virtualKey.created"
-    And the audit entry is visible in the organisation admin activity log
+    Then an AuditLog entry is written with `userId` = alice's id
+    And `action` = "gateway.virtual_key.created"
+    And `targetKind` = "virtual_key"
+    And the audit entry is visible at /settings/audit-log under organization admin
 
   # ============================================================================
   # OpenAPI future

@@ -323,7 +323,11 @@ export class EvaluatorService {
       limit: 100,
     });
 
-    const userIds = [...new Set(logs.map((l) => l.userId))];
+    const userIds = [
+      ...new Set(
+        logs.map((l) => l.userId).filter((id): id is string => !!id),
+      ),
+    ];
     const users = await this.repository.findUsersByIds(userIds);
     const usersById = Object.fromEntries(users.map((u) => [u.id, u]));
 
@@ -332,7 +336,7 @@ export class EvaluatorService {
       action: log.action,
       createdAt: log.createdAt,
       args: log.args,
-      user: usersById[log.userId] ?? null,
+      user: log.userId ? (usersById[log.userId] ?? null) : null,
     }));
   }
 }

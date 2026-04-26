@@ -198,7 +198,7 @@ export class GatewayCacheRuleService {
         {
           organizationId: input.organizationId,
           actorUserId: input.actorUserId,
-          action: "CACHE_RULE_CREATED",
+          action: "gateway.cache_rule.created",
           targetKind: "cache_rule",
           targetId: row.id,
           after: serializeRowForAudit(row),
@@ -253,7 +253,7 @@ export class GatewayCacheRuleService {
         {
           organizationId: input.organizationId,
           actorUserId: input.actorUserId,
-          action: "CACHE_RULE_UPDATED",
+          action: "gateway.cache_rule.updated",
           targetKind: "cache_rule",
           targetId: updated.id,
           before,
@@ -287,7 +287,7 @@ export class GatewayCacheRuleService {
         {
           organizationId: input.organizationId,
           actorUserId: input.actorUserId,
-          action: "CACHE_RULE_DELETED",
+          action: "gateway.cache_rule.deleted",
           targetKind: "cache_rule",
           targetId: updated.id,
           before,

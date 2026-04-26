@@ -4,10 +4,14 @@
  * `gatewayBudgets` tRPC routers consumed by the UI.
  *
  * Auth: standard project API key (`Authorization: Bearer <projectApiKey>`
- * or `X-Auth-Token`). All writes are audited to `GatewayAuditLog` with the
- * actor set to `svc_<projectApiKeyId>` (machine principal) rather than a
- * human user — the audit repository already accepts a null actorUserId for
- * this case.
+ * or `X-Auth-Token`). All writes are audited to `AuditLog` (gateway shape)
+ * with the actor set to a synthetic machine principal of the form
+ * `svc_<projectId>` (see `machineActorForProject`) — the API key bearer is
+ * a project-scoped credential, not a `User.id`, so the audit row records
+ * the project as the principal rather than fabricating a user link.
+ * `AuditLog.userId` is now nullable post-consolidation, so a future
+ * service-to-service write path can drop the synthetic id entirely; until
+ * then this preserves a stable per-project actor for forensic queries.
  */
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";

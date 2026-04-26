@@ -153,7 +153,7 @@ export default function SettingsLayout({
             {isEnterprise && !isLiteMember && (
               <MenuLink href="/settings/access-audit">Access Audit</MenuLink>
             )}
-            {isEnterprise && !isLiteMember && hasPermission("organization:manage") && (
+            {isEnterprise && !isLiteMember && hasPermission("auditLog:view") && (
               <MenuLink href="/settings/audit-log">Audit Log</MenuLink>
             )}
           </NavSection>

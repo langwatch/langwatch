@@ -140,7 +140,7 @@ function VirtualKeyDetailPage() {
                   operators forensically investigating a revoked VK
                   still need its create/update/rotate/revoke trail. */}
               <Link
-                href={`/${project?.slug}/gateway/audit?targetKind=virtual_key&targetId=${vk.id}`}
+                href={`/settings/audit-log?targetKind=virtual_key&targetId=${vk.id}`}
               >
                 <Button variant="outline" size="sm">
                   <FileClock size={14} /> Audit history

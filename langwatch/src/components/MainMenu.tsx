@@ -3,7 +3,6 @@ import type { Project } from "@prisma/client";
 import {
   Activity,
   Anvil,
-  FileClock,
   Film,
   Gauge,
   History,
@@ -364,20 +363,10 @@ export const MainMenu = React.memo(function MainMenu({
                           },
                         ]
                       : []),
-                    ...(hasPermission("gatewayLogs:view")
-                      ? [
-                          {
-                            icon: FileClock,
-                            label: projectRoutes.gateway_audit.title,
-                            href: projectRoutes.gateway_audit.path.replace(
-                              "[project]",
-                              project.slug,
-                            ),
-                            isActive:
-                              router.pathname.includes("/gateway/audit"),
-                          },
-                        ]
-                      : []),
+                    // Audit log entry removed — gateway audit rows are now
+                    // surfaced under /settings/audit-log alongside platform
+                    // governance events. Deep-links from VK / Budget detail
+                    // pages target /settings/audit-log directly.
                   ]}
                 />
               </>

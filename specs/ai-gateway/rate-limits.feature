@@ -153,8 +153,10 @@ Feature: Per-VK rate limits — RPM / RPD ceilings with dimension-aware 429 shap
 
   Scenario: Rate limits edits emit an audit row
     Given a user with role ADMIN raises rate_limits.rpm from 60 to 300
-    Then a GatewayAuditLog row is written with:
-      | action              | virtualKey.updated       |
-      | target              | virtualKey.<vk_id>       |
-      | metadata            | {rpm: {from: 60, to: 300}} |
-    And the row is visible at /settings/audit-log filtered by resource type "virtualKey"
+    Then an AuditLog row is written with:
+      | action     | gateway.virtual_key.updated          |
+      | targetKind | virtual_key                          |
+      | targetId   | <vk_id>                              |
+      | before     | {rateLimits: {rpm: 60}}              |
+      | after      | {rateLimits: {rpm: 300}}             |
+    And the row is visible at /settings/audit-log filtered by Target = "virtual_key"

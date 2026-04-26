@@ -137,7 +137,7 @@ Per-VK regex allow/deny lists for:
 - **MCP servers** — matched against declared `mcp_servers[].name` and `.url`. Denied servers → 403 `tool_not_allowed`.
 - **Outbound URLs** — heuristically matched against every `http(s)://` URL in the request body. Denied URLs → 403 `url_not_allowed`.
 
-Each block emits a `GatewayAuditLog` row + the `X-LangWatch-Request-Id` response header → trace correlation.
+Each block emits an `AuditLog` row (gateway shape) + the `X-LangWatch-Request-Id` response header → trace correlation.
 
 ## Traces (per-tenant observability)
 

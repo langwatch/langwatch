@@ -33,6 +33,7 @@ import { InputGroup } from "../../components/ui/input-group";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { useActivePlan } from "../../hooks/useActivePlan";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import type { EnrichedAuditLog } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
 
 function AuditLogPage() {
@@ -155,28 +156,14 @@ function AuditLogPage() {
             <Alert.Content>
               <Alert.Title>Enterprise Feature</Alert.Title>
               <Alert.Description>
-                Organisation-wide audit logs (logins, member changes, settings,
-                RBAC, billing) are available on Enterprise plans. Contact sales
+                Organisation-wide audit logs — including AI Gateway events
+                (virtual-key / budget / provider / cache-rule mutations)
+                alongside logins, member changes, settings, RBAC, and
+                billing — are available on Enterprise plans. Contact sales
                 to upgrade.
               </Alert.Description>
             </Alert.Content>
           </Alert.Root>
-          {project && (
-            <Alert.Root status="success">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Title>AI Gateway audit is available to you</Alert.Title>
-                <Alert.Description>
-                  Virtual-key, budget, provider, and cache-rule changes are
-                  logged for every plan.{" "}
-                  <Link href={`/${project.slug}/gateway/audit`}>
-                    Open the Gateway audit log
-                  </Link>
-                  .
-                </Alert.Description>
-              </Alert.Content>
-            </Alert.Root>
-          )}
           <Box width="full">
             <ContactSalesBlock />
           </Box>
@@ -243,7 +230,11 @@ function AuditLogPage() {
   };
 
   const totalHits = auditLogsData?.totalCount ?? 0;
-  const auditLogs = auditLogsData?.auditLogs ?? [];
+  // Single cast at the source so the rest of the page consumes the proper
+  // EnrichedAuditLog union (source / targetKind / before / after) without
+  // per-field `as any` casts. tRPC's inference loses the discriminator.
+  const auditLogs: EnrichedAuditLog[] =
+    (auditLogsData?.auditLogs as EnrichedAuditLog[] | undefined) ?? [];
 
   const downloadCSV = async () => {
     if (!organization) return;
@@ -255,16 +246,25 @@ function AuditLogPage() {
       const batchSize = 5000;
       let totalCount = 0;
 
-      // Fetch first batch to get total count
-      const initialBatch = await queryClient.organization.getAuditLogs.fetch({
+      // Mirror the on-screen table filters exactly so an export from a
+      // pre-filtered deep-link (`?targetKind=virtual_key&targetId=…`) does
+      // not silently widen to the whole org's audit history.
+      const baseFilters = {
         organizationId: organization.id,
         projectId: selectedProjectId ?? undefined,
         userId: searchUserId,
-        pageOffset: 0,
-        pageSize: batchSize,
         action: actionFilter || undefined,
         startDate: startDate.getTime(),
         endDate: endDate.getTime(),
+        targetKind: urlTargetKind || undefined,
+        targetId: urlTargetId || undefined,
+      };
+
+      // Fetch first batch to get total count
+      const initialBatch = await queryClient.organization.getAuditLogs.fetch({
+        ...baseFilters,
+        pageOffset: 0,
+        pageSize: batchSize,
       });
 
       allAuditLogs.push(...(initialBatch.auditLogs ?? []));
@@ -274,14 +274,9 @@ function AuditLogPage() {
       // Loop through remaining pages
       while (currentOffset < totalCount) {
         const batch = await queryClient.organization.getAuditLogs.fetch({
-          organizationId: organization.id,
-          projectId: selectedProjectId ?? undefined,
-          userId: searchUserId,
+          ...baseFilters,
           pageOffset: currentOffset,
           pageSize: batchSize,
-          action: actionFilter || undefined,
-          startDate: startDate.getTime(),
-          endDate: endDate.getTime(),
         });
 
         if (!batch.auditLogs || batch.auditLogs.length === 0) break;
@@ -290,30 +285,41 @@ function AuditLogPage() {
         currentOffset += batchSize;
       }
 
-      // Define CSV fields
+      // Define CSV fields. Source/Target/Before/After mirror the on-screen
+      // gateway-shape columns so a downloaded report carries the diffs.
       const fields = [
         "Timestamp",
+        "Source",
         "User Name",
         "User Email",
         "Action",
+        "Target Kind",
+        "Target Id",
         "Project",
         "IP Address",
         "User Agent",
         "Error",
         "Args",
+        "Before",
+        "After",
       ];
 
       // Convert audit logs to CSV rows
       const csvData = allAuditLogs.map((log) => [
         new Date(log.createdAt).toISOString(),
-        (log as any).user?.name ?? "",
-        (log as any).user?.email ?? "",
+        log.source ?? "platform",
+        log.user?.name ?? "",
+        log.user?.email ?? "",
         log.action,
-        (log as any).project?.name ?? log.projectId ?? "",
+        log.targetKind ?? "",
+        log.targetId ?? "",
+        log.project?.name ?? log.projectId ?? "",
         log.ipAddress ?? "",
         log.userAgent ?? "",
         log.error ?? "",
         log.args ? JSON.stringify(log.args) : "",
+        log.before ? JSON.stringify(log.before) : "",
+        log.after ? JSON.stringify(log.after) : "",
       ]);
 
       // Generate CSV
@@ -347,23 +353,26 @@ function AuditLogPage() {
   };
 
   // Derive a return URL back to the originating detail page when the
-  // operator arrived via a VK/budget deep-link. Mirrors the gateway
-  // audit.tsx breadcrumb so the UX is consistent across both views.
+  // operator arrived via a deep-link. Covers every kind documented on
+  // AuditLogFilters.targetKind so future gateway resources don't silently
+  // drop the breadcrumb.
   const backToResource = (() => {
     if (!urlTargetKind || !urlTargetId || !project?.slug) return null;
-    if (urlTargetKind === "virtual_key") {
-      return {
-        href: `/${project.slug}/gateway/virtual-keys/${urlTargetId}`,
-        label: "Virtual key",
-      };
-    }
-    if (urlTargetKind === "budget") {
-      return {
-        href: `/${project.slug}/gateway/budgets/${urlTargetId}`,
-        label: "Budget",
-      };
-    }
-    return null;
+    const kindMap: Record<string, { path: string; label: string }> = {
+      virtual_key: { path: "gateway/virtual-keys", label: "Virtual key" },
+      budget: { path: "gateway/budgets", label: "Budget" },
+      provider_binding: {
+        path: "gateway/providers",
+        label: "Provider binding",
+      },
+      cache_rule: { path: "gateway/cache-rules", label: "Cache rule" },
+    };
+    const entry = kindMap[urlTargetKind];
+    if (!entry) return null;
+    return {
+      href: `/${project.slug}/${entry.path}/${urlTargetId}`,
+      label: entry.label,
+    };
   })();
 
   return (
@@ -559,14 +568,10 @@ function AuditLogPage() {
                         size="sm"
                         variant="subtle"
                         colorPalette={
-                          (log as any).source === "gateway"
-                            ? "purple"
-                            : "gray"
+                          log.source === "gateway" ? "purple" : "gray"
                         }
                       >
-                        {(log as any).source === "gateway"
-                          ? "Gateway"
-                          : "Platform"}
+                        {log.source === "gateway" ? "Gateway" : "Platform"}
                       </Badge>
                     </Table.Cell>
                     <Table.Cell>
@@ -591,13 +596,13 @@ function AuditLogPage() {
                       </Text>
                     </Table.Cell>
                     <Table.Cell>
-                      {(log as any).targetKind && (log as any).targetId ? (
+                      {log.targetKind && log.targetId ? (
                         <VStack align="start" gap={0}>
                           <Text fontSize="xs" color="fg.muted">
-                            {(log as any).targetKind}
+                            {log.targetKind}
                           </Text>
                           <Text fontSize="xs" fontFamily="mono">
-                            {((log as any).targetId as string).slice(0, 16)}…
+                            {log.targetId.slice(0, 16)}…
                           </Text>
                         </VStack>
                       ) : (
@@ -669,6 +674,6 @@ function AuditLogPage() {
   );
 }
 
-export default withPermissionGuard("organization:manage", {
+export default withPermissionGuard("auditLog:view", {
   layoutComponent: SettingsLayout,
 })(AuditLogPage);

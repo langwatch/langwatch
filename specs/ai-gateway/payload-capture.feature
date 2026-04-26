@@ -91,7 +91,7 @@ Feature: Gateway trace payload capture
     Then the span's langwatch.input and langwatch.output contain the full unredacted content
     And langwatch.input_redacted = false
     And langwatch.output_redacted = false
-    And an AUDIT_LOG entry (kind=VIRTUAL_KEY_UPDATED, field=capture_payload, after="raw") is emitted
+    And an AUDIT_LOG entry (action=gateway.virtual_key.updated, field=capture_payload, after="raw") is emitted
 
   # ─────────────────────────────────────────────────────────────────────────
   # §5. Org kill switch overrides everything

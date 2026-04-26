@@ -1,102 +1,67 @@
 ---
 title: Audit log
-description: Who did what, when, to which resource — across every VK, budget, provider, and guardrail mutation.
+description: Who did what, when, to which resource — gateway mutations land in the same audit log as the rest of the platform.
 sidebarTitle: Audit log
 ---
 
-Every write through the REST API, the CLI, the tRPC routers, or the UI emits a row into `GatewayAuditLog`. Queryable programmatically via `GET /api/gateway/v1/audit` — the enterprise-governance answer to *"who revoked that key on Tuesday?"* without granting database access.
+Every gateway-resource mutation (Virtual Key, Budget, Provider Binding, Cache Rule) writes a row to the platform-wide `AuditLog` table. There is no separate gateway-only audit table — gateway events live alongside org-level platform events (member changes, settings, RBAC, billing) in **/settings/audit-log**, with a Source badge distinguishing the two.
 
-<Note>**Gateway-specific audit viewing lives in the platform's global audit log** at `/settings/audit-log`. Filter by resource type (`virtualKey` / `gatewayBudget` / `gatewayProvider`) to scope to the gateway surface. Full unification — merging `GatewayAuditLog` writes into the main `AuditLog` table so platform admins see every mutation in one query — is a follow-up; until then, gateway writes land in `GatewayAuditLog` and the REST export below is the programmatic path.</Note>
+<Note>**One audit log, two write shapes.** Gateway-shape rows carry `targetKind` / `targetId` / `before` / `after`. Platform-shape rows carry `args` / `metadata` / `error`. The viewer renders both with the same row template, computes `source` from the presence of `targetKind`, and offers a target-kind filter for narrowing to gateway events only.</Note>
 
 ## What's logged
 
-Source of truth: `GatewayAuditAction` enum in `langwatch/prisma/schema.prisma`.
+Action codes for gateway mutations (TypeScript `const` union in `langwatch/src/server/gateway/auditLog.repository.ts`):
 
-| Action enum value | Actor fields | Target |
+Action codes use a `gateway.<resource>.<verb>` dotted-lowercase shape, parallel to platform-side codes (`organization.member.add`, `project.update`). Verbs are past-tense to match Stripe / GitHub / Slack / Datadog audit conventions.
+
+| Action code | Actor | Target |
 |---|---|---|
-| `VIRTUAL_KEY_{CREATED, UPDATED, ROTATED, REVOKED, DELETED}` | `actorUserId` (user) or `actor = svc_<projectId>` (service token) | `virtualKey` / `<vk_id>` |
-| `BUDGET_{CREATED, UPDATED, DELETED}` | same | `gatewayBudget` / `<budget_id>` (DELETED is the soft-archive) |
-| `PROVIDER_BINDING_{CREATED, UPDATED, DELETED}` | same | `gatewayProvider` / `<binding_id>` |
-| `CACHE_RULE_{CREATED, UPDATED, DELETED}` | same | `gatewayCacheRule` / `<rule_id>` |
+| `gateway.virtual_key.{created, updated, rotated, revoked, deleted}` | resolved user (session, PAT, or API token mapped to a user) | `targetKind=virtual_key` / `targetId=<vk_id>` |
+| `gateway.budget.{created, updated, deleted}` | same | `targetKind=budget` / `targetId=<budget_id>` (`deleted` is the soft-archive) |
+| `gateway.provider_binding.{created, updated, deleted}` | same | `targetKind=provider_binding` / `targetId=<binding_id>` |
+| `gateway.cache_rule.{created, updated, deleted}` | same | `targetKind=cache_rule` / `targetId=<rule_id>` |
 
-<Info>Guardrail attach/detach events are NOT currently recorded as standalone audit rows — guardrail configuration changes flow through `VIRTUAL_KEY_UPDATED` (the guardrail list is a field on `VirtualKey.config`). Standalone `GUARDRAIL_ATTACHED / DETACHED` actions are a v1.1 follow-up if operators want finer-grained audit.</Info>
+<Info>Guardrail attach/detach events are NOT recorded as standalone audit rows — guardrail configuration changes flow through `gateway.virtual_key.updated` (the guardrail list is a field on `VirtualKey.config`). Standalone `gateway.guardrail.{attached, detached}` actions are a v1.1 follow-up if operators want finer-grained audit.</Info>
 
 Reads are **not** logged — the volume would swamp the ledger without adding governance value. If you need read-access attribution for compliance, use OTel trace logs (every request has `langwatch.principal_id`).
 
 ## Viewing in the UI
 
-Go to **/settings/audit-log** (gated on `gatewayLogs:view`) and filter by resource type to see gateway mutations. Six key affordances:
+Go to **/settings/audit-log** (Enterprise plan, gated on `auditLog:view` — granted by default to all four TeamUser roles incl. CUSTOM) and use the filters to narrow:
 
-1. **Filter by action** — `VIRTUAL_KEY_CREATED`, `VIRTUAL_KEY_ROTATED`, etc. (UI picker shows these with friendlier labels; the underlying filter sends the enum value.) Useful when investigating "did anyone rotate keys during the incident window?".
-2. **Filter by resource type** — `virtualKey` / `gatewayBudget` / `gatewayProvider` / `gatewayCacheRule`. Narrows the view when you're investigating one resource type.
-3. **Expand with changed-fields diff summary** — UPDATE rows expand to show a compact top-level diff (e.g. `priority 200 → 300`, `action.ttl 300 → 600` as red/green code badges) above the raw Before/After JSON panels. Common-case scanning is one line per changed field; deep-forensics still has the full JSON below.
-4. **CREATE/DELETE events show the full field list** — since those events have a null Before (or null After), the diff summary renders the relevant half as a field list instead of leaving the panel blank for the most common audit event class.
-5. **Deep-link from the target column** — clicking the target id opens the resource's detail page (VK detail, budget detail, provider detail). Skips the "which key was that?" lookup.
-6. **Deep-link IN from resource detail pages** — every VK detail and budget detail page carries an **Audit history** button that takes you to `/gateway/audit?targetKind=<kind>&targetId=<id>` with a pre-filled filter chip scoped to just that resource. Clear the chip with the `×` icon to re-expand the view. The pattern stays reachable on revoked VKs and archived budgets so forensic investigations start from the current state, not some "active only" fork.
-
-Pagination uses a composite `(createdAt, id)` cursor so batched same-millisecond entries (common when an operator does many mutations from a script) don't dedupe or skip. Load-more button, 50 rows per page.
+1. **Source badge** — purple "Gateway" / grey "Platform" on every row.
+2. **Filter by action** — `gateway.virtual_key.created`, `gateway.virtual_key.rotated`, etc. for gateway rows; platform rows use the same dotted style (e.g. `organization.member.add`, `project.update`). All gateway codes share the `gateway.` prefix so a single `LIKE 'gateway.%'` clause filters the entire gateway surface for SIEM exports.
+3. **Filter by Target** — `virtual_key` / `budget` / `provider_binding` / `cache_rule`. Selecting any value implicitly hides platform rows (which have null targetKind).
+4. **Expand with changed-fields diff summary** — UPDATE rows expand to show a compact top-level diff (e.g. `priority 200 → 300`, `action.ttl 300 → 600` as red/green code badges) above the raw Before/After JSON panels.
+5. **CREATE/DELETE events show the full field list** — since those events have a null Before (or null After), the diff summary renders the relevant half as a field list instead of leaving the panel blank for the most common audit event class.
+6. **Deep-link IN from resource detail pages** — every VK detail and budget detail page carries an **Audit history** button that takes you to `/settings/audit-log?targetKind=<kind>&targetId=<id>` with a pre-filled filter chip scoped to just that resource. Clear the chip with the `×` icon to re-expand the view. The pattern stays reachable on revoked VKs and archived budgets so forensic investigations start from the current state, not some "active only" fork.
 
 ## Querying programmatically
 
-The same data is available via the tRPC router used by the UI — `gatewayAudit.list`. For REST-first consumers, use a project API token against the LangWatch app's audit export endpoint:
+There is **no public REST endpoint** for audit log retrieval — gateway audit reads share the same tRPC procedure (`organization.getAuditLogs`) that powers `/settings/audit-log`. Three paths, ranked by typical operator use case:
 
-```bash
-curl -sS https://app.langwatch.ai/api/gateway/v1/audit \
-  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
-  -G -d "action=VIRTUAL_KEY_REVOKED" \
-     -d "since=2026-04-01T00:00:00Z" \
-     -d "limit=100"
-```
+1. **One-off / human review** — open `/settings/audit-log`, set the filters you want (Source, Action, Target), then hit **Export CSV** to download the filtered rows. The CSV carries gateway-shape fields (`targetKind`, `targetId`, `before`, `after`) for gateway rows and platform-shape fields (`args`, `metadata`) for platform rows.
+2. **Scripted / scheduled SIEM export** — query the Postgres `AuditLog` table directly from your SIEM ingestion pipeline. Filter on `targetKind IN ('virtual_key', 'budget', 'provider_binding', 'cache_rule')` to scope to gateway rows; join `User` on `userId` for actor enrichment. The schema is documented in `langwatch/prisma/schema.prisma → model AuditLog`.
+3. **In-app integrations** — call the tRPC procedure from a TypeScript client that already has a session: `await trpc.organization.getAuditLogs.query({ organizationId, targetKind, targetId, since, limit })`. Mirrors what the UI does. Not intended for cross-network REST consumers.
 
-Response shape:
-
-```json
-{
-  "data": [
-    {
-      "id": "aud_01HZ...",
-      "action": "VIRTUAL_KEY_REVOKED",
-      "actor_user_id": "user_01HZX...",
-      "actor_user_email": "alice@example.com",
-      "actor": null,
-      "target_kind": "virtualKey",
-      "target_id": "vk_01HZ...",
-      "metadata": { "reason": "rotation cycle" },
-      "created_at": "2026-04-18T16:03:12Z"
-    }
-  ],
-  "next_cursor": "2026-04-18T16:03:10Z|aud_01HZ..."
-}
-```
-
-Actor resolution: `actor_user_id` is set for session / personal-access-token writes (joined from the `User` table so `actor_user_email` comes along). `actor` is set for service-token writes and takes the form `svc_<projectId>`; there's no associated user.
+A first-class REST audit-export endpoint is a v1.2 follow-up; until then, the CSV download is the supported export path for governance / compliance use cases.
 
 ## Retention
 
-Default: 7 years, extendable on request. Stored in the primary app Postgres under `GatewayAuditLog`. The table is partitioned by `createdAt` to keep old-data queries cheap.
+Default: 7 years, extendable on request. Stored in the primary app Postgres under `AuditLog`. The table is indexed on `(organizationId, createdAt)` and `(targetKind, targetId)` to keep both org-tail queries and per-resource queries fast.
 
-## Export
+## Migration note (v3.1)
 
-For SIEM / compliance-warehouse pipelines, export via the REST endpoint on a nightly schedule:
-
-```bash
-# Pull everything from the last 24h, stream to your SIEM
-curl -sS "https://app.langwatch.ai/api/gateway/v1/audit?since=$(date -u -v-1d +%Y-%m-%dT%H:%M:%SZ)" \
-  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
-  | jq -c '.data[]' \
-  | your-siem-ingest
-```
-
-Rate-limited to 100 req/min/token; use the cursor for large pulls rather than increasing the `limit` (capped at 500 per request).
+Earlier v3.0 builds wrote gateway audit rows to a dedicated `GatewayAuditLog` table with a `GatewayAuditAction` Postgres enum. The consolidation migration `20260425000000_consolidate_gateway_audit_into_audit_log` extends `AuditLog` with `targetKind` / `targetId` / `before` / `after` columns and drops the gateway-only table. Self-hosters upgrading from v3.0 should run pending Prisma migrations on app boot per the standard upgrade procedure — the gateway audit log table goes away and downstream gateway services start writing to `AuditLog` directly. Per the v3.0 release note no audit rows were retained.
 
 ## Security considerations
 
 - **Can the audit log be tampered with?** Writes are append-only at the service layer — no UPDATE or DELETE is exposed. Deletions are only possible via direct database access, which is control-plane-operator-only and also audit-logged (via Postgres' built-in `pgaudit` extension, configured in the self-hosted deployment guide).
-- **Can an audit entry be forged?** No. Writes happen inside the same transaction as the resource mutation; either both land or neither lands. A caller cannot emit a fake audit entry via REST or CLI.
-- **Notifications on security-sensitive writes.** Rotations and revocations generate an organization-wide notification by default (configurable per org). Users with `gatewayLogs:view` also receive an email summary on `VIRTUAL_KEY_REVOKED` for keys they own.
+- **Can an audit entry be forged?** No. Gateway writes happen inside the same transaction as the resource mutation; either both land or neither lands. A caller cannot emit a fake audit entry via REST or CLI.
+- **Notifications on security-sensitive writes.** Rotations and revocations generate an organization-wide notification by default (configurable per org).
 
 ## See also
 
 - [Security](/ai-gateway/security) — how audit fits into the broader governance story.
-- [RBAC → gatewayLogs](/ai-gateway/rbac) — who can view the audit log.
+- [RBAC](/ai-gateway/rbac) — who can view the unified audit log.
 - [Virtual Keys → Rotation](/ai-gateway/virtual-keys#rotation) — the operation that makes auditability load-bearing.

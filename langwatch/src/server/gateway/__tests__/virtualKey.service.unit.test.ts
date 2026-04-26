@@ -188,7 +188,7 @@ describe("VirtualKeyService.create", () => {
       expect(created.hashedSecret).not.toBe(result.secret);
     });
 
-    it("emits VK_CREATED change-event + VIRTUAL_KEY_CREATED audit in same tx", async () => {
+    it("emits VK_CREATED change-event + gateway.virtual_key.created audit in same tx", async () => {
       const mocks = makeService();
 
       await mocks.service.create({ ...baseCreate });
@@ -197,7 +197,7 @@ describe("VirtualKeyService.create", () => {
       expect(mocks.changeAppend.mock.calls[0]?.[0].kind).toBe("VK_CREATED");
       expect(mocks.auditAppend).toHaveBeenCalledOnce();
       expect(mocks.auditAppend.mock.calls[0]?.[0].action).toBe(
-        "VIRTUAL_KEY_CREATED",
+        "gateway.virtual_key.created",
       );
     });
 
@@ -348,7 +348,7 @@ describe("VirtualKeyService.revoke", () => {
       expect(mocks.revokeMock).toHaveBeenCalledOnce();
       expect(mocks.changeAppend.mock.calls[0]?.[0].kind).toBe("VK_REVOKED");
       expect(mocks.auditAppend.mock.calls[0]?.[0].action).toBe(
-        "VIRTUAL_KEY_REVOKED",
+        "gateway.virtual_key.revoked",
       );
     });
   });

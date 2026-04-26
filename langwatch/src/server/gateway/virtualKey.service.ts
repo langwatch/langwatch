@@ -1,8 +1,8 @@
 /**
  * Business logic for virtual keys. Framework-agnostic (no tRPC / Hono imports).
  * Every mutation method runs inside a Prisma transaction that also appends a
- * GatewayChangeEvent (for the gateway's long-poll feed) and a
- * GatewayAuditLog (for humans).
+ * GatewayChangeEvent (for the gateway's long-poll feed) and an
+ * AuditLog row in gateway shape (for humans).
  */
 import { randomBytes } from "crypto";
 
@@ -171,7 +171,7 @@ export class VirtualKeyService {
           organizationId: input.organizationId,
           projectId: input.projectId,
           actorUserId: input.actorUserId,
-          action: "VIRTUAL_KEY_CREATED",
+          action: "gateway.virtual_key.created",
           targetKind: "virtual_key",
           targetId: vk.id,
           after: serialiseForAudit(vk),
@@ -242,7 +242,7 @@ export class VirtualKeyService {
           organizationId: input.organizationId,
           projectId: input.projectId,
           actorUserId: input.actorUserId,
-          action: "VIRTUAL_KEY_UPDATED",
+          action: "gateway.virtual_key.updated",
           targetKind: "virtual_key",
           targetId: vk.id,
           before,
@@ -296,7 +296,7 @@ export class VirtualKeyService {
           organizationId: input.organizationId,
           projectId: input.projectId,
           actorUserId: input.actorUserId,
-          action: "VIRTUAL_KEY_ROTATED",
+          action: "gateway.virtual_key.rotated",
           targetKind: "virtual_key",
           targetId: vk.id,
           before,
@@ -336,7 +336,7 @@ export class VirtualKeyService {
           organizationId: input.organizationId,
           projectId: input.projectId,
           actorUserId: input.actorUserId,
-          action: "VIRTUAL_KEY_REVOKED",
+          action: "gateway.virtual_key.revoked",
           targetKind: "virtual_key",
           targetId: vk.id,
           before,
