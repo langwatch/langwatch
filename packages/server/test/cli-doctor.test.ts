@@ -84,13 +84,33 @@ describe("CLI doctor command", () => {
   });
 
   describe("when run with `start --help`", () => {
-    it("documents the port-base, --yes, --no-open, --bullboard flags", async () => {
+    it("documents the port-base, --yes, --no-open, --bullboard, --dry-run flags", async () => {
       const result = await execa("node", [cliPath, "start", "--help"], { reject: false });
       const text = result.stdout;
       expect(text).toContain("--port-base");
       expect(text).toContain("--yes");
       expect(text).toContain("--no-open");
       expect(text).toContain("--bullboard");
+      expect(text).toContain("--dry-run");
     });
+  });
+
+  describe("when run with `start --dry-run`", () => {
+    it("prints the resolved port table and path schema, then exits 0 without writing anything", async () => {
+      const home = await mkdtemp(join(tmpdir(), "langwatch-dryrun-"));
+      const result = await execa("node", [cliPath, "start", "--dry-run", "--port-base", "5570"], {
+        env: { ...process.env, LANGWATCH_HOME: home, NO_COLOR: "1" },
+        reject: false,
+      });
+      expect(result.exitCode).toBe(0);
+      expect(result.stdout).toContain("dry-run — no work performed");
+      expect(result.stdout).toContain("port-base: 5570");
+      expect(result.stdout).toContain("langwatch          5570");
+      expect(result.stdout).toContain("postgres           6570");
+      expect(result.stdout).toContain("redis              6571");
+      // ensure nothing was written under the sandboxed home
+      const fs = await import("node:fs");
+      expect(fs.readdirSync(home)).toHaveLength(0);
+    }, 30_000);
   });
 });
