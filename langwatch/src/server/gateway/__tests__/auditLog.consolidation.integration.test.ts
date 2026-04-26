@@ -12,7 +12,8 @@
  *   3. Filtering by `targetKind` / `targetId` returns only rows for that
  *      resource (deep-link path from VK / Budget detail pages).
  *   4. The `GatewayAuditLog` table no longer exists post-migration —
- *      `prisma.gatewayAuditLog` is undefined at runtime.
+ *      both `prisma.gatewayAuditLog` is undefined AND `to_regclass` against
+ *      the live PG schema returns null.
  *
  * The adapter is exercised directly rather than through VirtualKeyService —
  * the service has its own unit tests for the upstream `auditLog.append` call;
@@ -94,11 +95,23 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
   }, 60_000);
 
   describe("when GatewayAuditLog table is dropped", () => {
-    it("the prisma client no longer exposes gatewayAuditLog", () => {
+    it("drops gatewayAuditLog from the prisma client", () => {
       // Post-consolidation `prisma.gatewayAuditLog` is undefined — would
-      // throw at runtime. Guard against accidental re-introduction.
+      // throw at runtime. Guard against accidental re-introduction in
+      // schema.prisma or a stale generated client.
       expect((prisma as unknown as Record<string, unknown>).gatewayAuditLog)
         .toBeUndefined();
+    });
+
+    it("removes the GatewayAuditLog table from the live database", async () => {
+      // Generated-client check above only proves schema.prisma changed;
+      // this probe proves the SQL migration actually dropped the table.
+      // A partially-applied migration or regenerated client without re-run
+      // would silently pass the prisma.gatewayAuditLog assertion.
+      const result = await prisma.$queryRaw<{ exists: boolean }[]>`
+        SELECT to_regclass('"GatewayAuditLog"') IS NOT NULL AS exists
+      `;
+      expect(result[0]?.exists).toBe(false);
     });
   });
 

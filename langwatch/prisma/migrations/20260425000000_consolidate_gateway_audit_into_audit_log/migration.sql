@@ -15,12 +15,20 @@
 -- langwatch/src/server/gateway/auditLog.repository.ts).
 
 -- 1. Extend AuditLog with governance fields ---------------------------------
+--
+-- userId is dropped to nullable so system-actor writes (background jobs,
+-- migrations, internal cron) can record audit rows without a user. Spec:
+-- specs/audit-log/audit-log.feature ("userId is changed to String? (nullable)
+-- so system actions can write rows without a user"). Live consumers always
+-- supply userId today; this is forward-defense for the system-actor path.
+-- DROP NOT NULL is a fast metadata-only operation on PG — no rewrite.
 
 ALTER TABLE "AuditLog"
     ADD COLUMN "targetKind" TEXT,
     ADD COLUMN "targetId"   TEXT,
     ADD COLUMN "before"     JSONB,
-    ADD COLUMN "after"      JSONB;
+    ADD COLUMN "after"      JSONB,
+    ALTER COLUMN "userId" DROP NOT NULL;
 
 -- 2. Indexes mirroring the dropped GatewayAuditLog read patterns -----------
 

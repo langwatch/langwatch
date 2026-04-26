@@ -966,7 +966,7 @@ model OrganizationFeature {
 model AuditLog {
     id             String   @id @default(cuid())
     createdAt      DateTime @default(now())
-    userId         String
+    userId         String?
     projectId      String?
     organizationId String?
     action         String

@@ -150,7 +150,8 @@ export interface AuditLogFilters {
 export interface EnrichedAuditLog {
   id: string;
   createdAt: Date;
-  userId: string;
+  /** Nullable to support system-actor writes (background jobs, migrations). */
+  userId: string | null;
   organizationId: string | null;
   projectId: string | null;
   action: string;

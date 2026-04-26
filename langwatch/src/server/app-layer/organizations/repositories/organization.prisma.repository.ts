@@ -927,11 +927,13 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     // Gateway-resource deep-link filter (`/settings/audit-log?targetKind=…
     // &targetId=…`). Both columns live on `AuditLog` post-consolidation —
     // see migration 20260425000000_consolidate_gateway_audit_into_audit_log.
+    // targetId is only honored when paired with targetKind so a stray
+    // `?targetId=` from a typo'd URL cannot match across kinds.
     if (filters.targetKind) {
       andConditions.push({ targetKind: filters.targetKind });
-    }
-    if (filters.targetId) {
-      andConditions.push({ targetId: filters.targetId });
+      if (filters.targetId) {
+        andConditions.push({ targetId: filters.targetId });
+      }
     }
 
     if (andConditions.length > 1) {
@@ -950,7 +952,14 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
       }),
     ]);
 
-    const userIds = [...new Set(rows.map((r) => r.userId))];
+    // userId is nullable post-consolidation (system-actor writes) — filter
+    // null out before passing to the Prisma `IN` predicate, which rejects
+    // null array members at runtime.
+    const userIds = [
+      ...new Set(
+        rows.map((r) => r.userId).filter((id): id is string => !!id),
+      ),
+    ];
     const projectIds = [
       ...new Set(
         rows.map((r) => r.projectId).filter((id): id is string => !!id),
@@ -986,7 +995,7 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
         userAgent: log.userAgent,
         error: log.error,
         args: isGateway ? { before: log.before, after: log.after } : log.args,
-        user: userMap.get(log.userId) ?? null,
+        user: log.userId ? (userMap.get(log.userId) ?? null) : null,
         project: log.projectId ? (projectMap.get(log.projectId) ?? null) : null,
         source: isGateway ? "gateway" : "platform",
         targetKind: log.targetKind,
