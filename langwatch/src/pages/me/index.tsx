@@ -43,7 +43,7 @@ export default function MyUsagePage() {
   const maxTool = Math.max(...spendByTool.map((t) => t.usd), 0.01);
 
   return (
-    <>
+    <MyLayout>
       <Head>
         <title>My Usage · LangWatch</title>
       </Head>
@@ -210,11 +210,9 @@ export default function MyUsagePage() {
           )}
         </SectionCard>
       </VStack>
-    </>
+    </MyLayout>
   );
 }
-
-MyUsagePage.layout = MyLayout;
 
 function SummaryCard({
   title,

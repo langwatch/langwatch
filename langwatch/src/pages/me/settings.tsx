@@ -119,7 +119,7 @@ export default function MySettingsPage() {
   };
 
   return (
-    <>
+    <MyLayout>
       <Head>
         <title>My Settings · LangWatch</title>
       </Head>
@@ -304,11 +304,9 @@ export default function MySettingsPage() {
           )}
         </SectionCard>
       </VStack>
-    </>
+    </MyLayout>
   );
 }
-
-MySettingsPage.layout = MyLayout;
 
 function SectionCard({
   title,
