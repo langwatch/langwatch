@@ -36,6 +36,13 @@ import { connection as redisConnection } from "~/server/redis";
 import { prisma } from "~/server/db";
 import { getServerAuthSession } from "~/server/auth";
 import { PersonalVirtualKeyService } from "~/server/governance/personalVirtualKey.service";
+import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
+import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import {
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:auth-cli");
@@ -60,6 +67,7 @@ const POLL_RATE_LIMIT_SECONDS = 4;
 
 const DEVICE_CODE_PREFIX = "lwcli:device:"; // Redis key prefix for device-code records
 const REFRESH_TOKEN_PREFIX = "lwcli:refresh:"; // Redis key prefix for refresh-token records
+const ACCESS_TOKEN_PREFIX = "lwcli:access:"; // Redis key prefix for access-token records
 const POLL_RATE_PREFIX = "lwcli:poll:"; // Redis key prefix for poll-rate-limit window
 
 type DeviceCodeStatus =
@@ -87,6 +95,13 @@ interface DeviceCodeRecord {
 }
 
 interface RefreshTokenRecord {
+  user_id: string;
+  organization_id: string;
+  issued_at: number;
+  expires_at: number;
+}
+
+interface AccessTokenRecord {
   user_id: string;
   organization_id: string;
   issued_at: number;
@@ -135,6 +150,41 @@ function userCodeKey(userCode: string): string {
 
 function refreshTokenKey(refreshToken: string): string {
   return `${REFRESH_TOKEN_PREFIX}${refreshToken}`;
+}
+
+function accessTokenKey(accessToken: string): string {
+  return `${ACCESS_TOKEN_PREFIX}${accessToken}`;
+}
+
+/**
+ * Resolve a Bearer access_token to its (user_id, organization_id) record.
+ * Returns null on missing / expired / malformed. Used by every authenticated
+ * CLI endpoint (currently /budget/status; future ones use the same helper).
+ *
+ * Auth contract: Authorization: Bearer lw_at_<base64url>. Anything else,
+ * including session cookies, is rejected — these endpoints are CLI-only.
+ */
+async function validateAccessToken(
+  authHeader: string | null | undefined,
+): Promise<AccessTokenRecord | null> {
+  if (!authHeader) return null;
+  const match = /^Bearer\s+(lw_at_[A-Za-z0-9_\-]+)$/.exec(authHeader.trim());
+  if (!match) return null;
+  const token = match[1]!;
+  const redis = getRedis();
+  const raw = await redis.get(accessTokenKey(token));
+  if (!raw) return null;
+  let record: AccessTokenRecord;
+  try {
+    record = JSON.parse(raw) as AccessTokenRecord;
+  } catch {
+    return null;
+  }
+  if (Date.now() > record.expires_at) {
+    await redis.del(accessTokenKey(token));
+    return null;
+  }
+  return record;
 }
 
 function pollRateKey(deviceCode: string): string {
@@ -341,21 +391,39 @@ app.post("/exchange", async (c: Context) => {
       );
     }
 
-    // Mint access + refresh tokens, persist refresh in Redis with TTL.
+    // Mint access + refresh tokens, persist both in Redis with TTL so
+    // protected CLI endpoints (/budget/status etc.) can validate Bearer
+    // tokens against an authoritative store.
     const accessToken = generateAccessToken();
     const refreshToken = generateRefreshToken();
+    const now = Date.now();
+    const accessRecord: AccessTokenRecord = {
+      user_id: user.id,
+      organization_id: organization.id,
+      issued_at: now,
+      expires_at: now + ACCESS_TOKEN_TTL_SECONDS * 1000,
+    };
     const refreshRecord: RefreshTokenRecord = {
       user_id: user.id,
       organization_id: organization.id,
-      issued_at: Date.now(),
-      expires_at: Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000,
+      issued_at: now,
+      expires_at: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
     };
-    await redis.set(
-      refreshTokenKey(refreshToken),
-      JSON.stringify(refreshRecord),
-      "EX",
-      REFRESH_TOKEN_TTL_SECONDS,
-    );
+    await redis
+      .multi()
+      .set(
+        accessTokenKey(accessToken),
+        JSON.stringify(accessRecord),
+        "EX",
+        ACCESS_TOKEN_TTL_SECONDS,
+      )
+      .set(
+        refreshTokenKey(refreshToken),
+        JSON.stringify(refreshRecord),
+        "EX",
+        REFRESH_TOKEN_TTL_SECONDS,
+      )
+      .exec();
 
     // Single-use device_code: delete after successful exchange.
     await redis.del(deviceCodeKey(device_code), userCodeKey(record.user_code));
@@ -447,18 +515,31 @@ app.post("/refresh", async (c: Context) => {
   // standard OAuth pattern, helps detect stolen tokens.)
   const newAccessToken = generateAccessToken();
   const newRefreshToken = generateRefreshToken();
-  const newRecord: RefreshTokenRecord = {
+  const now = Date.now();
+  const newAccessRecord: AccessTokenRecord = {
     user_id: record.user_id,
     organization_id: record.organization_id,
-    issued_at: Date.now(),
-    expires_at: Date.now() + REFRESH_TOKEN_TTL_SECONDS * 1000,
+    issued_at: now,
+    expires_at: now + ACCESS_TOKEN_TTL_SECONDS * 1000,
+  };
+  const newRefreshRecord: RefreshTokenRecord = {
+    user_id: record.user_id,
+    organization_id: record.organization_id,
+    issued_at: now,
+    expires_at: now + REFRESH_TOKEN_TTL_SECONDS * 1000,
   };
 
   await redis
     .multi()
     .set(
+      accessTokenKey(newAccessToken),
+      JSON.stringify(newAccessRecord),
+      "EX",
+      ACCESS_TOKEN_TTL_SECONDS,
+    )
+    .set(
       refreshTokenKey(newRefreshToken),
-      JSON.stringify(newRecord),
+      JSON.stringify(newRefreshRecord),
       "EX",
       REFRESH_TOKEN_TTL_SECONDS,
     )
@@ -474,6 +555,147 @@ app.post("/refresh", async (c: Context) => {
       refresh_expires_in: REFRESH_TOKEN_TTL_SECONDS,
     },
     200,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/cli/budget/status
+// ---------------------------------------------------------------------------
+// Pre-flight check called by `langwatch claude` / `codex` / `cursor` /
+// `gemini` before exec'ing the underlying tool. Lets the wrapper render
+// the spec-canonical Screen-8 budget-exceeded box (spec:
+// specs/ai-gateway/governance/budget-exceeded.feature) without making
+// any real LLM calls.
+//
+// Auth: Authorization: Bearer lw_at_<base64url> (CLI access token).
+//
+// Responses (per docs/ai-gateway/governance/cli-reference.mdx
+// "Budget pre-check (graceful degradation)"):
+//   200 {ok: true}                    — no applicable budget exhausted
+//   401 {error: ...}                  — invalid / missing access token
+//   402 {error: {type: budget_exceeded, ...}} — at least one is at hard_block
+//
+// Implementation note: we delegate budget evaluation to the existing
+// GatewayBudgetService.check() with projectedCost=0 — same code path
+// the gateway uses at request time, just without committing spend. If
+// ClickHouse isn't configured (smaller self-hosters), we fall back to
+// 200 because we have no spend data; the gateway itself will surface
+// the actual block at request time via the same code path.
+// ---------------------------------------------------------------------------
+function chRepoOrUndefined(): GatewayBudgetClickHouseRepository | undefined {
+  if (!isClickHouseEnabled()) return undefined;
+  return new GatewayBudgetClickHouseRepository(async (projectId) => {
+    const client = await getClickHouseClientForProject(projectId);
+    if (!client) {
+      throw new Error(
+        `ClickHouse enabled but no client for project ${projectId}`,
+      );
+    }
+    return client;
+  });
+}
+
+function requestIncreaseUrl(opts: {
+  scope: string;
+  scopeId: string;
+  limitUsd: string;
+  spentUsd: string;
+}): string {
+  const base =
+    env.NEXTAUTH_URL ?? env.BASE_HOST ?? "http://localhost:5560";
+  const params = new URLSearchParams({
+    scope: opts.scope,
+    scope_id: opts.scopeId,
+    limit_usd: opts.limitUsd,
+    spent_usd: opts.spentUsd,
+  });
+  return `${base.replace(/\/$/, "")}/me/budget/request?${params.toString()}`;
+}
+
+async function resolveOrgAdminEmail(
+  organizationId: string,
+): Promise<string | null> {
+  const admin = await prisma.organizationUser.findFirst({
+    where: { organizationId, role: "ADMIN" },
+    include: { user: { select: { email: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  return admin?.user.email ?? null;
+}
+
+app.get("/budget/status", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+
+  // Resolve the user's personal workspace (team + project). If none
+  // exists yet (first login, hasn't activated the CLI), nothing can be
+  // over budget — return 200 and let the wrapper exec normally.
+  const workspaceService = new PersonalWorkspaceService(prisma);
+  const workspace = await workspaceService.findExisting({
+    userId: tokenRecord.user_id,
+    organizationId: tokenRecord.organization_id,
+  });
+  if (!workspace) return c.json({ ok: true }, 200);
+
+  // Resolve the user's personal VK. Same graceful-fallback rationale —
+  // no VK means no traffic flowing, nothing to block on.
+  const vkService = PersonalVirtualKeyService.create(prisma);
+  const vks = await vkService.list({
+    userId: tokenRecord.user_id,
+    organizationId: tokenRecord.organization_id,
+  });
+  const personalVk = vks[0];
+  if (!personalVk) return c.json({ ok: true }, 200);
+
+  const budgetService = GatewayBudgetService.create(
+    prisma,
+    chRepoOrUndefined(),
+  );
+  const decision = await budgetService.check({
+    organizationId: tokenRecord.organization_id,
+    teamId: workspace.team.id,
+    projectId: workspace.project.id,
+    virtualKeyId: personalVk.id,
+    principalUserId: tokenRecord.user_id,
+    projectedCostUsd: 0,
+  });
+
+  if (decision.decision !== "hard_block" || decision.blockedBy.length === 0) {
+    return c.json({ ok: true }, 200);
+  }
+
+  // Pick the most-restrictive blocker. The check() result orders by
+  // strictness; first entry is the binding one.
+  const blocker = decision.blockedBy[0]!;
+  const adminEmail = await resolveOrgAdminEmail(tokenRecord.organization_id);
+
+  return c.json(
+    {
+      error: {
+        type: "budget_exceeded",
+        scope: blocker.scope.toLowerCase(),
+        limit_usd: blocker.limitUsd,
+        spent_usd: blocker.spentUsd,
+        period: blocker.window.toLowerCase(),
+        request_increase_url: requestIncreaseUrl({
+          scope: blocker.scope.toLowerCase(),
+          scopeId: blocker.scopeId,
+          limitUsd: blocker.limitUsd,
+          spentUsd: blocker.spentUsd,
+        }),
+        admin_email: adminEmail,
+      },
+    },
+    402,
   );
 });
 
