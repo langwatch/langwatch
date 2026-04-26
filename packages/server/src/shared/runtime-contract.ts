@@ -13,6 +13,10 @@ export type RuntimeContext = {
   predeps: PredepResult;
   envFile: string;
   version: string;
+  /** Opt-in: start bullboard alongside the rest. CLI flag `--bullboard`. */
+  bullboard: boolean;
+  /** Pass-through env from the user shell (OPENAI_API_KEY, …) — propagated to children, never persisted. */
+  userEnv: Record<string, string>;
 };
 
 export type ServiceHandle = {
@@ -21,10 +25,27 @@ export type ServiceHandle = {
   stop(): Promise<void>;
 };
 
+/**
+ * Events emitted by the runtime supervisor while installing/starting/running
+ * services. The CLI consumes this stream to render the listr2 status grid
+ * and to tee log lines to TTY (with stable per-service prefix + color).
+ *
+ * The stream stays open from the moment `events(ctx)` is called until
+ * `stopAll(handles)` resolves. Multiple consumers are not supported — call
+ * `events(ctx)` exactly once per CLI run.
+ */
+export type RuntimeEvent =
+  | { type: "starting"; service: string }
+  | { type: "healthy"; service: string; durationMs: number }
+  | { type: "log"; service: string; stream: "stdout" | "stderr"; line: string }
+  | { type: "crashed"; service: string; code: number; signal?: NodeJS.Signals }
+  | { type: "stopped"; service: string };
+
 export type RuntimeApi = {
-  installServices(ctx: RuntimeContext): Promise<void>;
   scaffoldEnv(ctx: RuntimeContext): Promise<{ written: boolean; path: string }>;
+  installServices(ctx: RuntimeContext): Promise<void>;
   startAll(ctx: RuntimeContext): Promise<ServiceHandle[]>;
   waitForHealth(ctx: RuntimeContext, opts: { timeoutMs: number }): Promise<void>;
   stopAll(handles: ServiceHandle[]): Promise<void>;
+  events(ctx: RuntimeContext): AsyncIterable<RuntimeEvent>;
 };

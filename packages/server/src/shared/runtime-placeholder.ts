@@ -5,7 +5,7 @@
 
 import type { RuntimeApi, RuntimeContext, RuntimeEvent, ServiceHandle } from "./runtime-contract.ts";
 
-const notImplemented = (name: string) => () => {
+const notImplemented = (name: string) => async () => {
   throw new Error(`services/runtime.ts not yet implemented (${name}). julia is wiring this — ping in #langwatch-npx if blocked.`);
 };
 

@@ -100,34 +100,81 @@ async function runListr({
   platform: SupportedPlatform;
   installResults: Record<string, { version: string; resolvedPath: string }>;
 }): Promise<void> {
-  const tasks = new Listr(
-    predeps.map((p) => ({
-      title: p.label,
-      task: async (_, task) => {
-        const result = await p.install({ platform, paths, task });
-        installResults[p.id] = result;
-        task.title = `${p.label}  ${chalk.dim(result.version)}`;
-      },
-      retry: { tries: 1, delay: 0 },
-      rollback: async () => {
-        // future: clean partial download
-      },
-    })),
-    {
-      concurrent: true,
-      exitOnError: false,
-      collectErrors: "minimal",
-      rendererOptions: { collapseSubtasks: false, showSubtasks: true },
+  const remaining = [...predeps];
+  // Loop until every predep either installs or the user explicitly skips it.
+  // Each pass runs the still-unfinished predeps concurrently in a fresh
+  // listr instance so the user sees a clean redraw on retry.
+  while (remaining.length > 0) {
+    const failed: Array<{ predep: Predep; error: Error }> = [];
+    const tasks = new Listr(
+      remaining.map((p) => ({
+        title: p.label,
+        task: async (_, task) => {
+          try {
+            const result = await p.install({ platform, paths, task });
+            installResults[p.id] = result;
+            task.title = `${p.label}  ${chalk.dim(result.version)}`;
+          } catch (err) {
+            failed.push({ predep: p, error: err as Error });
+            throw err;
+          }
+        },
+      })),
+      {
+        concurrent: true,
+        exitOnError: false,
+        collectErrors: "minimal",
+        rendererOptions: { collapseSubtasks: false, showSubtasks: true },
+      }
+    );
+    await tasks.run().catch(() => {
+      // listr re-throws even with exitOnError: false; we already captured
+      // the per-predep error in the task wrapper above.
+    });
+
+    if (failed.length === 0) return;
+
+    const action = await promptOnFailure(failed);
+    if (action === "abort") {
+      console.error(chalk.red(`✗ aborting — ${failed.length} predep(s) did not install.`));
+      process.exit(1);
     }
-  );
-  await tasks.run();
-  if (tasks.errors.length > 0) {
-    console.error(chalk.red(`✗ ${tasks.errors.length} predep installation(s) failed`));
-    for (const err of tasks.errors) {
-      console.error(chalk.red(`  - ${err.message}`));
+    if (action === "skip") {
+      console.warn(
+        chalk.yellow(
+          `⚠ skipping ${failed.length} predep(s) — services that depend on them will fail to start.`
+        )
+      );
+      return;
     }
-    process.exit(1);
+    // retry: keep only the failed ones in `remaining` and loop.
+    remaining.length = 0;
+    remaining.push(...failed.map((f) => f.predep));
   }
+}
+
+async function promptOnFailure(failed: Array<{ predep: Predep; error: Error }>): Promise<"retry" | "skip" | "abort"> {
+  console.error("");
+  console.error(chalk.red.bold(`✗ ${failed.length} predep(s) failed:`));
+  for (const f of failed) {
+    console.error(`  ${chalk.red("✗")} ${f.predep.label}: ${f.error.message}`);
+  }
+  if (process.env.CI) return "abort";
+  const { action } = await prompts(
+    {
+      type: "select",
+      name: "action",
+      message: "How would you like to proceed?",
+      choices: [
+        { title: "Retry the failed installs", value: "retry" },
+        { title: "Skip and continue (services using these will fail)", value: "skip" },
+        { title: "Abort", value: "abort" },
+      ],
+      initial: 0,
+    },
+    { onCancel: () => process.exit(130) }
+  );
+  return action ?? "abort";
 }
 
 function collectResult(
