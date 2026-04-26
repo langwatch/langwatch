@@ -468,6 +468,95 @@ func TestChainSync_EarlyReject(t *testing.T) {
 	assert.False(t, terminalCalled)
 }
 
+// TestHandleChat_ModelAwareSkipsWrongProvider proves the dispatcher
+// filters incompatible providers out of the credential chain before
+// dispatching. With a personal-VK shape (Anthropic + OpenAI + Gemini
+// behind one key), an Anthropic-only model must NOT first attempt the
+// OpenAI/Gemini creds and waste fallback budget.
+func TestHandleChat_ModelAwareSkipsWrongProvider(t *testing.T) {
+	var attempted []domain.ProviderID
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, cred domain.Credential) (*domain.Response, error) {
+			attempted = append(attempted, cred.ProviderID)
+			return successResponse(), nil
+		},
+	}
+	models := &mockModels{
+		resolveFn: func(_ context.Context, _ string, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
+			return &domain.ResolvedModel{
+				ModelID:    "claude-3-5-sonnet-20241022",
+				ProviderID: domain.ProviderAnthropic,
+				Source:     domain.ModelSourceImplicit,
+			}, nil
+		},
+	}
+
+	bundle := testBundle(
+		domain.Credential{ID: "openai_first", ProviderID: domain.ProviderOpenAI, APIKey: "sk-1"},
+		domain.Credential{ID: "anthropic", ProviderID: domain.ProviderAnthropic, APIKey: "sk-2"},
+		domain.Credential{ID: "gemini", ProviderID: domain.ProviderGemini, APIKey: "sk-3"},
+	)
+	bundle.Config.Fallback.MaxAttempts = 3
+
+	application := New(
+		WithProviders(provider),
+		WithModels(models),
+		WithLogger(zap.NewNop()),
+	)
+
+	_, err := application.HandleChat(
+		context.Background(), bundle,
+		bytes.NewReader([]byte(`{"model":"claude-3-5-sonnet","messages":[]}`)),
+		"claude-3-5-sonnet")
+	require.NoError(t, err)
+	require.Len(t, attempted, 1, "expected exactly one provider attempt")
+	assert.Equal(t, domain.ProviderAnthropic, attempted[0],
+		"expected Anthropic to be the only provider attempted (got %v)", attempted)
+}
+
+// TestHandleChat_ModelAwareImplicitInfersProvider verifies that even
+// when the model resolver leaves ProviderID empty (implicit), the
+// dispatcher infers the provider from the model name and filters
+// accordingly.
+func TestHandleChat_ModelAwareImplicitInfersProvider(t *testing.T) {
+	var attempted []domain.ProviderID
+	provider := &mockProvider{
+		dispatchFn: func(_ context.Context, _ *domain.Request, cred domain.Credential) (*domain.Response, error) {
+			attempted = append(attempted, cred.ProviderID)
+			return successResponse(), nil
+		},
+	}
+	models := &mockModels{
+		resolveFn: func(_ context.Context, raw string, _ domain.BundleConfig) (*domain.ResolvedModel, error) {
+			return &domain.ResolvedModel{
+				ModelID:    raw,
+				ProviderID: "", // implicit — dispatcher must infer
+				Source:     domain.ModelSourceImplicit,
+			}, nil
+		},
+	}
+
+	bundle := testBundle(
+		domain.Credential{ID: "anthropic_first", ProviderID: domain.ProviderAnthropic, APIKey: "sk-a"},
+		domain.Credential{ID: "openai", ProviderID: domain.ProviderOpenAI, APIKey: "sk-o"},
+	)
+	bundle.Config.Fallback.MaxAttempts = 2
+
+	application := New(
+		WithProviders(provider),
+		WithModels(models),
+		WithLogger(zap.NewNop()),
+	)
+
+	_, err := application.HandleChat(
+		context.Background(), bundle,
+		bytes.NewReader([]byte(`{"model":"gpt-4o-mini","messages":[]}`)),
+		"gpt-4o-mini")
+	require.NoError(t, err)
+	require.Len(t, attempted, 1)
+	assert.Equal(t, domain.ProviderOpenAI, attempted[0])
+}
+
 func TestPeekStream(t *testing.T) {
 	assert.True(t, PeekStream([]byte(`{"model":"gpt-4","stream":true}`)))
 	assert.False(t, PeekStream([]byte(`{"model":"gpt-4"}`)))

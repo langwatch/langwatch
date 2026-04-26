@@ -13,9 +13,10 @@ func (a *App) coreDispatch(ctx context.Context, call *pipeline.Call) (*domain.Re
 	if err := call.MaterializeBody(); err != nil {
 		return nil, err
 	}
-	resp, el, err := retry.Walk(ctx, retryOpts(call.Bundle), credentialIDs(call.Bundle.Credentials),
+	creds := eligibleCredentials(call.Bundle.Credentials, call.Request.Resolved)
+	resp, el, err := retry.Walk(ctx, retryOpts(call.Bundle), credentialIDs(creds),
 		func(ctx context.Context, slotID string) (*domain.Response, error) {
-			return a.providers.Dispatch(ctx, call.Request, findCredential(call.Bundle.Credentials, slotID))
+			return a.providers.Dispatch(ctx, call.Request, findCredential(creds, slotID))
 		}, classifyProviderError)
 	call.Meta.FallbackCount = countFallbacks(el)
 	el.Release()
@@ -29,9 +30,10 @@ func (a *App) coreDispatchStream(ctx context.Context, call *pipeline.Call) (doma
 	if err := call.MaterializeBody(); err != nil {
 		return nil, err
 	}
-	iter, el, err := retry.Walk(ctx, retryOpts(call.Bundle), credentialIDs(call.Bundle.Credentials),
+	creds := eligibleCredentials(call.Bundle.Credentials, call.Request.Resolved)
+	iter, el, err := retry.Walk(ctx, retryOpts(call.Bundle), credentialIDs(creds),
 		func(ctx context.Context, slotID string) (domain.StreamIterator, error) {
-			return a.providers.DispatchStream(ctx, call.Request, findCredential(call.Bundle.Credentials, slotID))
+			return a.providers.DispatchStream(ctx, call.Request, findCredential(creds, slotID))
 		}, classifyProviderError)
 	call.Meta.FallbackCount = countFallbacks(el)
 	el.Release()
