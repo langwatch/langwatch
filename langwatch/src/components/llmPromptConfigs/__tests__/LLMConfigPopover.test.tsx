@@ -140,6 +140,9 @@ vi.mock("../../ModelSelector", () => ({
       <option value="openai/gpt-4.1">GPT-4.1</option>
       <option value="openai/gpt-5">GPT-5</option>
       <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet</option>
+      <option value="bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0">
+        Claude Haiku 4.5 (Bedrock)
+      </option>
     </select>
   ),
 }));
