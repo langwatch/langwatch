@@ -41,6 +41,10 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 	traceID := req.TraceID
 	if traceID == "" {
 		traceID = ulid.Make().String()
+		// Write back so downstream dispatch (runEvaluator,
+		// runAgentWorkflow) sees the same trace id when calling out
+		// to LangWatch endpoints. Mirrors the Execute() path.
+		req.TraceID = traceID
 	}
 	plan, err := planner.New(req.Workflow)
 	if err != nil {

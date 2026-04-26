@@ -36,6 +36,12 @@ U = TypeVar("U", Topic, Subtopic)
 
 
 def get_matching_topic(trace: TraceWithEmbeddings, topics: list[U]) -> Optional[U]:
+    # Empty topics is a normal first-run / wiped-topics state — return
+    # None so the caller leaves the trace for new-topic creation. Without
+    # this guard, cdist raises on the (0,) array shape and the endpoint
+    # 500s instead of degrading cleanly.
+    if not topics:
+        return None
     trace_embeddings = np.array(trace["embeddings"])
     centroid_distances = cdist(
         [trace_embeddings],

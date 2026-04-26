@@ -130,6 +130,12 @@ func (e *Engine) Execute(ctx context.Context, req ExecuteRequest) (*ExecuteResul
 	traceID := req.TraceID
 	if traceID == "" {
 		traceID = ulid.Make().String()
+		// Write back so downstream dispatch (runEvaluator,
+		// runAgentWorkflow) sees the same trace id when calling out
+		// to LangWatch endpoints. Without this, server-side spans
+		// for evaluator + agent runs have no correlation back to the
+		// workflow execution.
+		req.TraceID = traceID
 	}
 	plan, err := planner.New(req.Workflow)
 	if err != nil {
