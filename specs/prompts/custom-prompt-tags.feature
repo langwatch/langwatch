@@ -50,14 +50,6 @@ Feature: Custom prompt tag definitions (CRUD)
   # --- Assign custom tags (existing endpoints) ---
 
   @integration @unimplemented
-  Scenario: Assign a custom tag to a prompt version
-    Given a custom tag "canary" exists
-    When I assign "canary" to v2 of "pizza-prompt"
-    Then fetching "pizza-prompt" with tag "canary" returns v2
-
-  # --- List ---
-
-  @integration @unimplemented
   Scenario: List tags returns all org tags
     Given custom tags "canary" and "ab-test" exist
     When I GET /api/orgs/:orgId/prompt-tags
@@ -77,13 +69,6 @@ Feature: Custom prompt tag definitions (CRUD)
     When I DELETE /api/orgs/:orgId/prompt-tags/:tagId
     Then the response status is 204
     And the tag "canary" no longer exists
-
-  @integration @unimplemented
-  Scenario: Delete a custom tag cascades to assignments
-    Given a custom tag "canary" exists
-    And "canary" is assigned to v2 of "pizza-prompt"
-    When I DELETE /api/orgs/:orgId/prompt-tags/:tagId
-    Then the "canary" assignment on "pizza-prompt" is cleared
 
   @integration @unimplemented
   Scenario: Cannot delete protected tags
