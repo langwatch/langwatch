@@ -36,6 +36,12 @@ export async function runMigrations(
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     ...envFromFile,
+    // Prepend ~/.langwatch/bin so the langwatch app's clickhouse:migrate
+    // task (which shells out to `which goose`) finds the predep-installed
+    // goose binary. Postgres + redis don't need this — they're spawned by
+    // absolute path from the supervisor — but goose is the one tool the
+    // langwatch app discovers via PATH.
+    PATH: `${ctx.paths.bin}:${process.env.PATH ?? ""}`,
     DATABASE_URL: `postgresql://langwatch@127.0.0.1:${ctx.ports.postgres}/langwatch_db?schema=langwatch_db&connection_limit=5`,
     CLICKHOUSE_URL: `http://127.0.0.1:${ctx.ports.clickhouseHttp}/langwatch`,
     SKIP_PRISMA_MIGRATE: "false",
