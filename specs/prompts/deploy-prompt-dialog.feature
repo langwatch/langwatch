@@ -19,48 +19,6 @@ Feature: Deploy Prompt Dialog
     And I see the prompt slug "pizza-prompt" with a copy button
 
   @integration @unimplemented
-  Scenario: Dialog shows all label rows
-    Given the Deploy dialog is open for "pizza-prompt"
-    Then I see three label rows: latest, production, staging
-    And the latest row shows the current version number
-    And the latest row is not editable
-
-  # --- Version dropdowns ---
-
-  @integration @unimplemented
-  Scenario: Version dropdown shows context
-    Given the Deploy dialog is open for "pizza-prompt"
-    When I open the production version dropdown
-    Then I see entries with version number and commit message
-    And versions are listed newest first
-
-  @integration @unimplemented
-  Scenario: Production and staging rows have version dropdowns
-    Given the Deploy dialog is open for "pizza-prompt"
-    Then the production row has a version dropdown
-    And the staging row has a version dropdown
-
-  # --- Assigning labels ---
-
-  @integration @unimplemented
-  Scenario: Assign production to a version
-    Given the Deploy dialog is open for "pizza-prompt"
-    And production is currently unassigned
-    When I select v3 from the production dropdown
-    And I click "Save changes"
-    Then production is assigned to v3
-
-  @integration @unimplemented
-  Scenario: Change staging version
-    Given the Deploy dialog is open for "pizza-prompt"
-    And staging is currently assigned to v2
-    When I change the staging dropdown to v3
-    And I click "Save changes"
-    Then staging is now assigned to v3
-
-  # --- Backend query ---
-
-  @integration @unimplemented
   Scenario: Fetch all labels for a prompt config
     Given "pizza-prompt" has production=v2 and staging=v3
     When I call getLabelsForConfig with configId for "pizza-prompt"
