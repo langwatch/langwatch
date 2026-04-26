@@ -157,18 +157,24 @@ export async function refresh(
 }
 
 /**
- * `POST /api/auth/cli/logout` — server-side revoke a refresh token.
- * Idempotent (200 on already-revoked / unknown tokens).
+ * `POST /api/auth/cli/logout` — server-side revoke a refresh token
+ * AND its paired access token (per `e7a042c69`: a stolen access
+ * token used to survive logout for up to 1h until expiry; sending
+ * both closes the gap). Idempotent — 200 on already-revoked or
+ * unknown tokens.
  */
 export async function logout(
   opts: DeviceFlowOptions,
   refreshToken: string,
+  accessToken?: string,
 ): Promise<void> {
-  const res = await rawPost(opts, "/api/auth/cli/logout", { refresh_token: refreshToken });
+  const body: Record<string, string> = { refresh_token: refreshToken };
+  if (accessToken) body.access_token = accessToken;
+  const res = await rawPost(opts, "/api/auth/cli/logout", body);
   // 401/404 mean "already gone" — that's success for logout.
   if (res.status === 200 || res.status === 401 || res.status === 404) return;
-  const body = await res.text().catch(() => "");
-  throw new DeviceFlowError("other", `logout failed (${res.status}): ${body.slice(0, 256)}`);
+  const text = await res.text().catch(() => "");
+  throw new DeviceFlowError("other", `logout failed (${res.status}): ${text.slice(0, 256)}`);
 }
 
 async function postJSON<T>(opts: DeviceFlowOptions, path: string, body: unknown): Promise<T> {
