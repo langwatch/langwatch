@@ -72,11 +72,17 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
 }
 
 async function resolvePnpm(): Promise<{ command: string; args: string[] }> {
-  // Prefer corepack pnpm so users don't need a global install. Fall back to
-  // the pnpm on PATH if corepack isn't available.
+  // Prefer pnpm directly on PATH (pnpm/action-setup puts it there on CI;
+  // corepack shims put it there for end users running `npx ...`). Fall back
+  // to `corepack pnpm` only if pnpm isn't reachable. We avoid corepack-as-
+  // primary because `corepack pnpm -C <dir>` swallows the `-C` flag in some
+  // cases — pnpm gets invoked from its own cwd, not the supplied dir, and
+  // langwatch's `build` script isn't found.
+  const direct = await execa("pnpm", ["--version"], { reject: false });
+  if (direct.exitCode === 0) return { command: "pnpm", args: [] };
   const { exitCode } = await execa("corepack", ["--version"], { reject: false });
   if (exitCode === 0) return { command: "corepack", args: ["pnpm"] };
-  return { command: "pnpm", args: [] };
+  throw new Error("pnpm not found on PATH and corepack is unavailable");
 }
 
 export function locateLangwatchDir(): string | null {
