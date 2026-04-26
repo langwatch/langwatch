@@ -92,8 +92,9 @@ Every `/api/gateway/v1/*` endpoint enforces the same permission as its equivalen
 | `POST /api/gateway/v1/providers/:id/disable` | `gatewayProviders:update` |
 | `POST /api/gateway/v1/virtual-keys/:id/guardrails` | `gatewayGuardrails:attach` |
 | `DELETE /api/gateway/v1/virtual-keys/:id/guardrails/:guardrailId` | `gatewayGuardrails:detach` |
-| `GET /api/gateway/v1/audit` | `gatewayLogs:view` |
 | `GET /api/gateway/v1/usage` | `gatewayUsage:view` |
+
+Audit log retrieval is **not** exposed via the public REST API in v1 — gateway audit rows live in the platform `AuditLog` table and are read via `/settings/audit-log` (CSV export) or via the tRPC `organization.getAuditLogs` procedure (gated on `auditLog:view`, with TeamUser ADMIN/MEMBER/VIEWER fallback for legacy admins). See [Audit log → Querying programmatically](/ai-gateway/audit#querying-programmatically). The `gatewayLogs:view` permission remains in the enum for backward compatibility but is no longer wired to any endpoint.
 
 A request with an API token that lacks the required permission returns `403 permission_denied` with the missing permission named in the `error.message`:
 

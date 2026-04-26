@@ -36,17 +36,13 @@ Go to **/settings/audit-log** (Enterprise plan, gated on `organization:manage`) 
 
 ## Querying programmatically
 
-The same data is available via the tRPC router used by the UI — `organization.getAuditLogs`. For REST-first consumers, use a project API token against the LangWatch app's audit export endpoint:
+There is **no public REST endpoint** for audit log retrieval — gateway audit reads share the same tRPC procedure (`organization.getAuditLogs`) that powers `/settings/audit-log`. Three paths, ranked by typical operator use case:
 
-```bash
-curl -sS https://app.langwatch.ai/api/gateway/v1/audit \
-  -H "Authorization: Bearer $LANGWATCH_API_KEY" \
-  -G -d "action=VIRTUAL_KEY_REVOKED" \
-     -d "since=2026-04-01T00:00:00Z" \
-     -d "limit=100"
-```
+1. **One-off / human review** — open `/settings/audit-log`, set the filters you want (Source, Action, Target), then hit **Export CSV** to download the filtered rows. The CSV carries gateway-shape fields (`targetKind`, `targetId`, `before`, `after`) for gateway rows and platform-shape fields (`args`, `metadata`) for platform rows.
+2. **Scripted / scheduled SIEM export** — query the Postgres `AuditLog` table directly from your SIEM ingestion pipeline. Filter on `targetKind IN ('virtual_key', 'budget', 'provider_binding', 'cache_rule')` to scope to gateway rows; join `User` on `userId` for actor enrichment. The schema is documented in `langwatch/prisma/schema.prisma → model AuditLog`.
+3. **In-app integrations** — call the tRPC procedure from a TypeScript client that already has a session: `await trpc.organization.getAuditLogs.query({ organizationId, targetKind, targetId, since, limit })`. Mirrors what the UI does. Not intended for cross-network REST consumers.
 
-The response carries gateway-shape fields (`target_kind`, `target_id`, `before`, `after`) populated for gateway rows and null for platform rows.
+A first-class REST audit-export endpoint is a v1.2 follow-up; until then, the CSV download is the supported export path for governance / compliance use cases.
 
 ## Retention
 
