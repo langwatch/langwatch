@@ -216,9 +216,12 @@ export class VirtualKeyService {
       );
       // Bind the routing policy in the same tx so create + bind is
       // atomic and the dispatcher never observes a half-configured VK.
+      // projectId is required in the where clause to satisfy
+      // dbMultiTenancyProtection — VirtualKey is a project-scoped model
+      // and the middleware rejects updates that don't scope by it.
       if (input.routingPolicyId) {
         await tx.virtualKey.update({
-          where: { id: vk.id },
+          where: { id: vk.id, projectId: input.projectId },
           data: { routingPolicyId: input.routingPolicyId },
         });
         vk.routingPolicyId = input.routingPolicyId;

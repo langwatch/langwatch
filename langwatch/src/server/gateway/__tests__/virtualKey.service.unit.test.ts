@@ -301,10 +301,15 @@ describe("VirtualKeyService.create", () => {
         // virtualKey.update call inside $transaction).
         expect(mocks.vkUpdateMock).toHaveBeenCalledOnce();
         const updateArgs = mocks.vkUpdateMock.mock.calls[0]?.[0] as {
-          where: { id: string };
+          where: { id: string; projectId: string };
           data: { routingPolicyId: string };
         };
         expect(updateArgs.data.routingPolicyId).toBe("rp_01");
+        // projectId MUST be in the where clause — dbMultiTenancyProtection
+        // rejects update queries on project-scoped models without it.
+        // (Bug #3: original patch used `where: { id: vk.id }` only and
+        // the middleware threw at runtime in PersonalVirtualKey flow.)
+        expect(updateArgs.where.projectId).toBe("proj_01");
       });
     });
   });
