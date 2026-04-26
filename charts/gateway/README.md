@@ -44,11 +44,17 @@ JWT pre-rotation has expired (default ~15 min).
 
 ## Install
 
+The gateway sub-chart is shipped as a dependency of the umbrella
+`langwatch` chart, not as a standalone published OCI artifact. Install
+the umbrella chart and opt into the gateway via values:
+
 ```bash
-helm install gateway oci://docker.io/langwatch/charts/gateway -n langwatch -f values.prod.yaml
+helm install langwatch oci://ghcr.io/langwatch/charts/langwatch \
+  -n langwatch -f values.prod.yaml --set gateway.enabled=true
 ```
 
-Or from a local checkout:
+Or, for development against the chart in this repo, render this
+sub-chart directly from the local checkout:
 
 ```bash
 helm install gateway ./charts/gateway -n langwatch -f values.prod.yaml
@@ -99,11 +105,12 @@ disable nginx proxy buffering and bump read/send timeouts to one hour
 so SSE chunks reach clients promptly:
 
 ```yaml
-ingress.annotations:
-  nginx.ingress.kubernetes.io/proxy-buffering: "off"
-  nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
-  nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
-  nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
+ingress:
+  annotations:
+    nginx.ingress.kubernetes.io/proxy-buffering: "off"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 ```
 
 If you swap `ingress.className` to `alb` or another controller, port

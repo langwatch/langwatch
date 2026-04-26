@@ -476,6 +476,36 @@ describe("RBAC Integration Tests", () => {
         expect(result).toBe(false);
       });
     });
+
+    describe("when user has only TeamUser VIEWER role (no RoleBindings, no admin)", () => {
+      beforeEach(() => {
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.MEMBER,
+        });
+        mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+        mockPrisma.teamUser.findMany.mockResolvedValue([
+          { role: TeamUserRole.VIEWER, assignedRoleId: null },
+        ]);
+      });
+
+      it("grants auditLog:view (VIEWER team role includes it)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "auditLog:view" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      it("does NOT grant gatewayBudgets:delete (VIEWER cannot delete)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "gatewayBudgets:delete" as Permission,
+        );
+        expect(result).toBe(false);
+      });
+    });
   });
 
   describe("Permission Middleware", () => {

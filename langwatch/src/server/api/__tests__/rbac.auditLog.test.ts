@@ -92,6 +92,9 @@ describe("AuditLog resource in RBAC", () => {
       expect(canView(TeamUserRole.ADMIN, Resources.AUDIT_LOG)).toBe(true);
       expect(canView(TeamUserRole.MEMBER, Resources.AUDIT_LOG)).toBe(true);
       expect(canView(TeamUserRole.VIEWER, Resources.AUDIT_LOG)).toBe(true);
+      // CUSTOM is the legacy-fallback bucket — covered explicitly so a
+      // regression that only breaks CUSTOM doesn't slip past the suite.
+      expect(canView(TeamUserRole.CUSTOM, Resources.AUDIT_LOG)).toBe(true);
     });
   });
 });

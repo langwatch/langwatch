@@ -25,7 +25,7 @@ Reads are **not** logged — the volume would swamp the ledger without adding go
 
 ## Viewing in the UI
 
-Go to **/settings/audit-log** (Enterprise plan, gated on `organization:manage`) and use the filters to narrow:
+Go to **/settings/audit-log** (Enterprise plan, gated on `auditLog:view` — granted by default to all four TeamUser roles incl. CUSTOM) and use the filters to narrow:
 
 1. **Source badge** — purple "Gateway" / grey "Platform" on every row.
 2. **Filter by action** — `VIRTUAL_KEY_CREATED`, `VIRTUAL_KEY_ROTATED`, etc. for gateway rows; tRPC paths like `project.update` for platform rows.

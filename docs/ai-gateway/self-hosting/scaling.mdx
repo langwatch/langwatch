@@ -88,9 +88,9 @@ There are no current `LW_GATEWAY_UPSTREAM_*` env vars to tune the transport dire
 
 ## Cold-start cost
 
-On boot the gateway runs a one-shot auth-cache warm-up against the control plane (`/api/internal/gateway/keys/changes`) before flipping `/startupz` to 200. For tenants with 50K+ virtual keys this takes 2–3 seconds; the chart's `probes.startup.failureThreshold: 30 × periodSeconds: 2 = 60s` window gives plenty of room. The pod is excluded from the load balancer until `/startupz` passes — no traffic hits a half-warmed cache.
+There is no boot-time cache warm-up in the current gateway. The `auth_cache_warm` readiness probe was removed because it created a chicken-and-egg with `/startupz` (the warm-up itself called the control plane, which couldn't accept traffic until *its* startup gate flipped). Instead the resolver warms organically on the first request per VK; an unwarmed gateway adds at most one extra ~50–200 ms control-plane round-trip on cold-cache requests. Subsequent requests hit the in-process cache and skip the round-trip entirely until the cache entry's soft-expiry passes.
 
-The cache is in-process and per-replica. Replicas warm independently; there is no cross-replica L2 cache in the current gateway. (See "Future tunables" for the values.yaml entries that anticipate this.)
+The cache is in-process and per-replica. Replicas warm independently; there is no cross-replica L2 cache in the current gateway. A Bootstrap-pull design that pre-loads keys before flipping `/startupz` to 200 is tracked under `specs/ai-gateway/auth-cache.feature` for v1.1+ when tenant key counts make the first-request tax visible at scale.
 
 ## Blue-green / canary
 

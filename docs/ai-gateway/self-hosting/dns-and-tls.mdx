@@ -164,7 +164,10 @@ Concrete checklist:
    The AWS Load Balancer Controller sees these annotations and provisions an NLB with the ACM cert attached. Wait for the NLB hostname to appear:
 
    ```bash
-   kubectl get svc langwatch-gateway-service -n langwatch \
+   # Service name follows the chart's `gateway.fullname` template — by
+   # default `<release>-gateway`. Replace `langwatch-gateway` below if
+   # you installed under a different release name.
+   kubectl get svc langwatch-gateway -n langwatch \
      -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
    ```
 
@@ -196,7 +199,7 @@ Concrete checklist:
 
 When the gateway TLS terminates on an AWS NLB (the SaaS + AWS-self-host posture), Cloudflare **must** stay in DNS-only mode (gray cloud). Four independent reasons, any one of which is enough:
 
-1. **TLS certificate validation.** The NLB serves the ACM cert valid for `gateway.acme.com`. Cloudflare's edge would terminate TLS using its own Universal SSL cert, then re-handshake to origin — but Cloudflare's origin-fetch client validates origin certs against Cloudflare's chain, and an ACM cert presented for the same hostname under `:443` will trip a 526 (`invalid SSL certificate`) on the edge. You'd have to either disable origin cert validation (Cloudflare's "Authenticated Origin Pulls" mode flipped off) or install the Cloudflare CA on the NLB — both add operational fragility for zero benefit.
+1. **Origin auth complexity.** Cloudflare Full (Strict) does accept any publicly-trusted CA at the origin, so an ACM cert on the NLB will validate without a 526 by default — but turning the proxy on opts you into Cloudflare's origin-auth surface. The day someone enables Authenticated Origin Pulls or expects mTLS between Cloudflare and the NLB, you'll need to install Cloudflare-issued origin certs (or the Cloudflare CA bundle) on the NLB just to keep the gateway reachable. That's operational fragility for zero benefit on a data plane Cloudflare shouldn't be inspecting in the first place.
 2. **Latency.** Cloudflare proxy adds ~10-30 ms per request even for cached zero-config setups, on top of the ~50 ms Cloudflare edge → AWS region path. The AI Gateway aims for sub-ms overhead beyond bifrost; halving that budget on every request defeats the design.
 3. **SSE / streaming buffering.** Cloudflare's proxy buffers small response chunks for compression and bot-detection scoring. SSE responses with single-token deltas (every OpenAI-shape stream) can stall by hundreds of milliseconds at the edge before being released to the client. The result: streaming feels broken even when it's working.
 4. **Privacy.** With Cloudflare proxying, the edge sees every customer's plaintext LLM prompt and completion (TLS terminates at Cloudflare). For enterprise customers under data-residency or PII constraints, that's a non-starter — the whole reason to run a gateway is to keep prompt content within your own boundary.
