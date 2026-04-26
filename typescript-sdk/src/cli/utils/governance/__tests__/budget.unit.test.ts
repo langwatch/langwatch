@@ -70,7 +70,7 @@ describe("checkBudget", () => {
     let seen = "";
     const fetchImpl = vi.fn().mockImplementation((_url: string, init: RequestInit) => {
       const headers = init.headers as Record<string, string>;
-      seen = headers.Authorization;
+      seen = headers.Authorization ?? "";
       return Promise.resolve(ok({ ok: true }));
     });
     await checkBudget(baseCfg("at_TOKEN"), { fetchImpl });

@@ -247,6 +247,33 @@ program
     }
   });
 
+program
+  .command("logout-device")
+  .description("Server-revoke the device-flow refresh token AND clear the local ~/.langwatch/config.json. Idempotent.")
+  .action(async () => {
+    try {
+      const { logoutDeviceCommand } = await import("./commands/logout-device.js");
+      await logoutDeviceCommand();
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("init-shell")
+  .description("Print an eval-able shell snippet so any shell session auto-exports the gateway env vars (alternative to `langwatch claude`).")
+  .argument("[shell]", "zsh|bash|fish|cmd|powershell", "zsh")
+  .action(async (shell: string) => {
+    try {
+      const { initShellCommand } = await import("./commands/init-shell.js");
+      await initShellCommand(shell);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
 // Add prompt command group
 const promptCmd = program
   .command("prompt")
