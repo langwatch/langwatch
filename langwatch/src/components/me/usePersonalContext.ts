@@ -33,6 +33,23 @@ export type PersonalApiKeyRow = {
   createdAt: string;
 };
 
+/**
+ * Wire shape mirrors `api.user.personalBudget` (Sergey's dc07c772e) and
+ * the gateway 402 body. status=ok → no banner; warning → yellow 80%
+ * banner; exceeded → BudgetExceededBanner with the structured fields.
+ */
+export type PersonalBudgetState =
+  | { status: "ok" }
+  | {
+      status: "warning" | "exceeded";
+      spentUsd: number;
+      limitUsd: number;
+      period: string;
+      scope: string;
+      requestIncreaseUrl?: string | null;
+      adminEmail?: string | null;
+    };
+
 export type PersonalContext = {
   ready: boolean;
   email: string;
@@ -43,6 +60,7 @@ export type PersonalContext = {
   routingPolicyName: string | null;
   switcher: WorkspaceSwitcherProps;
   summary: PersonalSummary;
+  budget: PersonalBudgetState;
   spendByDay: Array<{ day: string; usd: number }>;
   spendByTool: Array<{ tool: string; usd: number }>;
   recentActivity: PersonalRecentActivityRow[];
@@ -91,6 +109,28 @@ export function usePersonalContext(): PersonalContext {
     { enabled: !!organization, refetchOnWindowFocus: false },
   );
 
+  const personalBudgetQuery = api.user.personalBudget.useQuery(
+    { organizationId: orgId },
+    { enabled: !!organization, refetchOnWindowFocus: false },
+  );
+
+  // tRPC serializes Prisma Decimal fields as strings — coerce at the
+  // hook boundary so downstream UI (BudgetExceededBanner, /me dashboard)
+  // can use number arithmetic without re-coercing in every consumer.
+  const budget = useMemo<PersonalBudgetState>(() => {
+    const raw = personalBudgetQuery.data;
+    if (!raw || raw.status === "ok") return { status: "ok" };
+    return {
+      status: raw.status,
+      spentUsd: Number(raw.spentUsd),
+      limitUsd: Number(raw.limitUsd),
+      period: raw.period,
+      scope: raw.scope,
+      requestIncreaseUrl: raw.requestIncreaseUrl ?? null,
+      adminEmail: raw.adminEmail ?? null,
+    };
+  }, [personalBudgetQuery.data]);
+
   const apiKeys = useMemo<PersonalApiKeyRow[]>(() => {
     const rows = personalKeysQuery.data;
     if (!rows) return [];
@@ -124,15 +164,13 @@ export function usePersonalContext(): PersonalContext {
     switcher,
     summary: {
       spentThisMonthUsd: personalUsageQuery.data?.summary.spentUsd ?? 0,
-      // Per-user budget enforcement isn't shipped yet — admin can attach
-      // a GatewayBudget at user scope but the wire-up to surface the cap
-      // here is a follow-up. Renders an empty-state card until then.
-      budgetUsd: null,
+      budgetUsd: budget.status === "ok" ? null : budget.limitUsd,
       requestsThisMonth: personalUsageQuery.data?.summary.requests ?? 0,
       // Month-over-month delta requires a second window query; defer.
       requestsDeltaPctVsLastMonth: null,
       mostUsedModel: personalUsageQuery.data?.summary.mostUsedModel ?? null,
     },
+    budget,
     spendByDay:
       personalUsageQuery.data?.dailyBuckets.map((bucket) => ({
         day: bucket.day,

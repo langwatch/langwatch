@@ -26,18 +26,15 @@ export default function MyUsagePage() {
   const ctx = usePersonalContext();
   const {
     summary,
+    budget,
     spendByDay,
     spendByTool,
     recentActivity,
     organizationName,
   } = ctx;
 
-  const isOverBudget =
-    summary.budgetUsd !== null && summary.spentThisMonthUsd >= summary.budgetUsd;
-  const is80Pct =
-    !isOverBudget &&
-    summary.budgetUsd !== null &&
-    summary.spentThisMonthUsd / summary.budgetUsd >= 0.8;
+  const isOverBudget = budget.status === "exceeded";
+  const is80Pct = budget.status === "warning";
 
   const maxDay = Math.max(...spendByDay.map((d) => d.usd), 0.01);
   const maxTool = Math.max(...spendByTool.map((t) => t.usd), 0.01);
@@ -61,19 +58,21 @@ export default function MyUsagePage() {
           <Spacer />
         </HStack>
 
-        {isOverBudget && (
+        {budget.status === "exceeded" && (
           <BudgetExceededBanner
-            spentUsd={summary.spentThisMonthUsd}
-            limitUsd={summary.budgetUsd ?? 0}
-            period="monthly"
-            scope="user"
+            spentUsd={budget.spentUsd}
+            limitUsd={budget.limitUsd}
+            period={budget.period}
+            scope={budget.scope}
+            requestIncreaseUrl={budget.requestIncreaseUrl}
+            adminEmail={budget.adminEmail}
           />
         )}
-        {is80Pct && (
+        {budget.status === "warning" && (
           <BudgetBanner
             tone="yellow"
             title="Approaching budget"
-            message={`You've used ${Math.round((summary.spentThisMonthUsd / (summary.budgetUsd ?? 1)) * 100)}% of your monthly budget.`}
+            message={`You've used ${Math.round((budget.spentUsd / budget.limitUsd) * 100)}% of your ${budget.period} ${budget.scope} budget.`}
           />
         )}
 
