@@ -26,7 +26,9 @@ const initCommand = async (): Promise<void> => {
   return initCommandImpl();
 };
 
-const loginCommand = async (options?: { apiKey?: string }): Promise<void> => {
+const loginCommand = async (
+  options?: { apiKey?: string; device?: boolean; browser?: string },
+): Promise<void> => {
   const { loginCommand: loginCommandImpl } = await import("./commands/login.js");
   return loginCommandImpl(options);
 };
@@ -125,9 +127,11 @@ program
 // Top-level commands
 program
   .command("login")
-  .description("Login to LangWatch and save API key. Get a key from https://app.langwatch.ai/authorize (or ${LANGWATCH_ENDPOINT}/authorize for self-hosted).")
+  .description("Login to LangWatch. By default, prompts for an API key (or pass --api-key for CI). Use --device to authenticate via your company SSO and provision a personal AI Gateway virtual key.")
   .option("--api-key <key>", "Set API key non-interactively (for CI/CD and agents)")
-  .action(async (options: { apiKey?: string }) => {
+  .option("--device", "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI")
+  .option("--browser <name>", "browser to open for device-flow approval (chrome|chromium|firefox|safari|none|<path>)")
+  .action(async (options: { apiKey?: string; device?: boolean; browser?: string }) => {
     try {
       await loginCommand(options);
     } catch (error) {
