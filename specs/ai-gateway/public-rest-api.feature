@@ -321,7 +321,7 @@ Feature: Public REST API — /api/gateway/v1/*
     Given API token "sess_abc" maps to user "alice@example.com"
     When I send `POST /api/gateway/v1/virtual-keys` to create a key
     Then an AuditLog entry is written with `userId` = alice's id
-    And `action` = "VIRTUAL_KEY_CREATED"
+    And `action` = "gateway.virtual_key.created"
     And `targetKind` = "virtual_key"
     And the audit entry is visible at /settings/audit-log under organization admin
 

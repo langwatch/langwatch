@@ -193,7 +193,7 @@ Feature: AI Gateway — Virtual Keys
     And I confirm the rotation
     Then a new secret "lw_vk_live_01HZX9K3MB…" is generated and shown once
     And the previous secret stays valid for 24 hours (grace window) so clients can roll over
-    And an audit log entry "VIRTUAL_KEY_ROTATED" is recorded
+    And an audit log entry "gateway.virtual_key.rotated" is recorded
 
   @integration
   Scenario: Rotate secret-reveal dialog surfaces the 24h grace window

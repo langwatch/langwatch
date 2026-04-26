@@ -77,7 +77,7 @@ Debits carry the VK's `organization_id` as a filter predicate on every Postgres 
 Every write through the REST API or the UI emits a row in the platform-wide `AuditLog` (gateway shape):
 
 - `userId` — the resolved actor user (session, PAT, or API token mapped to a user).
-- `action` — string code: `VIRTUAL_KEY_CREATED`, `VIRTUAL_KEY_ROTATED`, `BUDGET_DELETED`, `PROVIDER_BINDING_UPDATED`, etc.
+- `action` — dotted-lowercase string code: `gateway.virtual_key.created`, `gateway.virtual_key.rotated`, `gateway.budget.deleted`, `gateway.provider_binding.updated`, etc. (See [Audit log → What's logged](/ai-gateway/audit#whats-logged) for the full mapping.)
 - `targetKind` / `targetId` — resource kind + id the action affected.
 - `before` / `after` — JSON diff on update actions.
 

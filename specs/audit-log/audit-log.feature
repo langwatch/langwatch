@@ -13,7 +13,7 @@ Feature: Unified Audit Log
       * `userId`            — actor user (nullable for system actions)
       * `organizationId`    — for org-scoped queries / RBAC fence
       * `projectId`         — for project-scoped queries (nullable for org-level events)
-      * `action`            — string code, e.g. "VIRTUAL_KEY_CREATED" or "PROJECT_INVITATION_SENT"
+      * `action`            — dotted-lowercase string code, e.g. "gateway.virtual_key.created" (gateway shape) or "project.invitation.sent" / "organization.member.add" (platform shape). Gateway codes share the `gateway.` prefix so a single `LIKE 'gateway.%'` clause filters the full gateway surface.
       * `targetKind`        — string, e.g. "virtual_key" / "budget" / "cache_rule" / "provider_binding" / null
       * `targetId`          — string, the affected resource id (nullable)
       * `before` / `after`  — JSON snapshots for governance diffs (nullable for non-governance events)
@@ -33,7 +33,7 @@ Feature: Unified Audit Log
     Then exactly one AuditLog row is written
     And the row has:
       | field          | value                          |
-      | action         | VIRTUAL_KEY_CREATED            |
+      | action         | gateway.virtual_key.created    |
       | targetKind     | virtual_key                    |
       | userId         | <alice id>                     |
       | organizationId | <acme org id>                  |
@@ -46,7 +46,7 @@ Feature: Unified Audit Log
   Scenario: Virtual Key update captures before/after diff
     Given Virtual Key "prod-key" with status "active" and rate-limit "100/m"
     When alice changes the rate-limit to "500/m"
-    Then a single AuditLog row is written with action "VIRTUAL_KEY_UPDATED"
+    Then a single AuditLog row is written with action "gateway.virtual_key.updated"
     And `before.rateLimit` equals "100/m"
     And `after.rateLimit` equals "500/m"
 
@@ -54,18 +54,18 @@ Feature: Unified Audit Log
   Scenario: Budget mutation writes targetKind=budget
     Given budget "demo-month" of $500/MONTH on project "demo"
     When alice updates the limit to $1000
-    Then an AuditLog row is written with action "BUDGET_UPDATED" and targetKind "budget"
+    Then an AuditLog row is written with action "gateway.budget.updated" and targetKind "budget"
     And `before.limitUsd` is "500" and `after.limitUsd` is "1000"
 
   @integration
   Scenario: Provider binding mutation writes targetKind=provider_binding
     When alice attaches an OpenAI provider binding to Virtual Key "prod-key"
-    Then an AuditLog row is written with action "PROVIDER_BINDING_CREATED" and targetKind "provider_binding"
+    Then an AuditLog row is written with action "gateway.provider_binding.created" and targetKind "provider_binding"
 
   @integration
   Scenario: Cache rule mutation writes targetKind=cache_rule
     When alice creates a cache rule "long-context-anthropic" matching anthropic models
-    Then an AuditLog row is written with action "CACHE_RULE_CREATED" and targetKind "cache_rule"
+    Then an AuditLog row is written with action "gateway.cache_rule.created" and targetKind "cache_rule"
 
   # ──────────────────────────────────────────────────────────────────────────
   # Read path — /settings/audit-log shows merged stream
@@ -74,10 +74,10 @@ Feature: Unified Audit Log
   @integration
   Scenario: Settings audit page lists gateway and platform events together
     Given organization "acme" has these audit rows in order:
-      | created_at  | action                | targetKind   | source   |
-      | 09:00       | PROJECT_INVITATION_SENT | null       | platform |
-      | 09:30       | VIRTUAL_KEY_CREATED     | virtual_key | gateway  |
-      | 10:00       | BUDGET_UPDATED          | budget      | gateway  |
+      | created_at  | action                       | targetKind   | source   |
+      | 09:00       | project.invitation.sent      | null         | platform |
+      | 09:30       | gateway.virtual_key.created  | virtual_key  | gateway  |
+      | 10:00       | gateway.budget.updated       | budget       | gateway  |
     When alice visits `/settings/audit-log`
     Then the table renders all 3 rows in DESC order by created_at
     And each row shows a Source badge: gateway = purple, platform = grey

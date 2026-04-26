@@ -12,14 +12,16 @@ Every gateway-resource mutation (Virtual Key, Budget, Provider Binding, Cache Ru
 
 Action codes for gateway mutations (TypeScript `const` union in `langwatch/src/server/gateway/auditLog.repository.ts`):
 
+Action codes use a `gateway.<resource>.<verb>` dotted-lowercase shape, parallel to platform-side codes (`organization.member.add`, `project.update`). Verbs are past-tense to match Stripe / GitHub / Slack / Datadog audit conventions.
+
 | Action code | Actor | Target |
 |---|---|---|
-| `VIRTUAL_KEY_{CREATED, UPDATED, ROTATED, REVOKED, DELETED}` | resolved user (session, PAT, or API token mapped to a user) | `targetKind=virtual_key` / `targetId=<vk_id>` |
-| `BUDGET_{CREATED, UPDATED, DELETED}` | same | `targetKind=budget` / `targetId=<budget_id>` (DELETED is the soft-archive) |
-| `PROVIDER_BINDING_{CREATED, UPDATED, DELETED}` | same | `targetKind=provider_binding` / `targetId=<binding_id>` |
-| `CACHE_RULE_{CREATED, UPDATED, DELETED}` | same | `targetKind=cache_rule` / `targetId=<rule_id>` |
+| `gateway.virtual_key.{created, updated, rotated, revoked, deleted}` | resolved user (session, PAT, or API token mapped to a user) | `targetKind=virtual_key` / `targetId=<vk_id>` |
+| `gateway.budget.{created, updated, deleted}` | same | `targetKind=budget` / `targetId=<budget_id>` (`deleted` is the soft-archive) |
+| `gateway.provider_binding.{created, updated, deleted}` | same | `targetKind=provider_binding` / `targetId=<binding_id>` |
+| `gateway.cache_rule.{created, updated, deleted}` | same | `targetKind=cache_rule` / `targetId=<rule_id>` |
 
-<Info>Guardrail attach/detach events are NOT recorded as standalone audit rows — guardrail configuration changes flow through `VIRTUAL_KEY_UPDATED` (the guardrail list is a field on `VirtualKey.config`). Standalone `GUARDRAIL_ATTACHED / DETACHED` actions are a v1.1 follow-up if operators want finer-grained audit.</Info>
+<Info>Guardrail attach/detach events are NOT recorded as standalone audit rows — guardrail configuration changes flow through `gateway.virtual_key.updated` (the guardrail list is a field on `VirtualKey.config`). Standalone `gateway.guardrail.{attached, detached}` actions are a v1.1 follow-up if operators want finer-grained audit.</Info>
 
 Reads are **not** logged — the volume would swamp the ledger without adding governance value. If you need read-access attribution for compliance, use OTel trace logs (every request has `langwatch.principal_id`).
 
@@ -28,7 +30,7 @@ Reads are **not** logged — the volume would swamp the ledger without adding go
 Go to **/settings/audit-log** (Enterprise plan, gated on `auditLog:view` — granted by default to all four TeamUser roles incl. CUSTOM) and use the filters to narrow:
 
 1. **Source badge** — purple "Gateway" / grey "Platform" on every row.
-2. **Filter by action** — `VIRTUAL_KEY_CREATED`, `VIRTUAL_KEY_ROTATED`, etc. for gateway rows; tRPC paths like `project.update` for platform rows.
+2. **Filter by action** — `gateway.virtual_key.created`, `gateway.virtual_key.rotated`, etc. for gateway rows; platform rows use the same dotted style (e.g. `organization.member.add`, `project.update`). All gateway codes share the `gateway.` prefix so a single `LIKE 'gateway.%'` clause filters the entire gateway surface for SIEM exports.
 3. **Filter by Target** — `virtual_key` / `budget` / `provider_binding` / `cache_rule`. Selecting any value implicitly hides platform rows (which have null targetKind).
 4. **Expand with changed-fields diff summary** — UPDATE rows expand to show a compact top-level diff (e.g. `priority 200 → 300`, `action.ttl 300 → 600` as red/green code badges) above the raw Before/After JSON panels.
 5. **CREATE/DELETE events show the full field list** — since those events have a null Before (or null After), the diff summary renders the relevant half as a field list instead of leaving the panel blank for the most common audit event class.
