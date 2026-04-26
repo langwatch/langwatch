@@ -20,7 +20,7 @@ import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "~/server/db";
-import { getApp } from "~/server/app-layer/app";
+import { PrismaOrganizationRepository } from "~/server/app-layer/organizations/repositories/organization.prisma.repository";
 import {
   startTestContainers,
   stopTestContainers,
@@ -33,7 +33,15 @@ const TEAM_ID = `team-audit-${suffix}`;
 const PROJECT_ID = `proj-audit-${suffix}`;
 const ACTOR_USER_ID = `usr-audit-${suffix}`;
 
+// VK creation hashes secrets with HMAC(LW_VIRTUAL_KEY_PEPPER, vk_secret).
+// In CI the env isn't pre-populated for integration tests; set a deterministic
+// fixture value before the suite starts so VirtualKeyService.create works.
+process.env.LW_VIRTUAL_KEY_PEPPER ??=
+  "0000000000000000000000000000000000000000000000000000000000000000";
+
 describe("AuditLog consolidation — gateway writes land in platform AuditLog", () => {
+  const organizations = new PrismaOrganizationRepository(prisma);
+
   beforeAll(async () => {
     await startTestContainers();
 
@@ -140,7 +148,7 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
 
   describe("when getAuditLogs is queried for the org", () => {
     it("returns gateway rows with source='gateway'", async () => {
-      const result = await getApp().organizations.getAuditLogs({
+      const result = await organizations.getAuditLogs({
         organizationId: ORG_ID,
         pageOffset: 0,
         pageSize: 25,
@@ -157,7 +165,7 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
     });
 
     it("filters to gateway-only when targetKind is set (deep-link path)", async () => {
-      const result = await getApp().organizations.getAuditLogs({
+      const result = await organizations.getAuditLogs({
         organizationId: ORG_ID,
         pageOffset: 0,
         pageSize: 25,
@@ -186,7 +194,7 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
       expect(recent).not.toBeNull();
       const targetId = recent!.targetId!;
 
-      const result = await getApp().organizations.getAuditLogs({
+      const result = await organizations.getAuditLogs({
         organizationId: ORG_ID,
         pageOffset: 0,
         pageSize: 25,
