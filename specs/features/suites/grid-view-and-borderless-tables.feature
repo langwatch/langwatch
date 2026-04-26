@@ -13,25 +13,6 @@ Feature: Scenario result grid view and full-width borderless run history
   # --- List/Grid View Toggle ---
 
   @integration @unimplemented
-  Scenario: Filter bar shows a list/grid view toggle on suite detail
-    Given a suite has run history
-    When I view the suite detail panel
-    Then a list/grid view toggle is visible in the filter bar
-    And the default view is grid
-
-  @integration @unimplemented
-  Scenario: Filter bar shows a list/grid view toggle on all runs
-    Given multiple suites have run history
-    When I view the all runs panel
-    Then a list/grid view toggle is visible in the filter bar
-
-  @integration @unimplemented
-  Scenario: Switching to grid view shows scenario results as cards
-    Given a run row is expanded to show scenario results
-    When I select the grid view toggle
-    Then scenario results display as cards in a responsive grid
-
-  @integration @unimplemented
   Scenario: Switching to list view shows scenario results as rows
     Given a run row is expanded to show scenario results
     When I select the list view toggle
@@ -50,48 +31,6 @@ Feature: Scenario result grid view and full-width borderless run history
     Then cards reflow to fewer columns
 
   # --- Run Rows Expanded by Default ---
-
-  @integration @unimplemented
-  Scenario: Run rows are expanded by default
-    Given a suite has run history
-    When I view the suite detail panel
-    Then all run rows are expanded showing their scenario results
-
-  @integration @unimplemented
-  Scenario: All runs panel rows are expanded by default
-    Given multiple suites have run history
-    When I view the all runs panel
-    Then all run rows are expanded showing their scenario results
-
-  # --- Card Content ---
-
-  @integration @unimplemented
-  Scenario: Grid card shows scenario name, target, and iteration
-    Given a run row is expanded in grid view
-    When I view a scenario result card
-    Then the card shows the scenario name
-    And the card shows the target name when available
-    And the card shows the iteration number when available
-
-  # --- Full-Width Borderless Tables ---
-
-  @integration @unimplemented
-  Scenario: Run history rows span the full container width
-    Given a suite has run history
-    When I view the suite detail panel
-    Then run history rows span the full container width
-
-  @integration @unimplemented
-  Scenario: Run history rows have no rounded corners
-    Given a suite has run history
-    When I view the suite detail panel
-    Then run history rows have no rounded corners
-
-  @integration @unimplemented
-  Scenario: Run row headers are sticky when scrolling
-    Given a run row is expanded with many scenario results
-    When I scroll down through the results
-    Then the run row header remains visible at the top
 
   @integration @unimplemented
   Scenario: Expanded scenario rows span the full container width

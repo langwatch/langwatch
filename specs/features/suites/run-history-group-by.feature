@@ -27,14 +27,6 @@ Feature: Suite run history group-by selector
 
   # UI elements: selector exists with correct options
   @integration @unimplemented
-  Scenario: Group-by selector renders with correct options
-    When the run history list renders
-    Then I see a group-by selector in the top-right of the filter bar
-    And the selector has options "None", "Scenario", and "Target"
-    And "None" is selected by default
-
-  # Grouping by scenario shows scenario name headers with pass rate and counts
-  @integration @unimplemented
   Scenario: Grouping by scenario re-groups results under scenario headers
     Given run data with multiple scenarios across multiple batch runs
     When I select "Scenario" from the group-by selector

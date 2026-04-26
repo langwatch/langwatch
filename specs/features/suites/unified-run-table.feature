@@ -34,39 +34,6 @@ Feature: Unified run table merging queued jobs and completed runs
 
   # Service layer: merge and deduplicate from both data sources
   @integration @unimplemented
-  Scenario: Service merges BullMQ jobs and ES scenario events into a unified list
-    Given BullMQ has waiting and active jobs for a batch run
-    And ES has completed scenario events for the same batch run
-    When the service fetches the unified run list
-    Then the result contains rows for both queued jobs and completed runs
-    And no duplicate rows exist for the same scenario run
-
-  # Deduplication: ES wins when both sources have data for the same scenario+target+batch
-  @integration @unimplemented
-  Scenario: ES data takes precedence over BullMQ job data
-    Given a job exists in BullMQ as active for a scenario and target
-    And an ES event exists for the same scenario, target, and batch run
-    When the service merges both data sources
-    Then only the ES-sourced row is returned for that scenario execution
-
-  # Edge case: no queued jobs returns only ES data
-  @integration @unimplemented
-  Scenario: Returns only ES data when no jobs are queued
-    Given BullMQ has no waiting or active jobs for the suite
-    And ES has completed scenario events
-    When the service fetches the unified run list
-    Then only ES-sourced rows are returned
-
-  # Edge case: no ES data returns only queued job rows
-  @integration @unimplemented
-  Scenario: Returns only queued rows when no ES events exist yet
-    Given BullMQ has waiting jobs for a batch run
-    And ES has no scenario events for that batch run
-    When the service fetches the unified run list
-    Then only queued job rows are returned
-
-  # All Runs view works with unified data
-  @integration @unimplemented
   Scenario: All Runs view includes queued jobs across suites
     Given multiple suites have pending jobs in BullMQ
     And completed runs exist in ES across suites
@@ -101,15 +68,6 @@ Feature: Unified run table merging queued jobs and completed runs
       | active       | running    |
 
   # Service layer: deduplication logic
-  @unit @unimplemented
-  Scenario: Deduplication removes BullMQ entries that have matching ES entries
-    Given a list of job rows and a list of ES rows
-    And some entries share the same scenario, target, and batch run
-    When deduplication runs
-    Then overlapping entries use the ES version
-    And non-overlapping entries from both sources are preserved
-
-  # Frontend: queued/running status rendering
   @integration @unimplemented
   Scenario: Queued rows render with a pending visual treatment
     Given the run table contains rows with "queued" status
@@ -118,9 +76,3 @@ Feature: Unified run table merging queued jobs and completed runs
     And queued rows do not show a pass/fail badge
 
   # Frontend: QueueStatusBanner is no longer needed
-  @integration @unimplemented
-  Scenario: No separate pending banner is displayed
-    Given a suite run is in progress with queued jobs
-    When I view the suite detail page
-    Then no separate pending jobs banner is visible
-    And all pending jobs are visible as rows in the run table

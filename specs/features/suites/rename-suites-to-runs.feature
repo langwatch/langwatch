@@ -24,16 +24,6 @@ Feature: Rename Suites to Run Plans and Simulation Runs to Run History in UI
     Then the page heading reads "Run Plans"
 
   @unit @unimplemented
-  Scenario: Route title is "Run Plans"
-    When the suites route configuration is read
-    Then its title property is "Run Plans"
-
-  @unit @unimplemented
-  Scenario: Feature icon label for suites is "Run Plans"
-    When the suites feature icon configuration is read
-    Then its label property is "Run Plans"
-
-  @unit @unimplemented
   Scenario: Route title for simulation runs is "Run History"
     When the simulation runs route configuration is read
     Then its title property is "Run History"
@@ -44,24 +34,6 @@ Feature: Rename Suites to Run Plans and Simulation Runs to Run History in UI
     Then its label property is "Run History"
 
   # --- Create / Edit Forms ---
-
-  @integration @unimplemented
-  Scenario: Form drawer title reads "New Run Plan" for creation
-    When the user opens the form to create a new run plan
-    Then the drawer title reads "New Run Plan"
-
-  @integration @unimplemented
-  Scenario: Form drawer title reads "Edit Run Plan" for editing
-    Given a run plan already exists
-    When the user opens the form to edit that run plan
-    Then the drawer title reads "Edit Run Plan"
-
-  @integration @unimplemented
-  Scenario: Form placeholder uses "Run Plan" terminology
-    When the user opens the form to create a new run plan
-    Then the name field placeholder reads "e.g., Critical Path Run Plan"
-
-  # --- Toast Messages ---
 
   @integration @unimplemented
   Scenario: Success toast after creating a run plan
@@ -86,35 +58,10 @@ Feature: Rename Suites to Run Plans and Simulation Runs to Run History in UI
   # --- Dialogs & Empty States ---
 
   @integration @unimplemented
-  Scenario: Archive confirmation dialog uses "run plan"
-    When the user initiates archiving a run plan
-    Then the confirmation dialog title reads "Archive run plan?"
-    And the dialog body mentions "archived run plans"
-
-  @integration @unimplemented
-  Scenario: Empty state when no run plans exist
-    Given no run plans exist in the project
-    When the user views the run plans sidebar
-    Then the empty state reads "No run plans yet"
-
-  @integration @unimplemented
-  Scenario: Empty state when search has no matches
-    Given run plans exist but none match the search query
-    When the user searches in the run plans sidebar
-    Then the empty state reads "No matching run plans"
-
-  @integration @unimplemented
   Scenario: Detail panel empty state
     When no run plan is selected
     Then the detail panel reads "No run plan selected"
     And shows a prompt to "Select a run plan from the sidebar"
-
-  @integration @unimplemented
-  Scenario: Detail panel empty state button
-    When no run plan is selected
-    Then the detail panel shows a "New Run Plan" button
-
-  # --- Header Button ---
 
   @integration @unimplemented
   Scenario: Page header button reads "New Run Plan"

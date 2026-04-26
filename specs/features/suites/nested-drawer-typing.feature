@@ -7,14 +7,6 @@ Feature: Nested drawer typing
     Given I am on the suites page with a project
 
   # Full user workflow: open suite editor, open child drawer, type in it
-  @e2e @unimplemented
-  Scenario: User types in a nested drawer opened from the suite editor
-    Given the suite editor drawer is open
-    When I open the scenario editor from the suite editor
-    And I type "My new scenario" into the name field
-    Then the name field contains "My new scenario"
-
-  # Verify focus is correctly transferred when navigating between drawers
   @integration @unimplemented
   Scenario: Focus moves to the nested drawer when it opens
     Given the suite editor drawer is open

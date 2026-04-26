@@ -31,21 +31,8 @@ Feature: Time filter for suite runs
     Then pagination resets to the first page
     And only the first page of filtered results is shown
 
-  @unit @unimplemented
-  Scenario: Selected date range limits displayed run data
-    Given a date range is selected
-    When run data is requested
-    Then only runs within the selected date range are shown
-    And runs outside the selected date range are not shown
-
   @integration @unimplemented
   Scenario: Batch runs are included or excluded atomically
     Given a batch run with individual runs spanning a time boundary
     When the time filter range excludes the batch's earliest runs but includes the latest
     Then the entire batch is shown
-
-  @unit @unimplemented
-  Scenario: Default time range is applied on initial load
-    Given no time range has been selected
-    When the suites page loads
-    Then the time filter defaults to the last 30 days

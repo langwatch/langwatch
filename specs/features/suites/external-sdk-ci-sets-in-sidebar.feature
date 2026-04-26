@@ -10,47 +10,12 @@ Feature: External SDK/CI sets in suites sidebar
   # Happy path - external sets appear and are navigable
 
   @e2e @unimplemented
-  Scenario: External sets section appears with SDK-submitted scenario runs
-    Given an SDK client has submitted scenario runs with scenarioSetId "nightly-regression"
-    And "nightly-regression" is not associated with any platform suite
-    When I view the suites sidebar
-    Then I see an "External Sets" section below the Suites section
-    And "nightly-regression" appears in the External Sets section
-
-  @e2e @unimplemented
   Scenario: Clicking an external set opens the batch view
     Given an SDK client has submitted scenario runs with scenarioSetId "nightly-regression"
     When I click "nightly-regression" in the External Sets section
     Then the batch view loads showing all scenario runs for "nightly-regression"
 
   # Display and status summary
-
-  @integration @unimplemented
-  Scenario: External set entry shows pass rate and recency
-    Given scenarioSetId "ci-smoke-tests" last ran 1 hour ago with 15/20 passing
-    And "ci-smoke-tests" is not associated with any platform suite
-    When I view the suites sidebar
-    Then "ci-smoke-tests" shows "15/20 passed" and recency in the External Sets section
-
-  @integration @unimplemented
-  Scenario Outline: External set shows correct status indicator
-    Given scenarioSetId "ci-smoke-tests" last ran 30 minutes ago with <passed>/<total> passing
-    And "ci-smoke-tests" is not associated with any platform suite
-    When I view the suites sidebar
-    Then "ci-smoke-tests" shows <icon> icon with "<passed>/<total> passed" and recency
-
-    Examples:
-      | passed | total | icon      |
-      | 10     | 10    | checkmark |
-      | 7      | 10    | error     |
-
-  @integration @unimplemented
-  Scenario: External set uses scenarioSetId as its display name
-    Given an SDK client has submitted scenario runs with scenarioSetId "my-custom-set-name"
-    When I view the suites sidebar
-    Then the entry displays "my-custom-set-name" as its name with no alias
-
-  # Read-only behavior
 
   @integration @unimplemented
   Scenario: External set batch view is read-only
@@ -78,14 +43,6 @@ Feature: External SDK/CI sets in suites sidebar
     Then neither the Suites section nor the External Sets section is visible
 
   # Empty state
-
-  @integration @unimplemented
-  Scenario: External Sets section is hidden when no external sets exist
-    Given no scenario runs have been submitted with an unlinked scenarioSetId
-    When I view the suites sidebar
-    Then the "External Sets" section is not visible
-
-  # Exclusion of platform-linked sets
 
   @integration @unimplemented
   Scenario: Sets associated with a platform suite do not appear in External Sets
