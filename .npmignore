@@ -50,3 +50,11 @@ langwatch/ee/
 **/.env
 **/.env.local
 **/.env.*.local
+
+# License-swap source. /LICENSE-NPM.txt holds the Apache-2.0 text that
+# scripts/pack-npm.sh swaps into /LICENSE.md (the file npm auto-includes)
+# at pack time — the source itself doesn't belong in the tarball. The
+# backup of the original BSL /LICENSE.md is staged in /tmp by mktemp,
+# never at repo root, because npm has a hardcoded auto-include rule for
+# any LICENSE-shaped filename that ignores .npmignore.
+LICENSE-NPM.txt

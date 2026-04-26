@@ -128,11 +128,15 @@ jobs:
         env:
           NODE_ENV: production
 
-      - name: Pack the npm tarball
+      - name: Pack the npm tarball (with Apache-2.0 LICENSE swapped in)
         id: pack
+        # scripts/pack-npm.sh swaps /LICENSE.md (BSL — for GitHub repo
+        # display) with /LICENSE-NPM.txt (Apache-2.0 — for the npm tarball)
+        # for the duration of `pnpm pack`, then restores. See the script
+        # for details.
         run: |
           mkdir -p _pack
-          pnpm pack --pack-destination "$GITHUB_WORKSPACE/_pack"
+          bash scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
           tarball="$(ls "$GITHUB_WORKSPACE/_pack"/langwatch-server-*.tgz | head -n1)"
           echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
           echo "tarball size:"; ls -lh "$tarball"
@@ -176,6 +180,24 @@ jobs:
           if [ "$size_bytes" -gt $((300 * 1024 * 1024)) ]; then
             echo "✗ tarball too large (>300 MB)"; exit 1
           fi
+
+          # The license swap should have produced an Apache-2.0 LICENSE in
+          # the tarball, NOT the BSL one. Catch a regression where someone
+          # bypasses scripts/pack-npm.sh and runs pnpm pack directly.
+          extract_dir="$(mktemp -d)"
+          tar -xzf "$tarball" -C "$extract_dir" package/LICENSE.md
+          if grep -q "Apache License" "$extract_dir/package/LICENSE.md"; then
+            echo "✓ tarball ships Apache-2.0 LICENSE.md"
+          elif grep -q "Business Source License" "$extract_dir/package/LICENSE.md"; then
+            echo "✗ tarball ships BSL LICENSE.md — license swap was not applied"
+            echo "  (use scripts/pack-npm.sh, not pnpm pack directly)"
+            exit 1
+          else
+            echo "✗ tarball LICENSE.md is unrecognized — neither Apache-2.0 nor BSL"
+            head -5 "$extract_dir/package/LICENSE.md"
+            exit 1
+          fi
+          rm -rf "$extract_dir"
 
       - name: Publish to npm with provenance
         env:
