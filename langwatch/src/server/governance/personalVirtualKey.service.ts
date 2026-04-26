@@ -39,6 +39,13 @@ export interface IssuedPersonalVk {
   baseUrl: string;
   /** Routing policy the VK was issued against (if any). */
   routingPolicyId: string | null;
+  /**
+   * Convenience aliases for the `personal_vk` payload returned via
+   * /api/auth/cli/exchange + helper scripts (the wire shape uses
+   * `id` + `label`, not `virtualKey.id` / `virtualKey.name`).
+   */
+  id: string;
+  label: string;
 }
 
 export class PersonalVirtualKeyService {
@@ -152,16 +159,19 @@ export class PersonalVirtualKeyService {
             personalTeamId,
           });
 
-    // For personal VKs we don't require an explicit fallback chain —
-    // the routing policy carries it. If no policy resolves we still
-    // create a "bare" VK without provider credentials; the gateway
-    // will reject calls until the admin configures a policy.
+    // Personal VKs delegate provider-chain resolution to the routing
+    // policy at request time — no embedded VirtualKeyProviderCredential
+    // rows. VirtualKeyService.create accepts an empty
+    // providerCredentialIds list iff `routingPolicyId` is set, and
+    // skips the per-project ownership assertion in that case (policies
+    // are org-scoped and may reference credentials living in other
+    // projects of the same org).
     //
-    // (The alternative — refusing to create — is hostile UX in the
-    // common "first user in the org, no admin config yet" case. We
-    // create the VK and surface the empty-policy state in the UI.)
-    const providerCredentialIds: string[] = [];
-
+    // If no policy resolves we still create a "bare" VK; the gateway
+    // dispatcher will reject calls against it with a clear error
+    // until the admin configures a default policy. The alternative
+    // (refusing to create) is hostile UX for the common "first user
+    // in the org, no admin config yet" case.
     const vkService = VirtualKeyService.create(this.prisma);
     const { virtualKey, secret } = await vkService.create({
       projectId: personalProjectId,
@@ -171,26 +181,17 @@ export class PersonalVirtualKeyService {
       environment: "live",
       principalUserId: userId,
       actorUserId: userId,
-      providerCredentialIds,
+      providerCredentialIds: [],
+      routingPolicyId: policy?.id ?? null,
     });
-
-    // Bind the routing policy (one extra UPDATE — kept out of the
-    // main create flow because routingPolicyId isn't part of the
-    // CreateVirtualKeyInput contract; that's still owned by the
-    // gateway-platform service which we don't want to touch this
-    // iteration).
-    if (policy) {
-      await this.prisma.virtualKey.update({
-        where: { id: virtualKey.id },
-        data: { routingPolicyId: policy.id },
-      });
-    }
 
     return {
       virtualKey,
       secret,
       baseUrl: this.gatewayBaseUrl,
       routingPolicyId: policy?.id ?? null,
+      id: virtualKey.id,
+      label: virtualKey.name,
     };
   }
 

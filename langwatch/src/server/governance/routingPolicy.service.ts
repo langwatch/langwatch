@@ -70,6 +70,14 @@ export class RoutingPolicyService {
   }
 
   async create(input: CreateRoutingPolicyInput): Promise<RoutingPolicy> {
+    // TODO(must-fix-before-PR, sergey/andre 2026-04-26): validate that
+    // every id in input.providerCredentialIds belongs to a project in
+    // input.organizationId. Without this, a caller with policy-write
+    // permission could reference credentials from another org's
+    // project and the chain would resolve at gateway-dispatch time
+    // (VirtualKeyService.create only checks the policy's org, not the
+    // policy's chain — by design, since chain validation is owned
+    // here). Track in #langwatch-ai-gateway kanban.
     return await this.prisma.$transaction(async (tx) => {
       // If isDefault was requested, atomically clear the existing default
       // for this scope tier first so the partial unique idx never trips.
@@ -106,6 +114,9 @@ export class RoutingPolicyService {
   }
 
   async update(input: UpdateRoutingPolicyInput): Promise<RoutingPolicy> {
+    // TODO(must-fix-before-PR, sergey/andre 2026-04-26): same gap as
+    // create() — providerCredentialIds (when supplied) must be
+    // validated against input.organizationId before write.
     const existing = await this.requireOwn(input.id, input.organizationId);
 
     const data: Prisma.RoutingPolicyUpdateInput = {
