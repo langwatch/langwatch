@@ -33,6 +33,16 @@ type Options struct {
 // server can't pin a runtime worker by streaming gigabytes.
 const defaultMaxResponseBytes int64 = 4 * 1024 * 1024
 
+// DefaultTimeout is the per-request HTTP node timeout when the
+// caller doesn't override it. Mirrors langwatch_nlp regression
+// 06f93d1eb ("increase HTTP agent default timeout to 5 minutes"):
+// HTTP agents with slow backends (e.g. RAG retrieval, multi-step
+// scrapers) routinely exceed the previous 30s default. The Python
+// path bumped to 300s to accommodate them; the Go path matches.
+// Exposed as a constant so tests + integrators can observe the
+// default without reflecting on the executor's private fields.
+const DefaultTimeout = 5 * time.Minute
+
 // New builds an Executor with the given options.
 func New(opts Options) *Executor {
 	if opts.Client == nil {
@@ -44,7 +54,7 @@ func New(opts Options) *Executor {
 		opts.Client = &http.Client{Transport: transport}
 	}
 	if opts.DefaultTimeout == 0 {
-		opts.DefaultTimeout = 5 * time.Minute
+		opts.DefaultTimeout = DefaultTimeout
 	}
 	if opts.MaxResponseBytes <= 0 {
 		opts.MaxResponseBytes = defaultMaxResponseBytes

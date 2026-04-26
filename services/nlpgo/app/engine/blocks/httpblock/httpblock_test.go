@@ -350,3 +350,18 @@ func TestExecute_TruncatesResponseAtMaxBytes(t *testing.T) {
 	assert.Equal(t, 64, len(res.UpstreamBody),
 		"expected MaxResponseBytes to truncate at 64, got %d", len(res.UpstreamBody))
 }
+
+// TestDefaultTimeoutMatchesPythonParity pins langwatch_nlp regression
+// 06f93d1eb ("increase HTTP agent default timeout to 5 minutes"). The
+// Python path bumped from 30s to 300s after slow RAG retrieval +
+// multi-step scraper agents started timing out at the lower default.
+// Pinning the constant guards against an accidental drop back to a
+// shorter default (which would cause the same timeouts to resurface
+// silently in the Go path). Per-request `Timeout` overrides still win
+// — only the absent-value default is enforced here.
+func TestDefaultTimeoutMatchesPythonParity(t *testing.T) {
+	if httpblock.DefaultTimeout != 5*time.Minute {
+		t.Errorf("httpblock.DefaultTimeout = %s; want 5m to match langwatch_nlp parity (regression 06f93d1eb)",
+			httpblock.DefaultTimeout)
+	}
+}
