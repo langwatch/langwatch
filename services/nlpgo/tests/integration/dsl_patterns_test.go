@@ -56,6 +56,7 @@
 //   pattern_005_http_to_sig    — http block fetches data, signature uses it    ✅
 //   pattern_006_sigs_to_code   — 2× parallel signature → code aggregator       ✅
 //   pattern_007_multi_output   — signature with 2+ outputs → JSON parse+split  ✅
+//   pattern_010_custom_safety  — custom node kind → typed unsupported error    ✅
 //
 // See feedback memory entry "No customer names in public repo".
 
@@ -1016,4 +1017,58 @@ func TestPattern006_TwoSignaturesIntoCodeAggregator(t *testing.T) {
 		require.True(t, ok, "missing node %q", id)
 		assert.Equal(t, "success", node["status"], "node %q expected success", id)
 	}
+}
+
+// TestPattern010_CustomNodeFailsWithActionableError pins the contract
+// for retired/unsupported node kinds: the engine fails the run with a
+// clean error rather than silently producing nothing. This is what
+// makes a Studio workflow with a `custom` node *diagnosable* from the
+// UI on the FF-on path — operators see a specific instruction telling
+// them which kinds are allowed instead of a generic 500. Observed
+// customer data shows 4 `custom` instances still in the wild; this
+// test ensures the failure is loud + actionable.
+//
+// Same contract applies to retired `retriever`. The planner-level
+// rejection lives in planner_test.go; this test pins the end-to-end
+// HTTP surface (Studio JSON in → typed error out via /go/studio/execute_sync).
+func TestPattern010_CustomNodeFailsWithActionableError(t *testing.T) {
+	url, _ := setupPatternStack(t, &fakeLLMClient{}, func(http.ResponseWriter, *http.Request) {})
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-010",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"k","spec_version":"1.3",
+	      "name":"Pattern010","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"x","type":"str"}],
+	          "dataset":{"inline":{"records":{"x":["v"]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"legacy","type":"custom","data":{}},
+	        {"id":"end","type":"end","data":{}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"x","target":"legacy","targetHandle":"x","type":"default"},
+	        {"id":"e2","source":"legacy","sourceHandle":"y","target":"end","targetHandle":"y","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "error", res.Status, "custom node must surface as a clean engine error, not silent success")
+	require.NotNil(t, res.Error)
+	// Error message must be actionable — name the kind AND tell the
+	// operator what to replace it with (planner.unsupportedKindMessages
+	// supplies the hint).
+	assert.Contains(t, res.Error.Message, "custom",
+		"error message should name the offending node kind so operators know what to fix")
+	assert.Contains(t, res.Error.Message, "replace",
+		"error message should include the actionable hint about replacing the node")
 }
