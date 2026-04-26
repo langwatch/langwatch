@@ -24,6 +24,14 @@ import (
 //go:embed runner.py
 var runnerPySource []byte
 
+// fakeDspyPySource is the bundled `dspy` stand-in. The runner injects
+// it into sys.modules so user code that imports dspy resolves to this
+// minimal stub instead of the real (heavy) dspy package — see
+// fake_dspy.py header for the rationale and the surveyed surface.
+//
+//go:embed fake_dspy.py
+var fakeDspyPySource []byte
+
 // Options configures an Executor.
 type Options struct {
 	// Python is the interpreter binary. Default: "python3".
@@ -61,6 +69,14 @@ func New(opts Options) (*Executor, error) {
 		runnerPath = filepath.Join(dir, "runner.py")
 		if err := os.WriteFile(runnerPath, runnerPySource, 0o600); err != nil {
 			return nil, fmt.Errorf("codeblock: write runner: %w", err)
+		}
+		// runner.py imports fake_dspy from its own directory — write
+		// it alongside so the import resolves whether the executor is
+		// running from the embedded copy (prod / tests) or a dev
+		// RunnerPath override.
+		fakeDspyPath := filepath.Join(dir, "fake_dspy.py")
+		if err := os.WriteFile(fakeDspyPath, fakeDspyPySource, 0o600); err != nil {
+			return nil, fmt.Errorf("codeblock: write fake_dspy: %w", err)
 		}
 	}
 	return &Executor{opts: opts, runnerPath: runnerPath}, nil

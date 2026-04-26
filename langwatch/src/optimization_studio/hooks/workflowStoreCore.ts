@@ -312,9 +312,14 @@ export const updateCodeClassName = (
     p.identifier === "code"
       ? {
           ...p,
+          // Match both the new plain-Python default (`class Code:`)
+          // and legacy dspy-flavored (`class Code(dspy.Module):`) so
+          // renaming preserves whatever base-class clause the customer
+          // had — captured in $1 as the parenthesized fragment, empty
+          // for plain classes.
           value: (p.value as string).replace(
-            /class .*?\(dspy\.Module\):/,
-            `class ${snakeCaseToPascalCase(newId)}(dspy.Module):`,
+            /class\s+\w+(\s*\([^)]*\))?\s*:/,
+            `class ${snakeCaseToPascalCase(newId)}$1:`,
           ),
         }
       : p,

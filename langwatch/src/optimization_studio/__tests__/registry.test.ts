@@ -82,6 +82,29 @@ describe("Optimization Studio Registry", () => {
       expect(codeParam).toBeDefined();
       expect(codeParam?.value).toContain('return {"output":');
     });
+
+    // Owner directive: the default code-block template must have NO
+    // dspy reference whatsoever. The fake-dspy stub still resolves
+    // `import dspy` for legacy customer workflows, but new
+    // drag-and-drop templates ship as plain Python so future code-block
+    // surface stays dspy-free as we move the lambda image off dspy.
+    it("default template ships without any dspy reference", () => {
+      const codeParam = code.parameters?.find((p) => p.identifier === "code");
+      const value = codeParam?.value as string;
+
+      expect(value).not.toContain("import dspy");
+      expect(value).not.toContain("dspy.Module");
+      expect(value).not.toContain("(dspy.");
+    });
+
+    it("default template uses a plain Python class", () => {
+      const codeParam = code.parameters?.find((p) => p.identifier === "code");
+      const value = codeParam?.value as string;
+
+      // Plain class shape: `class Code:` (no parens). The runner
+      // finds the class via its `forward` method regardless of base.
+      expect(value).toMatch(/^class\s+\w+\s*:/m);
+    });
   });
 
   describe("unified naming consistency", () => {

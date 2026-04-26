@@ -75,9 +75,7 @@ const code: Code = {
     {
       identifier: "code",
       type: "code",
-      value: `import dspy
-
-class Code(dspy.Module):
+      value: `class Code:
     def forward(self, ${defaultInput?.identifier ?? "input"}: str):
         # Your code goes here
 

@@ -97,9 +97,7 @@ function buildHttpConfig(
 // Code Config helpers
 // ---------------------------------------------------------------------------
 
-const DEFAULT_CODE = `import dspy
-
-class Code(dspy.Module):
+const DEFAULT_CODE = `class Code:
     def forward(self, input: str):
         # Your code goes here
 

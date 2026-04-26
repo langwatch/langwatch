@@ -123,6 +123,162 @@ func TestCodeBlock_NoExecuteFunctionDefined(t *testing.T) {
 	assert.Equal(t, "NameError", res.Error.Type)
 }
 
+// TestCodeBlock_DspyModuleSubclassInvoked covers the prod-customer
+// shape: 387 of 388 surveyed code-blocks subclass `dspy.Module` and
+// define a `forward` method. The runner must instantiate the class
+// with no args, call `instance(**inputs)` (which dspy.Module's
+// __call__ routes to forward), and surface the dict return as
+// declared outputs. `import dspy` resolves to the bundled fake_dspy
+// stub — no real dspy in the subprocess image.
+func TestCodeBlock_DspyModuleSubclassInvoked(t *testing.T) {
+	requirePython(t)
+	code := `import dspy
+
+class Code(dspy.Module):
+    def forward(self, a, b):
+        return {"sum": a + b}
+`
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code: code,
+		Inputs: map[string]any{
+			"a": float64(7),
+			"b": float64(8),
+		},
+		DeclaredOutputs: []string{"sum"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, float64(15), res.Outputs["sum"])
+}
+
+// TestCodeBlock_PlainClassWithForward covers the new default template:
+// a plain Python class (no dspy reference) with a `forward` method.
+// The runner must find the class and call `instance.forward(**inputs)`.
+func TestCodeBlock_PlainClassWithForward(t *testing.T) {
+	requirePython(t)
+	code := `class Code:
+    def forward(self, x):
+        return {"doubled": x * 2}
+`
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            code,
+		Inputs:          map[string]any{"x": float64(21)},
+		DeclaredOutputs: []string{"doubled"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, float64(42), res.Outputs["doubled"])
+}
+
+// TestCodeBlock_DspyPredictionReturnValue covers the second-most-common
+// return shape from the survey: customer code returning
+// `dspy.Prediction(**kwargs)` instead of a plain dict. The fake_dspy
+// stub's Prediction must surface its kwargs as dict keys so the
+// declared outputs resolve.
+func TestCodeBlock_DspyPredictionReturnValue(t *testing.T) {
+	requirePython(t)
+	code := `import dspy
+
+class Code(dspy.Module):
+    def forward(self, q):
+        return dspy.Prediction(answer="42", confidence=0.9)
+`
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            code,
+		Inputs:          map[string]any{"q": "anything"},
+		DeclaredOutputs: []string{"answer", "confidence"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, "42", res.Outputs["answer"])
+	assert.Equal(t, 0.9, res.Outputs["confidence"])
+}
+
+// TestCodeBlock_DspyMarkerImportsAreInert covers the marker-only
+// surface points: dspy.InputField + dspy.OutputField + dspy.Signature.
+// 4 + 2 + 2 customers reference these. The stub returns None / empty
+// class — the only contract is "no AttributeError on import or
+// reference."
+func TestCodeBlock_DspyMarkerImportsAreInert(t *testing.T) {
+	requirePython(t)
+	code := `import dspy
+
+class MySig(dspy.Signature):
+    pass
+
+class Code(dspy.Module):
+    a = dspy.InputField()
+    b = dspy.OutputField()
+
+    def forward(self, x):
+        # Reference markers without expecting behavior.
+        _ = MySig
+        return {"out": x}
+`
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            code,
+		Inputs:          map[string]any{"x": "hi"},
+		DeclaredOutputs: []string{"out"},
+	})
+	require.NoError(t, err)
+	require.Nil(t, res.Error, "expected no error, got %+v", res.Error)
+	assert.Equal(t, "hi", res.Outputs["out"])
+}
+
+// TestCodeBlock_DspyPredictRaises pins the deliberate-stub behavior:
+// real dspy.Predict performs an LLM call; the stub raises so a
+// customer relying on it sees a clear error rather than silent empty
+// Predictions. Matches the survey rationale (the 2 affected customers
+// should route through the workflow's signature node).
+func TestCodeBlock_DspyPredictRaises(t *testing.T) {
+	requirePython(t)
+	code := `import dspy
+
+class Code(dspy.Module):
+    def __init__(self):
+        super().__init__()
+        self.predict = dspy.Predict("question -> answer")
+
+    def forward(self, question):
+        return self.predict(question=question)
+`
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            code,
+		Inputs:          map[string]any{"question": "anything"},
+		DeclaredOutputs: []string{"answer"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Error, "expected error from dspy.Predict invocation")
+	assert.Equal(t, "RuntimeError", res.Error.Type)
+	assert.Contains(t, res.Error.Message, "dspy.Predict")
+}
+
+// TestCodeBlock_RealDspyNotInImage guards against an accidental real-
+// dspy bundle slipping into the subprocess image. The fake stub is a
+// strict subset; if a customer code-block reaches into a name we
+// didn't stub (e.g. dspy.Example), it must fail with AttributeError
+// rather than silently work via a real dspy install. Pin it so a
+// future dependency change doesn't quietly re-introduce dspy.
+func TestCodeBlock_RealDspyNotInImage(t *testing.T) {
+	requirePython(t)
+	code := `import dspy
+
+class Code(dspy.Module):
+    def forward(self):
+        # Example was a real-dspy primitive; never observed in
+        # production code-blocks, so the stub doesn't expose it.
+        return {"got": dspy.Example(a=1)}
+`
+	res, err := newExec(t).Execute(context.Background(), codeblock.Request{
+		Code:            code,
+		DeclaredOutputs: []string{"got"},
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res.Error)
+	assert.Equal(t, "AttributeError", res.Error.Type)
+	assert.Contains(t, res.Error.Message, "Example")
+}
+
 func TestCodeBlock_InvocationsAreIsolated(t *testing.T) {
 	requirePython(t)
 	exec := newExec(t)

@@ -6,6 +6,32 @@ from stdin describing the user's Python code, declared inputs, and
 declared outputs; executes the code in a fresh module namespace;
 writes a structured JSON result to the path passed as argv[1].
 
+Three accepted user-code shapes (in this order of precedence):
+
+  1. Legacy dspy.Module-style — what 387/388 production code-blocks use:
+
+         class Code(dspy.Module):
+             def forward(self, **inputs):
+                 return {"output": ...}
+
+  2. Plain class + forward() — the new default template, no dspy ref:
+
+         class Code:
+             def forward(self, **inputs):
+                 return {"output": ...}
+
+  3. Top-level execute() — kept for callers (chiefly our own tests +
+     trivial sandboxes) that don't want the class boilerplate:
+
+         def execute(**inputs):
+             return {"output": ...}
+
+The user's `import dspy` resolves to the bundled fake_dspy stub (which
+provides only Module + Prediction + Signature + InputField +
+OutputField + Predict). The real dspy package is NOT in the
+subprocess image — see fake_dspy.py for the one-customer-deep
+rationale.
+
 Wire shape (stdin):
     {
       "code":    "<python source>",
@@ -29,12 +55,24 @@ Wire shape (result file):
 
 from __future__ import annotations
 
+import inspect
 import io
 import json
+import os
 import sys
 import time
 import traceback
 from contextlib import redirect_stdout, redirect_stderr
+
+# Inject fake_dspy as the user-visible `dspy` module BEFORE any user
+# code is exec'd. We resolve it by file path so the runner stays
+# importable when invoked directly (sys.path = [cwd] only) without a
+# package context. The runner ships next to fake_dspy.py.
+_RUNNER_DIR = os.path.dirname(os.path.abspath(__file__))
+if _RUNNER_DIR not in sys.path:
+    sys.path.insert(0, _RUNNER_DIR)
+import fake_dspy  # noqa: E402 — must come after sys.path manipulation
+sys.modules.setdefault("dspy", fake_dspy)
 
 
 def main() -> int:
@@ -67,16 +105,8 @@ def main() -> int:
         with redirect_stdout(stdout_buf), redirect_stderr(stderr_buf):
             module_globals: dict = {"__name__": "__user_code__"}
             exec(compile(code, "<code-block>", "exec"), module_globals)
-            execute = module_globals.get("execute")
-            if execute is None or not callable(execute):
-                raise NameError("user code must define a callable `execute(**inputs) -> dict`")
-            result = execute(**inputs)
-            if result is None:
-                result = {}
-            if not isinstance(result, dict):
-                raise TypeError(
-                    f"execute() must return a dict, got {type(result).__name__}"
-                )
+            result = _invoke_user_entrypoint(module_globals, inputs)
+            result = _coerce_result(result)
             for name in declared_outputs:
                 if name not in result:
                     raise KeyError(f"missing_output: {name}")
@@ -98,6 +128,74 @@ def main() -> int:
         error=error,
     )
     return 0 if error is None else 1
+
+
+def _invoke_user_entrypoint(module_globals: dict, inputs: dict):
+    """Find and call the user's entrypoint, supporting all three shapes.
+
+    Resolution order:
+
+      1. A class subclassing fake_dspy.Module (legacy dspy-style code).
+      2. A class with a `forward` method but no Module base (the new
+         plain-Python default template).
+      3. A top-level `execute(**inputs) -> dict` callable.
+
+    The first match wins. We instantiate classes with no args because
+    every customer code-block surveyed defines a no-arg constructor
+    (387 use the implicit `dspy.Module.__init__`, 6 define their own
+    `__init__(self)` with no args). Customer code that needs
+    constructor args is unsupported by design — it didn't appear in
+    production traffic.
+    """
+    candidate_class = None
+    for value in module_globals.values():
+        if not inspect.isclass(value):
+            continue
+        # Prefer dspy.Module subclasses when both are present, so a
+        # customer who defines a helper plain class alongside the real
+        # one still gets the dspy.Module entrypoint chosen.
+        if issubclass(value, fake_dspy.Module) and value is not fake_dspy.Module:
+            candidate_class = value
+            break
+        if candidate_class is None and hasattr(value, "forward") and callable(getattr(value, "forward")):
+            candidate_class = value
+
+    if candidate_class is not None:
+        instance = candidate_class()
+        # dspy.Module.__call__ routes to forward; for plain classes we
+        # call forward directly so both shapes converge here.
+        if isinstance(instance, fake_dspy.Module):
+            return instance(**inputs)
+        return instance.forward(**inputs)
+
+    execute = module_globals.get("execute")
+    if execute is not None and callable(execute):
+        return execute(**inputs)
+
+    raise NameError(
+        "user code must define one of: a class with a forward(self, **inputs) "
+        "method, or a top-level callable `execute(**inputs) -> dict`"
+    )
+
+
+def _coerce_result(result):
+    """Normalize the user-code return value to a plain dict.
+
+    Customer code returns either a dict (most common — survey shows
+    386/388) or a `dspy.Prediction(...)` (6 cases — kwargs become
+    attributes that we surface as dict keys). None is treated as an
+    empty dict so a `forward()` that omits its return doesn't crash
+    the runner with a confusing TypeError.
+    """
+    if result is None:
+        return {}
+    if isinstance(result, dict):
+        return result
+    if isinstance(result, fake_dspy.Prediction):
+        return dict(result.__dict__)
+    raise TypeError(
+        f"user-code entrypoint must return dict, dspy.Prediction, or None — got {type(result).__name__}"
+    )
 
 
 def write_result(path, **fields):
