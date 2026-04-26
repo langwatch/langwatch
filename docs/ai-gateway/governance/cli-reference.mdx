@@ -147,6 +147,36 @@ $ langwatch dashboard
 Opening https://app.langwatch.ai/me
 ```
 
+#### `--trace <id>` deep-link
+
+Opens the per-trace detail page directly. Useful when a CLI run
+produces something interesting (a slow call, a strange cost, a
+guardrail violation) and you want to jump straight to the matching
+trace in the dashboard without copy-pasting IDs.
+
+```bash
+$ langwatch dashboard --trace tr_01HZK9...
+Opening https://app.langwatch.ai/me/traces/tr_01HZK9...
+```
+
+If the trace ID doesn't exist (revoked, expired, wrong workspace)
+the dashboard renders its own 404; the CLI's job ends at opening
+the URL.
+
+### `langwatch request-increase`
+
+Opens the budget-increase request page in your browser. If the most
+recent gateway response was a `402 budget_exceeded`, the gateway
+already issued a signed `request_increase_url` (with your user ID,
+limit, spent, and an HMAC) — this command opens that exact URL so
+your admin sees the right context. Otherwise it falls back to
+`<dashboard>/me/budget/request`.
+
+```bash
+$ langwatch request-increase
+Opening https://app.langwatch.ai/me/budget/request?...
+```
+
 ### `langwatch init <shell>`
 
 Prints an `eval`-able snippet so your shell auto-exports the gateway
@@ -187,6 +217,53 @@ just shorthand for "set env vars + exec".
 ### `langwatch version`
 
 Prints the binary version (set at build time via `-ldflags`).
+
+## Budget pre-check (graceful degradation)
+
+Before any wrapped command (`langwatch claude`, `codex`, `cursor`,
+`gemini`) `exec`s the underlying tool, the CLI hits
+`GET /api/auth/cli/budget/status` to check whether the user's
+personal/team/org/project budget is already exhausted.
+
+| Server response | CLI behavior |
+|---|---|
+| `200 {ok: true}` | exec normally |
+| `402` with the spec budget_exceeded payload | render Screen-8 box, persist `request_increase_url`, exit 2 (no tool process spawned) |
+| `404 not found` | older self-hosted server doesn't expose the endpoint yet — pass through, exec normally; the gateway will 402 the actual request and the underlying tool will surface its own error |
+| network error / 5xx | log to stderr, exec anyway — never block the user because the CLI couldn't reach the control plane |
+
+The 402 payload shape:
+
+```json
+{
+  "error": {
+    "type": "budget_exceeded",
+    "scope": "user",
+    "limit_usd": "500.00",
+    "spent_usd": "500.00",
+    "period": "month",
+    "request_increase_url": "https://app.langwatch.example.com/me/budget/request?...",
+    "admin_email": "platform-team@miro.com"
+  }
+}
+```
+
+When it fires, the CLI prints (no ANSI noise into pipes):
+
+```text
+⚠  Budget limit reached
+
+   You've used $500.00 of your $500.00 monthly budget.
+   To continue, ask your team admin to raise your limit.
+
+   Admin: platform-team@miro.com
+
+   Need urgent access? Run:
+     langwatch request-increase
+```
+
+— and exits with status 2 (configuration / quota error, distinct
+from the generic 1).
 
 ## Token lifecycle
 
