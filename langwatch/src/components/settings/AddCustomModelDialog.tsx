@@ -24,20 +24,21 @@ import { Checkbox } from "../ui/checkbox";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 
 /**
- * Parameters shown in the dialog — only the ones we actually
- * render in LLMConfigPopover. The "Max Tokens" field above captures
- * the model's ceiling; this checkbox controls whether users can
- * configure max_tokens per-invocation in the LLM config popover.
+ * Optional sampling parameters the popover renders for this model.
+ *
+ * `max_tokens` is intentionally absent: every chat model accepts a
+ * per-invocation token ceiling, so the popover always renders that slider
+ * regardless of what's stored here. The numeric "Max Tokens" field elsewhere
+ * in this dialog captures the model's hard ceiling.
  */
 const DIALOG_PARAMETERS: { value: SupportedParameter; label: string }[] = [
   { value: "temperature", label: "Temperature" },
-  { value: "max_tokens", label: "Max Tokens" },
   { value: "top_p", label: "Top P" },
   { value: "top_k", label: "Top K" },
   { value: "reasoning", label: "Reasoning" },
 ];
 
-const DEFAULT_PARAMETERS: SupportedParameter[] = ["temperature", "max_tokens"];
+const DEFAULT_PARAMETERS: SupportedParameter[] = ["temperature"];
 const DEFAULT_MAX_TOKENS = 8192;
 
 const MULTIMODAL_LABELS: Record<MultimodalInput, string> = {
