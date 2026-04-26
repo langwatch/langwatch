@@ -232,6 +232,46 @@ silent reuse of revoked state.
 The file is created with mode `0600`. Treat it like a private SSH
 key — anyone with read access can act as you against the gateway.
 
+## REST API surface
+
+For self-hosting, custom CLI clients, or anyone integrating against
+the device-flow directly, the wire surface is:
+
+| Endpoint | Purpose | Success | Notable error states |
+|---|---|---|---|
+| `POST /api/auth/cli/device-code` | Mint a device-code + user-code pair | `200` JSON `{ device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval }` | `400 invalid_request` |
+| `POST /api/auth/cli/exchange` | Long-poll for approval | `200` JSON `{ access_token, refresh_token, expires_in, refresh_expires_in, user, organization, default_personal_vk }` | `428 authorization_pending` (keep polling), `408 expired_token`, `410 access_denied`, `429 slow_down` (re-poll too fast — back off) |
+| `POST /api/auth/cli/refresh` | Rotate access token | `200` JSON `{ access_token, refresh_token, expires_in, refresh_expires_in }` (refresh-token rotation — old token is invalidated) | `401 invalid_grant` (CLI must wipe local state) |
+| `POST /api/auth/cli/logout` | Revoke a refresh-token server-side | `200 { ok: true }` (idempotent) | — |
+| `GET /api/auth/cli/lookup?user_code=...` | Browser-side: verify a pasted user-code | `200 { user_code, status, created_at, expires_at }` | `401 unauthorized` (user must sign in first), `404 not_found`, `410 expired` |
+| `POST /api/auth/cli/approve` | Browser-side: user clicks "Approve" | `200 { ok, personal_vk_label, organization_id }` | `401 unauthorized`, `403 forbidden` (caller not in target org), `409 already_resolved` |
+| `POST /api/auth/cli/deny` | Browser-side: user clicks "Deny" | `200 { ok }` (idempotent) | `401 unauthorized` |
+
+Wire format is **snake_case JSON** (matches RFC 8628 + every other
+OAuth library). Origin enforcement applies to all endpoints — pass
+`Origin: <your-base-url>` from any client outside a browser.
+
+The browser approval surface is `https://<your-base-url>/cli/auth?user_code=XXXX-YYYY`
+(the `verification_uri_complete` field). Unauthenticated visitors
+are bounced through SSO and return to the page automatically.
+
+### Verified behavior
+
+The reference server passes all of:
+
+- Each `device-code` mint returns a unique `user_code` and `device_code`
+- `user_code` is 8 chars, base32 alphabet (no I/O/0/1/L/U), dashed `XXXX-YYYY`
+- `verification_uri` ends with `/cli/auth`
+- `expires_in` defaults to 600s (configurable), `interval` defaults to 5s
+- Polling `/exchange` faster than the per-device rate-limit (4s) returns `429 slow_down`
+- Polling with an unknown / TTL-expired `device_code` returns `408 expired_token`
+- `/refresh` with an unknown / expired token returns `401 invalid_grant`
+- All browser-side endpoints (`/lookup`, `/approve`, `/deny`) require an
+  active session cookie; unauthenticated requests get `401 unauthorized`
+  with a body the CLI surfaces verbatim
+- `/logout` is idempotent — passing an unknown / already-revoked refresh
+  token still returns `200 { ok: true }`
+
 ## Troubleshooting
 
 <AccordionGroup>
