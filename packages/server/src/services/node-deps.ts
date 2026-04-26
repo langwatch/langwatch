@@ -36,12 +36,20 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
   bus.emit({ type: "starting", service: "pnpm:langwatch" as never });
   const start = Date.now();
 
-  // Run install + full build in the langwatch dir. Use corepack-vended pnpm
-  // so the user doesn't need a global pnpm install.
+  // Run install + full build in the langwatch dir.
+  //
+  // We use `pnpm -C <dir>` instead of `cwd: langwatchDir` because pnpm's
+  // workspace-aware mode resolves the workspace ROOT package.json when
+  // invoked through corepack (or sometimes plain pnpm too) — leading to
+  // "Missing script: build. Did you mean pnpm run build:cli?" because
+  // build:cli is on root. `-C` is the official "change to package dir
+  // and only that dir" flag. Also drop corepack indirection: every CI
+  // runner + dev machine that ships `node` either ships `pnpm` on PATH
+  // (via pnpm/action-setup) or has corepack-enabled pnpm shimmed onto
+  // PATH already, so we can call `pnpm` directly.
   const pnpm = await resolvePnpm();
   if (!existsSync(nodeModulesPath)) {
-    await execa(pnpm.command, [...pnpm.args, "install", "--prod=false", "--frozen-lockfile"], {
-      cwd: langwatchDir,
+    await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, "install", "--prod=false", "--frozen-lockfile"], {
       stdio: "inherit",
     });
   }
@@ -51,8 +59,7 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
   // langevals types (from the source committed in langevals/ts-integration/),
   // and the mcp-server bundle. vite build emits dist/client/ for static serving.
   // Without dist/client/, every UI route returns 404 and only /api/* works.
-  await execa(pnpm.command, [...pnpm.args, "run", "build"], {
-    cwd: langwatchDir,
+  await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, "run", "build"], {
     stdio: "inherit",
     env: {
       ...process.env,
