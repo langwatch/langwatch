@@ -322,15 +322,129 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 			req.LiteLLMParams[k] = v
 		}
 	}
+	// Wire structured-output response_format when the signature has
+	// either a json_schema-typed output OR multiple outputs that need
+	// field separation. The Python path does the equivalent via DSPy's
+	// `_get_structured_outputs_response_format` (template_adapter.py).
+	useStructured := signatureNeedsStructuredOutput(node.Data.Outputs)
+	if useStructured {
+		schemaName := node.ID + "Outputs"
+		if node.Data.Name != nil && *node.Data.Name != "" {
+			schemaName = *node.Data.Name + "Outputs"
+		}
+		req.ResponseFormat = composeSignatureResponseFormat(schemaName, node.Data.Outputs)
+	}
 	resp, err := e.llm.Execute(ctx, req)
 	if err != nil {
 		return nil, &NodeError{Type: "llm_error", Message: err.Error()}
+	}
+	if useStructured {
+		out, _ := extractSignatureOutputs(resp.Content, node.Data.Outputs)
+		return out, nil
 	}
 	out := make(map[string]any, len(outputNames(node.Data.Outputs)))
 	for _, name := range outputNames(node.Data.Outputs) {
 		out[name] = resp.Content
 	}
 	return out, nil
+}
+
+// signatureNeedsStructuredOutput returns true when the engine should
+// ask the LLM for a JSON-shaped response and parse it across multiple
+// outputs. True iff any output is typed json_schema OR there are 2+
+// outputs (multi-output requires field separation — assigning the raw
+// content to every declared output loses signal).
+func signatureNeedsStructuredOutput(outputs []dsl.Field) bool {
+	if len(outputs) >= 2 {
+		return true
+	}
+	for _, f := range outputs {
+		if f.Type == dsl.FieldTypeJSONSchema {
+			return true
+		}
+	}
+	return false
+}
+
+// composeSignatureResponseFormat builds the OpenAI-style response_format
+// covering every declared output of a signature node. Each output is a
+// property on a single root object — json_schema-typed outputs use the
+// customer-provided schema verbatim, scalar types map to their JSON
+// Schema equivalent.
+func composeSignatureResponseFormat(name string, outputs []dsl.Field) *app.ResponseFormat {
+	properties := make(map[string]any, len(outputs))
+	required := make([]string, 0, len(outputs))
+	for _, f := range outputs {
+		properties[f.Identifier] = jsonSchemaForField(f)
+		required = append(required, f.Identifier)
+	}
+	return &app.ResponseFormat{
+		Type: "json_schema",
+		JSONSchema: map[string]any{
+			"name":   name,
+			"strict": true,
+			"schema": map[string]any{
+				"type":                 "object",
+				"properties":           properties,
+				"required":             required,
+				"additionalProperties": false,
+			},
+		},
+	}
+}
+
+// jsonSchemaForField returns the JSON Schema fragment for one signature
+// output field. json_schema-typed fields use the schema the workflow
+// author attached; scalar field types fall back to a minimal type-only
+// schema sufficient for the LLM provider to constrain its reply.
+func jsonSchemaForField(f dsl.Field) map[string]any {
+	if f.Type == dsl.FieldTypeJSONSchema && len(f.JSONSchema) > 0 {
+		return f.JSONSchema
+	}
+	switch f.Type {
+	case dsl.FieldTypeInt:
+		return map[string]any{"type": "integer"}
+	case dsl.FieldTypeFloat:
+		return map[string]any{"type": "number"}
+	case dsl.FieldTypeBool:
+		return map[string]any{"type": "boolean"}
+	case dsl.FieldTypeList,
+		dsl.FieldTypeListStr,
+		dsl.FieldTypeListFloat,
+		dsl.FieldTypeListInt,
+		dsl.FieldTypeListBool:
+		return map[string]any{"type": "array"}
+	case dsl.FieldTypeDict:
+		return map[string]any{"type": "object"}
+	default:
+		return map[string]any{"type": "string"}
+	}
+}
+
+// extractSignatureOutputs splits a structured LLM response across the
+// signature node's declared outputs. Expects a JSON object whose
+// properties match the output identifiers. On parse failure falls back
+// to assigning the raw content to the first output so the workflow at
+// least gets *something* — same defensive posture as the http block's
+// non-JSON fallback.
+func extractSignatureOutputs(content string, outputs []dsl.Field) (map[string]any, []string) {
+	out := make(map[string]any, len(outputs))
+	var parsed map[string]any
+	if err := jsonUnmarshalRaw([]byte(content), &parsed); err != nil {
+		if len(outputs) > 0 {
+			out[outputs[0].Identifier] = content
+		}
+		return out, []string{fmt.Sprintf("signature: structured response did not parse as JSON object: %v", err)}
+	}
+	var warnings []string
+	for _, f := range outputs {
+		if v, ok := parsed[f.Identifier]; ok {
+			out[f.Identifier] = v
+		} else {
+			warnings = append(warnings, fmt.Sprintf("signature: missing %q in structured response", f.Identifier))
+		}
+	}
+	return out, warnings
 }
 
 // runEvaluator dispatches an evaluator node to the LangWatch evaluator

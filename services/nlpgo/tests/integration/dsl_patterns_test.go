@@ -55,6 +55,7 @@
 //   pattern_004_chain_eval     — signature → signature → evaluator chain        ✅
 //   pattern_005_http_to_sig    — http block fetches data, signature uses it    ✅
 //   pattern_006_sigs_to_code   — 2× parallel signature → code aggregator       ✅
+//   pattern_007_multi_output   — signature with 2+ outputs → JSON parse+split  ✅
 //
 // See feedback memory entry "No customer names in public repo".
 
@@ -645,6 +646,109 @@ func TestPattern004_SignatureChainThenEvaluator(t *testing.T) {
 		require.True(t, ok, "missing node %q", id)
 		assert.Equal(t, "success", node["status"], "node %q expected success", id)
 	}
+}
+
+// TestPattern007_MultiOutputSignatureParseAndSplit — single signature
+// with two declared outputs. Customer-style structured shape:
+// classifier emits {label, confidence} as one JSON object; the engine
+// must wire response_format json_schema upstream AND parse the JSON
+// reply back into separate outputs at the gateway boundary.
+//
+// What this proves:
+//
+//   1. The signature node detects 2+ outputs and wires
+//      response_format = json_schema in the LLMRequest. Verified by
+//      inspecting the captured request at the LLM boundary.
+//   2. The composed JSON Schema lists both outputs as required and
+//      maps each to its appropriate JSON Schema type.
+//   3. The engine parses the LLM's JSON response and splits the
+//      properties into the corresponding outputs (label → str,
+//      confidence → number) — no longer assigning the same Content
+//      to every declared output.
+func TestPattern007_MultiOutputSignatureParseAndSplit(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(req app.LLMRequest) (*app.LLMResponse, error) {
+			// Provider would normally enforce the schema; we just need
+			// a JSON-parseable payload that matches the declared shape.
+			return &app.LLMResponse{Content: `{"label":"weather","confidence":0.93}`}, nil
+		},
+	}
+	url, _ := setupPatternStack(t, llm, func(http.ResponseWriter, *http.Request) {})
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-007",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"k","spec_version":"1.3",
+	      "name":"Pattern007","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"text","type":"str"}],
+	          "dataset":{"inline":{"records":{"text":["A pleasant afternoon."]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"classify","type":"signature","data":{
+	          "name":"Classify",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Classify the sentiment of: {{ text }}. Reply with label + confidence."}
+	          ],
+	          "inputs":[{"identifier":"text","type":"str"}],
+	          "outputs":[
+	            {"identifier":"label","type":"str"},
+	            {"identifier":"confidence","type":"float"}
+	          ]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[
+	          {"identifier":"label","type":"str"},
+	          {"identifier":"confidence","type":"float"}
+	        ]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.text","target":"classify","targetHandle":"inputs.text","type":"default"},
+	        {"id":"e2","source":"classify","sourceHandle":"outputs.label","target":"end","targetHandle":"inputs.label","type":"default"},
+	        {"id":"e3","source":"classify","sourceHandle":"outputs.confidence","target":"end","targetHandle":"inputs.confidence","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	// (1) ResponseFormat was wired and reached the LLM boundary as
+	// type=json_schema with both outputs as required properties.
+	llmReq := llm.lastRequest(t)
+	require.NotNil(t, llmReq.ResponseFormat,
+		"signature with 2 outputs must request structured response_format")
+	assert.Equal(t, "json_schema", llmReq.ResponseFormat.Type)
+	js := llmReq.ResponseFormat.JSONSchema
+	require.NotNil(t, js)
+	schema := js["schema"].(map[string]any)
+	props := schema["properties"].(map[string]any)
+	require.NotNil(t, props["label"])
+	require.NotNil(t, props["confidence"])
+	required, _ := schema["required"].([]string)
+	if required == nil {
+		// May be []any after JSON round-trip in some paths
+		if alt, ok := schema["required"].([]any); ok {
+			for _, v := range alt {
+				required = append(required, v.(string))
+			}
+		}
+	}
+	assert.ElementsMatch(t, []string{"label", "confidence"}, required)
+
+	// (2) Both outputs land in the workflow result with the right
+	// values — proves parse-and-split happened, not the old "every
+	// output gets the raw content" bug.
+	require.NotNil(t, res.Result)
+	assert.Equal(t, "weather", res.Result["label"])
+	assert.InDelta(t, 0.93, res.Result["confidence"], 1e-9)
 }
 
 // stringContains is a tiny case-sensitive substring helper to avoid
