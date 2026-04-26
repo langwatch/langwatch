@@ -10,7 +10,7 @@ import type { PrismaClient, VirtualKey } from "@prisma/client";
 import type { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
-import { GatewayAuditLogRepository } from "./auditLog.repository";
+import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { ChangeEventRepository } from "./changeEvent.repository";
 import {
@@ -89,7 +89,7 @@ export class VirtualKeyService {
     private readonly prisma: PrismaClient,
     private readonly repository: VirtualKeyRepository,
     private readonly changeEvents: ChangeEventRepository,
-    private readonly auditLog: GatewayAuditLogRepository,
+    private readonly auditLog: GatewayAuditAdapter,
   ) {}
 
   static create(prisma: PrismaClient): VirtualKeyService {
@@ -97,7 +97,7 @@ export class VirtualKeyService {
       prisma,
       new VirtualKeyRepository(prisma),
       new ChangeEventRepository(prisma),
-      new GatewayAuditLogRepository(prisma),
+      new GatewayAuditAdapter(prisma),
     );
   }
 

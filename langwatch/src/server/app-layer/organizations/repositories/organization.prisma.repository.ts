@@ -980,9 +980,12 @@ export class PrismaOrganizationRepository implements OrganizationRepository {
     const projectMap = new Map(projects.map((p) => [p.id, p]));
 
     const auditLogs: EnrichedAuditLog[] = rows.map((log) => {
-      // Gateway-shape rows always carry both targetKind + targetId. Anything
-      // else is a platform-shape row.
-      const isGateway = !!log.targetKind && !!log.targetId;
+      // Gateway-shape rows are emitted under the `gateway.<resource>.<verb>`
+      // dotted naming convention; the `gateway.` prefix is the load-bearing
+      // discriminator (also documented for SIEM scoping via LIKE 'gateway.%').
+      // Presence of targetKind alone is not a safe signal — platform features
+      // could in principle add their own target tracking later.
+      const isGateway = log.action.startsWith("gateway.");
       return {
         id: log.id,
         createdAt: log.createdAt,

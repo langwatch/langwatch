@@ -53,7 +53,7 @@ export type AppendAuditInput = {
   after?: Prisma.InputJsonValue | null;
 };
 
-export class GatewayAuditLogRepository {
+export class GatewayAuditAdapter {
   constructor(private readonly prisma: PrismaClient) {}
 
   async append(

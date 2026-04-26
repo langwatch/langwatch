@@ -1,0 +1,25 @@
+-- Drop the redundant single-column index `AuditLog_organizationId_idx`.
+--
+-- The composite `AuditLog_organizationId_createdAt_idx` (added in
+-- 20260425000000_consolidate_gateway_audit_into_audit_log) covers every
+-- query the dropped index served via leftmost-prefix indexing — Postgres
+-- will use the composite for both `WHERE organizationId = X` and
+-- `WHERE organizationId = X ORDER BY createdAt DESC` lookups.
+--
+-- Removing the duplicate cuts write amplification on a hot table (every
+-- gateway + platform mutation appends an AuditLog row) without changing
+-- read-path behavior.
+--
+-- LOCKING NOTE: Plain `DROP INDEX [IF EXISTS]` acquires an ACCESS
+-- EXCLUSIVE lock on the table for the duration of the drop — this
+-- blocks concurrent reads and writes on `AuditLog` until the operation
+-- completes. The `IF EXISTS` clause only changes error handling
+-- (NOTICE instead of ERROR when the index is missing), it does NOT
+-- change locking behavior. Dropping a single index is a fast
+-- metadata-only operation (typically milliseconds even on large
+-- tables, since the index file is just unlinked), so the brief lock
+-- is acceptable for AuditLog. If we ever need a truly non-blocking
+-- variant, swap to `DROP INDEX CONCURRENTLY IF EXISTS` — but that
+-- can't run inside a transaction, so it would need a Prisma
+-- non-transactional migration setup we don't have today.
+DROP INDEX IF EXISTS "AuditLog_organizationId_idx";

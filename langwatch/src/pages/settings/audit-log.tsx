@@ -36,6 +36,23 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { EnrichedAuditLog } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
 
+// CSV-cell cap for JSON columns (args / before / after). 4 KB is enough
+// to capture typical gateway-shape diffs while staying well under the
+// per-cell limits of common spreadsheet tools (Excel: 32K chars).
+// `slice` counts UTF-16 code units, so the byte size can be up to ~16 KB
+// for fully non-ASCII payloads — acceptable upper bound.
+const CSV_JSON_CAP = 4096;
+
+// Stringify + cap a JSON-shaped value for inclusion in a CSV cell.
+// When the JSON exceeds the cap, append an explicit truncation marker so
+// downstream consumers can tell the cell was clipped vs. just empty.
+function truncateJsonForCsv(value: unknown): string {
+  if (value == null) return "";
+  const s = JSON.stringify(value);
+  if (s.length <= CSV_JSON_CAP) return s;
+  return `${s.slice(0, CSV_JSON_CAP)}…[truncated ${s.length - CSV_JSON_CAP} chars]`;
+}
+
 function AuditLogPage() {
   const { organization, project, organizations } = useOrganizationTeamProject();
   const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
@@ -317,9 +334,14 @@ function AuditLogPage() {
         log.ipAddress ?? "",
         log.userAgent ?? "",
         log.error ?? "",
-        log.args ? JSON.stringify(log.args) : "",
-        log.before ? JSON.stringify(log.before) : "",
-        log.after ? JSON.stringify(log.after) : "",
+        // Cap JSON columns so a single oversized diff (large request
+        // payload, full provider config) can't blow up the exported
+        // file size or break Excel/Sheets row parsing. Truncated cells
+        // carry an explicit "…[truncated N chars]" marker so consumers
+        // can tell clipped JSON from empty values.
+        truncateJsonForCsv(log.args),
+        truncateJsonForCsv(log.before),
+        truncateJsonForCsv(log.after),
       ]);
 
       // Generate CSV
@@ -353,19 +375,15 @@ function AuditLogPage() {
   };
 
   // Derive a return URL back to the originating detail page when the
-  // operator arrived via a deep-link. Covers every kind documented on
-  // AuditLogFilters.targetKind so future gateway resources don't silently
-  // drop the breadcrumb.
+  // operator arrived via a deep-link. Only kinds that have a real
+  // `[id]` detail route are mapped — provider_binding and cache_rule
+  // are list-only today, so we skip them rather than render a link
+  // that 404s.
   const backToResource = (() => {
     if (!urlTargetKind || !urlTargetId || !project?.slug) return null;
     const kindMap: Record<string, { path: string; label: string }> = {
       virtual_key: { path: "gateway/virtual-keys", label: "Virtual key" },
       budget: { path: "gateway/budgets", label: "Budget" },
-      provider_binding: {
-        path: "gateway/providers",
-        label: "Provider binding",
-      },
-      cache_rule: { path: "gateway/cache-rules", label: "Cache rule" },
     };
     const entry = kindMap[urlTargetKind];
     if (!entry) return null;

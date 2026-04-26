@@ -4,7 +4,7 @@
  * Integration coverage for the GatewayAuditLog → AuditLog consolidation.
  *
  * Hits real PG (testcontainers) — NO MOCKS. Validates that:
- *   1. `GatewayAuditLogRepository.append` writes rows to the platform
+ *   1. `GatewayAuditAdapter.append` writes rows to the platform
  *      `AuditLog` table with the gateway shape (targetKind / targetId /
  *      before / after) — the adapter's whole purpose.
  *   2. The unified `getAuditLogs` query returns those rows with
@@ -33,7 +33,7 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { GatewayAuditLogRepository } from "../auditLog.repository";
+import { GatewayAuditAdapter } from "../auditLog.repository";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-audit-${suffix}`;
@@ -45,7 +45,7 @@ const BUDGET_ID = `bdg-audit-${suffix}`;
 
 describe("AuditLog consolidation — gateway writes land in platform AuditLog", () => {
   const organizations = new PrismaOrganizationRepository(prisma);
-  const auditLog = new GatewayAuditLogRepository(prisma);
+  const auditLog = new GatewayAuditAdapter(prisma);
 
   beforeAll(async () => {
     await startTestContainers();
