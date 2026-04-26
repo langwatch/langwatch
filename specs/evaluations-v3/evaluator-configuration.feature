@@ -44,14 +44,6 @@ Feature: Evaluator configuration
     And I see an "Edit Configuration" button
 
   @unimplemented
-  Scenario: Open evaluator configuration panel for agent-specific mapping
-    Given agent "GPT-4o" has evaluator "Exact Match"
-    When I click on the "Exact Match" evaluator chip
-    And I click "Edit Configuration"
-    Then the evaluator configuration panel opens
-    And I can see input mapping options for agent "GPT-4o"
-
-  @unimplemented
   Scenario: Configure global evaluator settings
     When I click "+ Add evaluator" inside the "GPT-4o" agent cell
     And I select evaluator "LLM as Judge"
@@ -77,12 +69,6 @@ Feature: Evaluator configuration
     And the mapping is scoped to this specific agent
 
   @unimplemented
-  Scenario: Evaluator with unmapped required inputs shows warning
-    Given agent "GPT-4o" has evaluator "Exact Match"
-    And required input "output" is not mapped for agent "GPT-4o"
-    Then the evaluator chip shows a warning indicator
-
-  @unimplemented
   Scenario: Each agent has independent mappings for shared evaluator
     Given agents "GPT-4o" and "Claude Opus" are configured
     And a global evaluator "Exact Match" exists
@@ -100,28 +86,9 @@ Feature: Evaluator configuration
     Then the settings change applies to both agents
 
   @unimplemented
-  Scenario: Access global evaluators panel
-    When I look at the page toolbar (top right)
-    Then I see an "Evaluators" button
-    And clicking it opens a panel to manage global evaluator definitions
-    And I can see all evaluators with their per-agent mappings
-
-  @unimplemented
   Scenario: DSL generates unique evaluator nodes per agent
     Given agents "GPT-4o" and "Claude Opus" are configured
     And both agents use evaluator "Exact Match"
     When the workflow DSL is generated
     Then evaluator nodes are named "GPT-4o.Exact Match" and "Claude Opus.Exact Match"
     And results can be mapped back to the correct agent
-
-  @unimplemented
-  Scenario: Newly created evaluator is automatically added to workbench
-    When I click "+ Add evaluator" inside the "GPT-4o" agent cell
-    And I click "New Evaluator"
-    And I select category "Expected Answer"
-    And I select evaluator type "Exact Match"
-    And I configure the evaluator name as "My Custom Evaluator"
-    And I click "Create Evaluator"
-    Then the drawer closes
-    And the evaluator "My Custom Evaluator" is added to the workbench
-    And the evaluator chip appears inside the agent cell
