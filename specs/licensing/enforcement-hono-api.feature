@@ -12,32 +12,6 @@ Feature: Resource limit enforcement on API endpoints
   # Creating resources is blocked when limits are reached
   # ============================================================================
 
-  @integration @unimplemented
-  Scenario Outline: Creating a <resource> via API is blocked when at limit
-    Given the organization allows 3 <resource>
-    And the organization has 3 <resource>
-    When I create a <resource> via the API
-    Then the request is rejected as forbidden
-
-    Examples:
-      | resource   |
-      | prompt     |
-      | scenario   |
-      | evaluator  |
-
-  @integration @unimplemented
-  Scenario Outline: Creating a <resource> via API succeeds when under limit
-    Given the organization allows 10 <resource>
-    And the organization has 3 <resource>
-    When I create a <resource> via the API
-    Then the <resource> is created
-
-    Examples:
-      | resource   |
-      | prompt     |
-      | scenario   |
-      | evaluator  |
-
   # ============================================================================
   # Non-create operations are never blocked
   # ============================================================================
@@ -66,44 +40,9 @@ Feature: Resource limit enforcement on API endpoints
   # Customer-facing messages vary by plan source
   # ============================================================================
 
-  @integration @unimplemented
-  Scenario: Free SaaS user receives upgrade guidance when blocked
-    Given the organization is on a free SaaS plan
-    And the organization has reached its prompt limit
-    When I create a prompt via the API
-    Then the response tells me to upgrade my plan
-
-  @integration @unimplemented
-  Scenario: Paid SaaS user receives upgrade guidance when blocked
-    Given the organization is on a paid SaaS subscription
-    And the organization has reached its prompt limit
-    When I create a prompt via the API
-    Then the response tells me to upgrade my plan
-
-  @integration @unimplemented
-  Scenario: Self-hosted user without license receives license guidance when blocked
-    Given the organization is self-hosted without a license
-    And the organization has reached its prompt limit
-    When I create a prompt via the API
-    Then the response tells me to get a license
-
-  @integration @unimplemented
-  Scenario: Self-hosted user with license receives license upgrade guidance when blocked
-    Given the organization is self-hosted with a license
-    And the organization has reached its prompt limit
-    When I create a prompt via the API
-    Then the response tells me to upgrade my license
-
   # ============================================================================
   # Internal notifications when limits are hit
   # ============================================================================
-
-  @integration @unimplemented
-  Scenario: Team is notified when a resource limit is hit on SaaS
-    Given the organization is on a SaaS plan
-    And the organization has reached its prompt limit
-    When I create a prompt via the API
-    Then the team is notified about the limit being reached
 
   @integration @unimplemented
   Scenario: Notification is suppressed on self-hosted
