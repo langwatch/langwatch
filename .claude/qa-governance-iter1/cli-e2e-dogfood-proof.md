@@ -2,7 +2,8 @@
 
 **Date:** 2026-04-26
 **Branch:** `feat/governance-platform`
-**HEAD:** `58f417771 fix(gateway): include projectId in routingPolicyId-bind update where clause`
+**HEAD at original proof:** `58f417771 fix(gateway): include projectId in routingPolicyId-bind update where clause`
+**Subsequent fixes incorporated:** `e552d3f1a` (RoutingPolicyService provider org-ownership validation + PVK integration-test fixture), `f5d99106d` (Vite router fix — see §6 "Browser /cli/auth path" below)
 **Worktree:** `wise-mixing-zebra`
 **Servers:** pnpm dev `:5660` (Vite frontend + API), aigateway `:5563`
 
@@ -108,15 +109,98 @@ These env vars are exactly what `langwatch claude`, `langwatch codex`,
 Unix) before launching the underlying tool. Tools see the gateway
 as their AI provider with the personal VK as the bearer token.
 
+## 6. Browser `/cli/auth` path — discovered + fixed by Alexis
+
+The original proof at the top of this doc covered the **CLI side** of
+the device flow end-to-end (mint → poll → exchange → config persist
+→ whoami → init). The **browser approval** half (where a real user
+clicks **Approve** at `/cli/auth?user_code=…`) was driven by a
+local helper script in this proof, not by the live page.
+
+When Alexis ran her screenshot pass for the populated `/me`
+dashboard, she discovered that `/cli/auth` (along with `/me`,
+`/me/settings`, `/settings/routing-policies`) was **never registered
+in the Vite router** — those routes were falling through the
+`/:project` catch-all and bouncing the visitor to a project page.
+Fixed in `f5d99106d fix(governance): register /me, /me/settings,
+/cli/auth, /settings/routing-policies in Vite router + scope OTP
+redirects`.
+
+After her fix:
+- `GET http://localhost:5660/cli/auth?user_code=4X3T-MQ7R` → `200`
+  (Vite serves the React shell; the page-level handler reads
+  `router.query.user_code` and renders the approve confirmation
+  card after SSO).
+- `POST http://localhost:5660/api/auth/cli/device-code` returns
+  `verification_uri_complete=http://localhost:5660/cli/auth?user_code=…`
+  pointing at the now-reachable page.
+- The CLI exchange path is unchanged from `58f417771`; the original
+  CLI-side proof at §1–§5 above stands without modification.
+
+**Why this run was still helper-authenticated**, even with the route
+fix in place:
+
+1. **Auth0 callback URL not configured for `:5660`.** The running
+   pnpm dev has `NEXTAUTH_URL=http://localhost:5660` (Sergey's
+   restart), but Auth0's allowlist points at the prod hosts. An
+   unauthenticated visitor to `/cli/auth` is bounced through
+   `/auth/signin` → Auth0 → `callback URL mismatch` and never
+   reaches the approve button. This is expected on local dev.
+2. **Shared-worktree browser lock.** Alexis's screenshot pass had
+   the Playwright Chrome cache locked while taking screenshots of
+   `/me` and `/me/settings`; both my `mcp__playwright` and
+   `mcp__playwright-headed` invocations errored with
+   `Browser is already in use`. Driving a second browser would
+   require `--isolated`, which we deferred.
+
+The orchestrator-accepted bar for this PR is therefore: **CLI
+exchange/config/whoami/init proven end-to-end (above), and `/cli/auth`
+route registration proven via HTTP 200 + commit `f5d99106d`.**
+Approval through the live browser remains a self-host smoke test
+documented in `docs/ai-gateway/governance/cli-reference.mdx#verifying-a-fresh-install-end-to-end`.
+
 ## Bugs found during dogfood + fixed
 
-| # | Bug | Commit |
-|---|---|---|
-| 1 | RoutingPolicy missing from EXEMPT_MODELS in dbMultiTenancyProtection.ts | `77f8aee76 fix(governance): exempt RoutingPolicy from multitenancy projectId guard` |
-| 2 | PersonalVirtualKeyService.issue dropped policy.providerCredentialIds | `3111d8a2e fix(gateway): atomic routingPolicyId bind on VK create + auth-boundary checks` |
-| 3 | tx.virtualKey.update missing projectId in where clause | `58f417771 fix(gateway): include projectId in routingPolicyId-bind update where clause` |
+| # | Bug | Discovered by | Fix commit |
+|---|---|---|---|
+| 1 | RoutingPolicy missing from `EXEMPT_MODELS` in dbMultiTenancyProtection.ts (every query throws "requires projectId") | Andre | `77f8aee76` |
+| 2 | PersonalVirtualKeyService.issue dropped `policy.providerCredentialIds` on the floor (VK creation rejected with "At least one provider credential is required") | Andre | `3111d8a2e` |
+| 3 | `tx.virtualKey.update` missing `projectId` in where clause when binding `routingPolicyId` (multi-tenancy guard rejected) | Andre | `58f417771` |
+| 4 | `/cli/auth`, `/me`, `/me/settings`, `/settings/routing-policies` never registered in Vite router — all 4 routes were falling through `/:project` catch-all and redirecting to a project page | Alexis (during screenshot pass) | `f5d99106d` |
+| 5 | RoutingPolicyService.create/update did not validate `providerCredentialIds` belong to the policy's organization (privilege escalation surface) | Master orchestrator review of fix #2 | `e552d3f1a` |
+| 6 | PersonalVirtualKeyService integration test fixture didn't seed a default RoutingPolicy → red on main + on every iteration of fix #2 | Sergey (during fix #2 testing) | `e552d3f1a` |
 
-## Must-fix-before-PR (still open)
+## What's verified
 
-- RoutingPolicyService.create/update doesn't validate provider-credential org-ownership
-- PersonalVirtualKeyService integration test fixture missing seeded RoutingPolicy
+- ✅ CLI binary builds (`make cli`); 0 lint, 17/17 unit tests pass
+- ✅ `langwatch login` mints device-code, polls /exchange, persists
+  `~/.langwatch/config.json` (mode 0600, atomic rename)
+- ✅ `langwatch whoami` reads + prints real identity (rogerio@langwatch.ai
+  / acme-demo) from disk
+- ✅ `langwatch init zsh` injects ANTHROPIC + OPENAI + GEMINI base URLs
+  + auth tokens pointing at `http://localhost:5563` (the gateway)
+- ✅ Server contracts (Sergey's REST probe matrix at `7ff02f2a0` +
+  this dogfood):
+  - device-code: `200` with spec shape
+  - exchange: `428` pending → `200` after approval; `408` expired,
+    `410` denied, `429` slow_down
+  - refresh: `200` with rotated tokens; `401` invalid_grant
+  - logout: `200` idempotent
+  - lookup/approve/deny: session-protected; `401` unauthenticated
+- ✅ `/cli/auth` route registered after `f5d99106d`; HTTP 200 confirms
+  Vite serves the page (browser-level rendering + approve click is
+  the only piece left for self-host smoke test)
+
+## What's not in this proof (and why)
+
+- ❌ Live browser approval of /cli/auth: Auth0 callback URL not
+  configured for `:5660` on local dev (expected); separately, the
+  Playwright Chrome cache was locked by Alexis's parallel screenshot
+  session. Self-host smoke test in cli-reference.mdx covers the live
+  path.
+- ❌ A real `/v1/chat/completions` round-trip through the gateway:
+  the personal VK secret in the local config is a placeholder
+  (helper-script idempotent re-run path can't recover the
+  hashed-at-rest secret minted on the first call). For a real round
+  trip, wipe the personal VK + reissue, OR run the self-host
+  walkthrough end-to-end with a fresh user.
