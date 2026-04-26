@@ -59,6 +59,7 @@
 //   pattern_008_llm_boolean    — sig → evaluator(langevals/llm_boolean)        ✅
 //   pattern_009_llm_category   — sig → evaluator(langevals/llm_category)       ✅
 //   pattern_010_custom_safety  — custom node kind → typed unsupported error    ✅
+//   pattern_011_workflow_agent — sig → agent[type=workflow] sub-workflow chain ✅
 //
 // See feedback memory entry "No customer names in public repo".
 
@@ -1340,4 +1341,148 @@ func TestPattern009_LLMCategoryEvaluator(t *testing.T) {
 	require.NotNil(t, res.Result)
 	assert.Equal(t, "mild", res.Result["label"])
 	assert.Equal(t, "the description matches the mild category most closely", res.Result["details"])
+}
+
+// TestPattern011_WorkflowAsEvaluatorChain — signature → agent
+// (agent_type=workflow) → end. The workflow-as-evaluator chain: a
+// parent workflow embeds an `agent` node that POSTs to the LangWatch
+// app's /api/workflows/<id>/run, runs a separately-saved workflow as
+// the evaluator, and binds the unwrapped result back into the parent's
+// node graph.
+//
+// This is the third evaluator surface observed in real customer data
+// (8 saved Evaluator rows of `type=workflow` with workflowId set).
+// Distinct from langevals-slug evaluators (patterns 008/009): the
+// dispatch path is the agentblock.WorkflowRunner, not evaluatorblock.
+//
+// What this proves end-to-end:
+//
+//   1. The engine routes `agent` nodes through the agent dispatcher,
+//      and `agent_type=workflow` selects the WorkflowRunner — not the
+//      http or code branch.
+//   2. The HTTP request hits /api/workflows/<workflow_id>/run with the
+//      project apiKey on X-Auth-Token (matches the langevals dispatch
+//      style, since this is the same control-plane surface).
+//   3. Upstream signature output flows into the sub-workflow's request
+//      body verbatim, AND the runner injects `do_not_trace=true` to
+//      avoid double-counted spans (parity with CustomNode.forward).
+//   4. The X-LangWatch-Trace-Id parent trace propagates so Studio can
+//      stitch the sub-run as a child span.
+//   5. The wrapper response shape `{"result": <value>}` is unwrapped
+//      and bound to declared agent outputs (a single declared output
+//      receives the unwrapped value directly).
+//
+// Generic concept (claim → fact-check sub-workflow); zero customer
+// content.
+func TestPattern011_WorkflowAsEvaluatorChain(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(_ app.LLMRequest) (*app.LLMResponse, error) {
+			return &app.LLMResponse{Content: "the river runs north"}, nil
+		},
+	}
+	url, lwRequests := setupPatternStack(t, llm, func(w http.ResponseWriter, r *http.Request) {
+		// Only the /api/workflows/.../run path returns a result envelope;
+		// any other path is unexpected for this pattern.
+		if !stringContains(r.URL.Path, "/api/workflows/") || !stringContains(r.URL.Path, "/run") {
+			http.Error(w, "unexpected path", http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		// Wrapper-style response — what the LangWatch app's /run endpoint
+		// produces. The runner unwraps this; its `result` field becomes
+		// what reaches the engine.
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"result": map[string]any{
+				"verdict":   "supported",
+				"rationale": "the claim is consistent with known reference data",
+			},
+		})
+	})
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-011",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"sk-pattern-011","spec_version":"1.3",
+	      "name":"Pattern011","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"prompt","type":"str"}],
+	          "dataset":{"inline":{"records":{"prompt":["Describe the river."]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"claim","type":"signature","data":{
+	          "name":"Claim",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Make a claim about: {{ prompt }}"}
+	          ],
+	          "inputs":[{"identifier":"prompt","type":"str"}],
+	          "outputs":[{"identifier":"claim","type":"str"}]
+	        }},
+	        {"id":"verify","type":"agent","data":{
+	          "parameters":[
+	            {"identifier":"agent_type","type":"str","value":"workflow"},
+	            {"identifier":"workflow_id","type":"str","value":"wf_subverifier_42"}
+	          ],
+	          "inputs":[{"identifier":"claim","type":"str"}],
+	          "outputs":[{"identifier":"check","type":"dict"}]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[
+	          {"identifier":"check","type":"dict"}
+	        ]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.prompt","target":"claim","targetHandle":"inputs.prompt","type":"default"},
+	        {"id":"e2","source":"claim","sourceHandle":"outputs.claim","target":"verify","targetHandle":"inputs.claim","type":"default"},
+	        {"id":"e3","source":"verify","sourceHandle":"outputs.check","target":"end","targetHandle":"inputs.check","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	// (1) Exactly one upstream call — the sub-workflow run. The signature
+	// uses the fake LLM (no LangWatch HTTP traffic), so the only request
+	// captured here is the sub-workflow run.
+	require.Len(t, *lwRequests, 1, "expected exactly one /api/workflows/<id>/run call")
+	rec := (*lwRequests)[0]
+
+	// (2) URL targets the sub-workflow's id; auth token matches the
+	// parent workflow's api_key.
+	assert.Equal(t, "/api/workflows/wf_subverifier_42/run", rec["path"])
+	assert.Equal(t, "POST", rec["method"])
+	assert.Equal(t, "sk-pattern-011", rec["x_auth_token"])
+
+	// (3) Body carries the upstream signature output as `claim` AND the
+	// runner injects do_not_trace=true to avoid double-counted spans
+	// (parity with langwatch_nlp's CustomNode.forward).
+	subBody, ok := rec["body"].(map[string]any)
+	require.True(t, ok, "sub-workflow request body must be a JSON object")
+	assert.Equal(t, "the river runs north", subBody["claim"],
+		"signature output must reach sub-workflow request body as claim")
+	assert.Equal(t, true, subBody["do_not_trace"],
+		"runner must inject do_not_trace=true on every sub-workflow call")
+
+	// (4) Wrapper response is unwrapped and the single declared output
+	// receives the inner result map verbatim.
+	require.NotNil(t, res.Result)
+	check, ok := res.Result["check"].(map[string]any)
+	require.True(t, ok, "check output must be a map (unwrapped result envelope)")
+	assert.Equal(t, "supported", check["verdict"])
+	assert.Equal(t, "the claim is consistent with known reference data", check["rationale"])
+
+	// (5) All four nodes succeeded.
+	require.NotNil(t, res.Nodes)
+	for _, id := range []string{"entry", "claim", "verify", "end"} {
+		node, ok := res.Nodes[id].(map[string]any)
+		require.True(t, ok, "missing node %q in result.nodes", id)
+		assert.Equal(t, "success", node["status"], "node %q expected success", id)
+	}
 }
