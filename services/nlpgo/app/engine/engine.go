@@ -8,6 +8,7 @@ package engine
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sort"
@@ -925,7 +926,7 @@ func buildMessages(node *dsl.Node, inputs map[string]any) []app.ChatMessage {
 	return []app.ChatMessage{{Role: "user", Content: composeUserPrompt(inputs)}}
 }
 
-// coerceChatMessages accepts the two shapes a chat-history value can
+// coerceChatMessages accepts the three shapes a chat-history value can
 // arrive in and returns it as []app.ChatMessage. Returns nil when the
 // value is anything else (so the caller can fall through to the next
 // branch).
@@ -937,39 +938,81 @@ func buildMessages(node *dsl.Node, inputs map[string]any) []app.ChatMessage {
 // arrive as []any of map[string]any too; we preserve them verbatim on
 // the message struct's ToolCalls field so the gateway sees the same
 // structured tool-call list the upstream model emitted.
+//
+// Shape 3: string of a JSON-encoded list — the TS adapter
+// (resolve-field-mappings.ts:71) JSON-stringifies any non-string field
+// value before crossing into the NLP service. A signature node
+// declared with a `str`-typed `messages` input therefore receives the
+// chat history as `"[{\"role\":...}]"`. Pre-fix the string was
+// formatted as a single user-turn JSON blob and multi-turn context
+// was silently lost — see Python regression cb76144a6 (the same shape
+// issue _coerce_for_liquid covers on the Python side). The string is
+// only treated as chat history when every parsed element looks like a
+// {role, ...} message; non-history JSON strings (numeric arrays,
+// non-message objects, etc.) fall through untouched.
 func coerceChatMessages(v any) []app.ChatMessage {
 	switch x := v.(type) {
 	case []app.ChatMessage:
 		return x
 	case []any:
-		if len(x) == 0 {
+		return coerceChatMessageList(x)
+	case string:
+		stripped := strings.TrimLeft(x, " \t\r\n")
+		if !strings.HasPrefix(stripped, "[") {
 			return nil
 		}
-		out := make([]app.ChatMessage, 0, len(x))
-		for _, m := range x {
-			mm, ok := m.(map[string]any)
+		var parsed []any
+		if err := json.Unmarshal([]byte(x), &parsed); err != nil {
+			return nil
+		}
+		// Only treat the parsed list as a chat history when every entry
+		// is a map carrying a "role" key. Avoids false positives like
+		// `[1,2,3]` or `[{"name":"item"}]` being mistaken for messages.
+		for _, e := range parsed {
+			m, ok := e.(map[string]any)
 			if !ok {
-				continue
+				return nil
 			}
-			role, _ := mm["role"].(string)
-			msg := app.ChatMessage{Role: role, Content: mm["content"]}
-			if name, ok := mm["name"].(string); ok {
-				msg.Name = name
+			if _, hasRole := m["role"].(string); !hasRole {
+				return nil
 			}
-			if tcid, ok := mm["tool_call_id"].(string); ok {
-				msg.ToolCallID = tcid
-			}
-			if rawTC, ok := mm["tool_calls"].([]any); ok && len(rawTC) > 0 {
-				msg.ToolCalls = coerceToolCalls(rawTC)
-			}
-			out = append(out, msg)
 		}
-		if len(out) == 0 {
-			return nil
-		}
-		return out
+		return coerceChatMessageList(parsed)
 	}
 	return nil
+}
+
+// coerceChatMessageList builds the typed chat-message slice from a
+// JSON-unmarshalled []any. Shared between the direct-list path
+// (shape 2) and the JSON-string path (shape 3) so the two stay in
+// lockstep.
+func coerceChatMessageList(x []any) []app.ChatMessage {
+	if len(x) == 0 {
+		return nil
+	}
+	out := make([]app.ChatMessage, 0, len(x))
+	for _, m := range x {
+		mm, ok := m.(map[string]any)
+		if !ok {
+			continue
+		}
+		role, _ := mm["role"].(string)
+		msg := app.ChatMessage{Role: role, Content: mm["content"]}
+		if name, ok := mm["name"].(string); ok {
+			msg.Name = name
+		}
+		if tcid, ok := mm["tool_call_id"].(string); ok {
+			msg.ToolCallID = tcid
+		}
+		if rawTC, ok := mm["tool_calls"].([]any); ok && len(rawTC) > 0 {
+			msg.ToolCalls = coerceToolCalls(rawTC)
+		}
+		out = append(out, msg)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // coerceToolCalls converts the JSON-unmarshalled []any slice into a

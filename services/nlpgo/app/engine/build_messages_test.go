@@ -215,3 +215,138 @@ func TestBuildMessages_AcceptsTypedChatMessagesSlice(t *testing.T) {
 	require.Len(t, msgs, 1)
 	assert.Equal(t, "from typed slice", msgs[0].Content)
 }
+
+// TestBuildMessages_AcceptsJSONStringEncodedHistory pins the second
+// half of regression cb76144a6 (Workflow Agent scenario flow). The TS
+// adapter resolve-field-mappings.ts:71 unconditionally JSON-stringifies
+// any non-string field value before sending it to the NLP service. A
+// signature node declared with a `str`-typed `messages` (or
+// `chat_messages`) input therefore sees the value arrive as a JSON
+// string of the form `"[{\"role\":\"user\",\"content\":\"...\"}]"`,
+// not as a native list. Python's _coerce_for_liquid lstrips and
+// JSON-parses such strings back to native form so multi-turn history
+// survives. Pre-fix the signature collapsed all turns into a single
+// escaped-blob user message — a silent loss of conversation context.
+func TestBuildMessages_AcceptsJSONStringEncodedHistory(t *testing.T) {
+	node := signatureNode(t, "")
+	encoded := `[{"role":"user","content":"First turn"},` +
+		`{"role":"assistant","content":"First reply"},` +
+		`{"role":"user","content":"Second turn"}]`
+
+	msgs := buildMessages(node, map[string]any{"chat_messages": encoded})
+
+	require.Len(t, msgs, 3, "all turns must survive when input arrives as a JSON-encoded string")
+	assert.Equal(t, "user", msgs[0].Role)
+	assert.Equal(t, "First turn", msgs[0].Content)
+	assert.Equal(t, "assistant", msgs[1].Role)
+	assert.Equal(t, "First reply", msgs[1].Content)
+	assert.Equal(t, "user", msgs[2].Role)
+	assert.Equal(t, "Second turn", msgs[2].Content)
+}
+
+// TestBuildMessages_AcceptsJSONStringEncodedHistoryViaMessagesKey
+// covers the legacy-key counterpart of the JSON-string case above, so
+// we don't accidentally fix the canonical key while the legacy one
+// stays broken.
+func TestBuildMessages_AcceptsJSONStringEncodedHistoryViaMessagesKey(t *testing.T) {
+	node := signatureNode(t, "")
+	encoded := `[{"role":"user","content":"hi"}]`
+
+	msgs := buildMessages(node, map[string]any{"messages": encoded})
+
+	require.Len(t, msgs, 1)
+	assert.Equal(t, "user", msgs[0].Role)
+	assert.Equal(t, "hi", msgs[0].Content)
+}
+
+// TestBuildMessages_PreservesNonHistoryStringInputs guards the
+// false-positive direction of the JSON-string-of-history fix: a
+// `str`-typed input whose value happens to start with `[` or `{` but
+// is NOT a chat-history list (e.g. a literal JSON-formatted block, a
+// regex starting with `[`, etc.) must NOT be misinterpreted as
+// chat history. The string should fall through to composeUserPrompt
+// unchanged so the customer's prompt content is preserved verbatim.
+func TestBuildMessages_PreservesNonHistoryStringInputs(t *testing.T) {
+	node := signatureNode(t, "")
+	cases := []string{
+		`[1, 2, 3]`,                 // numeric array
+		`["a", "b", "c"]`,           // string array (no role/content)
+		`{"foo": "bar"}`,            // plain object
+		`[{"name":"item","qty":3}]`, // list of non-message objects
+		`not json at all [unbalanced`,
+		`hello world`,
+	}
+	for _, c := range cases {
+		msgs := buildMessages(node, map[string]any{"chat_messages": c})
+		// Either fall through to user-prompt fold (single user msg) or
+		// preserve the string under a different key — the load-bearing
+		// guard is "no panic, no list-of-roles invented out of thin
+		// air, no chat history fabricated from a non-message string."
+		for _, m := range msgs {
+			if m.Role == "user" {
+				continue
+			}
+			t.Errorf("non-history string input %q produced unexpected role %q", c, m.Role)
+		}
+	}
+}
+
+// TestBuildMessages_RendersJSONSchemaInputAsDotPath pins the
+// json_schema-typed INPUT path. Cross-node inputs land as
+// map[string]any after JSON-roundtrip through state.recordOutputs →
+// state.resolveInputs; a signature node accessing the structured
+// object via {{ profile.user.name }} must traverse the nested map and
+// emit the leaf scalar — same as a plain `dict`-typed input.
+//
+// This is the input-side complement to pattern_007 (multi-output
+// json_schema response) and pattern_012 (single-output literal
+// json_schema): proves that arbitrarily-nested user-defined schemas
+// flow through both directions of a signature node.
+func TestBuildMessages_RendersJSONSchemaInputAsDotPath(t *testing.T) {
+	node := signatureNode(t, "Hello {{ profile.user.name }} from {{ profile.user.org.name }}")
+	profile := map[string]any{
+		"user": map[string]any{
+			"name": "Alice",
+			"org": map[string]any{
+				"name": "Acme",
+			},
+		},
+	}
+	msgs := buildMessages(node, map[string]any{"profile": profile, "question": "x"})
+	assert.Equal(t, "Hello Alice from Acme", systemPrompt(msgs))
+}
+
+// TestBuildMessages_RendersJSONSchemaInputArrayAccess covers the
+// array-index path on a json_schema-typed input. The shape is the
+// same as `pattern_003` for HTTP block but proves the signature path
+// also works.
+func TestBuildMessages_RendersJSONSchemaInputArrayAccess(t *testing.T) {
+	node := signatureNode(t, "First item: {{ catalog.items[0].name }}")
+	catalog := map[string]any{
+		"items": []any{
+			map[string]any{"name": "alpha", "qty": 3.0},
+			map[string]any{"name": "beta", "qty": 7.0},
+		},
+	}
+	msgs := buildMessages(node, map[string]any{"catalog": catalog, "question": "x"})
+	assert.Equal(t, "First item: alpha", systemPrompt(msgs))
+}
+
+// TestBuildMessages_EmitsJSONSchemaInputAsJSONLiteral guards the
+// "no dot-path, just emit the structured object" case. When the
+// customer writes {{ profile }} with no path traversal, the engine
+// JSON-stringifies the object so it lands inside the prompt as a
+// canonical JSON literal — matching the Python path's json.dumps
+// fallback (template_adapter.py SerializableWithStringFallback).
+func TestBuildMessages_EmitsJSONSchemaInputAsJSONLiteral(t *testing.T) {
+	node := signatureNode(t, "Profile: {{ profile }}")
+	profile := map[string]any{"name": "Alice", "tier": "gold"}
+	msgs := buildMessages(node, map[string]any{"profile": profile, "question": "x"})
+
+	got := systemPrompt(msgs)
+	// Order isn't guaranteed by encoding/json for map[string]any, so
+	// just assert each field is present and the value is JSON-shaped.
+	assert.Contains(t, got, "Profile: ", "leading literal preserved")
+	assert.Contains(t, got, `"name":"Alice"`, "json key/value rendered")
+	assert.Contains(t, got, `"tier":"gold"`, "json key/value rendered")
+}
