@@ -87,6 +87,11 @@ export function usePersonalContext(): PersonalContext {
     { enabled: !!organization, refetchOnWindowFocus: false },
   );
 
+  const personalUsageQuery = api.user.personalUsage.useQuery(
+    { organizationId: orgId },
+    { enabled: !!organization, refetchOnWindowFocus: false },
+  );
+
   const apiKeys = useMemo<PersonalApiKeyRow[]>(() => {
     const rows = personalKeysQuery.data;
     if (!rows) return [];
@@ -154,18 +159,38 @@ export function usePersonalContext(): PersonalContext {
     routingPolicyName: personalContextQuery.data?.routingPolicy?.name ?? null,
     switcher,
     summary: {
-      // ClickHouse per-user aggregations not shipped yet — using mocked
-      // shape so the dashboard renders meaningfully. Real data flows in
-      // once the per-user trace-fold projection lands.
-      spentThisMonthUsd: 0,
+      spentThisMonthUsd: personalUsageQuery.data?.summary.spentUsd ?? 0,
+      // Per-user budget enforcement isn't shipped yet — admin can attach
+      // a GatewayBudget at user scope but the wire-up to surface the cap
+      // here is a follow-up. Renders an empty-state card until then.
       budgetUsd: null,
-      requestsThisMonth: 0,
+      requestsThisMonth: personalUsageQuery.data?.summary.requests ?? 0,
+      // Month-over-month delta requires a second window query; defer.
       requestsDeltaPctVsLastMonth: null,
-      mostUsedModel: null,
+      mostUsedModel: personalUsageQuery.data?.summary.mostUsedModel ?? null,
     },
-    spendByDay: [],
-    spendByTool: [],
-    recentActivity: [],
+    spendByDay:
+      personalUsageQuery.data?.dailyBuckets.map((bucket) => ({
+        day: bucket.day,
+        usd: bucket.spentUsd,
+      })) ?? [],
+    // The CH service breaks down by model name today (see gateway.md spec —
+    // tool-level breakdown needs User-Agent / `langwatch.client.name`
+    // extraction in the trace fold which lands separately). Surface the
+    // model-level breakdown in the same UI slot until then.
+    spendByTool:
+      personalUsageQuery.data?.breakdownByModel.map((row) => ({
+        tool: row.label,
+        usd: row.spentUsd,
+      })) ?? [],
+    recentActivity:
+      personalUsageQuery.data?.recentActivity.map((row) => ({
+        id: row.traceId,
+        occurredAt: row.occurredAt,
+        toolName: row.models[0] ?? "—",
+        summary: row.preview,
+        costUsd: row.spentUsd,
+      })) ?? [],
     apiKeys,
     notificationPrefs: {
       budgetThreshold80: true,
