@@ -51,28 +51,27 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
   const distAlreadyBuilt = existsSync(join(distPath, "client"));
 
   if (!existsSync(nodeModulesPath)) {
-    // When `dist/client/` ships pre-built (published tarball), we never run
-    // vite/esbuild/scenario-child-process locally — so we can install with
-    // `--prod` and skip ~50 devDependencies (vite, vitest, playwright,
-    // esbuild, type generators, etc.). Saves disk + install time on the
-    // user's machine. For dev/checkout flows where dist/ is missing, we
-    // still need devDeps to run the build below.
-    const installArgs = distAlreadyBuilt
-      ? ["install", "--prod", "--frozen-lockfile"]
-      : ["install", "--prod=false", "--frozen-lockfile"];
-    await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, ...installArgs], {
+    // Always install with `--prod=false`. We tried `--prod` for the
+    // prebuilt-dist path to save ~50 devDependencies (vite, esbuild,
+    // vitest, playwright, etc.), but it turned up two real-world
+    // breakages on dogfood:
+    //   1. .prisma/client/ never materialized → langwatch app crashed
+    //      on `Cannot find module '.prisma/client/index'`.
+    //   2. tsx's --tsconfig path-alias resolver failed to map `~/...`
+    //      imports inside src/tasks/* → `Cannot find module '~/server/...'`.
+    // The transitive deps that tsx + prisma + workers need at runtime
+    // overlap unpredictably with langwatch's devDependencies, and
+    // chasing each is a losing game. Disk hit is acceptable; reliability
+    // wins.
+    await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, "install", "--prod=false", "--frozen-lockfile"], {
       stdio: "inherit",
     });
 
-    // pnpm install does NOT auto-generate the prisma client (Prisma's
-    // `postinstall` is on `@prisma/client` only when bundled via `prisma`
-    // CLI's package.json — we get the CLI as a normal dep, not via the
-    // bundled installer). Without this step, `langwatch/node_modules/.prisma/client/`
-    // doesn't exist and the langwatch app crashes at boot with
-    // `Cannot find module '.prisma/client/index'`. The full-build path
-    // below (when !distAlreadyBuilt) covers this via start:prepare:files →
-    // prisma:generate:typescript; the prebuilt-dist path needs an explicit
-    // call.
+    // pnpm install does NOT auto-generate the prisma client. The full-
+    // build path below (when !distAlreadyBuilt) covers this via
+    // start:prepare:files → prisma:generate:typescript; the prebuilt-
+    // dist path needs an explicit call so .prisma/client/ exists before
+    // the langwatch app boots.
     if (distAlreadyBuilt) {
       await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, "exec", "prisma", "generate"], {
         stdio: "inherit",
