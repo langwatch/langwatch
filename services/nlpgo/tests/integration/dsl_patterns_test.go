@@ -60,6 +60,7 @@
 //   pattern_009_llm_category   — sig → evaluator(langevals/llm_category)       ✅
 //   pattern_010_custom_safety  — custom node kind → typed unsupported error    ✅
 //   pattern_011_workflow_agent — sig → agent[type=workflow] sub-workflow chain ✅
+//   pattern_012_json_schema_out — single output typed json_schema + inline shape ✅
 //
 // See feedback memory entry "No customer names in public repo".
 
@@ -1341,6 +1342,156 @@ func TestPattern009_LLMCategoryEvaluator(t *testing.T) {
 	require.NotNil(t, res.Result)
 	assert.Equal(t, "mild", res.Result["label"])
 	assert.Equal(t, "the description matches the mild category most closely", res.Result["details"])
+}
+
+// TestPattern012_SingleJSONSchemaOutput — signature node with a single
+// declared output of literal `type: "json_schema"` carrying an inline
+// schema. Companion to pattern_007 — that one proves the multi-output
+// path triggers structured response_format with str/float properties;
+// this one proves the *literal-typed* json_schema field works
+// end-to-end with the workflow author's exact schema verbatim.
+//
+// Not observed in this customer's prod data (their outputs are all str
+// or bool — see redacted summary), but the field type is supported by
+// the DSL parser + composeSignatureResponseFormat unit-test path
+// (signature_outputs_test.go), and a future customer could legitimately
+// use it. Pinning the e2e contract so structural drift is caught early.
+//
+// What this proves:
+//
+//   1. The DSL parser binds the inline `json_schema` object on the
+//      output Field.JSONSchema map.
+//   2. composeSignatureResponseFormat wraps the user's schema as a
+//      property on the wrapper object — `properties.<id>` is the
+//      verbatim user schema, not flattened.
+//   3. On the LLM boundary, response_format.type=json_schema and the
+//      schema's `properties.<id>` is the exact user schema — proves no
+//      flattening, no clobbering.
+//   4. extractSignatureOutputs unwraps the LLM's `{"<id>": <obj>}`
+//      reply and binds the inner object to the declared output, so the
+//      workflow result carries the structured payload verbatim.
+//
+// Generic concept (book metadata extractor); zero customer content.
+func TestPattern012_SingleJSONSchemaOutput(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(_ app.LLMRequest) (*app.LLMResponse, error) {
+			// Provider would normally enforce the schema; we just need
+			// a JSON-parseable payload that matches the declared shape.
+			return &app.LLMResponse{Content: `{"book":{"title":"Tides of Spring","year":1978,"author":"A. Generic"}}`}, nil
+		},
+	}
+	url, _ := setupPatternStack(t, llm, func(http.ResponseWriter, *http.Request) {})
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-012",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"k","spec_version":"1.3",
+	      "name":"Pattern012","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"blurb","type":"str"}],
+	          "dataset":{"inline":{"records":{"blurb":["A 1978 novel about coastal seasons."]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"extract","type":"signature","data":{
+	          "name":"Extract",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Extract book metadata from: {{ blurb }}"}
+	          ],
+	          "inputs":[{"identifier":"blurb","type":"str"}],
+	          "outputs":[
+	            {
+	              "identifier":"book",
+	              "type":"json_schema",
+	              "json_schema":{
+	                "type":"object",
+	                "properties":{
+	                  "title":{"type":"string"},
+	                  "year":{"type":"integer"},
+	                  "author":{"type":"string"}
+	                },
+	                "required":["title","year","author"],
+	                "additionalProperties":false
+	              }
+	            }
+	          ]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[{"identifier":"book","type":"json_schema"}]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.blurb","target":"extract","targetHandle":"inputs.blurb","type":"default"},
+	        {"id":"e2","source":"extract","sourceHandle":"outputs.book","target":"end","targetHandle":"inputs.book","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	// (1) Single-output json_schema-typed signature still triggers
+	// structured response_format wiring on the LLM boundary.
+	llmReq := llm.lastRequest(t)
+	require.NotNil(t, llmReq.ResponseFormat,
+		"json_schema-typed output must request structured response_format")
+	assert.Equal(t, "json_schema", llmReq.ResponseFormat.Type)
+	js := llmReq.ResponseFormat.JSONSchema
+	require.NotNil(t, js)
+	schema, ok := js["schema"].(map[string]any)
+	require.True(t, ok)
+
+	// (2) The user's inline schema reaches the LLM under
+	// `properties.<output_id>` verbatim — no flattening, no clobbering.
+	props, ok := schema["properties"].(map[string]any)
+	require.True(t, ok)
+	bookSchema, ok := props["book"].(map[string]any)
+	require.True(t, ok, "the json_schema-typed output's user schema must be wrapped under properties.book")
+	assert.Equal(t, "object", bookSchema["type"])
+	bookProps, ok := bookSchema["properties"].(map[string]any)
+	require.True(t, ok, "user's nested schema properties must survive verbatim")
+	require.NotNil(t, bookProps["title"])
+	require.NotNil(t, bookProps["year"])
+	require.NotNil(t, bookProps["author"])
+	// `required` may come back as []string or []any depending on JSON
+	// path; tolerate both, exactly like pattern_007.
+	required := normalizeRequired(t, bookSchema["required"])
+	assert.ElementsMatch(t, []string{"title", "year", "author"}, required)
+
+	// (3) extractSignatureOutputs unwraps the LLM's {"book": {...}}
+	// reply and binds the inner object to the declared output.
+	require.NotNil(t, res.Result)
+	bookOut, ok := res.Result["book"].(map[string]any)
+	require.True(t, ok, "result.book must be an object (the parsed inner JSON)")
+	assert.Equal(t, "Tides of Spring", bookOut["title"])
+	// JSON numbers come through as float64 by default; year is integer
+	// in the schema but float64 over the wire.
+	assert.InDelta(t, 1978.0, bookOut["year"], 1e-9)
+	assert.Equal(t, "A. Generic", bookOut["author"])
+}
+
+// normalizeRequired tolerates the two shapes `required` can land in
+// after JSON round-trip ([]string vs []any of string).
+func normalizeRequired(t *testing.T, raw any) []string {
+	t.Helper()
+	if s, ok := raw.([]string); ok {
+		return s
+	}
+	if a, ok := raw.([]any); ok {
+		out := make([]string, 0, len(a))
+		for _, v := range a {
+			if s, ok := v.(string); ok {
+				out = append(out, s)
+			}
+		}
+		return out
+	}
+	return nil
 }
 
 // TestPattern011_WorkflowAsEvaluatorChain — signature → agent
