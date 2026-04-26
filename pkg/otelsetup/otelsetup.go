@@ -200,6 +200,28 @@ func (p *Provider) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+// ForceFlush exports any pending spans synchronously. Safe to call on
+// a noop provider.
+//
+// Mirrors langwatch_nlp commit 1f1d62f55 ("flush spans immediately
+// after workflow execution to avoid ~180s ingestion delay caused by
+// Lambda freezing the BatchSpanProcessor background thread"). On
+// Lambda, the runtime freezes the process between invocations — any
+// background-thread flush queued by the BatchSpanProcessor never
+// runs, and spans only ship on the next thaw. Callers (request
+// handlers) should `defer p.ForceFlush(ctx)` so spans for the just-
+// finished request reach the collector before the freeze.
+//
+// Outside Lambda the cost is one extra exporter call per request —
+// negligible vs the alternative of losing observability for the
+// requests that triggered the failure path.
+func (p *Provider) ForceFlush(ctx context.Context) error {
+	if p.tp != nil {
+		return p.tp.ForceFlush(ctx)
+	}
+	return nil
+}
+
 // healthyExporter wraps a SpanExporter, invoking `onHealthy` the first
 // time ExportSpans returns nil. Used to flip the startupErrorHandler
 // filter off once the collector is actually answering.

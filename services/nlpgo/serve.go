@@ -32,6 +32,7 @@ func Serve(ctx context.Context, application *app.App, deps *Deps, cfg Config, pl
 		ChildProxy:          deps.ChildProxy,
 		MaxRequestBodyBytes: cfg.Server.MaxRequestBodyBytes,
 		PlaygroundProxy:     playground,
+		OTel:                deps.OTel,
 	})
 
 	srv := &http.Server{

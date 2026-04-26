@@ -5,7 +5,9 @@
 package httpapi
 
 import (
+	"context"
 	"net/http"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"go.uber.org/zap"
@@ -13,6 +15,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/health"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/pkg/httpmiddleware"
+	"github.com/langwatch/langwatch/pkg/otelsetup"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/domain"
 )
@@ -34,6 +37,12 @@ type RouterDeps struct {
 	// in-process aigateway dispatcher. nil → /go/proxy/v1/* returns the
 	// 501 stub (used by tests that don't exercise the playground path).
 	PlaygroundProxy PlaygroundProxy
+	// OTel is the OpenTelemetry provider whose `ForceFlush` is called
+	// after each /go/studio/* request, so spans for the just-finished
+	// workflow ship to the collector before the Lambda runtime freezes
+	// the process. nil → no per-request flush (tests, dev runs without
+	// telemetry).
+	OTel *otelsetup.Provider
 }
 
 // NewRouter assembles the chi router.
@@ -61,6 +70,9 @@ func NewRouter(deps RouterDeps) http.Handler {
 	r.Route("/go", func(g chi.Router) {
 		g.Get("/version", versionHandler(deps.Version))
 		g.Route("/studio", func(s chi.Router) {
+			if deps.OTel != nil {
+				s.Use(forceFlushMiddleware(deps.OTel))
+			}
 			s.Post("/execute_sync", executeSyncHandler(deps.App))
 			s.Post("/execute", executeStreamHandler(deps.App))
 		})
@@ -75,6 +87,27 @@ func NewRouter(deps RouterDeps) http.Handler {
 	}
 
 	return r
+}
+
+// forceFlushMiddleware exports any pending spans synchronously after
+// each /go/studio/* request returns. Mirrors langwatch_nlp commit
+// 1f1d62f55 ("flush spans immediately after workflow execution to
+// avoid ~180s ingestion delay caused by Lambda freezing the
+// BatchSpanProcessor background thread"). The flush runs in a fresh
+// 5-second-bounded context so a hung collector can't block the
+// caller indefinitely; the flush itself is best-effort — span loss
+// during a collector outage is preferable to wedged requests.
+func forceFlushMiddleware(provider *otelsetup.Provider) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				flushCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+				defer cancel()
+				_ = provider.ForceFlush(flushCtx)
+			}()
+			next.ServeHTTP(w, r)
+		})
+	}
 }
 
 var errorsRegistered bool

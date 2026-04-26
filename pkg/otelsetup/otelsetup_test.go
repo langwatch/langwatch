@@ -128,3 +128,56 @@ type fakeExporter struct {
 
 func (f *fakeExporter) ExportSpans(_ context.Context, _ []sdktrace.ReadOnlySpan) error { return f.err }
 func (f *fakeExporter) Shutdown(_ context.Context) error                               { return nil }
+
+// TestProvider_ForceFlushIsSafeOnNoopProvider pins the contract that
+// callers can `defer p.ForceFlush(ctx)` even when telemetry isn't
+// configured (e.g. local dev with OTLP_ENDPOINT unset). A naked
+// dereference of `p.tp` would panic — guard it.
+func TestProvider_ForceFlushIsSafeOnNoopProvider(t *testing.T) {
+	p := &Provider{} // no tracer provider, mirroring noop construction
+	if err := p.ForceFlush(context.Background()); err != nil {
+		t.Fatalf("noop ForceFlush should be a no-op, got %v", err)
+	}
+}
+
+// TestProvider_ForceFlushDelegatesToTracerProvider verifies the call
+// reaches the SDK tracer provider's ForceFlush. We use a real
+// tracer-provider with a counting span processor and a long batch
+// timeout so only ForceFlush triggers an export call. Pins the parity
+// claim from langwatch_nlp commit 1f1d62f55: the per-request flush
+// must actually push pending spans to the exporter, not just no-op.
+func TestProvider_ForceFlushDelegatesToTracerProvider(t *testing.T) {
+	exp := &countingExporter{}
+	tp := sdktrace.NewTracerProvider(
+		sdktrace.WithBatcher(exp,
+			sdktrace.WithBatchTimeout(time.Hour), // long timeout so only ForceFlush triggers
+		),
+	)
+	t.Cleanup(func() { _ = tp.Shutdown(context.Background()) })
+
+	tracer := tp.Tracer("test")
+	_, span := tracer.Start(context.Background(), "test-span")
+	span.End()
+
+	p := &Provider{tp: tp}
+	before := exp.calls.Load()
+	if err := p.ForceFlush(context.Background()); err != nil {
+		t.Fatalf("ForceFlush returned error: %v", err)
+	}
+	after := exp.calls.Load()
+	if after <= before {
+		t.Fatalf("ForceFlush should have triggered an export batch; got calls before=%d after=%d", before, after)
+	}
+}
+
+// countingExporter records each ExportSpans call so tests can assert
+// flush behavior.
+type countingExporter struct {
+	calls atomic.Int32
+}
+
+func (c *countingExporter) ExportSpans(_ context.Context, _ []sdktrace.ReadOnlySpan) error {
+	c.calls.Add(1)
+	return nil
+}
+func (c *countingExporter) Shutdown(_ context.Context) error { return nil }
