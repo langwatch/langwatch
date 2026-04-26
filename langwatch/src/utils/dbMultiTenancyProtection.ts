@@ -109,6 +109,20 @@ const EXEMPT_MODELS = [
    * `modelProviderId`). Same rationale as VirtualKeyProviderCredential.
    */
   "ModelProviderScope",
+  /**
+   * RoutingPolicy (iter governance-platform) is org-scoped:
+   * (organizationId, scope, scopeId, name) is the natural key. Scope
+   * may be 'organization' | 'team' | 'project', but the row itself
+   * doesn't carry a projectId column. Resolution paths
+   * (`resolveDefaultForUser`) query by organizationId + scope +
+   * scopeId — projectId enforcement would block the lookup.
+   *
+   * Same rationale as ModelProvider above (also (scopeType, scopeId)-
+   * keyed). Service layer authorises ownership via organizationId
+   * before any mutation; the middleware exemption only relaxes the
+   * SQL guard.
+   */
+  "RoutingPolicy",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
