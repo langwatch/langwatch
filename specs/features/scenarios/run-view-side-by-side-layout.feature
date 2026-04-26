@@ -13,19 +13,6 @@ Feature: Scenario run detail drawer
     And the list/grid remains visible but dimmed behind it
 
   @integration @unimplemented
-  Scenario: Drawer header shows run identity and status
-    Given a completed scenario run "Echo user request" for "target-A" that failed in 6.3 seconds
-    When the detail drawer opens for that run
-    Then the header displays the scenario name, target name, failure status, and duration
-
-  @integration @unimplemented
-  Scenario: Criteria section shows pass/fail summary
-    Given a run with 4 criteria where 0 passed
-    When the detail drawer opens for that run
-    Then the criteria section shows "0/4 passed"
-    And each criterion displays its name and pass/fail indicator
-
-  @integration @unimplemented
   Scenario: Failed criteria show expandable reasoning
     Given a run with a failed criterion that has reasoning text
     When the detail drawer opens for that run
@@ -37,12 +24,6 @@ Feature: Scenario run detail drawer
     When the detail drawer opens for that run
     Then the conversation section displays the message exchange
     And a "View Trace" link is available for the conversation
-
-  @integration @unimplemented
-  Scenario: Drawer content scrolls when it overflows
-    Given a run with many criteria and a long conversation
-    When the detail drawer opens for that run
-    Then the drawer body scrolls vertically to reveal all content
 
   @integration @unimplemented
   Scenario: Closing the drawer returns to the list view

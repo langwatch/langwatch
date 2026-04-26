@@ -21,15 +21,6 @@ Feature: Bull Board queue dashboard
 
   # --- Docker compose integration ---
 
-  @unit @unimplemented
-  Scenario: bullboard service is included in scenarios profile
-    Given the compose.dev.yml configuration
-    Then the bullboard service belongs to the "scenarios" profile
-    And its volume mounts ./bullboard to /app
-    And it exposes port 6380
-
-  # --- UI accessibility (full system) ---
-
   @e2e @unimplemented
   Scenario: Bull Board UI loads via dev-scenarios
     Given all services from the scenarios profile are running

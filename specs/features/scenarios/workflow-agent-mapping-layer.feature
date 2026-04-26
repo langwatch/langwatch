@@ -9,61 +9,6 @@ Feature: Workflow agent input/output mapping layer
 
   # --- Layer 1: Auto-compute on workflow save ---
 
-  @unit @unimplemented
-  Scenario: Auto-computes mappings when workflow with conventional inputs is saved
-    Given a workflow agent linked to the scenario
-    And the agent has no scenarioMappings configured
-    And the workflow has inputs named "query" and "history"
-    And the workflow has an output named "response"
-    When the workflow version is saved
-    Then the agent's scenarioMappings map "query" to the scenario "input" field
-    And the agent's scenarioMappings map "history" to the scenario "messages" field
-    And the agent's scenarioMappings map the workflow output "response" to the scenario output
-
-  @unit @unimplemented
-  Scenario: Skips auto-compute when workflow still has blank-template placeholder fields
-    Given a workflow agent linked to the scenario
-    And the agent has no scenarioMappings configured
-    And the workflow has the default blank-template inputs "question" and output "output"
-    When the workflow version is saved
-    Then the agent's scenarioMappings remain empty
-
-  @unit @unimplemented
-  Scenario: Re-computes mappings when existing mappings reference stale fields
-    Given a workflow agent linked to the scenario
-    And the agent has scenarioMappings referencing a field "old_query" that no longer exists
-    And the workflow now has an input named "prompt"
-    When the workflow version is saved
-    Then the agent's scenarioMappings are re-computed against the current workflow I/O
-    And the stale "old_query" mapping is replaced
-
-  @unit @unimplemented
-  Scenario: Auto-compute does not block the workflow save on failure
-    Given a workflow agent linked to the scenario
-    And the agent has no scenarioMappings configured
-    And the auto-compute logic encounters an error
-    When the workflow version is saved
-    Then the workflow save succeeds
-    And the error is logged
-    And the agent's scenarioMappings remain empty
-
-  # --- Layer 2: Client-side mapping check at Save & Run ---
-
-  @integration @unimplemented
-  Scenario: Opens mapping drawer when running a scenario with an unmapped workflow agent
-    Given a workflow agent selected as the scenario target
-    And the agent has empty scenarioMappings
-    When the user clicks Save & Run
-    Then the AgentWorkflowEditorDrawer opens instead of starting the run
-    And the user can configure the mappings before running
-
-  @integration @unimplemented
-  Scenario: Opens mapping drawer when workflow agent has no input-field mapping
-    Given a workflow agent selected as the scenario target
-    And the agent has scenarioMappings but none wire a source to scenario "input" or "messages"
-    When the user clicks Save & Run
-    Then the AgentWorkflowEditorDrawer opens instead of starting the run
-
   @e2e @unimplemented
   Scenario: Scenario runs successfully after user configures mappings via drawer
     Given a workflow agent selected as the scenario target
@@ -75,26 +20,6 @@ Feature: Workflow agent input/output mapping layer
     Then the scenario run executes successfully
 
   # --- Layer 3: Pre-run validation ---
-
-  @integration @unimplemented
-  Scenario: Returns actionable error for multi-input workflow agent without mappings
-    Given a workflow agent as the scenario target
-    And the workflow has multiple declared inputs
-    And the agent has no scenarioMappings configured
-    When the scenario run is triggered via any entry point
-    Then the run returns a structured validation error
-    And the error message directs the user to configure mappings
-
-  @unit @unimplemented
-  Scenario: Allows single-input workflow agent to run without explicit mappings
-    Given a workflow agent as the scenario target
-    And the workflow has exactly one declared input
-    And the agent has no scenarioMappings configured
-    When the scenario run is triggered
-    Then the run proceeds using the legacy single-input fallback
-    And no validation error is raised
-
-  # --- Layer 4: Existing flows unchanged ---
 
   @integration @unimplemented
   Scenario: Create flow navigates directly to workflow studio without mapping panel
@@ -121,30 +46,3 @@ Feature: Workflow agent input/output mapping layer
     Then AgentWorkflowEditorDrawer opens with the agent id
     And the drawer is populated with the agent's name, linked workflow, and scenarioMappings
     And WorkflowSelectorDrawer is not opened
-
-  @unit @unimplemented
-  Scenario Outline: Agents page routes each agent type to its matching editor drawer
-    Given the /[project]/agents page edit handler
-    When the user edits a "<type>" agent
-    Then the drawer name resolved for editing is "<drawer>"
-
-    Examples:
-      | type     | drawer              |
-      | code     | agentCodeEditor     |
-      | http     | agentHttpEditor     |
-      | workflow | agentWorkflowEditor |
-
-# --- AC Coverage Map ---
-# AC 1: "Auto-compute mappings on workflow save" → Scenario: Auto-computes mappings when workflow with conventional inputs is saved
-# AC 1: "Auto-compute mappings on workflow save" → Scenario: Skips auto-compute when workflow still has blank-template placeholder fields
-# AC 1: "Auto-compute mappings on workflow save" → Scenario: Re-computes mappings when existing mappings reference stale fields
-# AC 1: "Auto-compute mappings on workflow save" → Scenario: Auto-compute does not block the workflow save on failure
-# AC 2: "Mapping drawer gate at Save & Run" → Scenario: Opens mapping drawer when running a scenario with an unmapped workflow agent
-# AC 2: "Mapping drawer gate at Save & Run" → Scenario: Opens mapping drawer when workflow agent has no input-field mapping
-# AC 2: "Mapping drawer gate at Save & Run" → Scenario: Scenario runs successfully after user configures mappings via drawer
-# AC 3: "Pre-run validation for multi-input workflows" → Scenario: Returns actionable error for multi-input workflow agent without mappings
-# AC 3: "Pre-run validation for multi-input workflows" → Scenario: Allows single-input workflow agent to run without explicit mappings
-# AC 4: "No change to the current create flow" → Scenario: Create flow navigates directly to workflow studio without mapping panel
-# AC 5: "Existing edit path unchanged" → Scenario: Edit flow continues to show mapping panel as before
-# AC 6: "Edit from agents list opens the edit drawer, not the create drawer" → Scenario: Editing a workflow agent from the agents list opens the editor populated with existing data
-# AC 6: "Edit from agents list opens the edit drawer, not the create drawer" → Scenario: Agents list routes each agent type to its matching editor drawer

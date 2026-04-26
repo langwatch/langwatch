@@ -36,14 +36,6 @@ Feature: Lightweight bug-fix workflow for orchestrator
     When the orchestrator classifies the issue
     Then it is classified as a feature
 
-  @unit @unimplemented
-  Scenario: Detects bug by issue template
-    Given an issue created from the "bug_report" template
-    When the orchestrator classifies the issue
-    Then it is classified as a bug
-
-  # --- Bug-fix workflow skips heavyweight steps ---
-
   @integration @unimplemented
   Scenario: Bug-fix workflow skips plan creation
     Given an issue classified as a bug
@@ -56,26 +48,6 @@ Feature: Lightweight bug-fix workflow for orchestrator
     Given an issue classified as a bug
     When the orchestrator runs the bug-fix workflow
     Then the challenge step is skipped
-
-  @integration @unimplemented
-  Scenario: Bug-fix workflow skips user approval
-    Given an issue classified as a bug
-    When the orchestrator runs the bug-fix workflow
-    Then the user approval step is skipped
-
-  @integration @unimplemented
-  Scenario: Bug-fix workflow skips test review
-    Given an issue classified as a bug
-    When the orchestrator runs the bug-fix workflow
-    Then the test review step is skipped
-
-  @integration @unimplemented
-  Scenario: Bug-fix workflow skips E2E generation
-    Given an issue classified as a bug
-    When the orchestrator runs the bug-fix workflow
-    Then the E2E verification step is skipped
-
-  # --- Bug-fix workflow retains essential steps ---
 
   @integration @unimplemented
   Scenario: Bug-fix workflow runs investigation step

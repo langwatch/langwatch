@@ -28,10 +28,3 @@ Feature: Unified agent target section in scenario menus
     When I open the Save and Run dropdown
     And I search for "My"
     Then both "My HTTP Bot" and "My Code Bot" appear in the agents section
-
-  @integration @unimplemented
-  Scenario: Selecting an agent preserves its type
-    When I select an HTTP agent from the unified agents section
-    Then the target value has type "http" and the correct agent id
-    When I select a Code agent from the unified agents section
-    Then the target value has type "code" and the correct agent id
