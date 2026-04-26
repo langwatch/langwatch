@@ -50,16 +50,28 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 
 	out := make(chan StreamEvent, 16)
 	go func() {
-		defer close(out)
 		started := time.Now()
 
 		// Heartbeat goroutine — emits is_alive every Heartbeat ticks
-		// until the run completes.
+		// until the run completes. We must wait for it to fully exit
+		// before closing `out`; otherwise an in-flight emit() can race
+		// with close() and panic with "send on closed channel".
 		hbCtx, hbCancel := context.WithCancel(ctx)
-		defer hbCancel()
+		var hbDone chan struct{}
 		if opts.Heartbeat > 0 {
-			go heartbeat(hbCtx, traceID, opts.Heartbeat, out)
+			hbDone = make(chan struct{})
+			go func() {
+				defer close(hbDone)
+				heartbeat(hbCtx, traceID, opts.Heartbeat, out)
+			}()
 		}
+		defer func() {
+			hbCancel()
+			if hbDone != nil {
+				<-hbDone
+			}
+			close(out)
+		}()
 
 		for _, layer := range plan.Layers {
 			if err := ctx.Err(); err != nil {

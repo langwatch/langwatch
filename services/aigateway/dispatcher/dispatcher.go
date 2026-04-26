@@ -61,6 +61,17 @@ func New(ctx context.Context, opts Options) (*Dispatcher, error) {
 	return &Dispatcher{providers: router}, nil
 }
 
+// Close releases the underlying Bifrost connection pool. Call once at
+// process shutdown so the pool's goroutines and pre-allocated channels
+// don't outlive the service. Idempotent for nil receivers; subsequent
+// Dispatch calls after Close are undefined.
+func (d *Dispatcher) Close() {
+	if d == nil {
+		return
+	}
+	d.providers.Close()
+}
+
 // Request is the per-call shape. Body is the raw OpenAI-compat (or
 // Anthropic /v1/messages, or Responses, etc.) request payload as the
 // provider expects to see it. Model is the bare provider model id

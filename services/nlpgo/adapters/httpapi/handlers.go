@@ -196,20 +196,24 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 			ctx = withOrigin(ctx, req.Origin)
 		}
 
-		w.Header().Set("Content-Type", "text/event-stream")
-		w.Header().Set("Cache-Control", "no-cache")
-		w.Header().Set("Connection", "keep-alive")
-		w.Header().Set("X-Accel-Buffering", "no")
-		w.WriteHeader(http.StatusOK)
 		flusher, ok := w.(http.Flusher)
 		if !ok {
-			// Without flushing the events buffer indefinitely; surface
-			// a structured error rather than silently underperforming.
+			// Without flushing the events would buffer indefinitely;
+			// surface a structured error rather than silently
+			// underperforming. The flusher check has to happen BEFORE
+			// any Set/WriteHeader call — once 200 OK is on the wire,
+			// herr.WriteHTTP can no longer set a non-2xx status and
+			// the client sees mixed signals.
 			herr.WriteHTTP(w, herr.New(ctx, domain.ErrInternal, herr.M{
 				"reason": "no_flusher",
 			}, errors.New("response writer does not support flushing")))
 			return
 		}
+		w.Header().Set("Content-Type", "text/event-stream")
+		w.Header().Set("Cache-Control", "no-cache")
+		w.Header().Set("Connection", "keep-alive")
+		w.Header().Set("X-Accel-Buffering", "no")
+		w.WriteHeader(http.StatusOK)
 
 		streamCtx, cancel := context.WithCancel(ctx)
 		defer cancel()
@@ -311,7 +315,7 @@ func proxyPassthroughHandler(proxy PlaygroundProxy) http.HandlerFunc {
 			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrInternal, herr.M{
 				"reason": "gateway_proxy_not_wired",
 				"path":   r.URL.Path,
-			}))
+			}, errors.New("playground proxy not wired")))
 		}
 	}
 	return playgroundProxyDispatch(proxy)

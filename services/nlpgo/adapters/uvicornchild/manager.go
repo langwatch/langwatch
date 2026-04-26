@@ -50,6 +50,7 @@ type Manager struct {
 	cmd     *exec.Cmd
 	mu      sync.Mutex
 	fatalCh chan error
+	exited  chan struct{}
 	stopped atomic.Bool
 	client  *http.Client
 }
@@ -82,6 +83,7 @@ func New(opts Options) *Manager {
 	return &Manager{
 		opts:    opts,
 		fatalCh: make(chan error, 1),
+		exited:  make(chan struct{}),
 		client:  &http.Client{Timeout: opts.HealthTimeout},
 	}
 }
@@ -181,6 +183,7 @@ func (m *Manager) waitHealthy(ctx context.Context) error {
 
 func (m *Manager) watch(cmd *exec.Cmd) {
 	err := cmd.Wait()
+	close(m.exited)
 	if m.stopped.Load() {
 		return
 	}
@@ -212,12 +215,16 @@ func (m *Manager) killProcess() error {
 		return err
 	}
 	// Wait briefly for graceful exit; escalate to SIGKILL otherwise.
-	done := make(chan struct{})
-	go func() { _ = cmd.Wait(); close(done) }()
+	// The watch() goroutine is the only owner of cmd.Wait(); it closes
+	// m.exited when the child reaps. Calling cmd.Wait() a second time
+	// here returned immediately with an error (the process is already
+	// gone from this goroutine's perspective), short-circuiting the
+	// 5-second timer and silently skipping SIGKILL.
 	select {
-	case <-done:
+	case <-m.exited:
 	case <-time.After(5 * time.Second):
 		_ = syscall.Kill(-pgid, syscall.SIGKILL)
+		<-m.exited
 	}
 	return nil
 }

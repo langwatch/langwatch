@@ -59,6 +59,7 @@ func Root(ctx context.Context, _ []string) error {
 	if err != nil {
 		return err
 	}
+	defer disp.Close()
 	llm := llmexecutor.New(dispatcheradapter.New(disp))
 	deps.Logger.Info("nlpgo_llm_wired", zap.String("transport", "in_process_dispatcher"))
 
