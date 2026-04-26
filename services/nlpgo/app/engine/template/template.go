@@ -15,6 +15,7 @@
 package template
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strings"
@@ -61,17 +62,41 @@ func Render(tmpl string, inputs map[string]any) (string, []string) {
 
 func formatValue(v any) string {
 	if s, ok := v.(string); ok {
-		raw, _ := json.Marshal(s)
+		raw := encodeJSONNoHTMLEscape(s)
+		// Strip the outer quotes the JSON encoder added — callers
+		// embed the result inside an existing string context (system
+		// prompt or HTTP body literal). Inner JSON-special chars (",
+		// \, control chars) stay escaped.
 		if len(raw) >= 2 {
 			return string(raw[1 : len(raw)-1])
 		}
 		return ""
 	}
-	raw, err := json.Marshal(v)
-	if err != nil {
-		return fmt.Sprintf("%v", v)
-	}
+	raw := encodeJSONNoHTMLEscape(v)
 	return string(raw)
+}
+
+// encodeJSONNoHTMLEscape mirrors `json.Marshal` but with HTML-escape
+// disabled — `<`, `>`, `&` survive verbatim, matching Python's
+// `json.dumps(..., ensure_ascii=False)` behavior. Pins the parity
+// claim from langwatch_nlp regression e8db9a51e (UTF-8 encoding) for
+// the punctuation half of that fix's intent. The ASCII default in
+// Go's encoding/json already preserves emoji + non-ASCII unicode
+// verbatim, so no additional handling is needed there.
+func encodeJSONNoHTMLEscape(v any) []byte {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	if err := enc.Encode(v); err != nil {
+		return []byte(fmt.Sprintf("%v", v))
+	}
+	out := buf.Bytes()
+	// json.Encoder appends a trailing newline that json.Marshal does
+	// not — strip it so call sites see the same shape they always have.
+	if len(out) > 0 && out[len(out)-1] == '\n' {
+		out = out[:len(out)-1]
+	}
+	return out
 }
 
 func lookupPath(root map[string]any, path string) (any, bool) {
