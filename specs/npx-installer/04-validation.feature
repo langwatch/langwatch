@@ -58,14 +58,14 @@ Feature: End-to-end validation after `npx @langwatch/server` boots
     Given I am signed in with project "p1"
     When I POST a workflow with one LLM node to /api/workflows/execute
     Then the response status is 200
-    And ~/.langwatch/logs/<today>/langwatch_nlp.log contains "POST /workflow"
+    And ~/.langwatch/logs/langwatch_nlp.log contains "POST /workflow"
     And the trace appears in /api/traces within 5 seconds
 
   Scenario: An evaluator hits langevals end-to-end
     Given I am signed in with project "p1"
     When I POST to /api/evaluations/run with evaluator "langevals/ragas/answer_relevancy"
     Then the response status is 200
-    And ~/.langwatch/logs/<today>/langevals.log contains "POST /evaluations/ragas"
+    And ~/.langwatch/logs/langevals.log contains "POST /evaluations/ragas"
     And the result is persisted to clickhouse
 
   Scenario: A chat completion through the AI Gateway records a trace
