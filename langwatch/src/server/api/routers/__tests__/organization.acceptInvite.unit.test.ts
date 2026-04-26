@@ -111,7 +111,16 @@ describe("organization.acceptInvite", () => {
       const result = await caller.acceptInvite({ inviteCode: "test-code" });
 
       expect(result.success).toBe(true);
-      expect(transactionMock).toHaveBeenCalledTimes(1);
+      // Two transactions are expected since 651e0c1b2:
+      //   1. The invite tx — applies membership / role bindings / invite update.
+      //   2. PersonalWorkspaceService.ensure() — provisions the user's
+      //      personal team + project. Runs OUTSIDE the invite tx so a
+      //      personal-workspace failure doesn't roll back the membership.
+      // The mock's tx callback only provides invite-shape clients, so
+      // the second call's inner calls fall through (and the implementation
+      // catches + logs — non-fatal). What matters here is the invite was
+      // accepted and the personal-workspace path was attempted.
+      expect(transactionMock).toHaveBeenCalledTimes(2);
     });
   });
 
