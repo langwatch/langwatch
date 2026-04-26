@@ -36,6 +36,23 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { EnrichedAuditLog } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
 
+// CSV-cell cap for JSON columns (args / before / after). 4 KB is enough
+// to capture typical gateway-shape diffs while staying well under the
+// per-cell limits of common spreadsheet tools (Excel: 32K chars).
+// `slice` counts UTF-16 code units, so the byte size can be up to ~16 KB
+// for fully non-ASCII payloads — acceptable upper bound.
+const CSV_JSON_CAP = 4096;
+
+// Stringify + cap a JSON-shaped value for inclusion in a CSV cell.
+// When the JSON exceeds the cap, append an explicit truncation marker so
+// downstream consumers can tell the cell was clipped vs. just empty.
+function truncateJsonForCsv(value: unknown): string {
+  if (value == null) return "";
+  const s = JSON.stringify(value);
+  if (s.length <= CSV_JSON_CAP) return s;
+  return `${s.slice(0, CSV_JSON_CAP)}…[truncated ${s.length - CSV_JSON_CAP} chars]`;
+}
+
 function AuditLogPage() {
   const { organization, project, organizations } = useOrganizationTeamProject();
   const { isEnterprise, isLoading: isPlanLoading } = useActivePlan();
@@ -317,12 +334,14 @@ function AuditLogPage() {
         log.ipAddress ?? "",
         log.userAgent ?? "",
         log.error ?? "",
-        // Cap JSON columns at 4 KB so a single oversized diff (large
-        // request payload, full provider config) can't blow up the
-        // exported file size or break Excel/Sheets row parsing.
-        log.args ? JSON.stringify(log.args).slice(0, 4096) : "",
-        log.before ? JSON.stringify(log.before).slice(0, 4096) : "",
-        log.after ? JSON.stringify(log.after).slice(0, 4096) : "",
+        // Cap JSON columns so a single oversized diff (large request
+        // payload, full provider config) can't blow up the exported
+        // file size or break Excel/Sheets row parsing. Truncated cells
+        // carry an explicit "…[truncated N chars]" marker so consumers
+        // can tell clipped JSON from empty values.
+        truncateJsonForCsv(log.args),
+        truncateJsonForCsv(log.before),
+        truncateJsonForCsv(log.after),
       ]);
 
       // Generate CSV

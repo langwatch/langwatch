@@ -8,7 +8,18 @@
 --
 -- Removing the duplicate cuts write amplification on a hot table (every
 -- gateway + platform mutation appends an AuditLog row) without changing
--- read-path behavior. Safe under concurrent writes — DROP INDEX
--- IF EXISTS is non-blocking on Postgres in the brief window an INSERT
--- might be in-flight against the redundant index.
+-- read-path behavior.
+--
+-- LOCKING NOTE: Plain `DROP INDEX [IF EXISTS]` acquires an ACCESS
+-- EXCLUSIVE lock on the table for the duration of the drop — this
+-- blocks concurrent reads and writes on `AuditLog` until the operation
+-- completes. The `IF EXISTS` clause only changes error handling
+-- (NOTICE instead of ERROR when the index is missing), it does NOT
+-- change locking behavior. Dropping a single index is a fast
+-- metadata-only operation (typically milliseconds even on large
+-- tables, since the index file is just unlinked), so the brief lock
+-- is acceptable for AuditLog. If we ever need a truly non-blocking
+-- variant, swap to `DROP INDEX CONCURRENTLY IF EXISTS` — but that
+-- can't run inside a transaction, so it would need a Prisma
+-- non-transactional migration setup we don't have today.
 DROP INDEX IF EXISTS "AuditLog_organizationId_idx";
