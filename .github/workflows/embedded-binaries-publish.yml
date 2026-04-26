@@ -66,15 +66,28 @@ jobs:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
+      # alpine:3.19 ships busybox tools but no bash — and every other step
+      # uses `shell: bash`. Bootstrap with /bin/sh first so we can install
+      # bash + the rest of the toolchain inside the container.
+      - name: Bootstrap alpine container
+        if: contains(matrix.target.platform, 'musl')
+        shell: sh
+        run: |
+          set -e
+          apk add --no-cache \
+            bash jq curl tar gzip ca-certificates \
+            gcc g++ make musl-dev linux-headers \
+            bison flex perl pkgconfig \
+            openssl-dev zlib-dev
+
       - name: Read pinned versions
         id: versions
         shell: bash
         run: |
           set -e
-          # jq isn't in alpine:3.19 by default — install if missing.
+          # jq isn't on every host runner by default.
           command -v jq >/dev/null 2>&1 || (
-            if [ -f /etc/alpine-release ]; then apk add --no-cache jq
-            elif command -v apt-get >/dev/null 2>&1; then sudo apt-get update && sudo apt-get install -y jq
+            if command -v apt-get >/dev/null 2>&1; then sudo apt-get update && sudo apt-get install -y jq
             elif command -v brew >/dev/null 2>&1; then brew install jq
             fi
           )
@@ -84,28 +97,25 @@ jobs:
           echo "redis=$REDIS_VERSION" >> "$GITHUB_OUTPUT"
           echo "Pinned: postgres=$POSTGRES_VERSION redis=$REDIS_VERSION"
 
-      - name: Install build dependencies
+      # Alpine deps are installed by the bootstrap step above. Host runners
+      # (macOS / glibc Linux) install via brew / apt here.
+      - name: Install build dependencies (host runners)
+        if: ${{ !contains(matrix.target.platform, 'musl') }}
         shell: bash
         run: |
           set -e
           case "${{ matrix.target.platform }}" in
             darwin-*)
-              brew install bison flex icu4c openssl@3 readline
-              ;;
-            linux-*-musl)
-              # alpine:3.19 ships busybox tools but not the build chain —
-              # also need bash itself (this very `shell: bash` step).
-              apk add --no-cache \
-                bash gcc g++ make musl-dev linux-headers \
-                bison flex perl pkgconfig \
-                icu-dev openssl-dev readline-dev zlib-dev \
-                tar gzip curl ca-certificates
+              # bison + flex from brew because the macOS-shipped versions
+              # are too old for postgres 18's parser. Both are keg-only —
+              # the build step below adds them to PATH.
+              brew install bison flex openssl@3
               ;;
             linux-*)
               sudo apt-get update
               sudo apt-get install -y --no-install-recommends \
                 build-essential bison flex perl pkg-config \
-                libicu-dev libssl-dev libreadline-dev zlib1g-dev \
+                libssl-dev zlib1g-dev \
                 ca-certificates
               ;;
           esac
@@ -141,11 +151,25 @@ jobs:
           cd "postgresql-${PG_VERSION}"
           install_prefix="$PWD/_install"
           mkdir -p "$install_prefix"
-          # --without-icu would shrink the tarball ~30MB but breaks ICU
-          # collations, which Prisma migrations sometimes use. Keep ICU on.
-          # --without-readline because the runtime never opens an interactive
-          # psql; lops 2MB and one library off.
+
+          # macOS-only path massaging: brew installs bison/flex/openssl@3
+          # as keg-only formulae (not symlinked into /usr/local/bin or the
+          # default PKG_CONFIG_PATH). Postgres requires modern bison/flex
+          # (the macOS-shipped versions are too old) and pkg-config-visible
+          # openssl headers for --with-openssl.
+          if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then
+            export PATH="$(brew --prefix bison)/bin:$(brew --prefix flex)/bin:$PATH"
+            export PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+          fi
+
+          # --without-icu: skip the ICU collation library to keep the
+          # tarball lean (~30MB saving) and avoid the keg-only ICU
+          # dependency dance on macOS. Langwatch's prisma schema uses the
+          # database's default collation, never explicit ICU collations,
+          # so this is safe.
+          # --without-readline: the runtime never opens an interactive psql.
           ./configure --prefix="$install_prefix" \
+            --without-icu \
             --without-readline \
             --with-openssl
           if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then
