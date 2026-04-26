@@ -138,7 +138,15 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, e.maxBytes))
+	bodyBytes, readErr := io.ReadAll(io.LimitReader(resp.Body, e.maxBytes))
+	// A truncated read on a 2xx is worse than a clean error — callers
+	// would silently pipe partial JSON into downstream nodes. Surface
+	// the read failure (timeout mid-body, dropped connection, etc.)
+	// instead of swallowing it. Non-2xx still falls through so the
+	// caller sees the upstream status.
+	if readErr != nil && resp.StatusCode/100 == 2 {
+		return nil, fmt.Errorf("httpblock: read response body: %w", readErr)
+	}
 	if resp.StatusCode/100 != 2 {
 		return &Result{
 			StatusCode:   resp.StatusCode,

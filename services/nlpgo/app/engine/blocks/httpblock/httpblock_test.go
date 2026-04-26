@@ -294,6 +294,33 @@ func TestSafeDialer_BlocksLiteralPrivateIP(t *testing.T) {
 	assert.True(t, errors.Is(err, httpblock.ErrSSRFBlocked))
 }
 
+// TestExecute_TruncatedBodySurfacesError proves a partial-read on a
+// 2xx response is no longer silently downgraded to garbled output.
+// The upstream declares Content-Length: 100 but only writes 7 bytes
+// before the connection closes; net/http surfaces io.ErrUnexpectedEOF
+// and the executor must propagate that as a clean error rather than
+// piping a truncated JSON string into downstream nodes.
+func TestExecute_TruncatedBodySurfacesError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Length", "100")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"a":1}`)) // 7 of declared 100
+	}))
+	defer srv.Close()
+	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
+
+	exec := httpblock.New(httpblock.Options{
+		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{host}},
+	})
+	_, err := exec.Execute(context.Background(), httpblock.Request{
+		URL:    srv.URL + "/short",
+		Method: "GET",
+	})
+	require.Error(t, err, "partial 2xx response must surface as an error, not be silently truncated")
+	assert.Contains(t, err.Error(), "httpblock", "error should be tagged with the executor namespace")
+}
+
 // TestExecute_TruncatesResponseAtMaxBytes proves the configured cap
 // is honoured (Options.MaxResponseBytes was previously documented but
 // not wired — every response was capped at the hard-coded 4 MiB).
