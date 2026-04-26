@@ -62,6 +62,7 @@
 //   pattern_011_workflow_agent — sig → agent[type=workflow] sub-workflow chain ✅
 //   pattern_012_json_schema_out — single output typed json_schema + inline shape ✅
 //   pattern_013_falsy_settings — evaluator settings: 0 / "" / false / [] preserved ✅
+//   pattern_015_thread_id_headers — thread_id propagates to outbound HTTP headers  ✅
 //
 // See feedback memory entry "No customer names in public repo".
 
@@ -142,6 +143,9 @@ func setupPatternStack(t *testing.T, llm *fakeLLMClient, langwatch http.HandlerF
 			"path":         r.URL.Path,
 			"method":       r.Method,
 			"x_auth_token": r.Header.Get("X-Auth-Token"),
+			"x_trace_id":   r.Header.Get("X-LangWatch-Trace-Id"),
+			"x_origin":     r.Header.Get("X-LangWatch-Origin"),
+			"x_thread_id":  r.Header.Get("X-LangWatch-Thread-Id"),
 			"body":         parsed,
 		})
 		langwatch(w, r)
@@ -1766,5 +1770,130 @@ func TestPattern011_WorkflowAsEvaluatorChain(t *testing.T) {
 		node, ok := res.Nodes[id].(map[string]any)
 		require.True(t, ok, "missing node %q in result.nodes", id)
 		assert.Equal(t, "success", node["status"], "node %q expected success", id)
+	}
+}
+
+// TestPattern015_ThreadIDPropagatesToOutboundHeaders pins parity with
+// langwatch_nlp commit ac986cc3c ("feat: pass thread_id through
+// execute_component to LangWatch tracing"). Pre-fix, the Studio TS
+// app sent `thread_id` on the execute_flow / execute_component
+// payload, but the engine dropped it on the floor — conversations
+// weren't grouped in the LangWatch trace UI because the trace
+// metadata was missing the thread_id field.
+//
+// On the Go path this test pins three things end-to-end:
+//
+//   1. The handler decodes `thread_id` from the inbound payload
+//      (top-level field, not nested in metadata).
+//   2. The engine plumbs it through `ExecuteRequest.ThreadID` to the
+//      block executors that make outbound calls.
+//   3. Outbound HTTP calls (evaluator + agent-workflow) carry the
+//      `X-LangWatch-Thread-Id` header so the receiving services can
+//      stamp it onto the spans they emit. Mirrors the existing
+//      `X-LangWatch-Trace-Id` and `X-LangWatch-Origin` propagation.
+//
+// The fixture chains a signature → evaluator → agent-workflow shape
+// so we hit BOTH outbound surfaces in one run. Generic concept; zero
+// customer content.
+func TestPattern015_ThreadIDPropagatesToOutboundHeaders(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(_ app.LLMRequest) (*app.LLMResponse, error) {
+			return &app.LLMResponse{Content: "answer"}, nil
+		},
+	}
+	url, lwRequests := setupPatternStack(t, llm, func(w http.ResponseWriter, r *http.Request) {
+		// Two upstream paths in this fixture: evaluator dispatch + the
+		// downstream agent-workflow run. Both branches return a minimal
+		// response so the workflow completes and the engine emits both
+		// HTTP calls (so we observe the headers on each).
+		if stringContains(r.URL.Path, "/api/workflows/") && stringContains(r.URL.Path, "/run") {
+			w.Header().Set("Content-Type", "application/json")
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"result": map[string]any{"verdict": "ok"},
+			})
+			return
+		}
+		// Evaluator response.
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status":  "processed",
+			"score":   1.0,
+			"passed":  true,
+			"details": "ok",
+		})
+	})
+
+	// Body uses the discriminated execute_flow envelope with thread_id
+	// at the payload level — the exact shape Studio's TS app emits.
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-015-trace",
+	    "thread_id":"pattern-015-thread-abc",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"sk-pattern-015","spec_version":"1.3",
+	      "name":"Pattern015","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"q","type":"str"}],
+	          "dataset":{"inline":{"records":{"q":["x"]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"answer","type":"signature","data":{
+	          "name":"Answer",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Reply: {{ q }}"}
+	          ],
+	          "inputs":[{"identifier":"q","type":"str"}],
+	          "outputs":[{"identifier":"answer","type":"str"}]
+	        }},
+	        {"id":"judge","type":"evaluator","data":{
+	          "parameters":[
+	            {"identifier":"evaluator","type":"str","value":"langevals/llm_boolean"},
+	            {"identifier":"name","type":"str","value":"j"},
+	            {"identifier":"settings","type":"dict","value":{"prompt":"is {{ output }} ok?"}}
+	          ],
+	          "outputs":[
+	            {"identifier":"score","type":"float"},
+	            {"identifier":"passed","type":"bool"}
+	          ]
+	        }},
+	        {"id":"verify","type":"agent","data":{
+	          "parameters":[
+	            {"identifier":"agent_type","type":"str","value":"workflow"},
+	            {"identifier":"workflow_id","type":"str","value":"sub_wf"}
+	          ],
+	          "inputs":[{"identifier":"passed","type":"bool"}],
+	          "outputs":[{"identifier":"check","type":"dict"}]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[{"identifier":"check","type":"dict"}]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.q","target":"answer","targetHandle":"inputs.q","type":"default"},
+	        {"id":"e2","source":"answer","sourceHandle":"outputs.answer","target":"judge","targetHandle":"inputs.output","type":"default"},
+	        {"id":"e3","source":"judge","sourceHandle":"outputs.passed","target":"verify","targetHandle":"inputs.passed","type":"default"},
+	        {"id":"e4","source":"verify","sourceHandle":"outputs.check","target":"end","targetHandle":"inputs.check","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	// (1+2+3) Both outbound calls — the evaluator and the
+	// agent-workflow `/run` — must carry the same thread id verbatim.
+	require.Len(t, *lwRequests, 2, "expected exactly two upstream calls (evaluator + agent-workflow)")
+	for i, rec := range *lwRequests {
+		assert.Equal(t, "pattern-015-thread-abc", rec["x_thread_id"],
+			"call %d (path=%v) must carry X-LangWatch-Thread-Id", i, rec["path"])
+		assert.Equal(t, "pattern-015-trace", rec["x_trace_id"],
+			"call %d must keep X-LangWatch-Trace-Id (sanity sibling — proves the harness sees both)", i)
+		assert.Equal(t, "workflow", rec["x_origin"],
+			"call %d must keep X-LangWatch-Origin (sanity sibling)", i)
 	}
 }

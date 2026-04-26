@@ -86,6 +86,13 @@ type ExecuteRequest struct {
 	Origin    string
 	TraceID   string
 	ProjectID string
+	// ThreadID groups related Studio runs into a single conversation
+	// in the LangWatch trace UI. Mirrors langwatch_nlp's
+	// `ExecuteComponentPayload.thread_id` (commit ac986cc3c). Plumbed
+	// through to outbound HTTP calls (evaluator + agent-workflow) as
+	// the `X-LangWatch-Thread-Id` header so the receiving services can
+	// stamp it onto the spans they emit.
+	ThreadID string
 }
 
 // ExecuteResult is what the engine returns. It mirrors the Python
@@ -493,6 +500,7 @@ func (e *Engine) runEvaluator(ctx context.Context, req ExecuteRequest, node *dsl
 		Data:          inputs,
 		TraceID:       req.TraceID,
 		Origin:        req.Origin,
+		ThreadID:      req.ThreadID,
 	})
 	if err != nil {
 		return nil, &NodeError{Type: "evaluator_error", Message: err.Error()}
@@ -587,6 +595,7 @@ func (e *Engine) runAgentWorkflow(ctx context.Context, req ExecuteRequest, node 
 		Inputs:     inputs,
 		TraceID:    req.TraceID,
 		Origin:     req.Origin,
+		ThreadID:   req.ThreadID,
 	})
 	if err != nil {
 		return nil, &NodeError{Type: "agent_workflow_error", Message: err.Error()}

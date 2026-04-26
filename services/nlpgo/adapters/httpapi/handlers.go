@@ -108,6 +108,7 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 
 	var inner struct {
 		TraceID   string          `json:"trace_id"`
+		ThreadID  string          `json:"thread_id,omitempty"`
 		Workflow  json.RawMessage `json:"workflow"`
 		Inputs    any             `json:"inputs,omitempty"`
 		Origin    string          `json:"origin,omitempty"`
@@ -130,12 +131,17 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 	if origin == "" {
 		origin = r.Header.Get("X-LangWatch-Origin")
 	}
+	threadID := inner.ThreadID
+	if threadID == "" {
+		threadID = r.Header.Get("X-LangWatch-Thread-Id")
+	}
 	return &app.WorkflowRequest{
 		WorkflowJSON: inner.Workflow,
 		Inputs:       normalizeInputs(inner.Inputs),
 		Origin:       origin,
 		TraceID:      inner.TraceID,
 		ProjectID:    inner.ProjectID,
+		ThreadID:     threadID,
 	}, nil
 }
 

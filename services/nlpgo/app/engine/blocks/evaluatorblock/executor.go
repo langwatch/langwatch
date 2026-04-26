@@ -83,6 +83,9 @@ type Request struct {
 	TraceID string
 	// Origin is the X-LangWatch-Origin attribution (workflow/evaluation/...).
 	Origin string
+	// ThreadID groups Studio runs into a single conversation in trace
+	// metadata. Mirrors langwatch_nlp commit ac986cc3c. Optional.
+	ThreadID string
 	// TimeoutMS overrides the executor default timeout. 0 → default.
 	TimeoutMS int
 }
@@ -180,6 +183,9 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	}
 	if req.Origin != "" {
 		httpReq.Header.Set("X-LangWatch-Origin", req.Origin)
+	}
+	if req.ThreadID != "" {
+		httpReq.Header.Set("X-LangWatch-Thread-Id", req.ThreadID)
 	}
 
 	start := time.Now()

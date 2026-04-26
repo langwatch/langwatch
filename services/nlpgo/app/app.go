@@ -52,6 +52,7 @@ type WorkflowRequest struct {
 	Origin       string
 	TraceID      string
 	ProjectID    string
+	ThreadID     string
 }
 
 // WorkflowResult is the engine's response, ready for JSON serialization.
