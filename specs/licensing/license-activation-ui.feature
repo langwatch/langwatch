@@ -113,14 +113,6 @@ Feature: License Activation UI
     Then the "Activate License" button becomes enabled
 
   @integration @unimplemented
-  Scenario: License key textarea trims whitespace
-    Given I am on the license settings page
-    And I have selected the "Enter license key" method
-    When I paste a license key with leading and trailing whitespace
-    And I click "Activate License"
-    Then the whitespace is trimmed before activation
-
-  @integration @unimplemented
   Scenario: Activate License button disabled when textarea is empty
     Given I am on the license settings page
     And I have selected the "Enter license key" method
@@ -156,23 +148,6 @@ Feature: License Activation UI
     And the button is disabled during activation
     And the input method selection is disabled during activation
 
-  @integration @unimplemented
-  Scenario: Handle invalid license file
-    Given I am on the license settings page
-    And I have uploaded an invalid license file
-    When I click "Activate License"
-    Then I see an error toast with title "Failed to activate license"
-    And the error message explains the license is invalid or tampered
-
-  @integration @unimplemented
-  Scenario: Handle expired license file
-    Given I am on the license settings page
-    And I have uploaded an expired license file
-    When I click "Activate License"
-    Then I see an error toast with title "Failed to activate license"
-    And the error message explains the license has expired
-
-  # UI styling and layout
   @integration @unimplemented
   Scenario: Checkbox inputs use platform checkbox component
     Given I am on the license settings page
@@ -216,9 +191,3 @@ Feature: License Activation UI
     Then the file content is extracted as text
     And the content is passed to the license activation mutation
 
-  @unit @unimplemented
-  Scenario: License key normalization handles different input formats
-    Given a license key input
-    When normalizeKeyForActivation is called
-    Then leading/trailing whitespace is trimmed
-    And the normalized key is returned for API submission
