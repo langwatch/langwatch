@@ -183,6 +183,70 @@ program
     }
   });
 
+// AI Gateway governance — wrapped tool runners.
+// Each `langwatch <tool>` exec's the underlying binary with the
+// right ANTHROPIC_*/OPENAI_*/GEMINI_* env vars injected pointing
+// at the gateway, after a Screen-8 budget pre-check.
+program
+  .command("claude")
+  .description("Run `claude` (Claude Code) routed through the LangWatch gateway.")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapClaude } = await import("./commands/wrap.js");
+      await wrapClaude(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("codex")
+  .description("Run `codex` (OpenAI Codex CLI) routed through the LangWatch gateway.")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapCodex } = await import("./commands/wrap.js");
+      await wrapCodex(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("cursor")
+  .description("Run `cursor` routed through the LangWatch gateway.")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapCursor } = await import("./commands/wrap.js");
+      await wrapCursor(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("gemini")
+  .description("Run `gemini` (Gemini CLI) routed through the LangWatch gateway.")
+  .allowUnknownOption(true)
+  .helpOption(false)
+  .action(async (_opts, cmd: { args?: string[] }) => {
+    try {
+      const { wrapGemini } = await import("./commands/wrap.js");
+      await wrapGemini(cmd.args ?? []);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
 // Add prompt command group
 const promptCmd = program
   .command("prompt")
