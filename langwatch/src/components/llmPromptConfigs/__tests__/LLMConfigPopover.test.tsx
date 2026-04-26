@@ -89,6 +89,19 @@ const mockModelMetadata = {
     pricing: { inputCostPerToken: 0.000003, outputCostPerToken: 0.000015 },
     reasoningConfig: undefined,
   },
+  "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0": {
+    id: "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    name: "us.anthropic.claude-haiku-4-5-20251001-v1:0",
+    provider: "bedrock",
+    supportedParameters: ["temperature"],
+    contextLength: 0,
+    maxCompletionTokens: 8192,
+    defaultParameters: null,
+    supportsImageInput: false,
+    supportsAudioInput: false,
+    pricing: { inputCostPerToken: 0, outputCostPerToken: 0 },
+    reasoningConfig: undefined,
+  },
 };
 
 vi.mock("~/hooks/useModelProvidersSettings", () => ({
@@ -110,6 +123,7 @@ vi.mock("../../ModelSelector", () => ({
     "openai/gpt-4.1",
     "openai/gpt-5",
     "anthropic/claude-3.5-sonnet",
+    "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
   ],
   ModelSelector: ({
     model,
@@ -299,6 +313,34 @@ describe("LLMConfigPopover", () => {
           values: { model: "openai/gpt-5", reasoning: "medium" },
         });
         expect(screen.queryByText("Top P")).not.toBeInTheDocument();
+      });
+    });
+  });
+
+  describe("when the model entry omits max_tokens from supportedParameters", () => {
+    describe("for a managed-Bedrock chat custom model registered with only temperature", () => {
+      it("renders the Max Tokens slider so the user can configure per-invocation output limits", () => {
+        renderComponent({
+          values: {
+            model: "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            temperature: 1,
+          },
+        });
+        expect(
+          screen.getByTestId("parameter-row-max_tokens"),
+        ).toBeInTheDocument();
+      });
+
+      it("still renders the Temperature slider that the entry does declare", () => {
+        renderComponent({
+          values: {
+            model: "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+            temperature: 1,
+          },
+        });
+        expect(
+          screen.getByTestId("parameter-row-temperature"),
+        ).toBeInTheDocument();
       });
     });
   });

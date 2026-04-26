@@ -47,7 +47,7 @@ type MigrationResult = {
 // ============================================================================
 
 const CHAT_DEFAULTS = {
-  supportedParameters: ["temperature", "max_tokens"],
+  supportedParameters: ["temperature"],
   maxTokens: 8192,
 } as const;
 
