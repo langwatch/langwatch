@@ -155,8 +155,8 @@ program
   });
 
 program
-  .command("dashboard")
-  .description("Open your LangWatch dashboard (use --trace <id> to deep-link to a specific trace).")
+  .command("me")
+  .description("Open your LangWatch personal dashboard (use --trace <id> to deep-link to a specific trace).")
   .option("--trace <id>", "deep-link to a specific trace ID")
   .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
   .action(async (options: { trace?: string; browser?: string }) => {
