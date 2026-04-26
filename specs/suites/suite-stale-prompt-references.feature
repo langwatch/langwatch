@@ -24,12 +24,9 @@ Feature: Suite run validation for organization-scoped prompts
     When the suite run is triggered
     Then the run proceeds without validation errors
 
-  @unit @unimplemented
-  Scenario: Run validation accepts project-scoped prompt from same project
-    Given a project-scoped prompt "Local Bot" exists in "my-project"
-    And a suite in "my-project" references that prompt as a target
-    When the suite run is triggered
-    Then the run proceeds without validation errors
+  # "Run validation accepts project-scoped prompt from same project" — duplicate of
+  # suite-run-dependency-refactor.feature "Suite run succeeds when prompt config exists in project"
+  # (removed per AUDIT_MANIFEST.md, #3458).
 
   @unit @unimplemented
   Scenario: Run validation rejects prompt from unrelated project without org scope
@@ -38,12 +35,9 @@ Feature: Suite run validation for organization-scoped prompts
     When the suite run is triggered
     Then the run fails with an error about an invalid target reference
 
-  @unit @unimplemented
-  Scenario: Run validation rejects soft-deleted prompts
-    Given a prompt "Retired Bot" has been soft-deleted
-    And a suite still holds a reference to that prompt
-    When the suite run is triggered
-    Then the run fails with an error about an invalid target reference
+  # "Run validation rejects soft-deleted prompts" — duplicate of
+  # suite-run-dependency-refactor.feature "Suite run fails when prompt config is soft-deleted"
+  # (removed per AUDIT_MANIFEST.md, #3458).
 
   # ============================================================================
   # Edit Drawer — Deleted Prompt Warning
