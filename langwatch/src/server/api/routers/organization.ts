@@ -1334,7 +1334,7 @@ export const organizationRouter = createTRPCRouter({
         targetId: z.string().optional(),
       }),
     )
-    .use(checkOrganizationPermission("organization:manage"))
+    .use(checkOrganizationPermission("auditLog:view"))
     .query(async ({ ctx, input }) => {
       await assertEnterprisePlan({
         organizationId: input.organizationId,

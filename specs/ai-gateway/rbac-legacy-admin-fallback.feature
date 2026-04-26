@@ -65,10 +65,10 @@ Feature: AI Gateway — RBAC legacy ADMIN fallback for org-scoped checks
   # ============================================================================
 
   @integration
-  Scenario: audit-log:view still falls back to TeamUser where gateway permissions do
+  Scenario: auditLog:view still falls back to TeamUser where gateway permissions do
     Given "alice@acme.test" has TeamUser role MEMBER (not ADMIN) on "platform"
-    And the org has a RoleBinding granting "audit-log:view" to the "platform" team
-    When "alice@acme.test" attempts "audit-log:view" on org "acme"
+    And the org has a RoleBinding granting "auditLog:view" to the "platform" team
+    When "alice@acme.test" attempts "auditLog:view" on org "acme"
     Then the RBAC check returns true via the explicit RoleBinding (not the TeamUser fallback)
 
   # ============================================================================
