@@ -52,11 +52,16 @@ jobs:
           - { platform: darwin-x64,        runner: macos-13,          container: "" }
           - { platform: linux-x64,         runner: ubuntu-22.04,      container: "" }
           - { platform: linux-arm64,       runner: ubuntu-22.04-arm,  container: "" }
-          # Alpine (musl) builds: run inside the alpine container so libc
-          # links to musl, not glibc. Using 3.19 specifically — older musl
+          # Alpine (musl) build for x64. 3.19 specifically — older musl
           # versions miss some pthread features postgres uses.
+          # NOTE: linux-arm64-musl is intentionally absent. GitHub Actions
+          # forbids JavaScript actions (incl. actions/checkout) in Alpine
+          # ARM64 containers ("only supported on x64 Linux runners"). The
+          # workaround is to run all build commands via inline `docker run`
+          # from a glibc-arm64 host — added complexity we'll only invest in
+          # if real Alpine-arm64 demand surfaces. Alpine x64 covers the
+          # common dev-container case.
           - { platform: linux-x64-musl,    runner: ubuntu-latest,     container: "alpine:3.19" }
-          - { platform: linux-arm64-musl,  runner: ubuntu-24.04-arm,  container: "alpine:3.19" }
 
     env:
       AWS_REGION: eu-central-1
