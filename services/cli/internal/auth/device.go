@@ -209,6 +209,31 @@ func (c *Client) Refresh(ctx context.Context, refreshToken string) (*RefreshResu
 	return &r, nil
 }
 
+// Revoke server-side-revokes a refresh token. Used by `langwatch
+// logout` so a leaked refresh token can't be reused even if the
+// local config file isn't cleared (e.g. someone copied it). Treats
+// 401/404 as success — the token was already gone.
+func (c *Client) Revoke(ctx context.Context, refreshToken string) error {
+	req, err := c.buildRequest(ctx, http.MethodPost, "/api/auth/cli/revoke",
+		map[string]string{"refresh_token": refreshToken})
+	if err != nil {
+		return err
+	}
+	resp, err := c.client().Do(req)
+	if err != nil {
+		return fmt.Errorf("revoke: %w", err)
+	}
+	defer resp.Body.Close()
+	switch {
+	case resp.StatusCode/100 == 2,
+		resp.StatusCode == http.StatusUnauthorized,
+		resp.StatusCode == http.StatusNotFound:
+		return nil
+	default:
+		return c.unexpectedStatus(resp)
+	}
+}
+
 func (c *Client) post(ctx context.Context, path string, body any, out any) error {
 	req, err := c.buildRequest(ctx, http.MethodPost, path, body)
 	if err != nil {

@@ -9,6 +9,7 @@ import (
 	"runtime"
 	"syscall"
 
+	"github.com/langwatch/langwatch/services/cli/internal/auth"
 	"github.com/langwatch/langwatch/services/cli/internal/config"
 	"github.com/langwatch/langwatch/services/cli/internal/wrapper"
 )
@@ -42,9 +43,16 @@ func init() {
 }
 
 func wrapTool(toolName string) func(context.Context, []string) error {
-	return func(_ context.Context, args []string) error {
+	return func(ctx context.Context, args []string) error {
 		cfg, err := config.Load()
 		if err != nil {
+			return err
+		}
+		client := &auth.Client{BaseURL: cfg.ControlPlaneURL}
+		if err := auth.EnsureFresh(ctx, cfg, client, nil); err != nil {
+			if errors.Is(err, auth.ErrSessionRevoked) {
+				return errors.New(err.Error())
+			}
 			return err
 		}
 		envKV := wrapper.EnvForTool(cfg, toolName)
@@ -55,13 +63,17 @@ func wrapTool(toolName string) func(context.Context, []string) error {
 	}
 }
 
-func runShell(_ context.Context, args []string) error {
+func runShell(ctx context.Context, args []string) error {
 	cfg, err := config.Load()
 	if err != nil {
 		return err
 	}
 	if !cfg.LoggedIn() {
 		return errors.New("not logged in — run `langwatch login` first")
+	}
+	client := &auth.Client{BaseURL: cfg.ControlPlaneURL}
+	if err := auth.EnsureFresh(ctx, cfg, client, nil); err != nil {
+		return err
 	}
 
 	shell := os.Getenv("SHELL")

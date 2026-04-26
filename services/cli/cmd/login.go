@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"runtime"
 	"strings"
@@ -114,7 +115,20 @@ func runLogin(ctx context.Context, _ []string) error {
 	return nil
 }
 
-func runLogout(_ context.Context, _ []string) error {
+func runLogout(ctx context.Context, _ []string) error {
+	cfg, _ := config.Load()
+	// Best-effort server-side revocation: if it fails (network down,
+	// server returns an error), we still want to clear the local
+	// credentials. The cli-login.feature scenario explicitly notes
+	// that local wipe must happen even if revoke fails — otherwise
+	// "logout" leaves a usable token on disk and the user has to
+	// remember to delete the file manually.
+	if cfg != nil && cfg.RefreshToken != "" {
+		client := &auth.Client{BaseURL: cfg.ControlPlaneURL}
+		if err := client.Revoke(ctx, cfg.RefreshToken); err != nil {
+			fmt.Fprintf(os.Stderr, "warning: server-side revoke failed: %v\n", err)
+		}
+	}
 	if err := config.Clear(); err != nil {
 		return fmt.Errorf("clear config: %w", err)
 	}
