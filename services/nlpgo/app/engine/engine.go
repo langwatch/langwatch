@@ -554,9 +554,15 @@ func (r *runState) recordError(e *NodeError) {
 // today's "all keys flow through" behavior for legacy workflows.
 func (r *runState) resolveInputs(_ *planner.Plan, id string) map[string]any {
 	out := map[string]any{}
+	// Lock spans the entire read of r.outputs because sibling goroutines
+	// in the same layer can be writing to r.outputs (recordOutputs)
+	// concurrently. The previous shape (lock for edges, unlock, then
+	// read r.outputs unsynchronised) tripped the race detector reliably
+	// in TestPattern002_BranchingParallelSignatures — and could in
+	// principle return a half-written upstream output map under load.
 	r.mu.Lock()
+	defer r.mu.Unlock()
 	edges := r.edgesByTarget[id]
-	r.mu.Unlock()
 	for _, e := range edges {
 		parentOut, ok := r.outputs[e.Source]
 		if !ok {
