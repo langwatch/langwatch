@@ -204,9 +204,14 @@ jobs:
               [ -x "$bin" ] && [ ! -L "$bin" ] || continue
               file "$bin" 2>/dev/null | grep -q "Mach-O" || continue
               # Rewrite each absolute-path dylib reference to @rpath/<name>.
-              otool -L "$bin" 2>/dev/null | awk 'NR>1{print $1}' | grep "$install_prefix" | while read -r dylib_path; do
+              # `|| true` on the grep so set -eo pipefail doesn't blow the
+              # script when a binary happens to have zero install_prefix
+              # references (some helpers don't link any postgres dylib).
+              deps=$(otool -L "$bin" 2>/dev/null | awk 'NR>1{print $1}' | grep "$install_prefix" || true)
+              while IFS= read -r dylib_path; do
+                [ -n "$dylib_path" ] || continue
                 install_name_tool -change "$dylib_path" "@rpath/$(basename "$dylib_path")" "$bin" 2>/dev/null || true
-              done
+              done <<< "$deps"
               install_name_tool -add_rpath "@loader_path/../lib" "$bin" 2>/dev/null || true
             done
           fi
