@@ -40,6 +40,13 @@ const ROUTE_PATTERNS = [
   "/onboarding/welcome",
   "/settings",
   "/settings/*",
+  // Personal-scope governance routes — must precede the "/:project/*" patterns
+  // so the auto-detection in components/useWorkspaceCurrent doesn't classify
+  // /me as a project page (which collapses the WorkspaceSwitcher to project
+  // context and breaks the personal nav).
+  "/me",
+  "/me/settings",
+  "/cli/auth",
   "/:project/messages/:trace/:openTab/:span",
   "/:project/messages/:trace/:openTab",
   "/:project/messages/:trace",
