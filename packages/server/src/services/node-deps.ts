@@ -48,8 +48,19 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
   // (via pnpm/action-setup) or has corepack-enabled pnpm shimmed onto
   // PATH already, so we can call `pnpm` directly.
   const pnpm = await resolvePnpm();
+  const distAlreadyBuilt = existsSync(join(distPath, "client"));
+
   if (!existsSync(nodeModulesPath)) {
-    await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, "install", "--prod=false", "--frozen-lockfile"], {
+    // When `dist/client/` ships pre-built (published tarball), we never run
+    // vite/esbuild/scenario-child-process locally — so we can install with
+    // `--prod` and skip ~50 devDependencies (vite, vitest, playwright,
+    // esbuild, type generators, etc.). Saves disk + install time on the
+    // user's machine. For dev/checkout flows where dist/ is missing, we
+    // still need devDeps to run the build below.
+    const installArgs = distAlreadyBuilt
+      ? ["install", "--prod", "--frozen-lockfile"]
+      : ["install", "--prod=false", "--frozen-lockfile"];
+    await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, ...installArgs], {
       stdio: "inherit",
     });
   }
@@ -59,7 +70,7 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
   // .github/workflows/npx-server-publish.yml), so end users hit `pnpm install`
   // for prisma postinstall + nothing else. The build only runs for `pnpm pack`
   // -driven local dogfood and dev checkouts where dist/ doesn't exist yet.
-  if (!existsSync(join(distPath, "client"))) {
+  if (!distAlreadyBuilt) {
     // Full prod build: start:prepare:files → build:scenario-child-process → vite build.
     // start:prepare:files generates Prisma client, Zod types, SDK versions,
     // langevals types (from the source committed in langevals/ts-integration/),
