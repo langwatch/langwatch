@@ -110,30 +110,6 @@ Feature: SCIM Group Mapping
   # Built-in roles have a clear hierarchy: ADMIN > MEMBER > VIEWER
   # Users in multiple groups inherit the highest role at each scope
 
-  @unit @unimplemented
-  Scenario: User with multiple roles resolves to the most permissive
-    Given a user has roles [VIEWER, MEMBER] from different group bindings at the same scope
-    When the effective role is resolved
-    Then the result is MEMBER
-
-  @unit @unimplemented
-  Scenario: Role hierarchy resolves ADMIN as most permissive
-    Given a user has roles [MEMBER, ADMIN] from different group bindings
-    When the effective role is resolved
-    Then the result is ADMIN
-
-  @unit @unimplemented
-  Scenario: Removing a binding recalculates to remaining most permissive
-    Given a user has roles [VIEWER, MEMBER] from two group bindings
-    When the MEMBER binding is removed
-    Then the effective role recalculates to VIEWER
-
-  @unit @unimplemented
-  Scenario: Role hierarchy ordering
-    Given the role hierarchy for conflict resolution
-    Then ADMIN is more permissive than MEMBER
-    And MEMBER is more permissive than VIEWER
-
   @integration @unimplemented
   Scenario: Custom role is available when assigning a binding to a group
     Given the organization has a custom role "Auditor" with permissions

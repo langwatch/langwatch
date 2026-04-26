@@ -3,26 +3,6 @@ Feature: Stripe price catalog sync for SaaS billing
   I want billing price ids to be sourced from a synced Stripe catalog file
   So that plan key mapping is validated against Stripe without hardcoded ids in runtime code
 
-  @integration @unimplemented
-  Scenario: Sync task fetches Stripe prices for the detected key mode
-    Given the billing system is configured with valid Stripe credentials
-    When I run the stripe prices sync task
-    Then the task fetches all prices from Stripe
-    And the generated catalog includes the detected mode prices
-
-  @integration @unimplemented
-  Scenario: Sync task enforces required key mappings for current mode
-    Given the required billing keys are defined
-    When the sync task cannot resolve one required key for the detected mode
-    Then the task fails with a validation error
-
-  @integration @unimplemented
-  Scenario: Sync task preserves the opposite mode mapping
-    Given the price catalog includes both test and live price mappings
-    When I run the sync task with a test key
-    Then the test mapping is updated from Stripe data
-    And the live mapping remains unchanged
-
   @unit @unimplemented
   Scenario: Billing runtime resolves live price ids in production
     Given stripeCatalog.json has mapping values for test and live

@@ -99,9 +99,3 @@ Feature: Thread variables available in trace-level evaluator input mapping
   # --------------------------------------------------------------------------
   # UI label: rename "Threads" tab to "Thread" in DatasetMappingPreview
   # --------------------------------------------------------------------------
-
-  @unit @unimplemented
-  Scenario: DatasetMappingPreview tab label reads "Thread" not "Threads"
-    Given the DatasetMappingPreview component is rendered
-    When the user views the mapping toggle tabs
-    Then the thread tab label is "Thread"

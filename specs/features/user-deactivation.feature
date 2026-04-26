@@ -39,18 +39,6 @@ Feature: User Deactivation
   # ─── tRPC mutations ─────────────────────────────────────────────────────────
 
   @unit @unimplemented
-  Scenario: user.deactivate sets deactivatedAt on the user
-    Given a user exists with deactivatedAt null
-    When an admin calls user.deactivate with that user's id
-    Then the user's deactivatedAt is set to the current timestamp
-
-  @unit @unimplemented
-  Scenario: user.reactivate clears deactivatedAt on the user
-    Given a user exists with a non-null deactivatedAt
-    When an admin calls user.reactivate with that user's id
-    Then the user's deactivatedAt is set to null
-
-  @unit @unimplemented
   Scenario: user.deactivate is rejected for non-admin callers
     Given a non-admin authenticated user
     When they call user.deactivate with any user id
@@ -110,15 +98,3 @@ Feature: User Deactivation
     And the active member's row does not show a "Deactivated" badge
 
   # ─── Auth – login blocking ───────────────────────────────────────────────────
-
-  @unit @unimplemented
-  Scenario: Deactivated user is blocked from signing in
-    Given a user account with a non-null deactivatedAt
-    When the NextAuth signIn callback runs for that user
-    Then the callback returns false, denying login
-
-  @unit @unimplemented
-  Scenario: Active user is not blocked from signing in
-    Given a user account with deactivatedAt null
-    When the NextAuth signIn callback runs for that user
-    Then the deactivation check does not block the sign-in

@@ -12,55 +12,6 @@ Feature: Remove dead cost-checking code from worker paths
 
   # ── Interface and factory removal ──────────────────────────────────────
 
-  @unit @unimplemented
-  Scenario: ICostChecker interface no longer exists
-    Given the license-enforcement repository module
-    When the module is inspected
-    Then the export "ICostChecker" does not exist
-
-  @unit @unimplemented
-  Scenario: createCostChecker factory no longer exists
-    Given the license-enforcement repository module
-    When the module is inspected
-    Then the export "createCostChecker" does not exist
-
-  # ── Worker call-site removal ───────────────────────────────────────────
-
-  @unit @unimplemented
-  Scenario: evaluationsWorker no longer performs cost check
-    Given the evaluationsWorker module
-    When the module is inspected
-    Then it contains no reference to costChecker, maxMonthlyUsageLimit, or createCostChecker
-
-  @unit @unimplemented
-  Scenario: EvaluationExecutionService no longer depends on CostChecker
-    Given the EvaluationExecutionService dependency interface
-    When the interface is inspected
-    Then it does not include a costChecker property
-    And the class does not call maxMonthlyUsageLimit or getCurrentMonthCost
-
-  @unit @unimplemented
-  Scenario: evaluate API route no longer performs cost check
-    Given the dataset evaluate API route
-    When the module is inspected
-    Then it contains no reference to costChecker, maxMonthlyUsageLimit, or createCostChecker
-
-  @unit @unimplemented
-  Scenario: topicClustering no longer performs cost check
-    Given the topicClustering module
-    When the module is inspected
-    Then it contains no reference to costChecker, maxMonthlyUsageLimit, or createCostChecker
-
-  # ── Presets wiring removal ─────────────────────────────────────────────
-
-  @unit @unimplemented
-  Scenario: App presets no longer wire a costChecker into EvaluationExecutionService
-    Given the app-layer presets module
-    When EvaluationExecutionService is constructed
-    Then no costChecker argument is passed
-
-  # ── Preserve repository method for dashboard ───────────────────────────
-
   @integration @unimplemented
   Scenario: getCurrentMonthCost remains available in the repository
     Given a LicenseEnforcementRepository instance
@@ -74,16 +25,3 @@ Feature: Remove dead cost-checking code from worker paths
     Then the response includes the current month cost from getCurrentMonthCost
 
   # ── Existing tests updated ─────────────────────────────────────────────
-
-  @unit @unimplemented
-  Scenario: EvaluationExecutionService unit tests remove cost-limit scenarios
-    Given the evaluation-execution.service unit test file
-    When the test suite is inspected
-    Then there are no test cases for "cost limit exceeded" or "maxMonthlyUsageLimit"
-    And the test factory no longer includes a costChecker mock
-
-  @unit @unimplemented
-  Scenario: topicClustering unit tests remove createCostChecker mock
-    Given the topicClustering unit test file
-    When the test suite is inspected
-    Then there is no vi.mock for createCostChecker

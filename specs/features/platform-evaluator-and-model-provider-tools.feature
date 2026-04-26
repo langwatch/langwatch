@@ -57,23 +57,6 @@ Feature: Platform MCP tools for evaluators and model providers
   # --- Hono Endpoints for Evaluators (missing: update and archive) ---
 
   @integration @unimplemented
-  Scenario: PUT /api/evaluators/:id updates an evaluator
-    Given an evaluator exists with a known ID
-    When I send a PUT request with updated name and config
-    Then the evaluator is updated in the database
-    And the evaluatorType in config is immutable
-    And the response matches the apiResponseEvaluatorSchema
-
-  @integration @unimplemented
-  Scenario: DELETE /api/evaluators/:id archives an evaluator
-    Given an evaluator exists with a known ID
-    When I send a DELETE request for that evaluator
-    Then the evaluator archivedAt is set
-    And subsequent GET requests return 404
-
-  # --- Model Provider Tools ---
-
-  @integration @unimplemented
   Scenario: List all model providers for a project
     When I call platform_list_model_providers
     Then I receive all configured model providers
@@ -94,17 +77,3 @@ Feature: Platform MCP tools for evaluators and model providers
     And existing keys are preserved (omitted fields are not overwritten)
 
   # --- Hono Endpoints for Model Providers (greenfield) ---
-
-  @integration @unimplemented
-  Scenario: GET /api/model-providers lists providers with masked keys
-    When I send a GET request to /api/model-providers
-    Then I receive all providers for the project
-    And all API key values are masked
-
-  @integration @unimplemented
-  Scenario: PUT /api/model-providers/:provider upserts provider config
-    When I send a PUT request with provider name and customKeys
-    Then the provider is created or updated (upsert)
-    And the response confirms the provider is enabled
-    And API keys are masked in the response
-    And omitted fields are not overwritten
