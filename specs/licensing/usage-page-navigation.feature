@@ -71,14 +71,6 @@ Feature: Plan Management Navigation
       | Subscription | false   |
       | License      | true    |
 
-  @integration @unimplemented
-  Scenario: Platform provides hook for determining plan management URL
-    Given a component needs to link to plan management
-    When it calls the getPlanManagementUrl helper
-    Then in SaaS mode it returns "/settings/subscription"
-    And in self-hosted mode it returns "/settings/license"
-
-  # Resource limits display on Usage page
   @e2e @unimplemented
   Scenario: Usage page shows resource limits in self-hosted mode with license
     Given the platform is deployed in self-hosted mode
