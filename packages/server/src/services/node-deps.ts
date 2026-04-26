@@ -63,13 +63,29 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
     await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, ...installArgs], {
       stdio: "inherit",
     });
+
+    // pnpm install does NOT auto-generate the prisma client (Prisma's
+    // `postinstall` is on `@prisma/client` only when bundled via `prisma`
+    // CLI's package.json — we get the CLI as a normal dep, not via the
+    // bundled installer). Without this step, `langwatch/node_modules/.prisma/client/`
+    // doesn't exist and the langwatch app crashes at boot with
+    // `Cannot find module '.prisma/client/index'`. The full-build path
+    // below (when !distAlreadyBuilt) covers this via start:prepare:files →
+    // prisma:generate:typescript; the prebuilt-dist path needs an explicit
+    // call.
+    if (distAlreadyBuilt) {
+      await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, "exec", "prisma", "generate"], {
+        stdio: "inherit",
+      });
+    }
   }
 
   // Skip the build step entirely when dist/client/ is already present.
   // Published npm tarballs ship dist/ pre-built (see
   // .github/workflows/npx-server-publish.yml), so end users hit `pnpm install`
-  // for prisma postinstall + nothing else. The build only runs for `pnpm pack`
-  // -driven local dogfood and dev checkouts where dist/ doesn't exist yet.
+  // + `prisma generate` and nothing else. The build only runs for
+  // `pnpm pack`-driven local dogfood and dev checkouts where dist/
+  // doesn't exist yet.
   if (!distAlreadyBuilt) {
     // Full prod build: start:prepare:files → build:scenario-child-process → vite build.
     // start:prepare:files generates Prisma client, Zod types, SDK versions,
