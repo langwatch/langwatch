@@ -938,20 +938,36 @@ app.post("/deny", async (c: Context) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/auth/cli/logout — revoke a refresh_token explicitly.
-// (CLI uses this in `langwatch logout` so the local config wipe is
-// matched by a server-side revocation.)
+// POST /api/auth/cli/logout — revoke access + refresh tokens explicitly.
+// CLI uses this in `langwatch logout` so the local config wipe is
+// matched by a server-side revocation. Either token may be supplied;
+// supplying both kills both immediately. Without the access_token,
+// only the refresh is revoked and the access token expires naturally
+// in up to 1h — which is a real security gap if the access token was
+// stolen, hence the new `access_token` field added alongside refresh.
 // ---------------------------------------------------------------------------
+const logoutRequestSchema = z.object({
+  refresh_token: z.string().optional(),
+  access_token: z.string().optional(),
+});
+
 app.post("/logout", async (c: Context) => {
   const redis = getRedis();
   const body = await c.req.json().catch(() => ({}));
-  const parsed = refreshRequestSchema.safeParse(body);
+  const parsed = logoutRequestSchema.safeParse(body);
   if (!parsed.success) {
     // 200 either way — logout is idempotent and we don't want clients
     // to fail if they pass garbage; just nothing to revoke.
     return c.json({ ok: true });
   }
-  await redis.del(refreshTokenKey(parsed.data.refresh_token));
+  const ops = redis.multi();
+  if (parsed.data.refresh_token) {
+    ops.del(refreshTokenKey(parsed.data.refresh_token));
+  }
+  if (parsed.data.access_token) {
+    ops.del(accessTokenKey(parsed.data.access_token));
+  }
+  await ops.exec();
   return c.json({ ok: true });
 });
 
