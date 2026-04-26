@@ -60,7 +60,7 @@ jobs:
           - ubuntu-latest
           - ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 25
+    timeout-minutes: 35
     env:
       LANGWATCH_HOME: ${{ github.workspace }}/.langwatch-smoke
       PORT_BASE: ${{ inputs.port_base || '5560' }}
@@ -124,17 +124,32 @@ jobs:
           echo "$!" > "$GITHUB_WORKSPACE/_smoke.pid"
           echo "Started CLI in background (pid $(cat $GITHUB_WORKSPACE/_smoke.pid))"
 
-      - name: Wait for /api/health (up to 8 minutes)
+      - name: Wait for /api/health (up to 18 minutes)
         run: |
           set -e
           base=${PORT_BASE}
-          for shift in 0 10 20 30; do
+          # CI runners have nothing cached — predep download (postgres ~80MB,
+          # clickhouse ~100MB, redis tarball, uv installer) + uv venv install
+          # for langwatch_nlp + langevals + Go aigateway local-build + pnpm
+          # install + vite build of the langwatch app together can take 8-12
+          # minutes on a cold runner. Be generous so the smoke isn't flaky on
+          # the initial provisioning window. Subsequent runs hit the cached
+          # ~/.langwatch and finish in <1 min.
+          #
+          # Auto-shift is unlikely on a fresh CI runner (5560 should be free)
+          # so the inner timeout is what matters; outer shift is a safety net.
+          for shift in 0 10 20; do
             url="http://127.0.0.1:$((base + shift))/api/health"
-            for i in $(seq 1 96); do
+            echo "==> probing $url for up to 18min"
+            for i in $(seq 1 216); do
               if curl -fsS "$url" >/dev/null 2>&1; then
                 echo "✓ $url is healthy after $((i*5))s"
                 echo "RESOLVED_BASE=$((base + shift))" >> "$GITHUB_ENV"
                 exit 0
+              fi
+              if [ $((i % 12)) -eq 0 ]; then
+                echo "  …still waiting at $((i*5))s — last cli.log lines:"
+                tail -n 10 "$GITHUB_WORKSPACE/_smoke.log" 2>/dev/null | sed 's/^/    /' || true
               fi
               sleep 5
             done
