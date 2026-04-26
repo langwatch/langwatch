@@ -1,0 +1,126 @@
+---
+title: Post-install checklist
+description: What to do after `helm install` to get personal keys, the AI Gateway, and the unified `langwatch` CLI working end-to-end.
+---
+
+This page is the operational counterpart to the post-install
+`NOTES.txt` that `helm install langwatch ...` prints — extra depth on
+each step plus the `kubectl` probes self-hosters typically run to
+verify the install.
+
+If you haven't installed yet, start with [helm](./helm) and come back
+here once the chart deploys cleanly.
+
+## 1. Reach the UI as the bootstrap admin
+
+```bash
+# Default service name (release name = `langwatch`)
+kubectl -n langwatch port-forward svc/langwatch-app 5560:5560
+open http://localhost:5560
+```
+
+Sign in with the email address that should own the bootstrap
+organization. SSO (SAML / OIDC) can be configured later — for the
+first sign-in any local-credential or Auth0 path is fine.
+
+If you set `ingress.enabled=true` and your DNS is pointing at the
+controller, replace the port-forward with the public URL.
+
+## 2. Add at least one Model Provider credential
+
+Personal keys reference a `RoutingPolicy` which references a
+`GatewayProviderCredential`. Without at least one provider
+configured, no key — personal or service — can route traffic.
+
+In the UI: **Settings → Model Providers → Add provider**.
+
+Behind the scenes the chart materialises the encryption pepper
+needed to seal the credential at rest:
+
+```bash
+kubectl -n langwatch get secret langwatch-app-secrets \
+  -o jsonpath='{.data.LW_VK_PEPPER}' | base64 -d
+```
+
+If the pepper rotates between deployments, previously-stored
+credentials become unreadable. Treat it like a database root
+password — bind it to your existing secret-management workflow.
+
+## 3. Publish a default RoutingPolicy
+
+In the UI: **Settings → Routing Policies → New policy**, scope =
+`organization`. Mark it default. Pick the providers from step 2 in
+your preferred fallback order. Optionally add a model allowlist —
+e.g. `claude-3-5-*` and `gpt-4o*` — to keep personal keys out of the
+expensive frontier models.
+
+When a member runs `langwatch login --device`, their personal VK
+gets bound to this policy automatically. They never see provider
+plumbing.
+
+If you skip this step, the CLI surfaces a clear error
+(`policy not configured`) instead of silently routing to nothing.
+
+## 4. Verify the AI Gateway is healthy
+
+```bash
+# In-cluster probe via the Service
+kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
+  -- curl -sS http://langwatch-gateway/healthz
+# → {"status":"ok","version":"...", "uptime_s":...}
+
+# Pod-level look at warmup + provider-cache
+kubectl -n langwatch logs -l app.kubernetes.io/name=langwatch-gateway --tail 50
+```
+
+If the gateway can't reach the control plane, it logs
+`auth_upstream_unavailable` and returns 503 for every VK call. The
+fix is almost always `gateway.controlPlane.baseUrl` — defaults to
+`http://langwatch-app:5560` on the assumption your release name is
+`langwatch`. Adjust on a different release name or split-domain.
+
+## 5. Distribute the unified `langwatch` CLI to your team
+
+```bash
+# One-liner for the IT-bot Slack message:
+npx @langwatch/sdk@latest login --device --url https://<your-host>
+```
+
+Devs run that once. They get a short-lived `lw_at_*` access token
+plus a personal `lw_vk_live_*` virtual key, both bound to their SSO
+identity. Then any of the wrapped tools "just work":
+
+```bash
+langwatch claude       # Claude Code with org-managed keys
+langwatch codex        # Codex CLI
+langwatch cursor       # Cursor with custom endpoint
+langwatch shell        # Subshell with ANTHROPIC_BASE_URL etc. preloaded
+```
+
+The CLI calls `GET /api/auth/cli/budget/status` before exec'ing the
+underlying tool — a 402 short-circuits with a branded budget error
+so devs aren't surprised mid-session.
+
+## 6. Off-board cleanly when someone leaves
+
+Personal teams are deactivated through the same admin path as the
+user themselves:
+
+- **Settings → Organization → Members → ...**, choose Remove.
+- The user's personal team and projects stay in the audit log for
+  compliance retention but every personal VK is revoked
+  synchronously. New gateway calls return `401 vk_revoked`.
+- Their refresh + access tokens in Redis are invalidated so a
+  cached CLI session can't keep working past the off-boarding.
+
+## What to read next
+
+- [Helm chart](./helm) — chart structure, secrets, upgrade procedure.
+- [Configuration](./config) — env vars and tuning knobs.
+- [Health checks](./health-checks) — readiness / liveness wiring.
+- [Scaling](./scaling) — HPA, replicas, custom Prometheus metrics.
+
+For the admin-side walkthrough of features (RoutingPolicies,
+budgets, off-boarding policy), see
+[admin setup](../governance/admin-setup) under the governance
+section — same content, audience is the admin not the operator.
