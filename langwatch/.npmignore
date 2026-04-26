@@ -1,0 +1,70 @@
+# Trims langwatch/ for the @langwatch/server tarball. See root .npmignore
+# for the rest.
+#
+# IMPORTANT: when an .npmignore exists at this level, npm/pnpm IGNORE the
+# sibling .gitignore — so the broad excludes here must be re-stated
+# explicitly. The .gitignore would otherwise drop:
+#   - /dist               (we ship the prebuilt vite client + scenario bundle)
+#   - *.generated.ts      (start:prepare:files outputs, imported at runtime)
+#   - src/server/sdk-radar/sdk-versions.json (same)
+# All three are required for `pnpm run start:app` to boot.
+
+# Heavy non-runtime trees.
+node_modules/
+.pnpm-store/
+.pnp/
+.pnp.js
+.next/
+.turbo/
+.vercel/
+
+# Test artifacts.
+coverage/
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+e2e/auth.json
+*.tsbuildinfo
+
+# Source maps from build (large, not needed at runtime).
+**/*.map
+
+# Saas-only mounts and EE source.
+saas-src/
+ee/
+
+# Local secrets / env.
+.env
+.env*.local
+.sentryclirc
+
+# Editor + OS detritus.
+.DS_Store
+.vscode/
+.idea/
+*.pem
+
+# Debug logs.
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+server.log
+screenshot-*.png
+
+# GDPR reports.
+reports/
+
+# Local-only config.
+.eslintrc.local.cjs
+licenses.json
+
+# Local sqlite db.
+prisma/db.sqlite
+prisma/db.sqlite-journal
+
+# Quickwit dev binary.
+quickwit
+quickwit-*
+!elastic/quickwit
