@@ -49,7 +49,15 @@ The easiest way to get started with LangWatch.
 
 ### Local setup 💻
 
-Get up and running on your own machine using docker compose:
+The fastest way to run LangWatch locally — only Node.js required:
+
+```bash
+npx @langwatch/server
+```
+
+The CLI installs `uv`, `postgres`, `redis`, `clickhouse`, and the AI gateway binary into `~/.langwatch/`, scaffolds a `.env` with locally-generated secrets, then starts every service in parallel and opens `http://localhost:5560`. Everything lives under `~/.langwatch/`; `rm -rf ~/.langwatch` is a clean reset.
+
+Prefer Docker? You can still use docker compose:
 
 ```bash
 git clone https://github.com/langwatch/langwatch.git
