@@ -283,7 +283,7 @@
     "encoding": "^0.1.13",
     "esbuild": "^0.27.7",
     "fishery": "^2.4.0",
-    "jest-mock-extended": "^4.0.0",
+    "jest-mock-extended": "^4.0.1",
     "jsdom": "^27.4.0",
     "node-mocks-http": "^1.17.2",
     "playwright": "1.59.1",
