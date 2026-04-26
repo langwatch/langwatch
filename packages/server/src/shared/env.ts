@@ -1,4 +1,6 @@
 import { randomBytes } from "node:crypto";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import type { PortAllocation } from "./ports.ts";
 
 export type EnvOverrides = Partial<Record<string, string>>;
@@ -80,4 +82,49 @@ export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput):
   }
 
   return lines.join("\n") + "\n";
+}
+
+/**
+ * The env-file scaffolder both the CLI's [2/4] env phase and
+ * services/runtime.ts's `scaffoldEnv` call into. Idempotent — once a
+ * .env has been written it's never overwritten so the user's edits
+ * (e.g. OPENAI_API_KEY) survive across runs.
+ *
+ * The list of passthrough keys (OPENAI_API_KEY etc.) is intentionally
+ * NOT honoured here — those propagate via RuntimeContext.userEnv so the
+ * .env file stays free of user secrets. See 04-validation.feature.
+ */
+export function scaffoldEnvFile(input: EnvScaffoldInput & { path: string }): { written: boolean; path: string } {
+  if (existsSync(input.path)) {
+    return { written: false, path: input.path };
+  }
+  mkdirSync(dirname(input.path), { recursive: true });
+  writeFileSync(input.path, buildEnv(input), { mode: 0o600 });
+  return { written: true, path: input.path };
+}
+
+const PASSTHROUGH_ENV_KEYS = [
+  "OPENAI_API_KEY",
+  "AZURE_OPENAI_ENDPOINT",
+  "AZURE_OPENAI_API_KEY",
+  "ANTHROPIC_API_KEY",
+  "GROQ_API_KEY",
+  "GOOGLE_APPLICATION_CREDENTIALS",
+  "VERTEXAI_PROJECT",
+  "VERTEXAI_LOCATION",
+  "SENDGRID_API_KEY",
+  "SENTRY_DSN",
+] as const;
+
+/**
+ * Snapshot the user's process.env for the keys we propagate to children.
+ * Empty values are dropped so they don't override .env defaults.
+ */
+export function captureUserEnv(env: NodeJS.ProcessEnv = process.env): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of PASSTHROUGH_ENV_KEYS) {
+    const value = env[key];
+    if (value && value.length > 0) out[key] = value;
+  }
+  return out;
 }

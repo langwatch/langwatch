@@ -1,7 +1,6 @@
 import { Command } from "commander";
 import chalk from "chalk";
-import { writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { resolve } from "node:path";
 import prompts from "prompts";
 import { printBanner, printPhases } from "./animation/banner.ts";
 import { openBrowser } from "./animation/open-browser.ts";
@@ -11,7 +10,7 @@ import { resolvePortConflicts } from "./port-conflict/resolve.ts";
 import { paths } from "./shared/paths.ts";
 import { allocatePorts, PORT_BASE_DEFAULT } from "./shared/ports.ts";
 import { detectPlatform } from "./shared/platform.ts";
-import { buildEnv } from "./shared/env.ts";
+import { captureUserEnv, scaffoldEnvFile } from "./shared/env.ts";
 import { placeholderRuntime, type RuntimeApi, type RuntimeContext } from "./shared/runtime-placeholder.ts";
 
 declare const __LANGWATCH_VERSION__: string;
@@ -28,13 +27,7 @@ async function loadRuntime(): Promise<RuntimeApi> {
 }
 
 function ensureEnvFile(ctx: RuntimeContext): { written: boolean; path: string } {
-  const path = ctx.paths.envFile;
-  if (existsSync(path)) {
-    return { written: false, path };
-  }
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, buildEnv({ ports: ctx.ports }), { mode: 0o600 });
-  return { written: true, path };
+  return scaffoldEnvFile({ ports: ctx.ports, path: ctx.paths.envFile });
 }
 
 const program = new Command();
@@ -83,6 +76,7 @@ program
       envFile: paths.envFile,
       version: VERSION,
       bullboard: Boolean(opts.bullboard),
+      userEnv: captureUserEnv(),
     };
 
     console.log("");
@@ -141,6 +135,7 @@ program
       envFile: paths.envFile,
       version: VERSION,
       bullboard: false,
+      userEnv: captureUserEnv(),
     };
     ensureEnvFile(ctx);
     await runtime.installServices(ctx);
