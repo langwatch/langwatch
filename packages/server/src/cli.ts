@@ -47,9 +47,10 @@ program
 program
   .command("start", { isDefault: true })
   .description("install missing predeps, scaffold .env, start every service, open the browser")
-  .option("--port-base <n>", "first port slot to use; the +1..+7 services follow it", String(PORT_BASE_DEFAULT))
+  .option("--port-base <n>", "first port slot to use (app tier base..base+9, infra tier base+1000..+1009)", String(PORT_BASE_DEFAULT))
   .option("-y, --yes", "skip every confirmation prompt", false)
   .option("--no-open", "do not auto-open the browser when ready")
+  .option("--bullboard", "expose the BullMQ dashboard on the bullboard infra slot", false)
   .action(async (opts) => {
     detectPlatform();
     printBanner(VERSION);
@@ -74,16 +75,24 @@ program
     console.log(chalk.bold.cyan("[1/4] predeps"));
     const predeps = await runPredeps({ yes: opts.yes, version: VERSION });
 
-    console.log("");
-    console.log(chalk.bold.cyan("[2/4] services"));
     const runtime = await loadRuntime();
-    const ctx: RuntimeContext = { ports, paths, predeps, envFile: paths.envFile, version: VERSION };
-    await runtime.installServices(ctx);
+    const ctx: RuntimeContext = {
+      ports,
+      paths,
+      predeps,
+      envFile: paths.envFile,
+      version: VERSION,
+      bullboard: Boolean(opts.bullboard),
+    };
 
     console.log("");
-    console.log(chalk.bold.cyan("[3/4] env"));
+    console.log(chalk.bold.cyan("[2/4] env"));
     const env = ensureEnvFile(ctx);
     console.log(env.written ? chalk.green(`✓ scaffolded ${env.path}`) : chalk.dim(`= ${env.path} already exists`));
+
+    console.log("");
+    console.log(chalk.bold.cyan("[3/4] services"));
+    await runtime.installServices(ctx);
 
     console.log("");
     console.log(chalk.bold.cyan("[4/4] start"));
@@ -91,7 +100,7 @@ program
     await runtime.waitForHealth(ctx, { timeoutMs: 60_000 });
 
     const url = `http://localhost:${ports.langwatch}`;
-    if (opts.open !== false) await openBrowser(url);
+    if (opts.open !== false && !process.env.CI) await openBrowser(url);
 
     const onShutdown = async () => {
       console.log(chalk.yellow("\n  ⏻ shutting down LangWatch..."));
@@ -131,9 +140,10 @@ program
       predeps: {},
       envFile: paths.envFile,
       version: VERSION,
+      bullboard: false,
     };
-    await runtime.installServices(ctx);
     ensureEnvFile(ctx);
+    await runtime.installServices(ctx);
     console.log(chalk.green("✓ install complete — run `npx @langwatch/server` to start"));
   });
 

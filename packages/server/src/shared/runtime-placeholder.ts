@@ -3,18 +3,23 @@
 // fall back to this placeholder when missing. Once the real runtime lands,
 // loadRuntime() picks it up automatically — no edit needed here.
 
-import type { RuntimeApi, RuntimeContext, ServiceHandle } from "./runtime-contract.ts";
+import type { RuntimeApi, RuntimeContext, RuntimeEvent, ServiceHandle } from "./runtime-contract.ts";
 
 const notImplemented = (name: string) => () => {
   throw new Error(`services/runtime.ts not yet implemented (${name}). julia is wiring this — ping in #langwatch-npx if blocked.`);
 };
 
+async function* emptyEvents(): AsyncIterable<RuntimeEvent> {
+  // intentionally empty
+}
+
 export const placeholderRuntime: RuntimeApi = {
-  installServices: notImplemented("installServices") as RuntimeApi["installServices"],
   scaffoldEnv: notImplemented("scaffoldEnv") as RuntimeApi["scaffoldEnv"],
+  installServices: notImplemented("installServices") as RuntimeApi["installServices"],
   startAll: notImplemented("startAll") as RuntimeApi["startAll"],
   waitForHealth: notImplemented("waitForHealth") as RuntimeApi["waitForHealth"],
   stopAll: (async () => {}) as RuntimeApi["stopAll"],
+  events: emptyEvents as RuntimeApi["events"],
 };
 
-export type { RuntimeApi, RuntimeContext, ServiceHandle };
+export type { RuntimeApi, RuntimeContext, RuntimeEvent, ServiceHandle };

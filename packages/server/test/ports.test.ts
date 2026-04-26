@@ -3,7 +3,7 @@ import { allocatePorts, portsToCheck, PORT_BASE_DEFAULT } from "../src/shared/po
 
 describe("port allocation", () => {
   describe("when called with the default base", () => {
-    it("places langwatch on 5560 and the rest in +1..+7 slots", () => {
+    it("splits into app (base..base+9) and infra (base+1000..base+1009) tiers", () => {
       const a = allocatePorts(PORT_BASE_DEFAULT);
       expect(a).toEqual({
         base: 5560,
@@ -11,25 +11,27 @@ describe("port allocation", () => {
         nlp: 5561,
         langevals: 5562,
         aigateway: 5563,
-        redis: 5564,
-        clickhouseHttp: 5565,
-        clickhouseNative: 5566,
-        postgres: 5567,
+        postgres: 6560,
+        redis: 6561,
+        clickhouseHttp: 6562,
+        clickhouseNative: 6563,
+        bullboard: 6564,
       });
     });
   });
 
   describe("when called with a shifted base", () => {
-    it("cascades the shift to every service", () => {
+    it("cascades the shift to BOTH tiers in lockstep", () => {
       const a = allocatePorts(5570);
       expect(a.langwatch).toBe(5570);
-      expect(a.postgres).toBe(5577);
-      expect(a.redis).toBe(5574);
+      expect(a.postgres).toBe(6570);
+      expect(a.redis).toBe(6571);
+      expect(a.bullboard).toBe(6574);
     });
   });
 
   describe("portsToCheck", () => {
-    it("returns one entry per service so every slot is detected", () => {
+    it("returns one entry per always-on service (bullboard is opt-in)", () => {
       const a = allocatePorts(5560);
       const checks = portsToCheck(a);
       expect(checks.map((c) => c.label)).toEqual([
@@ -37,10 +39,10 @@ describe("port allocation", () => {
         "langwatch_nlp",
         "langevals",
         "ai gateway",
+        "postgres",
         "redis",
         "clickhouse http",
         "clickhouse native",
-        "postgres",
       ]);
       expect(new Set(checks.map((c) => c.port)).size).toBe(8);
     });

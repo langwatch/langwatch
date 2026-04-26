@@ -6,11 +6,11 @@ describe("buildEnv", () => {
   describe("when given the default port base", () => {
     const env = buildEnv({ ports: allocatePorts(5560) });
 
-    it("targets every URL at the matching port", () => {
+    it("targets every URL at the matching port (app tier 5560-3, infra tier 6560-3)", () => {
       expect(env).toContain("BASE_HOST=http://localhost:5560");
-      expect(env).toContain("DATABASE_URL=postgresql://langwatch@localhost:5567");
-      expect(env).toContain("REDIS_URL=redis://localhost:5564/0");
-      expect(env).toContain("CLICKHOUSE_URL=http://localhost:5565/langwatch");
+      expect(env).toContain("DATABASE_URL=postgresql://langwatch@localhost:6560");
+      expect(env).toContain("REDIS_URL=redis://localhost:6561/0");
+      expect(env).toContain("CLICKHOUSE_URL=http://localhost:6562/langwatch");
       expect(env).toContain("LANGWATCH_NLP_SERVICE=http://localhost:5561");
       expect(env).toContain("LANGEVALS_ENDPOINT=http://localhost:5562");
       expect(env).toContain("LW_GATEWAY_BASE_URL=http://localhost:5560");
@@ -46,11 +46,11 @@ describe("buildEnv", () => {
   });
 
   describe("when given a custom port base", () => {
-    it("shifts every URL to the new slot", () => {
+    it("shifts every URL to the new slot in lockstep across both tiers", () => {
       const env = buildEnv({ ports: allocatePorts(5610) });
       expect(env).toContain("BASE_HOST=http://localhost:5610");
-      expect(env).toContain("DATABASE_URL=postgresql://langwatch@localhost:5617");
-      expect(env).toContain("REDIS_URL=redis://localhost:5614/0");
+      expect(env).toContain("DATABASE_URL=postgresql://langwatch@localhost:6610");
+      expect(env).toContain("REDIS_URL=redis://localhost:6611/0");
     });
   });
 });
