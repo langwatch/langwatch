@@ -91,16 +91,16 @@ Feature: Front-door reverse proxy — nlpgo routes /go/* itself, everything else
   # ============================================================================
   # Auth boundary in the front door
   # ============================================================================
+  #
+  # Earlier drafts mandated HMAC on /go/*. That bridge was removed when the
+  # gateway pivoted to library-mode (see _shared/contract.md §4 / §8). nlpgo
+  # /go/* now matches the Python service's posture: no application-layer auth.
+  # The infra layer (Lambda Function URL, restrictive Security Groups, URL
+  # secrecy) is the auth boundary.
 
   @integration @v1
-  Scenario: /go/* rejects unsigned requests at the front door — never reaches the upstream
-    When a request hits "/go/studio/execute_sync" with no LW_NLPGO_INTERNAL_SECRET signature
-    Then the front door returns 401 with body.type "auth_failed"
-    And no proxy hop, no in-process handler is invoked beyond the auth middleware
-
-  @integration @v1
-  Scenario: legacy paths are NOT auth-checked by nlpgo (preserves today's behavior)
-    When a request hits "/studio/execute_sync" with no signature
+  Scenario: legacy paths are reverse-proxied to uvicorn unchanged
+    When a request hits "/studio/execute_sync"
     Then the request is reverse-proxied to uvicorn unchanged
     And uvicorn handles the request as it does today
 

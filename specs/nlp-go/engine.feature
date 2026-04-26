@@ -8,7 +8,7 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
 
   Background:
     Given nlpgo is listening on :5562
-    And a valid LW_NLPGO_INTERNAL_SECRET is configured
+    And nlpgo imports the AI Gateway dispatcher in-process (see contract.md §8)
 
   Rule: Workflow JSON deserializes losslessly
 

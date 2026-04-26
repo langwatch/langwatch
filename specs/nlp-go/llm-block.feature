@@ -6,14 +6,14 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   # The signature node is the most critical block. It owes byte-equivalent behavior
   # to the Python+DSPy+LiteLLM stack across six provider families, structured outputs,
   # tool calls, streaming, and the full chat-history preservation contract from
-  # _shared/contract.md §10. Credentials are inline (per-request) — the gateway has
-  # no per-customer credential store for studio runs; it accepts the inline-creds
-  # header path described in _shared/contract.md §8.
+  # _shared/contract.md §10. Credentials are inline (per-request) — nlpgo imports the
+  # AI Gateway as a Go library and dispatches with a `domain.Credential` value built
+  # from the workflow's `litellm_params`. There is no second HTTP hop and no HMAC.
+  # See _shared/contract.md §4 (no application-layer auth) and §8 (library, not HTTP).
 
   Background:
     Given the nlpgo service is running on port 5562 with NLPGO_BYPASS unset
-    And the AI Gateway is running on port 5563 with LW_GATEWAY_INTERNAL_SECRET set
-    And nlpgo is configured with the same LW_GATEWAY_INTERNAL_SECRET so it can sign gateway calls
+    And nlpgo imports the AI Gateway dispatcher in-process (no second HTTP hop)
     And a project "acme-api" exists with no VirtualKey configured
 
   # ============================================================================
@@ -24,13 +24,13 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   Scenario: signature node with OpenAI litellm_params runs end-to-end via the gateway
     Given a workflow whose signature node has model "openai/gpt-5-mini" and litellm_params:
       | api_key | sk-test-... |
-    When the TS app POSTs to "/go/studio/execute_sync" with that workflow signed by LW_NLPGO_INTERNAL_SECRET
-    Then nlpgo translates the litellm_params into an inline-credentials header
-    And nlpgo forwards a "/v1/chat/completions" call to the gateway with:
-      | header                              | value                            |
-      | X-LangWatch-Internal-Auth           | hmac-sha256 over canonical req   |
-      | X-LangWatch-Inline-Credentials      | base64-json with provider+key    |
-      | X-LangWatch-Project-Id              | acme-api                         |
+    When the TS app POSTs to "/go/studio/execute_sync" with that workflow
+    Then nlpgo translates the litellm_params into a domain.Credential value
+    And nlpgo invokes dispatcher.DispatchStream / Dispatch in-process with:
+      | field           | value                                |
+      | Type            | domain.RequestTypeChat               |
+      | Credential      | { ProviderID: "openai", ApiKey:... } |
+      | Body            | OpenAI-shape /v1/chat/completions    |
     And the gateway dispatches to OpenAI with the inline api_key
     And the response status is 200
     And the workflow result contains the assistant message in chat_messages shape
@@ -104,7 +104,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
       | api_base      | https://acme.openai.azure.com   |
       | api_version   | 2024-05-01-preview              |
     When nlpgo executes the node
-    Then nlpgo's inline-credentials header carries azure.api_key, azure.api_base, azure.api_version
+    Then nlpgo's domain.Credential carries azure.api_key, azure.api_base, azure.api_version
     And the gateway dispatches to Azure with deployment "my-gpt5-prod"
     And the response is 200
 
@@ -112,7 +112,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
   Scenario: Azure missing api_version falls back to default 2024-05-01-preview
     Given a workflow whose signature node has model "azure/my-deployment" and litellm_params with no api_version
     When nlpgo executes the node
-    Then nlpgo injects api_version "2024-05-01-preview" before signing the gateway call
+    Then nlpgo injects api_version "2024-05-01-preview" into the Credential before dispatch
 
   @integration @v1
   Scenario: Azure extra_headers JSON string is forwarded as a parsed object
@@ -275,12 +275,18 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
     And the per-node cost is reported in the workflow result
 
   # ============================================================================
-  # Negative auth — nlpgo MUST reject unsigned /go/* calls
+  # Negative paths — bad input is rejected, but auth is at the infra layer
   # ============================================================================
+  #
+  # Earlier drafts of this spec mandated an HMAC signature on /go/*. That bridge
+  # was removed when the gateway moved to library-mode (see _shared/contract.md
+  # §4 / §8). nlpgo /go/* now matches the Python NLP service's posture: no
+  # application-layer auth, security comes from Lambda Function URL + URL
+  # secrecy + restrictive Security Groups.
 
   @integration @v1
-  Scenario: /go/studio/execute_sync without a valid LW_NLPGO_INTERNAL_SECRET signature returns 401
-    When a request hits "/go/studio/execute_sync" with a wrong signature
-    Then the response status is 401
-    And the response body.type is "auth_failed"
+  Scenario: /go/studio/execute_sync with a malformed body returns a typed 400
+    When a request hits "/go/studio/execute_sync" with a body that is not valid JSON
+    Then the response status is 400
+    And the response body.type names the parse failure
     And no gateway call is made

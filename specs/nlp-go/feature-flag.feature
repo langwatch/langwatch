@@ -42,7 +42,6 @@ Feature: TS app routes to nlpgo via release_nlp_go_engine_enabled
     Given the flag is ON for project "acme-api"
     When the playground for "acme-api" calls /api/proxy/v1/chat/completions
     Then the TS app forwards to "${LANGWATCH_NLP_SERVICE}/go/proxy/v1/chat/completions"
-    And the request is signed with LW_NLPGO_INTERNAL_SECRET
     And every "x-litellm-*" header from the playground client is preserved on the outbound request
 
   # ============================================================================
@@ -54,7 +53,7 @@ Feature: TS app routes to nlpgo via release_nlp_go_engine_enabled
     Given the flag is ON for project "acme-api"
     When the topic-clustering worker calls fetchTopicsBatchClustering for project "acme-api"
     Then the request POSTs to "${TOPIC_CLUSTERING_SERVICE}/topics/batch_clustering" (no /go prefix)
-    And the request is unsigned (no X-LangWatch-NLPGO-Signature)
+    And the request carries no application-layer auth header (matches today's Python posture)
 
   # ============================================================================
   # Env-var overrides mirror existing PostHog conventions

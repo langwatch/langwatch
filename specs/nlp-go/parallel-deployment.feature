@@ -109,27 +109,21 @@ Feature: Parallel deployment — Go and Python share one container/lambda
   # ============================================================================
 
   @integration @v1
-  Scenario: legacy /studio/execute_sync requests pass through the proxy unsigned (today's behavior)
-    When the TS app POSTs to /studio/execute_sync (legacy path) with no signature header
+  Scenario: legacy /studio/execute_sync requests pass through the proxy unchanged (today's behavior)
+    When the TS app POSTs to /studio/execute_sync (legacy path)
     Then nlpgo's reverse proxy forwards the request as-is
-    And uvicorn responds 200 (it does not check the signature)
-
-  @integration @v1
-  Scenario: /go/* requests must carry a valid LW_NLPGO_INTERNAL_SECRET signature
-    When a request hits /go/studio/execute_sync with no signature
-    Then the response status is 401
-    And the request is NOT proxied to uvicorn
+    And uvicorn responds 200
 
   # ============================================================================
   # Provider-credential handling
   # ============================================================================
 
   @integration @v1
-  Scenario: /go/* requests strip x-litellm-* headers before reaching the gateway
+  Scenario: /go/proxy/v1/* translates x-litellm-* headers into a domain.Credential
     Given a /go/proxy/v1/chat/completions request carrying x-litellm-* credential headers
     When nlpgo translates the request
-    Then no x-litellm-* header appears in the outbound gateway request
-    And the equivalent inline-credentials header is signed by LW_GATEWAY_INTERNAL_SECRET
+    Then no x-litellm-* header is forwarded to a second hop (there is no second hop)
+    And the dispatcher receives the equivalent domain.Credential value in-process
 
   # ============================================================================
   # Resource budget

@@ -68,13 +68,11 @@ In both **Lambda** (production) and **dev pod** (k8s) we run **one container** w
 
 ## 4. Authentication
 
-Today the Python NLP service has no auth — Lambda function URL + cluster-internal trust. **For the Go path we add HMAC auth** mirroring the gateway's `LW_GATEWAY_INTERNAL_SECRET`:
+The Python NLP service has no application-layer auth today — its security posture is Lambda Function URL + URL secrecy + restrictive Security Group. **The Go path inherits the same posture:** no HMAC, no Bearer token on `/go/*`. nlpgo and uvicorn share the container's network surface; both are unauthenticated and rely on the surrounding infrastructure (FunctionURL/VPC/SG) for ingress control.
 
-- Env var: `LW_NLPGO_INTERNAL_SECRET` (32-byte hex). Generated with `openssl rand -hex 32`.
-- TS app signs every request to `/go/*` with `X-LangWatch-NLPGO-Signature: hmac-sha256(secret, body)`.
-- nlpgo middleware verifies before dispatch; mismatch → `401`.
-- Reverse-proxied requests (non-`/go/*`) are forwarded to uvicorn **without** signing, preserving today's behavior.
-- Retrofitting the Python path to require the same secret is **out of scope** for this PR — done as a separate hardening change after the migration completes.
+Earlier drafts of this spec described an `LW_NLPGO_INTERNAL_SECRET` HMAC bridge. That bridge was removed when nlpgo pivoted to importing the AI Gateway dispatcher as a library (see §8). Without an HTTP hop between nlpgo and the gateway there is nothing to authenticate at the wire layer; per-request credentials travel in-process as `domain.Credential` values, not as base64-encoded HTTP headers.
+
+Hardening the underlying ingress posture (e.g. retrofitting the Python path with mutual TLS, or moving off Lambda Function URLs) is tracked as a separate workstream after the migration completes.
 
 ---
 
@@ -133,70 +131,59 @@ This is the only place nlpgo depends on a Python interpreter being installed in 
 
 ---
 
-## 8. AI Gateway integration — HTTP, not library
+## 8. AI Gateway integration — library, not HTTP
 
-nlpgo treats the AI Gateway as an external service:
-- All LLM calls go to `${LW_GATEWAY_BASE_URL}` (env, defaults to `http://langwatch-aigateway:5563` in pod, public URL in Lambda).
-- The gateway client lives in `services/nlpgo/adapters/gatewayclient/` and exposes typed methods for `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, plus a streaming pass-through.
-- Rationale: (a) Lambda can reach the gateway over 443 just like everything else, (b) embedding the gateway as a library would put provider keys in the same address space as untrusted user code (code block), (c) version skew is decoupled, (d) cleanest auth + error boundary.
+nlpgo imports the AI Gateway as an in-process Go package and dispatches
+through `services/aigateway/dispatcher`. Per-request credentials are passed
+directly as `domain.Credential` values; there is no second HTTP hop, no
+HMAC, no `LW_GATEWAY_BASE_URL` in the Studio path. Studio code-block
+sandboxing isolates user Python at the subprocess boundary (see §7), so the
+gateway library and the user's Python sandbox never share an address space.
 
-### 8.1 Inline-credentials inbound auth path (gateway-side extension)
+What the in-process dispatcher does NOT skip:
+- Provider routing through Bifrost (real provider HTTP calls).
+- Per-provider error classification + retry (Bifrost-internal).
+- Streaming pass-through with raw-byte preservation.
 
-Studio runs cannot use a per-customer Virtual Key — the credentials live under
-`ModelProvider.customKeys` keyed by project, not under any VK. So nlpgo cannot
-pass a Bearer token; it must pass the raw provider credentials inline. We add
-a new inbound auth path on the gateway that:
+What it does skip (vs. the HTTP `/v1/*` path used by SDK/CLI customers):
+- Virtual-key auth — nlpgo brings credentials per-call.
+- Rate limiting — internal traffic, not customer-facing.
+- Budget tracking — no VK to debit.
+- Cache rules / guardrails — Studio runs decide for themselves.
 
-1. Accepts requests carrying these headers:
-   - `X-LangWatch-Internal-Auth: <hex hmac-sha256>` — signature over canonical request.
-   - `X-LangWatch-Internal-Timestamp: <unix>` — replay guard (±300s window).
-   - `X-LangWatch-Inline-Credentials: <base64-json>` — provider creds blob (shape below).
-   - `X-LangWatch-Project-Id: <project>` — for span/cost attribution.
-   - `X-LangWatch-Origin: <origin>` — see §12.5.
-2. Verifies HMAC against `LW_GATEWAY_INTERNAL_SECRET`. Canonical input:
-   `METHOD\nPATH\nTIMESTAMP\nhex(sha256(BODY))\nhex(sha256(INLINE_CREDS_HEADER))`.
-3. On success, builds a synthetic `Bundle{ProjectID, Credentials: <from inline-creds>}`
-   and short-circuits the existing `AuthMiddleware` (no control-plane lookup).
-4. On failure (bad HMAC, stale timestamp, missing inline-creds header), falls
-   through to the standard `Authorization: Bearer <vk>` path. If that also
-   fails, returns 401.
+The standard VK + `/v1/*` HTTP path is unchanged for SDK / CLI / customer
+Bifrost-passthrough traffic. nlpgo and the HTTP path coexist on different
+process surfaces but share the same Bifrost router.
 
-The middleware lives at `services/aigateway/adapters/httpapi/internal_auth.go`
-and runs before `AuthMiddleware` for the `/v1/*` route group. The standard VK
-path is unchanged for all other callers (CLI/SDK/Bifrost passthrough customers).
+### 8.1 Per-request credential shape
 
-#### Inline-credentials JSON shape
+`domain.Credential` carries the provider id + the provider-specific credential
+material. nlpgo's `services/nlpgo/adapters/dispatcheradapter/` translates the
+inbound `litellm_params` (Studio shape) or `x-litellm-*` headers (playground
+shape) into a Credential before calling the dispatcher.
 
-```json
-{
-  "provider": "openai|anthropic|azure|bedrock|vertex_ai|gemini|custom",
-  "openai":    { "api_key": "...", "api_base": "..."?, "organization": "..."? },
-  "anthropic": { "api_key": "...", "api_base": "..."? },
-  "azure":     { "api_key": "...", "api_base": "...", "api_version": "...",
-                 "use_azure_gateway": "true"?, "extra_headers": {...}? },
-  "bedrock":   { "aws_access_key_id": "...", "aws_secret_access_key": "...",
-                 "aws_session_token": "..."?, "aws_region_name": "...",
-                 "aws_bedrock_runtime_endpoint": "..."? },
-  "vertex_ai": { "vertex_credentials": "<JSON SA key>", "vertex_project": "...",
-                 "vertex_location": "..." },
-  "gemini":    { "api_key": "..." },
-  "custom":    { "api_key": "...", "api_base": "..." }
-}
+Credential material per provider — all populated fields are strings unless
+noted:
+
 ```
-
-The translator in `services/nlpgo/adapters/litellm/` produces this exact shape
-from the input `litellm_params` map. Only the slot for the active `provider`
-is populated; other slots are absent.
+openai:    { api_key, api_base?, organization? }
+anthropic: { api_key, api_base? }
+azure:     { api_key, api_base, api_version, use_azure_gateway?: bool,
+             extra_headers?: map<string,string> }
+bedrock:   { aws_access_key_id, aws_secret_access_key, aws_session_token?,
+             aws_region_name, aws_bedrock_runtime_endpoint? }
+vertex_ai: { vertex_credentials: <JSON SA key>, vertex_project, vertex_location }
+gemini:    { api_key }
+custom:    { api_key, api_base }
+```
 
 #### Security notes
 
 - Inline credentials never appear in any log line at any level.
-- The middleware logs `internal_auth_succeeded` / `internal_auth_failed` with
-  request id + project id only — never with secret values or even key prefixes.
-- Replay window is 300s; older timestamps reject. Clock skew tolerance is 60s
-  in the future direction.
-- The inline-creds header is part of the HMAC canonical input, so a successful
-  HMAC implies the inline creds were not tampered in flight.
+- nlpgo logs `nlpgo_llm_dispatched` with request id + project id only, never
+  with secret values or even key prefixes.
+- Credentials live only in the per-request `domain.Credential` value; they
+  are not cached, persisted, or written to OTel attributes.
 
 ---
 

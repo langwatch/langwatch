@@ -4,15 +4,14 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
   So that I get the new gateway-backed cost tracking without any change in request/response shape
 
   # _shared/contract.md §1 + §11 + §8: the playground hits /proxy/v1/* today on uvicorn.
-  # When the project is on the Go engine, the TS app prepends /go/, signs the request
-  # with LW_NLPGO_INTERNAL_SECRET, and includes inline credentials via x-litellm-* headers.
-  # nlpgo translates the headers into an inline-credentials header and forwards to the
-  # AI Gateway as a passthrough — preserving every byte of the OpenAI shape including
+  # When the project is on the Go engine, the TS app prepends /go/ and forwards the
+  # request to nlpgo, which carries the x-litellm-* credential headers through to the
+  # in-process gateway dispatcher. nlpgo translates the headers into a domain.Credential
+  # and forwards verbatim — preserving every byte of the OpenAI shape including
   # streaming SSE, tool calls, image content, and the function-calling Beta variants.
 
   Background:
-    Given nlpgo is running with LW_NLPGO_INTERNAL_SECRET set
-    And nlpgo is configured to reach the AI Gateway with LW_GATEWAY_INTERNAL_SECRET
+    Given nlpgo is running with the in-process AI Gateway dispatcher loaded
     And a project "acme-api" exists
 
   # ============================================================================
@@ -21,7 +20,7 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
 
   @integration @v1
   Scenario Outline: every OpenAI-style /v1/* method is reachable under /go/proxy/v1/*
-    When the TS app forwards a "<method>" request to "/go/proxy/v1<subpath>" signed with LW_NLPGO_INTERNAL_SECRET
+    When the TS app forwards a "<method>" request to "/go/proxy/v1<subpath>"
     Then nlpgo dispatches a corresponding gateway call to "<gateway_path>"
     And the response status is 200
     And the response body shape matches OpenAI's spec for "<subpath>"
@@ -102,9 +101,9 @@ Feature: Proxy passthrough — playground LLM calls via /go/proxy/v1/*
   # ============================================================================
 
   @integration @v1
-  Scenario: /go/proxy/v1/* requests without a valid LW_NLPGO_INTERNAL_SECRET signature return 401
-    When a request to "/go/proxy/v1/chat/completions" arrives with a wrong signature
-    Then the response status is 401
+  Scenario: /go/proxy/v1/* without provider headers returns a typed 400 before any dispatch
+    When a request to "/go/proxy/v1/chat/completions" arrives with no x-litellm-* credential headers and no provider prefix in body.model
+    Then the response status is 400
     And no gateway call is made
 
   @integration @v1
