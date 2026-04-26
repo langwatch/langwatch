@@ -218,19 +218,19 @@ describe("Row height mode", () => {
       expect(store.ui.rowHeightMode).toBe("compact");
     });
 
-    it("setRowHeightMode changes mode to expanded", () => {
+    it("setRowHeightMode changes mode to fit", () => {
       const store = useEvaluationsV3Store.getState();
 
-      store.setRowHeightMode("expanded");
+      store.setRowHeightMode("fit");
 
       const updatedStore = useEvaluationsV3Store.getState();
-      expect(updatedStore.ui.rowHeightMode).toBe("expanded");
+      expect(updatedStore.ui.rowHeightMode).toBe("fit");
     });
 
     it("setRowHeightMode changes mode back to compact", () => {
       const store = useEvaluationsV3Store.getState();
 
-      store.setRowHeightMode("expanded");
+      store.setRowHeightMode("fit");
       store.setRowHeightMode("compact");
 
       const updatedStore = useEvaluationsV3Store.getState();
@@ -247,7 +247,7 @@ describe("Row height mode", () => {
       ).toBe(true);
 
       // Switch mode
-      store.setRowHeightMode("expanded");
+      store.setRowHeightMode("fit");
 
       const updatedStore = useEvaluationsV3Store.getState();
       expect(updatedStore.ui.expandedCells.size).toBe(0);
@@ -631,5 +631,90 @@ describe("TargetHeader stability", () => {
     expect(mountCount.current).toBe(initialMountCount);
 
     console.log = originalLog;
+  });
+});
+
+// Regression for issue #3441 fix 4: the table always renders a trailing
+// phantom row (Excel-style "click to add"), but target columns must NOT
+// render content for phantom rows — no input = nothing to run. Dataset cells
+// keep their click-to-add affordance for the phantom row.
+describe("phantom empty rows", () => {
+  beforeEach(() => {
+    useEvaluationsV3Store.getState().reset();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.clearAllMocks();
+  });
+
+  describe("when the dataset has 2 populated rows (displayRowCount = 3)", () => {
+    const seedTwoPopulatedRowsAndOneTarget = () => {
+      // displayRowCount = max(rowCount + 1, 3) = max(3, 3) = 3, so rows 0..1
+      // are populated and row 2 is the trailing phantom row that should be
+      // suppressed in the target column but kept in the dataset column (for
+      // click-to-add).
+      const store = useEvaluationsV3Store.getState();
+      store.updateDataset("test-data", {
+        columns: [
+          { id: "input", name: "input", type: "string" },
+          { id: "expected_output", name: "expected_output", type: "string" },
+        ],
+        inline: {
+          columns: [
+            { id: "input", name: "input", type: "string" },
+            { id: "expected_output", name: "expected_output", type: "string" },
+          ],
+          records: {
+            input: ["row 0 input", "row 1 input"],
+            expected_output: ["row 0 expected", "row 1 expected"],
+          },
+        },
+      });
+
+      store.addTarget({
+        id: "test-target",
+        type: "prompt",
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+        mappings: {},
+      });
+    };
+
+    it("still renders a dataset cell on the phantom row (click-to-add affordance)", async () => {
+      seedTwoPopulatedRowsAndOneTarget();
+
+      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("cell-0-input")).toBeInTheDocument();
+        expect(screen.getByTestId("cell-1-input")).toBeInTheDocument();
+      });
+
+      // The phantom row (row 2) DOES get a dataset cell.
+      expect(screen.getByTestId("cell-2-input")).toBeInTheDocument();
+    });
+
+    it("renders target cell content only for populated rows, not the phantom row", async () => {
+      seedTwoPopulatedRowsAndOneTarget();
+
+      render(<EvaluationsV3Table disableVirtualization />, { wrapper: Wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("cell-0-input")).toBeInTheDocument();
+      });
+
+      // TargetCellContent for an empty-output cell renders "No output yet".
+      // With the fix: 2 populated rows → 2 target cells → 2 "No output yet".
+      // Without the fix: the phantom row (row 2) also renders a target cell,
+      // yielding 3 matches.
+      expect(screen.getAllByText("No output yet")).toHaveLength(2);
+
+      // Add-evaluator button sits inside TargetCellContent — same invariant,
+      // one per populated row.
+      expect(
+        screen.getAllByTestId("add-evaluator-button-test-target"),
+      ).toHaveLength(2);
+    });
   });
 });

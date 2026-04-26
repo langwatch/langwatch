@@ -71,7 +71,7 @@ import { TargetSuperHeader } from "./TargetSuperHeader";
 import { VirtualizedTableBody } from "./VirtualizedTableBody";
 
 // Max rows for expanded mode (disable virtualization above this)
-const MAX_ROWS_FOR_EXPANDED_MODE = 100;
+const MAX_ROWS_FOR_FIT_MODE = 100;
 
 // Default percentage widths for columns (stored as numbers, e.g., 16 means 16%)
 const CHECKBOX_WIDTH_PX = 40; // Checkbox is fixed pixels
@@ -870,7 +870,7 @@ export function EvaluationsV3Table({
   // - Disable virtualization in expanded mode for datasets <= 100 rows
   const rowHeightMode = ui.rowHeightMode;
   const shouldVirtualize =
-    rowHeightMode === "compact" || rowCount > MAX_ROWS_FOR_EXPANDED_MODE;
+    rowHeightMode === "compact" || rowCount > MAX_ROWS_FOR_FIT_MODE;
 
   const selectedRows = ui.selectedRows;
   const allSelected = selectedRows.size === rowCount && rowCount > 0;
@@ -920,12 +920,14 @@ export function EvaluationsV3Table({
         ]),
       );
 
-      // Check if this row is empty - empty rows don't get executed
-      const _rowIsEmpty = isRowEmpty(datasetValues);
+      // Empty rows (the Excel-style trailing phantom row) don't get executed
+      // and shouldn't render target outputs / evaluator chips.
+      const rowIsEmpty = isRowEmpty(datasetValues);
 
       return {
         rowIndex: index,
         dataset: datasetValues,
+        isEmpty: rowIsEmpty,
         targets: Object.fromEntries(
           targets.map((target) => [
             target.id,
@@ -1152,6 +1154,10 @@ export function EvaluationsV3Table({
             <TargetHeaderFromMeta targetId={targetId} context={context} />
           ),
           cell: (info) => {
+            // Phantom empty rows render nothing in target columns — the
+            // dataset side keeps the click-to-add affordance, but there's
+            // no input to run a target against.
+            if (info.row.original.isEmpty) return null;
             const data = info.getValue() as {
               output: unknown;
               evaluators: Record<string, unknown>;

@@ -412,6 +412,63 @@ describe("EvaluatorChip", () => {
     });
   });
 
+  // Regression for issue #3441 fix 2: the missing-mapping alert icon on
+  // an evaluator chip must be wrapped in a Tooltip with the same copy as
+  // the prompt/target header's equivalent alert in TargetHeader.tsx. Before
+  // this fix the `(!)` icon rendered bare, giving no hover affordance.
+  describe("when hasMissingMappings is true — alert icon tooltip", () => {
+    it("renders the missing-mapping alert icon with an accessible trigger", () => {
+      render(
+        <EvaluatorChip
+          evaluator={createEvaluator()}
+          result={undefined}
+          hasMissingMappings
+          onEdit={vi.fn()}
+          onRemove={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const alert = screen.getByTestId(
+        `evaluator-missing-mapping-alert-${createEvaluator().id}`,
+      );
+      expect(alert).toBeInTheDocument();
+      // Chakra's Tooltip.Trigger adds `data-scope="tooltip"` / aria-describedby
+      // on the wrapped element. Its presence is proof the icon is wrapped
+      // rather than bare.
+      expect(
+        alert.getAttribute("aria-describedby") ??
+          alert.getAttribute("data-scope"),
+      ).not.toBeNull();
+    });
+
+    it("shows the 'Missing variable mappings - Click to configure' copy on hover", async () => {
+      const user = userEvent.setup();
+
+      render(
+        <EvaluatorChip
+          evaluator={createEvaluator()}
+          result={undefined}
+          hasMissingMappings
+          onEdit={vi.fn()}
+          onRemove={vi.fn()}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      const alert = screen.getByTestId(
+        `evaluator-missing-mapping-alert-${createEvaluator().id}`,
+      );
+      await user.hover(alert);
+
+      expect(
+        await screen.findByText(
+          "Missing variable mappings - Click to configure",
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+
   describe("when evaluator has missing mappings", () => {
     it("redirects Rerun click to onEdit", async () => {
       const onEdit = vi.fn();
