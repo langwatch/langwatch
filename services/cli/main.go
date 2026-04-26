@@ -39,6 +39,14 @@ func main() {
 	defer cancel()
 
 	if err := cmd.Run(ctx, os.Args[1:]); err != nil {
+		// Subcommands that already printed a structured message (e.g.
+		// wrapper.RenderBudgetExceeded) attach an explicit exit code
+		// to the error and don't want the generic stderr line. Errors
+		// implementing ExitCode() get their code respected silently;
+		// everything else falls through to the default "stderr + 1".
+		if ec, ok := err.(interface{ ExitCode() int }); ok {
+			os.Exit(ec.ExitCode())
+		}
 		fmt.Fprintf(os.Stderr, "%s\n", err)
 		os.Exit(1)
 	}

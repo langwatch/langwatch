@@ -55,6 +55,21 @@ func wrapTool(toolName string) func(context.Context, []string) error {
 			}
 			return err
 		}
+
+		// Budget pre-check — if the user's personal/team/org/project
+		// budget is already exhausted, render the spec-canonical Screen-8
+		// box and exit 2 BEFORE exec'ing the tool. This is the
+		// budget-exceeded.feature contract: no Claude/Codex/Cursor process
+		// is spawned when the gateway would 402 the very first call.
+		// Cache the request_increase_url so a follow-up
+		// `langwatch request-increase` opens the exact signed URL.
+		if be, _ := wrapper.CheckBudget(cfg, nil); be != nil {
+			wrapper.RenderBudgetExceeded(os.Stderr, be)
+			cfg.LastRequestIncreaseURL = be.RequestIncreaseURL
+			_ = config.Save(cfg)
+			return &exitCodeError{code: 2, msg: be.Error()}
+		}
+
 		envKV := wrapper.EnvForTool(cfg, toolName)
 		return wrapper.Run(cfg, wrapper.Tool{
 			Name:    toolName,
@@ -62,6 +77,17 @@ func wrapTool(toolName string) func(context.Context, []string) error {
 		}, args)
 	}
 }
+
+// exitCodeError lets a subcommand request a specific os.Exit code
+// without depending on the test-unfriendly os.Exit. main.go converts
+// this to the correct exit status.
+type exitCodeError struct {
+	code int
+	msg  string
+}
+
+func (e *exitCodeError) Error() string  { return e.msg }
+func (e *exitCodeError) ExitCode() int  { return e.code }
 
 func runShell(ctx context.Context, args []string) error {
 	cfg, err := config.Load()

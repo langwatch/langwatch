@@ -44,6 +44,14 @@ type Config struct {
 	// DefaultPersonalVK is the personal virtual-key secret prefix
 	// auto-issued at login. The full secret is in PersonalVKSecret.
 	DefaultPersonalVK PersonalVK `json:"default_personal_vk,omitempty"`
+
+	// LastRequestIncreaseURL is the most recent signed
+	// `request_increase_url` returned by the gateway in a
+	// budget_exceeded 402 payload. Cached here so
+	// `langwatch request-increase` can open the exact URL the
+	// gateway produced (with HMAC'd user/limit/spent query params)
+	// rather than reconstructing one — see budget-exceeded.feature.
+	LastRequestIncreaseURL string `json:"last_request_increase_url,omitempty"`
 }
 
 // Identity represents the authenticated user.
