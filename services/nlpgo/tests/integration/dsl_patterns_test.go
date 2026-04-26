@@ -56,6 +56,8 @@
 //   pattern_005_http_to_sig    — http block fetches data, signature uses it    ✅
 //   pattern_006_sigs_to_code   — 2× parallel signature → code aggregator       ✅
 //   pattern_007_multi_output   — signature with 2+ outputs → JSON parse+split  ✅
+//   pattern_008_llm_boolean    — sig → evaluator(langevals/llm_boolean)        ✅
+//   pattern_009_llm_category   — sig → evaluator(langevals/llm_category)       ✅
 //   pattern_010_custom_safety  — custom node kind → typed unsupported error    ✅
 //
 // See feedback memory entry "No customer names in public repo".
@@ -1071,4 +1073,271 @@ func TestPattern010_CustomNodeFailsWithActionableError(t *testing.T) {
 		"error message should name the offending node kind so operators know what to fix")
 	assert.Contains(t, res.Error.Message, "replace",
 		"error message should include the actionable hint about replacing the node")
+}
+
+// TestPattern008_LLMBooleanEvaluator — signature → evaluator with the
+// `langevals/llm_boolean` slug → end. This is the dominant evaluator
+// shape observed in real customer traffic: a 4-parameter settings dict
+// (model + max_tokens + prompt-with-{{var}}-markers), no `categories`.
+//
+// What this proves:
+//
+//   1. The evaluator dispatch builds the right URL — slug embeds the
+//      langevals/ namespace and path-joins onto /api/evaluations/.
+//   2. The full `settings` dict — model, max_tokens, prompt — is sent
+//      verbatim to the langevals service. In particular the `{{ var }}`
+//      markers in the prompt body are preserved on the wire (they are
+//      rendered downstream by langevals, not by us).
+//   3. The `data` dict carries upstream signature output + entry-side
+//      expected, so the evaluator has both surfaces for its boolean
+//      judgement.
+//   4. Result.score / Result.passed / Result.details propagate through
+//      the engine to the workflow result — the boolean shape callers
+//      expect from llm_boolean.
+//
+// Generic concept (math fact judge); zero customer content.
+func TestPattern008_LLMBooleanEvaluator(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(_ app.LLMRequest) (*app.LLMResponse, error) {
+			return &app.LLMResponse{Content: "12", Cost: 0.0001}, nil
+		},
+	}
+	url, lwRequests := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status":  "processed",
+			"score":   1.0,
+			"passed":  true,
+			"details": "the candidate answer is numerically correct",
+			"cost":    map[string]any{"currency": "USD", "amount": 0.00007},
+		})
+	})
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-008",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"sk-pattern-008","spec_version":"1.3",
+	      "name":"Pattern008","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[
+	            {"identifier":"question","type":"str"},
+	            {"identifier":"expected","type":"str"}
+	          ],
+	          "dataset":{"inline":{"records":{
+	            "question":["What is 7+5?"],
+	            "expected":["12"]
+	          },"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"answer","type":"signature","data":{
+	          "name":"Answer",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Answer with only the digits: {{ question }}"}
+	          ],
+	          "inputs":[{"identifier":"question","type":"str"}],
+	          "outputs":[{"identifier":"answer","type":"str"}]
+	        }},
+	        {"id":"judge","type":"evaluator","data":{
+	          "parameters":[
+	            {"identifier":"evaluator","type":"str","value":"langevals/llm_boolean"},
+	            {"identifier":"name","type":"str","value":"is-answer-correct"},
+	            {"identifier":"settings","type":"dict","value":{
+	              "model":"openai/gpt-5-mini",
+	              "max_tokens":256,
+	              "prompt":"Given the question {{ input }} and expected {{ expected_output }}, is the answer {{ output }} correct? Reply true or false."
+	            }}
+	          ],
+	          "outputs":[
+	            {"identifier":"score","type":"float"},
+	            {"identifier":"passed","type":"bool"},
+	            {"identifier":"details","type":"str"}
+	          ]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[
+	          {"identifier":"score","type":"float"},
+	          {"identifier":"passed","type":"bool"},
+	          {"identifier":"details","type":"str"}
+	        ]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.question","target":"answer","targetHandle":"inputs.question","type":"default"},
+	        {"id":"e2","source":"entry","sourceHandle":"outputs.question","target":"judge","targetHandle":"inputs.input","type":"default"},
+	        {"id":"e3","source":"answer","sourceHandle":"outputs.answer","target":"judge","targetHandle":"inputs.output","type":"default"},
+	        {"id":"e4","source":"entry","sourceHandle":"outputs.expected","target":"judge","targetHandle":"inputs.expected_output","type":"default"},
+	        {"id":"e5","source":"judge","sourceHandle":"outputs.score","target":"end","targetHandle":"inputs.score","type":"default"},
+	        {"id":"e6","source":"judge","sourceHandle":"outputs.passed","target":"end","targetHandle":"inputs.passed","type":"default"},
+	        {"id":"e7","source":"judge","sourceHandle":"outputs.details","target":"end","targetHandle":"inputs.details","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	// (1) URL path embeds the langevals/ namespace — slug path-joins
+	// onto /api/evaluations/.
+	require.Len(t, *lwRequests, 1, "expected exactly one evaluator HTTP call")
+	rec := (*lwRequests)[0]
+	assert.Equal(t, "/api/evaluations/langevals/llm_boolean/evaluate", rec["path"])
+	assert.Equal(t, "sk-pattern-008", rec["x_auth_token"])
+
+	// (2) settings.{model,max_tokens,prompt} reach langevals verbatim,
+	// including the {{ var }} markers in the prompt body. langevals
+	// renders them itself; we must not eat them on the way through.
+	settings, ok := rec["body"].(map[string]any)["settings"].(map[string]any)
+	require.True(t, ok, "evaluator request must carry a settings object")
+	assert.Equal(t, "openai/gpt-5-mini", settings["model"])
+	assert.InDelta(t, 256.0, settings["max_tokens"], 1e-9)
+	prompt, _ := settings["prompt"].(string)
+	assert.Contains(t, prompt, "{{ input }}",
+		"settings.prompt must preserve {{ var }} markers — langevals renders them")
+	assert.Contains(t, prompt, "{{ expected_output }}")
+	assert.Contains(t, prompt, "{{ output }}")
+	assert.NotContains(t, settings, "categories",
+		"llm_boolean settings must NOT carry a categories field")
+
+	// (3) data dict carries both upstream signature output AND entry-side
+	// expected — the boolean evaluator needs both surfaces.
+	data := rec["body"].(map[string]any)["data"].(map[string]any)
+	assert.Equal(t, "What is 7+5?", data["input"])
+	assert.Equal(t, "12", data["output"], "signature output must reach evaluator data.output")
+	assert.Equal(t, "12", data["expected_output"])
+
+	// (4) score / passed / details surface through to the workflow result.
+	require.NotNil(t, res.Result)
+	assert.InDelta(t, 1.0, res.Result["score"], 1e-9)
+	assert.Equal(t, true, res.Result["passed"])
+	assert.Equal(t, "the candidate answer is numerically correct", res.Result["details"])
+}
+
+// TestPattern009_LLMCategoryEvaluator — signature → evaluator with the
+// `langevals/llm_category` slug → end. Same shape as pattern_008 plus
+// the `categories` array — `[{name, description}, ...]`. This is the
+// second-most-common evaluator pattern observed in real traffic.
+//
+// What this proves on top of pattern_008:
+//
+//   1. settings.categories survives the JSON boundary as a list of
+//      objects with `name` and `description` keys preserved (no
+//      flattening to bare strings).
+//   2. The evaluator returns a `label` (which category matched) and the
+//      engine surfaces it to result.label — the field shape that
+//      langevals/llm_category callers depend on, distinct from the
+//      score/passed shape of llm_boolean.
+//
+// Generic concept (weather severity classifier judge); zero customer
+// content.
+func TestPattern009_LLMCategoryEvaluator(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(_ app.LLMRequest) (*app.LLMResponse, error) {
+			return &app.LLMResponse{Content: "mild"}, nil
+		},
+	}
+	url, lwRequests := setupPatternStack(t, llm, func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"status":  "processed",
+			"label":   "mild",
+			"details": "the description matches the mild category most closely",
+			"cost":    map[string]any{"currency": "USD", "amount": 0.00009},
+		})
+	})
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-009",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"sk-pattern-009","spec_version":"1.3",
+	      "name":"Pattern009","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"observation","type":"str"}],
+	          "dataset":{"inline":{"records":{
+	            "observation":["A pleasant afternoon with a high of 22C and a light breeze."]
+	          },"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"classify","type":"signature","data":{
+	          "name":"Classify",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Describe the severity of: {{ observation }}"}
+	          ],
+	          "inputs":[{"identifier":"observation","type":"str"}],
+	          "outputs":[{"identifier":"verdict","type":"str"}]
+	        }},
+	        {"id":"judge","type":"evaluator","data":{
+	          "parameters":[
+	            {"identifier":"evaluator","type":"str","value":"langevals/llm_category"},
+	            {"identifier":"name","type":"str","value":"severity-bucket"},
+	            {"identifier":"settings","type":"dict","value":{
+	              "model":"openai/gpt-5-mini",
+	              "max_tokens":128,
+	              "prompt":"Given the observation {{ input }} and the verdict {{ output }}, pick the matching category.",
+	              "categories":[
+	                {"name":"extreme","description":"dangerous conditions, advisories likely"},
+	                {"name":"mild","description":"unremarkable, comfortable conditions"},
+	                {"name":"normal","description":"typical seasonal conditions, no advisories"}
+	              ]
+	            }}
+	          ],
+	          "outputs":[
+	            {"identifier":"label","type":"str"},
+	            {"identifier":"details","type":"str"}
+	          ]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[
+	          {"identifier":"label","type":"str"},
+	          {"identifier":"details","type":"str"}
+	        ]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.observation","target":"classify","targetHandle":"inputs.observation","type":"default"},
+	        {"id":"e2","source":"entry","sourceHandle":"outputs.observation","target":"judge","targetHandle":"inputs.input","type":"default"},
+	        {"id":"e3","source":"classify","sourceHandle":"outputs.verdict","target":"judge","targetHandle":"inputs.output","type":"default"},
+	        {"id":"e4","source":"judge","sourceHandle":"outputs.label","target":"end","targetHandle":"inputs.label","type":"default"},
+	        {"id":"e5","source":"judge","sourceHandle":"outputs.details","target":"end","targetHandle":"inputs.details","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	require.Len(t, *lwRequests, 1, "expected exactly one evaluator HTTP call")
+	rec := (*lwRequests)[0]
+	assert.Equal(t, "/api/evaluations/langevals/llm_category/evaluate", rec["path"])
+
+	// (1) settings.categories — slice of {name, description} objects,
+	// preserved verbatim. Crucial: no flattening to bare strings.
+	settings := rec["body"].(map[string]any)["settings"].(map[string]any)
+	categoriesAny, ok := settings["categories"].([]any)
+	require.True(t, ok, "settings.categories must be a list, got %T", settings["categories"])
+	require.Len(t, categoriesAny, 3, "expected 3 categories in settings")
+	for _, c := range categoriesAny {
+		entry, ok := c.(map[string]any)
+		require.True(t, ok, "each category entry must be an object, got %T", c)
+		assert.NotEmpty(t, entry["name"], "category.name must be present")
+		assert.NotEmpty(t, entry["description"], "category.description must be present")
+	}
+
+	// (2) label surfaces through to the workflow result — the shape
+	// langevals/llm_category callers depend on (distinct from
+	// score/passed for llm_boolean).
+	require.NotNil(t, res.Result)
+	assert.Equal(t, "mild", res.Result["label"])
+	assert.Equal(t, "the description matches the mild category most closely", res.Result["details"])
 }
