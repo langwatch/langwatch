@@ -44,6 +44,7 @@ import { skipPermissionCheck } from "../rbac";
 import { checkOrganizationPermission, checkTeamPermission } from "../rbac";
 import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 import { LITE_MEMBER_VIEWER_ONLY_ERROR } from "~/server/app-layer/organizations/compute-effective-team-role-updates";
+import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
 import type { FullyLoadedOrganization } from "~/server/app-layer/organizations/repositories/organization.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
 import { enrichTeamWithRoleBindings } from "~/server/app-layer/organizations/organization.service";
@@ -1035,6 +1036,29 @@ export const organizationRouter = createTRPCRouter({
           invite,
         });
       });
+
+      // Provision the user's Personal Workspace (Team.isPersonal +
+      // Project.isPersonal) for this org. Idempotent — safe if a prior
+      // invite already triggered it. Runs outside the invite tx so an
+      // unexpected failure here doesn't roll the membership back; the
+      // next login will retry via the lazy backfill in
+      // `user.personalContext`.
+      try {
+        const personalWorkspaceService = new PersonalWorkspaceService(prisma);
+        await personalWorkspaceService.ensure({
+          userId: session.user.id,
+          organizationId: invite.organizationId,
+          displayName: session.user.name,
+          displayEmail: session.user.email,
+        });
+      } catch (err) {
+        // Non-fatal — log and continue. Lazy backfill will recover on
+        // the user's next session resolution.
+        console.warn(
+          `[governance] failed to provision personal workspace for user=${session.user.id} org=${invite.organizationId}:`,
+          err,
+        );
+      }
 
       const inviteService = InviteService.create(prisma);
       const projectSlug = await inviteService.findLandingProjectSlug(invite);
