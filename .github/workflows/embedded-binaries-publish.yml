@@ -207,12 +207,17 @@ jobs:
           # MALLOC=libc avoids jemalloc (which has its own build deps and
           # causes alpine pain). BUILD_TLS=no — runtime listens on 127.0.0.1
           # only, no need to compile TLS.
-          # Build BOTH redis-server (the daemon) and redis-cli — the
-          # supervisor's health check shells out to `redis-cli PING` to
-          # confirm readiness, so we ship both binaries.
+          # Build deps (bundled lua, hiredis, hdr_histogram) first then the
+          # binaries. Redis's parallel Makefile races between redis-server
+          # link and lua compilation on arm64 ("undefined reference to
+          # luaopen_base"); -j1 deps + then -j(nproc) redis-server fixes it.
+          # Build BOTH redis-server and redis-cli — supervisor's health
+          # check shells out to `redis-cli PING`.
           if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then
+            make BUILD_TLS=no MALLOC=libc -j$(sysctl -n hw.ncpu) -C deps lua hiredis hdr_histogram
             make BUILD_TLS=no MALLOC=libc -j$(sysctl -n hw.ncpu) redis-server redis-cli
           else
+            make BUILD_TLS=no MALLOC=libc -j$(nproc) -C deps lua hiredis hdr_histogram
             make BUILD_TLS=no MALLOC=libc -j$(nproc) redis-server redis-cli
           fi
           strip src/redis-server src/redis-cli 2>/dev/null || true
@@ -261,15 +266,28 @@ jobs:
           TARBALL: ${{ steps.hash.outputs.tarball }}
         run: |
           set -e
-          # Cache forever (versioned key, content-addressed) — CloudFront
-          # default TTL is also 1 year, so this just makes the response
-          # explicit to direct-to-S3 fetchers if any exist.
-          aws s3 cp "$TARBALL"           "s3://${S3_BUCKET}/${TARBALL}"           --cache-control "public, max-age=31536000, immutable"
-          aws s3 cp "${TARBALL}.sha256"  "s3://${S3_BUCKET}/${TARBALL}.sha256"    --cache-control "public, max-age=31536000, immutable" --content-type "text/plain"
+          # CloudFront default TTL is 1y. We OVERWRITE keys when re-publishing
+          # the same upstream version (e.g. fixing a build flag), so we MUST
+          # invalidate to flush the stale-cached version. Without that,
+          # users get whatever the edge cached first, sha256 sidecar gets
+          # invalidated separately, mismatch crashes the predep.
+          # max-age=300 instead of 1y so even if invalidation lags, edges
+          # rotate to origin within 5 min.
+          aws s3 cp "$TARBALL"           "s3://${S3_BUCKET}/${TARBALL}"           --cache-control "public, max-age=300"
+          aws s3 cp "${TARBALL}.sha256"  "s3://${S3_BUCKET}/${TARBALL}.sha256"    --cache-control "public, max-age=300" --content-type "text/plain"
 
-          # Best-effort sanity probe through the CDN. CloudFront propagation
-          # is usually <30s but can be longer; don't fail the job on miss.
-          sleep 5
+          # Force-invalidate this tarball's CloudFront edge cache. Skipped
+          # silently if the publisher IAM user doesn't have
+          # cloudfront:CreateInvalidation yet (apply the langwatch-saas
+          # terraform follow-up).
+          aws cloudfront create-invalidation \
+            --distribution-id "${EMBEDS_DISTRIBUTION_ID}" \
+            --paths "/${TARBALL}" "/${TARBALL}.sha256" 2>&1 | head -5 || \
+            echo "  (CloudFront invalidation skipped — IAM user lacks cloudfront:CreateInvalidation)"
+
+          # Best-effort sanity probe through the CDN. Invalidation typically
+          # propagates in <30s; don't fail the job on miss.
+          sleep 10
           for i in 1 2 3 4 5 6; do
             if curl -fsSI "https://embeds.langwatch.ai/${TARBALL}" >/dev/null 2>&1; then
               echo "✓ https://embeds.langwatch.ai/${TARBALL} live"

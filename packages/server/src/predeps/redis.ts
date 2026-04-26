@@ -42,23 +42,19 @@ export const redisPredep: Predep = {
   label: "redis-server (queue + fold cache backend)",
   required: true,
 
+  // Always use the embedded redis. NOT checking `which redis-server` —
+  // a user with a system redis installed (debian's redis 6.x, brew's
+  // 7.x, etc.) would otherwise have us spawn THEIR binary against our
+  // config, risking version-drift surprises (renamed commands, default
+  // changes, ACL behavior). Tarball is ~1.5MB so the cost of always
+  // downloading is negligible vs. an unreproducible version mismatch.
   async detect(paths) {
     const bundled = join(paths.bin, "redis-server");
     if (existsSync(bundled)) {
       const v = await resolveVersion(bundled);
       if (v) return { installed: true, version: v, resolvedPath: bundled };
     }
-    try {
-      const { stdout } = await execa("which", ["redis-server"], { reject: false });
-      const path = stdout.trim();
-      if (path) {
-        const v = await resolveVersion(path);
-        if (v) return { installed: true, version: v, resolvedPath: path };
-      }
-    } catch {
-      // ignore
-    }
-    return { installed: false, reason: "redis-server not on PATH or in ~/.langwatch/bin" };
+    return { installed: false, reason: `not yet downloaded to ${paths.bin}/redis-server` };
   },
 
   async install({ platform, paths, task }) {

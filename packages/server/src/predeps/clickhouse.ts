@@ -33,23 +33,18 @@ export const clickhousePredep: Predep = {
   label: "clickhouse (analytics)",
   required: true,
 
+  // Always use the embedded clickhouse. NOT checking `which clickhouse` —
+  // version drift between a user's system clickhouse and the schema /
+  // queries langwatch ships is the worst kind of surprise (silent column
+  // type changes, renamed functions). Tarball is large (~360MB) but only
+  // downloaded once into ~/.langwatch/bin and reused thereafter.
   async detect(paths) {
     const bundled = join(paths.bin, "clickhouse");
     if (existsSync(bundled)) {
       const v = await resolveVersion(bundled);
       if (v) return { installed: true, version: v, resolvedPath: bundled };
     }
-    try {
-      const { stdout } = await execa("which", ["clickhouse"], { reject: false });
-      const path = stdout.trim();
-      if (path) {
-        const v = await resolveVersion(path);
-        if (v) return { installed: true, version: v, resolvedPath: path };
-      }
-    } catch {
-      // ignore
-    }
-    return { installed: false, reason: "clickhouse not on PATH or in ~/.langwatch/bin" };
+    return { installed: false, reason: `not yet downloaded to ${paths.bin}/clickhouse` };
   },
 
   async install({ platform, paths, task }) {
