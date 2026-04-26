@@ -9,41 +9,6 @@ Feature: Trace export with depth options
     And my project has traces with spans, evaluations, and metadata
 
   # ============================================================================
-  # Export Config Dialog
-  # ============================================================================
-
-  @unimplemented
-  Scenario: Export All button opens the config dialog
-    When I click the "Export all" button in the page header
-    Then an export config dialog appears
-    And the dialog shows the total number of matching traces
-    And the mode defaults to "Summary"
-    And the format defaults to "CSV"
-
-  @unimplemented
-  Scenario: Export Selected button opens the config dialog scoped to selection
-    Given I have selected 5 traces in the table
-    When I click the "Export" button in the floating toolbar
-    Then an export config dialog appears
-    And the dialog shows "5 selected traces"
-
-  @unimplemented
-  Scenario: Toggle between Summary and Full mode
-    Given the export config dialog is open
-    When I select "Full" mode
-    Then the dialog indicates that spans and evaluations will be included
-    When I select "Summary" mode
-    Then the dialog indicates that only trace-level fields will be exported
-
-  @unimplemented
-  Scenario: Toggle between CSV and JSON format
-    Given the export config dialog is open
-    When I select "JSON" format
-    Then the dialog indicates the file will be JSONL
-    When I select "CSV" format
-    Then the dialog indicates the file will be CSV
-
-  # ============================================================================
   # Summary Mode Export (CSV)
   # ============================================================================
 
@@ -66,15 +31,6 @@ Feature: Trace export with depth options
   # ============================================================================
   # Full Mode Export (CSV)
   # ============================================================================
-
-  @unimplemented
-  Scenario: Full CSV exports one row per span with trace fields denormalized
-    Given a trace has 3 spans (1 chain, 1 LLM, 1 tool)
-    And the export config dialog is open with mode "Full" and format "CSV"
-    When I click "Export"
-    Then the CSV contains 3 rows for that trace
-    And each row includes trace-level fields: trace_id, trace_timestamp, trace_input, trace_output, trace_total_cost
-    And each row includes span-level fields: span_id, parent_span_id, span_type, span_name
 
   @unimplemented
   Scenario: Full CSV includes LLM span details
@@ -112,27 +68,6 @@ Feature: Trace export with depth options
     Then each row includes Toxicity_score "0.95", Toxicity_passed "true", Toxicity_details "No toxic content detected"
 
   # ============================================================================
-  # JSON / JSONL Export
-  # ============================================================================
-
-  @unimplemented
-  Scenario: Summary JSON exports one JSON object per trace
-    Given the export config dialog is open with mode "Summary" and format "JSON"
-    When I click "Export"
-    Then a JSONL file is downloaded
-    And each line is a valid JSON object with trace-level fields
-    And spans are not included in the output
-
-  @unimplemented
-  Scenario: Full JSON exports nested trace objects with spans
-    Given a trace has 3 spans and 2 evaluations
-    And the export config dialog is open with mode "Full" and format "JSON"
-    When I click "Export"
-    Then a JSONL file is downloaded
-    And each line is a JSON object containing a "spans" array with 3 items
-    And each line contains an "evaluations" array with 2 items
-
-  # ============================================================================
   # Filters and Scope
   # ============================================================================
 
@@ -167,19 +102,6 @@ Feature: Trace export with depth options
   # ============================================================================
   # Streaming Download and Progress
   # ============================================================================
-
-  @unimplemented
-  Scenario: Progress bar appears during export
-    Given I start an export of 500 traces
-    Then a progress indicator appears showing "Exported 0 of 500 traces"
-    And the progress updates as batches complete
-    And the progress reaches "Exported 500 of 500 traces" when the download finishes
-
-  @unimplemented
-  Scenario: Large export streams without blocking the UI
-    Given I start an export of 5,000 traces in Full mode
-    Then the Messages page remains interactive while the export streams
-    And I can continue browsing traces during the download
 
   @unimplemented
   Scenario: Export completes with correct file name

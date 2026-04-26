@@ -67,25 +67,6 @@ Feature: Saved Views on Traces List
     And it lists the available origin values with counts
 
   @unit @unimplemented
-  Scenario: ClickHouse origin filter for "application" matches absent values
-    Given the ClickHouse filter condition builder for "traces.origin"
-    When I build a condition for values ["application"]
-    Then the SQL checks for empty or null origin attribute
-    And it does not use a simple IN clause with "application"
-
-  @unit @unimplemented
-  Scenario: ClickHouse origin filter for specific values
-    Given the ClickHouse filter condition builder for "traces.origin"
-    When I build a condition for values ["evaluation"]
-    Then the SQL uses an IN clause matching the attribute value
-
-  @unit @unimplemented
-  Scenario: ClickHouse origin filter for mixed values including "application"
-    Given the ClickHouse filter condition builder for "traces.origin"
-    When I build a condition for values ["application", "evaluation"]
-    Then the SQL combines an absence check OR an IN clause
-
-  @unit @unimplemented
   Scenario: ClickHouse origin aggregation labels empty values as "application"
     Given the ClickHouse filter definition for "traces.origin"
     When the aggregation query runs
@@ -143,20 +124,6 @@ Feature: Saved Views on Traces List
     And each default badge has its corresponding origin color
 
   @integration @unimplemented
-  Scenario: Seed views are created in the database on first access
-    Given the project has no saved views in the database
-    When a team member loads the traces page
-    Then 4 seed views are created in the database for the project
-    And they are visible to all team members
-
-  @integration @unimplemented
-  Scenario: Clicking a default view filters traces by origin
-    When I click the "Application" view badge
-    Then the traces list filters to show only traces where origin is "application"
-    And the "Application" badge appears selected
-    And the "All Traces" badge appears deselected
-
-  @integration @unimplemented
   Scenario: Clicking "All Traces" resets all filters including search query
     Given the "Evaluations" view is currently selected
     And the search query is set to "error timeout"
@@ -164,13 +131,6 @@ Feature: Saved Views on Traces List
     Then all field filters are cleared
     And the search query is cleared
     And the traces list shows all traces without any filtering
-    And "All Traces" appears selected
-
-  @integration @unimplemented
-  Scenario: Clicking the active view deselects it
-    Given the "Simulations" view is currently selected
-    When I click the "Simulations" view badge again
-    Then the origin filter is cleared
     And "All Traces" appears selected
 
   # ─── Step 2: Saving Custom Views ────────────────────────────────────
@@ -211,31 +171,11 @@ Feature: Saved Views on Traces List
   # ─── Step 3: Database Persistence ───────────────────────────────────
 
   @integration @unimplemented
-  Scenario: Views are stored in the database per project
-    When I save a custom view "Debug View"
-    Then the view exists in the SavedView table with the correct projectId
-    And the filters are stored as JSON
-
-  @integration @unimplemented
-  Scenario: Selected view ID persists locally per user
-    Given I have clicked the "Application" view badge
-    When I reload the page
-    Then the "Application" view is still selected for me
-    But another team member may have a different view selected
-
-  @integration @unimplemented
   Scenario: Views are scoped to project by projectId
     Given I have saved views for project "proj-alpha"
     When I switch to project "proj-beta"
     Then I only see the seed views for "proj-beta"
     And the custom views from "proj-alpha" do not appear
-
-  @integration @unimplemented
-  Scenario: Multitenancy protection on all endpoints
-    Given a saved view belongs to project "proj-alpha"
-    When I try to access it with projectId "proj-beta"
-    Then the request returns not found
-    And the view is not exposed to the wrong project
 
   # ─── Step 4: Edit Mode ─────────────────────────────────────────────
 
@@ -296,36 +236,10 @@ Feature: Saved Views on Traces List
   # ─── Step 5: View Matching and Edge Cases ───────────────────────────
 
   @unit @unimplemented
-  Scenario: Applying a view updates URL params
-    When I click the "Evaluations" view badge
-    Then the URL query params reflect the origin filter
-    And the filter sidebar shows the origin filter as active
-
-  @unit @unimplemented
   Scenario: Manually changing filters deselects the active view
     Given the "Application" view is currently selected
     When I manually add a model filter in the sidebar
     Then no saved view badge appears selected
-
-  @unit @unimplemented
-  Scenario: Re-applying saved view's exact filters re-selects the badge
-    Given a saved view "Debug" with filters model=["gpt-4"]
-    When I manually set the model filter to ["gpt-4"] via the sidebar
-    Then the "Debug" badge appears selected
-
-  @unit @unimplemented
-  Scenario: View matching ignores array order
-    Given a saved view with model=["gpt-4", "claude-3"]
-    When the URL has model=["claude-3", "gpt-4"]
-    Then the saved view badge appears selected
-
-  @integration @unimplemented
-  Scenario: Page loads with URL filters not matching any saved view
-    Given the URL contains filter params for "has_error=true"
-    And no saved view matches those exact filters
-    When the page renders
-    Then no saved view badge appears selected
-    And the filters from the URL are applied to the traces list
 
   @unit @unimplemented
   Scenario: Maximum view name length
@@ -339,36 +253,3 @@ Feature: Saved Views on Traces List
     Then seed views are created and shown alongside "All Traces"
     And the three-dot menu is still visible
 
-  # ─── Step 6: tRPC Endpoints ─────────────────────────────────────────
-
-  @integration @unimplemented
-  Scenario: getAll returns views ordered by position
-    Given the project has saved views in the database
-    When I call savedViews.getAll with the projectId
-    Then I receive all views for that project
-    And they are ordered by the "order" field ascending
-
-  @integration @unimplemented
-  Scenario: create adds a new view at the end
-    When I call savedViews.create with name, filters, and projectId
-    Then a new view is created in the database
-    And its order is after all existing views
-
-  @integration @unimplemented
-  Scenario: delete removes a view
-    Given a saved view exists with id "view-1"
-    When I call savedViews.delete with id "view-1" and projectId
-    Then the view is removed from the database
-
-  @integration @unimplemented
-  Scenario: rename updates the view name
-    Given a saved view exists with name "Old Name"
-    When I call savedViews.rename with the new name "New Name"
-    Then the view name is updated in the database
-
-  @integration @unimplemented
-  Scenario: reorder updates the order of all views
-    Given views exist in order ["view-a", "view-b", "view-c"]
-    When I call savedViews.reorder with ["view-c", "view-a", "view-b"]
-    Then the order field is updated for each view
-    And subsequent getAll returns them in the new order

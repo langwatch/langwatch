@@ -134,14 +134,6 @@ Feature: Explicit application origin for race condition prevention
   # --- Precondition matcher changes ---
 
   @unit @unimplemented
-  Scenario: Precondition matcher does not default empty origin to "application"
-    Given a precondition: traces.origin is "application"
-    And a trace with no langwatch.origin attribute in the fold state
-    When the precondition matcher evaluates the trace
-    Then the precondition fails
-    Because empty origin means "pending", not "application"
-
-  @unit @unimplemented
   Scenario: Precondition matcher matches explicit application origin
     Given a precondition: traces.origin is "application"
     And a trace with langwatch.origin = "application" in the fold state
@@ -205,13 +197,6 @@ Feature: Explicit application origin for race condition prevention
   # origin = "application" matches ONLY explicit "application", not empty/NULL.
 
   @unit @unimplemented
-  Scenario: ClickHouse filter for origin "application" matches only explicit value
-    Given a trace filter with traces.origin = "application"
-    When the filter is compiled to ClickHouse SQL
-    Then the WHERE clause matches ts.Attributes['langwatch.origin'] = 'application'
-    And does NOT match empty or NULL values
-
-  @unit @unimplemented
   Scenario: Frontend renders "Application" tag for explicit application origin
     Given a trace has langwatch.origin = "application" in its attributes
     When the trace is displayed in the traces table
@@ -226,20 +211,6 @@ Feature: Explicit application origin for race condition prevention
   # ===========================================================================
   # Race condition scenarios (the core problem this feature prevents)
   # ===========================================================================
-
-  @integration @unimplemented
-  Scenario: Child spans arriving before root span do not trigger evaluations prematurely
-    Given an online evaluation monitor is enabled for the project
-    And a trace's child spans arrive first without langwatch.origin
-    And the child spans carry sdk.name = "langwatch" in resource attributes
-    When the fold projection processes the child spans
-    Then it infers langwatch.origin = "application" (SDK heuristic)
-    And when the evaluation trigger reactor fires at normal debounce
-    Then evaluation commands are dispatched for matching monitors
-    # Old SDK child spans carry SDK info → fold projection infers immediately
-    # If the root span arrives later with origin = "evaluation", the fold
-    # projection updates the origin but the evaluation was already dispatched —
-    # acceptable for the transitional case, evaluation dedup handles re-fires
 
   @integration @unimplemented
   Scenario: New SDK child spans before root span are handled correctly
