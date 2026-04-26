@@ -92,6 +92,28 @@ jobs:
           go-version: "1.24"
           cache: false
 
+      # Pre-install postgres + redis + clickhouse + uv via the OS package manager.
+      # The CLI detects them via `which` and skips the download for any predep
+      # that's already on PATH. Without this, smoke fails because the
+      # langwatch CDN URLs for embedded redis/postgres aren't populated yet
+      # (tracked in a follow-up). Once those are real, drop this step.
+      - name: Install predeps via OS package manager (CI shortcut)
+        shell: bash
+        run: |
+          set -e
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew install postgresql@16 redis clickhouse uv
+            echo "/opt/homebrew/opt/postgresql@16/bin" >> "$GITHUB_PATH"
+          else
+            sudo apt-get update
+            sudo apt-get install -y postgresql-16 redis-server lsof
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+            # Clickhouse: official one-liner installer.
+            curl -fsSL https://clickhouse.com/ | sh
+            sudo mv ./clickhouse /usr/local/bin/clickhouse
+          fi
+
       - name: Install pnpm dependencies (workspace)
         run: pnpm install --frozen-lockfile
 
