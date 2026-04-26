@@ -209,6 +209,91 @@ func TestNormalizeReasoningEffort_NoKeyNoOp(t *testing.T) {
 	}
 }
 
+// TestEnsureReasoningMaxTokens_FloorsAnthropicWithReasoningEnabled pins
+// langwatch_nlp regression ead6141a4 ("auto-increase max_tokens when
+// reasoning/effort enabled"). When a non-OpenAI model has a reasoning
+// field set, the upstream provider may auto-enable extended thinking
+// with budget_tokens that exceeds the customer's configured max_tokens,
+// causing the API to 400. Pre-fix the Go path mirrored this bug because
+// ApplyReasoningOverrides is gated on IsReasoningModel (OpenAI-only).
+//
+// The fix: EnsureReasoningMaxTokens runs after NormalizeReasoningEffort
+// and floors max_tokens for ANY model when reasoning_effort is present
+// in the request body. Provider-specific renames (max_tokens →
+// max_completion_tokens for OpenAI reasoning) still happen later in
+// ApplyReasoningOverrides; this helper only ensures the floor is met.
+func TestEnsureReasoningMaxTokens_FloorsAnthropicWithReasoningEnabled(t *testing.T) {
+	body := map[string]any{
+		"reasoning_effort": "high",
+		"max_tokens":       4096,
+	}
+	mutated := EnsureReasoningMaxTokens(body)
+	if !mutated {
+		t.Fatalf("expected floor to apply when reasoning_effort is set with low max_tokens")
+	}
+	if got := body["max_tokens"]; got != reasoningMaxTokensFloor {
+		t.Errorf("expected max_tokens=%d, got %v", reasoningMaxTokensFloor, got)
+	}
+}
+
+// TestEnsureReasoningMaxTokens_PreservesHighMaxTokens guards against
+// regressions that lower an already-high customer-set max_tokens. Floor
+// only raises; never lowers.
+func TestEnsureReasoningMaxTokens_PreservesHighMaxTokens(t *testing.T) {
+	body := map[string]any{
+		"reasoning_effort": "medium",
+		"max_tokens":       64000,
+	}
+	EnsureReasoningMaxTokens(body)
+	if body["max_tokens"] != 64000 {
+		t.Errorf("expected high max_tokens preserved, got %v", body["max_tokens"])
+	}
+}
+
+// TestEnsureReasoningMaxTokens_InsertsWhenAbsent covers the implicit
+// default — a customer who configured reasoning_effort but no max_tokens
+// still needs the floor applied or the provider 400s.
+func TestEnsureReasoningMaxTokens_InsertsWhenAbsent(t *testing.T) {
+	body := map[string]any{"reasoning_effort": "low"}
+	mutated := EnsureReasoningMaxTokens(body)
+	if !mutated {
+		t.Fatalf("expected insertion when reasoning_effort is set without max_tokens")
+	}
+	if got := body["max_tokens"]; got != reasoningMaxTokensFloor {
+		t.Errorf("expected max_tokens=%d, got %v", reasoningMaxTokensFloor, got)
+	}
+}
+
+// TestEnsureReasoningMaxTokens_NoReasoningNoOp guards the false-positive
+// direction: a non-reasoning request must keep its customer-configured
+// max_tokens unchanged.
+func TestEnsureReasoningMaxTokens_NoReasoningNoOp(t *testing.T) {
+	body := map[string]any{"max_tokens": 256}
+	if EnsureReasoningMaxTokens(body) {
+		t.Errorf("expected no mutation when reasoning_effort is absent")
+	}
+	if body["max_tokens"] != 256 {
+		t.Errorf("max_tokens must not change when no reasoning is enabled, got %v", body["max_tokens"])
+	}
+}
+
+// TestEnsureReasoningMaxTokens_EmptyReasoningEffortNoOp covers the
+// edge case where reasoning_effort is present but explicitly empty —
+// treated as "not enabled" so no floor is applied. Mirrors the Python
+// `bool(...)` truthiness check in has_reasoning_enabled.
+func TestEnsureReasoningMaxTokens_EmptyReasoningEffortNoOp(t *testing.T) {
+	body := map[string]any{
+		"reasoning_effort": "",
+		"max_tokens":       100,
+	}
+	if EnsureReasoningMaxTokens(body) {
+		t.Errorf("expected no mutation when reasoning_effort is the empty string")
+	}
+	if body["max_tokens"] != 100 {
+		t.Errorf("max_tokens must not change when reasoning_effort is empty, got %v", body["max_tokens"])
+	}
+}
+
 func TestFromLiteLLMParams_OpenAI(t *testing.T) {
 	ic, err := FromLiteLLMParams("openai", map[string]any{
 		"api_key":      "sk-test",

@@ -207,6 +207,62 @@ func TestExecute_ReasoningModelOverridesTempAndMaxTokens(t *testing.T) {
 	}
 }
 
+// TestExecute_AnthropicReasoningEnabledFloorsMaxTokens pins the
+// non-OpenAI half of langwatch_nlp regression ead6141a4. When the
+// customer config sets a reasoning field on a non-reasoning-class
+// model (e.g. an Anthropic Sonnet with thinkingLevel=high), the
+// upstream provider may auto-enable extended thinking with budget_tokens
+// that exceed a low max_tokens, producing a 400. The Go path must
+// floor max_tokens at reasoningMaxTokensFloor (16000) for ANY model
+// when reasoning is requested.
+//
+// This is the executor-level integration of EnsureReasoningMaxTokens
+// (see translator_test.go for the unit-level pin).
+func TestExecute_AnthropicReasoningEnabledFloorsMaxTokens(t *testing.T) {
+	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
+	exec := New(gw)
+
+	maxTok := 4096
+	_, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model:           "anthropic/claude-sonnet-4",
+		MaxTokens:       &maxTok,
+		ReasoningEffort: "high",
+		LiteLLMParams:   map[string]any{"api_key": "k"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Anthropic doesn't get the OpenAI-reasoning rename, so max_tokens
+	// stays as max_tokens (not max_completion_tokens) — but the floor
+	// applies all the same.
+	maxV := bodyFloat(t, gw.lastReq.Body, "max_tokens")
+	if maxV < 16000 {
+		t.Errorf("expected anthropic max_tokens floored to 16000 when reasoning enabled, got %v", maxV)
+	}
+}
+
+// TestExecute_NonReasoningRequestPreservesLowMaxTokens guards the
+// false-positive direction: a normal Anthropic request without any
+// reasoning effort must keep its low max_tokens unchanged.
+func TestExecute_NonReasoningRequestPreservesLowMaxTokens(t *testing.T) {
+	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
+	exec := New(gw)
+
+	maxTok := 256
+	_, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model:         "anthropic/claude-sonnet-4",
+		MaxTokens:     &maxTok,
+		LiteLLMParams: map[string]any{"api_key": "k"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	maxV := bodyFloat(t, gw.lastReq.Body, "max_tokens")
+	if maxV != 256 {
+		t.Errorf("expected non-reasoning max_tokens preserved at 256, got %v", maxV)
+	}
+}
+
 func TestExecute_AnthropicTemperatureClamped(t *testing.T) {
 	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
 	exec := New(gw)

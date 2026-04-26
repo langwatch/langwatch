@@ -159,6 +159,10 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 
 	// Apply the preserved post-DSPy behaviors.
 	litellm.NormalizeReasoningEffort(body)
+	// Floor max_tokens for any reasoning-enabled config — runs before
+	// ApplyReasoningOverrides so OpenAI reasoning models inherit the
+	// floor when the override migrates max_tokens → max_completion_tokens.
+	litellm.EnsureReasoningMaxTokens(body)
 	litellm.ApplyReasoningOverrides(translatedModel, body)
 	litellm.ClampAnthropicTemperature(provider, body)
 

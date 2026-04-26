@@ -100,6 +100,48 @@ func FromLiteLLMParams(provider string, params map[string]any) (InlineCredential
 	}
 }
 
+// EnsureReasoningMaxTokens floors max_tokens at reasoningMaxTokensFloor
+// when the request has any reasoning effort set, regardless of model
+// class. Mirrors langwatch_nlp's has_reasoning_enabled + max_tokens
+// floor behavior (see langwatch_nlp/studio/utils.py, regression
+// ead6141a4): when extended thinking is enabled, the upstream provider
+// may auto-set budget_tokens that exceeds a low max_tokens, causing
+// the API (especially Anthropic) to 400. The floor only raises an
+// already-set max_tokens; if max_tokens is absent it inserts the
+// default. Provider-specific renames (e.g. max_tokens →
+// max_completion_tokens for OpenAI reasoning) happen later in
+// ApplyReasoningOverrides — this helper only enforces the floor and
+// is provider-agnostic. Call after NormalizeReasoningEffort so the
+// canonical key is the only one inspected. Returns true if it
+// mutated body.
+func EnsureReasoningMaxTokens(body map[string]any) bool {
+	effort, _ := body["reasoning_effort"].(string)
+	if effort == "" {
+		return false
+	}
+	existing, present := body["max_tokens"]
+	if !present {
+		body["max_tokens"] = reasoningMaxTokensFloor
+		return true
+	}
+	switch n := existing.(type) {
+	case int:
+		if n >= reasoningMaxTokensFloor {
+			return false
+		}
+	case int64:
+		if int(n) >= reasoningMaxTokensFloor {
+			return false
+		}
+	case float64:
+		if int(n) >= reasoningMaxTokensFloor {
+			return false
+		}
+	}
+	body["max_tokens"] = reasoningMaxTokensFloor
+	return true
+}
+
 // ApplyReasoningOverrides mutates the provider request body in place to
 // pin temperature to 1.0 and floor max_tokens at reasoningMaxTokensFloor
 // for reasoning-class models. Returns true if any override was applied
