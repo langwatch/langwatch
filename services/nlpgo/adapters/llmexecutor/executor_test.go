@@ -282,6 +282,151 @@ func TestExecute_AnthropicTemperatureClamped(t *testing.T) {
 	}
 }
 
+// TestExecute_FiltersEmptyContentMessages pins langwatch_nlp regression
+// 1ed2c7fdf ("fix(litellm): fix Anthropic model integration issues") —
+// Anthropic strictly rejects messages with empty text content blocks
+// ("text content blocks must be non-empty"). Pre-fix the Go path
+// forwarded customer-supplied empty messages straight through and the
+// gateway returned a 400 when the request hit Claude.
+//
+// Mirrors Python's _filter_empty_content_messages in template_adapter.py:
+// drops messages with nil content, with empty-string content (after
+// strip), and (for list-of-blocks content) drops empty text blocks /
+// drops the whole message if all blocks were empty. Preserves
+// non-text blocks (images, tool calls).
+//
+// Filter runs unconditionally (not gated on provider): an empty
+// message has no information to convey, and OpenAI tolerates the
+// removal silently.
+func TestExecute_FiltersEmptyContentMessages(t *testing.T) {
+	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
+	exec := New(gw)
+
+	_, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model: "anthropic/claude-haiku-4-5",
+		Messages: []app.ChatMessage{
+			{Role: "user", Content: "real message"},
+			{Role: "assistant", Content: ""},
+			{Role: "user", Content: "   \t\n  "},
+			{Role: "system", Content: nil},
+			{Role: "user", Content: "another real message"},
+		},
+		LiteLLMParams: map[string]any{"api_key": "k"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var body struct {
+		Messages []map[string]any `json:"messages"`
+	}
+	if err := json.Unmarshal(gw.lastReq.Body, &body); err != nil {
+		t.Fatalf("parse body: %v", err)
+	}
+	if len(body.Messages) != 2 {
+		t.Fatalf("expected 2 messages after empty-content filter, got %d: %+v",
+			len(body.Messages), body.Messages)
+	}
+	if body.Messages[0]["content"] != "real message" {
+		t.Errorf("expected first message preserved, got %v", body.Messages[0]["content"])
+	}
+	if body.Messages[1]["content"] != "another real message" {
+		t.Errorf("expected second message preserved, got %v", body.Messages[1]["content"])
+	}
+}
+
+// TestExecute_FilterPreservesNonTextBlocks guards the second half of
+// the regression contract: messages with structured-content lists
+// (image blocks, tool calls) MUST survive the filter even when text
+// blocks within them are empty. Customer multimodal workflows would
+// otherwise silently lose images.
+func TestExecute_FilterPreservesNonTextBlocks(t *testing.T) {
+	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
+	exec := New(gw)
+
+	imageBlock := map[string]any{
+		"type":      "image_url",
+		"image_url": map[string]any{"url": "data:image/png;base64,abc"},
+	}
+	contentList := []any{
+		map[string]any{"type": "text", "text": ""},
+		imageBlock,
+		map[string]any{"type": "text", "text": "describe this"},
+	}
+
+	_, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model: "anthropic/claude-haiku-4-5",
+		Messages: []app.ChatMessage{
+			{Role: "user", Content: contentList},
+		},
+		LiteLLMParams: map[string]any{"api_key": "k"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var body struct {
+		Messages []map[string]any `json:"messages"`
+	}
+	if err := json.Unmarshal(gw.lastReq.Body, &body); err != nil {
+		t.Fatalf("parse body: %v", err)
+	}
+	if len(body.Messages) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(body.Messages))
+	}
+	blocks, ok := body.Messages[0]["content"].([]any)
+	if !ok {
+		t.Fatalf("expected list content, got %T", body.Messages[0]["content"])
+	}
+	// Empty text block dropped; image + non-empty text survive.
+	if len(blocks) != 2 {
+		t.Errorf("expected 2 blocks after filter (image + non-empty text), got %d: %+v",
+			len(blocks), blocks)
+	}
+	// Find the image block — order must be preserved.
+	if blocks[0].(map[string]any)["type"] != "image_url" {
+		t.Errorf("expected image block to survive, got %+v", blocks[0])
+	}
+}
+
+// TestExecute_FilterDropsAllEmptyBlocksMessage covers the "all blocks
+// empty" case: a structured-list message whose every text block is
+// empty must be dropped entirely (rather than forwarded with an empty
+// list, which would still 400 Anthropic).
+func TestExecute_FilterDropsAllEmptyBlocksMessage(t *testing.T) {
+	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
+	exec := New(gw)
+
+	allEmpty := []any{
+		map[string]any{"type": "text", "text": ""},
+		map[string]any{"type": "text", "text": "  "},
+	}
+
+	_, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model: "anthropic/claude-haiku-4-5",
+		Messages: []app.ChatMessage{
+			{Role: "user", Content: "real one"},
+			{Role: "assistant", Content: allEmpty},
+			{Role: "user", Content: "follow-up"},
+		},
+		LiteLLMParams: map[string]any{"api_key": "k"},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var body struct {
+		Messages []map[string]any `json:"messages"`
+	}
+	if err := json.Unmarshal(gw.lastReq.Body, &body); err != nil {
+		t.Fatalf("parse body: %v", err)
+	}
+	if len(body.Messages) != 2 {
+		t.Fatalf("expected 2 messages (all-empty middle dropped), got %d: %+v",
+			len(body.Messages), body.Messages)
+	}
+}
+
 func TestExecute_InlineCredentialsHeaderSetForBedrock(t *testing.T) {
 	gw := &fakeGateway{respStatus: 200, respBody: successResponse("ok")}
 	exec := New(gw)

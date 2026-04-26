@@ -130,10 +130,15 @@ func buildGatewayRequest(ctx context.Context, req app.LLMRequest, stream bool) (
 	translatedModel := litellm.TranslateModelID(prefixedModel)
 	gatewayProvider := litellm.GatewayProviderForModel(provider)
 
-	// Build the OpenAI-shape body.
+	// Build the OpenAI-shape body. Empty-content messages are filtered
+	// before marshaling — Anthropic strictly rejects messages with empty
+	// text content blocks ("text content blocks must be non-empty"),
+	// and OpenAI tolerates the removal silently. Mirrors the Python
+	// _filter_empty_content_messages guard from langwatch_nlp regression
+	// 1ed2c7fdf.
 	body := map[string]any{
 		"model":    translatedModelOrInferred(translatedModel, gatewayProvider, req.Model),
-		"messages": req.Messages,
+		"messages": filterEmptyContentMessages(req.Messages),
 	}
 	if len(req.Tools) > 0 {
 		body["tools"] = req.Tools
@@ -306,4 +311,74 @@ func parseChatCompletionResponse(body []byte, durationMS int64) (*app.LLMRespons
 		ToolCalls:        choice.Message.ToolCalls,
 	}}
 	return out, nil
+}
+
+// filterEmptyContentMessages drops messages with no usable content
+// before they reach the gateway. Mirrors langwatch_nlp's
+// _filter_empty_content_messages (regression 1ed2c7fdf): Anthropic
+// rejects messages with empty text content blocks ("text content
+// blocks must be non-empty") with a 400, and OpenAI tolerates the
+// removal silently. The filter applies unconditionally — an empty
+// message has no information to convey regardless of provider.
+//
+// Behavior, matching the Python equivalent:
+//   - Drops messages with nil content.
+//   - Drops messages with whitespace-only or empty string content.
+//   - For list-of-blocks content (multimodal): drops empty text
+//     blocks; preserves non-text blocks (images, structured data);
+//     drops the entire message when ALL blocks were empty (an empty
+//     content list still 400s Anthropic).
+//   - Preserves messages with assistant-only tool-call payloads even
+//     when their text content is empty — the tool call itself is the
+//     load-bearing content.
+func filterEmptyContentMessages(messages []app.ChatMessage) []app.ChatMessage {
+	if len(messages) == 0 {
+		return messages
+	}
+	out := make([]app.ChatMessage, 0, len(messages))
+	for _, m := range messages {
+		// Tool-call payload counts as content even if text is empty.
+		if len(m.ToolCalls) > 0 {
+			out = append(out, m)
+			continue
+		}
+		switch c := m.Content.(type) {
+		case nil:
+			continue
+		case string:
+			if strings.TrimSpace(c) == "" {
+				continue
+			}
+			out = append(out, m)
+		case []any:
+			filtered := make([]any, 0, len(c))
+			for _, b := range c {
+				block, ok := b.(map[string]any)
+				if !ok {
+					filtered = append(filtered, b)
+					continue
+				}
+				if t, _ := block["type"].(string); t != "text" {
+					filtered = append(filtered, b)
+					continue
+				}
+				text, _ := block["text"].(string)
+				if strings.TrimSpace(text) != "" {
+					filtered = append(filtered, b)
+				}
+			}
+			if len(filtered) == 0 {
+				continue
+			}
+			copy := m
+			copy.Content = filtered
+			out = append(out, copy)
+		default:
+			// Other content shapes (e.g. typed message structs) flow
+			// through unchanged — only the explicit empty cases above
+			// trigger removal.
+			out = append(out, m)
+		}
+	}
+	return out
 }
