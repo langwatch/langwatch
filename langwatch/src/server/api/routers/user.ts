@@ -12,6 +12,7 @@ import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
 import { RoutingPolicyService } from "~/server/governance/routingPolicy.service";
+import { PersonalUsageService } from "~/server/governance/personalUsage.service";
 
 export const userRouter = createTRPCRouter({
   /**
@@ -354,6 +355,96 @@ export const userRouter = createTRPCRouter({
         routingPolicy: defaultPolicy
           ? { id: defaultPolicy.id, name: defaultPolicy.name }
           : null,
+      };
+    }),
+
+  /**
+   * Per-user usage rollup powering the /me dashboard cards + charts +
+   * recent activity. ClickHouse-backed, scoped to the user's personal
+   * project (which by definition has only their traces — no cross-user
+   * contamination possible).
+   *
+   * Returns empty-state safe values (zeros, empty arrays, null model)
+   * when no traces exist yet, so the page can render before the user's
+   * first CLI request lands in CH.
+   */
+  personalUsage: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        /** Defaults to start-of-current-month → now if omitted. */
+        windowStartMs: z.number().optional(),
+        windowEndMs: z.number().optional(),
+      }),
+    )
+    .use(skipPermissionCheck)
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const membership = await ctx.prisma.organizationUser.findUnique({
+        where: {
+          userId_organizationId: { userId, organizationId: input.organizationId },
+        },
+      });
+      if (!membership) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Not a member of organization ${input.organizationId}`,
+        });
+      }
+
+      // Find the user's personal project. If none yet, return empty-state.
+      const workspaceService = new PersonalWorkspaceService(ctx.prisma);
+      const workspace = await workspaceService.findExisting({
+        userId,
+        organizationId: input.organizationId,
+      });
+      if (!workspace) {
+        return {
+          summary: {
+            spentUsd: 0,
+            requests: 0,
+            promptTokens: 0,
+            completionTokens: 0,
+            mostUsedModel: null,
+          },
+          dailyBuckets: [],
+          breakdownByModel: [],
+          recentActivity: [],
+        };
+      }
+
+      const window =
+        input.windowStartMs && input.windowEndMs
+          ? {
+              start: new Date(input.windowStartMs),
+              end: new Date(input.windowEndMs),
+            }
+          : undefined;
+
+      const usage = new PersonalUsageService();
+
+      // Run the four queries in parallel — they're independent and the
+      // CH server happily multiplexes. Cuts wall time roughly in half
+      // for the dashboard initial-render p95.
+      const [summary, dailyBuckets, breakdownByModel, recentActivity] =
+        await Promise.all([
+          usage.summary({ personalProjectId: workspace.project.id, window }),
+          usage.dailyBuckets({ personalProjectId: workspace.project.id, window }),
+          usage.breakdownByModel({
+            personalProjectId: workspace.project.id,
+            window,
+          }),
+          usage.recentActivity({
+            personalProjectId: workspace.project.id,
+            window,
+          }),
+        ]);
+
+      return {
+        summary,
+        dailyBuckets,
+        breakdownByModel,
+        recentActivity,
       };
     }),
 });
