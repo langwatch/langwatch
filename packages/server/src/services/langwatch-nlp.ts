@@ -50,8 +50,12 @@ export async function startLangwatchNlp(
   });
 
   const ready = await pollUntilHealthy({
+    // 120s — uvicorn boot + LiteLLM proxy init + 4-worker ProcessPool spawn
+    // can hit ~50-60s on a cold cache, and a parallel dogfood run pushed
+    // it past the previous 60s ceiling. langevals already polls a similar
+    // service, but its app surface is smaller and starts faster.
     check: httpGetCheck(`http://127.0.0.1:${ctx.ports.nlp}/health`),
-    timeoutMs: 60_000,
+    timeoutMs: 120_000,
   });
   if (!ready.ok) {
     await handle.stop();
