@@ -43,6 +43,9 @@ const venvsFn = vi.fn(async () => {
 const nodeDepsFn = vi.fn(async () => {
   callLog.push("node-deps");
 });
+const ensureAppDirFn = vi.fn(async () => {
+  callLog.push("app-dir");
+});
 
 vi.mock("../../src/services/postgres.ts", () => ({ startPostgres: postgresStub.fn }));
 vi.mock("../../src/services/redis.ts", () => ({ startRedis: redisStub.fn }));
@@ -54,6 +57,10 @@ vi.mock("../../src/services/langwatch.ts", () => ({ startLangwatch: langwatchStu
 vi.mock("../../src/services/migrate.ts", () => ({ runMigrations: migrateFn }));
 vi.mock("../../src/services/venvs.ts", () => ({ syncVenvs: venvsFn }));
 vi.mock("../../src/services/node-deps.ts", () => ({ ensureLangwatchDeps: nodeDepsFn }));
+vi.mock("../../src/services/app-dir.ts", () => ({
+  ensureAppDir: ensureAppDirFn,
+  appRoot: () => "/tmp/.langwatch-test/app",
+}));
 vi.mock("../../src/services/env-file.ts", () => ({ readEnvFile: () => ({}) }));
 
 // Import AFTER vi.mock so the runtime resolves the stubs.
@@ -76,6 +83,7 @@ function fakeCtx(): RuntimeContext {
     paths: {
       root: "/tmp/.langwatch-test",
       bin: "/tmp/.langwatch-test/bin",
+      app: "/tmp/.langwatch-test/app",
       data: "/tmp/.langwatch-test/data",
       redisData: "/tmp/.langwatch-test/data/redis",
       postgresData: "/tmp/.langwatch-test/data/postgres",
@@ -108,6 +116,7 @@ describe("services/runtime", () => {
       migrateFn,
       venvsFn,
       nodeDepsFn,
+      ensureAppDirFn,
     ].forEach((fn) => fn.mockClear());
   });
 
@@ -118,6 +127,19 @@ describe("services/runtime", () => {
       expect(nodeDepsFn).toHaveBeenCalledTimes(1);
       expect(callLog).toContain("venvs");
       expect(callLog).toContain("node-deps");
+    });
+
+    it("relocates the @langwatch/server tree before venv/node-deps run", async () => {
+      // Order matters: venvs + node-deps both resolve paths via appRoot(),
+      // which only points at LANGWATCH_HOME/app once ensureAppDir has run.
+      await runtime.installServices(fakeCtx());
+      expect(ensureAppDirFn).toHaveBeenCalledTimes(1);
+      const appDirIdx = callLog.indexOf("app-dir");
+      const venvsIdx = callLog.indexOf("venvs");
+      const nodeDepsIdx = callLog.indexOf("node-deps");
+      expect(appDirIdx).toBeGreaterThanOrEqual(0);
+      expect(appDirIdx).toBeLessThan(venvsIdx);
+      expect(appDirIdx).toBeLessThan(nodeDepsIdx);
     });
   });
 

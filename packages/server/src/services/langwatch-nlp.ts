@@ -1,13 +1,11 @@
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
+import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export async function startLangwatchNlp(
   ctx: RuntimeContext,
@@ -64,10 +62,6 @@ export async function startLangwatchNlp(
 }
 
 function locateProject(name: string): string | null {
-  const candidates = [
-    join(__dirname, "..", "..", "..", "..", name),
-    join(__dirname, "..", "..", "..", name),
-    join(process.cwd(), name),
-  ];
-  return candidates.find((p) => existsSync(join(p, "pyproject.toml"))) ?? null;
+  const dir = join(appRoot(), name);
+  return existsSync(join(dir, "pyproject.toml")) ? dir : null;
 }

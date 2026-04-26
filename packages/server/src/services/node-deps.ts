@@ -1,20 +1,16 @@
 import { execa } from "execa";
-import { existsSync, mkdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
+import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * Ensure langwatch/node_modules exists + start:prepare:files has run, both of
  * which are prerequisites for `pnpm run prisma:migrate` and `pnpm run start:app`.
  *
- * On a fresh checkout this is a one-time ~30-60s cost. On a published npm
- * tarball we'll ship `langwatch/node_modules/` pre-installed (via
- * npx-server-publish.yml), so the existsSync short-circuits and this is a
- * no-op — but the safety net stays for `pnpm pack`-driven local dogfood.
+ * Runs INSIDE the relocated app tree (LANGWATCH_HOME/app/langwatch/) — see
+ * services/app-dir.ts for why we relocate out of node_modules.
  */
 export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): Promise<void> {
   const langwatchDir = locateLangwatchDir();
@@ -118,34 +114,8 @@ async function resolvePnpm(): Promise<{ command: string; args: string[] }> {
 }
 
 export function locateLangwatchDir(): string | null {
-  // Both the workspace dev layout (packages/server/dist/cli.cjs +
-  // workspace-root/langwatch/) and the published tarball layout
-  // (@langwatch/server/packages/server/dist/cli.cjs + @langwatch/server/langwatch/)
-  // resolve to "3 ups + langwatch" from __dirname. We also probe cwd as a
-  // last resort for `node dist/cli.cjs` ran from an unexpected directory.
-  //
-  // We can't just check for package.json — the workspace root in dev (and
-  // GitHub Actions' /home/runner/work/langwatch/langwatch checkout root) also
-  // has a package.json, and an earlier 4-up candidate happened to land on it,
-  // causing `pnpm -C <workspace-root> run build` to fail with
-  // "ERR_PNPM_NO_SCRIPT Missing script: build" (the workspace root has
-  // build:cli, not build). Match on name="langwatch" in package.json instead.
-  const candidates = [
-    join(__dirname, "..", "..", "..", "langwatch"),
-    join(process.cwd(), "langwatch"),
-  ];
-  for (const p of candidates) {
-    const pkgPath = join(p, "package.json");
-    if (!existsSync(pkgPath)) continue;
-    try {
-      const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as { name?: string };
-      if (pkg.name === "langwatch") return p;
-    } catch {
-      // ignore unreadable / non-JSON, try next
-    }
-  }
-  return null;
+  // appRoot() returns the relocated tree (LANGWATCH_HOME/app) once
+  // ensureAppDir has run, or the dev workspace fallback otherwise.
+  const dir = join(appRoot(), "langwatch");
+  return existsSync(join(dir, "package.json")) ? dir : null;
 }
-
-// Re-exported so other services (migrate.ts, langwatch.ts) can resolve the same path.
-void mkdirSync;

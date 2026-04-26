@@ -1,13 +1,11 @@
 import { execa } from "execa";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
+import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 import { servicePaths } from "./paths.ts";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 type VenvSpec = {
   name: "langwatch_nlp" | "langevals";
@@ -56,7 +54,7 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
 }
 
 function resolveVenvSpecs(): VenvSpec[] {
-  const root = locateMonorepoRoot();
+  const root = appRoot();
   return [
     {
       name: "langwatch_nlp",
@@ -69,19 +67,6 @@ function resolveVenvSpecs(): VenvSpec[] {
       lockFile: join(root, "langevals", "uv.lock"),
     },
   ];
-}
-
-function locateMonorepoRoot(): string {
-  // packages/server/dist/cli.cjs → ../../.. is repo root in dev,
-  // node_modules/@langwatch/server/packages/server/dist/cli.cjs → ../../.. is the install root.
-  const candidates = [
-    join(__dirname, "..", "..", "..", ".."),
-    join(__dirname, "..", "..", ".."),
-    process.cwd(),
-  ];
-  const fallback = candidates[0];
-  if (!fallback) throw new Error("monorepo root candidates list is empty (impossible)");
-  return candidates.find((p) => existsSync(join(p, "langwatch_nlp", "uv.lock"))) ?? fallback;
 }
 
 function hashFileSafely(file: string): string {

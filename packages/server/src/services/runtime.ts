@@ -8,6 +8,7 @@ import type {
   ServiceHandle,
 } from "../shared/runtime-contract.ts";
 import { startAigateway } from "./aigateway.ts";
+import { ensureAppDir } from "./app-dir.ts";
 import { startClickhouse } from "./clickhouse.ts";
 import { scaffoldEnv } from "./env.ts";
 import { readEnvFile } from "./env-file.ts";
@@ -42,6 +43,13 @@ const runtimeImpl: RuntimeApi = {
 
   async installServices(ctx) {
     const bus = busFor(ctx);
+    // Relocate the @langwatch/server tree out of node_modules first —
+    // every downstream step (uv sync, pnpm install, migrations, app boot)
+    // resolves files via app-dir.ts#appRoot() and needs the relocation
+    // to have completed. See app-dir.ts for the tsx/node_modules guard
+    // root cause.
+    await ensureAppDir(ctx, bus);
+
     // uv sync + langwatch node_modules + prepare:files run in parallel.
     // Each helper is idempotent and prints "already cached" + early-returns
     // when its lockfile hash matches the previous run.
