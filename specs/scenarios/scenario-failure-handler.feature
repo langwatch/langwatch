@@ -39,21 +39,6 @@ Feature: Scenario Failure Handler
     And no new RUN_STARTED event is emitted
 
   @unit @unimplemented
-  Scenario: Idempotent - no action when RUN_FINISHED already exists
-    Given a scenario job failed
-    And both RUN_STARTED and RUN_FINISHED events exist for this batchRunId
-    When ScenarioFailureHandler.ensureFailureEventsEmitted is called
-    Then no events are emitted
-    And the handler returns successfully
-
-  @unit @unimplemented
-  Scenario: Generate synthetic scenarioRunId with correct format
-    Given a scenario job failed
-    And no events exist in Elasticsearch
-    When the handler generates a synthetic scenarioRunId
-    Then the ID follows the pattern "scenariorun_{nanoid}"
-
-  @unit @unimplemented
   Scenario: Include job metadata in failure events
     Given a scenario job failed with:
       | projectId  | proj_123     |
@@ -76,14 +61,6 @@ Feature: Scenario Failure Handler
   # when result.success is false.
 
   @integration @unimplemented
-  Scenario: Worker calls failure handler on job failure
-    Given a scenario job completes with result.success = false
-    And the result includes error "Prefetch failed: Scenario not found"
-    When the worker's completed event fires
-    Then ScenarioFailureHandler.ensureFailureEventsEmitted is called
-    And the handler receives the job data and error message
-
-  @integration @unimplemented
   Scenario: Worker does not call failure handler on success
     Given a scenario job completes with result.success = true
     When the worker's completed event fires
@@ -102,41 +79,6 @@ Feature: Scenario Failure Handler
   # ============================================================================
   # Update pollForScenarioRun to return early on RUN_STARTED instead of
   # waiting for messages, and properly handle error states.
-
-  @unit @unimplemented
-  Scenario: Return success when RUN_STARTED exists with IN_PROGRESS status
-    Given a scenario run exists with:
-      | scenarioRunId | run_123      |
-      | status        | IN_PROGRESS  |
-      | messages      | []           |
-    When pollForScenarioRun fetches the batch run data
-    Then it returns success with scenarioRunId "run_123"
-    And does not continue polling
-
-  @unit @unimplemented
-  Scenario: Return error when run has ERROR status
-    Given a scenario run exists with:
-      | scenarioRunId | run_123      |
-      | status        | ERROR        |
-    When pollForScenarioRun fetches the batch run data
-    Then it returns failure with error "run_error"
-    And includes scenarioRunId "run_123"
-
-  @unit @unimplemented
-  Scenario: Return error when run has FAILED status
-    Given a scenario run exists with:
-      | scenarioRunId | run_123      |
-      | status        | FAILED       |
-    When pollForScenarioRun fetches the batch run data
-    Then it returns failure with error "run_error"
-    And includes scenarioRunId "run_123"
-
-  @unit @unimplemented
-  Scenario: Continue polling when no runs exist yet
-    Given no scenario runs exist for the batchRunId
-    When pollForScenarioRun is called
-    Then it continues polling until timeout
-    And returns failure with error "timeout" after max attempts
 
   # ============================================================================
   # End-to-End Failure Visibility - E2E Tests

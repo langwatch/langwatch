@@ -8,18 +8,6 @@ Feature: Scenario API
   # ============================================================================
 
   @integration @unimplemented
-  Scenario: Create scenario with valid data
-    Given I am authenticated in project "test-project"
-    When I call scenario.create with:
-      | name      | Refund Request Test                             |
-      | situation | User requests a refund                          |
-      | criteria  | ["Agent acknowledges", "Agent offers solution"] |
-      | labels    | ["refund", "support"]                           |
-    Then the scenario is persisted with projectId "test-project"
-    And the scenario has an auto-generated ID
-    And createdAt and updatedAt are set
-
-  @integration @unimplemented
   Scenario: Create scenario validates required fields
     Given I am authenticated in project "test-project"
     When I call scenario.create without a name
@@ -30,42 +18,9 @@ Feature: Scenario API
   # Read
   # ============================================================================
 
-  @integration @unimplemented
-  Scenario: List scenarios for project
-    Given scenarios exist in project "test-project":
-      | name       | labels      |
-      | Scenario A | ["billing"] |
-      | Scenario B | ["support"] |
-    When I call scenario.list for project "test-project"
-    Then I receive 2 scenarios
-    And they are ordered by updatedAt desc
-
-  @integration @unimplemented
-  Scenario: Get scenario by ID
-    Given scenario "Scenario A" exists with ID "scen_123"
-    When I call scenario.get with ID "scen_123"
-    Then I receive the scenario with all fields
-
-  @integration @unimplemented
-  Scenario: Scenarios are project-scoped
-    Given scenario "Scenario A" exists in project "project-1"
-    And scenario "Scenario B" exists in project "project-2"
-    When I call scenario.list for project "project-1"
-    Then I only receive "Scenario A"
-
   # ============================================================================
   # Update
   # ============================================================================
-
-  @integration @unimplemented
-  Scenario: Update scenario fields
-    Given scenario "Scenario A" exists
-    When I call scenario.update with:
-      | name     | Scenario A (Updated) |
-      | criteria | ["New criterion"]    |
-    Then the scenario name is updated
-    And the criteria array is replaced
-    And updatedAt is refreshed
 
   @integration @unimplemented
   Scenario: Update preserves unmodified fields
@@ -76,13 +31,6 @@ Feature: Scenario API
   # ============================================================================
   # Delete
   # ============================================================================
-
-  @integration @unimplemented
-  Scenario: Delete scenario
-    Given scenario "To Delete" exists
-    When I call scenario.delete with its ID
-    Then the scenario is removed
-    And it no longer appears in list
 
   # ============================================================================
   # Execution
