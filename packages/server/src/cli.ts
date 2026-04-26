@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import prompts from "prompts";
 import { printBanner, printPhases } from "./animation/banner.ts";
 import { openBrowser } from "./animation/open-browser.ts";
+import { streamEventsToTTY } from "./animation/log-tee.ts";
 import { runPredeps } from "./predeps/runner.ts";
 import { inspectPredeps, printDoctorTable } from "./predeps/detect-only.ts";
 import { resolvePortConflicts } from "./port-conflict/resolve.ts";
@@ -108,6 +109,7 @@ program
 
     console.log("");
     console.log(chalk.bold.cyan("[4/4] start"));
+    const eventsStream = streamEventsToTTY(runtime.events(ctx));
     const handles = await runtime.startAll(ctx);
     await runtime.waitForHealth(ctx, { timeoutMs: 60_000 });
 
@@ -117,10 +119,16 @@ program
     const onShutdown = async () => {
       console.log(chalk.yellow("\n  ⏻ shutting down LangWatch..."));
       await runtime.stopAll(handles);
+      await eventsStream;
       process.exit(0);
     };
     process.on("SIGINT", onShutdown);
     process.on("SIGTERM", onShutdown);
+
+    // Block forever — drained by the events tee above. SIGINT exits via
+    // `onShutdown`; an uncaught crash event in renderEvent ends the
+    // iterator and returns control here.
+    await eventsStream;
   });
 
 program
