@@ -19,14 +19,21 @@ import { TEST_PUBLIC_KEY } from "../../../../../ee/licensing/__tests__/fixtures/
 // This allows test licenses (signed with TEST_PRIVATE_KEY) to validate correctly.
 process.env.LANGWATCH_LICENSE_PUBLIC_KEY = TEST_PUBLIC_KEY;
 
-// Deterministic 32-byte pepper for VirtualKey crypto in integration tests.
-// Without this set in CI, PersonalVirtualKeyService.ensureDefault throws
-// VirtualKeyCryptoError on the second call (the decrypt-on-rotate path
-// fails because the pepper differs across processes) instead of the
-// expected PersonalVirtualKeyAlreadyExistsError. Matches the value used
-// in virtualKey.service.unit.test.ts for consistency across the suite.
+// Deterministic test values for the three AI Gateway secrets.
+// The boot-validation logic enforces all-or-nothing: if any one of
+// these is set, all three must be set (see start.ts). Without this
+// block, the unit-test pepper-only fix in 50a4fea9b broke gateway
+// init on every integration shard. Honor existing env values so
+// localdev with real secrets isn't overridden. Matches the value
+// used in virtualKey.service.unit.test.ts for the pepper.
 process.env.LW_VIRTUAL_KEY_PEPPER =
   process.env.LW_VIRTUAL_KEY_PEPPER ?? "unit-test-pepper-32-bytes-exactly!";
+process.env.LW_GATEWAY_INTERNAL_SECRET =
+  process.env.LW_GATEWAY_INTERNAL_SECRET ??
+  "unit-test-gateway-internal-secret-32b!";
+process.env.LW_GATEWAY_JWT_SECRET =
+  process.env.LW_GATEWAY_JWT_SECRET ??
+  "unit-test-gateway-jwt-secret-32-bytes!";
 
 if (process.env.CI && process.env.CI_REDIS_URL) {
   process.env.REDIS_URL = process.env.CI_REDIS_URL;
