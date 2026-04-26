@@ -14,7 +14,7 @@ import (
 // Python `StudioServerEvent` discriminated union so the SSE serializer
 // can emit it verbatim.
 type StreamEvent struct {
-	Type    string         `json:"type"` // is_alive | execution_state_change | done | error
+	Type    string         `json:"type"` // is_alive_response | execution_state_change | done | error
 	TraceID string         `json:"trace_id,omitempty"`
 	Payload map[string]any `json:"payload,omitempty"`
 }
@@ -30,7 +30,7 @@ type ExecuteStreamOptions struct {
 // channel as nodes complete. The channel is closed when the run ends
 // (success, error, or context cancellation).
 //
-// Heartbeat ticks emit `is_alive` events; the SSE handler relies on
+// Heartbeat ticks emit `is_alive_response` events; the SSE handler relies on
 // these to keep the connection alive past intermediate proxy timeouts.
 // Idle-timeout detection lives in the handler (not here) because only
 // the handler observes whether the client received the chunk.
@@ -52,7 +52,7 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 	go func() {
 		started := time.Now()
 
-		// Heartbeat goroutine — emits is_alive every Heartbeat ticks
+		// Heartbeat goroutine — emits is_alive_response every Heartbeat ticks
 		// until the run completes. We must wait for it to fully exit
 		// before closing `out`; otherwise an in-flight emit() can race
 		// with close() and panic with "send on closed channel".

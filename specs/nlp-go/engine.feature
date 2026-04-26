@@ -91,7 +91,7 @@ Feature: Workflow execution engine — DSL parsing, DAG resolution, lifecycle
       Given NLP_STREAM_HEARTBEAT_SECONDS is set to 1
       And a workflow whose only code node sleeps 5 seconds
       When I POST /go/studio/execute and read the SSE stream
-      Then I receive at least 4 "is_alive" events before the "done" event
+      Then I receive at least 4 "is_alive_response" events before the "done" event
 
     @integration
     Scenario: idle stream times out and closes

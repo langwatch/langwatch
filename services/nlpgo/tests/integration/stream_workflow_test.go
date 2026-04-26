@@ -145,7 +145,7 @@ func TestStream_EmitsExecutionStateChangePerNodeThenDone(t *testing.T) {
 	assert.Equal(t, "hi", result["q"])
 }
 
-// TestStream_HeartbeatTicksDuringSlowRun proves is_alive frames keep
+// TestStream_HeartbeatTicksDuringSlowRun proves is_alive_response frames keep
 // the SSE stream warm during a long-running node.
 func TestStream_HeartbeatTicksDuringSlowRun(t *testing.T) {
 	if testing.Short() {

@@ -38,7 +38,7 @@ type WorkflowStreamOptions struct {
 // the Python StudioServerEvent discriminated union one-for-one so the
 // SSE handler can serialize verbatim.
 type WorkflowStreamEvent struct {
-	Type    string         `json:"type"` // is_alive | execution_state_change | done | error
+	Type    string         `json:"type"` // is_alive_response | execution_state_change | done | error
 	TraceID string         `json:"trace_id,omitempty"`
 	Payload map[string]any `json:"payload,omitempty"`
 }

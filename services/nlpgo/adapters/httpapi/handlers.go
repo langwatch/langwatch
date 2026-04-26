@@ -167,7 +167,7 @@ func normalizeInputs(v any) map[string]any {
 
 // executeStreamHandler is the entry point for /go/studio/execute.
 // Returns Server-Sent Events: one `execution_state_change` per node
-// transition (running → success/error), `is_alive` heartbeats every
+// transition (running → success/error), `is_alive_response` heartbeats every
 // NLP_STREAM_HEARTBEAT_SECONDS, and a final `done` (or `error`) frame
 // when the run completes. Closes when the client disconnects.
 func executeStreamHandler(application *app.App) http.HandlerFunc {

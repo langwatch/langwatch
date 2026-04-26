@@ -49,7 +49,7 @@ type UvicornChildConfig struct {
 
 // EngineConfig surfaces engine knobs (timeouts, code-block sandbox).
 type EngineConfig struct {
-	// StreamHeartbeatSeconds — how often the SSE engine emits is_alive.
+	// StreamHeartbeatSeconds — how often the SSE engine emits is_alive_response.
 	StreamHeartbeatSeconds int `env:"STREAM_HEARTBEAT_SECONDS"`
 	// StreamIdleTimeoutSeconds — close the SSE stream if no events for this long.
 	StreamIdleTimeoutSeconds int `env:"STREAM_IDLE_TIMEOUT_SECONDS"`

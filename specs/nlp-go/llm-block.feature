@@ -233,7 +233,7 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
     Then nlpgo emits "execution_state_change" events for each gateway delta
     And the gateway-bound /v1/chat/completions request has stream=true
     And nlpgo sends a final "done" event with the complete result
-    And there is at least one "is_alive" heartbeat if the stream takes longer than NLP_STREAM_HEARTBEAT_SECONDS
+    And there is at least one "is_alive_response" heartbeat if the stream takes longer than NLP_STREAM_HEARTBEAT_SECONDS
 
   # ============================================================================
   # Errors & cancellation
