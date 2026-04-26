@@ -20,14 +20,6 @@ name: embedded-binaries-publish
 on:
   workflow_dispatch:
     inputs:
-      only_binary:
-        description: "Build only this binary (postgres, redis, or empty for both)"
-        required: false
-        default: ""
-      only_platform:
-        description: "Build only this platform (e.g. linux-x64-musl) or empty for all"
-        required: false
-        default: ""
       dry_run:
         description: "Build + sha256 but skip the s3 upload"
         required: false
@@ -46,9 +38,6 @@ concurrency:
 jobs:
   build:
     name: build ${{ matrix.binary }} for ${{ matrix.target.platform }}
-    if: |
-      (github.event.inputs.only_binary == '' || github.event.inputs.only_binary == matrix.binary) &&
-      (github.event.inputs.only_platform == '' || github.event.inputs.only_platform == matrix.target.platform)
     runs-on: ${{ matrix.target.runner }}
     container: ${{ matrix.target.container || null }}
     timeout-minutes: 30
