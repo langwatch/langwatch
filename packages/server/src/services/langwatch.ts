@@ -1,14 +1,12 @@
 import { execa } from "execa";
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { httpGetCheck, pollUntilHealthy } from "./health.ts";
+import { locateLangwatchDir } from "./node-deps.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 /**
  * The langwatch (Hono) prod server. Launched via `pnpm run start:app` so
@@ -63,15 +61,6 @@ export async function startLangwatch(
   }
   bus.emit({ type: "healthy", service: "langwatch", durationMs: Date.now() - start });
   return handle;
-}
-
-function locateLangwatchDir(): string | null {
-  const candidates = [
-    join(__dirname, "..", "..", "..", "..", "langwatch"),
-    join(__dirname, "..", "..", "..", "langwatch"),
-    join(process.cwd(), "langwatch"),
-  ];
-  return candidates.find((p) => existsSync(join(p, "package.json"))) ?? null;
 }
 
 async function ensureNodeModules(langwatchDir: string, bus: EventBus): Promise<void> {
