@@ -140,6 +140,49 @@ program
     }
   });
 
+// AI Gateway governance — read identity, deep-link, request budget increase.
+program
+  .command("whoami")
+  .description("Print the identity persisted by `langwatch login --device` (governance plane).")
+  .action(async () => {
+    try {
+      const { whoamiCommand } = await import("./commands/whoami.js");
+      await whoamiCommand();
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("dashboard")
+  .description("Open your LangWatch dashboard (use --trace <id> to deep-link to a specific trace).")
+  .option("--trace <id>", "deep-link to a specific trace ID")
+  .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
+  .action(async (options: { trace?: string; browser?: string }) => {
+    try {
+      const { dashboardCommand } = await import("./commands/dashboard.js");
+      await dashboardCommand(options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+program
+  .command("request-increase")
+  .description("Open the budget-increase request page (uses the gateway-issued signed URL when available).")
+  .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
+  .action(async (options: { browser?: string }) => {
+    try {
+      const { requestIncreaseCommand } = await import("./commands/request-increase.js");
+      await requestIncreaseCommand(options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
 // Add prompt command group
 const promptCmd = program
   .command("prompt")
