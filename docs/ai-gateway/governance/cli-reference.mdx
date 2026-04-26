@@ -69,9 +69,11 @@ $ langwatch login
 
 ### `langwatch logout`
 
-Revokes the local refresh token at the server and clears
-`~/.langwatch/config.json`. Idempotent — safe to run when not logged
-in.
+POSTs to `/api/auth/cli/logout` to server-revoke the refresh token,
+then clears `~/.langwatch/config.json` locally. Best-effort: if the
+server call fails (network down, server returns an error), the
+local clear still happens — otherwise "logout" would leave a usable
+token on disk. Idempotent — safe to run when not logged in.
 
 ```bash
 $ langwatch logout
@@ -185,6 +187,26 @@ just shorthand for "set env vars + exec".
 ### `langwatch version`
 
 Prints the binary version (set at build time via `-ldflags`).
+
+## Token lifecycle
+
+Access tokens are short-lived (~1h). Before any wrapped command
+(`langwatch claude`, `codex`, `cursor`, `gemini`, `shell`) runs,
+the CLI checks the access token's remaining lifetime; if it's
+under 5 minutes, a transparent refresh happens via
+`POST /api/auth/cli/refresh`, persisting both rotated tokens. The
+underlying tool starts with a fresh token in env every time.
+
+If the server returns 401 to a refresh (the refresh token has been
+server-revoked — typically because an admin clicked **Revoke** on
+the user, or the user was deactivated in the IdP), the CLI:
+
+1. Deletes `~/.langwatch/config.json`
+2. Prints `Session revoked — run `langwatch login` to sign in again`
+3. Exits non-zero
+
+Re-running `langwatch login` re-establishes credentials. There is no
+silent reuse of revoked state.
 
 ## Config file
 

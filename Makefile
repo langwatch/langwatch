@@ -1,6 +1,6 @@
 .PHONY: start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart worktree
-.PHONY: dev-up dev-down dev-logs setup-hooks service service-watch
+.PHONY: dev-up dev-down dev-logs setup-hooks service service-watch cli cli-install cli-test
 
 # =============================================================================
 # DOCKER DEV ENVIRONMENT (compose.dev.yml)
@@ -28,6 +28,33 @@ service:
 	@set -a && . $(DEV_ENV_FILE) && set +a && \
 		export LOG_FORMAT=pretty && \
 		exec go run ./cmd/service $(svc)
+
+# =============================================================================
+# LANGWATCH CLI — services/cli/ (governance plane CLI)
+# =============================================================================
+# Build the `langwatch` binary that wraps Claude Code / Codex / Cursor /
+# Gemini CLI for end users. See docs/ai-gateway/governance/cli-reference.mdx.
+#
+#   make cli                     → builds tmp/langwatch
+#   make cli-install              → installs to $GOBIN (or ~/go/bin)
+#   make cli-test                 → unit tests
+#   GATEWAY=https://my.gw make cli-install   → bake a custom default
+CLI_VERSION ?= dev
+GATEWAY     ?= https://gateway.langwatch.ai
+APP_URL     ?= https://app.langwatch.ai
+CLI_LDFLAGS = -X 'main.Version=$(CLI_VERSION)'
+
+cli:
+	@mkdir -p tmp
+	go build -ldflags "$(CLI_LDFLAGS)" -o tmp/langwatch ./services/cli
+	@echo "Built tmp/langwatch (version=$(CLI_VERSION))"
+
+cli-install:
+	go install -ldflags "$(CLI_LDFLAGS)" ./services/cli
+	@echo "Installed langwatch to $$(go env GOPATH)/bin (rename if your binary is named 'cli')"
+
+cli-test:
+	go test ./services/cli/...
 
 # Run a Go service with live reload on file changes.
 # Usage: make service-watch svc=aigateway
