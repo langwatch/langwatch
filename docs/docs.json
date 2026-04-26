@@ -557,7 +557,6 @@
               "ai-gateway/governance/overview",
               "ai-gateway/governance/personal-keys",
               "ai-gateway/governance/admin-setup",
-              "ai-gateway/governance/cli-reference",
               "ai-gateway/governance/routing-policies"
             ]
           },
