@@ -47,23 +47,29 @@ function extractCredentials(
     try {
       const decoded = Buffer.from(encoded, "base64").toString("utf-8");
       const colonIndex = decoded.indexOf(":");
-      if (colonIndex === -1) return null;
-
-      const projectId = decoded.slice(0, colonIndex);
-      const token = decoded.slice(colonIndex + 1);
-      if (!projectId || !token) return null;
-
-      return { token, projectId };
+      if (colonIndex !== -1) {
+        const projectId = decoded.slice(0, colonIndex);
+        const token = decoded.slice(colonIndex + 1);
+        if (projectId && token) {
+          return { token, projectId };
+        }
+      }
+      // Fall through to X-Auth-Token below: a malformed Basic header (e.g.
+      // injected by a corporate proxy for upstream auth) must not poison
+      // the customer's legitimate X-Auth-Token credential.
     } catch {
-      return null;
+      // Same fallthrough on undecodable base64.
     }
   }
 
   // Priority 2: Bearer token
   if (authHeader?.toLowerCase().startsWith("bearer ")) {
-    const token = authHeader.slice(7);
-    if (!token) return null;
-    return { token, projectId: xProjectId ?? null };
+    const token = authHeader.slice(7).trim();
+    if (token) {
+      return { token, projectId: xProjectId ?? null };
+    }
+    // Empty Bearer also falls through to X-Auth-Token — same proxy-injection
+    // hardening as Basic above.
   }
 
   // Priority 3: X-Auth-Token header (legacy)
@@ -100,8 +106,19 @@ export function createUnifiedAuthMiddleware({
 
   return async (c, next) => {
     const credentials = extractCredentials((name) => c.req.header(name));
+    // Diagnostic context for auth failures — lets on-call attribute a 401 to
+    // a specific customer/SDK without needing the customer to reproduce with
+    // debug logs. Read once and reuse across both failure paths so values
+    // are consistent. No raw token / body content is included.
+    const diag = collectAuthDiagnostics(c);
 
     if (!credentials) {
+      logger.warn(
+        diag,
+        diag.hasEmptyAuthToken
+          ? "Authentication failed: X-Auth-Token sent but empty"
+          : "Authentication failed: no auth header present",
+      );
       return c.json(
         {
           error: "Unauthorized",
@@ -121,9 +138,8 @@ export function createUnifiedAuthMiddleware({
     } catch (error) {
       logger.error(
         {
+          ...diag,
           error,
-          path: c.req.path,
-          method: c.req.method,
         },
         "Database error during authentication",
       );
@@ -140,6 +156,7 @@ export function createUnifiedAuthMiddleware({
     if (!resolved) {
       logger.warn(
         {
+          ...diag,
           hasToken: true,
           tokenType: credentials.token.startsWith("pat-lw-")
             ? "pat"
@@ -180,6 +197,44 @@ export function createUnifiedAuthMiddleware({
 }
 
 export { extractCredentials };
+
+/**
+ * Diagnostic fields safe to emit on auth failure. Captures enough request
+ * fingerprint to attribute 401s to a specific customer/SDK in CloudWatch
+ * without leaking credentials or request bodies. `traceparent` lets us join
+ * the failed POST to the customer's downstream OTel trace, which usually
+ * carries identifying metadata even when the auth header path doesn't.
+ *
+ * `hasEmptyAuthToken` distinguishes "X-Auth-Token sent as an empty string"
+ * (typically a customer-side env-var misconfig) from "no auth header at all"
+ * (typically a misconfigured SDK or unauthenticated probe). Both produce the
+ * same 401 today — the log line tells them apart.
+ */
+export type AuthDiagnostics = {
+  path: string;
+  method: string;
+  userAgent: string | null;
+  traceparent: string | null;
+  forwardedFor: string | null;
+  hasEmptyAuthToken: boolean;
+};
+
+export function collectAuthDiagnostics(c: {
+  req: { path: string; method: string; header: (name: string) => string | undefined };
+}): AuthDiagnostics {
+  const get = (name: string) => c.req.header(name) ?? null;
+  const xAuthToken = c.req.header("x-auth-token");
+  return {
+    path: c.req.path,
+    method: c.req.method,
+    userAgent: get("user-agent"),
+    traceparent: get("traceparent"),
+    forwardedFor: get("x-forwarded-for") ?? get("x-real-ip"),
+    // Sent-but-empty is distinct from absent (SDK with a misconfigured
+    // empty api_key still serializes the header).
+    hasEmptyAuthToken: xAuthToken !== undefined && xAuthToken === "",
+  };
+}
 
 /**
  * Enforces the PAT permission ceiling for an already-resolved token.
