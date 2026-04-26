@@ -262,13 +262,13 @@ Pick this for:
 - non-k8s deploys (systemd, Nomad, plain Docker) where `kubectl port-forward` isn't available;
 - k8s deploys behind a corporate VPN or internal LB where operators want direct HTTP access without going through `kubectl exec`.
 
-### Safety net
+### Safety net (v1.1)
 
-The gateway's `config.validate()` runs at startup and enforces:
+When the admin listener ships in v1.1, the gateway's `config.validate()` will run at startup and enforce:
 
-> **Non-loopback `GATEWAY_ADMIN_ADDR` + empty `GATEWAY_ADMIN_AUTH_TOKEN` + unset `GATEWAY_ALLOW_INSECURE`** ⇒ the gateway refuses to start with an error naming both env vars.
+> **Non-loopback `GATEWAY_ADMIN_ADDR` + empty `GATEWAY_ADMIN_AUTH_TOKEN` + unset `GATEWAY_ALLOW_INSECURE`** ⇒ the gateway will refuse to start with an error naming both env vars.
 
-This is the critical safety net: an operator who accidentally binds the admin listener to `0.0.0.0` without a token won't silently expose unauthenticated pprof to the pod network. The pod crashes, k8s backs off, and the boot logs name the env variable to fix. `GATEWAY_ALLOW_INSECURE=true` exists only for test harnesses — never set it in production.
+This is the critical safety net for the v1.1 admin surface: an operator who accidentally binds the admin listener to `0.0.0.0` without a token won't silently expose unauthenticated pprof to the pod network. The pod will crash, k8s will back off, and the boot logs will name the env variable to fix. `GATEWAY_ALLOW_INSECURE=true` will exist only for test harnesses — never set it in production. None of this is wired in the v1 binary today; the chart values just describe the planned shape.
 
 ### Accessing pprof with the bearer token
 
