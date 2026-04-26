@@ -18,6 +18,7 @@ type Executor struct {
 	client      *http.Client
 	ssrf        SSRFOptions
 	defaultTime time.Duration
+	maxBytes    int64
 }
 
 // Options configures an Executor.
@@ -28,18 +29,31 @@ type Options struct {
 	MaxResponseBytes  int64 // 0 → 4 MiB
 }
 
+// defaultMaxResponseBytes caps untrusted upstream payloads so a hostile
+// server can't pin a runtime worker by streaming gigabytes.
+const defaultMaxResponseBytes int64 = 4 * 1024 * 1024
+
 // New builds an Executor with the given options.
 func New(opts Options) *Executor {
 	if opts.Client == nil {
-		opts.Client = &http.Client{}
+		// Default Transport with our SSRF dial-time policy. A
+		// caller-supplied Client takes responsibility for its own
+		// dial-time safety.
+		transport := http.DefaultTransport.(*http.Transport).Clone()
+		transport.DialContext = SafeDialer(opts.SSRF)
+		opts.Client = &http.Client{Transport: transport}
 	}
 	if opts.DefaultTimeout == 0 {
 		opts.DefaultTimeout = 5 * time.Minute
+	}
+	if opts.MaxResponseBytes <= 0 {
+		opts.MaxResponseBytes = defaultMaxResponseBytes
 	}
 	return &Executor{
 		client:      opts.Client,
 		ssrf:        opts.SSRF,
 		defaultTime: opts.DefaultTimeout,
+		maxBytes:    opts.MaxResponseBytes,
 	}
 }
 
@@ -124,7 +138,7 @@ func (e *Executor) Execute(ctx context.Context, req Request) (*Result, error) {
 	}
 	defer resp.Body.Close()
 
-	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, 4*1024*1024))
+	bodyBytes, _ := io.ReadAll(io.LimitReader(resp.Body, e.maxBytes))
 	if resp.StatusCode/100 != 2 {
 		return &Result{
 			StatusCode:   resp.StatusCode,

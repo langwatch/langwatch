@@ -341,23 +341,8 @@ type Workflow struct {
 // error that includes the offending offset.
 func ParseWorkflow(b []byte) (*Workflow, error) {
 	var w Workflow
-	dec := json.NewDecoder(stringReader(b))
-	dec.UseNumber() // unused for now; future-proofs precise number round-trip
 	if err := json.Unmarshal(b, &w); err != nil {
 		return nil, fmt.Errorf("dsl: parse workflow: %w", err)
 	}
 	return &w, nil
-}
-
-// stringReader is a minimal byte-slice reader used to construct a
-// json.Decoder without pulling in bytes/strings packages just for the
-// reader wrapper. Avoids an extra alloc per parse.
-type stringReader []byte
-
-func (s stringReader) Read(p []byte) (int, error) {
-	if len(s) == 0 {
-		return 0, fmt.Errorf("EOF")
-	}
-	n := copy(p, s)
-	return n, nil
 }

@@ -258,3 +258,68 @@ func TestExecute_BlocksSSRF(t *testing.T) {
 	require.Error(t, err)
 	assert.True(t, errors.Is(err, httpblock.ErrSSRFBlocked))
 }
+
+// TestSafeDialer_BlocksPrivateIPAtDialTime simulates the DNS-rebinding
+// TOCTOU: the resolver returns a private IP at dial time, and the
+// dialer must reject before opening a connection. This is independent
+// of CheckURL — it's the second line of defense.
+func TestSafeDialer_BlocksPrivateIPAtDialTime(t *testing.T) {
+	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+		Resolver: func(host string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("10.0.0.5")}, nil
+		},
+	})
+	_, err := dial(context.Background(), "tcp", "rebound.example:80")
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, httpblock.ErrSSRFBlocked),
+		"expected ErrSSRFBlocked, got %v", err)
+}
+
+func TestSafeDialer_BlocksMetadataIPAtDialTime(t *testing.T) {
+	dial := httpblock.SafeDialer(httpblock.SSRFOptions{
+		Resolver: func(host string) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("169.254.169.254")}, nil
+		},
+	})
+	_, err := dial(context.Background(), "tcp", "imds-bait.example:80")
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, httpblock.ErrSSRFBlocked))
+}
+
+// TestSafeDialer_BlocksLiteralPrivateIP catches direct dials by IP.
+func TestSafeDialer_BlocksLiteralPrivateIP(t *testing.T) {
+	dial := httpblock.SafeDialer(httpblock.SSRFOptions{})
+	_, err := dial(context.Background(), "tcp", "10.0.0.1:80")
+	require.Error(t, err)
+	assert.True(t, errors.Is(err, httpblock.ErrSSRFBlocked))
+}
+
+// TestExecute_TruncatesResponseAtMaxBytes proves the configured cap
+// is honoured (Options.MaxResponseBytes was previously documented but
+// not wired — every response was capped at the hard-coded 4 MiB).
+func TestExecute_TruncatesResponseAtMaxBytes(t *testing.T) {
+	payload := make([]byte, 1024)
+	for i := range payload {
+		payload[i] = 'x'
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/plain")
+		_, _ = w.Write(payload)
+	}))
+	defer srv.Close()
+	host, _, _ := net.SplitHostPort(srv.Listener.Addr().String())
+
+	exec := httpblock.New(httpblock.Options{
+		SSRF:             httpblock.SSRFOptions{AllowedHosts: []string{host}},
+		MaxResponseBytes: 64,
+	})
+	res, err := exec.Execute(context.Background(), httpblock.Request{
+		URL:    srv.URL + "/big",
+		Method: "GET",
+	})
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	// Response is non-JSON so executor falls back to string output.
+	assert.Equal(t, 64, len(res.UpstreamBody),
+		"expected MaxResponseBytes to truncate at 64, got %d", len(res.UpstreamBody))
+}

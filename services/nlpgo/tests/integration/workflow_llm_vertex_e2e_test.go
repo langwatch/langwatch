@@ -20,7 +20,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -213,8 +212,11 @@ func TestSync_RealWorkflowEndToEnd_Vertex(t *testing.T) {
 
 	answer, _ := res.Result["answer"].(string)
 	require.NotEmpty(t, answer, "expected non-empty answer from real Vertex call")
-	assert.True(t, strings.ContainsAny(answer, "0123456789"),
-		"expected a digit in the answer, got %q", answer)
+	// 4+4=8 — tightened from "any digit" so a wrong-but-numeric reply
+	// doesn't silently mask a regression in prompt rendering or model
+	// dispatch (matches the OpenAI/Anthropic e2e pattern).
+	assert.Contains(t, answer, "8",
+		"expected the answer to contain the digit 8, got %q", answer)
 
 	require.NotNil(t, res.Nodes)
 	for _, id := range []string{"entry", "answer", "end"} {
