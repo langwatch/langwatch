@@ -169,6 +169,7 @@ documented in `docs/ai-gateway/governance/cli-reference.mdx#verifying-a-fresh-in
 | 4 | `/cli/auth`, `/me`, `/me/settings`, `/settings/routing-policies` never registered in Vite router — all 4 routes were falling through `/:project` catch-all and redirecting to a project page | Alexis (during screenshot pass) | `f5d99106d` |
 | 5 | RoutingPolicyService.create/update did not validate `providerCredentialIds` belong to the policy's organization (privilege escalation surface) | Master orchestrator review of fix #2 | `e552d3f1a` |
 | 6 | PersonalVirtualKeyService integration test fixture didn't seed a default RoutingPolicy → red on main + on every iteration of fix #2 | Sergey (during fix #2 testing) | `e552d3f1a` |
+| 7 | `user.personalContext`/`user.personalUsage`/`personalVirtualKeys.list/issuePersonal/revokePersonal` used bare `skipPermissionCheck` while accepting `organizationId` — silent tRPC rejection masked by `/me` empty-state copy | Alexis (during screenshot pass) | `e52651123` |
 
 ## What's verified
 
@@ -190,6 +191,13 @@ documented in `docs/ai-gateway/governance/cli-reference.mdx#verifying-a-fresh-in
 - ✅ `/cli/auth` route registered after `f5d99106d`; HTTP 200 confirms
   Vite serves the page (browser-level rendering + approve click is
   the only piece left for self-host smoke test)
+- ✅ `/me`, `/me/settings`, `/settings/routing-policies` populated
+  end-to-end on `:5660` post-`e52651123` — Alexis's screenshots prove
+  the bug-#7 fix unblocked real `personalContext`/`personalUsage`/
+  `personalVirtualKeys.list` data flow:
+  - https://i.img402.dev/h6e31g1r4b.png — /me dashboard
+  - https://i.img402.dev/bhs7kgzt2q.png — /me/settings (real Profile)
+  - https://i.img402.dev/lbt3bb3f43.png — /settings/routing-policies admin
 
 ## What's not in this proof (and why)
 
