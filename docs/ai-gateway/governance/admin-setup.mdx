@@ -1,0 +1,196 @@
+---
+title: Admin setup
+description: One-time configuration for an organization rolling out LangWatch Governance — SSO, providers, routing policies, and budgets.
+sidebarTitle: Admin setup
+---
+
+This is the **admin** side of [Personal IDE keys](/ai-gateway/governance/personal-keys).
+Once configured, every developer in your organization can run
+`langwatch login` and immediately get a working CLI experience —
+no per-user setup, no IT tickets.
+
+Total time: ~30 minutes for a fresh organization.
+
+## Prerequisites
+
+- Organization owner or admin role at LangWatch.
+- Workspace API keys for the providers you want to make available
+  (one each from Anthropic, OpenAI, Gemini, Azure, Bedrock, Vertex —
+  whatever your team needs).
+- Your IdP's SAML metadata or OIDC discovery URL (Okta, Azure AD,
+  Google Workspace, Auth0).
+
+## 1. Connect SSO
+
+In **Settings → SSO**, click **Connect identity provider**.
+
+<Tabs>
+  <Tab title="Okta (SAML)">
+    1. In Okta admin, create a new SAML 2.0 application.
+    2. **Single sign-on URL**:
+       `https://app.langwatch.ai/api/auth/sso/{your-org-slug}/callback`
+    3. **Audience URI**: `https://app.langwatch.ai`
+    4. Map the **NameID** to email and add the standard claims
+       (`email`, `firstName`, `lastName`).
+    5. Download the IdP metadata XML.
+    6. Paste it into LangWatch's **Connect identity provider** form.
+    7. (Optional) Enable **SCIM provisioning** so users are
+       auto-created the first time they sign in.
+  </Tab>
+  <Tab title="Azure AD (OIDC)">
+    1. In Azure portal, register a new application.
+    2. Set redirect URI to
+       `https://app.langwatch.ai/api/auth/sso/{your-org-slug}/callback`
+    3. Generate a client secret.
+    4. Note the tenant ID, client ID, client secret.
+    5. Paste into LangWatch's **Connect identity provider** form.
+  </Tab>
+  <Tab title="Google Workspace (OIDC)">
+    1. In Google Cloud Console, create OAuth 2.0 credentials.
+    2. Set authorized redirect URI to
+       `https://app.langwatch.ai/api/auth/sso/{your-org-slug}/callback`
+    3. Restrict to your Workspace domain.
+    4. Paste client ID + secret into LangWatch.
+  </Tab>
+</Tabs>
+
+Once SSO is live, anyone with an `@yourdomain.com` email is
+auto-routed to your IdP at login. You can disable password
+authentication entirely from this page if you want SSO-only.
+
+## 2. Connect providers
+
+In **Settings → Model Providers**, add an entry per upstream:
+
+1. Click **Add provider** and pick from the list (Anthropic, OpenAI,
+   Azure OpenAI, Bedrock, Vertex, Gemini, custom OpenAI-compatible).
+2. Paste the workspace API key (or AWS / GCP credentials).
+3. Set the **scope**: `Organization` (everyone), `Team` (only members
+   of one team), or `Project` (only one project).
+
+For most orgs starting out, scope at `Organization` so the credential
+is available everywhere. You can tighten later by creating
+team-scoped overrides.
+
+<Note>The provider entries here are the same ones the AI Gateway
+already uses for service virtual keys. Personal keys reuse them — no
+parallel pool.</Note>
+
+## 3. Define routing policies
+
+Open **AI Gateway → Routing Policies** and click **New policy**.
+
+A policy is the answer to "when one of my users wants to call a
+model, what providers can serve it, in what order?" — see the
+full reference at [Routing policies](/ai-gateway/governance/routing-policies).
+
+Two policies to create on day one:
+
+<Steps>
+  <Step title="developer-default">
+    - Scope: Organization
+    - Strategy: `priority`
+    - Providers (in order): Anthropic, OpenAI, Gemini
+    - Allowed models: `claude-3-5-*`, `claude-3-opus-*`,
+      `gpt-4o*`, `gpt-5*`, `o1-*`, `o3-*`, `o4-*`, `gemini-2.5-*`
+    - Mark as **default for ORG scope**
+
+    This is what every user's personal key will reference unless a
+    team-level override exists.
+  </Step>
+  <Step title="evaluator-default">
+    - Scope: Organization
+    - Strategy: `cost`
+    - Providers: OpenAI, Gemini, Anthropic
+    - Allowed models: `gpt-4o-mini`, `gpt-5-mini`,
+      `gemini-2.5-flash`, `claude-3-5-haiku-*`
+    - Mark as **default for the evaluator system VK** (your
+      LangWatch-internal evaluators will use this, keeping eval
+      costs predictable).
+  </Step>
+</Steps>
+
+Policies cascade: a `TEAM`-scoped policy with `isDefault=true`
+overrides the `ORG`-scoped default for members of that team.
+
+## 4. Set per-user budgets
+
+In **AI Gateway → Budgets**:
+
+1. Click **New budget** and pick scope `User (default)`.
+2. Set the monthly cap (e.g. `$500/mo`).
+3. Click save.
+
+Every personal VK auto-issued by `langwatch login` inherits this
+budget. To exempt a power user, override at scope `User` with a
+specific user ID and a higher limit.
+
+You can also set:
+- **Team budgets** — cap an entire team's total spend.
+- **Project budgets** — cap a production agent's spend.
+- **Org budgets** — a hard ceiling for the whole organization.
+
+The gateway enforces the **strictest binding** — if any scope is
+exceeded, the request is rejected with a structured error
+identifying the blocking scope.
+
+## 5. Roll out to your team
+
+Send your team this snippet:
+
+```text
+Welcome to LangWatch! To use AI tools at <YourCompany>:
+
+1. Install: curl -sSL https://get.langwatch.com | sh
+2. Sign in: langwatch login
+3. Use it:  langwatch claude  (or codex / cursor / gemini)
+
+Dashboard: https://app.langwatch.ai/me
+Questions: <#langwatch slack channel>
+```
+
+That's it. The first time each user runs `langwatch login`, the
+backend auto-provisions their personal team + project, mints a
+personal VK against the `developer-default` routing policy, and
+returns it in the same round-trip. They have a working CLI in
+under a minute.
+
+## What you'll see as users come online
+
+In **AI Gateway → Activity**:
+
+- Per-user request counts and spend, in real time.
+- A **By tool** breakdown (Claude Code vs Codex vs Cursor).
+- A **By model** breakdown.
+- The full audit trail of `lw_vk_…` issuance, `langwatch login`
+  events, budget violations, and policy denials.
+
+In **Settings → Members**:
+
+- A list of every user with their personal team auto-created.
+- Per-user budget ceiling and current spend.
+- A **Revoke all credentials** button per user — useful for
+  off-boarding.
+
+## Off-boarding flow
+
+When someone leaves:
+
+1. Disable them in your IdP (this is what your IT process already
+   does).
+2. The next time the LangWatch SCIM sync runs (or when their access
+   token expires, ~1h), their credentials are dead.
+3. (Optional, for immediate revocation) In **Settings → Members**,
+   click **Revoke all credentials** for the user. This invalidates
+   their refresh token and any active access tokens within 60s.
+
+Their personal team and traces stay in the audit log for
+compliance, but no new gateway calls succeed.
+
+## What's next
+
+- [Routing policies](/ai-gateway/governance/routing-policies) for the
+  full policy DSL (priority/cost/latency/round_robin strategies,
+  model allowlists, cascading defaults).
+- [`langwatch` CLI reference](/ai-gateway/governance/cli-reference)
+  for every subcommand and flag your users will see.

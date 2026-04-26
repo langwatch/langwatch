@@ -1,0 +1,240 @@
+---
+title: langwatch CLI reference
+description: Every subcommand the langwatch binary exposes — login, tool wrappers, shell integration, configuration.
+sidebarTitle: CLI reference
+---
+
+The `langwatch` CLI is the dev-side surface of LangWatch Governance.
+It does three things:
+
+1. Authenticates you against your organization via SSO
+   (`langwatch login`).
+2. Wraps your existing AI tools so every request flows through your
+   organization's gateway with your identity attached
+   (`langwatch claude`, `langwatch codex`, etc.).
+3. Provides utility commands for inspection and shell integration
+   (`langwatch whoami`, `langwatch dashboard`, `langwatch init`).
+
+## Install
+
+<CodeGroup>
+
+```bash macOS / Linux
+curl -sSL https://get.langwatch.com | sh
+```
+
+```bash Homebrew
+brew install langwatch/tap/langwatch
+```
+
+```powershell Windows
+iwr -useb https://get.langwatch.com/install.ps1 | iex
+```
+
+```bash From source
+go install github.com/langwatch/langwatch/services/cli@latest
+# binary lands at $GOPATH/bin/cli — rename to langwatch
+```
+
+</CodeGroup>
+
+## Global behavior
+
+- All commands respect `LANGWATCH_URL` (control plane base URL,
+  default `https://app.langwatch.ai`) and `LANGWATCH_GATEWAY_URL`
+  (gateway base URL, default `https://gateway.langwatch.ai`).
+  Self-hosted users override these at install time.
+- Config lives at `~/.langwatch/config.json` (mode 0600).
+  Override with `LANGWATCH_CLI_CONFIG=/path/to/config.json`.
+
+## Subcommands
+
+### `langwatch login`
+
+Initiates the [RFC 8628 device-code](https://www.rfc-editor.org/rfc/rfc8628)
+OAuth flow. Opens your default browser to a verification URL,
+delegates to your organization's IdP for SSO, then returns control
+to the CLI.
+
+On success, persists access token, refresh token, user identity,
+organization metadata, and an auto-issued personal virtual key.
+
+```bash
+$ langwatch login
+→ Opening browser to authenticate...
+→ Verification URL: https://app.langwatch.ai/cli/auth?code=ABCD-EFGH
+
+⠋ Waiting for you to log in
+```
+
+### `langwatch logout`
+
+Revokes the local refresh token at the server and clears
+`~/.langwatch/config.json`. Idempotent — safe to run when not logged
+in.
+
+```bash
+$ langwatch logout
+Logged out — credentials cleared.
+```
+
+### `langwatch whoami`
+
+Prints the current identity, organization, gateway URL, and personal
+VK prefix. Exits non-zero with a clear message if not logged in.
+
+```bash
+$ langwatch whoami
+User:         jane@miro.com
+Name:         Jane Doe
+Organization: Miro
+Gateway:      https://gateway.langwatch.ai
+Dashboard:    https://app.langwatch.ai
+Personal VK:  lw_vk_live_01HZ…
+```
+
+### Tool wrappers — `claude`, `codex`, `cursor`, `gemini`
+
+Each wrapper:
+
+1. Loads the local config.
+2. Computes the env vars the underlying tool needs to talk to the
+   gateway:
+   - `claude` → `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`
+   - `codex` → `OPENAI_BASE_URL`, `OPENAI_API_KEY`
+   - `cursor` → both pairs above (Cursor uses both APIs)
+   - `gemini` → `GOOGLE_GENAI_API_BASE`, `GEMINI_API_KEY`
+3. `exec`s the underlying tool with those env vars merged into the
+   inherited environment, replacing the running process on Unix so
+   terminal handling, signals, and exit codes match the underlying
+   tool exactly.
+
+```bash
+# All forwarded args are passed through to the underlying tool:
+$ langwatch claude --model claude-3-5-sonnet
+$ langwatch codex   "fix the failing tests"
+$ langwatch cursor                            # opens Cursor app
+$ langwatch gemini  "explain this stack"
+```
+
+If the underlying tool isn't on `$PATH`, the wrapper exits with a
+clear error pointing at install instructions. The wrapper does
+**not** install the underlying tool for you.
+
+### `langwatch shell`
+
+Spawns a subshell with all gateway env vars pre-set, so any tool
+you invoke directly inherits them — useful for running scripts that
+themselves call AI tooling.
+
+```bash
+$ langwatch shell
+» Entering langwatch shell (gateway: https://gateway.langwatch.ai). Type `exit` to leave.
+$ claude            # already routed through gateway
+$ ./my-script.sh    # any AI calls in here go through gateway
+$ exit
+```
+
+### `langwatch dashboard`
+
+Opens `<control-plane>/me` in your default browser — your personal
+usage dashboard.
+
+```bash
+$ langwatch dashboard
+Opening https://app.langwatch.ai/me
+```
+
+### `langwatch init <shell>`
+
+Prints an `eval`-able snippet so your shell auto-exports the gateway
+env vars. Use this when you'd rather run plain `claude` / `codex`
+than the wrappers.
+
+Supported shells: `zsh`, `bash`, `fish`, `cmd`, `powershell` (alias
+`pwsh`). Defaults to `zsh`.
+
+<CodeGroup>
+
+```bash zsh / bash
+# In ~/.zshrc or ~/.bashrc
+eval "$(langwatch init zsh)"
+```
+
+```fish fish
+# In ~/.config/fish/config.fish
+langwatch init fish | source
+```
+
+```powershell PowerShell
+# In $PROFILE
+langwatch init powershell | Invoke-Expression
+```
+
+```cmd Windows cmd
+:: Run on shell start
+langwatch init cmd > %TEMP%\lw.cmd && %TEMP%\lw.cmd
+```
+
+</CodeGroup>
+
+After re-sourcing, plain `claude` / `codex` / `cursor` / `gemini`
+talk to the gateway. The wrappers continue to work too — they're
+just shorthand for "set env vars + exec".
+
+### `langwatch version`
+
+Prints the binary version (set at build time via `-ldflags`).
+
+## Config file
+
+`~/.langwatch/config.json`:
+
+```json
+{
+  "gateway_url": "https://gateway.langwatch.ai",
+  "control_plane_url": "https://app.langwatch.ai",
+  "access_token": "lw_at_…",
+  "refresh_token": "lw_rt_…",
+  "expires_at": 1714248000,
+  "user": {"id": "u_…", "email": "jane@miro.com", "name": "Jane Doe"},
+  "organization": {"id": "o_…", "slug": "miro", "name": "Miro"},
+  "default_personal_vk": {
+    "id": "vk_…",
+    "secret": "lw_vk_live_…",
+    "prefix": "lw_vk_live_01HZ"
+  }
+}
+```
+
+The file is created with mode `0600`. Treat it like a private SSH
+key — anyone with read access can act as you against the gateway.
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Browser didn't open at login">
+    The CLI prints the verification URL — copy it into your browser
+    manually. The fallback message also includes the user code so you
+    can paste it on the verification page.
+  </Accordion>
+  <Accordion title="`Tool not found in PATH`">
+    The wrapper expects the underlying tool (Claude Code, Codex,
+    etc.) to be installed already. Install it with the official
+    installer, then retry the wrapper.
+  </Accordion>
+  <Accordion title="`not logged in — run langwatch login`">
+    Either you've never run login on this machine, or your refresh
+    token has been revoked. Re-run `langwatch login`.
+  </Accordion>
+  <Accordion title="`Budget limit reached`">
+    The gateway is enforcing your monthly cap. Ask your admin to
+    raise it or wait for the period reset. The error message
+    includes your admin's email.
+  </Accordion>
+  <Accordion title="Self-hosted setup — overriding URLs">
+    Set `LANGWATCH_URL` (control plane) and `LANGWATCH_GATEWAY_URL`
+    (gateway) before running `langwatch login`. The values are
+    persisted in the config file on first save.
+  </Accordion>
+</AccordionGroup>

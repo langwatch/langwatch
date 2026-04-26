@@ -1,0 +1,190 @@
+---
+title: Personal IDE keys
+description: Sign in with your company SSO and get a per-user virtual key your IDE tools can use. No raw provider keys on your laptop, ever.
+sidebarTitle: Personal keys
+---
+
+Your team uses Claude Code, Codex, Cursor, and Gemini CLI every day.
+LangWatch Governance lets your IT admin issue you a single virtual
+key — bound to your identity, governed by your team's policy — that
+all of those tools share.
+
+This page is the **end-user** flow. If you're an admin setting it up
+for your organization, see [Admin setup](/ai-gateway/governance/admin-setup).
+
+## What you get
+
+- One CLI command to sign in: `langwatch login`
+- Wrappers that let you keep using the tools you already know:
+  `langwatch claude`, `langwatch codex`, `langwatch cursor`,
+  `langwatch gemini`
+- A personal dashboard at <code>https://app.langwatch.ai/me</code>
+  showing your spending, requests, most-used models, and recent
+  activity
+- Budget enforcement at the gateway — if you go over your monthly
+  cap, the request fails fast with an actionable error
+
+## Setup
+
+### 1. Install the CLI
+
+<CodeGroup>
+
+```bash macOS / Linux
+curl -sSL https://get.langwatch.com | sh
+```
+
+```bash Homebrew
+brew install langwatch/tap/langwatch
+```
+
+```powershell Windows (PowerShell)
+iwr -useb https://get.langwatch.com/install.ps1 | iex
+```
+
+</CodeGroup>
+
+The installer drops a single Go binary onto your `$PATH`. Verify:
+
+```bash
+$ langwatch version
+langwatch 1.x.x
+```
+
+### 2. Sign in
+
+```bash
+$ langwatch login
+→ Opening browser to authenticate...
+→ Verification URL: https://app.langwatch.ai/cli/auth?code=ABCD-EFGH
+
+⠋ Waiting for you to log in
+```
+
+Your browser opens to a LangWatch page that asks for your work email,
+then redirects to your company's IdP (Okta, Azure AD, Auth0,
+whatever). After you complete SSO + MFA, control returns to the
+CLI:
+
+```bash
+✓ Logged in as jane@miro.com
+  Organization: Miro
+  Gateway: https://gateway.langwatch.ai
+
+Try it:
+  langwatch claude         # use Claude Code
+  langwatch codex          # use Codex
+  langwatch cursor         # use Cursor
+```
+
+Behind the scenes, the CLI persisted your access + refresh tokens at
+`~/.langwatch/config.json` (mode 0600) and a personal virtual key
+your gateway-bound tools will use as their auth.
+
+<Note>You did **not** pick a model provider during setup. Your
+admin already wired up Anthropic, OpenAI, Gemini, etc. at the
+organization level. You just inherit them.</Note>
+
+### 3. Use your tools normally
+
+```bash
+$ langwatch claude
+▲  Claude Code v2.x.x
+✓  Connected via LangWatch (jane@miro.com)
+> help me refactor this auth middleware
+```
+
+Same Claude Code experience as before — flags, terminal handling,
+exit codes are all identical because `langwatch claude` `exec`'s
+the underlying tool with the right env vars pre-injected.
+
+The same pattern works for Codex, Cursor, and Gemini CLI:
+
+```bash
+$ langwatch codex   "fix the failing tests"
+$ langwatch cursor                            # opens Cursor with gateway env
+$ langwatch gemini  "explain this stack trace"
+```
+
+### 4. Or, set it up always-on
+
+If typing `langwatch` every time is friction, you can have your
+shell pre-export the env vars so plain `claude`, `codex`, etc.
+already route through the gateway:
+
+<CodeGroup>
+
+```bash zsh / bash
+# Add to your ~/.zshrc or ~/.bashrc
+eval "$(langwatch init zsh)"
+```
+
+```fish fish
+# Add to your ~/.config/fish/config.fish
+langwatch init fish | source
+```
+
+```powershell PowerShell
+# Add to your $PROFILE
+langwatch init powershell | Invoke-Expression
+```
+
+</CodeGroup>
+
+After re-sourcing your shell rc, `claude` (without the wrapper)
+talks to the gateway too.
+
+## Your dashboard
+
+Open `https://app.langwatch.ai/me` (or run `langwatch dashboard`)
+to see your usage:
+
+- Spent vs. budget for the month
+- Total requests, week-over-week
+- Most-used model
+- Spending breakdown by tool (Claude Code, Cursor, Codex)
+- Recent activity (last 10 requests with cost + summary)
+
+Your dashboard shows **only** your usage. To switch to a team's
+view, use the workspace switcher in the top-left of the navbar.
+
+## Hitting your budget
+
+If you cross 80% of your monthly cap, the dashboard shows a yellow
+warning banner. If you hit 100%, your next request fails with a
+clear message:
+
+```bash
+$ langwatch claude
+⚠  Budget limit reached
+
+   You've used $500.00 of your $500.00 monthly budget. To
+   continue, ask your team admin to raise your limit.
+
+   Admin: platform-team@miro.com
+```
+
+Budgets reset on the period your admin configured (monthly or
+weekly). If you need an urgent increase, your admin can adjust your
+budget in real time — no token re-issuance required.
+
+## Security
+
+- Your access token is short-lived (~1h) and refreshed automatically.
+- Your refresh token is stored at `~/.langwatch/config.json` with
+  mode 0600. We're working on OS keyring integration; for now,
+  protect that file as you would any local secret.
+- Revoking your account at the LangWatch admin console invalidates
+  both tokens immediately. Your CLI begins failing within 60s.
+- The CLI never sees a raw provider key. The gateway holds the
+  upstream credentials.
+
+## Sign out
+
+```bash
+$ langwatch logout
+Logged out — credentials cleared.
+```
+
+This clears `~/.langwatch/config.json` locally **and** revokes your
+refresh token at the server, so leaked-state can't be reused.

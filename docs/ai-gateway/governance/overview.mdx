@@ -1,0 +1,116 @@
+---
+title: Governance overview
+description: One control plane for every AI tool in your enterprise — virtual keys, SSO, per-user identity, policy, and budgets across Claude Code, Codex, Cursor, Gemini CLI, and your custom agents.
+sidebarTitle: Overview
+---
+
+LangWatch Governance is the layer above the AI Gateway that gives your
+organization a single, auditable view of every LLM call your teams
+make — from a developer's IDE all the way to your production agents.
+
+It does three things at once:
+
+<CardGroup cols={3}>
+  <Card title="Personal IDE keys" icon="user" href="/ai-gateway/governance/personal-keys">
+    Devs sign in via your company SSO. Their CLIs (Claude Code, Codex,
+    Cursor, Gemini CLI) talk to the gateway with a per-user virtual
+    key. Per-user attribution, per-user budgets, one revoke kills it
+    everywhere.
+  </Card>
+  <Card title="Admin policy plane" icon="shield-halved" href="/ai-gateway/governance/admin-setup">
+    Connect providers once, publish routing policies once, define
+    budgets once. Users inherit it all without picking a model
+    provider, an order, or a fallback chain.
+  </Card>
+  <Card title="LangWatch CLI" icon="terminal" href="/ai-gateway/governance/cli-reference">
+    The <code>langwatch</code> binary wraps every coding-assistant
+    CLI. <code>langwatch login</code> handles SSO; <code>langwatch
+    claude</code> exec's Claude Code with the right env vars
+    pre-injected.
+  </Card>
+</CardGroup>
+
+## What problem this solves
+
+Enterprises rolling out AI tooling hit the same wall, in this order:
+
+1. **Devs use Claude Code, Codex, Cursor, Gemini CLI.** Each tool wants
+   its own API key. Ops are now distributing dozens of long-lived raw
+   keys via tickets and Slack DMs.
+2. **Per-engineer cost attribution becomes impossible.** Anthropic's
+   admin console shows one big workspace bill; you can't tell if it
+   was your senior engineer or a runaway loop.
+3. **Off-boarding is a manual sweep.** When someone leaves, who tracks
+   down all the keys they had?
+4. **Security gets uncomfortable.** A key on someone's laptop is one
+   stolen laptop away from being the company's API bill.
+
+LangWatch Governance fixes the whole sequence by making the dev's
+identity (via SSO) the credential. The dev never sees a raw provider
+key. Their gateway-issued virtual key inherits the organization's
+policy automatically. Revoking access is one click.
+
+## Architecture at a glance
+
+```
+┌─────────────────┐    SSO    ┌──────────────────┐
+│  Dev terminal   │──────────▶│  Your IdP (Okta) │
+│  $ langwatch    │           └────────┬─────────┘
+│      login      │                    │ SAML
+│      claude     │                    ▼
+└────────┬────────┘           ┌──────────────────┐
+         │                    │  LangWatch app   │
+         │  short-lived       │  /api/auth/cli/* │
+         │  bearer (lw_vk_*)  │                  │
+         ▼                    └────────┬─────────┘
+┌──────────────────┐                   │ trust
+│  AI Gateway      │◀──────────────────┘ (virtual key
+│  gateway.lw.ai   │                    issued)
+└────────┬─────────┘
+         │
+         │ resolves VK → org's
+         │ policy + provider creds
+         │
+         ▼
+   Anthropic / OpenAI / Gemini / Bedrock / Vertex / Azure
+```
+
+The dev's CLI never sees a real provider key. The gateway holds the
+upstream credentials, owned by the organization, paid by the
+organization, governed by LangWatch policy. The dev's identity is
+preserved end-to-end via JWT claims (`organization_id`, `project_id`,
+`principal_id`, `personal: true`) so dashboards, audit, and budgets
+attribute usage to the right person without leaking tokens.
+
+## What stays the same vs the existing AI Gateway
+
+- **Virtual keys still drive every request.** Personal VKs are the
+  same shape as service VKs — same `lw_vk_…` secret format, same
+  gateway code path. The discriminator is the project the VK lives
+  in (`Project.isPersonal=true`).
+- **The OpenAI-compatible API at `/api/v1/*` is unchanged.** Any tool
+  that already speaks the gateway speaks personal keys with no
+  code change.
+- **Existing project + service-account flows keep working.** Personal
+  keys are an addition, not a replacement.
+
+## What's new
+
+- Routing policies decouple the credential from the provider chain —
+  see [Routing policies](/ai-gateway/governance/routing-policies).
+- The dispatcher now filters the credential chain by the request's
+  resolved model so a personal VK with multiple providers doesn't
+  waste fallback budget hitting wrong-provider creds first.
+- Per-user JWT claims and trace attribution land everywhere
+  automatically.
+
+## Where to next
+
+- For a dev who just wants to use the CLI:
+  [Personal IDE keys](/ai-gateway/governance/personal-keys)
+- For an admin onboarding their org:
+  [Admin setup](/ai-gateway/governance/admin-setup)
+- For the full CLI reference:
+  [`langwatch` CLI](/ai-gateway/governance/cli-reference)
+- For the model-aware routing policy:
+  [Routing policies](/ai-gateway/governance/routing-policies)
