@@ -78,7 +78,8 @@ jobs:
             bash jq curl tar gzip ca-certificates \
             gcc g++ make musl-dev linux-headers \
             bison flex perl pkgconfig \
-            openssl-dev zlib-dev
+            openssl-dev zlib-dev \
+            aws-cli
 
       - name: Read pinned versions
         id: versions
@@ -154,12 +155,15 @@ jobs:
 
           # macOS-only path massaging: brew installs bison/flex/openssl@3
           # as keg-only formulae (not symlinked into /usr/local/bin or the
-          # default PKG_CONFIG_PATH). Postgres requires modern bison/flex
-          # (the macOS-shipped versions are too old) and pkg-config-visible
-          # openssl headers for --with-openssl.
+          # default LDFLAGS / CPPFLAGS). Postgres requires modern bison/flex
+          # (the macOS-shipped versions are too old). For openssl, postgres's
+          # configure runs a direct `-lcrypto` link test that ignores
+          # PKG_CONFIG_PATH; pass --with-libs / --with-includes instead.
+          extra_configure=""
           if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then
             export PATH="$(brew --prefix bison)/bin:$(brew --prefix flex)/bin:$PATH"
-            export PKG_CONFIG_PATH="$(brew --prefix openssl@3)/lib/pkgconfig:${PKG_CONFIG_PATH:-}"
+            ssl_prefix="$(brew --prefix openssl@3)"
+            extra_configure="--with-libs=${ssl_prefix}/lib --with-includes=${ssl_prefix}/include"
           fi
 
           # --without-icu: skip the ICU collation library to keep the
@@ -171,7 +175,8 @@ jobs:
           ./configure --prefix="$install_prefix" \
             --without-icu \
             --without-readline \
-            --with-openssl
+            --with-openssl \
+            $extra_configure
           if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then
             make -j$(sysctl -n hw.ncpu) world-bin
           else
