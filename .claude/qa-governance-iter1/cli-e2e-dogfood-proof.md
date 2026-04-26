@@ -22,19 +22,33 @@ budget,wrapper}.ts`.
 Status of the unified TS CLI port (10/11 subcommands):
 | Subcommand | Status |
 |---|---|
-| `langwatch login --device` | ✅ ported |
-| `langwatch whoami` | ✅ ported |
-| `langwatch dashboard --trace` | ✅ ported |
-| `langwatch request-increase` | ✅ ported |
-| `langwatch claude` / `codex` / `cursor` / `gemini` | ✅ ported |
-| `langwatch logout-device` | ✅ ported |
-| `langwatch init-shell <zsh\|bash\|fish\|cmd\|pwsh>` | ✅ ported |
+| `langwatch login --device` | ✅ `f45c102d0` |
+| `langwatch whoami` | ✅ `d13abb4c9` |
+| `langwatch me [--trace <id>]` (renamed from `dashboard` to avoid commander collision with existing analytics-dashboards group) | ✅ `caca79bed` |
+| `langwatch request-increase` | ✅ `d13abb4c9` |
+| `langwatch claude` / `codex` / `cursor` / `gemini` | ✅ `1639ee26b` |
+| `langwatch logout-device` (revokes both refresh AND access tokens per `e7a042c69`) | ✅ `d72bd58cd` + `ea034a667` |
+| `langwatch init-shell <zsh\|bash\|fish\|cmd\|pwsh>` | ✅ `d72bd58cd` |
 | `langwatch shell` (spawn subshell) | ⏳ deferred (nice-to-have) |
 
-36 vitest cases passing across the four governance utility modules.
-Re-running this dogfood proof against the TS CLI is the next
-verification slice — what's below stands as the design proof and
-the bug-discovery record.
+**Verified post-port:**
+- 36 vitest cases passing across the four governance utility modules
+  (config 4, device-flow 14, budget 11, wrapper 7)
+- Built CLI boots cleanly without commander collision
+- `langwatch --help` shows all 10 governance subcommands alongside
+  the existing 30+ LLMOps surfaces
+- `langwatch whoami` exits 1 with clear message when not logged in
+- `langwatch init-shell zsh` prints `# not logged in — run langwatch login --device first` when not logged in, exit 1
+- Sergey's REST probe matrix at `7dbd74ab5` proves the server-side
+  endpoints behave per the spec contract
+
+**Live e2e capture deferred:** the approve-device-code helper script
+under `langwatch/tmp/` kept getting deleted by parallel commits
+(shared-worktree hazard) mid-run. Server-side proven via Sergey's
+matrix; client-side proven via vitest mocks; the missing piece is
+a single transcript joining the two. Will re-attempt once the
+worktree settles or via a hermetic Vitest scenario test in a
+follow-up slice.
 
 ---
 
