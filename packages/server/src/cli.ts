@@ -140,8 +140,11 @@ program
     for (const [k, v] of Object.entries(ports)) {
       if (k === "base") continue;
       const conflict = conflicts.conflicts.find((c) => c.port === v);
-      const marker = conflict ? chalk.red(`✗ in use by pid ${conflict.pid} (${conflict.command})`) : chalk.green("✓");
+      const marker = conflict ? chalk.red("✗") : chalk.green("✓");
       console.log(`  ${marker} ${k.padEnd(18)} ${v}`);
+      if (conflict) {
+        console.log(chalk.dim(`      held by pid ${conflict.pid}: ${conflict.command}`));
+      }
     }
     console.log("");
     const missing = rows.filter((r) => !r.installed).length;
