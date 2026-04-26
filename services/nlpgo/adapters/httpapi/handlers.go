@@ -9,11 +9,40 @@ import (
 	"net/http"
 	"time"
 
+	"go.uber.org/zap"
+
+	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/nlpgo/adapters/llmexecutor"
 	"github.com/langwatch/langwatch/services/nlpgo/app"
 	"github.com/langwatch/langwatch/services/nlpgo/domain"
 )
+
+// enrichRequestLogContext stamps the inbound studio-event identifiers
+// onto the context-bound logger so every downstream log line emitted
+// during this request carries them. Mirrors langwatch_nlp regression
+// ff42237f3 ("add logging and project id to nlp logging") — without
+// project_id on log lines, prod logs from nlpgo can't be filtered to
+// a single customer's traffic, which makes incident triage and
+// per-customer debugging much harder than on the Python path. Trace
+// id + origin are the natural correlation siblings (project_id alone
+// underspecifies the call) so they ride along.
+func enrichRequestLogContext(ctx context.Context, req *app.WorkflowRequest) context.Context {
+	fields := make([]zap.Field, 0, 3)
+	if req.ProjectID != "" {
+		fields = append(fields, zap.String("project_id", req.ProjectID))
+	}
+	if req.TraceID != "" {
+		fields = append(fields, zap.String("trace_id", req.TraceID))
+	}
+	if req.Origin != "" {
+		fields = append(fields, zap.String("origin", req.Origin))
+	}
+	if len(fields) == 0 {
+		return ctx
+	}
+	return clog.With(ctx, fields...)
+}
 
 // executeSyncHandler is the entry point for /go/studio/execute_sync.
 // Body shape mirrors the Python ExecuteFlowPayload (and Sarah's engine
@@ -43,10 +72,11 @@ func executeSyncHandler(application *app.App) http.HandlerFunc {
 			herr.WriteHTTP(w, *herrErr)
 			return
 		}
-		ctx := r.Context()
+		ctx := enrichRequestLogContext(r.Context(), req)
 		if req.Origin != "" {
 			ctx = withOrigin(ctx, req.Origin)
 		}
+		clog.Get(ctx).Info("execute_flow_received")
 		result, err := executor.Execute(ctx, *req)
 		if err != nil {
 			herr.WriteHTTP(w, herr.New(r.Context(), domain.ErrBadRequest, herr.M{
@@ -197,10 +227,11 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 			herr.WriteHTTP(w, *herrErr)
 			return
 		}
-		ctx := r.Context()
+		ctx := enrichRequestLogContext(r.Context(), req)
 		if req.Origin != "" {
 			ctx = withOrigin(ctx, req.Origin)
 		}
+		clog.Get(ctx).Info("execute_flow_received", zap.Bool("stream", true))
 
 		flusher, ok := w.(http.Flusher)
 		if !ok {
