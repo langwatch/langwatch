@@ -202,3 +202,93 @@ func TestSync_RealWorkflowEndToEnd_OpenAI(t *testing.T) {
 		assert.Equal(t, "success", node["status"])
 	}
 }
+
+// TestSync_RealWorkflowEndToEnd_OpenAI_TemplatedInstructions exercises
+// the signature-node `instructions` Liquid render against a real
+// provider. Sibling of TestSync_RealWorkflowEndToEnd_OpenAI but with a
+// templated system prompt: `{{ topic }}` and `{{ qty }}` come from the
+// dataset and must be substituted *before* the call reaches OpenAI. If
+// the engine ever stops rendering, the model receives the raw `{{ }}`
+// markers and either errors (request rejected) or returns nonsense
+// (no digit), so the assertion below bites loudly.
+//
+// This is the live-provider companion to the in-process pattern_001
+// test — proves the same template-render path works end-to-end through
+// the real Bifrost / OpenAI HTTPS dispatch, not just through a fake LLM.
+func TestSync_RealWorkflowEndToEnd_OpenAI_TemplatedInstructions(t *testing.T) {
+	apiKey := os.Getenv("OPENAI_API_KEY")
+	if apiKey == "" {
+		t.Skip("OPENAI_API_KEY not set")
+	}
+	stack := setupStackWithLLM(t)
+
+	body := `{
+	  "type": "execute_flow",
+	  "payload": {
+	    "trace_id": "real-e2e-template",
+	    "origin": "workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"k","spec_version":"1.3","name":"TemplatedMath","icon":"🧮","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[
+	            {"identifier":"topic","type":"str"},
+	            {"identifier":"qty","type":"str"}
+	          ],
+	          "dataset":{"inline":{"records":{
+	            "topic":["addition"],
+	            "qty":["3 plus 3"]
+	          }}},
+	          "entry_selection":0,
+	          "train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"answer","type":"signature","data":{
+	          "name":"Answer",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{
+	              "model":"openai/gpt-5-mini",
+	              "litellm_params":{"api_key":"` + apiKey + `"}
+	            }},
+	            {"identifier":"instructions","type":"str","value":"You are a {{ topic }} tutor. Compute {{ qty }} and reply with only the numeric digit."}
+	          ],
+	          "inputs":[
+	            {"identifier":"topic","type":"str"},
+	            {"identifier":"qty","type":"str"}
+	          ],
+	          "outputs":[{"identifier":"answer","type":"str"}]
+	        }},
+	        {"id":"end","type":"end","data":{
+	          "inputs":[{"identifier":"answer","type":"str"}]
+	        }}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.topic","target":"answer","targetHandle":"inputs.topic","type":"default"},
+	        {"id":"e2","source":"entry","sourceHandle":"outputs.qty","target":"answer","targetHandle":"inputs.qty","type":"default"},
+	        {"id":"e3","source":"answer","sourceHandle":"outputs.answer","target":"end","targetHandle":"inputs.answer","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+
+	res := postSync(t, stack, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+	assert.Equal(t, "real-e2e-template", res.TraceID)
+
+	answer, _ := res.Result["answer"].(string)
+	require.NotEmpty(t, answer, "expected non-empty answer from real OpenAI call")
+	// 3+3=6 — proves the template variables made it into the prompt.
+	// If the engine had passed `{{ qty }}` verbatim, the model would
+	// either error or return something other than the digit 6.
+	assert.Contains(t, answer, "6",
+		"expected the answer to contain digit 6 (3+3), got %q — likely the {{ }} template did not render", answer)
+
+	require.NotNil(t, res.Nodes)
+	for _, id := range []string{"entry", "answer", "end"} {
+		node, ok := res.Nodes[id].(map[string]any)
+		require.True(t, ok, "missing node %q in result.nodes", id)
+		assert.Equal(t, "success", node["status"])
+	}
+}
