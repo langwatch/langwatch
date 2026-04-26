@@ -16,6 +16,7 @@
  * two defaults briefly during the swap.
  */
 import { Prisma, type PrismaClient, type RoutingPolicy } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 
 export type RoutingPolicyScope = "organization" | "team" | "project";
 
@@ -70,14 +71,10 @@ export class RoutingPolicyService {
   }
 
   async create(input: CreateRoutingPolicyInput): Promise<RoutingPolicy> {
-    // TODO(must-fix-before-PR, sergey/andre 2026-04-26): validate that
-    // every id in input.providerCredentialIds belongs to a project in
-    // input.organizationId. Without this, a caller with policy-write
-    // permission could reference credentials from another org's
-    // project and the chain would resolve at gateway-dispatch time
-    // (VirtualKeyService.create only checks the policy's org, not the
-    // policy's chain — by design, since chain validation is owned
-    // here). Track in #langwatch-ai-gateway kanban.
+    await this.assertProviderCredentialsBelongToOrg(
+      input.organizationId,
+      input.providerCredentialIds,
+    );
     return await this.prisma.$transaction(async (tx) => {
       // If isDefault was requested, atomically clear the existing default
       // for this scope tier first so the partial unique idx never trips.
@@ -114,10 +111,13 @@ export class RoutingPolicyService {
   }
 
   async update(input: UpdateRoutingPolicyInput): Promise<RoutingPolicy> {
-    // TODO(must-fix-before-PR, sergey/andre 2026-04-26): same gap as
-    // create() — providerCredentialIds (when supplied) must be
-    // validated against input.organizationId before write.
     const existing = await this.requireOwn(input.id, input.organizationId);
+    if (input.providerCredentialIds !== undefined) {
+      await this.assertProviderCredentialsBelongToOrg(
+        input.organizationId,
+        input.providerCredentialIds,
+      );
+    }
 
     const data: Prisma.RoutingPolicyUpdateInput = {
       updatedBy: { connect: { id: input.actorUserId } },
@@ -233,5 +233,50 @@ export class RoutingPolicyService {
       throw new Error(`RoutingPolicy ${id} not found in org ${organizationId}`);
     }
     return policy;
+  }
+
+  /**
+   * Reject any providerCredentialId that doesn't resolve to a
+   * GatewayProviderCredential whose project belongs to the supplied
+   * organization. Counterpart to VirtualKeyService.create's policy-org
+   * check: VK.create trusts that a policy's chain has already been
+   * sanitised here, so this is the auth boundary for cross-org chain
+   * smuggling. Empty input short-circuits.
+   *
+   * Uses a two-step query because dbMultiTenancyProtection rejects
+   * GatewayProviderCredential queries that don't carry projectId in
+   * the WHERE — we resolve the org's project set first, then filter
+   * the credentials to that set.
+   */
+  private async assertProviderCredentialsBelongToOrg(
+    organizationId: string,
+    providerCredentialIds: string[],
+  ): Promise<void> {
+    if (providerCredentialIds.length === 0) return;
+    const projects = await this.prisma.project.findMany({
+      where: { team: { organizationId } },
+      select: { id: true },
+    });
+    const projectIds = projects.map((p) => p.id);
+    if (projectIds.length === 0) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message:
+          "Organization has no projects — cannot reference any provider credentials",
+      });
+    }
+    const validCount = await this.prisma.gatewayProviderCredential.count({
+      where: {
+        id: { in: providerCredentialIds },
+        projectId: { in: projectIds },
+      },
+    });
+    if (validCount !== providerCredentialIds.length) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message:
+          "One or more provider credentials do not belong to this organization",
+      });
+    }
   }
 }

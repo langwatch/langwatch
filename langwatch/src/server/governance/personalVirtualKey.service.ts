@@ -206,15 +206,24 @@ export class PersonalVirtualKeyService {
     userId: string;
     organizationId: string;
   }) {
+    // dbMultiTenancyProtection requires projectId in the WHERE on
+    // VirtualKey; relation filters don't satisfy it. Resolve the
+    // user's personal projects in this org first.
+    const personalProjects = await this.prisma.project.findMany({
+      where: {
+        isPersonal: true,
+        ownerUserId: userId,
+        team: { organizationId },
+      },
+      select: { id: true },
+    });
+    const personalProjectIds = personalProjects.map((p) => p.id);
+    if (personalProjectIds.length === 0) return [];
     return await this.prisma.virtualKey.findMany({
       where: {
+        projectId: { in: personalProjectIds },
         principalUserId: userId,
         revokedAt: null,
-        project: {
-          isPersonal: true,
-          ownerUserId: userId,
-          team: { organizationId },
-        },
       },
       select: {
         id: true,
@@ -292,11 +301,20 @@ export class PersonalVirtualKeyService {
     userId: string;
     actorUserId: string;
   }): Promise<number> {
+    // Same projectId-in-WHERE constraint from dbMultiTenancyProtection
+    // as `list` above — resolve the user's personal projects across
+    // every org first.
+    const personalProjects = await this.prisma.project.findMany({
+      where: { isPersonal: true, ownerUserId: userId },
+      select: { id: true },
+    });
+    const personalProjectIds = personalProjects.map((p) => p.id);
+    if (personalProjectIds.length === 0) return 0;
     const personalVks = await this.prisma.virtualKey.findMany({
       where: {
+        projectId: { in: personalProjectIds },
         principalUserId: userId,
         revokedAt: null,
-        project: { isPersonal: true, ownerUserId: userId },
       },
       select: {
         id: true,

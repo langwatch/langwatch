@@ -43,6 +43,18 @@ const ORG_ID = `org-pvk-${suffix}`;
 const OTHER_ORG_ID = `org-pvk-other-${suffix}`;
 const USER_ID = `usr-pvk-${suffix}`;
 const OTHER_USER_ID = `usr-pvk-other-${suffix}`;
+// Admin-side seed in ORG_ID: a shared project + a credential + an
+// org-scoped default RoutingPolicy. PersonalVirtualKeyService.issue
+// resolves this policy via resolveDefaultForUser and binds it on the
+// freshly-issued VK; without it, VirtualKeyService.create takes the
+// no-policy + empty-chain branch and rejects (the dispatcher would
+// otherwise have no chain to consult). OTHER_ORG_ID intentionally has
+// no policy so cross-org tests still observe the bare-issuance error.
+const SHARED_PROJECT_ID = `proj-pvk-shared-${suffix}`;
+const SHARED_TEAM_ID = `team-pvk-shared-${suffix}`;
+const SHARED_MP_ID = `mp-pvk-shared-${suffix}`;
+const SHARED_CRED_ID = `cred-pvk-shared-${suffix}`;
+const DEFAULT_POLICY_ID = `rp-pvk-default-${suffix}`;
 
 describe("PersonalVirtualKeyService", () => {
   const service = PersonalVirtualKeyService.create(prisma);
@@ -78,17 +90,98 @@ describe("PersonalVirtualKeyService", () => {
         { organizationId: OTHER_ORG_ID, userId: USER_ID, role: "MEMBER" },
       ],
     });
+
+    // Admin-side seed: shared team + shared project (where the
+    // GatewayProviderCredential lives) + an org-scoped default
+    // RoutingPolicy referencing it. PersonalVirtualKeyService.issue
+    // calls resolveDefaultForUser → finds this policy → VK is created
+    // through the policy-bound branch. Mirrors the real production
+    // path where the org admin configures a default policy before
+    // members issue personal keys.
+    await prisma.team.create({
+      data: {
+        id: SHARED_TEAM_ID,
+        name: "Shared",
+        slug: `pvk-shared-${suffix}`,
+        organizationId: ORG_ID,
+        isPersonal: false,
+      },
+    });
+    await prisma.project.create({
+      data: {
+        id: SHARED_PROJECT_ID,
+        name: "Shared",
+        slug: `pvk-shared-${suffix}`,
+        apiKey: `pvk-shared-apikey-${suffix}`,
+        teamId: SHARED_TEAM_ID,
+        language: "typescript",
+        framework: "other",
+      },
+    });
+    await prisma.modelProvider.create({
+      data: {
+        id: SHARED_MP_ID,
+        projectId: SHARED_PROJECT_ID,
+        name: "OpenAI",
+        provider: "openai",
+        enabled: true,
+      },
+    });
+    await prisma.gatewayProviderCredential.create({
+      data: {
+        id: SHARED_CRED_ID,
+        projectId: SHARED_PROJECT_ID,
+        modelProviderId: SHARED_MP_ID,
+        slot: "primary",
+      },
+    });
+    await prisma.routingPolicy.create({
+      data: {
+        id: DEFAULT_POLICY_ID,
+        organizationId: ORG_ID,
+        scope: "organization",
+        scopeId: ORG_ID,
+        name: "default",
+        providerCredentialIds: [SHARED_CRED_ID],
+        strategy: "priority",
+        isDefault: true,
+        createdById: USER_ID,
+        updatedById: USER_ID,
+      },
+    });
   }, 60_000);
 
   afterAll(async () => {
     const orgIds = [ORG_ID, OTHER_ORG_ID];
-    await prisma.virtualKey.deleteMany({
-      where: { project: { team: { organizationId: { in: orgIds } } } },
+    // dbMultiTenancyProtection demands projectId in the WHERE for
+    // VirtualKey / GatewayProviderCredential / ModelProvider — resolve
+    // project ids explicitly before deleteMany so we satisfy the
+    // guard while still scoping to exactly this test's seeded rows.
+    const projects = await prisma.project.findMany({
+      where: { team: { organizationId: { in: orgIds } } },
+      select: { id: true },
     });
+    const projectIds = projects.map((p) => p.id);
+    if (projectIds.length > 0) {
+      await prisma.virtualKey.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
+    }
     await prisma.roleBinding.deleteMany({ where: { organizationId: { in: orgIds } } });
     await prisma.teamUser.deleteMany({
       where: { team: { organizationId: { in: orgIds } } },
     });
+    await prisma.routingPolicy.deleteMany({
+      where: { organizationId: { in: orgIds } },
+    });
+    if (projectIds.length > 0) {
+      await prisma.gatewayProviderCredential.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
+      await prisma.modelProvider.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
+    }
     await prisma.project.deleteMany({
       where: { team: { organizationId: { in: orgIds } } },
     });
@@ -254,11 +347,19 @@ describe("PersonalVirtualKeyService", () => {
         label: "extra-key",
       });
 
+      // dbMultiTenancyProtection requires projectId in the WHERE on
+      // VirtualKey — resolve the personal projects first.
+      const personalProjects = await prisma.project.findMany({
+        where: { isPersonal: true, ownerUserId: OTHER_USER_ID },
+        select: { id: true },
+      });
+      const personalProjectIds = personalProjects.map((p) => p.id);
+
       const beforeCount = await prisma.virtualKey.count({
         where: {
+          projectId: { in: personalProjectIds },
           principalUserId: OTHER_USER_ID,
           revokedAt: null,
-          project: { isPersonal: true, ownerUserId: OTHER_USER_ID },
         },
       });
       expect(beforeCount).toBeGreaterThanOrEqual(2);
@@ -271,9 +372,9 @@ describe("PersonalVirtualKeyService", () => {
 
       const afterActive = await prisma.virtualKey.count({
         where: {
+          projectId: { in: personalProjectIds },
           principalUserId: OTHER_USER_ID,
           revokedAt: null,
-          project: { isPersonal: true, ownerUserId: OTHER_USER_ID },
         },
       });
       expect(afterActive).toBe(0);
