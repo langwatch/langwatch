@@ -23,6 +23,7 @@ import { signOut } from "~/utils/auth-client";
 import numeral from "numeral";
 import React, { useState } from "react";
 import { useDrawer } from "../hooks/useDrawer";
+import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { useUpgradeModalStore } from "../stores/upgradeModalStore";
@@ -320,6 +321,10 @@ export const DashboardLayout = ({
     {},
     { enabled: !!session },
   );
+  const { enabled: gatewayMenuEnabled } = useFeatureFlag(
+    "release_ui_ai_gateway_menu_enabled",
+    { projectId: project?.id, enabled: !!project },
+  );
 
   usePostHogIdentify({
     session: session ?? null,
@@ -544,6 +549,11 @@ export const DashboardLayout = ({
                   <Menu.ItemGroup
                     title={`${session.user.name} (${session.user.email})`}
                   >
+                    {gatewayMenuEnabled && (
+                      <Menu.Item value="my-workspace" asChild>
+                        <Link href="/me">My Workspace</Link>
+                      </Menu.Item>
+                    )}
                     {!isLiteMember && (
                       <Menu.Item value="api-keys" asChild>
                         <Link href="/settings/api-keys">
