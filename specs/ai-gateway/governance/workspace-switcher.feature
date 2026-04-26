@@ -186,3 +186,78 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
     Then the trigger label is the team's display name
     And the team row carries the active checkmark
     And the personal row does NOT carry the checkmark
+
+  # ---------------------------------------------------------------------------
+  # DashboardLayout consolidation (Stage 2c — replace legacy ProjectSelector)
+  # ---------------------------------------------------------------------------
+  #
+  # rchaves's "no second systems" audit (iter 4) identified ProjectSelector
+  # (src/components/DashboardLayout.tsx) and WorkspaceSwitcher
+  # (src/components/WorkspaceSwitcher.tsx) as duplicate implementations of
+  # the same context-switcher UX pattern. WorkspaceSwitcher is the
+  # superset (Personal + Teams + Projects vs Projects-only). Stage 2c
+  # promotes WorkspaceSwitcher to be the single context picker rendered
+  # in DashboardLayout's header, preserving the existing
+  # ProjectSelector UX (project avatar in trigger, route preservation on
+  # click, per-team "+ New project" button) and deleting the legacy
+  # component.
+
+  @bdd @ui @workspace-switcher @consolidation @stage-2c
+  Scenario: DashboardLayout renders WorkspaceSwitcher in the header (not ProjectSelector)
+    Given the user is signed in and on a project page
+    When the DashboardLayout chrome renders
+    Then exactly one workspace switcher is in the header bar
+    And it is rendered by `<WorkspaceSwitcher>` (not the legacy
+        `ProjectSelector` component)
+    And `ProjectSelector` is not exported from anywhere in the codebase
+        (the component is deleted in this stage)
+
+  @bdd @ui @workspace-switcher @route-preservation @stage-2c
+  Scenario: Picking a different project preserves the current sub-route
+    Given the user is on "/<project-old>/messages?view=table"
+    When the user opens the switcher and picks "<project-new>"
+    Then the browser navigates to "/<project-new>/messages?view=table"
+    And the sub-route + query string are preserved
+    And the switcher chip re-renders with the new project name
+
+  @bdd @ui @workspace-switcher @route-preservation @stage-2c
+  Scenario: Picking a project from a route with extra dynamic segments
+    Given the user is on "/<project-old>/messages/trace_xyz/spans"
+    And the route pattern is "/[project]/messages/[trace]/[openTab]"
+    When the user picks "<project-new>"
+    Then the browser navigates to "/<project-new>/messages" (parent route)
+    And the user is NOT taken to a 404 like "/<project-new>/messages/trace_xyz/spans"
+
+  @bdd @ui @workspace-switcher @route-preservation @stage-2c
+  Scenario: Picking a project from a non-project route falls back to project root
+    Given the user is on "/me/settings"
+    When the user picks "<project-new>"
+    Then the browser navigates to
+        "/<project-new>?return_to=%2Fme%2Fsettings"
+    And the project root page MAY redirect back to /me/settings after
+        loading (preserves intent without breaking the project's
+        own redirect logic)
+
+  @bdd @ui @workspace-switcher @add-project @stage-2c
+  Scenario: The dropdown shows a per-team "+ New project" button (admin-only)
+    Given the user is an organization admin OR a team admin on team T
+    When the user opens the switcher
+    Then within team T's "Projects" group there is a "+ New project" entry
+    And clicking it opens the existing CreateProject drawer
+        (`useDrawer().openDrawer("createProject", ...)`)
+    And the user's org-membership / team-membership filters apply (a
+        viewer-only member on team T sees no "+ New project" entry there)
+
+  @bdd @ui @workspace-switcher @add-project @stage-2c
+  Scenario: The "+ New project" button is suppressed for non-admin members
+    Given the user is a regular member (not admin) on team T
+    When the user opens the switcher
+    Then no "+ New project" entry is rendered in team T's group
+        (non-admins cannot create projects from this UI)
+
+  @bdd @ui @workspace-switcher @persistence @stage-2c
+  Scenario: Picking a project from a non-project route persists selectedProjectSlug
+    Given the user is on "/settings/teams/<team-slug>"
+    When the user picks "<project-new>"
+    Then localStorage.selectedProjectSlug is set to "<project-new>"
+    And subsequent visits to ambiguous routes can default to that project
