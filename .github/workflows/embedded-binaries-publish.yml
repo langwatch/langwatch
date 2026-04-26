@@ -178,12 +178,38 @@ jobs:
           ./configure --prefix="$install_prefix" \
             --without-icu \
             --without-readline
+          # `world-bin` builds binaries; `install-world` installs the FULL
+          # tree (bin/, lib/, share/, include/) — using install-world-bin
+          # earlier shipped tarballs without libpq.so.5, so psql/pg_dump/
+          # pg_isready linked against a system libpq at runtime (too old on
+          # ubuntu 22.04 → "undefined symbol: PQchangePassword") or hit a
+          # build-time absolute @rpath on macOS → SIGABRT in initdb.
           if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then
             make -j$(sysctl -n hw.ncpu) world-bin
           else
             make -j$(nproc) world-bin
           fi
-          make install-world-bin
+          make install
+          # macOS dylibs embed the absolute build path as their install_name
+          # by default, and binaries reference that exact path. Rewrite to
+          # @rpath/<name> on the dylibs and add @loader_path/../lib to the
+          # binaries' rpath search list so the published tarball is
+          # relocatable to any user's ~/.langwatch/bin/postgres/.
+          if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then
+            for dylib in "$install_prefix"/lib/*.dylib; do
+              [ -f "$dylib" ] || continue
+              install_name_tool -id "@rpath/$(basename "$dylib")" "$dylib" 2>/dev/null || true
+            done
+            for bin in "$install_prefix"/bin/*; do
+              [ -x "$bin" ] && [ ! -L "$bin" ] || continue
+              file "$bin" 2>/dev/null | grep -q "Mach-O" || continue
+              # Rewrite each absolute-path dylib reference to @rpath/<name>.
+              otool -L "$bin" 2>/dev/null | awk 'NR>1{print $1}' | grep "$install_prefix" | while read -r dylib_path; do
+                install_name_tool -change "$dylib_path" "@rpath/$(basename "$dylib_path")" "$bin" 2>/dev/null || true
+              done
+              install_name_tool -add_rpath "@loader_path/../lib" "$bin" 2>/dev/null || true
+            done
+          fi
           # Strip debug info from the executables to halve the tarball size.
           find "$install_prefix/bin" -type f -exec strip {} + 2>/dev/null || true
           # Pack contents of _install (bin/, lib/, share/, include/) at the
