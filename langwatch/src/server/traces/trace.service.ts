@@ -279,6 +279,13 @@ export class TraceService {
       downloadMode?: boolean;
       includeSpans?: boolean;
       scrollId?: string | null;
+      /**
+       * When true, the returned traces keep the full ComputedInput /
+       * ComputedOutput values instead of the truncated preview used for the
+       * list view. Set by callers that forward the captured payload downstream
+       * (e.g. the triggers cron sending to Slack/email/dataset).
+       */
+      includeFullContent?: boolean;
     } = {},
   ): Promise<TracesForProjectResult> {
     return this.tracer.withActiveSpan(

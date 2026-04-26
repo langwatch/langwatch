@@ -53,6 +53,14 @@ interface ClickHouseScrollCursor {
 }
 
 /**
+ * Cap (in characters) applied to ComputedInput/ComputedOutput when a caller
+ * does not opt into `includeFullContent`. 10_000 chars is enough for a
+ * readable preview in the trace list UI and keeps per-row payloads predictable
+ * for projects with very large captured content.
+ */
+const TRACE_IO_PREVIEW_CAP = 10_000;
+
+/**
  * Service for fetching traces from ClickHouse.
  *
  * Fetches trace summaries and, when needed, span rows via separate ClickHouse
@@ -448,6 +456,14 @@ export class ClickHouseTraceService {
     options: {
       includeSpans?: boolean;
       scrollId?: string | null;
+      /**
+       * When true, return the full ComputedInput/ComputedOutput for every row.
+       * Defaults to false — the list view truncates heavy payload columns at
+       * the ClickHouse layer to keep per-request heap bounded. Only callers
+       * that actually consume the full payload (e.g. the triggers cron, which
+       * forwards input/output to Slack/email/dataset) should set this to true.
+       */
+      includeFullContent?: boolean;
     } = {},
   ): Promise<TracesForProjectResult | null> {
     return await this.tracer.withActiveSpan(
@@ -546,6 +562,7 @@ export class ClickHouseTraceService {
               filterParams,
               traceIds: input.traceIds,
               query: input.query,
+              includeFullContent: options.includeFullContent === true,
             });
 
           // When includeSpans is requested, fetch and attach actual spans
@@ -608,9 +625,34 @@ export class ClickHouseTraceService {
           const traceIds = groups.flat().map((t) => t.trace_id);
           let traceChecks: TracesForProjectResult["traceChecks"] = {};
           if (traceIds.length > 0 && clickHouseClient) {
+            // Explicit projection — avoid SELECT * because the
+            // evaluation_runs row carries heavy JSON columns
+            // (`Details`, `Error`, `Inputs`) that can be 100s of KB each.
+            // Single-call reads of 200+ MB have been observed in prod when
+            // many traces on a page each have large evaluation payloads.
+            // Select only the columns the mapper consumes; update this list
+            // when `mapClickHouseEvaluationToTraceEvaluation` changes.
             const evalResult = await clickHouseClient.query({
               query: `
-                SELECT *
+                SELECT
+                  TenantId,
+                  EvaluationId,
+                  EvaluatorId,
+                  EvaluatorType,
+                  EvaluatorName,
+                  TraceId,
+                  IsGuardrail,
+                  Status,
+                  Score,
+                  Passed,
+                  Label,
+                  Details,
+                  Error,
+                  Inputs,
+                  ScheduledAt,
+                  StartedAt,
+                  CompletedAt,
+                  UpdatedAt
                 FROM evaluation_runs
                 WHERE TenantId = {tenantId:String}
                   AND TraceId IN ({traceIds:Array(String)})
@@ -1300,6 +1342,7 @@ export class ClickHouseTraceService {
     filterParams,
     traceIds,
     query,
+    includeFullContent,
   }: {
     projectId: string;
     pageSize: number;
@@ -1312,6 +1355,7 @@ export class ClickHouseTraceService {
     filterParams?: Record<string, unknown>;
     traceIds?: string[];
     query?: string;
+    includeFullContent?: boolean;
   }): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",
@@ -1427,8 +1471,11 @@ export class ClickHouseTraceService {
                 ts.SubTopicId AS ts_SubTopicId,
                 ts.HasAnnotation AS ts_HasAnnotation,
                 ts.AnnotationIds AS ts_AnnotationIds,
-                ts.ComputedInput AS ts_ComputedInput,
-                ts.ComputedOutput AS ts_ComputedOutput,
+                ${
+                  includeFullContent === true
+                    ? "ts.ComputedInput AS ts_ComputedInput,\n                ts.ComputedOutput AS ts_ComputedOutput,"
+                    : "substring(ts.ComputedInput, 1, {previewCap:UInt32}) AS ts_ComputedInput,\n                substring(ts.ComputedOutput, 1, {previewCap:UInt32}) AS ts_ComputedOutput,"
+                }
                 ts.Attributes AS ts_Attributes,
                 toUnixTimestamp64Milli(ts.OccurredAt) AS ts_OccurredAt,
                 toUnixTimestamp64Milli(ts.CreatedAt) AS ts_CreatedAt,
@@ -1466,6 +1513,7 @@ export class ClickHouseTraceService {
               lastTimestamp: cursor?.lastTimestamp ?? 0,
               lastTraceId: cursor?.lastTraceId ?? "",
               pageSize,
+              previewCap: TRACE_IO_PREVIEW_CAP,
             },
             format: "JSONEachRow",
           }),
