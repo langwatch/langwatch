@@ -14,25 +14,9 @@ Feature: LiteLLM Reasoning Parameter Unification
   # Issue: LiteLLM rejects provider-specific params passed directly
   # Error: "effort: Extra inputs are not permitted"
 
-  @unit @unimplemented
-  Scenario: TypeScript boundary layer uses reasoning_effort for Anthropic
-    Given a prompt config with model "anthropic/claude-opus-4.5" and reasoning "high"
-    When mapping reasoning to provider parameters at the boundary
-    Then the result should be { reasoning_effort: "high" }
     # NOT { effort: "high" } - LiteLLM doesn't recognize 'effort'
 
-  @unit @unimplemented
-  Scenario: TypeScript boundary layer uses reasoning_effort for Gemini
-    Given a prompt config with model "gemini/gemini-2.5-pro" and reasoning "medium"
-    When mapping reasoning to provider parameters at the boundary
-    Then the result should be { reasoning_effort: "medium" }
     # NOT { thinkingLevel: "medium" } - LiteLLM doesn't recognize 'thinkingLevel'
-
-  @unit @unimplemented
-  Scenario: TypeScript boundary layer uses reasoning_effort for OpenAI
-    Given a prompt config with model "openai/gpt-5" and reasoning "low"
-    When mapping reasoning to provider parameters at the boundary
-    Then the result should be { reasoning_effort: "low" }
 
   @unit @unimplemented
   Scenario: Python boundary layer uses reasoning_effort for Anthropic
@@ -59,42 +43,5 @@ Feature: LiteLLM Reasoning Parameter Unification
   # llmModels.json keeps provider-specific names for UI clarity
   # Translation happens at boundary before LiteLLM call
 
-  @unit @unimplemented
-  Scenario: Translates registry parameterName 'effort' to reasoning_effort
-    Given llmModels.json defines parameterName "effort" for Anthropic models
-    When the reasoning value is mapped for LiteLLM
-    Then the key should be translated to "reasoning_effort"
-
-  @unit @unimplemented
-  Scenario: Translates registry parameterName 'thinkingLevel' to reasoning_effort
-    Given llmModels.json defines parameterName "thinkingLevel" for Gemini models
-    When the reasoning value is mapped for LiteLLM
-    Then the key should be translated to "reasoning_effort"
-
-  @unit @unimplemented
-  Scenario: Passes through reasoning_effort unchanged
-    Given llmModels.json defines parameterName "reasoning_effort" for OpenAI models
-    When the reasoning value is mapped for LiteLLM
-    Then the key should remain "reasoning_effort"
-
   # Normalization from database (backward compatibility)
   # Database may contain provider-specific fields from before unification
-
-  @unit @unimplemented
-  Scenario: Normalizes effort from database to reasoning
-    Given database config with effort "medium"
-    When normalizing to unified format
-    Then the result should have reasoning "medium"
-
-  @unit @unimplemented
-  Scenario: Normalizes thinkingLevel from database to reasoning
-    Given database config with thinkingLevel "low"
-    When normalizing to unified format
-    Then the result should have reasoning "low"
-
-  @unit @unimplemented
-  Scenario: Priority order when multiple fields present
-    Given database config with reasoning "high" and effort "low"
-    When normalizing to unified format
-    Then the result should have reasoning "high"
-    # Priority: reasoning > reasoning_effort > thinkingLevel > effort
