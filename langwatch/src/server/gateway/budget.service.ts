@@ -21,7 +21,7 @@ import type {
 import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
-import { GatewayAuditLogRepository } from "./auditLog.repository";
+import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { GatewayBudgetClickHouseRepository } from "./budget.clickhouse.repository";
 import { nextResetAt, shouldResetBudget } from "./budgetWindow";
@@ -147,7 +147,7 @@ export class GatewayBudgetService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly changeEvents = new ChangeEventRepository(prisma),
-    private readonly auditLog = new GatewayAuditLogRepository(prisma),
+    private readonly auditLog = new GatewayAuditAdapter(prisma),
     private readonly chRepo?: GatewayBudgetClickHouseRepository,
   ) {}
 
@@ -158,7 +158,7 @@ export class GatewayBudgetService {
     return new GatewayBudgetService(
       prisma,
       new ChangeEventRepository(prisma),
-      new GatewayAuditLogRepository(prisma),
+      new GatewayAuditAdapter(prisma),
       chRepo,
     );
   }

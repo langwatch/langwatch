@@ -9,7 +9,7 @@ beforeAll(() => {
     process.env.LW_VIRTUAL_KEY_PEPPER ?? "unit-test-pepper-32-bytes-exactly!";
 });
 
-import { GatewayAuditLogRepository } from "../auditLog.repository";
+import { GatewayAuditAdapter } from "../auditLog.repository";
 import { ChangeEventRepository } from "../changeEvent.repository";
 import { VirtualKeyService } from "../virtualKey.service";
 import {
@@ -60,7 +60,7 @@ type Mocks = {
   prisma: PrismaClient;
   repository: VirtualKeyRepository;
   changeEvents: ChangeEventRepository;
-  auditLog: GatewayAuditLogRepository;
+  auditLog: GatewayAuditAdapter;
   service: VirtualKeyService;
   findByIdMock: ReturnType<typeof vi.fn>;
   createMock: ReturnType<typeof vi.fn>;
@@ -110,7 +110,7 @@ function makeService(opts: {
   } as unknown as VirtualKeyRepository;
 
   const changeEvents = { append: changeAppend } as unknown as ChangeEventRepository;
-  const auditLog = { append: auditAppend } as unknown as GatewayAuditLogRepository;
+  const auditLog = { append: auditAppend } as unknown as GatewayAuditAdapter;
 
   const prisma = {
     gatewayProviderCredential: { count: providerCount },

@@ -40,7 +40,7 @@ import type {
 import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 
-import { GatewayAuditLogRepository } from "./auditLog.repository";
+import { GatewayAuditAdapter } from "./auditLog.repository";
 import { serializeRowForAudit } from "./auditSerializer";
 import { ChangeEventRepository } from "./changeEvent.repository";
 
@@ -145,7 +145,7 @@ export class GatewayCacheRuleService {
   constructor(
     private readonly prisma: PrismaClient,
     private readonly changeEvents = new ChangeEventRepository(prisma),
-    private readonly auditLog = new GatewayAuditLogRepository(prisma),
+    private readonly auditLog = new GatewayAuditAdapter(prisma),
   ) {}
 
   static create(prisma: PrismaClient): GatewayCacheRuleService {
