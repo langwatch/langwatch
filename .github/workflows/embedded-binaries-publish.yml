@@ -207,19 +207,17 @@ jobs:
           # MALLOC=libc avoids jemalloc (which has its own build deps and
           # causes alpine pain). BUILD_TLS=no — runtime listens on 127.0.0.1
           # only, no need to compile TLS.
-          # `make distclean` first to wipe any cached partial build state
-          # (redis's bundled lua otherwise sometimes links partially with
-          # hidden symbols on arm64 / under LTO, producing "undefined
-          # reference to luaopen_base").
-          # `-j1 -C deps` so the bundled lua/hiredis/linenoise/hdr_histogram
-          # build serially (their inter-target deps in deps/Makefile aren't
-          # parallel-safe), then -jN for src.
+          # MAKEFLAGS=-j1 forces fully-serial build through ALL recursed
+          # sub-makes. Parallel builds keep producing truncated lua object
+          # files on the ubuntu-22.04-arm runner pool ("ranlib: liblua.a:
+          # error reading ldebug.o: file truncated"), even with
+          # `-j1 -C deps` at the outer level (sub-makes spawn their own
+          # parallelism). Redis is small enough that single-threaded
+          # build is ~30s on any runner — trading speed for determinism.
           # Build BOTH redis-server and redis-cli — supervisor's health
           # check shells out to `redis-cli PING`.
-          jobs="$(if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then sysctl -n hw.ncpu; else nproc; fi)"
-          make distclean
-          make BUILD_TLS=no MALLOC=libc -j1 -C deps lua hiredis linenoise hdr_histogram
-          make BUILD_TLS=no MALLOC=libc -j"$jobs" redis-server redis-cli
+          MAKEFLAGS=-j1 make distclean
+          MAKEFLAGS=-j1 make BUILD_TLS=no MALLOC=libc redis-server redis-cli
           strip src/redis-server src/redis-cli 2>/dev/null || true
           # Tarball: redis-server + redis-cli at the root.
           tar czf "../redis-${REDIS_VERSION}-${{ matrix.target.platform }}.tar.gz" -C src redis-server redis-cli
