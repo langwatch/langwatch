@@ -107,7 +107,7 @@ Server-Sent Events. Event shapes match `langwatch_nlp.studio.types.events.Studio
 |---|---|
 | `is_alive_response` | `{}` — heartbeat every `NLP_STREAM_HEARTBEAT_SECONDS` (default 15). Matches Python `IsAliveResponse.type`. |
 | `execution_state_change` | `{ trace_id, state: { status, nodes: { <node_id>: { status, inputs, outputs, error?, cost?, duration_ms? } } } }` |
-| `done` | `{ trace_id, status: "success"|"error", result }` |
+| `done` | `{ trace_id, status: "success" \| "error", result }` |
 | `error` | `{ trace_id, payload: { stack?, message } }` |
 
 - Idle timeout = `NLP_STREAM_IDLE_TIMEOUT_SECONDS` (default 900). On timeout, emit `error` then close.
