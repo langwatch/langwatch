@@ -20,8 +20,8 @@ export function printPhases(): void {
   const num = (n: number) => chalk.bold.cyan(`${n}.`);
   const lines = [
     `  ${num(1)} ${chalk.bold("predeps")}   ${chalk.dim("uv, postgres, redis, clickhouse, ai-gateway")}`,
-    `  ${num(2)} ${chalk.bold("services")}  ${chalk.dim("install python deps, build app, prepare data dirs")}`,
-    `  ${num(3)} ${chalk.bold("env")}       ${chalk.dim("scaffold ~/.langwatch/.env with locally-generated secrets")}`,
+    `  ${num(2)} ${chalk.bold("env")}       ${chalk.dim("scaffold ~/.langwatch/.env with locally-generated secrets")}`,
+    `  ${num(3)} ${chalk.bold("services")}  ${chalk.dim("install python deps, build app, prepare data dirs")}`,
     `  ${num(4)} ${chalk.bold("start")}     ${chalk.dim("boot every service via concurrently and open your browser")}`,
   ];
   console.log(chalk.bold("    Plan:"));
