@@ -1,7 +1,7 @@
 import { execa } from "execa";
-import { chmodSync, createWriteStream, existsSync, mkdirSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
-import { pipeline } from "node:stream/promises";
+import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
 // Goose runs the langwatch app's ClickHouse schema migrations
@@ -64,12 +64,7 @@ export const goosePredep: Predep = {
     mkdirSync(paths.bin, { recursive: true });
     const url = downloadUrl(platform);
     const target = join(paths.bin, "goose");
-    task.output = `downloading goose ${GOOSE_VERSION} (${platform}) from github.com/pressly/goose`;
-    const res = await fetch(url);
-    if (!res.ok || !res.body) {
-      throw new Error(`goose download failed (${url}): HTTP ${res.status}`);
-    }
-    await pipeline(res.body as unknown as NodeJS.ReadableStream, createWriteStream(target));
+    await downloadWithProgress(url, target, task, `downloading goose ${GOOSE_VERSION}`);
     chmodSync(target, 0o755);
     const version = (await resolveVersion(target)) ?? "unknown";
     return { version, resolvedPath: target };

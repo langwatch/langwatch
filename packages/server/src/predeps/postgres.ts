@@ -1,9 +1,10 @@
 import { execa } from "execa";
 import { createHash } from "node:crypto";
-import { createReadStream, createWriteStream, existsSync, mkdirSync } from "node:fs";
+import { createReadStream, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import embedsVersions from "../../embeds.versions.json" with { type: "json" };
+import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
 // Embedded postgres tarballs are built nightly by .github/workflows/
@@ -69,15 +70,9 @@ export const postgresPredep: Predep = {
     const target = join(paths.bin, "postgres");
     mkdirSync(target, { recursive: true });
     const url = downloadUrl(platform);
-    task.output = `downloading PostgreSQL ${PG_VERSION} (${platform}) from embeds.langwatch.ai`;
     const tar = await import("tar");
     const tmp = join(paths.bin, `.postgres-${PG_VERSION}-${platform}.tar.gz`);
-
-    const res = await fetch(url);
-    if (!res.ok || !res.body) {
-      throw new Error(`postgres download failed (${url}): HTTP ${res.status}`);
-    }
-    await pipeline(res.body as unknown as NodeJS.ReadableStream, createWriteStream(tmp));
+    await downloadWithProgress(url, tmp, task, `downloading postgres ${PG_VERSION}`);
 
     task.output = "verifying sha256";
     const expectedRes = await fetch(`${url}.sha256`);

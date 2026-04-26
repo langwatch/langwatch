@@ -1,6 +1,7 @@
 import { execa } from "execa";
 import { chmodSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
 // ClickHouse ships a single self-contained binary that auto-detects whether
@@ -50,13 +51,8 @@ export const clickhousePredep: Predep = {
   async install({ platform, paths, task }) {
     mkdirSync(paths.bin, { recursive: true });
     const url = downloadUrl(platform);
-    task.output = `downloading ${url}`;
     const out = join(paths.bin, "clickhouse");
-    const res = await fetch(url);
-    if (!res.ok || !res.body) throw new Error(`clickhouse download failed: HTTP ${res.status}`);
-    const fs = await import("node:fs");
-    const stream = await import("node:stream/promises");
-    await stream.pipeline(res.body as unknown as NodeJS.ReadableStream, fs.createWriteStream(out));
+    await downloadWithProgress(url, out, task, "downloading clickhouse");
     chmodSync(out, 0o755);
     const version = (await resolveVersion(out)) ?? "unknown";
     return { version, resolvedPath: out };

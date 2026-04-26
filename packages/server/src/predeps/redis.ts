@@ -1,9 +1,10 @@
 import { execa } from "execa";
 import { createHash } from "node:crypto";
-import { chmodSync, createReadStream, createWriteStream, existsSync, mkdirSync } from "node:fs";
+import { chmodSync, createReadStream, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { pipeline } from "node:stream/promises";
 import embedsVersions from "../../embeds.versions.json" with { type: "json" };
+import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
 // Embedded redis-server is built from upstream redis.io source against
@@ -60,15 +61,9 @@ export const redisPredep: Predep = {
   async install({ platform, paths, task }) {
     mkdirSync(paths.bin, { recursive: true });
     const url = downloadUrl(platform);
-    task.output = `downloading redis ${REDIS_VERSION} (${platform}) from embeds.langwatch.ai`;
     const tar = await import("tar");
     const tmp = join(paths.bin, `.redis-${REDIS_VERSION}-${platform}.tar.gz`);
-
-    const res = await fetch(url);
-    if (!res.ok || !res.body) {
-      throw new Error(`redis download failed (${url}): HTTP ${res.status}`);
-    }
-    await pipeline(res.body as unknown as NodeJS.ReadableStream, createWriteStream(tmp));
+    await downloadWithProgress(url, tmp, task, `downloading redis ${REDIS_VERSION}`);
 
     task.output = "verifying sha256";
     const expectedRes = await fetch(`${url}.sha256`);

@@ -2,6 +2,7 @@ import { execa } from "execa";
 import { chmodSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
 // The Go AI Gateway monobinary is built per-platform in CI and uploaded to a
@@ -66,7 +67,7 @@ async function buildFromCheckout(repoRoot: string, outDir: string, task: { outpu
 export function makeAigatewayPredep(version: string): Predep {
   return {
     id: "aigateway",
-    label: "ai-gateway (Go data plane)",
+    label: "langwatch ai-gateway",
     required: true,
 
     async detect(paths) {
@@ -84,15 +85,17 @@ export function makeAigatewayPredep(version: string): Predep {
       const out = join(paths.bin, "aigateway");
 
       const url = downloadUrl(version, platform);
-      task.output = `downloading ${url}`;
-      const res = await fetch(url);
-      if (res.ok && res.body) {
-        const fs = await import("node:fs");
-        const stream = await import("node:stream/promises");
-        await stream.pipeline(res.body as unknown as NodeJS.ReadableStream, fs.createWriteStream(out));
+      try {
+        await downloadWithProgress(url, out, task, `downloading langwatch ai-gateway ${version}`);
         chmodSync(out, 0o755);
         const v = (await resolveVersion(out)) ?? version;
         return { version: v, resolvedPath: out };
+      } catch (err) {
+        // GH release HTTP miss falls through to the local-build path below.
+        // Other errors (disk full, etc.) we'd want to surface, but in
+        // practice the only HTTP error we care about is 404 on a not-yet-
+        // published release artifact — local-build is the right fallback.
+        if (!(err instanceof Error) || !/HTTP 404/.test(err.message)) throw err;
       }
 
       // GH release artifact is missing — fall back to a local Go build if we
@@ -107,7 +110,7 @@ export function makeAigatewayPredep(version: string): Predep {
       }
 
       throw new Error(
-        `aigateway download failed: HTTP ${res.status}. No local checkout found to build from. The v${version} release must publish aigateway-${platform.replace("x64", "amd64")} for npx-only installs to work.`
+        `aigateway download failed for v${version} (${url}). No local checkout found to build from. The v${version} release must publish aigateway-${platform.replace("x64", "amd64")} for npx-only installs to work.`,
       );
     },
   };
