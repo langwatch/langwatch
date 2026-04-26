@@ -53,7 +53,12 @@ import { Menu } from "./ui/menu";
 import { CommandBarTrigger } from "../features/command-bar";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
-  const { project } = useOrganizationTeamProject();
+  // No redirects from the breadcrumb path — it only reads `project` for the
+  // dashboard link. The owning DashboardLayout call handles bouncing.
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
 
   if (!currentRoute) return null;
 
@@ -287,12 +292,20 @@ export const AddProjectButton = ({
 export type DashboardLayoutProps = {
   publicPage?: boolean;
   compactMenu?: boolean;
+  /**
+   * Set on personal-scope routes (`/me`, `/me/settings`) where the page
+   * intentionally has no project context. Disables the OTP hook's
+   * "no project → bounce to /onboarding or /<defaultProjectSlug>"
+   * redirect, which would otherwise hijack the route on first paint.
+   */
+  personalScope?: boolean;
 } & StackProps;
 
 export const DashboardLayout = ({
   children,
   publicPage = false,
   compactMenu: compactMenuProp = false,
+  personalScope = false,
   ...props
 }: DashboardLayoutProps) => {
   // fallback: "lg" tells Chakra to assume large screen during SSR/initial render,
@@ -305,7 +318,10 @@ export const DashboardLayout = ({
   const { data: session } = useRequiredSession({ required: !publicPage });
 
   const { isLoading, organization, organizations, team, project, organizationRole } =
-    useOrganizationTeamProject();
+    useOrganizationTeamProject({
+      redirectToOnboarding: !personalScope,
+      redirectToProjectOnboarding: !personalScope,
+    });
   const { isLiteMember } = useLiteMemberGuard();
   const usage = api.limits.getUsage.useQuery(
     { organizationId: organization?.id ?? "" },
@@ -337,6 +353,7 @@ export const DashboardLayout = ({
   }
 
   const isOpsRoute = router.pathname.startsWith("/ops");
+  const isPersonalScopeRoute = personalScope || router.pathname.startsWith("/me");
 
   if (
     !publicPage &&
@@ -344,7 +361,7 @@ export const DashboardLayout = ({
       isLoading ||
       !organization ||
       !organizations ||
-      (!isOpsRoute && (!team || !project)))
+      (!isOpsRoute && !isPersonalScopeRoute && (!team || !project)))
   ) {
     return <LoadingScreen />;
   }

@@ -183,6 +183,27 @@ const routes: RouteObject[] = [
     path: "/settings/usage",
     ...page(() => import("./pages/settings/usage")),
   },
+  {
+    path: "/settings/routing-policies",
+    ...page(() => import("./pages/settings/routing-policies")),
+  },
+
+  // Personal-scope governance routes (must precede the /:project catch-all
+  // so "me" doesn't get treated as a project slug)
+  {
+    path: "/me",
+    ...page(() => import("./pages/me/index")),
+  },
+  {
+    path: "/me/settings",
+    ...page(() => import("./pages/me/settings")),
+  },
+
+  // CLI device-flow approval (RFC 8628 user-facing screen)
+  {
+    path: "/cli/auth",
+    ...page(() => import("./pages/cli/auth")),
+  },
 
   // Project routes
   {

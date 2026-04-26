@@ -30,7 +30,7 @@ export default function MyLayout({ children }: PropsWithChildren) {
   const { switcher } = usePersonalContext();
 
   return (
-    <DashboardLayout>
+    <DashboardLayout personalScope>
       <Box width="full" paddingY={4} paddingX={4}>
         <VStack align="stretch" gap={4} width="full">
           <HStack width="full">
