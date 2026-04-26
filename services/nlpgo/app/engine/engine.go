@@ -24,6 +24,7 @@ import (
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/dsl"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/planner"
+	"github.com/langwatch/langwatch/services/nlpgo/app/engine/template"
 )
 
 // Engine wires the per-block executors together. It's the unit the
@@ -773,8 +774,16 @@ func buildMessages(node *dsl.Node, inputs map[string]any) []app.ChatMessage {
 		return out
 	}
 	if instr := paramString(node.Data.Parameters, "instructions"); instr != "" {
+		// Render Liquid-subset placeholders against the upstream
+		// inputs so {{ var }} / {{ x.y }} / {{ x[0] }} in the system
+		// prompt resolve like they do on the Python path. Unresolved
+		// keys come back as warnings — non-fatal here, the engine
+		// still emits the partially-rendered string. Full Liquid
+		// (loops, ifs, filters) intentionally not supported yet:
+		// see specs/nlp-go/llm-block.feature.
+		rendered, _ := template.Render(instr, inputs)
 		return []app.ChatMessage{
-			{Role: "system", Content: instr},
+			{Role: "system", Content: rendered},
 			{Role: "user", Content: composeUserPrompt(inputs)},
 		}
 	}
