@@ -346,7 +346,15 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 		return nil, &NodeError{Type: "llm_error", Message: err.Error()}
 	}
 	if useStructured {
-		out, _ := extractSignatureOutputs(resp.Content, node.Data.Outputs)
+		out, warnings := extractSignatureOutputs(resp.Content, node.Data.Outputs)
+		// Surface parse-and-split warnings (malformed JSON,
+		// missing fields) at warn level so operators see when a
+		// signature node received a partial/malformed structured
+		// response — silently dropping these would have downstream
+		// nodes consuming nil/empty values with no signal.
+		for _, w := range warnings {
+			e.logger.Warn(w, "node_id", node.ID)
+		}
 		return out, nil
 	}
 	out := make(map[string]any, len(outputNames(node.Data.Outputs)))
