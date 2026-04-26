@@ -28,18 +28,18 @@ export async function runPredeps({ yes = false, skipConfirm = false, version }: 
   const detection = await detectAll(predeps);
   const missing = predeps.filter((p) => !detection[p.id]?.installed);
 
-  for (const [id, det] of Object.entries(detection)) {
-    if (det.installed) {
-      console.log(chalk.green("✓") + ` ${idLabel(predeps, id)} ${chalk.dim("already installed — " + det.version)}`);
-    }
-  }
-
   if (missing.length === 0) {
     return collectResult(predeps, detection, {});
   }
 
-  if (!skipConfirm && !yes) {
-    await confirmInstallPrompt(missing);
+  // Only `uv` warrants a confirmation prompt — it's the one predep that
+  // installs into the user's home (`~/.local/bin/uv` via the official
+  // installer) instead of being a self-contained binary under
+  // `~/.langwatch/bin`. Every other predep is a static binary we drop into
+  // `~/.langwatch/bin` and which `rm -rf ~/.langwatch` cleans up — no need
+  // to bother the user about it.
+  if (!skipConfirm && !yes && missing.some((p) => p.id === "uv")) {
+    await confirmUvInstallPrompt();
   }
 
   const installResults: Record<string, { version: string; resolvedPath: string }> = {};
@@ -58,35 +58,18 @@ async function detectAll(predeps: Predep[]) {
   return out;
 }
 
-function idLabel(predeps: Predep[], id: string): string {
-  return predeps.find((p) => p.id === id)?.label ?? id;
-}
-
-async function confirmInstallPrompt(missing: Predep[]): Promise<void> {
-  const choices = missing.map((p) => ({
-    title: `${p.label}  ${chalk.dim("[required]")}`,
-    value: p.id,
-    selected: true,
-    disabled: false,
-  }));
-  console.log("");
-  console.log(chalk.bold("LangWatch needs the following dependencies. All are required."));
-  console.log(chalk.dim("They install once into ~/.langwatch/bin and never touch your shell rc files."));
-  console.log("");
-  const { confirmed } = await prompts(
+async function confirmUvInstallPrompt(): Promise<void> {
+  const { ok } = await prompts(
     {
-      type: "multiselect",
-      name: "confirmed",
-      message: "Press space to (un)check, return to confirm. Required items cannot be unchecked.",
-      choices,
-      hint: "- enter to install",
-      instructions: false,
-      min: missing.length,
+      type: "confirm",
+      name: "ok",
+      message: "LangWatch needs to install `uv` (Astral's Python package manager) — proceed?",
+      initial: true,
     },
     { onCancel: () => process.exit(130) }
   );
-  if (!Array.isArray(confirmed) || confirmed.length !== missing.length) {
-    console.error(chalk.red("All predeps are required — aborting."));
+  if (!ok) {
+    console.error(chalk.red("Aborted — `uv` is required to run langwatch_nlp + langevals."));
     process.exit(1);
   }
 }

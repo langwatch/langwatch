@@ -2,7 +2,11 @@
 # package.json gets dropped by default; this file trims further inside the
 # directories that ARE included (langwatch/, langwatch_nlp/, langevals/).
 #
-# The CLI bundle (packages/server/dist/cli.cjs) ships unmodified.
+# The CLI bundle (packages/server/dist/cli.cjs) ships unmodified, and the
+# langwatch app's dist/ (vite client + scenario-child-process + mcp-server
+# bundles) is intentionally NOT excluded here — it's pre-built in
+# .github/workflows/npx-server-publish.yml so end users skip the runtime
+# `vite build` step.
 
 # Internal dev tooling — used only during langwatch development, never at
 # runtime by `npx @langwatch/server`. Keeping these out cuts the tarball

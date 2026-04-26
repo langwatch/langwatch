@@ -40,7 +40,9 @@ describe("CLI doctor command", () => {
     }, 30_000);
 
     it("prints the LangWatch banner", () => {
-      expect(stdout).toContain("LangWatch self-hosted");
+      // ASCII art "LANGWATCH" — match a unique mid-art row instead of the
+      // top/bottom rows which use generic block characters.
+      expect(stdout).toContain("██║     ███████║██╔██╗ ██║██║  ███╗");
       expect(stdout).toContain("v3.1.0");
     });
 

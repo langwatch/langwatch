@@ -36,7 +36,7 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
   bus.emit({ type: "starting", service: "pnpm:langwatch" as never });
   const start = Date.now();
 
-  // Run install + full build in the langwatch dir.
+  // Run install + (optionally) full build in the langwatch dir.
   //
   // We use `pnpm -C <dir>` instead of `cwd: langwatchDir` because pnpm's
   // workspace-aware mode resolves the workspace ROOT package.json when
@@ -54,19 +54,25 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
     });
   }
 
-  // Full prod build: start:prepare:files → build:scenario-child-process → vite build.
-  // start:prepare:files generates Prisma client, Zod types, SDK versions,
-  // langevals types (from the source committed in langevals/ts-integration/),
-  // and the mcp-server bundle. vite build emits dist/client/ for static serving.
-  // Without dist/client/, every UI route returns 404 and only /api/* works.
-  await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, "run", "build"], {
-    stdio: "inherit",
-    env: {
-      ...process.env,
-      // The build:scenario-child-process step pre-bundles the worker entry.
-      NODE_ENV: "production",
-    },
-  });
+  // Skip the build step entirely when dist/client/ is already present.
+  // Published npm tarballs ship dist/ pre-built (see
+  // .github/workflows/npx-server-publish.yml), so end users hit `pnpm install`
+  // for prisma postinstall + nothing else. The build only runs for `pnpm pack`
+  // -driven local dogfood and dev checkouts where dist/ doesn't exist yet.
+  if (!existsSync(join(distPath, "client"))) {
+    // Full prod build: start:prepare:files → build:scenario-child-process → vite build.
+    // start:prepare:files generates Prisma client, Zod types, SDK versions,
+    // langevals types (from the source committed in langevals/ts-integration/),
+    // and the mcp-server bundle. vite build emits dist/client/ for static serving.
+    // Without dist/client/, every UI route returns 404 and only /api/* works.
+    await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, "run", "build"], {
+      stdio: "inherit",
+      env: {
+        ...process.env,
+        NODE_ENV: "production",
+      },
+    });
+  }
 
   bus.emit({ type: "healthy", service: "pnpm:langwatch" as never, durationMs: Date.now() - start });
 }

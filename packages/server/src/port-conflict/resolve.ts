@@ -28,7 +28,7 @@ export async function resolvePortConflicts({ base = PORT_BASE_DEFAULT, yes = fal
 
   const choices = [
     ...(report.suggestedBase != null
-      ? [{ title: `Shift to PORT=${report.suggestedBase} (and every service +${report.suggestedBase - report.base})`, value: "shift" }]
+      ? [{ title: `Shift to PORT=${report.suggestedBase}`, value: "shift" }]
       : []),
     { title: "Kill the conflicting processes", value: "kill" },
     { title: "Cancel and let me free the ports manually", value: "cancel" },
@@ -58,7 +58,7 @@ export async function resolvePortConflicts({ base = PORT_BASE_DEFAULT, yes = fal
 }
 
 function reportShift(newBase: number, report: ConflictReport): ResolvedPorts {
-  console.log(chalk.cyan(`→ shifting to PORT=${newBase} for this run.`));
+  console.log(chalk.cyan(`→ shifting to PORT=${newBase}.`));
   return { base: newBase, report, resolution: "shifted" };
 }
 

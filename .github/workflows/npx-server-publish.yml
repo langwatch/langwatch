@@ -82,6 +82,24 @@ jobs:
       - name: Build @langwatch/server CLI
         run: pnpm --filter @langwatch/server-cli build
 
+      # Pre-build the langwatch app (vite client + scenario-child-process +
+      # mcp-server) so the published tarball ships dist/ artifacts. Without
+      # this, end users see vite chunder past at startup on first run —
+      # exactly the bureaucracy we're trying to eliminate.
+      #
+      # langwatch/ is its own pnpm workspace (not in the root pnpm-workspace
+      # `packages/*` glob), so we install + build it explicitly here.
+      # node_modules/ is excluded from the tarball by .npmignore, so end
+      # users still run `pnpm install` once on first start (which generates
+      # the platform-specific Prisma client via prisma's postinstall hook).
+      - name: Install langwatch app deps
+        run: pnpm -C langwatch install --frozen-lockfile --prod=false
+
+      - name: Build langwatch app (vite + scenario + mcp + generated types)
+        run: pnpm -C langwatch run build
+        env:
+          NODE_ENV: production
+
       - name: Pack the npm tarball
         id: pack
         run: |
@@ -101,6 +119,8 @@ jobs:
           required=(
             "package/packages/server/dist/cli.cjs"
             "package/langwatch/package.json"
+            "package/langwatch/dist/client/index.html"
+            "package/langwatch/dist/scenario-child-process.js"
             "package/langwatch_nlp/pyproject.toml"
             "package/langevals/pyproject.toml"
           )

@@ -2,7 +2,7 @@ import { Command } from "commander";
 import chalk from "chalk";
 import { resolve } from "node:path";
 import prompts from "prompts";
-import { printBanner, printPhases } from "./animation/banner.ts";
+import { printBanner } from "./animation/banner.ts";
 import { openBrowser } from "./animation/open-browser.ts";
 import { streamEventsToTTY } from "./animation/log-tee.ts";
 import { runPredeps } from "./predeps/runner.ts";
@@ -44,7 +44,7 @@ program
 program
   .command("start", { isDefault: true })
   .description("install missing predeps, scaffold .env, start every service, open the browser")
-  .option("--port-base <n>", "first port slot to use (app tier base..base+9, infra tier base+1000..+1009)", String(PORT_BASE_DEFAULT))
+  .option("--port-base <n>", "first port slot to use", String(PORT_BASE_DEFAULT))
   .option("-y, --yes", "skip every confirmation prompt", false)
   .option("--no-open", "do not auto-open the browser when ready")
   .option("--bullboard", "expose the BullMQ dashboard on the bullboard infra slot", false)
@@ -52,7 +52,6 @@ program
   .action(async (opts) => {
     detectPlatform();
     printBanner(VERSION);
-    printPhases();
 
     if (opts.dryRun) {
       const base = Number.parseInt(opts.portBase, 10);
@@ -71,23 +70,10 @@ program
       process.exit(0);
     }
 
-    if (!opts.yes) {
-      const { go } = await prompts(
-        { type: "confirm", name: "go", message: "Ready to install and start LangWatch?", initial: true },
-        { onCancel: () => process.exit(130) }
-      );
-      if (!go) {
-        console.log(chalk.yellow("Aborted."));
-        process.exit(0);
-      }
-    }
-
     const base = Number.parseInt(opts.portBase, 10);
     const { base: resolvedBase } = await resolvePortConflicts({ base, yes: opts.yes });
     const ports = allocatePorts(resolvedBase);
 
-    console.log("");
-    console.log(chalk.bold.cyan("[1/4] predeps"));
     const predeps = await runPredeps({ yes: opts.yes, version: VERSION });
 
     const runtime = await loadRuntime();
@@ -101,17 +87,9 @@ program
       userEnv: captureUserEnv(),
     };
 
-    console.log("");
-    console.log(chalk.bold.cyan("[2/4] env"));
-    const env = ensureEnvFile(ctx);
-    console.log(env.written ? chalk.green(`✓ scaffolded ${env.path}`) : chalk.dim(`= ${env.path} already exists`));
-
-    console.log("");
-    console.log(chalk.bold.cyan("[3/4] services"));
+    ensureEnvFile(ctx);
     await runtime.installServices(ctx);
 
-    console.log("");
-    console.log(chalk.bold.cyan("[4/4] start"));
     const eventsStream = streamEventsToTTY(runtime.events(ctx));
     const handles = await runtime.startAll(ctx);
     await runtime.waitForHealth(ctx, { timeoutMs: 60_000 });
