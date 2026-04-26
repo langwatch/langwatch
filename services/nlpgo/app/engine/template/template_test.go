@@ -85,3 +85,105 @@ func TestRender_QuotesAndBackslashesInStringValues(t *testing.T) {
 	assert.Contains(t, out, `\\`,
 		"backslash inside string value must be JSON-escaped")
 }
+
+// TestRender_JSONValueDoesNotReinterpretBraces pins the parity contract
+// derived from langwatch_nlp commit c6e2ede84 ("fix: dataset image
+// column type + use liquid templates instead of low level python
+// string template to avoid having issues with json interpolation").
+//
+// The Python regression: TemplateAdapter previously did
+//
+//	template_clean = re.sub(r"{{\s*(.*?)\s*}}", r"{{\1}}", template)
+//	template_fmt = template_clean.replace("{{", "{").replace("}}", "}")
+//	return template_fmt.format_map(SafeDict(str_inputs))
+//
+// — i.e. converted Liquid markers to Python format placeholders, then
+// called .format_map(). When a customer's input value was a JSON
+// object like {"name":"Alice"}, the literal `{` and `}` characters in
+// the rendered value got re-interpreted by .format_map() as new format
+// placeholders, producing KeyError or wrong output. The fix switched
+// to liquid.render which treats values as opaque strings — single-pass
+// replacement, no re-scanning of the rendered output.
+//
+// Go's `Render` is single-pass by construction. This pins the contract
+// against a future "optimization" that re-scans the output (e.g. if
+// someone introduces a multi-pass renderer for control-flow support
+// later). Three sub-cases cover the concrete failure modes Python's
+// bug produced.
+func TestRender_JSONValueDoesNotReinterpretBraces(t *testing.T) {
+	t.Run("plain JSON object value", func(t *testing.T) {
+		// A profile object inserted into the system prompt — the
+		// canonical c6e2ede84 shape. The JSON braces in the rendered
+		// value must NOT be re-scanned for template markers.
+		out, warnings := Render("Profile: {{ profile }}", map[string]any{
+			"profile": map[string]any{"name": "Alice", "age": 30},
+		})
+		assert.Empty(t, warnings)
+		assert.Contains(t, out, `"name":"Alice"`)
+		assert.Contains(t, out, `"age":30`)
+	})
+
+	t.Run("value containing literal {{ }} markers is not re-interpreted", func(t *testing.T) {
+		// Stress the regression: a string value containing literal
+		// `{{ malicious }}` should NOT be re-evaluated as a template.
+		// Single-pass renderers handle this naturally; double-pass
+		// renderers (the Python bug) would try to look up the inner
+		// var and either fail loudly or blow up with KeyError.
+		out, warnings := Render("Echo: {{ payload }}", map[string]any{
+			"payload": "user said: {{ secret_var }}",
+		})
+		// `secret_var` is NOT defined, so any double-pass renderer
+		// would emit a warning for it. We must NOT see one.
+		for _, w := range warnings {
+			assert.NotContains(t, w, "secret_var",
+				"a value containing {{ }} must NOT be re-rendered as a template")
+		}
+		assert.Contains(t, out, "{{ secret_var }}",
+			"the literal {{ secret_var }} from the value must survive verbatim in the output")
+	})
+
+	t.Run("value containing only one brace doesn't break the tail", func(t *testing.T) {
+		// Single { in a value (e.g. partial JSON, or curly-quote
+		// transcription) shouldn't cause the renderer to think it's
+		// looking at the start of a template marker.
+		out, warnings := Render("Got: {{ snippet }} done.", map[string]any{
+			"snippet": "{ partial",
+		})
+		assert.Empty(t, warnings)
+		assert.True(t, strings.HasSuffix(out, "done."),
+			"the literal trailing text after the marker must survive even when the value contains a stray brace; got %q", out)
+	})
+}
+
+// TestRender_DotPathAndArrayIndex pins the basic Liquid-subset support
+// (already exercised by build_messages_test.go end-to-end, but the
+// renderer-level tests were missing — adding here so the contract is
+// observable without spinning up the engine).
+func TestRender_DotPathAndArrayIndex(t *testing.T) {
+	out, warnings := Render(
+		"Hello {{ user.name }}, item {{ items[0] }}, nested {{ outer.inner.leaf }}.",
+		map[string]any{
+			"user":  map[string]any{"name": "Bob"},
+			"items": []any{"alpha", "beta"},
+			"outer": map[string]any{"inner": map[string]any{"leaf": "L"}},
+		},
+	)
+	assert.Empty(t, warnings)
+	assert.Equal(t, "Hello Bob, item alpha, nested L.", out)
+}
+
+// TestRender_MissingVariableEmitsWarningButNotPanic pins the
+// "render-and-warn" contract. Engine consumers rely on this — they log
+// the warning and treat the missing slot as empty rather than
+// crashing.
+func TestRender_MissingVariableEmitsWarningButNotPanic(t *testing.T) {
+	out, warnings := Render("Topic: {{ topic }}, missing: {{ ghost }}", map[string]any{
+		"topic": "math",
+	})
+	if assert.Len(t, warnings, 1) {
+		assert.Contains(t, warnings[0], "ghost")
+	}
+	assert.Contains(t, out, "Topic: math")
+	assert.NotContains(t, out, "{{ ghost }}",
+		"missing variable should be substituted with empty, not survive verbatim")
+}
