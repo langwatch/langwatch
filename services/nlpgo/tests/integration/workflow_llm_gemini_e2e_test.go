@@ -19,7 +19,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
-	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -181,11 +180,11 @@ func TestSync_RealWorkflowEndToEnd_Gemini(t *testing.T) {
 
 	answer, _ := res.Result["answer"].(string)
 	require.NotEmpty(t, answer, "expected non-empty answer from real Gemini call")
-	// Loose check — Gemini models often wrap single-digit answers
-	// with "10" or extra whitespace. We only need to prove the call
-	// reached the provider and a digit came back.
-	assert.True(t, strings.ContainsAny(answer, "0123456789"),
-		"expected a digit in the answer, got %q", answer)
+	// 7+7=14 — tightened from "any digit" so a wrong-but-numeric reply
+	// can't silently mask a regression in prompt rendering or model
+	// dispatch (matches the OpenAI/Vertex e2e pattern).
+	assert.Contains(t, answer, "14",
+		"expected the answer to contain 14, got %q", answer)
 
 	// Per-node accounting: signature node should be present and
 	// successful. Cost may be zero if Gemini's response didn't
