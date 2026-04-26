@@ -43,7 +43,8 @@ describe("CLI doctor command", () => {
       // ASCII art "LANGWATCH" — match a unique mid-art row instead of the
       // top/bottom rows which use generic block characters.
       expect(stdout).toContain("██║     ███████║██╔██╗ ██║██║  ███╗");
-      expect(stdout).toContain("v3.1.0");
+      // Match any semver-shaped version line so beta/rc bumps don't break this.
+      expect(stdout).toMatch(/v\d+\.\d+\.\d+(-[\w.]+)?/);
     });
 
     it("lists every predep regardless of install status", () => {
@@ -69,7 +70,9 @@ describe("CLI doctor command", () => {
   describe("when run with --version", () => {
     it("prints just the version and exits 0", async () => {
       const result = await execa("node", [cliPath, "--version"], { reject: false });
-      expect(result.stdout.trim()).toBe("3.1.0");
+      // Match any semver — the version bumps with each release-please cut
+      // (and beta/rc/prerelease bumps in between), so don't pin to a literal.
+      expect(result.stdout.trim()).toMatch(/^\d+\.\d+\.\d+(-[\w.]+)?$/);
       expect(result.exitCode).toBe(0);
     });
   });

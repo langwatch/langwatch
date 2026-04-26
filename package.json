@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/server",
-  "version": "3.1.0",
+  "version": "3.1.0-beta.0",
   "description": "Run LangWatch locally with one command — `npx @langwatch/server`. Bundles the Next.js control plane, Python NLP service, evaluators, and the Go AI gateway with embedded postgres, redis, and clickhouse.",
   "license": "MIT",
   "homepage": "https://langwatch.ai",
