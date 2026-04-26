@@ -3,7 +3,7 @@ import { compare, hash } from "bcrypt";
 import { z } from "zod";
 import { env } from "../../../env.mjs";
 
-import { skipPermissionCheck } from "../rbac";
+import { checkOrganizationPermission, skipPermissionCheck } from "../rbac";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 import { UserService } from "~/server/users/user.service";
 import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions";
@@ -318,7 +318,7 @@ export const userRouter = createTRPCRouter({
    */
   personalContext: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(skipPermissionCheck)
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
@@ -377,7 +377,7 @@ export const userRouter = createTRPCRouter({
         windowEndMs: z.number().optional(),
       }),
     )
-    .use(skipPermissionCheck)
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       const membership = await ctx.prisma.organizationUser.findUnique({

@@ -16,7 +16,7 @@ import {
 } from "~/server/governance/personalVirtualKey.service";
 import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
 
-import { skipPermissionCheck } from "../rbac";
+import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 async function assertOrgMembership(
@@ -42,7 +42,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
    */
   list: protectedProcedure
     .input(z.object({ organizationId: z.string() }))
-    .use(skipPermissionCheck)
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
       await assertOrgMembership(ctx.prisma, ctx.session.user.id, input.organizationId);
       const service = PersonalVirtualKeyService.create(ctx.prisma);
@@ -77,7 +77,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
         routingPolicyId: z.string().optional(),
       }),
     )
-    .use(skipPermissionCheck)
+    .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ ctx, input }) => {
       await assertOrgMembership(ctx.prisma, ctx.session.user.id, input.organizationId);
 
@@ -130,7 +130,7 @@ export const personalVirtualKeysRouter = createTRPCRouter({
   /** Revoke one of the caller's personal VKs. Idempotent. */
   revokePersonal: protectedProcedure
     .input(z.object({ organizationId: z.string(), id: z.string() }))
-    .use(skipPermissionCheck)
+    .use(checkOrganizationPermission("organization:view"))
     .mutation(async ({ ctx, input }) => {
       await assertOrgMembership(ctx.prisma, ctx.session.user.id, input.organizationId);
 
