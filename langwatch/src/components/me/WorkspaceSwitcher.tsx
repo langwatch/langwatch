@@ -13,6 +13,8 @@ import { useRouter } from "~/utils/compat/next-router";
 import { Menu } from "../ui/menu";
 import { Link } from "../ui/link";
 
+import { useWorkspaceCurrent } from "./useWorkspaceCurrent";
+
 // Public shape consumed by the switcher. Keeping this minimal lets the
 // caller source from anywhere — the Sergey tRPC `user.personalContext` once
 // it lands, or the existing `useOrganizationTeamProject` shaped to fit.
@@ -45,7 +47,13 @@ export type WorkspaceSwitcherProps = {
   personal: Extract<WorkspaceSwitcherEntry, { kind: "personal" }>;
   teams: Array<Extract<WorkspaceSwitcherEntry, { kind: "team" }>>;
   projects: Array<Extract<WorkspaceSwitcherEntry, { kind: "project" }>>;
-  current: WorkspaceSwitcherCurrent;
+  /**
+   * Currently-selected context. When omitted, the switcher derives it from
+   * the router pathname + the user's resolved org/team/project context via
+   * `useWorkspaceCurrent`. Pass an explicit value only when overriding the
+   * URL-driven selection (e.g. tests, programmatic preview cards).
+   */
+  current?: WorkspaceSwitcherCurrent;
 };
 
 const ICON_BY_KIND = {
@@ -102,10 +110,12 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
   personal,
   teams,
   projects,
-  current,
+  current: currentProp,
 }: WorkspaceSwitcherProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const derivedCurrent = useWorkspaceCurrent({ teams, projects });
+  const current = currentProp ?? derivedCurrent;
 
   const { label: triggerLabel, kind: triggerKind } = currentLabel(
     current,

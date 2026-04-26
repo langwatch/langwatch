@@ -38,7 +38,6 @@ export default function MyLayout({ children }: PropsWithChildren) {
               personal={switcher.personal}
               teams={switcher.teams}
               projects={switcher.projects}
-              current={{ kind: "personal" }}
             />
             <Spacer />
           </HStack>

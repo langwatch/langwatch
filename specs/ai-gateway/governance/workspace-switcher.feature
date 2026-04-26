@@ -134,3 +134,55 @@ Feature: AI Gateway Governance — Workspace Switcher (top-left context dropdown
     Then the trigger button has `aria-haspopup="menu"` and `aria-expanded="true"` while open
     And each entry has role="menuitem"
     And the section headings have role="presentation" (separators)
+
+  # ---------------------------------------------------------------------------
+  # Auto-detected current context from URL
+  # ---------------------------------------------------------------------------
+  #
+  # Iter 4 polish: the switcher derives its `current` selection from the
+  # router pathname rather than requiring every consumer to thread the prop
+  # through. This makes the component drop-in across DashboardLayout,
+  # MyLayout, and any future Settings sub-layout without per-call wiring.
+  # The hook lives in `components/me/useWorkspaceCurrent.ts` and consumers
+  # may still override by passing `current` explicitly.
+
+  @bdd @ui @workspace-switcher @auto-current
+  Scenario: On /me the switcher auto-detects "personal" without a prop
+    Given the user is on "/me" or "/me/settings"
+    And the consumer renders <WorkspaceSwitcher /> without a `current` prop
+    Then the trigger label is "My Workspace"
+    And the User icon is shown
+    And inside the dropdown the personal row carries the active checkmark
+
+  @bdd @ui @workspace-switcher @auto-current
+  Scenario: On a project page the switcher auto-detects the active project
+    Given the URL is "/<project-slug>" or any "/[project]/..." sub-route
+    And the project resolves through the existing useOrganizationTeamProject hook
+    And the consumer renders <WorkspaceSwitcher /> without a `current` prop
+    Then the trigger label is the project's display name
+    And the Folder icon is shown
+    And inside the dropdown the matching project row carries the active checkmark
+
+  @bdd @ui @workspace-switcher @auto-current
+  Scenario: On a team route the switcher auto-detects the team
+    Given the URL is "/settings/teams/<team-slug>"
+    And the slug matches a team the user belongs to
+    And the consumer renders <WorkspaceSwitcher /> without a `current` prop
+    Then the trigger label is the team's display name
+    And the Users icon is shown
+    And inside the dropdown the matching team row carries the active checkmark
+
+  @bdd @ui @workspace-switcher @auto-current
+  Scenario: On a route that doesn't map to any context the switcher reads "Choose workspace"
+    Given the URL is "/settings/billing" (no team or project context)
+    And the consumer renders <WorkspaceSwitcher /> without a `current` prop
+    Then the trigger label is "Choose workspace"
+    And no row in the dropdown has an active checkmark
+
+  @bdd @ui @workspace-switcher @auto-current
+  Scenario: Explicitly passed `current` prop overrides auto-detection
+    Given the URL is "/me" (auto-detection would pick personal)
+    And the consumer renders <WorkspaceSwitcher current={{ kind: "team", teamId: "team_a" }} />
+    Then the trigger label is the team's display name
+    And the team row carries the active checkmark
+    And the personal row does NOT carry the checkmark

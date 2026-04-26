@@ -11,14 +11,21 @@ import {
 } from "../WorkspaceSwitcher";
 
 const mockPush = vi.fn();
+let mockPathname = "/";
+let mockProject: { id: string; slug: string } | null = null;
 
 vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: {},
-    asPath: "/",
+    asPath: mockPathname,
+    pathname: mockPathname,
     push: mockPush,
     replace: vi.fn(),
   }),
+}));
+
+vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+  useOrganizationTeamProject: () => ({ project: mockProject }),
 }));
 
 function renderSwitcher(props: WorkspaceSwitcherProps) {
@@ -57,6 +64,8 @@ const projectFoo = {
 describe("WorkspaceSwitcher", () => {
   beforeEach(() => {
     mockPush.mockClear();
+    mockPathname = "/";
+    mockProject = null;
   });
 
   afterEach(() => {
@@ -199,6 +208,93 @@ describe("WorkspaceSwitcher", () => {
         name: /Switch workspace \(current: My Workspace\)/i,
       });
       expect(trigger).toBeInTheDocument();
+    });
+  });
+
+  // -------------------------------------------------------------------
+  // Auto-detected current context (no `current` prop passed)
+  // Spec: specs/ai-gateway/governance/workspace-switcher.feature
+  //       (scenarios under "Auto-detected current context from URL")
+  // -------------------------------------------------------------------
+
+  describe("when `current` is not passed and the route is /me", () => {
+    it("auto-detects personal as the current context", () => {
+      mockPathname = "/me";
+      renderSwitcher({
+        personal,
+        teams: [teamA],
+        projects: [projectFoo],
+      });
+
+      expect(screen.getByText("My Workspace")).toBeInTheDocument();
+    });
+  });
+
+  describe("when `current` is not passed and the route is /me/settings", () => {
+    it("still auto-detects personal", () => {
+      mockPathname = "/me/settings";
+      renderSwitcher({
+        personal,
+        teams: [teamA],
+        projects: [projectFoo],
+      });
+
+      expect(screen.getByText("My Workspace")).toBeInTheDocument();
+    });
+  });
+
+  describe("when `current` is not passed and the route is a team settings page", () => {
+    it("auto-detects the team via slug match", () => {
+      mockPathname = "/settings/teams/team-a";
+      renderSwitcher({
+        personal,
+        teams: [teamA],
+        projects: [],
+      });
+
+      expect(screen.getByText("Acme Engineering")).toBeInTheDocument();
+    });
+  });
+
+  describe("when `current` is not passed and the resolved project matches a switcher entry", () => {
+    it("auto-detects the project from the OTP hook", () => {
+      mockPathname = "/project-foo";
+      mockProject = { id: "project_foo", slug: "project-foo" };
+      renderSwitcher({
+        personal,
+        teams: [],
+        projects: [projectFoo],
+      });
+
+      expect(screen.getByText("Foo Project")).toBeInTheDocument();
+    });
+  });
+
+  describe("when `current` is not passed and the route doesn't match any context", () => {
+    it("falls back to 'Choose workspace'", () => {
+      mockPathname = "/settings/billing";
+      renderSwitcher({
+        personal,
+        teams: [teamA],
+        projects: [projectFoo],
+      });
+
+      expect(screen.getByText(/choose workspace/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("when an explicit `current` prop is passed", () => {
+    it("overrides auto-detection from the URL", () => {
+      mockPathname = "/me"; // would auto-detect personal
+      renderSwitcher({
+        personal,
+        teams: [teamA],
+        projects: [],
+        current: { kind: "team", teamId: "team_a" },
+      });
+
+      // Trigger shows the team label (override won), not "My Workspace"
+      expect(screen.getByText("Acme Engineering")).toBeInTheDocument();
     });
   });
 });
