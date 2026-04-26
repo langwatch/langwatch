@@ -15,6 +15,7 @@ package integration_test
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -133,47 +134,80 @@ func TestSync_RealWorkflowEndToEnd_Azure(t *testing.T) {
 	}
 	stack := setupStackWithLLM_azure(t)
 
-	body := `{
-	  "type": "execute_flow",
-	  "payload": {
-	    "trace_id": "real-e2e-azure",
-	    "origin": "workflow",
-	    "workflow": {
-	      "workflow_id":"wf","api_key":"k","spec_version":"1.3","name":"AzureMath","icon":"🧮","description":"x","version":"x",
-	      "template_adapter":"default",
-	      "nodes":[
-	        {"id":"entry","type":"entry","data":{
-	          "outputs":[{"identifier":"question","type":"str"}],
-	          "dataset":{"inline":{"records":{"question":["What is 6+6? Reply with just the digits."]}}},
-	          "entry_selection":0,
-	          "train_size":1.0,"test_size":0.0,"seed":1
-	        }},
-	        {"id":"answer","type":"signature","data":{
-	          "name":"Answer",
-	          "parameters":[
-	            {"identifier":"llm","type":"llm","value":{
-	              "model":"azure/` + model + `",
-	              "litellm_params":{"api_key":"` + apiKey + `","api_base":"` + endpoint + `"}
-	            }}
-	          ],
-	          "inputs":[{"identifier":"question","type":"str"}],
-	          "outputs":[{"identifier":"answer","type":"str"}]
-	        }},
-	        {"id":"end","type":"end","data":{
-	          "inputs":[{"identifier":"answer","type":"str"}]
-	        }}
-	      ],
-	      "edges":[
-	        {"id":"e1","source":"entry","sourceHandle":"outputs.question","target":"answer","targetHandle":"inputs.question","type":"default"},
-	        {"id":"e2","source":"answer","sourceHandle":"outputs.answer","target":"end","targetHandle":"inputs.answer","type":"default"}
-	      ],
-	      "state":{}
-	    },
-	    "inputs":[{}]
-	  }
-	}`
+	// Build the workflow body via encoding/json so a malformed env var
+	// (accidental quote / newline / surrounding whitespace in
+	// AZURE_OPENAI_API_KEY or AZURE_OPENAI_ENDPOINT) fails as a
+	// credential error rather than producing invalid JSON. Mirrors the
+	// Vertex + Bedrock e2e pattern.
+	workflow := map[string]any{
+		"workflow_id":      "wf",
+		"api_key":          "k",
+		"spec_version":     "1.3",
+		"name":             "AzureMath",
+		"icon":             "🧮",
+		"description":      "x",
+		"version":          "x",
+		"template_adapter": "default",
+		"nodes": []any{
+			map[string]any{
+				"id": "entry", "type": "entry",
+				"data": map[string]any{
+					"outputs": []any{map[string]any{"identifier": "question", "type": "str"}},
+					"dataset": map[string]any{
+						"inline": map[string]any{
+							"records": map[string]any{"question": []any{"What is 6+6? Reply with just the digits."}},
+						},
+					},
+					"entry_selection": 0,
+					"train_size":      1.0,
+					"test_size":       0.0,
+					"seed":            1,
+				},
+			},
+			map[string]any{
+				"id": "answer", "type": "signature",
+				"data": map[string]any{
+					"name": "Answer",
+					"parameters": []any{map[string]any{
+						"identifier": "llm", "type": "llm",
+						"value": map[string]any{
+							"model": "azure/" + model,
+							"litellm_params": map[string]any{
+								"api_key":  apiKey,
+								"api_base": endpoint,
+							},
+						},
+					}},
+					"inputs":  []any{map[string]any{"identifier": "question", "type": "str"}},
+					"outputs": []any{map[string]any{"identifier": "answer", "type": "str"}},
+				},
+			},
+			map[string]any{
+				"id": "end", "type": "end",
+				"data": map[string]any{
+					"inputs": []any{map[string]any{"identifier": "answer", "type": "str"}},
+				},
+			},
+		},
+		"edges": []any{
+			map[string]any{"id": "e1", "source": "entry", "sourceHandle": "outputs.question", "target": "answer", "targetHandle": "inputs.question", "type": "default"},
+			map[string]any{"id": "e2", "source": "answer", "sourceHandle": "outputs.answer", "target": "end", "targetHandle": "inputs.answer", "type": "default"},
+		},
+		"state": map[string]any{},
+	}
+	envelope := map[string]any{
+		"type": "execute_flow",
+		"payload": map[string]any{
+			"trace_id": "real-e2e-azure",
+			"origin":   "workflow",
+			"workflow": workflow,
+			"inputs":   []any{map[string]any{}},
+		},
+	}
+	body, err := json.Marshal(envelope)
+	require.NoError(t, err)
 
-	res := postSync(t, stack, body)
+	res := postSync(t, stack, string(body))
 	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
 	assert.Equal(t, "real-e2e-azure", res.TraceID)
 
