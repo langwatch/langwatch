@@ -12,8 +12,8 @@ import { type PropsWithChildren } from "react";
 import { DashboardLayout } from "~/components/DashboardLayout";
 
 import { MenuLink } from "../MenuLink";
+import { WorkspaceSwitcher } from "../WorkspaceSwitcher";
 
-import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { usePersonalContext } from "./usePersonalContext";
 
 /**

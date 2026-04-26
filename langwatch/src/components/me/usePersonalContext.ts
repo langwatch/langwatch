@@ -7,7 +7,7 @@ import { api } from "~/utils/api";
 import type {
   WorkspaceSwitcherProps,
   WorkspaceSwitcherCurrent,
-} from "./WorkspaceSwitcher";
+} from "../WorkspaceSwitcher";
 
 export type PersonalSummary = {
   spentThisMonthUsd: number;

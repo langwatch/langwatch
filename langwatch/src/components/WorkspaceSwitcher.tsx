@@ -10,8 +10,9 @@ import { Check, ChevronDown, Folder, User, Users } from "lucide-react";
 import React, { useState } from "react";
 import { useRouter } from "~/utils/compat/next-router";
 
-import { Menu } from "../ui/menu";
-import { Link } from "../ui/link";
+import { Menu } from "./ui/menu";
+import { Link } from "./ui/link";
+import { ProjectAvatar } from "./ProjectAvatar";
 
 import { useWorkspaceCurrent } from "./useWorkspaceCurrent";
 
@@ -124,6 +125,11 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
     projects,
   );
   const TriggerIcon = ICON_BY_KIND[triggerKind];
+  // For project context, render the colored ProjectAvatar in the trigger to
+  // preserve parity with the legacy ProjectSelector — projects are visually
+  // identified by their team-color bubble across the rest of the app.
+  const triggerProjectName =
+    triggerKind === "project" ? triggerLabel : null;
 
   const hasMore = teams.length > 0 || projects.length > 0;
 
@@ -147,7 +153,11 @@ export const WorkspaceSwitcher = React.memo(function WorkspaceSwitcher({
           disabled={!hasMore}
         >
           <HStack gap={2}>
-            <TriggerIcon size={14} />
+            {triggerProjectName ? (
+              <ProjectAvatar name={triggerProjectName} />
+            ) : (
+              <TriggerIcon size={14} />
+            )}
             <Text>{triggerLabel}</Text>
             {hasMore && <ChevronDown size={14} />}
           </HStack>
