@@ -4,27 +4,33 @@ import (
 	"testing"
 )
 
-// TestEngineDefaults_ParityWithLangwatchNLP pins the engine-level
-// timeouts that have known parity contracts with langwatch_nlp:
+// TestEngineDefaults pins the engine-level SSE timeouts at the
+// values the owner anchored:
 //
-//   - StreamIdleTimeoutSeconds = 900 — matches langwatch_nlp regression
-//     57e6d1f1c ("increase WebSocket idle timeout from 120s to 900s")
-//     so long-running code-node calls (8+ minute external agent calls)
-//     are not killed prematurely. The Python path bumped from 120s to
-//     match AWS Lambda's max execution timeout; a regression to a
-//     shorter default would cause those workflows to fail silently.
+//   - StreamIdleTimeoutSeconds = 720 (12min) — must outlive the
+//     slowest single agent HTTP call (httpblock.DefaultTimeout =
+//     12min) so customers running slow agent backends don't see the
+//     inbound SSE stream torn down mid-call. langwatch_nlp regression
+//     57e6d1f1c bumped from 120s to 900s but the original Python value
+//     was anchored to Lambda's 15min hard cap rather than the
+//     workload — Go anchors to the workload (12min agent ceiling)
+//     instead, leaving a 3min margin under Lambda's cap for the rest
+//     of the workflow to finalize.
 //
-//   - StreamHeartbeatSeconds = 15 — matches the Python heartbeat
-//     cadence (specs/nlp-go/_shared/contract.md §6). Bumping it would
-//     break clients that detect a dead stream by missed heartbeats.
+//   - StreamHeartbeatSeconds = 15 — matches the heartbeat cadence
+//     in specs/nlp-go/_shared/contract.md §6. Heartbeats every 15s
+//     mean a healthy stream never trips the idle timeout in practice;
+//     idle is the safety net for client-side hangs / writer hangs.
+//     Bumping the heartbeat would break clients that detect a dead
+//     stream by missed heartbeats.
 //
-// Both values are observed by setting up a fresh defaults() and
-// inspecting the EngineConfig — the function is deliberately exposed
-// so tests + integrators don't reach into env-driven loading.
-func TestEngineDefaults_ParityWithLangwatchNLP(t *testing.T) {
+// Both values are observed by setting up a fresh defaultConfig()
+// (package-private — tests in the same package have access without
+// reaching into env-driven loading).
+func TestEngineDefaults(t *testing.T) {
 	cfg := defaultConfig()
-	if cfg.Engine.StreamIdleTimeoutSeconds != 900 {
-		t.Errorf("Engine.StreamIdleTimeoutSeconds = %d; want 900 to match langwatch_nlp parity (regression 57e6d1f1c)",
+	if cfg.Engine.StreamIdleTimeoutSeconds != 720 {
+		t.Errorf("Engine.StreamIdleTimeoutSeconds = %d; want 720 (12min — must outlive the 12min slow-agent httpblock timeout)",
 			cfg.Engine.StreamIdleTimeoutSeconds)
 	}
 	if cfg.Engine.StreamHeartbeatSeconds != 15 {

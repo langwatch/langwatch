@@ -84,8 +84,14 @@ func defaultConfig() Config {
 			UpstreamURL: "http://127.0.0.1:5561",
 		},
 		Engine: EngineConfig{
-			StreamHeartbeatSeconds:   15,
-			StreamIdleTimeoutSeconds: 900,
+			StreamHeartbeatSeconds: 15,
+			// 12min idle timeout matches httpblock.DefaultTimeout —
+			// the SSE stream must outlive the slowest single agent
+			// HTTP call so customers running long agent backends
+			// don't see the inbound stream torn down mid-call. Owner
+			// anchored both at 12min (under Lambda's 15min cap with
+			// margin for the outer connection to drain).
+			StreamIdleTimeoutSeconds: 720,
 			CodeBlockTimeoutSeconds:  60,
 			SandboxPython:            "python3",
 		},

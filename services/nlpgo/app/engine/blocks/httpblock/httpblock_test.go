@@ -351,17 +351,20 @@ func TestExecute_TruncatesResponseAtMaxBytes(t *testing.T) {
 		"expected MaxResponseBytes to truncate at 64, got %d", len(res.UpstreamBody))
 }
 
-// TestDefaultTimeoutMatchesPythonParity pins langwatch_nlp regression
-// 06f93d1eb ("increase HTTP agent default timeout to 5 minutes"). The
-// Python path bumped from 30s to 300s after slow RAG retrieval +
-// multi-step scraper agents started timing out at the lower default.
-// Pinning the constant guards against an accidental drop back to a
-// shorter default (which would cause the same timeouts to resurface
-// silently in the Go path). Per-request `Timeout` overrides still win
-// — only the absent-value default is enforced here.
-func TestDefaultTimeoutMatchesPythonParity(t *testing.T) {
-	if httpblock.DefaultTimeout != 5*time.Minute {
-		t.Errorf("httpblock.DefaultTimeout = %s; want 5m to match langwatch_nlp parity (regression 06f93d1eb)",
+// TestDefaultTimeoutAccommodatesSlowAgents pins the per-request HTTP
+// block default timeout at 12 minutes. langwatch_nlp regression
+// 06f93d1eb bumped from 30s to 300s ("increase HTTP agent default
+// timeout to 5 minutes") but didn't go far enough — customer agent
+// backends routinely take 10+ minutes (RAG retrieval, multi-step
+// scrapers, sub-workflow chains). The Go path anchors at 12 minutes
+// per owner directive: high enough to cover real agents, with a
+// 3-minute margin under Lambda's 15-minute hard execution cap so the
+// response payload has time to drain and the rest of the workflow
+// to finalize. A regression to a shorter default would silently kill
+// slow-agent calls.
+func TestDefaultTimeoutAccommodatesSlowAgents(t *testing.T) {
+	if httpblock.DefaultTimeout != 12*time.Minute {
+		t.Errorf("httpblock.DefaultTimeout = %s; want 12m (slow agents take 10+ min, Lambda capped at 15min so 3min margin)",
 			httpblock.DefaultTimeout)
 	}
 }
