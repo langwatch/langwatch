@@ -83,7 +83,7 @@ jobs:
             bash jq curl tar gzip ca-certificates \
             gcc g++ make musl-dev linux-headers \
             bison flex perl pkgconfig \
-            openssl-dev zlib-dev \
+            zlib-dev \
             aws-cli
 
       - name: Read pinned versions
@@ -115,13 +115,13 @@ jobs:
               # bison + flex from brew because the macOS-shipped versions
               # are too old for postgres 18's parser. Both are keg-only —
               # the build step below adds them to PATH.
-              brew install bison flex openssl@3
+              brew install bison flex
               ;;
             linux-*)
               sudo apt-get update
               sudo apt-get install -y --no-install-recommends \
                 build-essential bison flex perl pkg-config \
-                libssl-dev zlib1g-dev \
+                zlib1g-dev \
                 ca-certificates
               ;;
           esac
@@ -158,30 +158,26 @@ jobs:
           install_prefix="$PWD/_install"
           mkdir -p "$install_prefix"
 
-          # macOS-only path massaging: brew installs bison/flex/openssl@3
-          # as keg-only formulae (not symlinked into /usr/local/bin or the
-          # default LDFLAGS / CPPFLAGS). Postgres requires modern bison/flex
-          # (the macOS-shipped versions are too old). For openssl, postgres's
-          # configure runs a direct `-lcrypto` link test that ignores
-          # PKG_CONFIG_PATH; pass --with-libs / --with-includes instead.
-          extra_configure=""
+          # macOS-only: brew bison/flex are keg-only and the system bison
+          # is too old for postgres 18's parser. Add to PATH for this build.
           if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then
             export PATH="$(brew --prefix bison)/bin:$(brew --prefix flex)/bin:$PATH"
-            ssl_prefix="$(brew --prefix openssl@3)"
-            extra_configure="--with-libs=${ssl_prefix}/lib --with-includes=${ssl_prefix}/include"
           fi
 
-          # --without-icu: skip the ICU collation library to keep the
-          # tarball lean (~30MB saving) and avoid the keg-only ICU
-          # dependency dance on macOS. Langwatch's prisma schema uses the
-          # database's default collation, never explicit ICU collations,
-          # so this is safe.
+          # --without-icu: skip ICU collations (~30MB saving). Langwatch's
+          #   prisma schema uses the database's default collation, never
+          #   explicit ICU collations, so this is safe.
           # --without-readline: the runtime never opens an interactive psql.
+          # No --with-openssl: SSL is unnecessary for the 127.0.0.1-only
+          #   embedded-postgres scenario, AND linking against brew's
+          #   openssl@3 (keg-only) hardcodes /opt/homebrew/opt/openssl@3/...
+          #   into the postgres binary's load commands — dyld fails when a
+          #   user runs the published tarball on a Mac without that exact
+          #   brew formula installed. Building without OpenSSL produces a
+          #   self-contained binary that runs anywhere.
           ./configure --prefix="$install_prefix" \
             --without-icu \
-            --without-readline \
-            --with-openssl \
-            $extra_configure
+            --without-readline
           if [ "${RUNNER_OS:-Linux}" = "macOS" ]; then
             make -j$(sysctl -n hw.ncpu) world-bin
           else

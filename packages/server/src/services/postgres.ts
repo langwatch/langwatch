@@ -103,7 +103,7 @@ async function initdb(layout: PostgresLayout, dataDir: string): Promise<void> {
 }
 
 async function ensureDatabase(layout: PostgresLayout, port: number): Promise<void> {
-  const { exitCode } = await execa(
+  const probe1 = await execa(
     layout.psql,
     [
       "-h", "127.0.0.1",
@@ -114,8 +114,10 @@ async function ensureDatabase(layout: PostgresLayout, port: number): Promise<voi
     ],
     { reject: false },
   );
-  if (exitCode !== 0) {
-    throw new Error("postgres connect probe failed");
+  if (probe1.exitCode !== 0) {
+    throw new Error(
+      `postgres connect probe failed (psql exit ${probe1.exitCode}): ${probe1.stderr || probe1.stdout || "no output"}`,
+    );
   }
   const probe = await execa(
     layout.psql,
