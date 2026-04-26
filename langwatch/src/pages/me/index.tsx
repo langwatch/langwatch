@@ -10,6 +10,7 @@ import {
 import numeral from "numeral";
 import Head from "~/utils/compat/next-head";
 
+import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import MyLayout from "~/components/me/MyLayout";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
 
@@ -61,10 +62,11 @@ export default function MyUsagePage() {
         </HStack>
 
         {isOverBudget && (
-          <BudgetBanner
-            tone="red"
-            title="Budget limit reached"
-            message={`You've used ${fmtUsd(summary.spentThisMonthUsd)} of your ${fmtUsd(summary.budgetUsd ?? 0)} monthly budget.`}
+          <BudgetExceededBanner
+            spentUsd={summary.spentThisMonthUsd}
+            limitUsd={summary.budgetUsd ?? 0}
+            period="monthly"
+            scope="user"
           />
         )}
         {is80Pct && (
