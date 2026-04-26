@@ -10,6 +10,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -1004,9 +1005,17 @@ func composeUserPrompt(inputs map[string]any) string {
 	}
 	// Fallback: render the inputs map as JSON-ish text so the LLM at
 	// least sees something. Caller can override by setting "instructions".
+	// Sort keys so the same input map produces the same prompt every
+	// run — Go map iteration is randomized and a non-deterministic
+	// system prompt breaks both replay and provider response caching.
+	keys := make([]string, 0, len(inputs))
+	for k := range inputs {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
 	var b strings.Builder
-	for k, v := range inputs {
-		fmt.Fprintf(&b, "%s: %v\n", k, v)
+	for _, k := range keys {
+		fmt.Fprintf(&b, "%s: %v\n", k, inputs[k])
 	}
 	return strings.TrimSpace(b.String())
 }

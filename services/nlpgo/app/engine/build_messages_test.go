@@ -93,6 +93,24 @@ func TestBuildMessages_PreservesUserPromptVerbatim(t *testing.T) {
 	assert.Equal(t, "What is {{ x }}?", msgs[1].Content)
 }
 
+// TestComposeUserPrompt_StableKeyOrdering pins the determinism guard:
+// when no canonical input key (question/prompt/input) is present and the
+// fallback key-value dump runs, the keys must be sorted so the same
+// inputs produce the same prompt across runs. Go map iteration is
+// randomized and a non-deterministic system prompt breaks both replay
+// and provider response caching. Run the function many times and
+// confirm one stable output.
+func TestComposeUserPrompt_StableKeyOrdering(t *testing.T) {
+	inputs := map[string]any{"zeta": 1, "alpha": 2, "mid": 3, "beta": 4}
+	first := composeUserPrompt(inputs)
+	for i := 0; i < 50; i++ {
+		assert.Equal(t, first, composeUserPrompt(inputs),
+			"composeUserPrompt fallback must be deterministic across iterations")
+	}
+	// And the order is alphabetical, not random.
+	assert.Equal(t, "alpha: 2\nbeta: 4\nmid: 3\nzeta: 1", first)
+}
+
 // TestBuildMessages_AcceptsChatMessagesFromJSON pins the
 // chat_messages-from-JSON regression contract.md §10 (commit cb76144a6)
 // guards against. When chat history flows from one node's output into a
