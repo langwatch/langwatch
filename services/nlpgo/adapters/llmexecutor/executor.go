@@ -263,9 +263,10 @@ func parseChatCompletionResponse(body []byte, durationMS int64) (*app.LLMRespons
 	var raw struct {
 		Choices []struct {
 			Message struct {
-				Role      string         `json:"role"`
-				Content   any            `json:"content"`
-				ToolCalls []app.ToolCall `json:"tool_calls"`
+				Role             string         `json:"role"`
+				Content          any            `json:"content"`
+				ReasoningContent string         `json:"reasoning_content"`
+				ToolCalls        []app.ToolCall `json:"tool_calls"`
 			} `json:"message"`
 			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
@@ -299,9 +300,10 @@ func parseChatCompletionResponse(body []byte, durationMS int64) (*app.LLMRespons
 		out.Content = s
 	}
 	out.Messages = []app.ChatMessage{{
-		Role:      choice.Message.Role,
-		Content:   choice.Message.Content,
-		ToolCalls: choice.Message.ToolCalls,
+		Role:             choice.Message.Role,
+		Content:          choice.Message.Content,
+		ReasoningContent: choice.Message.ReasoningContent,
+		ToolCalls:        choice.Message.ToolCalls,
 	}}
 	return out, nil
 }

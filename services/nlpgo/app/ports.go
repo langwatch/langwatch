@@ -98,12 +98,20 @@ type LLMResponse struct {
 // string or a list of content parts (text + image url). We keep it as
 // an opaque any to avoid forcing a sum type before the engine needs it.
 type ChatMessage struct {
-	Role       string         `json:"role"`
-	Content    any            `json:"content,omitempty"`
-	Name       string         `json:"name,omitempty"`
-	ToolCalls  []ToolCall     `json:"tool_calls,omitempty"`
-	ToolCallID string         `json:"tool_call_id,omitempty"`
-	Extra      map[string]any `json:"-"`
+	Role    string `json:"role"`
+	Content any    `json:"content,omitempty"`
+	// ReasoningContent is the model's reasoning trace returned alongside
+	// the final answer for reasoning models (DeepSeek's `reasoning_content`,
+	// OpenAI's o1/o3/gpt-5 internal reasoning surfaced via gateway, plus
+	// Anthropic's thinking blocks). Mirrors langwatch_nlp commit
+	// 16f1d4a80 ("add reasoning tokens and effort support for LLM
+	// models"), the message half of the parity claim — usage.reasoning_tokens
+	// already round-trips via Usage.ReasoningTokens.
+	ReasoningContent string         `json:"reasoning_content,omitempty"`
+	Name             string         `json:"name,omitempty"`
+	ToolCalls        []ToolCall     `json:"tool_calls,omitempty"`
+	ToolCallID       string         `json:"tool_call_id,omitempty"`
+	Extra            map[string]any `json:"-"`
 }
 
 // Tool, ToolCall, ResponseFormat, Usage shadow the OpenAI shapes. The

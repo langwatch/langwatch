@@ -500,3 +500,80 @@ func bodyBool(t *testing.T, body []byte, key string) bool {
 	b, _ := m[key].(bool)
 	return b
 }
+
+// TestExecute_PreservesReasoningContentInResponseMessage pins the
+// parity claim from langwatch_nlp commit 16f1d4a80 ("add reasoning
+// tokens and effort support for LLM models"). Reasoning models
+// (DeepSeek's `reasoning_content`, OpenAI's o1/o3/gpt-5 surfaced via
+// gateway, plus Anthropic thinking blocks) return the model's
+// internal reasoning trace alongside the final answer. The Python
+// SDK fix preserved both reasoning_tokens (count) AND reasoning_content
+// (text) on the SDK message. Go was already capturing
+// usage.reasoning_tokens but dropping the message-level
+// reasoning_content. This test pins both halves end-to-end.
+func TestExecute_PreservesReasoningContentInResponseMessage(t *testing.T) {
+	body := []byte(`{
+		"id":"chatcmpl-r",
+		"choices":[{
+			"index":0,
+			"message":{
+				"role":"assistant",
+				"content":"the answer is 42",
+				"reasoning_content":"step 1: thought about it. step 2: arrived at 42."
+			},
+			"finish_reason":"stop"
+		}],
+		"usage":{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15,"reasoning_tokens":7}
+	}`)
+	gw := &fakeGateway{respStatus: 200, respBody: body}
+	exec := New(gw)
+
+	resp, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model:         "openai/gpt-5",
+		Messages:      []app.ChatMessage{{Role: "user", Content: "what is the meaning of life?"}},
+		LiteLLMParams: map[string]any{"api_key": "sk-test"},
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	// Final answer survives in Content (already covered by happy-path
+	// tests, asserted here as a sanity sibling).
+	if resp.Content != "the answer is 42" {
+		t.Errorf("expected content 'the answer is 42', got %q", resp.Content)
+	}
+	// Reasoning trace survives on the message — the bug was that this
+	// field was dropped by the response parser. Without this test, a
+	// future re-parse of message.* could silently regress and the
+	// trace UI would lose the reasoning column.
+	if len(resp.Messages) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(resp.Messages))
+	}
+	if got := resp.Messages[0].ReasoningContent; got != "step 1: thought about it. step 2: arrived at 42." {
+		t.Errorf("reasoning_content was dropped or corrupted by the parser: got %q", got)
+	}
+	// Token count parity (already covered, but cheap to re-pin
+	// alongside since both halves of 16f1d4a80 are load-bearing).
+	if resp.Usage.ReasoningTokens != 7 {
+		t.Errorf("expected reasoning_tokens=7, got %d", resp.Usage.ReasoningTokens)
+	}
+}
+
+// TestExecute_AbsentReasoningContentLeavesFieldEmpty pins the
+// non-regression case: when the model returns no reasoning_content
+// (the common case for non-reasoning models), the field must be empty
+// rather than carrying a stale or default value.
+func TestExecute_AbsentReasoningContentLeavesFieldEmpty(t *testing.T) {
+	gw := &fakeGateway{respStatus: 200, respBody: successResponse("plain answer")}
+	exec := New(gw)
+	resp, err := exec.Execute(context.Background(), app.LLMRequest{
+		Model:         "openai/gpt-5-mini",
+		Messages:      []app.ChatMessage{{Role: "user", Content: "hi"}},
+		LiteLLMParams: map[string]any{"api_key": "sk-test"},
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	if resp.Messages[0].ReasoningContent != "" {
+		t.Errorf("non-reasoning response leaked reasoning_content: %q", resp.Messages[0].ReasoningContent)
+	}
+}
