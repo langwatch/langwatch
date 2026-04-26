@@ -4,14 +4,19 @@
  * Integration coverage for the GatewayAuditLog → AuditLog consolidation.
  *
  * Hits real PG (testcontainers) — NO MOCKS. Validates that:
- *   1. Gateway services (VirtualKey) write rows to the platform `AuditLog`
- *      table with the gateway shape (targetKind / targetId / before / after).
+ *   1. `GatewayAuditLogRepository.append` writes rows to the platform
+ *      `AuditLog` table with the gateway shape (targetKind / targetId /
+ *      before / after) — the adapter's whole purpose.
  *   2. The unified `getAuditLogs` query returns those rows with
  *      `source = "gateway"`.
  *   3. Filtering by `targetKind` / `targetId` returns only rows for that
  *      resource (deep-link path from VK / Budget detail pages).
  *   4. The `GatewayAuditLog` table no longer exists post-migration —
  *      `prisma.gatewayAuditLog` is undefined at runtime.
+ *
+ * The adapter is exercised directly rather than through VirtualKeyService —
+ * the service has its own unit tests for the upstream `auditLog.append` call;
+ * this suite is about proving the *table* under it changed.
  *
  * Spec: specs/audit-log/audit-log.feature
  * Migration: prisma/migrations/20260425000000_consolidate_gateway_audit_into_audit_log
@@ -25,22 +30,19 @@ import {
   startTestContainers,
   stopTestContainers,
 } from "~/server/event-sourcing/__tests__/integration/testContainers";
-import { VirtualKeyService } from "../virtualKey.service";
+import { GatewayAuditLogRepository } from "../auditLog.repository";
 
 const suffix = nanoid(8);
 const ORG_ID = `org-audit-${suffix}`;
 const TEAM_ID = `team-audit-${suffix}`;
 const PROJECT_ID = `proj-audit-${suffix}`;
 const ACTOR_USER_ID = `usr-audit-${suffix}`;
-
-// VK creation hashes secrets with HMAC(LW_VIRTUAL_KEY_PEPPER, vk_secret).
-// In CI the env isn't pre-populated for integration tests; set a deterministic
-// fixture value before the suite starts so VirtualKeyService.create works.
-process.env.LW_VIRTUAL_KEY_PEPPER ??=
-  "0000000000000000000000000000000000000000000000000000000000000000";
+const VK_ID = `vk-audit-${suffix}`;
+const BUDGET_ID = `bdg-audit-${suffix}`;
 
 describe("AuditLog consolidation — gateway writes land in platform AuditLog", () => {
   const organizations = new PrismaOrganizationRepository(prisma);
+  const auditLog = new GatewayAuditLogRepository(prisma);
 
   beforeAll(async () => {
     await startTestContainers();
@@ -81,7 +83,6 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
 
   afterAll(async () => {
     await prisma.auditLog.deleteMany({ where: { organizationId: ORG_ID } });
-    await prisma.virtualKey.deleteMany({ where: { projectId: PROJECT_ID } });
     await prisma.organizationUser.deleteMany({
       where: { organizationId: ORG_ID, userId: ACTOR_USER_ID },
     });
@@ -101,28 +102,28 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
     });
   });
 
-  describe("when a Virtual Key is created", () => {
-    it("writes a single AuditLog row in gateway shape", async () => {
-      const service = VirtualKeyService.create(prisma);
-
+  describe("when the gateway audit adapter writes a VK row", () => {
+    it("creates an AuditLog row in gateway shape (targetKind + before/after)", async () => {
       const before = await prisma.auditLog.count({
         where: { organizationId: ORG_ID, action: "VIRTUAL_KEY_CREATED" },
       });
 
-      const { virtualKey } = await service.create({
-        projectId: PROJECT_ID,
+      await auditLog.append({
         organizationId: ORG_ID,
-        name: `audit-vk-${suffix}`,
-        environment: "test",
+        projectId: PROJECT_ID,
         actorUserId: ACTOR_USER_ID,
-        providerCredentialIds: [],
+        action: "VIRTUAL_KEY_CREATED",
+        targetKind: "virtual_key",
+        targetId: VK_ID,
+        before: null,
+        after: { name: `audit-vk-${suffix}`, status: "active" },
       });
 
       const rows = await prisma.auditLog.findMany({
         where: {
           organizationId: ORG_ID,
           targetKind: "virtual_key",
-          targetId: virtualKey.id,
+          targetId: VK_ID,
           action: "VIRTUAL_KEY_CREATED",
         },
         orderBy: { createdAt: "desc" },
@@ -134,15 +135,43 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
       expect(row.organizationId).toBe(ORG_ID);
       expect(row.projectId).toBe(PROJECT_ID);
       expect(row.targetKind).toBe("virtual_key");
-      expect(row.targetId).toBe(virtualKey.id);
+      expect(row.targetId).toBe(VK_ID);
       expect(row.before).toBeNull();
       expect(row.after).not.toBeNull();
+      expect(row.after).toMatchObject({ status: "active" });
 
       // Sanity: total VIRTUAL_KEY_CREATED rows for this org went up by 1.
       const after = await prisma.auditLog.count({
         where: { organizationId: ORG_ID, action: "VIRTUAL_KEY_CREATED" },
       });
       expect(after).toBe(before + 1);
+    });
+
+    it("captures before/after diff on update events", async () => {
+      await auditLog.append({
+        organizationId: ORG_ID,
+        projectId: PROJECT_ID,
+        actorUserId: ACTOR_USER_ID,
+        action: "BUDGET_UPDATED",
+        targetKind: "budget",
+        targetId: BUDGET_ID,
+        before: { limitUsd: "500" },
+        after: { limitUsd: "1000" },
+      });
+
+      const row = await prisma.auditLog.findFirst({
+        where: {
+          organizationId: ORG_ID,
+          targetKind: "budget",
+          targetId: BUDGET_ID,
+          action: "BUDGET_UPDATED",
+        },
+        orderBy: { createdAt: "desc" },
+      });
+
+      expect(row).not.toBeNull();
+      expect(row!.before).toMatchObject({ limitUsd: "500" });
+      expect(row!.after).toMatchObject({ limitUsd: "1000" });
     });
   });
 
@@ -182,29 +211,17 @@ describe("AuditLog consolidation — gateway writes land in platform AuditLog", 
     });
 
     it("filters to a specific resource when targetId is set", async () => {
-      // Use the most-recent VK we created above as the deep-link target.
-      const recent = await prisma.auditLog.findFirst({
-        where: {
-          organizationId: ORG_ID,
-          targetKind: "virtual_key",
-          action: "VIRTUAL_KEY_CREATED",
-        },
-        orderBy: { createdAt: "desc" },
-      });
-      expect(recent).not.toBeNull();
-      const targetId = recent!.targetId!;
-
       const result = await organizations.getAuditLogs({
         organizationId: ORG_ID,
         pageOffset: 0,
         pageSize: 25,
         targetKind: "virtual_key",
-        targetId,
+        targetId: VK_ID,
       });
 
       expect(result.auditLogs.length).toBeGreaterThan(0);
       for (const row of result.auditLogs) {
-        expect(row.targetId).toBe(targetId);
+        expect(row.targetId).toBe(VK_ID);
       }
     });
   });
