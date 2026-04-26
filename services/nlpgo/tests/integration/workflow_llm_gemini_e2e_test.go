@@ -145,7 +145,7 @@ func TestSync_RealWorkflowEndToEnd_Gemini(t *testing.T) {
 	      "nodes":[
 	        {"id":"entry","type":"entry","data":{
 	          "outputs":[{"identifier":"question","type":"str"}],
-	          "dataset":{"inline":{"records":{"question":["What is 7+7? Reply with just the single digit."]}}},
+	          "dataset":{"inline":{"records":{"question":["What is 7+7? Reply with just the digits."]}}},
 	          "entry_selection":0,
 	          "train_size":1.0,"test_size":0.0,"seed":1
 	        }},
