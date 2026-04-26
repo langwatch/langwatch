@@ -11,8 +11,15 @@ import { rateLimit } from "~/server/rateLimit";
 import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
+import { PersonalVirtualKeyService } from "~/server/governance/personalVirtualKey.service";
 import { RoutingPolicyService } from "~/server/governance/routingPolicy.service";
 import { PersonalUsageService } from "~/server/governance/personalUsage.service";
+import { GatewayBudgetService } from "~/server/gateway/budget.service";
+import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import {
+  getClickHouseClientForProject,
+  isClickHouseEnabled,
+} from "~/server/clickhouse/clickhouseClient";
 
 export const userRouter = createTRPCRouter({
   /**
@@ -447,4 +454,153 @@ export const userRouter = createTRPCRouter({
         recentActivity,
       };
     }),
+
+  /**
+   * Per-user budget state powering the /me dashboard's
+   * BudgetExceededBanner. Same wire shape as the CLI 402 payload
+   * (cli-reference.mdx "Budget pre-check") so client + CLI render
+   * with identical fields.
+   *
+   * Delegates to GatewayBudgetService.check() with projectedCostUsd=0
+   * — same code path the gateway uses at request time, so the UI's
+   * banner state and the CLI's pre-check decision can never disagree.
+   *
+   * Returns:
+   *   { status: "ok" }                                 nothing to render
+   *   { status: "warning", ...details }                soft_warn (≥80% used)
+   *   { status: "exceeded", ...details }               hard_block (≥100% used)
+   *
+   * Graceful-degradation cases that return {status: "ok"}:
+   *   - User has no personal workspace yet
+   *   - User has no personal VK yet
+   *   - ClickHouse not configured (smaller self-hosters)
+   */
+  personalBudget: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      const workspaceService = new PersonalWorkspaceService(ctx.prisma);
+      const workspace = await workspaceService.findExisting({
+        userId,
+        organizationId: input.organizationId,
+      });
+      if (!workspace) return { status: "ok" as const };
+
+      const vkService = PersonalVirtualKeyService.create(ctx.prisma);
+      const vks = await vkService.list({
+        userId,
+        organizationId: input.organizationId,
+      });
+      const personalVk = vks[0];
+      if (!personalVk) return { status: "ok" as const };
+
+      const chRepo = isClickHouseEnabled()
+        ? new GatewayBudgetClickHouseRepository(async (projectId) => {
+            const client = await getClickHouseClientForProject(projectId);
+            if (!client) {
+              throw new Error(
+                `ClickHouse enabled but no client for project ${projectId}`,
+              );
+            }
+            return client;
+          })
+        : undefined;
+      const budgetService = GatewayBudgetService.create(ctx.prisma, chRepo);
+      const decision = await budgetService.check({
+        organizationId: input.organizationId,
+        teamId: workspace.team.id,
+        projectId: workspace.project.id,
+        virtualKeyId: personalVk.id,
+        principalUserId: userId,
+        projectedCostUsd: 0,
+      });
+
+      // Status mapping: hard_block → exceeded (red banner),
+      // soft_warn → warning (yellow banner), allow → ok (no banner).
+      if (decision.decision === "allow") return { status: "ok" as const };
+
+      const blocker =
+        decision.blockedBy[0] ??
+        decision.scopes
+          .map((s) => ({ ...s, pctUsed: percentUsed(s.spentUsd, s.limitUsd) }))
+          .filter((s) => s.pctUsed >= 80)
+          .sort((a, b) => b.pctUsed - a.pctUsed)[0];
+      if (!blocker) return { status: "ok" as const };
+
+      const adminEmail = await resolveOrgAdminEmail(
+        ctx.prisma,
+        input.organizationId,
+      );
+      const baseStatus =
+        decision.decision === "hard_block"
+          ? ("exceeded" as const)
+          : ("warning" as const);
+      return {
+        status: baseStatus,
+        scope: normalizeScope(blocker.scope),
+        spentUsd: blocker.spentUsd,
+        limitUsd: blocker.limitUsd,
+        period: blocker.window.toLowerCase(),
+        requestIncreaseUrl: requestIncreaseUrl({
+          baseUrl: env.NEXTAUTH_URL ?? env.BASE_HOST ?? null,
+          scope: normalizeScope(blocker.scope),
+          scopeId: blocker.scopeId,
+          limitUsd: blocker.limitUsd,
+          spentUsd: blocker.spentUsd,
+        }),
+        adminEmail,
+      };
+    }),
 });
+
+// ---------------------------------------------------------------------------
+// personalBudget helpers
+// ---------------------------------------------------------------------------
+
+function percentUsed(spentUsd: string, limitUsd: string): number {
+  const limit = Number.parseFloat(limitUsd);
+  if (!Number.isFinite(limit) || limit <= 0) return 0;
+  const spent = Number.parseFloat(spentUsd);
+  return (spent / limit) * 100;
+}
+
+/** Map server-side scope codes to the wire-shape values the
+ *  BudgetExceededBanner + CLI Screen-8 box accept. */
+function normalizeScope(scope: string): string {
+  const s = scope.toLowerCase();
+  // VIRTUAL_KEY-scope blocks are surfaced as "personal" in the
+  // user-facing banner — that matches the CLI's normalization.
+  if (s === "virtual_key") return "personal";
+  return s;
+}
+
+function requestIncreaseUrl(opts: {
+  baseUrl: string | null;
+  scope: string;
+  scopeId: string;
+  limitUsd: string;
+  spentUsd: string;
+}): string | undefined {
+  if (!opts.baseUrl) return undefined;
+  const params = new URLSearchParams({
+    scope: opts.scope,
+    scope_id: opts.scopeId,
+    limit_usd: opts.limitUsd,
+    spent_usd: opts.spentUsd,
+  });
+  return `${opts.baseUrl.replace(/\/$/, "")}/me/budget/request?${params.toString()}`;
+}
+
+async function resolveOrgAdminEmail(
+  prisma: import("@prisma/client").PrismaClient,
+  organizationId: string,
+): Promise<string | undefined> {
+  const admin = await prisma.organizationUser.findFirst({
+    where: { organizationId, role: "ADMIN" },
+    include: { user: { select: { email: true } } },
+    orderBy: { createdAt: "asc" },
+  });
+  return admin?.user.email ?? undefined;
+}
