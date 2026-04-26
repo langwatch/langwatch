@@ -39,12 +39,14 @@ export interface PersonalWorkspace {
     id: string;
     name: string;
     slug: string;
+    createdAt: Date;
   };
   project: {
     id: string;
     name: string;
     slug: string;
     apiKey: string;
+    createdAt: Date;
   };
   /** True iff the workspace was created in this call. */
   created: boolean;
@@ -151,12 +153,18 @@ export class PersonalWorkspaceService {
       });
 
       return {
-        team: { id: team.id, name: team.name, slug: team.slug },
+        team: {
+          id: team.id,
+          name: team.name,
+          slug: team.slug,
+          createdAt: team.createdAt,
+        },
         project: {
           id: project.id,
           name: project.name,
           slug: project.slug,
           apiKey: project.apiKey,
+          createdAt: project.createdAt,
         },
         created: true,
       };
@@ -200,6 +208,7 @@ export class PersonalWorkspaceService {
         id: true,
         name: true,
         slug: true,
+        createdAt: true,
         projects: {
           where: { isPersonal: true, archivedAt: null },
           select: {
@@ -207,6 +216,7 @@ export class PersonalWorkspaceService {
             name: true,
             slug: true,
             apiKey: true,
+            createdAt: true,
           },
           take: 1,
         },
@@ -219,12 +229,18 @@ export class PersonalWorkspaceService {
     const project = team.projects[0]!;
 
     return {
-      team: { id: team.id, name: team.name, slug: team.slug },
+      team: {
+        id: team.id,
+        name: team.name,
+        slug: team.slug,
+        createdAt: team.createdAt,
+      },
       project: {
         id: project.id,
         name: project.name,
         slug: project.slug,
         apiKey: project.apiKey,
+        createdAt: project.createdAt,
       },
     };
   }

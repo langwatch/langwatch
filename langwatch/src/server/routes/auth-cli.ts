@@ -34,6 +34,8 @@ import { z } from "zod";
 import { env } from "~/env.mjs";
 import { connection as redisConnection } from "~/server/redis";
 import { prisma } from "~/server/db";
+import { getServerAuthSession } from "~/server/auth";
+import { PersonalVirtualKeyService } from "~/server/governance/personalVirtualKey.service";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:auth-cli");
@@ -473,6 +475,244 @@ app.post("/refresh", async (c: Context) => {
     },
     200,
   );
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/cli/lookup?user_code=XXXX-YYYY
+// ---------------------------------------------------------------------------
+// Used by the browser-side approval page to surface the device-code
+// metadata (originating CLI hostname, request time) before the user
+// approves. Session-protected so unauthenticated visitors can't probe
+// outstanding device codes.
+// ---------------------------------------------------------------------------
+app.get("/lookup", async (c: Context) => {
+  const session = await getServerAuthSession({ req: c.req.raw as any });
+  if (!session?.user) {
+    return c.json(
+      { error: "unauthorized", error_description: "Sign in to continue" },
+      401,
+    );
+  }
+  const userCode = c.req.query("user_code");
+  if (!userCode) {
+    return c.json(
+      { error: "invalid_request", error_description: "user_code is required" },
+      400,
+    );
+  }
+  const record = await findDeviceCodeByUserCode(userCode);
+  if (!record) {
+    return c.json(
+      {
+        error: "not_found",
+        error_description: "Code not recognised — it may have expired",
+      },
+      404,
+    );
+  }
+  if (Date.now() > record.expires_at) {
+    return c.json(
+      {
+        error: "expired",
+        error_description: "Code has expired — restart `langwatch login`",
+      },
+      410,
+    );
+  }
+  return c.json(
+    {
+      user_code: record.user_code,
+      status: record.status,
+      created_at: record.created_at,
+      expires_at: record.expires_at,
+    },
+    200,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/cli/approve
+// ---------------------------------------------------------------------------
+// Called by the browser-side /cli/auth page when the user clicks
+// "Approve". Mints (or returns existing) personal VK and flips the
+// device-code record to `approved`. Session-protected.
+// ---------------------------------------------------------------------------
+const approveRequestSchema = z.object({
+  user_code: z.string().min(1),
+  organization_id: z.string().min(1),
+});
+
+app.post("/approve", async (c: Context) => {
+  const session = await getServerAuthSession({ req: c.req.raw as any });
+  if (!session?.user) {
+    return c.json(
+      { error: "unauthorized", error_description: "Sign in to continue" },
+      401,
+    );
+  }
+
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = approveRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: "invalid_request",
+        error_description: "user_code and organization_id are required",
+      },
+      400,
+    );
+  }
+  const { user_code, organization_id } = parsed.data;
+
+  // Verify caller is a member of the org they're issuing a key for.
+  const membership = await prisma.organizationUser.findUnique({
+    where: {
+      userId_organizationId: { userId: session.user.id, organizationId: organization_id },
+    },
+  });
+  if (!membership) {
+    return c.json(
+      {
+        error: "forbidden",
+        error_description: `Not a member of organization ${organization_id}`,
+      },
+      403,
+    );
+  }
+
+  const record = await findDeviceCodeByUserCode(user_code);
+  if (!record) {
+    return c.json(
+      { error: "not_found", error_description: "Code not recognised" },
+      404,
+    );
+  }
+  if (Date.now() > record.expires_at) {
+    return c.json(
+      { error: "expired", error_description: "Code has expired" },
+      410,
+    );
+  }
+  if (record.status !== "pending") {
+    return c.json(
+      {
+        error: "already_resolved",
+        error_description: `Code is in '${record.status}' state — restart langwatch login`,
+      },
+      409,
+    );
+  }
+
+  // Mint (or return) the user's default personal VK for this org.
+  // Idempotent — if already present, the service throws
+  // PersonalVirtualKeyAlreadyExistsError; we map that to 409 so the
+  // user knows they already have a default and should run a fresh
+  // login on the new device only after revoking the old one.
+  const service = PersonalVirtualKeyService.create(prisma);
+  let issued;
+  try {
+    issued = await service.ensureDefault({
+      userId: session.user.id,
+      organizationId: organization_id,
+      displayName: session.user.name,
+      displayEmail: session.user.email,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "PersonalVirtualKeyAlreadyExistsError") {
+      // Issue an additional device-specific key instead so multiple
+      // devices don't have to share the "default" key. Label includes
+      // a short suffix from the user_code for human discoverability.
+      const labelSuffix = user_code.replace("-", "").toLowerCase().slice(0, 6);
+      const workspace = await prisma.team.findFirst({
+        where: {
+          organizationId: organization_id,
+          ownerUserId: session.user.id,
+          isPersonal: true,
+        },
+        select: {
+          id: true,
+          projects: {
+            where: { isPersonal: true, archivedAt: null },
+            select: { id: true },
+            take: 1,
+          },
+        },
+      });
+      if (!workspace?.projects[0]) {
+        return c.json(
+          { error: "server_error", error_description: "Personal workspace missing" },
+          500,
+        );
+      }
+      issued = await service.issue({
+        userId: session.user.id,
+        organizationId: organization_id,
+        personalProjectId: workspace.projects[0].id,
+        personalTeamId: workspace.id,
+        label: `device-${labelSuffix}`,
+      });
+    } else {
+      logger.error(
+        { err, user_code },
+        `[auth-cli] approve failed for ${user_code}`,
+      );
+      return c.json(
+        { error: "server_error", error_description: "Failed to issue key" },
+        500,
+      );
+    }
+  }
+
+  await approveDeviceCode({
+    deviceCode: record.device_code,
+    userId: session.user.id,
+    organizationId: organization_id,
+    personalVk: {
+      id: issued.virtualKey.id,
+      label: issued.virtualKey.name,
+      secret: issued.secret,
+      base_url: issued.baseUrl,
+    },
+  });
+
+  return c.json(
+    {
+      ok: true,
+      personal_vk_label: issued.virtualKey.name,
+      organization_id,
+    },
+    200,
+  );
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/cli/deny — user clicked "Deny" on the approval card.
+// ---------------------------------------------------------------------------
+const denyRequestSchema = z.object({ user_code: z.string().min(1) });
+
+app.post("/deny", async (c: Context) => {
+  const session = await getServerAuthSession({ req: c.req.raw as any });
+  if (!session?.user) {
+    return c.json(
+      { error: "unauthorized", error_description: "Sign in to continue" },
+      401,
+    );
+  }
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = denyRequestSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "invalid_request", error_description: "user_code is required" },
+      400,
+    );
+  }
+  const record = await findDeviceCodeByUserCode(parsed.data.user_code);
+  if (!record) {
+    // Idempotent — denying an unknown code is a no-op.
+    return c.json({ ok: true });
+  }
+  await denyDeviceCode(record.device_code);
+  return c.json({ ok: true });
 });
 
 // ---------------------------------------------------------------------------

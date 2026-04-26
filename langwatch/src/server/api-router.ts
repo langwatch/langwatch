@@ -100,8 +100,12 @@ export function createApiRouter() {
 
   api.route("/", adminApp);
   api.route("/", annotationsApp);
-  api.route("/", authApp);
+  // ORDERING: authCliApp MUST be registered BEFORE authApp.
+  // authApp owns the BetterAuth catch-all (`/auth/*`), which would
+  // otherwise swallow `/auth/cli/*` and return 404 from BetterAuth.
+  // Register the more-specific basePath first so Hono routes match it.
   api.route("/", authCliApp);  // /api/auth/cli/* — RFC 8628 device-flow for CLI
+  api.route("/", authApp);
   api.route("/", collectorApp);
   api.route("/", cronApp);
   api.route("/", evaluationsLegacyApp);
