@@ -207,7 +207,7 @@ func (e *Engine) dispatch(ctx context.Context, req ExecuteRequest, node *dsl.Nod
 	case dsl.ComponentHTTP:
 		return e.runHTTP(ctx, node, inputs, ns)
 	case dsl.ComponentSignature:
-		return e.runSignature(ctx, node, inputs)
+		return e.runSignature(ctx, req, node, inputs)
 	case dsl.ComponentPromptingTechnique:
 		// Decorator: produces no outputs of its own; signature nodes
 		// reference it via a parameter and apply it at LLM-call time.
@@ -309,11 +309,11 @@ func (e *Engine) runHTTP(ctx context.Context, node *dsl.Node, inputs map[string]
 	return out, nil
 }
 
-func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[string]any) (map[string]any, *NodeError) {
+func (e *Engine) runSignature(ctx context.Context, execReq ExecuteRequest, node *dsl.Node, inputs map[string]any) (map[string]any, *NodeError) {
 	if e.llm == nil {
 		return nil, &NodeError{Type: "llm_executor_unavailable", Message: "LLM executor not yet wired"}
 	}
-	llmCfg := paramLLMConfig(node.Data.Parameters)
+	llmCfg := resolveLLMConfig(node, execReq.Workflow)
 	model := ""
 	provider := ""
 	if llmCfg != nil && llmCfg.Model != nil {
@@ -874,6 +874,27 @@ func paramLLMConfig(params []dsl.Field) *dsl.LLMConfig {
 			return nil
 		}
 		return &c
+	}
+	return nil
+}
+
+// resolveLLMConfig returns the effective LLM config for a signature
+// node, falling back to workflow.DefaultLLM when the node-level
+// `llm` parameter is missing, null, or carries no model. Mirrors
+// langwatch_nlp's `has_llm_node_using_default_llm` (regression
+// 6d3d8a823) — a workflow with a signature node relying on
+// default_llm pre-fix had its default_llm blanked before dispatch
+// because the previous `node.type == "llm"` check never matched
+// (signature nodes carry an `llm` parameter, not a node of type
+// "llm"). Without this fallback, dispatch would emit an empty model
+// and the gateway would 400.
+func resolveLLMConfig(node *dsl.Node, w *dsl.Workflow) *dsl.LLMConfig {
+	if cfg := paramLLMConfig(node.Data.Parameters); cfg != nil &&
+		cfg.Model != nil && *cfg.Model != "" {
+		return cfg
+	}
+	if w != nil {
+		return w.DefaultLLM
 	}
 	return nil
 }

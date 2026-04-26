@@ -1897,3 +1897,93 @@ func TestPattern015_ThreadIDPropagatesToOutboundHeaders(t *testing.T) {
 			"call %d must keep X-LangWatch-Origin (sanity sibling)", i)
 	}
 }
+
+// TestPattern014_SignatureFallsBackToWorkflowDefaultLLM is the
+// integration-level pin for langwatch_nlp regression 6d3d8a823 ("defaults
+// for gpt-5 and default model deleting during execution"). A workflow
+// that sets `default_llm` at the top level and has signature nodes
+// WITHOUT a `llm` parameter must dispatch using that default. Pre-fix
+// (Python) the parser blanked default_llm because the `node.type ==
+// "llm"` check never matched any real node — the Go engine pre-fix
+// mirrored the bug by ignoring workflow.DefaultLLM entirely (parsed
+// but never consumed).
+//
+// Asserts: the LLM client receives a request whose model + provider
+// come from workflow.default_llm, and the signature node completes
+// successfully end-to-end through the HTTP server boundary.
+func TestPattern014_SignatureFallsBackToWorkflowDefaultLLM(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(_ app.LLMRequest) (*app.LLMResponse, error) {
+			return &app.LLMResponse{Content: "fallback ok", Cost: 0.00007}, nil
+		},
+	}
+	url, _ := setupPatternStack(t, llm, func(http.ResponseWriter, *http.Request) {})
+
+	// Note the signature node has NO `llm` parameter — only `instructions`.
+	// The workflow-level `default_llm` is the only LLM config in the
+	// workflow. Pre-fix this would dispatch with empty model and the
+	// gateway would 400 (or, on the Python path, the parser would
+	// blank default_llm during normalization and the same crash would
+	// happen).
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-014",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"sk-pattern-014","spec_version":"1.3",
+	      "name":"Pattern014","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "default_llm":{"model":"openai/gpt-5-mini","temperature":0.3,"max_tokens":256,"litellm_params":{"api_key":"k-default"}},
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"question","type":"str"}],
+	          "dataset":{"inline":{"records":{"question":["What is the capital of France?"]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"answer","type":"signature","data":{
+	          "name":"Answer",
+	          "parameters":[
+	            {"identifier":"instructions","type":"str","value":"Reply concisely to: {{ question }}"}
+	          ],
+	          "inputs":[{"identifier":"question","type":"str"}],
+	          "outputs":[{"identifier":"answer","type":"str"}]
+	        }},
+	        {"id":"end","type":"end","data":{
+	          "inputs":[{"identifier":"answer","type":"str"}]
+	        }}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.question","target":"answer","targetHandle":"inputs.question","type":"default"},
+	        {"id":"e2","source":"answer","sourceHandle":"outputs.answer","target":"end","targetHandle":"inputs.answer","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+	assert.Equal(t, "pattern-014", res.TraceID)
+
+	// (1) The fake LLM saw exactly one Execute call carrying the
+	// workflow-level default model and provider — proves the
+	// fallback reached the dispatch boundary.
+	llmReq := llm.lastRequest(t)
+	assert.Equal(t, "openai", llmReq.Provider, "default_llm provider must reach dispatch")
+	assert.Equal(t, "gpt-5-mini", llmReq.Model, "default_llm model must reach dispatch")
+
+	// (2) Per-node accounting: every node successful, signature node
+	// in particular (the load-bearing claim).
+	require.NotNil(t, res.Nodes)
+	for _, id := range []string{"entry", "answer", "end"} {
+		node, ok := res.Nodes[id].(map[string]any)
+		require.True(t, ok, "missing node %q in result.nodes", id)
+		assert.Equal(t, "success", node["status"], "node %q expected success", id)
+	}
+
+	// (3) The signature output reached the end node verbatim.
+	require.NotNil(t, res.Result)
+	assert.Equal(t, "fallback ok", res.Result["answer"])
+}
