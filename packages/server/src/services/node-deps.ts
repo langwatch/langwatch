@@ -1,5 +1,5 @@
 import { execa } from "execa";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
@@ -86,12 +86,33 @@ async function resolvePnpm(): Promise<{ command: string; args: string[] }> {
 }
 
 export function locateLangwatchDir(): string | null {
+  // Both the workspace dev layout (packages/server/dist/cli.cjs +
+  // workspace-root/langwatch/) and the published tarball layout
+  // (@langwatch/server/packages/server/dist/cli.cjs + @langwatch/server/langwatch/)
+  // resolve to "3 ups + langwatch" from __dirname. We also probe cwd as a
+  // last resort for `node dist/cli.cjs` ran from an unexpected directory.
+  //
+  // We can't just check for package.json — the workspace root in dev (and
+  // GitHub Actions' /home/runner/work/langwatch/langwatch checkout root) also
+  // has a package.json, and an earlier 4-up candidate happened to land on it,
+  // causing `pnpm -C <workspace-root> run build` to fail with
+  // "ERR_PNPM_NO_SCRIPT Missing script: build" (the workspace root has
+  // build:cli, not build). Match on name="langwatch" in package.json instead.
   const candidates = [
-    join(__dirname, "..", "..", "..", "..", "langwatch"),
     join(__dirname, "..", "..", "..", "langwatch"),
     join(process.cwd(), "langwatch"),
   ];
-  return candidates.find((p) => existsSync(join(p, "package.json"))) ?? null;
+  for (const p of candidates) {
+    const pkgPath = join(p, "package.json");
+    if (!existsSync(pkgPath)) continue;
+    try {
+      const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as { name?: string };
+      if (pkg.name === "langwatch") return p;
+    } catch {
+      // ignore unreadable / non-JSON, try next
+    }
+  }
+  return null;
 }
 
 // Re-exported so other services (migrate.ts, langwatch.ts) can resolve the same path.

@@ -107,6 +107,13 @@ jobs:
           else
             sudo apt-get update
             sudo apt-get install -y postgresql-16 redis-server lsof
+            # apt installs the postgres server binary at
+            # /usr/lib/postgresql/16/bin/postgres which is NOT on PATH by
+            # default — only the wrappers (psql, pg_dump) are. Without this
+            # the predep `which postgres` check fails and the CLI falls
+            # through to the langwatch CDN download (currently broken,
+            # tracked as #3489).
+            echo "/usr/lib/postgresql/16/bin" >> "$GITHUB_PATH"
             curl -LsSf https://astral.sh/uv/install.sh | sh
             echo "$HOME/.local/bin" >> "$GITHUB_PATH"
             # Clickhouse: official one-liner installer.
@@ -226,8 +233,11 @@ jobs:
           fi
           ls -la _logs/
 
-      - name: Upload logs on failure
-        if: failure()
+      - name: Upload logs on failure or cancellation
+        # The `failure()` filter doesn't fire on timeout-cancellation, so we
+        # widen to `!success()` — that catches both genuine failures and
+        # 35-minute-job-cap cancellations, which is when we most want logs.
+        if: ${{ !success() }}
         uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
         with:
           name: npx-server-smoke-logs-${{ matrix.runner }}-${{ github.sha }}
