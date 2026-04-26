@@ -44,10 +44,28 @@ program
   .option("-y, --yes", "skip every confirmation prompt", false)
   .option("--no-open", "do not auto-open the browser when ready")
   .option("--bullboard", "expose the BullMQ dashboard on the bullboard infra slot", false)
+  .option("--dry-run", "print what would be done and exit (no installs, no env, no services)", false)
   .action(async (opts) => {
     detectPlatform();
     printBanner(VERSION);
     printPhases();
+
+    if (opts.dryRun) {
+      const base = Number.parseInt(opts.portBase, 10);
+      const ports = allocatePorts(base);
+      console.log(chalk.bold("dry-run — no work performed"));
+      console.log("");
+      console.log(chalk.bold("port-base:"), base);
+      console.log(chalk.bold("ports:"));
+      for (const [k, v] of Object.entries(ports)) {
+        if (k === "base") continue;
+        console.log(`  ${k.padEnd(18)} ${v}`);
+      }
+      console.log("");
+      console.log(chalk.bold("paths:"));
+      for (const [k, v] of Object.entries(paths)) console.log(`  ${k.padEnd(18)} ${v}`);
+      process.exit(0);
+    }
 
     if (!opts.yes) {
       const { go } = await prompts(
@@ -108,13 +126,27 @@ program
 program
   .command("doctor")
   .description("check which predeps and services are installed; do not change anything")
-  .action(async () => {
+  .option("--port-base <n>", "report the resolved ports for this base", String(PORT_BASE_DEFAULT))
+  .action(async (opts) => {
     detectPlatform();
     printBanner(VERSION);
     const rows = await inspectPredeps({ version: VERSION });
     printDoctorTable(rows);
+    const base = Number.parseInt(opts.portBase, 10);
+    const ports = allocatePorts(base);
+    const { detectConflicts } = await import("./port-conflict/detect.ts");
+    const conflicts = await detectConflicts(base);
+    console.log(chalk.bold(`Ports (port-base=${base})`));
+    for (const [k, v] of Object.entries(ports)) {
+      if (k === "base") continue;
+      const conflict = conflicts.conflicts.find((c) => c.port === v);
+      const marker = conflict ? chalk.red(`✗ in use by pid ${conflict.pid} (${conflict.command})`) : chalk.green("✓");
+      console.log(`  ${marker} ${k.padEnd(18)} ${v}`);
+    }
+    console.log("");
     const missing = rows.filter((r) => !r.installed).length;
-    process.exit(missing === 0 ? 0 : 1);
+    const exitCode = missing === 0 && conflicts.conflicts.length === 0 ? 0 : 1;
+    process.exit(exitCode);
   });
 
 program
