@@ -317,9 +317,12 @@ function AuditLogPage() {
         log.ipAddress ?? "",
         log.userAgent ?? "",
         log.error ?? "",
-        log.args ? JSON.stringify(log.args) : "",
-        log.before ? JSON.stringify(log.before) : "",
-        log.after ? JSON.stringify(log.after) : "",
+        // Cap JSON columns at 4 KB so a single oversized diff (large
+        // request payload, full provider config) can't blow up the
+        // exported file size or break Excel/Sheets row parsing.
+        log.args ? JSON.stringify(log.args).slice(0, 4096) : "",
+        log.before ? JSON.stringify(log.before).slice(0, 4096) : "",
+        log.after ? JSON.stringify(log.after).slice(0, 4096) : "",
       ]);
 
       // Generate CSV
@@ -353,19 +356,15 @@ function AuditLogPage() {
   };
 
   // Derive a return URL back to the originating detail page when the
-  // operator arrived via a deep-link. Covers every kind documented on
-  // AuditLogFilters.targetKind so future gateway resources don't silently
-  // drop the breadcrumb.
+  // operator arrived via a deep-link. Only kinds that have a real
+  // `[id]` detail route are mapped — provider_binding and cache_rule
+  // are list-only today, so we skip them rather than render a link
+  // that 404s.
   const backToResource = (() => {
     if (!urlTargetKind || !urlTargetId || !project?.slug) return null;
     const kindMap: Record<string, { path: string; label: string }> = {
       virtual_key: { path: "gateway/virtual-keys", label: "Virtual key" },
       budget: { path: "gateway/budgets", label: "Budget" },
-      provider_binding: {
-        path: "gateway/providers",
-        label: "Provider binding",
-      },
-      cache_rule: { path: "gateway/cache-rules", label: "Cache rule" },
     };
     const entry = kindMap[urlTargetKind];
     if (!entry) return null;
