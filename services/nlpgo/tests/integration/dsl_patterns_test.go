@@ -53,6 +53,8 @@
 //   pattern_002_branching      — entry → 2× parallel signature → end           ✅
 //   pattern_003_liquid_in_sig  — multi-var, dot-path, array-index in one prompt ✅
 //   pattern_004_chain_eval     — signature → signature → evaluator chain        ✅
+//   pattern_005_http_to_sig    — http block fetches data, signature uses it    ✅
+//   pattern_006_sigs_to_code   — 2× parallel signature → code aggregator       ✅
 //
 // See feedback memory entry "No customer names in public repo".
 
@@ -63,6 +65,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync"
@@ -659,4 +662,254 @@ func stringContains(s, sub string) bool {
 		}
 	}
 	return false
+}
+
+// setupPatternStackWithUpstream is the pattern_005+ harness: same
+// in-process wiring as setupPatternStack, plus an SSRF allow-list that
+// permits the supplied upstream host so the http-block can reach a
+// test httptest server.
+func setupPatternStackWithUpstream(t *testing.T, llm *fakeLLMClient, langwatch http.HandlerFunc, upstreamHost string) (url string, lwRequests *[]map[string]any) {
+	t.Helper()
+	captured := []map[string]any{}
+	requestsOut := &captured
+
+	lwSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var parsed map[string]any
+		_ = json.Unmarshal(body, &parsed)
+		captured = append(captured, map[string]any{
+			"path": r.URL.Path, "body": parsed,
+		})
+		langwatch(w, r)
+	}))
+	t.Cleanup(lwSrv.Close)
+
+	httpExec := httpblock.New(httpblock.Options{
+		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{upstreamHost}},
+	})
+	codeExec, err := codeblock.New(codeblock.Options{})
+	require.NoError(t, err)
+	evalExec := evaluatorblock.New(evaluatorblock.Options{})
+	agentRunner := agentblock.NewWorkflowRunner(agentblock.WorkflowRunnerOptions{})
+
+	eng := engine.New(engine.Options{
+		HTTP:             httpExec,
+		Code:             codeExec,
+		LLM:              llm,
+		Evaluator:        evalExec,
+		AgentWorkflow:    agentRunner,
+		LangWatchBaseURL: lwSrv.URL,
+	})
+
+	application := app.New(app.WithWorkflowExecutor(executorAdapter{eng: eng}))
+	probes := health.New("test")
+	probes.MarkStarted()
+	router := httpapi.NewRouter(httpapi.RouterDeps{App: application, Health: probes, Version: "test"})
+	srv := httptest.NewServer(router)
+	t.Cleanup(srv.Close)
+	return srv.URL, requestsOut
+}
+
+// TestPattern005_HTTPThenSignatureWithLiquidUse — entry → http (fetches
+// data) → signature (uses the http output via {{ http_output }} in
+// instructions) → end. Customer-style retrieval-augmented shape: pull
+// some context over HTTP, fold it into the prompt.
+//
+// What this proves:
+//
+//   1. The http block's response body lands in the engine state under
+//      the configured output name.
+//   2. The signature node receives the http output as an upstream
+//      input AND the engine renders {{ <input_name> }} from it inside
+//      `instructions`. (Catches both the edge-routing path AND the
+//      Liquid render path in one shot.)
+//   3. The composed system prompt observed at the LLM boundary
+//      contains the http payload — not the raw {{ }} marker.
+func TestPattern005_HTTPThenSignatureWithLiquidUse(t *testing.T) {
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"forecast":"sunny with a high of 24C"}`))
+	}))
+	t.Cleanup(upstream.Close)
+	upstreamHost, _, _ := net.SplitHostPort(upstream.Listener.Addr().String())
+
+	llm := &fakeLLMClient{
+		respond: func(_ app.LLMRequest) (*app.LLMResponse, error) {
+			return &app.LLMResponse{Content: "Looks like a great day."}, nil
+		},
+	}
+	url, _ := setupPatternStackWithUpstream(t, llm, func(http.ResponseWriter, *http.Request) {}, upstreamHost)
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-005",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"k","spec_version":"1.3",
+	      "name":"Pattern005","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"city","type":"str"}],
+	          "dataset":{"inline":{"records":{"city":["Lisbon"]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"fetch","type":"http","data":{
+	          "parameters":[
+	            {"identifier":"url","type":"str","value":"` + upstream.URL + `/forecast"},
+	            {"identifier":"method","type":"str","value":"GET"},
+	            {"identifier":"output_path","type":"str","value":"$.forecast"}
+	          ],
+	          "outputs":[{"identifier":"forecast","type":"str"}]
+	        }},
+	        {"id":"narrate","type":"signature","data":{
+	          "name":"Narrate",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Forecast for the user: {{ forecast }}. Reply in one sentence."}
+	          ],
+	          "inputs":[{"identifier":"forecast","type":"str"}],
+	          "outputs":[{"identifier":"narration","type":"str"}]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[{"identifier":"narration","type":"str"}]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"fetch","sourceHandle":"outputs.forecast","target":"narrate","targetHandle":"inputs.forecast","type":"default"},
+	        {"id":"e2","source":"narrate","sourceHandle":"outputs.narration","target":"end","targetHandle":"inputs.narration","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	// The LLM saw the upstream's forecast text rendered into the prompt.
+	llmReq := llm.lastRequest(t)
+	var sys string
+	for _, m := range llmReq.Messages {
+		if m.Role == "system" {
+			sys, _ = m.Content.(string)
+			break
+		}
+	}
+	assert.Contains(t, sys, "sunny with a high of 24C",
+		"signature instructions should have {{ forecast }} rendered from the http output, got %q", sys)
+	assert.NotContains(t, sys, "{{ forecast }}",
+		"raw {{ forecast }} marker must not survive in the prompt")
+
+	require.NotNil(t, res.Result)
+	assert.Equal(t, "Looks like a great day.", res.Result["narration"])
+	for _, id := range []string{"fetch", "narrate", "end"} {
+		node, ok := res.Nodes[id].(map[string]any)
+		require.True(t, ok, "missing node %q", id)
+		assert.Equal(t, "success", node["status"], "node %q expected success", id)
+	}
+}
+
+// TestPattern006_TwoSignaturesIntoCodeAggregator — entry → 2× parallel
+// signature → code (combines both outputs) → end. Customer-style
+// reduce step where two LLM-produced fields are merged into a single
+// structured payload by deterministic Python code.
+//
+// What this proves:
+//
+//   1. The code block accepts both signature outputs as inputs (named
+//      kwargs `summary` and `sentiment`) — proves the engine wires
+//      multiple upstream signature outputs into one downstream code
+//      block correctly.
+//   2. The code block's structured return propagates to the end node.
+//   3. All five nodes report "success".
+func TestPattern006_TwoSignaturesIntoCodeAggregator(t *testing.T) {
+	llm := &fakeLLMClient{
+		respond: func(req app.LLMRequest) (*app.LLMResponse, error) {
+			var sys string
+			for _, m := range req.Messages {
+				if m.Role == "system" {
+					sys, _ = m.Content.(string)
+					break
+				}
+			}
+			switch {
+			case stringContains(sys, "summary"):
+				return &app.LLMResponse{Content: "Two clear paragraphs."}, nil
+			case stringContains(sys, "sentiment"):
+				return &app.LLMResponse{Content: "neutral"}, nil
+			}
+			return &app.LLMResponse{Content: "fallback"}, nil
+		},
+	}
+	url, _ := setupPatternStack(t, llm, func(http.ResponseWriter, *http.Request) {})
+
+	body := `{
+	  "type":"execute_flow",
+	  "payload": {
+	    "trace_id":"pattern-006",
+	    "origin":"workflow",
+	    "workflow": {
+	      "workflow_id":"wf","api_key":"k","spec_version":"1.3",
+	      "name":"Pattern006","icon":"x","description":"x","version":"x",
+	      "template_adapter":"default",
+	      "nodes":[
+	        {"id":"entry","type":"entry","data":{
+	          "outputs":[{"identifier":"text","type":"str"}],
+	          "dataset":{"inline":{"records":{"text":["A short article about clouds."]},"count":1}},
+	          "entry_selection":0,"train_size":1.0,"test_size":0.0,"seed":1
+	        }},
+	        {"id":"summarize","type":"signature","data":{
+	          "name":"Summarize",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Write a one-line summary of: {{ text }}"}
+	          ],
+	          "inputs":[{"identifier":"text","type":"str"}],
+	          "outputs":[{"identifier":"summary","type":"str"}]
+	        }},
+	        {"id":"classify","type":"signature","data":{
+	          "name":"Classify",
+	          "parameters":[
+	            {"identifier":"llm","type":"llm","value":{"model":"openai/gpt-5-mini","litellm_params":{"api_key":"k"}}},
+	            {"identifier":"instructions","type":"str","value":"Classify the sentiment of: {{ text }}"}
+	          ],
+	          "inputs":[{"identifier":"text","type":"str"}],
+	          "outputs":[{"identifier":"sentiment","type":"str"}]
+	        }},
+	        {"id":"merge","type":"code","data":{
+	          "parameters":[
+	            {"identifier":"code","type":"code","value":"def execute(summary, sentiment):\n    return {'report': sentiment + ': ' + summary}\n"}
+	          ],
+	          "inputs":[
+	            {"identifier":"summary","type":"str"},
+	            {"identifier":"sentiment","type":"str"}
+	          ],
+	          "outputs":[{"identifier":"report","type":"str"}]
+	        }},
+	        {"id":"end","type":"end","data":{"inputs":[{"identifier":"report","type":"str"}]}}
+	      ],
+	      "edges":[
+	        {"id":"e1","source":"entry","sourceHandle":"outputs.text","target":"summarize","targetHandle":"inputs.text","type":"default"},
+	        {"id":"e2","source":"entry","sourceHandle":"outputs.text","target":"classify","targetHandle":"inputs.text","type":"default"},
+	        {"id":"e3","source":"summarize","sourceHandle":"outputs.summary","target":"merge","targetHandle":"inputs.summary","type":"default"},
+	        {"id":"e4","source":"classify","sourceHandle":"outputs.sentiment","target":"merge","targetHandle":"inputs.sentiment","type":"default"},
+	        {"id":"e5","source":"merge","sourceHandle":"outputs.report","target":"end","targetHandle":"inputs.report","type":"default"}
+	      ],
+	      "state":{}
+	    },
+	    "inputs":[{}]
+	  }
+	}`
+	res := postSync(t, &stack{url: url}, body)
+	require.Equal(t, "success", res.Status, "engine error: %+v", res.Error)
+
+	require.NotNil(t, res.Result)
+	assert.Equal(t, "neutral: Two clear paragraphs.", res.Result["report"],
+		"code block should have aggregated both signature outputs")
+
+	for _, id := range []string{"entry", "summarize", "classify", "merge", "end"} {
+		node, ok := res.Nodes[id].(map[string]any)
+		require.True(t, ok, "missing node %q", id)
+		assert.Equal(t, "success", node["status"], "node %q expected success", id)
+	}
 }
