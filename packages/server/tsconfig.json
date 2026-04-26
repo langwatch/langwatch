@@ -14,9 +14,10 @@
     "noFallthroughCasesInSwitch": true,
     "skipLibCheck": true,
     "outDir": "dist",
-    "rootDir": "src",
+    "rootDir": ".",
     "noEmit": true,
-    "isolatedModules": true
+    "isolatedModules": true,
+    "allowImportingTsExtensions": true
   },
   "include": ["src/**/*.ts", "scripts/**/*.ts"],
   "exclude": ["dist", "node_modules", "test"]
