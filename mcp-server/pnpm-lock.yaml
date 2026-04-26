@@ -31,7 +31,7 @@ importers:
         version: 1.1.0
       vitest:
         specifier: ^3.2.4
-        version: 3.2.4(@types/debug@4.1.12)(@types/node@16.18.126)(tsx@4.20.5)(yaml@2.8.3)
+        version: 3.2.4(@types/debug@4.1.13)(@types/node@16.18.126)(tsx@4.20.5)(yaml@2.8.3)
       yargs:
         specifier: ^17.7.2
         version: 17.7.2
@@ -53,10 +53,10 @@ importers:
         version: 9.39.2
       '@langwatch/scenario':
         specifier: ^0.4.6
-        version: 0.4.10(0f856a09318632441f52123e7e66f3b6)
+        version: 0.4.10(325f2ac55009fad6e2acd26ed8f33b8a)
       '@types/debug':
         specifier: ^4.1.12
-        version: 4.1.12
+        version: 4.1.13
       '@types/eslint__js':
         specifier: ^8.42.3
         version: 8.42.3
@@ -1340,8 +1340,8 @@ packages:
   '@types/connect@3.4.38':
     resolution: {integrity: sha512-K6uROf1LD88uDQqJCktA4yzL1YYAK6NgfsI0v/mTgyPKWsX1CnJ0XPSDhViejru1GcRkLWb8RlzFYJRqGUbaug==}
 
-  '@types/debug@4.1.12':
-    resolution: {integrity: sha512-vIChWdVG3LG1SMxEvI/AK+FWJthlrqlTu7fbrlywTkkaONwk/UAGaULXRlf8vkzFBLVm0zkMdCquhL5aOjhXPQ==}
+  '@types/debug@4.1.13':
+    resolution: {integrity: sha512-KSVgmQmzMwPlmtljOomayoR89W4FynCAi3E8PPs7vmDVPe84hT+vGPKkJfThkmXs0x0jAaa9U8uW8bbfyS2fWw==}
 
   '@types/deep-eql@4.0.2':
     resolution: {integrity: sha512-c9h9dVVMigMPc4bwTvC5dxqtqJZwQPePsWjPlpSOnojbor6pGqdk541lfA7AqFQr5pB1BRdq0juY9db81BwyFw==}
@@ -3482,7 +3482,7 @@ snapshots:
       '@langchain/core': 0.3.80(@opentelemetry/api@1.9.1)(@opentelemetry/exporter-trace-otlp-proto@0.215.0(@opentelemetry/api@1.9.1))(@opentelemetry/sdk-trace-base@2.7.0(@opentelemetry/api@1.9.1))(openai@6.34.0(ws@8.20.0)(zod@4.3.6))
       js-tiktoken: 1.0.21
 
-  '@langwatch/scenario@0.4.10(0f856a09318632441f52123e7e66f3b6)':
+  '@langwatch/scenario@0.4.10(325f2ac55009fad6e2acd26ed8f33b8a)':
     dependencies:
       '@ag-ui/core': 0.0.28
       '@ai-sdk/openai': 3.0.52(zod@3.25.76)
@@ -3493,7 +3493,7 @@ snapshots:
       langwatch: 0.16.1(7c67c605ee5bfbd7a8d8f9918c809a56)
       open: 11.0.0
       rxjs: 7.8.2
-      vitest: 3.2.4(@types/debug@4.1.12)(@types/node@16.18.126)(tsx@4.20.5)(yaml@2.8.3)
+      vitest: 3.2.4(@types/debug@4.1.13)(@types/node@16.18.126)(tsx@4.20.5)(yaml@2.8.3)
       xksuid: 0.0.4
       zod: 3.25.76
     transitivePeerDependencies:
@@ -4333,7 +4333,7 @@ snapshots:
     dependencies:
       '@types/node': 16.18.126
 
-  '@types/debug@4.1.12':
+  '@types/debug@4.1.13':
     dependencies:
       '@types/ms': 2.1.0
 
@@ -5968,7 +5968,7 @@ snapshots:
       tsx: 4.20.5
       yaml: 2.8.3
 
-  vitest@3.2.4(@types/debug@4.1.12)(@types/node@16.18.126)(tsx@4.20.5)(yaml@2.8.3):
+  vitest@3.2.4(@types/debug@4.1.13)(@types/node@16.18.126)(tsx@4.20.5)(yaml@2.8.3):
     dependencies:
       '@types/chai': 5.2.2
       '@vitest/expect': 3.2.4
@@ -5994,7 +5994,7 @@ snapshots:
       vite-node: 3.2.4(@types/node@16.18.126)(tsx@4.20.5)(yaml@2.8.3)
       why-is-node-running: 2.3.0
     optionalDependencies:
-      '@types/debug': 4.1.12
+      '@types/debug': 4.1.13
       '@types/node': 16.18.126
     transitivePeerDependencies:
       - jiti
