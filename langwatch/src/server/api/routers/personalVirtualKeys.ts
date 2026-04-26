@@ -1,0 +1,155 @@
+/**
+ * tRPC router for personal-VK lifecycle.
+ *
+ * Distinct from `virtualKeysRouter` (which is project-scoped, RBAC-gated
+ * via `virtualKeys:create`/`update`/etc.). Personal-VK procedures are
+ * authorised by the caller being the owner of the personal workspace —
+ * no project-level RBAC required because the personal project IS the
+ * caller's by construction.
+ */
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
+
+import {
+  PersonalVirtualKeyService,
+  PersonalVirtualKeyNotFoundError,
+} from "~/server/governance/personalVirtualKey.service";
+import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
+
+import { skipPermissionCheck } from "../rbac";
+import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+async function assertOrgMembership(
+  prisma: import("@prisma/client").PrismaClient,
+  userId: string,
+  organizationId: string,
+) {
+  const membership = await prisma.organizationUser.findUnique({
+    where: { userId_organizationId: { userId, organizationId } },
+  });
+  if (!membership) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Not a member of organization ${organizationId}`,
+    });
+  }
+}
+
+export const personalVirtualKeysRouter = createTRPCRouter({
+  /**
+   * List the caller's personal VKs in an organization. Never returns
+   * the secret. Used by /me/settings to render the device list.
+   */
+  list: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(skipPermissionCheck)
+    .query(async ({ ctx, input }) => {
+      await assertOrgMembership(ctx.prisma, ctx.session.user.id, input.organizationId);
+      const service = PersonalVirtualKeyService.create(ctx.prisma);
+      const keys = await service.list({
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+      });
+      return keys;
+    }),
+
+  /**
+   * Issue a new personal VK with the given label. Returns the secret
+   * exactly once — caller must persist it immediately.
+   *
+   * Used by:
+   *   - /me/settings "Add a new key" drawer (e.g. label="jane-laptop").
+   *   - The CLI device-flow approval handler for the FIRST personal
+   *     VK on first login (label="default").
+   */
+  issuePersonal: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        label: z
+          .string()
+          .min(1)
+          .max(64)
+          .regex(/^[a-z0-9][a-z0-9_\-]*$/, {
+            message:
+              "Label must be lowercase alphanumeric, dash, or underscore (no spaces)",
+          }),
+        routingPolicyId: z.string().optional(),
+      }),
+    )
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrgMembership(ctx.prisma, ctx.session.user.id, input.organizationId);
+
+      // Make sure the personal workspace exists (lazy backfill for users
+      // who joined the org before we shipped this feature).
+      const workspaceService = new PersonalWorkspaceService(ctx.prisma);
+      const workspace = await workspaceService.ensure({
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+        displayName: ctx.session.user.name,
+        displayEmail: ctx.session.user.email,
+      });
+
+      // Reject duplicate labels at the application layer (the unique idx
+      // is on (projectId, name) and would surface a P2002 anyway).
+      const existing = await ctx.prisma.virtualKey.findFirst({
+        where: {
+          projectId: workspace.project.id,
+          name: input.label,
+          revokedAt: null,
+        },
+      });
+      if (existing) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: `You already have a personal key labelled '${input.label}'`,
+        });
+      }
+
+      const service = PersonalVirtualKeyService.create(ctx.prisma);
+      const issued = await service.issue({
+        userId: ctx.session.user.id,
+        organizationId: input.organizationId,
+        personalProjectId: workspace.project.id,
+        personalTeamId: workspace.team.id,
+        label: input.label,
+        routingPolicyId: input.routingPolicyId,
+      });
+
+      return {
+        id: issued.virtualKey.id,
+        label: issued.virtualKey.name,
+        secret: issued.secret,
+        baseUrl: issued.baseUrl,
+        displayPrefix: issued.virtualKey.displayPrefix,
+        routingPolicyId: issued.routingPolicyId,
+      };
+    }),
+
+  /** Revoke one of the caller's personal VKs. Idempotent. */
+  revokePersonal: protectedProcedure
+    .input(z.object({ organizationId: z.string(), id: z.string() }))
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrgMembership(ctx.prisma, ctx.session.user.id, input.organizationId);
+
+      const service = PersonalVirtualKeyService.create(ctx.prisma);
+      try {
+        await service.revoke({
+          userId: ctx.session.user.id,
+          organizationId: input.organizationId,
+          virtualKeyId: input.id,
+        });
+      } catch (err) {
+        if (err instanceof PersonalVirtualKeyNotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: err.message,
+          });
+        }
+        throw err;
+      }
+      return { ok: true };
+    }),
+});

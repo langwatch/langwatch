@@ -39,6 +39,7 @@ import { app as workflowsApp } from "./routes/workflows";
 import { app as adminApp } from "../../ee/admin/routes/admin";
 import { app as annotationsApp } from "./routes/annotations";
 import { app as authApp } from "./routes/auth";
+import { app as authCliApp } from "./routes/auth-cli";
 import { app as collectorApp } from "./routes/collector";
 import { app as cronApp } from "./routes/cron";
 import { app as evaluationsLegacyApp } from "./routes/evaluations-legacy";
@@ -100,6 +101,7 @@ export function createApiRouter() {
   api.route("/", adminApp);
   api.route("/", annotationsApp);
   api.route("/", authApp);
+  api.route("/", authCliApp);  // /api/auth/cli/* — RFC 8628 device-flow for CLI
   api.route("/", collectorApp);
   api.route("/", cronApp);
   api.route("/", evaluationsLegacyApp);

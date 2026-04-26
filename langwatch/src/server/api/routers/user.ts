@@ -10,6 +10,8 @@ import { revokeOtherSessionsForUser } from "~/server/better-auth/revokeSessions"
 import { rateLimit } from "~/server/rateLimit";
 import { getClientIp } from "~/utils/getClientIp";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
+import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
+import { RoutingPolicyService } from "~/server/governance/routingPolicy.service";
 
 export const userRouter = createTRPCRouter({
   /**
@@ -296,5 +298,62 @@ export const userRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await UserService.create(ctx.prisma).reactivate({ id: input.userId });
       return { success: true };
+    }),
+
+  /**
+   * Personal context for a user inside an organization. Backs the /me
+   * dashboard's `usePersonalContext` hook (see
+   * src/components/me/usePersonalContext.ts for the consumed shape).
+   *
+   * Lazily provisions the personal workspace on first call so existing
+   * users (who joined the org before this feature shipped) get one
+   * without re-accepting an invite.
+   *
+   * Cost / activity rollups are intentionally NOT computed here this
+   * iteration — the hook keeps its mocked data for those fields until
+   * the ClickHouse aggregations land in iter 2. This procedure ships
+   * the workspace identity + routing-policy resolution so the page
+   * and CLI both have a stable contract to wire against.
+   */
+  personalContext: protectedProcedure
+    .input(z.object({ organizationId: z.string() }))
+    .use(skipPermissionCheck)
+    .query(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+
+      // Caller must be a member of the org.
+      const membership = await ctx.prisma.organizationUser.findUnique({
+        where: {
+          userId_organizationId: { userId, organizationId: input.organizationId },
+        },
+      });
+      if (!membership) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: `Not a member of organization ${input.organizationId}`,
+        });
+      }
+
+      const workspaceService = new PersonalWorkspaceService(ctx.prisma);
+      const workspace = await workspaceService.ensure({
+        userId,
+        organizationId: input.organizationId,
+        displayName: ctx.session.user.name,
+        displayEmail: ctx.session.user.email,
+      });
+
+      const policyService = new RoutingPolicyService(ctx.prisma);
+      const defaultPolicy = await policyService.resolveDefaultForUser({
+        userId,
+        organizationId: input.organizationId,
+        personalTeamId: workspace.team.id,
+      });
+
+      return {
+        workspace,
+        routingPolicy: defaultPolicy
+          ? { id: defaultPolicy.id, name: defaultPolicy.name }
+          : null,
+      };
     }),
 });
