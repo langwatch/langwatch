@@ -10,15 +10,6 @@ Feature: Model Parameter Constraints
   # Unit Tests: Constraint Resolution
 
   @unit @unimplemented
-  Scenario: Anthropic provider has temperature max 1.0
-    Given the provider "anthropic" has parameterConstraints:
-      | parameter   | min | max |
-      | temperature | 0   | 1   |
-    When resolving constraints for model "anthropic/claude-sonnet-4"
-    Then temperature constraint should have max 1.0
-    And temperature constraint should have min 0
-
-  @unit @unimplemented
   Scenario: OpenAI provider uses global defaults
     Given the provider "openai" has no parameterConstraints for temperature
     When resolving constraints for model "openai/gpt-4.1"
