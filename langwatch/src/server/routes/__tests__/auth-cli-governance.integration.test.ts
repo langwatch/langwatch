@@ -224,9 +224,11 @@ describe("GET /api/auth/cli/governance/*", () => {
           `Bearer ${TOKEN_A}`,
         );
         expect(res.status).toBe(200);
-        const body = (await res.json()) as Array<{ id: string; name: string }>;
-        expect(Array.isArray(body)).toBe(true);
-        const ids = body.map((s) => s.id);
+        const body = (await res.json()) as {
+          sources: Array<{ id: string; name: string }>;
+        };
+        expect(Array.isArray(body.sources)).toBe(true);
+        const ids = body.sources.map((s) => s.id);
         expect(ids).toContain(SOURCE_A_ID);
         expect(ids).not.toContain(SOURCE_B_ID);
       });
@@ -269,14 +271,14 @@ describe("GET /api/auth/cli/governance/*", () => {
     });
 
     describe("when called for a source owned by the caller's org", () => {
-      it("returns 200 with an array (empty when no events have landed)", async () => {
+      it("returns 200 with {events:[]} (empty when no events have landed)", async () => {
         const res = await callGovernance(
           `/ingest/sources/${SOURCE_A_ID}/events?limit=10`,
           `Bearer ${TOKEN_A}`,
         );
         expect(res.status).toBe(200);
-        const body = await res.json();
-        expect(Array.isArray(body)).toBe(true);
+        const body = (await res.json()) as { events: unknown[] };
+        expect(Array.isArray(body.events)).toBe(true);
       });
 
       it("respects the limit query param (clamped to 1..200)", async () => {
