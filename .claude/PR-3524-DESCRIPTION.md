@@ -323,8 +323,74 @@ trail. The mechanical delete commit (`f3de1ae07`) is the boundary between
 
 ## Customer-facing surfaces touched by this PR
 
-> **Andre to fold customer-facing narrative + per-platform mapping here from
-> his iter19 draft (.monitor-logs/pr-3524-body-iter19-andre-lane-a-draft.md).**
+### Per-platform OTLP-shape mapping (what each source emits, where it lands)
+
+Every governance ingest source picks its OTLP wire shape based on whether the upstream emits span-shaped agent activity or flat audit events:
+
+| Source type | Delivery | OTLP shape | Storage | Drill-down UX | Today's capability |
+|---|---|---|---|---|---|
+| `otel_generic` | Push (HTTP/OTLP) | Spans | `recorded_spans` | Trace viewer | Production-ready |
+| `claude_cowork` | Push (HTTP/OTLP) | Spans | `recorded_spans` | Trace viewer | Production-ready |
+| `workato` | Webhook → OTLP logs | Logs | `log_records` | Log detail pane | Receiver works; per-platform deeper adapter (job-array unwrap) is follow-up |
+| `s3_custom` | S3 replay + callback webhook | Logs | `log_records` | Log detail pane | Receiver works; S3 DSL parsing is follow-up |
+| `copilot_studio` | Pull (worker, vendor API) | Logs | `log_records` | Log detail pane | Setup-contract-only; puller worker is follow-up |
+| `openai_compliance` | Pull (worker, vendor API) | Logs | `log_records` | Log detail pane | Setup-contract-only; puller worker is follow-up |
+| `claude_compliance` | Pull (worker, vendor API) | Logs | `log_records` | Log detail pane | Setup-contract-only; puller worker is follow-up |
+
+**Why two shapes**: spans carry parent-child + duration + status — native fit for multi-step agent activity that benefits from drill-down in the trace viewer. Logs are flat: one event = one row, attributes carry the payload. Forcing flat audit feeds into the span shape requires synthetic `traceId`/`spanId`/duration that carry no information. **One internal pipeline either way** — both shapes pass through the same hardened OTLP parser (`langwatch/src/server/otel/parseOtlpBody.ts:57-159`) and the same trace pipeline downstream.
+
+### Compliance posture (per-framework mapping for the auditor in the room)
+
+| Framework | Coverage in this PR | Mechanism in LangWatch |
+|---|---|---|
+| **SOC 2 Type II** | ✅ Baseline | Append-only `event_log` (PR #3351 foundation) + per-origin retention class + RBAC via project membership + access logging + org-tenancy isolation |
+| **ISO 27001** | ✅ Baseline | Same; documented control mapping (Annex A.12 logging, A.18 compliance) |
+| **EU AI Act** (general-purpose tier) | ✅ Baseline | Audit trail durable in `event_log` + retention class meets logging requirements + non-repudiation |
+| **GDPR** | ✅ Baseline | Right-to-be-forgotten honoured at retention boundary; org-tenancy isolation; auditor read-only role for DPO access |
+| **HIPAA** (most uses) | ✅ Baseline | 7-year archive class (`seven_years`) + RBAC + `event_log` non-repudiation + org-tenancy isolation |
+| **EU AI Act** (high-risk tier) | ⏳ Pending follow-up | Same baseline + cryptographic tamper-evidence (named, design locked in `compliance-baseline.feature`) |
+| **HIPAA** (covered-entity strict / HITECH cryptographic verification) | ⏳ Pending follow-up | Same + tamper-evidence follow-up |
+| **SEC 17a-4** (broker-dealer WORM) | ✗ Out of scope | Requires WORM storage layer + cryptographic verification beyond LangWatch's current model |
+
+**Tamper-evidence is named, not abandoned**: the design (Merkle-root publication of `event_log` digests + customer-rotatable signing keys + verification REST API) is locked in `specs/ai-gateway/governance/compliance-baseline.feature` so it isn't reinvented when a named customer requirement lands. **Why deferred**: the baseline `event_log` already provides non-repudiation for SOC 2 / ISO 27001 / EU AI Act general-purpose / GDPR / HIPAA-most-uses without cryptographic publication; we're not over-engineering for hypothetical customers. **What we don't compromise**: the baseline ships in this PR, fully tested, fully spec'd. Tamper-evidence is the only deferred compliance scope.
+
+### In-scope vs out-of-scope (deferral honesty)
+
+| | This PR | Out of scope (named follow-ups) |
+|---|---|---|
+| **Architecture** | Unified observability substrate (recorded_spans + log_records); hidden Governance Project lazy-ensure; origin metadata; reserved namespaces | — |
+| **Receivers** | OTLP/HTTP push + generic webhook → OTLP logs adapter (default minimum-shape mapper) | Per-platform deeper webhook adapters (workato job arrays, s3 DSL parsing, copilot_studio Purview shapes); pull-mode workers for copilot_studio + openai_compliance + claude_compliance |
+| **Folds** | (Step 3/3, in flight) | governance_kpis + governance_ocsf_events on the unified store |
+| **Anomaly reactor** | spend_spike Live; 6 other types Preview (composer accepts, reactor skips with debug log); log-only dispatch | C3 `triggerActionDispatch` (Slack / PagerDuty / SIEM webhook / email); structured threshold-config schema per rule type |
+| **OCSF / SIEM** | (Step 3/3, in flight) | Per-org SIEM push UI; DLQ + replay; managed Splunk/Datadog HEC integrations |
+| **Compliance** | SOC 2 Type II / ISO 27001 / EU AI Act general-purpose / GDPR / HIPAA-most-uses baseline | Cryptographic tamper-evidence (Merkle-root + signing keys + verification API) |
+| **Retention** | Three classes (`thirty_days` / `one_year` / `seven_years`); CH TTL hook (Step 2c, in flight) | Per-source custom retention windows; org-plan ceiling enforcement |
+| **UI** | Governance home + composer + secret-reveal modal + per-source detail (unified store) + anomaly composer + project-filter regression | Per-org SIEM push management UI; tamper-evidence verification UI |
+| **CLI** | `langwatch governance status`; `langwatch ingest list/health/tail` (read-only) | `langwatch ingest mutate` writes; OCSF push trigger; tamper-evidence verify |
+| **Tier 2 / Tier 5** | Control-plane primitives | BYOK endpoint routing runtime; sandboxed-runtime adapter |
+
+### CLI ingest debug surface (lane-A)
+
+Read-only governance debug helpers gated behind `LANGWATCH_GOVERNANCE_PREVIEW=1`. Same backend the web `/governance` and per-source detail page render, exposed via Bearer-auth REST adapters under `/api/auth/cli/governance/*`.
+
+| Command | What it does | Backend |
+|---------|--------------|---------|
+| `langwatch governance status` | Org-level setup-state OR-of-flags (drives MainMenu Govern entry promotion) | `api.governance.setupState` |
+| `langwatch ingest list [--all] [--json]` | Org's IngestionSources, active by default | `api.ingestionSources.list` |
+| `langwatch ingest health <id> [--json]` | 24h / 7d / 30d events + lastSuccessIso | `api.ingestionSources.healthMetrics` |
+| `langwatch ingest tail <id> [--limit N] [--follow] [--json]` | Stream events from unified store, dedup by spanId/eventId | `api.governance.eventsForSource` |
+
+All `--json` modes contract-stable byte-for-byte with the equivalent tRPC procedure. `--follow` polls every 3s with cursor watermark + `seen` Set dedup.
+
+### Documentation updates landed in this PR
+
+- `docs/ai-gateway/overview` — 30-second curl with the new "Don't have a VK yet?" persona-fork callout
+- `docs/ai-gateway/quickstart` — explicit developer / admin persona fork at the top
+- `docs/ai-gateway/governance/{overview, control-plane, personal-keys, admin-setup, routing-policies, anomaly-rules, cli-debug}` — full governance reading order
+- `docs/ai-gateway/governance/ingestion-sources/{index, otel-generic, claude-cowork, workato, s3-custom, copilot-studio, openai-compliance, claude-compliance}` — 8 per-platform pages with brutally honest **Production-ready / Receiver-works / Setup-contract-only** matrix
+- `docs/observability/trace-vs-activity-ingestion` — disambiguation page (two URLs, ONE substrate, IngestionSource as origin metadata)
+
+Plus an internal architecture decision record landing in `dev/docs/adr/` capturing the parallel-pipeline rip-out and the unified-substrate decision (drafted at `.monitor-logs/lane-a-dev-docs-adr-draft.md`, lands as the PR is finalized).
 
 ---
 
