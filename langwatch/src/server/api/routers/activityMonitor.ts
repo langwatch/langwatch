@@ -86,4 +86,41 @@ export const activityMonitorRouter = createTRPCRouter({
         currentState: "open" | "acknowledged" | "resolved";
       }>;
     }),
+
+  /**
+   * Recent events for a single IngestionSource — powers the per-source
+   * detail page's "raw vs normalised" preview. Cursor-paginated by
+   * eventTimestamp DESC via the optional `beforeIso` parameter.
+   */
+  eventsForSource: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        sourceId: z.string(),
+        limit: z.number().int().min(1).max(200).default(50),
+        beforeIso: z.string().optional(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      const service = ActivityMonitorService.create(ctx.prisma);
+      return await service.eventsForSource(input);
+    }),
+
+  /**
+   * Volume metrics for one source over rolling 24h/7d/30d windows +
+   * lastSuccessIso. Powers the per-source detail page's health header.
+   */
+  sourceHealthMetrics: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        sourceId: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ ctx, input }) => {
+      const service = ActivityMonitorService.create(ctx.prisma);
+      return await service.sourceHealthMetrics(input);
+    }),
 });

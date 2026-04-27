@@ -47,6 +47,27 @@ export interface IngestionSourceHealthRow {
   eventsLast24h: number;
 }
 
+export interface ActivityEventDetailRow {
+  eventId: string;
+  eventType: string;
+  actor: string;
+  action: string;
+  target: string;
+  costUsd: number;
+  tokensInput: number;
+  tokensOutput: number;
+  eventTimestampIso: string;
+  ingestedAtIso: string;
+  rawPayload: string;
+}
+
+export interface SourceHealthMetrics {
+  events24h: number;
+  events7d: number;
+  events30d: number;
+  lastSuccessIso: string | null;
+}
+
 const EMPTY_SUMMARY: SummaryResult = {
   spentThisWindowUsd: 0,
   windowOverPreviousPct: 0,
@@ -259,6 +280,156 @@ export class ActivityMonitorService {
       eventsLast24h: countsBySourceId[src.id] ?? 0,
     }));
   }
+
+  /**
+   * Recent events for a single IngestionSource — powers the per-source
+   * detail page's "raw vs normalised" preview. Cursor-paginated by
+   * eventTimestamp (DESC). Caller authorises that the source belongs
+   * to the org BEFORE calling this — service returns empty when the
+   * source-id doesn't match the org (defensive).
+   */
+  async eventsForSource(input: {
+    organizationId: string;
+    sourceId: string;
+    limit?: number;
+    /** ISO timestamp — return events strictly older than this. */
+    beforeIso?: string;
+  }): Promise<ActivityEventDetailRow[]> {
+    if (!isClickHouseEnabled()) return [];
+    const client = await getClickHouseClientForOrganization(
+      input.organizationId,
+    );
+    if (!client) return [];
+
+    const limit = input.limit ?? 50;
+    const beforeFilter = input.beforeIso
+      ? "AND EventTimestamp < toDateTime64({beforeIso:String}, 3)"
+      : "";
+    const result = await client.query({
+      query: `
+        SELECT
+          EventId AS event_id,
+          EventType AS event_type,
+          Actor AS actor,
+          Action AS action,
+          Target AS target,
+          CostUSD AS cost_usd,
+          TokensInput AS tokens_input,
+          TokensOutput AS tokens_output,
+          EventTimestamp AS event_timestamp,
+          IngestedAt AS ingested_at,
+          RawPayload AS raw_payload
+        FROM gateway_activity_events
+        WHERE OrganizationId = {organizationId:String}
+          AND TenantId = {sourceId:String}
+          ${beforeFilter}
+        ORDER BY EventTimestamp DESC, EventId DESC
+        LIMIT {limit:UInt32}
+      `,
+      query_params: {
+        organizationId: input.organizationId,
+        sourceId: input.sourceId,
+        limit,
+        ...(input.beforeIso
+          ? { beforeIso: isoToClickhouseTime(input.beforeIso) }
+          : {}),
+      },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      event_id: string;
+      event_type: string;
+      actor: string;
+      action: string;
+      target: string;
+      cost_usd: string | number;
+      tokens_input: string | number;
+      tokens_output: string | number;
+      event_timestamp: string;
+      ingested_at: string;
+      raw_payload: string;
+    }>;
+    return rows.map((r) => ({
+      eventId: r.event_id,
+      eventType: r.event_type,
+      actor: r.actor,
+      action: r.action,
+      target: r.target,
+      costUsd: roundCurrency(Number(r.cost_usd) || 0),
+      tokensInput: Number(r.tokens_input) || 0,
+      tokensOutput: Number(r.tokens_output) || 0,
+      eventTimestampIso: clickhouseTimeToIso(r.event_timestamp),
+      ingestedAtIso: clickhouseTimeToIso(r.ingested_at),
+      rawPayload: r.raw_payload,
+    }));
+  }
+
+  /**
+   * Volume metrics for a single IngestionSource over rolling windows.
+   * Powers the per-source detail page's "events ingested" health
+   * section. Single CH query with conditional aggregation.
+   */
+  async sourceHealthMetrics(input: {
+    organizationId: string;
+    sourceId: string;
+  }): Promise<SourceHealthMetrics> {
+    const empty: SourceHealthMetrics = {
+      events24h: 0,
+      events7d: 0,
+      events30d: 0,
+      lastSuccessIso: null,
+    };
+    if (!isClickHouseEnabled()) return empty;
+    const client = await getClickHouseClientForOrganization(
+      input.organizationId,
+    );
+    if (!client) return empty;
+
+    const now = Date.now();
+    const result = await client.query({
+      query: `
+        SELECT
+          countIf(EventTimestamp >= toDateTime64({since24h:String}, 3)) AS events_24h,
+          countIf(EventTimestamp >= toDateTime64({since7d:String}, 3)) AS events_7d,
+          count() AS events_30d,
+          max(EventTimestamp) AS last_success
+        FROM gateway_activity_events
+        WHERE OrganizationId = {organizationId:String}
+          AND TenantId = {sourceId:String}
+          AND EventTimestamp >= toDateTime64({since30d:String}, 3)
+      `,
+      query_params: {
+        organizationId: input.organizationId,
+        sourceId: input.sourceId,
+        since24h: msToClickhouseTime(now - 24 * 60 * 60 * 1000),
+        since7d: msToClickhouseTime(now - 7 * 24 * 60 * 60 * 1000),
+        since30d: msToClickhouseTime(now - 30 * 24 * 60 * 60 * 1000),
+      },
+      format: "JSONEachRow",
+    });
+    const rows = (await result.json()) as Array<{
+      events_24h: string | number;
+      events_7d: string | number;
+      events_30d: string | number;
+      last_success: string;
+    }>;
+    const row = rows[0];
+    if (!row) return empty;
+    const lastRaw = row.last_success;
+    return {
+      events24h: Number(row.events_24h) || 0,
+      events7d: Number(row.events_7d) || 0,
+      events30d: Number(row.events_30d) || 0,
+      lastSuccessIso:
+        lastRaw && !lastRaw.startsWith("1970")
+          ? clickhouseTimeToIso(lastRaw)
+          : null,
+    };
+  }
+}
+
+function isoToClickhouseTime(iso: string): string {
+  return iso.replace("T", " ").replace("Z", "");
 }
 
 // ---------------------------------------------------------------------------
