@@ -17,9 +17,7 @@ const DEFAULT_CODE_NODE_PROPERTIES: CodeExecutionNode = {
       {
         identifier: "code",
         type: "code",
-        value: `import dspy
-
-class Code(dspy.Module):
+        value: `class Code:
     def forward(self, ${INPUT_FIELD_NAME}: str):
         # Your code goes here
 

@@ -48,9 +48,7 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { ScenarioInputMappingSection, isScenarioMappingValid } from "~/components/suites/ScenarioInputMappingSection";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 
-const DEFAULT_CODE = `import dspy
-
-class Code(dspy.Module):
+const DEFAULT_CODE = `class Code:
     def forward(self, input: str):
         # Your code goes here
 
