@@ -40,6 +40,7 @@ const ROUTE_PATTERNS = [
   "/onboarding/welcome",
   "/settings",
   "/settings/governance",
+  "/settings/governance/ingestion-sources/:id",
   "/settings/governance/ingestion-sources",
   "/settings/governance/anomaly-rules",
   "/settings/*",

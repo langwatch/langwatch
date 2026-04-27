@@ -424,9 +424,15 @@ function SourceRow({
     >
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <HStack gap={2}>
-          <Text fontSize="sm" fontWeight="medium">
-            {source.name}
-          </Text>
+          <Link
+            href={`/settings/governance/ingestion-sources/${source.id}`}
+            color="fg"
+            _hover={{ color: "orange.600" }}
+          >
+            <Text fontSize="sm" fontWeight="medium">
+              {source.name}
+            </Text>
+          </Link>
           <Badge size="sm" variant="surface">
             {typeLabel}
           </Badge>

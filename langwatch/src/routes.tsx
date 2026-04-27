@@ -196,6 +196,12 @@ const routes: RouteObject[] = [
     ...page(() => import("./pages/settings/governance/ingestion-sources")),
   },
   {
+    path: "/settings/governance/ingestion-sources/:id",
+    ...page(() =>
+      import("./pages/settings/governance/ingestion-source-detail"),
+    ),
+  },
+  {
     path: "/settings/governance/anomaly-rules",
     ...page(() => import("./pages/settings/governance/anomaly-rules")),
   },
