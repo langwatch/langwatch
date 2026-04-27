@@ -524,4 +524,98 @@ describe("workflowStoreCore", () => {
       });
     });
   });
+
+  describe("hasPendingChanges (regression: #2270)", () => {
+    let testStore: StoreApi<WorkflowStore>;
+
+    beforeEach(() => {
+      testStore = createStore<WorkflowStore>(storeCreator as any);
+    });
+
+    function buildDbDsl() {
+      return {
+        spec_version: "1.4" as const,
+        name: "My Workflow",
+        icon: "🧩",
+        description: "A test workflow",
+        version: "1.0",
+        nodes: [
+          makeNode({
+            id: "node1",
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+          }),
+        ],
+        edges: [],
+        default_llm: {
+          model: "openai/gpt-5-mini",
+          max_tokens: 2048,
+          temperature: 0,
+          litellm_params: {},
+        },
+        template_adapter: "default",
+        enable_tracing: true,
+        workflow_type: "workflow" as const,
+        state: {},
+      };
+    }
+
+    /**
+     * Replicates the [workflow].tsx DB load sequence. The `snapshotBaseline`
+     * flag controls whether the fix (setAutosavedWorkflow after load) is
+     * applied — when false, this is the pre-fix behavior.
+     */
+    function loadFromDb(
+      dbDsl: ReturnType<typeof buildDbDsl>,
+      { snapshotBaseline }: { snapshotBaseline: boolean },
+    ) {
+      testStore.getState().setAutosavedWorkflow(undefined);
+      testStore.getState().setWorkflow({
+        ...dbDsl,
+        workflow_id: "wf_123",
+        nodes: dbDsl.nodes.map((node: any) => ({
+          ...node,
+          selected: false,
+        })),
+      } as any);
+      testStore.getState().setLastCommittedWorkflow(dbDsl as any);
+
+      if (snapshotBaseline) {
+        const loadedWorkflow = testStore.getState().getWorkflow();
+        testStore.getState().setAutosavedWorkflow(loadedWorkflow);
+      }
+    }
+
+    describe("when workflow is loaded from DB and autosave baseline is set from normalized state", () => {
+      it("reports no pending changes", () => {
+        loadFromDb(buildDbDsl(), { snapshotBaseline: true });
+
+        expect(testStore.getState().hasPendingChanges()).toBe(false);
+      });
+    });
+
+    describe("when workflow is loaded from DB without snapshotting the autosave baseline", () => {
+      it("leaves autosave baseline undefined, disabling dirty-state detection until AutoSave fires", () => {
+        loadFromDb(buildDbDsl(), { snapshotBaseline: false });
+
+        // Pre-fix: autosavedWorkflow stays undefined → hasPendingChanges short-circuits
+        // to false, but this is a false negative — the baseline is missing, so any
+        // store mutation before AutoSave's debounce fires will be silently absorbed
+        // into the baseline, making it impossible to detect as a change.
+        expect(testStore.getState().getAutosavedWorkflow()).toBeUndefined();
+      });
+    });
+
+    describe("when autosave baseline is set and user makes a change", () => {
+      it("reports pending changes", () => {
+        loadFromDb(buildDbDsl(), { snapshotBaseline: true });
+
+        expect(testStore.getState().hasPendingChanges()).toBe(false);
+
+        testStore.getState().setWorkflow({ name: "Renamed Workflow" });
+
+        expect(testStore.getState().hasPendingChanges()).toBe(true);
+      });
+    });
+  });
 });

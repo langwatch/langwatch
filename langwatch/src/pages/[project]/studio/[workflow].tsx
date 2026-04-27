@@ -61,6 +61,10 @@ export default function Studio() {
         })),
       });
       setLastCommittedWorkflow(dsl);
+      // Snapshot the normalized store state as autosave baseline so
+      // hasPendingChanges() does not falsely detect dirty state after load
+      const loadedWorkflow = _useWorkflowStore.getState().getWorkflow();
+      setAutosavedWorkflow(loadedWorkflow);
       setCurrentVersionId(workflow.data?.currentVersion?.id);
     } else {
       reset();
