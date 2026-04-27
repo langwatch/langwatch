@@ -115,18 +115,33 @@ export class IngestionSourceService {
       where: { ingestSecretHash: candidateHash, archivedAt: null },
     });
     if (direct) return direct;
-    // Rotation grace path: scan for sources with a still-valid prior
-    // hash. Cheap because we only look at sources that actually rotated
-    // recently (filterable via `parserConfig::jsonb -> '_rotation' IS NOT NULL`).
-    const rotating = await this.prisma.$queryRaw<IngestionSource[]>`
-      SELECT * FROM "IngestionSource"
-       WHERE "archivedAt" IS NULL
-         AND "parserConfig" -> '_rotation' IS NOT NULL
-         AND "parserConfig" -> '_rotation' ->> 'priorHash' = ${candidateHash}
-         AND ("parserConfig" -> '_rotation' ->> 'expiresAt')::bigint > ${Date.now()}
-       LIMIT 1
-    `;
-    return rotating[0] ?? null;
+    // Rotation grace path: scan only sources where parserConfig has a
+    // `_rotation` slot (Prisma JSON `path` filter). We avoid $queryRaw
+    // because dbMultiTenancyProtection rejects raw queries (no model
+    // context to authorise against). For typical orgs the rotating
+    // set is tiny (hours-scale grace window) so the in-app hash check
+    // on each is negligible.
+    const candidates = await this.prisma.ingestionSource.findMany({
+      where: {
+        archivedAt: null,
+        parserConfig: { path: ["_rotation", "priorHash"], equals: candidateHash },
+      },
+    });
+    const now = Date.now();
+    for (const candidate of candidates) {
+      const rotation =
+        ((candidate.parserConfig as Record<string, unknown>)?._rotation as
+          | { priorHash?: string; expiresAt?: number }
+          | undefined) ?? undefined;
+      if (
+        rotation?.priorHash === candidateHash &&
+        typeof rotation.expiresAt === "number" &&
+        rotation.expiresAt > now
+      ) {
+        return candidate;
+      }
+    }
+    return null;
   }
 
   // ---------------------------------------------------------------------
