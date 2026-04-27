@@ -1,6 +1,6 @@
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
-import { locateLangwatchDir } from "./node-deps.ts";
+import { locateLangwatchDir, resolvePnpm } from "./node-deps.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
@@ -19,26 +19,30 @@ import { supervise, type SupervisedHandle } from "./spawn.ts";
  * inferred from process liveness; if it crashes, supervise() emits the
  * crash event and the user sees it in the log stream.
  */
-export function startLangwatchWorkers(
+export async function startLangwatchWorkers(
   ctx: RuntimeContext,
   bus: EventBus,
   envFromFile: Record<string, string>,
-): SupervisedHandle {
+): Promise<SupervisedHandle> {
   bus.emit({ type: "starting", service: "workers" });
 
   const langwatchDir = locateLangwatchDir();
   if (!langwatchDir) throw new Error("langwatch app dir not found");
 
   const sp = servicePaths(ctx.paths);
+  const pnpm = await resolvePnpm(ctx.paths);
   const handle = supervise({
     spec: {
       name: "workers",
-      command: "pnpm",
-      args: ["run", "start:workers"],
+      command: pnpm.command,
+      args: [...pnpm.args, "run", "start:workers"],
       cwd: langwatchDir,
       env: {
         ...process.env,
         ...envFromFile,
+        // ctx.paths.bin first so the bundled pnpm is reachable to nested
+        // invocations; matches startLangwatch.
+        PATH: `${ctx.paths.bin}:${process.env.PATH ?? ""}`,
         NODE_ENV: "production",
         // PORT isn't used by workers but we set it for symmetry with the
         // app — some shared bootstrap code reads it for log tagging.

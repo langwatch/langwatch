@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
+import type { LangwatchPaths } from "../shared/paths.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 
 /**
@@ -13,7 +14,7 @@ import { execAndPipe } from "./_pipe-to-bus.ts";
  * Runs INSIDE the relocated app tree (LANGWATCH_HOME/app/langwatch/) — see
  * services/app-dir.ts for why we relocate out of node_modules.
  */
-export async function ensureLangwatchDeps(bus: EventBus): Promise<void> {
+export async function ensureLangwatchDeps(ctx: { paths: LangwatchPaths }, bus: EventBus): Promise<void> {
   const langwatchDir = locateLangwatchDir();
   if (!langwatchDir) throw new Error("langwatch app dir not found");
 
@@ -60,7 +61,7 @@ export async function ensureLangwatchDeps(bus: EventBus): Promise<void> {
   // pnpm -C <dir>` swallows the `-C` flag in some cases and pnpm
   // re-resolves cwd to its own dir, defeating the workspace-isolation
   // intent above. See resolvePnpm() below.
-  const pnpm = await resolvePnpm();
+  const pnpm = await resolvePnpm(ctx.paths);
 
   if (!installFresh) {
     // Always install with `--prod=false`. We tried `--prod` for the
@@ -136,18 +137,39 @@ function computeInstallKey(...files: string[]): string {
   return h.digest("hex");
 }
 
-export async function resolvePnpm(): Promise<{ command: string; args: string[] }> {
-  // Prefer pnpm directly on PATH (pnpm/action-setup puts it there on CI;
-  // corepack shims put it there for end users running `npx ...`). Fall back
-  // to `corepack pnpm` only if pnpm isn't reachable. We avoid corepack-as-
-  // primary because `corepack pnpm -C <dir>` swallows the `-C` flag in some
-  // cases — pnpm gets invoked from its own cwd, not the supplied dir, and
-  // langwatch's `build` script isn't found.
+/**
+ * Resolve which `pnpm` to use for our outer invocations (the `pnpm install`,
+ * `pnpm run build`, `pnpm run prisma:migrate` calls we make from
+ * services/{node-deps,migrate,langwatch,langwatch-workers}.ts).
+ *
+ * Order:
+ *  1. The bundled pnpm we install as a predep into `<paths.bin>/pnpm` —
+ *     see predeps/pnpm.ts. This is the canonical end-user path.
+ *     Self-contained, no corepack dependency, deterministic version.
+ *  2. Direct `pnpm` on PATH — for dev checkouts and CI runners that
+ *     already have pnpm/action-setup or a global pnpm install.
+ *  3. `corepack pnpm` — last-ditch fallback for environments with
+ *     corepack but no pnpm on PATH and no bundled pnpm yet.
+ *
+ * The bundled pnpm wins over PATH-pnpm so the version is whatever the
+ * predep pinned, regardless of the user's globals. ctx.paths.bin is also
+ * prepended to PATH for spawned children, so any nested `pnpm` call inside
+ * langwatch's package.json scripts (e.g. `sh -c 'pnpm prisma migrate
+ * deploy'`) resolves to the same bundled binary.
+ *
+ * Pass `paths` from any caller that has runtime context; callers who
+ * don't (legacy ensureLangwatchDeps before predeps run) skip step 1.
+ */
+export async function resolvePnpm(paths?: LangwatchPaths): Promise<{ command: string; args: string[] }> {
+  if (paths) {
+    const bundled = join(paths.bin, "pnpm");
+    if (existsSync(bundled)) return { command: bundled, args: [] };
+  }
   const direct = await execa("pnpm", ["--version"], { reject: false });
   if (direct.exitCode === 0) return { command: "pnpm", args: [] };
   const { exitCode } = await execa("corepack", ["--version"], { reject: false });
   if (exitCode === 0) return { command: "corepack", args: ["pnpm"] };
-  throw new Error("pnpm not found on PATH and corepack is unavailable");
+  throw new Error("pnpm not found in <bin>/pnpm, on PATH, or via corepack");
 }
 
 export function locateLangwatchDir(): string | null {

@@ -48,11 +48,12 @@ export async function runMigrations(
     SKIP_CLICKHOUSE_MIGRATE: "false",
   };
 
-  // Resolve pnpm via the same fallback chain node-deps.ts uses (direct →
-  // corepack pnpm). Bare-Linux boxes — node installed via nvm without
-  // pnpm-on-PATH and without `corepack enable` — would otherwise hit
-  // `spawn pnpm ENOENT` here. Mirrors ensureLangwatchDeps.
-  const pnpm = await resolvePnpm();
+  // resolvePnpm(paths) prefers the bundled <bin>/pnpm (installed by the
+  // pnpm predep), so both the OUTER `pnpm run prisma:migrate` AND the
+  // INNER `pnpm prisma migrate deploy` (inside the package.json's `sh -c`)
+  // resolve to the same binary — the inner one finds it via PATH, which
+  // the env block above already prepends with ctx.paths.bin.
+  const pnpm = await resolvePnpm(ctx.paths);
   await execAndPipe(bus, "migrate:prisma", pnpm.command, [...pnpm.args, "run", "prisma:migrate"], { cwd: langwatchDir, env });
   await execAndPipe(bus, "migrate:clickhouse", pnpm.command, [...pnpm.args, "run", "clickhouse:migrate"], { cwd: langwatchDir, env });
 

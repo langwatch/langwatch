@@ -56,7 +56,7 @@ const runtimeImpl: RuntimeApi = {
     // when its lockfile hash matches the previous run.
     await Promise.all([
       syncVenvs(ctx, bus),
-      ensureLangwatchDeps(bus),
+      ensureLangwatchDeps(ctx, bus),
     ]);
   },
 
@@ -103,9 +103,10 @@ const runtimeImpl: RuntimeApi = {
       // share the same boot env (Redis + Prisma already migrated, app
       // listening). Without these, the BullMQ collector/evaluations/
       // track-event/topic-clustering queues fill up with no consumer and
-      // the UI sits forever on "Waiting for first trace…". Sync spawn —
-      // no port to health-probe; lifecycle inferred from process state.
-      const workers = startLangwatchWorkers(ctx, bus, childEnv);
+      // the UI sits forever on "Waiting for first trace…". The await is
+      // for resolvePnpm() inside startLangwatchWorkers — the spawn itself
+      // is non-blocking; lifecycle is inferred from process state.
+      const workers = await startLangwatchWorkers(ctx, bus, childEnv);
       handles.push(workers);
     } catch (err) {
       await stopHandles(handles);
