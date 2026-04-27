@@ -33,7 +33,10 @@
 import type { Context } from "hono";
 import { Hono } from "hono";
 
-import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import type {
+  IExportLogsServiceRequest,
+  IExportTraceServiceRequest,
+} from "@opentelemetry/otlp-transformer";
 import type { IngestionSource } from "@prisma/client";
 
 import { getApp } from "~/server/app-layer/app";
@@ -83,6 +86,85 @@ function stampOriginAttrs(
       }
     }
   }
+}
+
+/**
+ * Map a webhook envelope (arbitrary JSON pushed by the upstream
+ * platform) to a single OTLP `IExportLogsServiceRequest` carrying ONE
+ * log_record. Per-source-type deeper mappings (workato job arrays,
+ * s3_custom DSL parsing) ship as follow-up adapters; this is the
+ * minimum shape that satisfies receiver-shapes.feature for flat-event
+ * sources — body = raw JSON string, attributes carry origin metadata.
+ *
+ * Why one log_record per envelope (not per parsed sub-event): keeps
+ * the unified-trace contract simple. When per-platform adapters land,
+ * they replace this default mapper with their richer per-event shape.
+ */
+function buildWebhookLogRequest(
+  rawBody: string,
+  source: IngestionSource,
+): IExportLogsServiceRequest {
+  const nowNanos = String(BigInt(Date.now()) * 1_000_000n);
+  return {
+    resourceLogs: [
+      {
+        resource: {
+          attributes: [
+            {
+              key: "service.name",
+              value: { stringValue: `ingestion-source/${source.sourceType}` },
+            },
+          ],
+          droppedAttributesCount: 0,
+        },
+        scopeLogs: [
+          {
+            scope: {
+              name: "langwatch.governance.ingestion",
+              version: "1",
+            },
+            logRecords: [
+              {
+                timeUnixNano: nowNanos,
+                observedTimeUnixNano: nowNanos,
+                severityNumber: 9, // SeverityNumber.INFO
+                severityText: "INFO",
+                body: { stringValue: rawBody },
+                attributes: [
+                  {
+                    key: "langwatch.origin.kind",
+                    value: { stringValue: "ingestion_source" },
+                  },
+                  {
+                    key: "langwatch.ingestion_source.id",
+                    value: { stringValue: source.id },
+                  },
+                  {
+                    key: "langwatch.ingestion_source.organization_id",
+                    value: { stringValue: source.organizationId },
+                  },
+                  {
+                    key: "langwatch.ingestion_source.source_type",
+                    value: { stringValue: source.sourceType },
+                  },
+                  {
+                    key: "langwatch.governance.retention_class",
+                    value: { stringValue: source.retentionClass },
+                  },
+                ],
+                droppedAttributesCount: 0,
+                traceId: new Uint8Array(0),
+                spanId: new Uint8Array(0),
+                flags: 0,
+              } as never,
+            ],
+            schemaUrl: "",
+          },
+        ],
+        schemaUrl: "",
+      },
+    ],
+  } as unknown as IExportLogsServiceRequest;
 }
 
 const logger = createLogger("langwatch:ingest");
@@ -217,15 +299,22 @@ app.post("/otel/:sourceId", async (c: Context) => {
 // ---------------------------------------------------------------------------
 // POST /api/ingest/webhook/:sourceId
 // ---------------------------------------------------------------------------
-// Generic JSON webhook receiver. Used by source types that push events
-// over HTTPS to a customer-specific URL: workato (audit log streaming),
-// custom in-house agents, future adapters with bespoke shapes.
+// Generic JSON webhook receiver for flat-event sources (workato audit
+// streaming, s3_custom callback mode, custom in-house agents). Maps
+// the JSON envelope to ONE OTLP log_record (NOT a synthetic span — flat
+// events have no logical duration / parent-child tree) and hands off to
+// the EXISTING log pipeline via getApp().traces.logCollection.
+// handleOtlpLogRequest. Same store, same trace viewer drill-down,
+// origin metadata distinguishes from application logs.
 //
-// In the unified-trace correction (in flight): webhook bodies will be
-// mapped to OTLP log records (NOT synthetic spans — they're flat events,
-// not span-shaped) and handed to the existing log pipeline with origin
-// metadata. This commit is the placeholder shape; mapping + handoff
-// lands in the next commit.
+// Per-source-type deeper mappings (workato job arrays, s3_custom DSL
+// parsing) ship as follow-up adapters that replace buildWebhookLogRequest
+// with their richer per-event shape — same handoff target.
+//
+// Spec contracts:
+//   - receiver-shapes.feature flat-event scenarios
+//   - architecture-invariants.feature unified-substrate scenarios
+//   - retention.feature origin-attribute-stamping scenarios
 // ---------------------------------------------------------------------------
 app.post("/webhook/:sourceId", async (c: Context) => {
   const source = await authIngestionSource(c);
@@ -253,14 +342,29 @@ app.post("/webhook/:sourceId", async (c: Context) => {
 
   let bodyBytes = 0;
   let envelopeId = "";
+  let handoffOk = false;
   try {
     const raw = await c.req.text();
     bodyBytes = raw.length;
     envelopeId = `envelope-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+
+    if (bodyBytes > 0) {
+      const govProject = await ensureHiddenGovernanceProject(
+        prisma,
+        source.organizationId,
+      );
+      const logRequest = buildWebhookLogRequest(raw, source);
+      await getApp().traces.logCollection.handleOtlpLogRequest({
+        tenantId: govProject.id,
+        logRequest,
+        piiRedactionLevel: govProject.piiRedactionLevel,
+      });
+      handoffOk = true;
+    }
   } catch (err) {
     logger.warn(
       { sourceId: source.id, err: String(err) },
-      "webhook ingest body read failed (still ack'ing)",
+      "webhook ingest receive failed (still ack'ing)",
     );
   }
 
@@ -272,8 +376,9 @@ app.post("/webhook/:sourceId", async (c: Context) => {
       sourceType: source.sourceType,
       bytes: bodyBytes,
       envelopeId,
+      handoffOk,
     },
-    "webhook ingest received (parser-only placeholder; OTLP-logs handoff lands in next commit)",
+    "webhook ingest landed in unified log pipeline",
   );
 
   return c.json({ accepted: true, bytes: bodyBytes, eventId: envelopeId }, 202);
