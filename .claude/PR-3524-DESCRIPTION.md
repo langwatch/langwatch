@@ -390,7 +390,7 @@ All `--json` modes contract-stable byte-for-byte with the equivalent tRPC proced
 - `docs/ai-gateway/governance/ingestion-sources/{index, otel-generic, claude-cowork, workato, s3-custom, copilot-studio, openai-compliance, claude-compliance}` — 8 per-platform pages with brutally honest **Production-ready / Receiver-works / Setup-contract-only** matrix
 - `docs/observability/trace-vs-activity-ingestion` — disambiguation page (two URLs, ONE substrate, IngestionSource as origin metadata)
 
-Plus an internal architecture decision record landing in `dev/docs/adr/` capturing the parallel-pipeline rip-out and the unified-substrate decision (drafted at `.monitor-logs/lane-a-dev-docs-adr-draft.md`, lands as the PR is finalized).
+Plus the internal architecture decision record at [`dev/docs/adr/018-governance-unified-observability-substrate.md`](../dev/docs/adr/018-governance-unified-observability-substrate.md) (commit `53a5c4af9`) — captures the parallel-pipeline rip-out, the user directive that triggered it, the 6-point unified-substrate decision, 4 alternatives considered with rejection reasons, the per-source-type wire-shape table, the hidden Gov Project lifecycle diagram, and the branch-correction commit-trace from `f3de1ae07` through `33a8cf6d0`.
 
 ---
 
