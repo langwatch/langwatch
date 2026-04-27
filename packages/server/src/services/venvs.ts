@@ -30,7 +30,11 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
     specs.map(async (spec) => {
       const venvDir = sp.venv(spec.name);
       const hashFile = join(venvDir, ".lock-hash");
-      const expected = hashFileSafely(spec.lockFile);
+      // Hash key includes the extras list so a venv installed without
+      // --extra all (e.g. an upgrade from < beta.17) gets re-synced when
+      // the spec adds new extras. Pure-lockfile hashing missed this and
+      // left langevals with no evaluator routes registered.
+      const expected = `${hashFileSafely(spec.lockFile)}|extras=${(spec.extras ?? []).slice().sort().join(",")}`;
       if (existsSync(venvDir) && readFileSafely(hashFile) === expected) return;
 
       bus.emit({ type: "starting", service: `prepare:${spec.name}` as never });
