@@ -1,20 +1,19 @@
 import {
   Badge,
   Box,
-  HStack,
   Heading,
+  HStack,
   SimpleGrid,
   Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import {
-  AlertTriangle,
+  CheckCircle2,
+  Circle,
   CircleCheck,
   CircleDashed,
   CircleX,
-  TrendingDown,
-  TrendingUp,
 } from "lucide-react";
 import numeral from "numeral";
 import Head from "~/utils/compat/next-head";
@@ -25,26 +24,31 @@ import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { Link } from "~/components/ui/link";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api, type RouterOutputs } from "~/utils/api";
 
 /**
- * Org-admin "bird's-eye view" of every AI agent / IDE tool / IngestionSource
- * running under the organization. Cross-cutting spend, per-user breakdown,
- * anomaly alerts, source health.
+ * Org-admin overview of AI governance state — spend, users, anomalies,
+ * IngestionSource health. Wires the api.activityMonitor.* procedures
+ * (Sergey Option B) for live reads off gateway_activity_events.
  *
- * v0 ships with deterministic in-memory fixture data so admins can evaluate
- * the UX. Real-data wire-up follows the D2 Activity Monitor backend
- * (IngestionSource ingestion + OCSF normalization + cross-source CH
- * aggregation). The "Preview · mocked data" badge in the header sets
- * expectations until then.
+ * When no traffic has been ingested yet, the page shows a setup
+ * checklist instead of empty zeroes — a "configure your first source"
+ * onboarding rather than an empty wasteland.
  *
  * Spec: specs/ai-gateway/governance/admin-oversight.feature
  */
 
+type Source = RouterOutputs["ingestionSources"]["list"][number];
+type SourceHealth = RouterOutputs["activityMonitor"]["ingestionSourcesHealth"][number];
+type SpendByUser = RouterOutputs["activityMonitor"]["spendByUser"][number];
+
 const fmtUsd = (n: number) =>
   n === 0 ? "$0.00" : numeral(n).format("$0,0.00");
 
-const fmtRelative = (iso: string): string => {
-  const diffMs = Date.now() - new Date(iso).getTime();
+const fmtRelative = (date: Date | string | null): string => {
+  if (!date) return "—";
+  const d = typeof date === "string" ? new Date(date) : date;
+  const diffMs = Date.now() - d.getTime();
   const sec = Math.floor(diffMs / 1000);
   if (sec < 60) return `${sec}s ago`;
   const min = Math.floor(sec / 60);
@@ -55,224 +59,176 @@ const fmtRelative = (iso: string): string => {
   return `${days}d ago`;
 };
 
-// ---- v0 mock data --------------------------------------------------------
-
-const MOCK_SUMMARY = {
-  spentThisMonthUsd: 12_847.42,
-  monthOverMonthPct: 18,
-  activeUsersThisMonth: 47,
-  newUsersThisWeek: 4,
-  openAnomalyCount: 2,
-  anomalyBreakdown: { critical: 0, warning: 2, info: 0 },
-};
-
-const MOCK_USERS = [
-  {
-    userId: "user_jane",
-    name: "Jane Doe",
-    email: "jane@miro.com",
-    spendUsd: 1_482.11,
-    requests: 12_891,
-    lastActivityIso: new Date(Date.now() - 1000 * 60 * 12).toISOString(),
-    trendVsLastMonthPct: 22,
-    mostUsedModel: "claude-3-5-sonnet",
-  },
-  {
-    userId: "user_marc",
-    name: "Marc Rovira",
-    email: "marc@miro.com",
-    spendUsd: 1_211.84,
-    requests: 9_412,
-    lastActivityIso: new Date(Date.now() - 1000 * 60 * 4).toISOString(),
-    trendVsLastMonthPct: -8,
-    mostUsedModel: "gpt-5-mini",
-  },
-  {
-    userId: "user_florian",
-    name: "Florian Schmidt",
-    email: "florian@miro.com",
-    spendUsd: 942.05,
-    requests: 6_201,
-    lastActivityIso: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-    trendVsLastMonthPct: 5,
-    mostUsedModel: "claude-3-5-sonnet",
-  },
-  {
-    userId: "user_sergio",
-    name: "Sergio Martín",
-    email: "sergio@miro.com",
-    spendUsd: 612.33,
-    requests: 4_184,
-    lastActivityIso: new Date(Date.now() - 1000 * 60 * 60 * 30).toISOString(),
-    trendVsLastMonthPct: 0,
-    mostUsedModel: "gpt-5-mini",
-  },
-];
-
-const MOCK_ANOMALIES = [
-  {
-    id: "alert_1",
-    severity: "warning" as const,
-    rule: "Weekend spend spike",
-    source: "Workato production",
-    detectedAtIso: new Date(Date.now() - 1000 * 60 * 35).toISOString(),
-    currentState: "open" as const,
-  },
-  {
-    id: "alert_2",
-    severity: "warning" as const,
-    rule: "Unusual model — gpt-5-pro outside known list",
-    source: "Claude Code (jane@miro.com)",
-    detectedAtIso: new Date(Date.now() - 1000 * 60 * 60 * 4).toISOString(),
-    currentState: "open" as const,
-  },
-];
-
-const MOCK_INGESTION_SOURCES = [
-  {
-    id: "src_cowork",
-    name: "Miro Cowork",
-    sourceType: "claude_cowork",
-    status: "healthy" as const,
-    lastEventIso: new Date(Date.now() - 1000 * 30).toISOString(),
-  },
-  {
-    id: "src_workato",
-    name: "Workato production",
-    sourceType: "workato",
-    status: "degraded" as const,
-    lastEventIso: new Date(Date.now() - 1000 * 60 * 22).toISOString(),
-  },
-  {
-    id: "src_copilot",
-    name: "Microsoft Copilot Studio",
-    sourceType: "copilot_studio",
-    status: "stale" as const,
-    lastEventIso: new Date(Date.now() - 1000 * 60 * 60 * 12).toISOString(),
-  },
-];
-
-// ---- Page ----------------------------------------------------------------
-
 function GovernanceOverviewPage() {
   const { organization, project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
+  const orgId = organization?.id ?? "";
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
     { projectId: project?.id, enabled: !!project },
+  );
+
+  const sourcesQuery = api.ingestionSources.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+  const policiesQuery = api.routingPolicy.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+  const summaryQuery = api.activityMonitor.summary.useQuery(
+    { organizationId: orgId, windowDays: 30 },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+  const usersQuery = api.activityMonitor.spendByUser.useQuery(
+    { organizationId: orgId, windowDays: 30, limit: 50 },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+  const healthQuery = api.activityMonitor.ingestionSourcesHealth.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+  const anomaliesQuery = api.activityMonitor.recentAnomalies.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
   );
 
   if (!governancePreviewEnabled) {
     return <NotFoundScene />;
   }
 
-  const orgName = organization?.name ?? "your organization";
-  const isEmpty =
-    MOCK_SUMMARY.spentThisMonthUsd === 0 &&
-    MOCK_SUMMARY.activeUsersThisMonth === 0 &&
-    MOCK_SUMMARY.openAnomalyCount === 0;
+  const sources = sourcesQuery.data ?? [];
+  const policies = policiesQuery.data ?? [];
+  const summary = summaryQuery.data;
+  const users = usersQuery.data ?? [];
+  const sourceHealth = healthQuery.data ?? [];
+  const anomalies = anomaliesQuery.data ?? [];
+
+  const hasSources = sources.length > 0;
+  const hasPolicies = policies.length > 0;
+  const hasTraffic =
+    !!summary &&
+    (summary.spentThisWindowUsd > 0 ||
+      summary.activeUsersThisWindow > 0 ||
+      summary.openAnomalyCount > 0);
 
   return (
     <SettingsLayout>
       <Head>
-        <title>Governance Overview · LangWatch</title>
+        <title>Governance · LangWatch</title>
       </Head>
 
       <VStack align="stretch" gap={6} width="full" maxW="container.xl">
         <HStack alignItems="end">
           <VStack align="start" gap={1}>
             <HStack gap={2}>
-              <Heading as="h2" size="lg">
-                Governance Overview
-              </Heading>
+              <Heading size="md">Governance</Heading>
               <Badge colorPalette="purple" variant="subtle">
-                Preview · mocked data
+                Preview
               </Badge>
             </HStack>
             <Text color="fg.muted" fontSize="sm">
-              Bird&rsquo;s-eye view of all AI activity in {orgName}.
-              Spend, users, anomalies, and ingestion-source health in
-              one place.
+              Spend, users, anomalies, and ingestion-source health for
+              the organization. Window: last 30 days.
             </Text>
           </VStack>
           <Spacer />
         </HStack>
 
-        {/* Summary cards */}
-        <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
-          <SummaryCard
-            title="Spent this month"
-            value={fmtUsd(MOCK_SUMMARY.spentThisMonthUsd)}
-            subline={
-              isEmpty
-                ? "no AI traffic yet"
-                : `${MOCK_SUMMARY.monthOverMonthPct >= 0 ? "↑" : "↓"} ${Math.abs(
-                    MOCK_SUMMARY.monthOverMonthPct,
-                  )}% vs last month`
-            }
-            tone={MOCK_SUMMARY.monthOverMonthPct > 25 ? "amber" : "default"}
-          />
-          <SummaryCard
-            title="Active AI users this month"
-            value={numeral(MOCK_SUMMARY.activeUsersThisMonth).format("0,0")}
-            subline={
-              isEmpty
-                ? "nobody has used AI yet"
-                : `${MOCK_SUMMARY.newUsersThisWeek} new this week`
-            }
-          />
-          <SummaryCard
-            title="Anomaly alerts (open)"
-            value={numeral(MOCK_SUMMARY.openAnomalyCount).format("0,0")}
-            subline={
-              isEmpty
-                ? "nothing to alert on"
-                : `${MOCK_SUMMARY.anomalyBreakdown.critical} critical, ${MOCK_SUMMARY.anomalyBreakdown.warning} warning`
-            }
-            tone={MOCK_SUMMARY.openAnomalyCount > 0 ? "amber" : "default"}
-          />
-        </SimpleGrid>
-
-        {isEmpty && (
+        {!hasTraffic && (
           <Box
             borderWidth="1px"
             borderColor="border.muted"
             borderRadius="md"
             padding={5}
           >
-            <Text fontWeight="medium" marginBottom={2}>
-              Connect a source to start collecting data
-            </Text>
-            <Text fontSize="sm" color="fg.muted" marginBottom={3}>
-              You haven&rsquo;t routed any traffic through LangWatch yet. Pick
-              a starting point:
-            </Text>
-            <HStack gap={3} wrap="wrap">
-              <Link href="/settings/model-providers" color="orange.600">
-                Add a provider
-              </Link>
-              <Text color="fg.muted">·</Text>
-              <Link href="/settings/routing-policies" color="orange.600">
-                Define a routing policy
-              </Link>
-              <Text color="fg.muted">·</Text>
-              <Link
+            <VStack align="start" gap={1} marginBottom={4}>
+              <Heading as="h3" size="sm">
+                Setup checklist
+              </Heading>
+              <Text fontSize="sm" color="fg.muted">
+                Complete each step to start collecting governance data.
+                Live metrics replace this checklist once your first
+                source is reporting events.
+              </Text>
+            </VStack>
+            <VStack align="stretch" gap={2}>
+              <SetupItem
+                done={hasPolicies}
+                title="Define a routing policy"
+                description="Tell virtual keys which providers + models to route through."
+                href="/settings/routing-policies"
+                ctaLabel={
+                  hasPolicies
+                    ? `${policies.length} policy${policies.length === 1 ? "" : "ies"} configured`
+                    : "Add a routing policy"
+                }
+              />
+              <SetupItem
+                done={hasSources}
+                title="Connect an ingestion source"
+                description="Map an external AI platform into the activity monitor via OTel push, webhook, or S3 audit drop."
                 href="/settings/governance/ingestion-sources"
-                color="orange.600"
-              >
-                Set up an ingestion source
-              </Link>
-            </HStack>
+                ctaLabel={
+                  hasSources
+                    ? `${sources.length} source${sources.length === 1 ? "" : "s"} configured`
+                    : "Add an ingestion source"
+                }
+              />
+              <SetupItem
+                done={false}
+                title="Define anomaly rules"
+                description="Set thresholds that page on-call when activity drifts."
+                href="/settings/governance/anomaly-rules"
+                ctaLabel="Anomaly rules"
+                upcoming
+              />
+            </VStack>
           </Box>
         )}
 
-        {/* Ingestion source health */}
+        {hasTraffic && summary && (
+          <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+            <SummaryCard
+              title="Spend (30 d)"
+              value={fmtUsd(summary.spentThisWindowUsd)}
+              subline={
+                summary.spentThisWindowUsd === 0
+                  ? "no traffic this window"
+                  : `${summary.windowOverPreviousPct >= 0 ? "↑" : "↓"} ${Math.abs(
+                      summary.windowOverPreviousPct,
+                    )}% vs previous`
+              }
+              tone={summary.windowOverPreviousPct > 25 ? "amber" : "default"}
+            />
+            <SummaryCard
+              title="Active users (30 d)"
+              value={numeral(summary.activeUsersThisWindow).format("0,0")}
+              subline={
+                summary.activeUsersThisWindow === 0
+                  ? "nobody used AI this window"
+                  : `${summary.newUsersThisWindow} new this window`
+              }
+            />
+            <SummaryCard
+              title="Open anomalies"
+              value={numeral(summary.openAnomalyCount).format("0,0")}
+              subline={
+                summary.openAnomalyCount === 0
+                  ? "nothing to alert on"
+                  : `${summary.anomalyBreakdown.critical} critical · ${summary.anomalyBreakdown.warning} warning`
+              }
+              tone={summary.openAnomalyCount > 0 ? "amber" : "default"}
+            />
+          </SimpleGrid>
+        )}
+
         <SectionCard
           title="Ingestion sources"
           subline="External AI platforms reporting activity to LangWatch."
         >
-          {MOCK_INGESTION_SOURCES.length === 0 ? (
+          {sourceHealth.length === 0 ? (
             <VStack align="start" gap={2}>
               <Text color="fg.muted" fontSize="sm">
                 No ingestion sources configured.
@@ -281,51 +237,51 @@ function GovernanceOverviewPage() {
                 href="/settings/governance/ingestion-sources"
                 color="orange.600"
               >
-                + Add your first source
+                + Add a source
               </Link>
             </VStack>
           ) : (
             <HStack gap={3} wrap="wrap">
-              {MOCK_INGESTION_SOURCES.map((src) => (
+              {sourceHealth.map((src) => (
                 <SourceChip key={src.id} source={src} />
               ))}
             </HStack>
           )}
         </SectionCard>
 
-        {/* Anomaly alerts */}
         <SectionCard
-          title="Active anomaly alerts"
+          title="Recent anomalies"
           subline="Cross-source rules that fired and haven't been acknowledged."
           aria-live="polite"
         >
-          {MOCK_ANOMALIES.length === 0 ? (
+          {anomalies.length === 0 ? (
             <Text color="fg.muted" fontSize="sm">
-              All quiet — no active alerts.
+              {hasTraffic
+                ? "All quiet — no active alerts."
+                : "Available when the detection backend ships."}
             </Text>
           ) : (
             <VStack align="stretch" gap={2}>
-              {MOCK_ANOMALIES.map((a) => (
+              {anomalies.map((a) => (
                 <AnomalyRow key={a.id} alert={a} />
               ))}
             </VStack>
           )}
         </SectionCard>
 
-        {/* Per-user table */}
         <SectionCard
           title="By user"
-          subline="Spend and activity per LangWatch member, this month."
+          subline="Spend and activity per LangWatch member, last 30 days."
         >
-          {MOCK_USERS.length === 0 ? (
+          {users.length === 0 ? (
             <Text color="fg.muted" fontSize="sm">
-              No active users this month.
+              No active users this window.
             </Text>
           ) : (
             <VStack align="stretch" gap={0}>
               <UserRowHeader />
-              {MOCK_USERS.map((u) => (
-                <UserRow key={u.userId} user={u} />
+              {users.map((u) => (
+                <UserRow key={u.actor} user={u} />
               ))}
             </VStack>
           )}
@@ -335,7 +291,55 @@ function GovernanceOverviewPage() {
   );
 }
 
-// ---- Sub-components ------------------------------------------------------
+function SetupItem({
+  done,
+  title,
+  description,
+  href,
+  ctaLabel,
+  upcoming,
+}: {
+  done: boolean;
+  title: string;
+  description: string;
+  href: string;
+  ctaLabel: string;
+  upcoming?: boolean;
+}) {
+  return (
+    <HStack
+      borderWidth="1px"
+      borderColor={done ? "green.200" : "border.muted"}
+      borderRadius="sm"
+      padding={3}
+      gap={3}
+      alignItems="start"
+      opacity={upcoming ? 0.7 : 1}
+    >
+      <Box color={done ? "green.500" : "fg.muted"} paddingTop="2px">
+        {done ? <CheckCircle2 size={18} /> : <Circle size={18} />}
+      </Box>
+      <VStack align="start" gap={0} flex={1} minWidth={0}>
+        <HStack gap={2}>
+          <Text fontSize="sm" fontWeight="medium">
+            {title}
+          </Text>
+          {upcoming && (
+            <Badge size="sm" variant="surface" colorPalette="gray">
+              Coming soon
+            </Badge>
+          )}
+        </HStack>
+        <Text fontSize="xs" color="fg.muted">
+          {description}
+        </Text>
+      </VStack>
+      <Link href={href} color="orange.600">
+        {ctaLabel}
+      </Link>
+    </HStack>
+  );
+}
 
 type SummaryCardTone = "default" | "amber";
 
@@ -357,7 +361,6 @@ function SummaryCard({
       borderColor="border.muted"
       borderRadius="md"
       padding={4}
-      _dark={{ borderColor: "border.muted" }}
     >
       <Text
         fontSize="xs"
@@ -368,7 +371,7 @@ function SummaryCard({
       >
         {title}
       </Text>
-      <Heading as="span" size="lg" color={accent} marginTop={1}>
+      <Heading as="span" size="md" color={accent} marginTop={1}>
         {value}
       </Heading>
       <Text fontSize="sm" color="fg.muted" marginTop={1}>
@@ -398,7 +401,7 @@ function SectionCard({
       {...rest}
     >
       <VStack align="start" gap={1} marginBottom={3}>
-        <Heading as="h3" size="md">
+        <Heading as="h3" size="sm">
           {title}
         </Heading>
         {subline && (
@@ -413,26 +416,26 @@ function SectionCard({
 }
 
 const SOURCE_STATUS_ICON = {
-  healthy: CircleCheck,
-  degraded: CircleDashed,
-  stale: CircleDashed,
-  down: CircleX,
+  active: CircleCheck,
+  awaiting_first_event: CircleDashed,
+  disabled: CircleX,
 } as const;
 
 const SOURCE_STATUS_COLOR = {
-  healthy: "green.600",
-  degraded: "orange.500",
-  stale: "yellow.600",
-  down: "red.600",
+  active: "green.600",
+  awaiting_first_event: "orange.500",
+  disabled: "fg.muted",
 } as const;
 
-function SourceChip({
-  source,
-}: {
-  source: (typeof MOCK_INGESTION_SOURCES)[number];
-}) {
-  const Icon = SOURCE_STATUS_ICON[source.status];
-  const color = SOURCE_STATUS_COLOR[source.status];
+function SourceChip({ source }: { source: SourceHealth }) {
+  const Icon =
+    SOURCE_STATUS_ICON[
+      (source.status as keyof typeof SOURCE_STATUS_ICON) ?? "awaiting_first_event"
+    ] ?? CircleDashed;
+  const color =
+    SOURCE_STATUS_COLOR[
+      (source.status as keyof typeof SOURCE_STATUS_COLOR) ?? "awaiting_first_event"
+    ] ?? "fg.muted";
 
   return (
     <Link
@@ -456,7 +459,9 @@ function SourceChip({
             {source.name}
           </Text>
           <Text fontSize="xs" color="fg.muted">
-            {source.sourceType} · {fmtRelative(source.lastEventIso)}
+            {source.sourceType} · {fmtRelative(source.lastEventIso ?? null)}
+            {source.eventsLast24h > 0 &&
+              ` · ${numeral(source.eventsLast24h).format("0,0")} events / 24h`}
           </Text>
         </VStack>
       </HStack>
@@ -464,13 +469,13 @@ function SourceChip({
   );
 }
 
-const SEVERITY_COLOR = {
+type AnomalySeverity = "critical" | "warning" | "info";
+
+const SEVERITY_COLOR: Record<AnomalySeverity, string> = {
   critical: "red.600",
   warning: "orange.500",
   info: "blue.600",
-} as const;
-
-type AnomalySeverity = "critical" | "warning" | "info";
+};
 
 function AnomalyRow({
   alert,
@@ -479,7 +484,7 @@ function AnomalyRow({
     id: string;
     severity: AnomalySeverity;
     rule: string;
-    source: string;
+    sourceLabel: string;
     detectedAtIso: string;
     currentState: "open" | "acknowledged" | "resolved";
   };
@@ -494,7 +499,7 @@ function AnomalyRow({
       alignItems="start"
     >
       <Box color={SEVERITY_COLOR[alert.severity]} paddingTop="2px">
-        <AlertTriangle size={16} />
+        <CircleDashed size={16} />
       </Box>
       <VStack align="start" gap={0} flex={1}>
         <HStack gap={2}>
@@ -514,16 +519,12 @@ function AnomalyRow({
           </Text>
         </HStack>
         <Text fontSize="xs" color="fg.muted">
-          {alert.source} · detected {fmtRelative(alert.detectedAtIso)}
+          {alert.sourceLabel} · detected {fmtRelative(alert.detectedAtIso)}
         </Text>
       </VStack>
-      <Link
-        href={`/settings/governance/anomalies/${alert.id}`}
-        fontSize="sm"
-        color="orange.600"
-      >
-        Investigate →
-      </Link>
+      <Badge size="sm" variant="surface">
+        {alert.currentState}
+      </Badge>
     </HStack>
   );
 }
@@ -542,78 +543,51 @@ function UserRowHeader() {
       letterSpacing="wider"
     >
       <Box flex={3}>User</Box>
-      <Box flex={1.2} textAlign="right">
-        Spend
-      </Box>
-      <Box flex={1.2} textAlign="right">
-        Requests
-      </Box>
-      <Box flex={1.2} textAlign="right">
-        Last active
-      </Box>
-      <Box flex={1.5} textAlign="right">
-        Trend
-      </Box>
-      <Box flex={2} textAlign="right">
-        Most-used model
-      </Box>
+      <Box flex={2}>Spend</Box>
+      <Box flex={2}>Requests</Box>
+      <Box flex={2}>Last active</Box>
+      <Box flex={2}>Trend</Box>
+      <Box flex={2}>Most-used</Box>
     </HStack>
   );
 }
 
-function UserRow({ user }: { user: (typeof MOCK_USERS)[number] }) {
-  const TrendIcon = user.trendVsLastMonthPct >= 0 ? TrendingUp : TrendingDown;
+function UserRow({ user }: { user: SpendByUser }) {
+  const trendArrow =
+    user.trendVsPreviousPct > 0
+      ? "↑"
+      : user.trendVsPreviousPct < 0
+        ? "↓"
+        : "·";
   const trendColor =
-    user.trendVsLastMonthPct >= 25
+    user.trendVsPreviousPct > 25
       ? "orange.500"
-      : user.trendVsLastMonthPct >= 0
-        ? "fg.muted"
-        : "green.600";
-
+      : user.trendVsPreviousPct < -25
+        ? "blue.500"
+        : "fg.muted";
   return (
-    <Link
-      href={`/settings/governance/users/${user.userId}`}
-      _hover={{ textDecoration: "none", backgroundColor: "bg.muted" }}
+    <HStack
+      paddingY={2}
+      paddingX={3}
+      borderBottomWidth="1px"
+      borderColor="border.muted"
+      fontSize="sm"
     >
-      <HStack
-        paddingY={3}
-        paddingX={3}
-        borderBottomWidth="1px"
-        borderColor="border.muted"
-      >
-        <Box flex={3}>
-          <Text fontSize="sm" fontWeight="medium">
-            {user.name}
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            {user.email}
-          </Text>
-        </Box>
-        <Box flex={1.2} textAlign="right" fontSize="sm">
-          {fmtUsd(user.spendUsd)}
-        </Box>
-        <Box flex={1.2} textAlign="right" fontSize="sm" color="fg.muted">
-          {numeral(user.requests).format("0,0")}
-        </Box>
-        <Box flex={1.2} textAlign="right" fontSize="xs" color="fg.muted">
-          {fmtRelative(user.lastActivityIso)}
-        </Box>
-        <Box flex={1.5} textAlign="right" fontSize="sm">
-          <HStack justifyContent="end" gap={1}>
-            <Box color={trendColor}>
-              <TrendIcon size={14} />
-            </Box>
-            <Text color={trendColor}>
-              {user.trendVsLastMonthPct >= 0 ? "+" : ""}
-              {user.trendVsLastMonthPct}%
-            </Text>
-          </HStack>
-        </Box>
-        <Box flex={2} textAlign="right" fontSize="sm" color="fg.muted">
-          {user.mostUsedModel}
-        </Box>
-      </HStack>
-    </Link>
+      <Box flex={3}>
+        <Text fontWeight="medium">{user.actor}</Text>
+      </Box>
+      <Box flex={2}>{fmtUsd(user.spendUsd)}</Box>
+      <Box flex={2}>{numeral(user.requests).format("0,0")}</Box>
+      <Box flex={2} color="fg.muted">
+        {fmtRelative(user.lastActivityIso)}
+      </Box>
+      <Box flex={2} color={trendColor}>
+        {trendArrow} {Math.abs(user.trendVsPreviousPct)}%
+      </Box>
+      <Box flex={2} color="fg.muted">
+        {user.mostUsedTarget}
+      </Box>
+    </HStack>
   );
 }
 

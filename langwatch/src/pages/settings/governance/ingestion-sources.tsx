@@ -45,7 +45,7 @@ import { api, type RouterOutputs } from "~/utils/api";
 /**
  * Admin CRUD for IngestionSources — the per-platform fleet config that
  * powers the Activity Monitor pillar. One source per platform fleet
- * (e.g. "Miro Cowork", "Acme Workato production"). Wires to
+ * Wires to
  * api.ingestionSources.* per Sergey's slice 4.
  *
  * Spec: specs/ai-gateway/governance/ingestion-sources.feature
@@ -279,20 +279,18 @@ function IngestionSourcesPage() {
         <HStack alignItems="end">
           <VStack align="start" gap={0}>
             <HStack gap={2}>
-              <Heading as="h2" size="lg">
-                Ingestion Sources
-              </Heading>
+              <Heading size="md">Ingestion Sources</Heading>
               <Badge colorPalette="purple" size="sm" variant="surface">
                 Preview
               </Badge>
             </HStack>
             <Text color="fg.muted" fontSize="sm" maxW="3xl">
-              Configure cross-platform feeds for the Activity Monitor.
-              Each source maps a closed SaaS platform (Cowork, Workato,
-              Copilot Studio, OpenAI Compliance) into LangWatch's
-              normalised ActivityEvent stream.{" "}
-              <Link href="/settings/governance">
-                Back to governance overview
+              Configure cross-platform feeds for the activity monitor.
+              Each source maps an external AI platform into the
+              normalised activity stream via OTel push, webhook, or
+              S3 audit drops.{" "}
+              <Link href="/settings/governance" color="orange.600">
+                Back to governance
               </Link>
               .
             </Text>
@@ -541,7 +539,7 @@ function SourceComposer({
               onChange={(e) =>
                 setComposer({ ...composer, name: e.target.value })
               }
-              placeholder="e.g. Acme Cowork production"
+              placeholder="Display name for this source"
             />
           </VStack>
         </HStack>
@@ -605,7 +603,7 @@ const PARSER_FIELDS: Record<SourceType, FieldDef[]> = {
     {
       key: "allowedSourceTypeLabel",
       label: "Expected SourceType label (optional)",
-      placeholder: "e.g. cowork, claude-cowork-desktop",
+      placeholder: "Optional source-type label",
       hint: "If set, only events whose `LangWatchSourceType` attribute matches this label are accepted. Leave blank to accept any.",
     },
   ],
