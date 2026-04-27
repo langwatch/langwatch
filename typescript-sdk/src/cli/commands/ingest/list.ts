@@ -95,8 +95,14 @@ function colorStatus(status: string): string {
   }
 }
 
-function humanRelative(d: Date): string {
-  const ms = Date.now() - d.getTime();
+/**
+ * Render a relative timestamp like "5m ago" / "2h ago" / "3d ago"
+ * for the table's LAST EVENT column. Falls back to the ISO string
+ * for future timestamps (clock drift) since "in 5 minutes" would be
+ * confusing in a "last event" context. Exported for unit testing.
+ */
+export function humanRelative(d: Date, now: number = Date.now()): string {
+  const ms = now - d.getTime();
   if (ms < 0) return d.toISOString();
   const s = Math.floor(ms / 1000);
   if (s < 60) return `${s}s ago`;
@@ -108,18 +114,35 @@ function humanRelative(d: Date): string {
   return `${days}d ago`;
 }
 
-function printTable(rows: string[][]): void {
-  if (rows.length === 0) return;
+/**
+ * Build a fixed-width table from rows including a leading header row.
+ * Returns the formatted string (one row per \n-separated line) instead
+ * of console.log-ing directly, so callers control output and tests can
+ * assert column alignment without spying on stdout.
+ *
+ * Each cell's visible width is computed by stripping ANSI escape codes
+ * (chalk wraps colors as `\x1b[Nm...\x1b[0m`); without this, coloured
+ * cells appear longer than they actually are and break alignment.
+ */
+export function buildTable(rows: string[][]): string {
+  if (rows.length === 0) return "";
   const widths = rows[0]!.map((_, i) =>
     rows.reduce((max, r) => Math.max(max, stripAnsi(r[i] ?? "").length), 0),
   );
+  const lines: string[] = [];
   for (const row of rows) {
     const padded = row.map((cell, i) => {
       const visibleLen = stripAnsi(cell).length;
       return cell + " ".repeat(Math.max(0, widths[i]! - visibleLen));
     });
-    console.log(padded.join("  "));
+    lines.push(padded.join("  "));
   }
+  return lines.join("\n");
+}
+
+function printTable(rows: string[][]): void {
+  const out = buildTable(rows);
+  if (out) console.log(out);
 }
 
 function stripAnsi(s: string): string {
