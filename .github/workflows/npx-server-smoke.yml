@@ -247,7 +247,10 @@ jobs:
           fi
 
       - name: Probe a workflow execution end-to-end
-        if: env.OPENAI_API_KEY_CI != ''
+        # Read the secret directly in the if-check. Step-level `env:` is
+        # populated AFTER the if-check is evaluated, so `env.OPENAI_API_KEY_CI`
+        # in the condition was always empty → the step was always skipped.
+        if: ${{ secrets.OPENAI_API_KEY_CI != '' }}
         env:
           OPENAI_API_KEY_CI: ${{ secrets.OPENAI_API_KEY_CI }}
         run: |

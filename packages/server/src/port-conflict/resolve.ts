@@ -22,8 +22,20 @@ export async function resolvePortConflicts({ base = PORT_BASE_DEFAULT, yes = fal
 
   printConflicts(report);
 
-  if (yes && report.suggestedBase != null) {
-    return reportShift(report.suggestedBase, report);
+  if (yes) {
+    if (report.suggestedBase != null) {
+      return reportShift(report.suggestedBase, report);
+    }
+    // `--yes` means unattended; we can't drop into a prompt and hang the
+    // caller (CI runners, npx --yes invocations from another script).
+    // Exit cleanly with a non-zero status so the wrapper knows resolution
+    // failed.
+    console.error(
+      chalk.red(
+        "✗ --yes was set but no port shift can free every conflicting slot. Free the ports manually or re-run interactively.",
+      ),
+    );
+    process.exit(1);
   }
 
   const choices = [
