@@ -101,7 +101,7 @@ describe("PrismaOrganizationRepository — internal_governance project filter", 
       where: { id: { in: [applicationProject.id, governanceProject.id] } },
     });
     await prisma.organizationUser.deleteMany({
-      where: { userId: testUser.id },
+      where: { userId: testUser.id, organizationId: organization.id },
     });
     await prisma.team.delete({ where: { id: team.id } });
     await prisma.organization.delete({ where: { id: organization.id } });
