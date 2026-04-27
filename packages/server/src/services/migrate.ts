@@ -1,7 +1,7 @@
-import { execa } from "execa";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
 import { locateLangwatchDir } from "./node-deps.ts";
+import { execAndPipe } from "./_pipe-to-bus.ts";
 
 /**
  * Run Prisma migrations against the embedded postgres + ClickHouse goose
@@ -48,8 +48,8 @@ export async function runMigrations(
     SKIP_CLICKHOUSE_MIGRATE: "false",
   };
 
-  await execa("pnpm", ["run", "prisma:migrate"], { cwd: langwatchDir, env, stdio: "inherit" });
-  await execa("pnpm", ["run", "clickhouse:migrate"], { cwd: langwatchDir, env, stdio: "inherit" });
+  await execAndPipe(bus, "migrate:prisma", "pnpm", ["run", "prisma:migrate"], { cwd: langwatchDir, env });
+  await execAndPipe(bus, "migrate:clickhouse", "pnpm", ["run", "clickhouse:migrate"], { cwd: langwatchDir, env });
 
   bus.emit({ type: "healthy", service: "postgres", durationMs: Date.now() - start });
 }

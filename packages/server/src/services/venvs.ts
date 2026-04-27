@@ -1,4 +1,3 @@
-import { execa } from "execa";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
@@ -6,6 +5,7 @@ import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
 import { servicePaths } from "./paths.ts";
+import { execAndPipe } from "./_pipe-to-bus.ts";
 
 type VenvSpec = {
   name: "langwatch_nlp" | "langevals";
@@ -36,7 +36,9 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
       const start = Date.now();
 
       mkdirSync(venvDir, { recursive: true });
-      await execa(
+      await execAndPipe(
+        bus,
+        `uv:${spec.name}`,
         uvBin,
         ["sync", "--project", spec.projectDir],
         {
@@ -44,7 +46,6 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
             ...process.env,
             UV_PROJECT_ENVIRONMENT: venvDir,
           },
-          stdio: "inherit",
         },
       );
       writeFileSync(hashFile, expected);

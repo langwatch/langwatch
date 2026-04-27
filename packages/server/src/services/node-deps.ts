@@ -4,6 +4,7 @@ import { join } from "node:path";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import { appRoot } from "./app-dir.ts";
 import type { EventBus } from "./event-bus.ts";
+import { execAndPipe } from "./_pipe-to-bus.ts";
 
 /**
  * Ensure langwatch/node_modules exists + start:prepare:files has run, both of
@@ -59,9 +60,12 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
     // overlap unpredictably with langwatch's devDependencies, and
     // chasing each is a losing game. Disk hit is acceptable; reliability
     // wins.
-    await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, "install", "--prod=false", "--frozen-lockfile"], {
-      stdio: "inherit",
-    });
+    await execAndPipe(
+      bus,
+      "pnpm:langwatch",
+      pnpm.command,
+      [...pnpm.args, "-C", langwatchDir, "install", "--prod=false", "--frozen-lockfile"],
+    );
 
     // pnpm install does NOT auto-generate the prisma client. The full-
     // build path below (when !distAlreadyBuilt) covers this via
@@ -69,9 +73,12 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
     // dist path needs an explicit call so .prisma/client/ exists before
     // the langwatch app boots.
     if (distAlreadyBuilt) {
-      await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, "exec", "prisma", "generate"], {
-        stdio: "inherit",
-      });
+      await execAndPipe(
+        bus,
+        "pnpm:langwatch",
+        pnpm.command,
+        [...pnpm.args, "-C", langwatchDir, "exec", "prisma", "generate"],
+      );
     }
   }
 
@@ -87,13 +94,18 @@ export async function ensureLangwatchDeps(ctx: RuntimeContext, bus: EventBus): P
     // langevals types (from the source committed in langevals/ts-integration/),
     // and the mcp-server bundle. vite build emits dist/client/ for static serving.
     // Without dist/client/, every UI route returns 404 and only /api/* works.
-    await execa(pnpm.command, [...pnpm.args, "-C", langwatchDir, "run", "build"], {
-      stdio: "inherit",
-      env: {
-        ...process.env,
-        NODE_ENV: "production",
+    await execAndPipe(
+      bus,
+      "pnpm:langwatch",
+      pnpm.command,
+      [...pnpm.args, "-C", langwatchDir, "run", "build"],
+      {
+        env: {
+          ...process.env,
+          NODE_ENV: "production",
+        },
       },
-    });
+    );
   }
 
   bus.emit({ type: "healthy", service: "pnpm:langwatch" as never, durationMs: Date.now() - start });
