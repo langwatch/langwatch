@@ -15,10 +15,18 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { IngestionSourceService, SUPPORTED_SOURCE_TYPES } from "~/server/governance/activity-monitor/ingestionSource.service";
+import {
+  IngestionSourceService,
+  SUPPORTED_RETENTION_CLASSES,
+  SUPPORTED_SOURCE_TYPES,
+} from "~/server/governance/activity-monitor/ingestionSource.service";
 
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+
+const retentionClassSchema = z.enum(
+  SUPPORTED_RETENTION_CLASSES as readonly [string, ...string[]],
+);
 
 const sourceTypeSchema = z.enum(
   SUPPORTED_SOURCE_TYPES as readonly [string, ...string[]],
@@ -41,6 +49,7 @@ function toDto(row: {
   name: string;
   description: string | null;
   parserConfig: unknown;
+  retentionClass: string;
   status: string;
   lastEventAt: Date | null;
   archivedAt: Date | null;
@@ -60,6 +69,7 @@ function toDto(row: {
     name: row.name,
     description: row.description,
     parserConfig: safeParser,
+    retentionClass: row.retentionClass,
     status: row.status,
     lastEventAt: row.lastEventAt,
     archivedAt: row.archivedAt,
@@ -107,6 +117,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         name: z.string().min(1).max(128),
         description: z.string().nullable().optional(),
         parserConfig: z.record(z.string(), z.unknown()).optional(),
+        retentionClass: retentionClassSchema.optional(),
       }),
     )
     .use(checkOrganizationPermission("organization:manage"))
@@ -119,6 +130,9 @@ export const ingestionSourcesRouter = createTRPCRouter({
         name: input.name,
         description: input.description ?? null,
         parserConfig: input.parserConfig,
+        retentionClass: input.retentionClass as
+          | (typeof SUPPORTED_RETENTION_CLASSES)[number]
+          | undefined,
         actorUserId: ctx.session.user.id,
       });
       return {
@@ -135,6 +149,7 @@ export const ingestionSourcesRouter = createTRPCRouter({
         name: z.string().min(1).max(128).optional(),
         description: z.string().nullable().optional(),
         parserConfig: z.record(z.string(), z.unknown()).optional(),
+        retentionClass: retentionClassSchema.optional(),
         status: statusSchema.optional(),
         teamId: z.string().nullable().optional(),
       }),
@@ -148,6 +163,9 @@ export const ingestionSourcesRouter = createTRPCRouter({
         name: input.name,
         description: input.description,
         parserConfig: input.parserConfig,
+        retentionClass: input.retentionClass as
+          | (typeof SUPPORTED_RETENTION_CLASSES)[number]
+          | undefined,
         status: input.status,
         teamId: input.teamId,
       });

@@ -135,11 +135,39 @@ const STATUS_META: Record<
   disabled: { icon: CircleX, label: "Disabled", color: "fg.muted" },
 };
 
+type RetentionClass = "thirty_days" | "one_year" | "seven_years";
+
+const RETENTION_CLASS_OPTIONS: Array<{
+  value: RetentionClass;
+  label: string;
+  blurb: string;
+}> = [
+  {
+    value: "thirty_days",
+    label: "Operational (30 days)",
+    blurb:
+      "Default. Debugging window for application traces. SOC2 / ISO 27001 baseline retention.",
+  },
+  {
+    value: "one_year",
+    label: "Compliance (1 year)",
+    blurb:
+      "EU AI Act / GDPR / HIPAA-most-uses retention. Use when this source feeds compliance audit obligations.",
+  },
+  {
+    value: "seven_years",
+    label: "Long-form audit (7 years)",
+    blurb:
+      "Regulated industry retention (financial services, healthcare). Org plan ceiling enforced.",
+  },
+];
+
 interface ComposerState {
   sourceType: SourceType;
   name: string;
   description: string;
   parserConfig: Record<string, string>;
+  retentionClass: RetentionClass;
 }
 
 const blankComposer = (): ComposerState => ({
@@ -147,6 +175,7 @@ const blankComposer = (): ComposerState => ({
   name: "",
   description: "",
   parserConfig: {},
+  retentionClass: "thirty_days",
 });
 
 function fmtRelative(date: Date | string | null): string {
@@ -256,6 +285,7 @@ function IngestionSourcesPage() {
       name: composer.name.trim(),
       description: composer.description.trim() || null,
       parserConfig: buildParserConfig(composer),
+      retentionClass: composer.retentionClass,
     });
   };
 
@@ -579,6 +609,39 @@ function SourceComposer({
           values={composer.parserConfig}
           onChange={(parserConfig) => setComposer({ ...composer, parserConfig })}
         />
+
+        <VStack align="stretch" gap={1}>
+          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+            Retention class
+          </Text>
+          <select
+            value={composer.retentionClass}
+            onChange={(e) =>
+              setComposer({
+                ...composer,
+                retentionClass: e.target.value as RetentionClass,
+              })
+            }
+            style={{
+              padding: "8px",
+              border: "1px solid var(--chakra-colors-border-muted)",
+              borderRadius: "var(--chakra-radii-sm)",
+              background: "white",
+              fontSize: "14px",
+            }}
+          >
+            {RETENTION_CLASS_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <Text fontSize="xs" color="fg.muted">
+            {RETENTION_CLASS_OPTIONS.find(
+              (o) => o.value === composer.retentionClass,
+            )?.blurb}
+          </Text>
+        </VStack>
 
         <HStack gap={3}>
           <Spacer />

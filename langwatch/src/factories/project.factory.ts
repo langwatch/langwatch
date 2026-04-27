@@ -14,6 +14,7 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   teamId: nanoid(),
   language: "en",
   framework: "langchain",
+  kind: "application",
   firstMessage: false,
   integrated: false,
   createdAt: new Date(),
