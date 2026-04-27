@@ -558,7 +558,8 @@
               "ai-gateway/governance/control-plane",
               "ai-gateway/governance/personal-keys",
               "ai-gateway/governance/admin-setup",
-              "ai-gateway/governance/routing-policies"
+              "ai-gateway/governance/routing-policies",
+              "ai-gateway/governance/cli-debug"
             ]
           },
           {
