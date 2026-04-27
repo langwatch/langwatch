@@ -104,10 +104,21 @@ attribute usage to the right person without leaking tokens.
 - Per-user JWT claims and trace attribution land everywhere
   automatically.
 
+## Where Personal IDE keys sit in the bigger picture
+
+Personal IDE keys are **Tier 1** — the proxy tier — of LangWatch's
+five-tier control plane. The same primitives feed audit-log
+ingestion, OpenTelemetry, BYOK endpoint routing, and the sandboxed
+runtime. See [Control plane & integration tiers](/ai-gateway/governance/control-plane)
+for the full taxonomy and where each enterprise platform (Claude Code,
+Copilot Studio, Cowork, Workato, …) fits.
+
 ## Where to next
 
 - For a dev who just wants to use the CLI:
   [Personal IDE keys](/ai-gateway/governance/personal-keys)
+- For the broader 5-tier control-plane story:
+  [Control plane & integration tiers](/ai-gateway/governance/control-plane)
 - For an admin onboarding their org:
   [Admin setup](/ai-gateway/governance/admin-setup)
 - For the full CLI reference:

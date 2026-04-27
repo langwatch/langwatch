@@ -1,0 +1,255 @@
+---
+title: Control plane & integration tiers
+description: Where the LangWatch CLI, AI Gateway, web app, and Activity Monitor fit in one shared control plane — and how the five integration tiers stack up.
+sidebarTitle: Control plane
+---
+
+LangWatch is positioned as a **control plane** above every AI tool an
+enterprise uses — not just the ones whose API key path you own. The
+data plane (the AI Gateway proxy) is one of five integration tiers; the
+control plane is what stays the same across all of them.
+
+This page is the navigation map for "where does X fit?". Use it to
+locate the surface you're configuring (or asking about) on the larger
+ladder. Sister docs go deep on individual tiers; this one only
+explains the relationships.
+
+## The split: control plane vs data plane
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                         LangWatch control plane                     │
+│                                                                     │
+│   Identity  ·  Policy  ·  Budgets  ·  Audit  ·  Dashboards  ·  Alert routing
+│                                                                     │
+│         (one set of primitives, shared by every tier below)         │
+└──────┬─────────────┬─────────────┬─────────────┬─────────────┬──────┘
+       │             │             │             │             │
+       ▼             ▼             ▼             ▼             ▼
+   ┌────────┐  ┌────────┐  ┌──────────┐  ┌──────────┐  ┌────────────┐
+   │ Tier 1 │  │ Tier 2 │  │  Tier 3  │  │  Tier 4  │  │   Tier 5   │
+   │Gateway │  │  BYOK  │  │   Audit  │  │   OTel   │  │  Sandbox   │
+   │ proxy  │  │endpoint│  │  ingest  │  │   SDK    │  │  runtime   │
+   └────────┘  └────────┘  └──────────┘  └──────────┘  └────────────┘
+
+      ▲                                                       ▲
+      │                                                       │
+   most control                                          deepest control
+   over LLM calls                                        over agent
+   (block in-flight)                                     execution
+```
+
+The control-plane primitives are the same six entities described in
+the [governance overview](/ai-gateway/governance/overview) — Org,
+Members, Teams (personal + shared), Projects + IngestionSources,
+ApiCredentials (polymorphic owner), RoutingPolicies, Budgets. Every
+tier below uses them; every dashboard reads from the same trace store
+they emit into.
+
+The data-plane components below the control plane are independent.
+Customers can adopt a single tier (e.g. Tier 3 audit ingestion alone)
+without touching any other.
+
+## The five integration tiers
+
+| Tier | Mode | Customer owns the key path? | What you can do |
+|------|------|------------------------------|-----------------|
+| **1** | Gateway proxy | Yes | Mid-flight inspect, rewrite, **block**. Mint per-user virtual keys. Enforce policy + budget before the call leaves the gateway. |
+| **2** | BYOK endpoint routing | Sometimes | Customer points a SaaS platform's "custom LLM endpoint" at the gateway. Same depth as Tier 1 *for traffic that flows through it*. |
+| **3** | Audit log ingest | No | Pull from a closed platform's compliance API into [`IngestionSource`](#tier-3--audit-log-ingest) records. Detect anomalies, alert, **trigger admin-API revoke** out-of-band. |
+| **4** | OTel / SDK instrumentation | Partial | Customer's agent code (or an opt-in SaaS like Claude Cowork) emits OpenTelemetry to LangWatch. Per-turn detail, no block, but full trace context. |
+| **5** | Sandboxed runtime | Yes (you host it) | LangWatch runs the agent. Egress policy, MCP allowlist, file-system jail, tool approval. Maximum control. |
+
+Every real customer is a mix. A typical large enterprise adopts:
+**Tier 1** for Claude Code / Codex / Cursor / Gemini CLI / custom
+agents (BYOK paths LangWatch can proxy). **Tier 3** for closed SaaS
+where Microsoft / Anthropic / OpenAI own the runtime (Copilot Studio,
+ChatGPT Enterprise, Claude for Work). **Tier 4** for in-house agents
+already instrumented. **Tier 5** later, for the agents they
+genuinely don't trust.
+
+## Tier 1 — Gateway proxy (where the CLI lives)
+
+Tier 1 is everything documented under
+[Coding CLI Integrations](/ai-gateway/cli/overview). The CLI's job
+is to acquire a virtual key, then `exec` the underlying tool with
+the gateway's base URL injected:
+
+```
+Dev terminal              LangWatch                  Provider
+─────────────             ─────────                  ────────
+$ langwatch               app.langwatch.ai           api.anthropic.com
+  login --device  ◀──SSO──▶  /api/auth/cli/*
+  ↓ writes ~/.langwatch
+  ↓ ANTHROPIC_AUTH_TOKEN=lw_vk_...
+
+$ langwatch claude  ──exec(anthropic_url)─▶  gateway.langwatch.ai
+                                              │ resolve VK
+                                              │ apply RoutingPolicy
+                                              │ budget pre-check
+                                              ▼
+                                              api.anthropic.com
+```
+
+Why Tier 1 wins:
+
+- **Per-user attribution at the credential layer.** Jane's
+  `lw_vk_...` carries `principal_id=jane`. Every request, every
+  trace, every cost roll-up attributes to her without parsing
+  the model's `user` field at the provider.
+- **Mid-flight policy.** Gateway can block before the call goes
+  out (request size, model allowlist, denied tool, budget
+  exceeded). Tier 3 only sees the call after it happened.
+- **One credential covers every tool the dev uses.** Same VK for
+  Claude Code, Codex, Cursor, Gemini CLI — see the matrix on the
+  [CLI overview](/ai-gateway/cli/overview).
+
+The CLI itself is documented end-to-end at
+[Personal IDE keys](/ai-gateway/governance/personal-keys) and
+the per-tool config pages under `/ai-gateway/cli/`.
+
+## Tier 2 — BYOK endpoint routing
+
+A handful of closed SaaS platforms let an admin point their "custom
+LLM endpoint" at a third-party gateway. When the customer wires this
+up, that platform's traffic effectively joins Tier 1: same proxy,
+same policy, same per-user attribution (if the SaaS forwards user
+identity).
+
+Confirmed BYOK paths in 2026:
+
+- **Workato** — Genies recipes can target a custom LLM endpoint.
+- **Vertex AI custom endpoint** — point at the gateway as a
+  passthrough.
+- **Bedrock proxy routing** — same.
+- **Some Copilot Studio scenarios** — mileage varies; check with
+  the customer before promising it.
+
+When BYOK isn't available, the platform falls back to Tier 3.
+
+## Tier 3 — Audit log ingest
+
+For closed SaaS where the runtime is owned by Anthropic / OpenAI /
+Microsoft / Google / Workato, LangWatch can't proxy the call but
+can ingest the **audit log** the platform exposes. The trace pipeline
+writes one row per audit event into the same store as Tier 1 traces,
+tagged by `SourceType` so dashboards can union or filter at will.
+
+Per-platform mode:
+
+- **Microsoft Purview / Copilot Studio** — pull every 1-5 min via
+  the Office 365 Management Activity API.
+- **Claude Compliance API** — pull. Plus Cowork **OTel push**
+  (Tier 4) when the admin enables it centrally.
+- **OpenAI Compliance Platform** — pull JSONL files at
+  minutes-level latency.
+- **Workato Activity Audit Log** — push to a webhook the customer
+  configures, or stream-to-S3.
+- **Gemini for Workspace / Vertex** — pull via Cloud Logging, or
+  push via Pub/Sub sink.
+
+You can't block in-flight here, but you can:
+
+1. Detect (anomaly rules — "user X did N actions outside business
+   hours").
+2. Alert (Slack / PagerDuty / SIEM via OCSF).
+3. **Trigger admin-API revoke** — call the platform's own admin
+   API (Anthropic, OpenAI, Microsoft Power Platform) to disable
+   the offending workspace key or session within seconds. Tier 3 is
+   "near-real-time stop", not "no stop".
+
+The IngestionSource entity that holds the connection metadata is
+shared across Tier 3, Tier 4, and the S3 audit drop case. See the
+admin setup doc for the per-source forms.
+
+## Tier 4 — OpenTelemetry / SDK instrumentation
+
+Customer-side agents that emit OpenInference / Traceloop / standard
+OTel into LangWatch. This is the deepest visibility short of running
+the runtime — per-turn detail, full trace context, prompt + response
+in the trace, all the LangWatch eval/monitoring features attach
+automatically.
+
+Two important Tier 4 sub-cases:
+
+- **Claude Cowork OTel export.** Anthropic ships Cowork with a
+  central OTLP-endpoint config — admin pastes the LangWatch URL +
+  bearer token in the workspace settings, every Cowork install in
+  the org streams to LangWatch. **No per-desktop config required.**
+- **In-house agents using the LangWatch SDKs** — the existing
+  `@langwatch/sdk` setup; nothing governance-specific needed.
+
+## Tier 5 — Sandboxed runtime (Open Managed Agents)
+
+For workloads the customer wants to run inside LangWatch's own
+runtime: Open Managed Agents, Hermes, OpenClaw, or any custom
+agent. Per gateway.md the recommended 2026 stack is **Firecracker
+microVMs with snapshot-restore** for cloud, **Kata Containers / Google
+Agent Sandbox on Kubernetes** for self-hosted. Egress policy via
+Envoy sidecar, MCP allowlist enforced at the runtime layer.
+
+Tier 5 is post-Phase-1 work; it's not in the current PR. Linked
+here so the broader story is visible.
+
+## Where this PR ships in the ladder
+
+The current branch (PR #3524) implements Tier 1 end-to-end:
+
+- ✅ **CLI** (`langwatch login --device`, `langwatch claude/codex/
+  cursor/gemini`, `langwatch whoami`, `langwatch me`,
+  `langwatch logout-device`, `langwatch init-shell`,
+  `langwatch request-increase`).
+- ✅ **Personal Workspace** (Team + Project with `isPersonal` flag).
+- ✅ **Personal Virtual Keys** (issued via the device-flow exchange).
+- ✅ **Routing Policies** (Org/Team/Project hierarchy, provider-cred
+  validation).
+- ✅ **`/me` + `/me/settings`** dashboards (web app, gated behind the
+  `release_ui_ai_governance_enabled` flag).
+- ✅ **Budget enforcement** (cross-surface — gateway 402 ↔ CLI
+  Screen-8 box ↔ web `BudgetExceededBanner` all derive from
+  `GatewayBudgetService.check()`).
+- ✅ **Helm `NOTES.txt` + post-install checklist** for self-hosted
+  bootstrap.
+
+In flight on the same branch:
+
+- 🚧 IngestionSource backend foundation (Tier 3 + 4 entry point).
+- 🚧 Admin oversight dashboard (cross-tier rollup, mocked data first).
+- 🚧 Architecture deep-dive doc (the diagram + per-tier internals).
+
+Tier 2 / Tier 5 are deferred; the architecture doesn't preclude them
+and the control-plane primitives already accommodate them.
+
+## Feature-flag gates (preview)
+
+The governance preview is opt-in until the long-lived branch lands
+behind a single fence on each surface:
+
+- **Web app:** PostHog flag `release_ui_ai_governance_enabled`.
+  Off by default. Force-enable with
+  `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_governance_enabled`.
+  Existing AI Gateway menu surface stays on the unrelated
+  `release_ui_ai_gateway_menu_enabled` flag — they ship
+  independently.
+- **CLI:** env var `LANGWATCH_GOVERNANCE_PREVIEW=1`. Off by default.
+  When unset, the new subcommands aren't registered and
+  `langwatch login` shows only `--api-key`. Existing
+  `langwatch login --api-key` / dataset / prompts / scenarios
+  surface is untouched and ships as-is.
+- **Backend:** the tRPC procedures, REST endpoints, gateway 402
+  payload, and Prisma schema are not flag-gated. Hiding only the
+  user-facing surfaces lets the long-lived branch merge cleanly
+  without exposing preview features.
+
+## Where to next
+
+- For a dev opting in to Tier 1 today:
+  [Personal IDE keys](/ai-gateway/governance/personal-keys).
+- For an admin onboarding a new org:
+  [Admin setup](/ai-gateway/governance/admin-setup).
+- For the routing-policy DSL that lets one VK serve multiple tools:
+  [Routing policies](/ai-gateway/governance/routing-policies).
+- For per-tool CLI config (env vars, dialect notes):
+  [Coding CLI Integrations](/ai-gateway/cli/overview).
+- For the architecture deep-dive once published:
+  `architecture.md` (in flight on this branch).

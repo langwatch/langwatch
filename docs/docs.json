@@ -555,6 +555,7 @@
             "group": "Governance",
             "pages": [
               "ai-gateway/governance/overview",
+              "ai-gateway/governance/control-plane",
               "ai-gateway/governance/personal-keys",
               "ai-gateway/governance/admin-setup",
               "ai-gateway/governance/routing-policies"
