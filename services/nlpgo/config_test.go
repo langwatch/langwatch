@@ -38,3 +38,39 @@ func TestEngineDefaults(t *testing.T) {
 			cfg.Engine.StreamHeartbeatSeconds)
 	}
 }
+
+// TestValidateRequired_BypassWithoutUpstreamIsValid pins the Go-only
+// deployment topology unlocked by PR #3483: when nlpgo runs as the
+// sole NLP backend (npx @langwatch/server / fully-migrated stacks),
+// there is no Python child anywhere — bypass=true and UpstreamURL=""
+// must both be valid. Pre-fix the validator hard-rejected this combo
+// with 'NLPGO_CHILD_UPSTREAM_URL must be set when NLPGO_CHILD_BYPASS=
+// true', forcing operators to invent a phantom unreachable URL just
+// to satisfy validation. The phantom URL was never dialed in
+// production (FF=on routes everything to /go/*) — purely ceremony.
+//
+// Removed the rejection. Routes with no Go handler still 502 in
+// Go-only mode, but via the goOnlyModeFallback path with a clear
+// body (see TestRouter_GoOnlyModeFallbackReturns502InHTTPAPI tests).
+func TestValidateRequired_BypassWithoutUpstreamIsValid(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Child.Bypass = true
+	cfg.Child.UpstreamURL = ""
+	if err := validateRequired(cfg); err != nil {
+		t.Errorf("Bypass=true + UpstreamURL='' must validate clean (Go-only topology); got err: %v", err)
+	}
+}
+
+// TestValidateRequired_BypassWithUpstreamIsAlsoValid keeps the legacy
+// rollout topology working: Bypass=true + UpstreamURL=<external child>
+// is the dual-process Lambda shape where nlpgo doesn't spawn the
+// child but reverse-proxies legacy paths to it. Both shapes are
+// first-class.
+func TestValidateRequired_BypassWithUpstreamIsAlsoValid(t *testing.T) {
+	cfg := defaultConfig()
+	cfg.Child.Bypass = true
+	cfg.Child.UpstreamURL = "http://127.0.0.1:5561"
+	if err := validateRequired(cfg); err != nil {
+		t.Errorf("Bypass=true + UpstreamURL set must validate clean (legacy external-child topology); got err: %v", err)
+	}
+}

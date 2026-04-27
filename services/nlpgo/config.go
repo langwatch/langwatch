@@ -6,7 +6,6 @@ package nlpgo
 
 import (
 	"context"
-	"errors"
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
@@ -119,13 +118,30 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	return cfg, nil
 }
 
-func validateRequired(cfg Config) error {
+func validateRequired(_ Config) error {
 	// Soft requirements — we let nlpgo boot even when the gateway is
 	// unconfigured because the /go/proxy and LLM-block paths fail
 	// gracefully and operators may temporarily run nlpgo as a pure
 	// reverse proxy during rollout.
-	if cfg.Child.Bypass && cfg.Child.UpstreamURL == "" {
-		return errors.New("nlpgo: NLPGO_CHILD_UPSTREAM_URL must be set when NLPGO_CHILD_BYPASS=true")
-	}
+	//
+	// `Child.Bypass=true` is now valid in two distinct topologies:
+	//
+	//  1. **External child** (legacy rollout / Lambda dual-process):
+	//     `Bypass=true` + `UpstreamURL=<url>` — no in-process child
+	//     spawned, but legacy `/non-go/*` requests reverse-proxy to the
+	//     URL where the Python sidecar is running externally.
+	//
+	//  2. **Go-only** (npx @langwatch/server / fully migrated stacks):
+	//     `Bypass=true` + `UpstreamURL=""` — there is no Python child
+	//     at all. `/go/*` runs in-process; legacy non-`/go/*` requests
+	//     get a self-explaining 502 from proxypass (see
+	//     proxypassHandler) so an operator who forgot to force the FF
+	//     on for every project sees a clear message rather than a
+	//     cryptic dial-failure log.
+	//
+	// We previously rejected (2) at config-load with
+	// 'NLPGO_CHILD_UPSTREAM_URL must be set when NLPGO_CHILD_BYPASS=true'
+	// — a stale assumption from when bypass meant 'child runs
+	// externally'. Removed; both shapes are first-class.
 	return nil
 }

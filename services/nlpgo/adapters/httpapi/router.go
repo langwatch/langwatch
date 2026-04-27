@@ -80,13 +80,44 @@ func NewRouter(deps RouterDeps) http.Handler {
 		g.HandleFunc("/proxy/v1beta/*", proxyPassthroughHandler(deps.PlaygroundProxy))
 	})
 
-	// Fall-through: proxy everything else to uvicorn child.
+	// Fall-through: proxy everything else to uvicorn child if a child
+	// is configured. In Go-only mode (NLPGO_CHILD_BYPASS=true with no
+	// upstream URL — the npx-server topology) ChildProxy is nil; we
+	// short-circuit with a typed 502 + a self-explaining body so an
+	// operator who forgot to force the FF on for every project sees a
+	// clear message rather than chi's default 404 (which would suggest
+	// the URL is wrong) or a generic dial-failure log line.
 	if deps.ChildProxy != nil {
 		r.NotFound(deps.ChildProxy.ServeHTTP)
 		r.MethodNotAllowed(deps.ChildProxy.ServeHTTP)
+	} else {
+		r.NotFound(goOnlyModeFallback)
+		r.MethodNotAllowed(goOnlyModeFallback)
 	}
 
 	return r
+}
+
+// goOnlyModeFallback handles non-/go/* requests when nlpgo is running
+// in Go-only mode (no Python child, no upstream URL). Status code
+// matches the legacy proxypass 502 ("child upstream unavailable") so
+// existing client retry logic keeps working unchanged; the body
+// explains what to do, since a fresh operator hitting this path is
+// almost always missing the per-project feature flag override.
+//
+// Pinned by TestRouter_GoOnlyModeFallbackReturns502 + integration
+// tests in router_go_only_mode_test.go.
+func goOnlyModeFallback(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.WriteHeader(http.StatusBadGateway)
+	_, _ = w.Write([]byte(
+		"nlpgo is in Go-only mode (NLPGO_CHILD_BYPASS=true, no upstream " +
+			"configured).\nOnly /go/* paths are served by this binary. The " +
+			"main app must have release_nlp_go_engine_enabled forced on " +
+			"for every project — set FEATURE_FLAG_FORCE_ENABLE=" +
+			"release_nlp_go_engine_enabled in the langwatch app's env.\n" +
+			"Path attempted: " + r.URL.Path + "\n",
+	))
 }
 
 // forceFlushMiddleware exports any pending spans synchronously after
