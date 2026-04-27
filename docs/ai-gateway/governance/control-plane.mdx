@@ -311,6 +311,16 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   activity. The boolean OR (`governanceActive`) drives whether
   the `/governance` nav entry appears for org admins. Wires the
   conservative no-auto-redirect promotion rule.
+- ✅ **MainMenu Governance entry** — gated on the three-of-three
+  predicate: `release_ui_ai_governance_enabled` flag on AND
+  `organization:manage` permission AND
+  `api.governance.setupState.governanceActive === true`. Renders
+  a "GOVERN · Preview" section between LIBRARY and AI GATEWAY ·
+  Beta with an Eye-icon link to `/settings/governance`. Vast
+  majority of current LLMOps admins (no governance state) see no
+  nav change at all.
+
+  ![MainMenu showing GOVERN Preview section with Governance entry — only visible when governanceActive=true](https://i.img402.dev/mck1l1ar3g.png)
 
 In flight on the same branch:
 
