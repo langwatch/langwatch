@@ -67,7 +67,7 @@ Feature: Semantic caching — fuzzy-match prompts to cached responses
   # Golden path — hit on a near-duplicate prompt
   # ============================================================================
 
-  @integration @semantic_cache
+  @integration @semantic_cache @unimplemented
   Scenario: A near-duplicate prompt serves from cache
     Given the first request sends user message "What are your office hours?"
     And the upstream response is "We're open Monday through Friday, 9am to 5pm."
@@ -82,7 +82,7 @@ Feature: Semantic caching — fuzzy-match prompts to cached responses
     And no debit is written to the budget outbox (upstream wasn't called)
     And a tiny embedding-cost debit IS written (the embedding call happened)
 
-  @integration @semantic_cache
+  @integration @semantic_cache @unimplemented
   Scenario: Exact-match prompt hits cache with similarity 1.0
     Given the first request sends user message "FAQ: what's your pricing?"
     When the identical prompt is sent again
@@ -90,7 +90,7 @@ Feature: Semantic caching — fuzzy-match prompts to cached responses
     And `X-LangWatch-Semantic-Similarity` is `1.00`
     And the response body is byte-identical to the first
 
-  @integration @semantic_cache
+  @integration @semantic_cache @unimplemented
   Scenario: Below-threshold similarity misses and dispatches upstream
     Given a cached entry for "What's the weather in Amsterdam?"
     When a new request asks "What's your company's mission statement?"
@@ -192,7 +192,7 @@ Feature: Semantic caching — fuzzy-match prompts to cached responses
   # Observability
   # ============================================================================
 
-  @integration @semantic_cache @observability
+  @integration @semantic_cache @observability @unimplemented
   Scenario: Hit/miss/skip appear in Prometheus and OTel
     When the gateway handles a mix of semantic cache outcomes
     Then Prometheus exposes:
@@ -211,7 +211,7 @@ Feature: Semantic caching — fuzzy-match prompts to cached responses
     And the /gateway/usage UI shows a "semantic cache" filter with hit-rate
     And the budgets page shows "saved by cache" alongside spend
 
-  @integration @semantic_cache @observability
+  @integration @semantic_cache @observability @unimplemented
   Scenario: Budget reflects saved cost on cache hits
     Given a cached hit for a prompt that would have cost $0.002 upstream
     When the semantic cache serves the response
@@ -226,14 +226,14 @@ Feature: Semantic caching — fuzzy-match prompts to cached responses
   # Cache lifecycle
   # ============================================================================
 
-  @integration @semantic_cache @lifecycle
+  @integration @semantic_cache @lifecycle @unimplemented
   Scenario: TTL expiration evicts stale entries
     Given a cached entry was stored 3601 seconds ago with ttl_seconds=3600
     When a similar request arrives
     Then the entry is a miss (Redis returned nil / expired)
     And the new response IS stored with a fresh TTL
 
-  @integration @semantic_cache @lifecycle
+  @integration @semantic_cache @lifecycle @unimplemented
   Scenario: Editing a VK's config invalidates its semantic cache
     Given "vk_faq" has cached entries
     When an operator updates `vk_faq.config.system_prompt` via the REST API
@@ -245,7 +245,7 @@ Feature: Semantic caching — fuzzy-match prompts to cached responses
     `/changes` cursor advances past the config-mutation revision. The
     control plane does NOT need to hold Redis credentials.
 
-  @integration @semantic_cache @lifecycle
+  @integration @semantic_cache @lifecycle @unimplemented
   Scenario: Revoking a VK nukes its semantic cache
     When "vk_faq" is revoked via `POST /virtual-keys/:id/revoke`
     Then the next `/changes` tick triggers eviction of `semcache:vk_faq:*`

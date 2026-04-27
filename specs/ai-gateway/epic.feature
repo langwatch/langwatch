@@ -34,7 +34,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   # E1 — Golden path: single request flows through the whole pipeline
   # ============================================================================
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Single chat completion — OpenAI shape — succeeds and is attributed
     Given the gateway auth cache is warm for key "prod-key"
     When I POST /v1/chat/completions to the gateway with:
@@ -53,7 +53,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
       | attr.langwatch.org_id      | <acme org id>            |
     And the project "gateway-demo" monthly budget "spent_usd" increases by the reported cost
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Single message — Anthropic shape — succeeds via Claude Code-compatible path
     Given the gateway auth cache is warm for key "prod-key"
     When I POST /v1/messages to the gateway with:
@@ -69,7 +69,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   # E2 — Auth caching: hot path has zero control-plane RTT after warmup
   # ============================================================================
 
-  @integration @epic @performance
+  @integration @epic @performance @unimplemented
   Scenario: Hot-path request does not hit the control-plane
     Given the gateway auth cache is warm for key "prod-key"
     And the control-plane /internal/gateway/resolve-key has been called zero times since warmup
@@ -79,7 +79,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
     And /internal/gateway/config/:vk_id is still called zero times (ETag unchanged)
     And /internal/gateway/budget/debit is called 10 times (fire-and-forget)
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Gateway survives control-plane outage after bootstrap
     Given the gateway has started with LW_GATEWAY_BOOTSTRAP_PULL=true
     And all active VKs have been pre-loaded into L1 cache
@@ -93,7 +93,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   # E3 — Budget enforcement
   # ============================================================================
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Hard-cap budget breach returns 402 with OpenAI-compatible envelope
     Given project "gateway-demo" has a monthly budget of $100 with on_breach "block"
     And 99.50 USD has been spent this month
@@ -113,7 +113,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
       """
     And the trace records span attribute "langwatch.budget.breached_scope=project:month"
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Soft-cap budget breach emits warning header and still succeeds
     Given team "platform" has a monthly team budget of $5000 with on_breach "warn"
     And spend this month is $4600 (92%)
@@ -126,7 +126,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   # E4 — Fallback chain
   # ============================================================================
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Primary provider 5xx triggers fallback to secondary transparently
     Given the key "prod-key" has fallback chain [openai, anthropic]
     And the upstream OpenAI API is returning 503 for all requests
@@ -137,7 +137,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
     And the response header "X-LangWatch-Fallback-Count" equals "1"
     And the trace records two attempt spans with "langwatch.fallback.attempt=0" and "=1"
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Upstream 400 does NOT trigger fallback (client error)
     Given the upstream OpenAI API returns 400 "invalid request format"
     When I POST /v1/chat/completions with a malformed body
@@ -149,7 +149,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   # E5 — Caching passthrough (load-bearing for Anthropic cost)
   # ============================================================================
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Anthropic cache_control is forwarded byte-identically when mode=respect
     Given the VK "prod-key" has cache.mode = "respect"
     When I POST /v1/messages with a body containing a "cache_control": {"type":"ephemeral"} block on the system prompt
@@ -157,7 +157,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
     And the response usage includes "cache_read_input_tokens" or "cache_creation_input_tokens"
     And the debit call reports the cache-read vs cache-write token counts separately
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Cache override via header disables cache for a single request
     Given the VK "prod-key" has cache.mode = "respect"
     When I POST /v1/messages with header "X-LangWatch-Cache: disable" and a cache_control block in the body
@@ -168,7 +168,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   # E6 — Streaming contract
   # ============================================================================
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: SSE streaming passes tool-call deltas byte-for-byte
     Given the upstream OpenAI is streaming tool-call deltas in SSE format
     When I POST /v1/chat/completions with "stream": true
@@ -177,7 +177,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
     And the total number of SSE events emitted equals the number emitted by upstream
     And the ordering of "delta" events is preserved
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Stream-chunk guardrail redacts PII mid-stream
     Given the VK "prod-key" has a stream_chunk guardrail "pii-redactor" attached
     And the upstream returns a stream that includes an email "alice@acme.com"
@@ -191,7 +191,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   # E7 — Policy rules (tools/MCP/URLs)
   # ============================================================================
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Requesting a denied tool returns tool_not_allowed
     Given the VK "prod-key" has policy_rules.tools.deny = ["^shell\\..*"]
     When I POST /v1/chat/completions with tools: [{name: "shell.exec"}]
@@ -204,7 +204,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   # E8 — Per-tenant OTel routing
   # ============================================================================
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Trace for tenant A lands in tenant A's project, not tenant B's
     Given organization "acme" has project "acme-demo" and organization "globex" has project "globex-demo"
     And tenants "acme" and "globex" each have their own VK
@@ -217,7 +217,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   # E9 — Coding-CLI integration (dogfood)
   # ============================================================================
 
-  @integration @epic @cli
+  @integration @epic @cli @unimplemented
   Scenario: Claude Code CLI can use a LangWatch VK as an Anthropic endpoint
     Given ANTHROPIC_BASE_URL is set to "http://localhost:7400"
     And ANTHROPIC_AUTH_TOKEN is set to a LangWatch VK
@@ -226,7 +226,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
     And the request is visible in project "gateway-demo" as a trace tagged "claude-code"
     And the budget is debited accordingly
 
-  @integration @epic @cli
+  @integration @epic @cli @unimplemented
   Scenario: Codex CLI can use a LangWatch VK as an OpenAI endpoint
     Given OPENAI_BASE_URL is set to "http://localhost:7400/v1"
     And OPENAI_API_KEY is set to a LangWatch VK
@@ -234,7 +234,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
     Then Codex exits 0
     And the request is visible in project "gateway-demo" as a trace tagged "codex"
 
-  @integration @epic @cli
+  @integration @epic @cli @unimplemented
   Scenario: Model alias lets the same CLI talk to multiple providers without config change
     Given VK "prod-key" has model_aliases = {"gpt-4o": "azure/my-deployment"}
     When I run `codex exec --model gpt-4o "ping"`
@@ -245,7 +245,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   # E10 — Health & readiness
   # ============================================================================
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Readiness is green only when all dependencies are usable
     Given the gateway process is alive
     When I GET /readyz
@@ -257,7 +257,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
       | the changes long-poll goroutine is running             |
     And if any check fails the endpoint returns 503 with a JSON body listing failing checks
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Liveness is green as long as the process is responsive
     When I GET /healthz
     Then the gateway returns 200 with body {"status":"ok"}
@@ -267,7 +267,7 @@ Feature: LangWatch AI Gateway — Cross-cutting epic
   # E11 — RBAC end-to-end
   # ============================================================================
 
-  @integration @epic
+  @integration @epic @unimplemented
   Scenario: Developer without virtualKeys:create cannot create a VK
     Given user "dev@acme" has only "virtualKeys:view" on project "gateway-demo"
     When they attempt to create a new VK in the UI

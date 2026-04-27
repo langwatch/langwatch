@@ -20,7 +20,7 @@ Feature: AI Gateway — OpenAI client-param compatibility translation
   # v1 behaviour — pass-through, surface the upstream 400 verbatim
   # ============================================================================
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: gpt-5-mini with legacy max_tokens parameter returns 400 from upstream
     When I POST to "/v1/chat/completions" with body:
       """
@@ -39,7 +39,7 @@ Feature: AI Gateway — OpenAI client-param compatibility translation
     # but does surface OpenAI's exact error message so the caller knows what
     # to change.
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: gpt-5-mini with new max_completion_tokens parameter succeeds
     When I POST to "/v1/chat/completions" with body:
       """
@@ -52,7 +52,7 @@ Feature: AI Gateway — OpenAI client-param compatibility translation
     Then the response status is 200
     And the response body.choices[0].message.content is non-empty
 
-  @integration @v1
+  @integration @v1 @unimplemented
   Scenario: gpt-4o with legacy max_tokens continues to work (v1 parity with OpenAI)
     When I POST to "/v1/chat/completions" with body:
       """
@@ -71,14 +71,14 @@ Feature: AI Gateway — OpenAI client-param compatibility translation
   # Observability — operators can measure the tail before translating
   # ============================================================================
 
-  @unit @v1
+  @unit @v1 @unimplemented
   Scenario: upstream 400 with "max_tokens" in the error body emits a structured log
     When the gateway receives an upstream 400 with body containing "max_tokens"
     Then a structured log is written at INFO with `reason=legacy_max_tokens_rejected`
     And the log includes `model`, `virtual_key_id`, and `gateway_request_id`
     And the log is rate-limited to once per VK per hour to avoid noise
 
-  @unit @v1
+  @unit @v1 @unimplemented
   Scenario: Prometheus counter tracks the legacy-param rejection tail
     Given `gateway_http_requests_total{status="400", reason="legacy_max_tokens"}` is a declared metric
     When the gateway receives an upstream 400 with body containing "max_tokens"

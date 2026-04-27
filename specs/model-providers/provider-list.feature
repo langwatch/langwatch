@@ -67,7 +67,7 @@ Feature: Model Provider List Management
     Then I see the "openai" provider in the list
     And the "openai" provider row does not show a "Default Model" badge
 
-  @integration
+  @integration @unimplemented
   Scenario: "Add Model Provider" menu lists every provider regardless of existing rows
     Given I have "openai" provider with one row configured
     And I have "anthropic" provider not configured

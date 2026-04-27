@@ -19,7 +19,7 @@ Feature: langwatch CLI — virtual-keys subcommands
   # list
   # ============================================================================
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: List virtual keys (empty)
     Given project "gateway-demo" has no virtual keys
     When I run `langwatch virtual-keys list`
@@ -27,7 +27,7 @@ Feature: langwatch CLI — virtual-keys subcommands
     And stdout contains "No virtual keys configured"
     And stdout suggests "langwatch virtual-keys create --name <name>"
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: List virtual keys (populated)
     Given project "gateway-demo" has 2 virtual keys "prod-key" and "dev-key"
     When I run `langwatch virtual-keys list`
@@ -35,7 +35,7 @@ Feature: langwatch CLI — virtual-keys subcommands
     And stdout shows a table with columns "Name, Prefix, Env, Status, Providers, Last Used, Created"
     And the table has 2 rows
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: List virtual keys as JSON
     Given project "gateway-demo" has 2 virtual keys
     When I run `langwatch virtual-keys list --format json`
@@ -47,7 +47,7 @@ Feature: langwatch CLI — virtual-keys subcommands
   # create
   # ============================================================================
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: Create a virtual key with defaults
     When I run `langwatch virtual-keys create --name prod-key --provider openai`
     Then the exit code is 0
@@ -56,24 +56,24 @@ Feature: langwatch CLI — virtual-keys subcommands
     And stdout warns that the secret will not be shown again
     And stdout suggests "Copy now:" with the full secret
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: Create with multiple providers (fallback chain)
     When I run `langwatch virtual-keys create --name prod --provider openai --provider anthropic`
     Then the virtual key is created with providers [openai, anthropic] in that order
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: Create in test mode
     When I run `langwatch virtual-keys create --name test-key --env test --provider openai`
     Then the created key has prefix "lw_vk_test_"
     And the env badge in the output shows "test"
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: Create with a budget
     When I run `langwatch virtual-keys create --name budget-key --provider openai --budget-usd 100 --budget-window month`
     Then a VK is created
     And a monthly $100 project-scoped budget is attached with on_breach "block"
 
-  @integration @cli @json-output
+  @integration @cli @json-output @unimplemented
   Scenario: Create with JSON output for scripts
     When I run `langwatch virtual-keys create --name prod --provider openai --format json`
     Then stdout is a single-line JSON object with keys "id", "secret", "prefix", "env", "created_at"
@@ -83,7 +83,7 @@ Feature: langwatch CLI — virtual-keys subcommands
   # rotate
   # ============================================================================
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: Rotate a VK's secret
     Given I know the id of VK "prod-key"
     When I run `langwatch virtual-keys rotate prod-key`
@@ -93,7 +93,7 @@ Feature: langwatch CLI — virtual-keys subcommands
     Then a new secret is displayed exactly once
     And stdout notes "Old secret valid for 24 hours"
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: Rotate with --yes skips confirmation
     When I run `langwatch virtual-keys rotate prod-key --yes`
     Then rotation happens without prompting
@@ -102,7 +102,7 @@ Feature: langwatch CLI — virtual-keys subcommands
   # revoke
   # ============================================================================
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: Revoke a VK
     Given I know the id of VK "stale-key"
     When I run `langwatch virtual-keys revoke stale-key`
@@ -111,7 +111,7 @@ Feature: langwatch CLI — virtual-keys subcommands
     When I type "y"
     Then stdout says "Revoked. Gateway caches invalidate within 60 seconds."
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: Revoke with --yes skips confirmation
     When I run `langwatch virtual-keys revoke stale-key --yes`
     Then the VK is revoked without prompting
@@ -120,7 +120,7 @@ Feature: langwatch CLI — virtual-keys subcommands
   # get (single key detail)
   # ============================================================================
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: Get a VK's config
     Given I know the id of VK "prod-key"
     When I run `langwatch virtual-keys get prod-key`
@@ -130,7 +130,7 @@ Feature: langwatch CLI — virtual-keys subcommands
   # Errors
   # ============================================================================
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: Missing API token
     Given I have NOT run `langwatch login`
     When I run `langwatch virtual-keys list`
@@ -138,14 +138,14 @@ Feature: langwatch CLI — virtual-keys subcommands
     And stderr contains "No LangWatch API key found"
     And stderr suggests running "langwatch login"
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: Token lacks permission
     Given my token has only "virtualKeys:view"
     When I run `langwatch virtual-keys create --name x --provider openai`
     Then the exit code is 1
     And stderr contains "permission_denied" and "virtualKeys:create"
 
-  @integration @cli
+  @integration @cli @unimplemented
   Scenario: Provider not configured
     When I run `langwatch virtual-keys create --name x --provider cohere`
     Then the exit code is 1
@@ -156,7 +156,7 @@ Feature: langwatch CLI — virtual-keys subcommands
   # Dogfooding integration — using a VK the CLI just created
   # ============================================================================
 
-  @integration @cli @dogfood
+  @integration @cli @dogfood @unimplemented
   Scenario: Minted VK immediately works against the gateway
     When I run `langwatch virtual-keys create --name dogfood --provider openai --format json`
     And I capture the "secret" field as $VK

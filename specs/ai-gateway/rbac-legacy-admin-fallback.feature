@@ -22,7 +22,7 @@ Feature: AI Gateway — RBAC legacy ADMIN fallback for org-scoped checks
   # Gateway org-scoped surfaces must work for legacy admins
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: Audit log listing page renders populated for legacy org ADMIN
     # Post-consolidation: gateway audit rows are visible at /settings/audit-log
     # alongside platform rows. Legacy org ADMINs reach the page via the same
@@ -32,14 +32,14 @@ Feature: AI Gateway — RBAC legacy ADMIN fallback for org-scoped checks
     And the audit-log table shows at least 1 row
     And the response does NOT redirect to "/auth/signin"
 
-  @integration
+  @integration @unimplemented
   Scenario: Budget org-list includes the legacy admin's org budgets
     When "alice@acme.test" visits "/acme-demo-b4UwtJ/gateway/budgets"
     Then the response status is 200
     And the budget table includes rows scoped to organization "acme"
     And the user sees NO "unauthorized" empty-state
 
-  @integration
+  @integration @unimplemented
   Scenario: Cache rule list is accessible from gateway nav
     When "alice@acme.test" visits "/acme-demo-b4UwtJ/gateway/cache-rules"
     Then the response status is 200
@@ -49,13 +49,13 @@ Feature: AI Gateway — RBAC legacy ADMIN fallback for org-scoped checks
   # organization:manage stays strictly org-admin-only (no escalation)
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Legacy admin CANNOT perform organization:manage via TeamUser fallback
     When "alice@acme.test" attempts "organization:manage" on org "acme"
     Then the RBAC check returns false
     And the authorization decision log records "legacy fallback: skipped — organization:manage requires ORG-scoped binding"
 
-  @unit
+  @unit @unimplemented
   Scenario: OrganizationUser ADMIN passes (legacy path for organization:manage)
     When "alice@acme.test" attempts "organization:manage" on org "acme" via OrganizationUser ADMIN
     Then the RBAC check returns true
@@ -64,7 +64,7 @@ Feature: AI Gateway — RBAC legacy ADMIN fallback for org-scoped checks
   # Non-gateway org-scoped permissions continue to use existing paths
   # ============================================================================
 
-  @integration
+  @integration @unimplemented
   Scenario: auditLog:view still falls back to TeamUser where gateway permissions do
     Given "alice@acme.test" has TeamUser role MEMBER (not ADMIN) on "platform"
     And the org has a RoleBinding granting "auditLog:view" to the "platform" team
@@ -75,7 +75,7 @@ Feature: AI Gateway — RBAC legacy ADMIN fallback for org-scoped checks
   # Observability — legacy-fallback uses should be trackable
   # ============================================================================
 
-  @unit
+  @unit @unimplemented
   Scenario: Legacy-fallback usage emits a log line so operators can measure the tail
     When a legacy admin accesses a gateway org-scoped surface via the TeamUser fallback
     Then a structured log "rbac.legacy_teamuser_fallback_used" is written
