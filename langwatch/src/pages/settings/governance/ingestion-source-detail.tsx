@@ -381,7 +381,7 @@ function EmptyEventsHint({ source }: { source: Source }) {
         <Code fontSize="xs">/api/otel/v1/traces</Code> with your project
         API key instead — see{" "}
         <Link
-          href="/ai-gateway/governance/ingestion-sources/otel-generic"
+          href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
           color="orange.600"
         >
           Choosing the right OTel endpoint
