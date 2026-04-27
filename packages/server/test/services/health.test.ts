@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { createServer } from "node:http";
 import { execCheck, httpGetCheck, pollUntilHealthy } from "../../src/services/health.ts";
 
