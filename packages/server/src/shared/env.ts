@@ -123,16 +123,27 @@ export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput):
  * .env file stays free of user secrets. See 04-validation.feature.
  */
 export function scaffoldEnvFile(input: EnvScaffoldInput & { path: string }): { written: boolean; path: string } {
+  const secretsPath = join(dirname(input.path), "secrets.json");
+
   if (existsSync(input.path)) {
+    // .env already exists. Backfill secrets.json from it if the sidecar
+    // hasn't been written yet — this covers users upgrading from a prior
+    // beta that didn't ship the secret-persistence path. Without this,
+    // their existing CREDENTIALS_SECRET stays in the .env but the
+    // sidecar is empty, so the next `rm ~/.langwatch/.env` rotates the
+    // secret and orphans encrypted ModelProvider rows.
+    if (!existsSync(secretsPath)) {
+      writePersistedSecrets(secretsPath, readFileSync(input.path, "utf8"));
+    }
     return { written: false, path: input.path };
   }
+
   mkdirSync(dirname(input.path), { recursive: true });
 
   // Read previously persisted secrets (from a prior scaffold) and overlay
   // them so a `rm ~/.langwatch/.env; npx ...` doesn't rotate
   // CREDENTIALS_SECRET out from under encrypted postgres rows. The first
   // scaffold writes the sidecar; every later scaffold reuses it.
-  const secretsPath = join(dirname(input.path), "secrets.json");
   const persistedSecrets = readPersistedSecrets(secretsPath);
   const overlay = { ...input.overrides, ...persistedSecrets };
 
