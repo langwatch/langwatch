@@ -306,6 +306,76 @@ program
       process.exit(1);
     }
   });
+
+// `langwatch ingest *` — read-only debug tools for the IngestionSource
+// + Activity Monitor surfaces. Mirrors the web admin /settings/governance
+// flows for ops folks who live in terminal. Authoring stays browser-only.
+const ingestCmd = program
+  .command("ingest")
+  .description("Inspect IngestionSources and tail their recent OCSF-normalised events (read-only governance debug helpers).");
+
+ingestCmd
+  .command("list")
+  .description("List the org's IngestionSources (active by default; --all includes archived).")
+  .option("--all", "include archived sources")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (options: { all?: boolean; json?: boolean }) => {
+    try {
+      const { ingestListCommand } = await import("./commands/ingest/list.js");
+      await ingestListCommand(options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+ingestCmd
+  .command("tail <sourceId>")
+  .description("Stream the most recent events for an IngestionSource. --follow polls every 3s.")
+  .option("--limit <n>", "how many events to fetch on first poll (default 50)", (v) => parseInt(v, 10))
+  .option("--follow", "keep polling for new events; exit on Ctrl-C")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (sourceId: string, options: { limit?: number; follow?: boolean; json?: boolean }) => {
+    try {
+      const { ingestTailCommand } = await import("./commands/ingest/tail.js");
+      await ingestTailCommand(sourceId, options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+ingestCmd
+  .command("health <sourceId>")
+  .description("Show events received in the last 24h / 7d / 30d + last-success timestamp for one IngestionSource.")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (sourceId: string, options: { json?: boolean }) => {
+    try {
+      const { ingestHealthCommand } = await import("./commands/ingest/health.js");
+      await ingestHealthCommand(sourceId, options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
+
+const governanceCmd = program
+  .command("governance")
+  .description("Inspect org-level governance state from the CLI (read-only).");
+
+governanceCmd
+  .command("status")
+  .description("Show the org's governance setup-state OR-of-flags (mirrors api.governance.setupState).")
+  .option("--json", "emit machine-readable JSON")
+  .action(async (options: { json?: boolean }) => {
+    try {
+      const { governanceStatusCommand } = await import("./commands/governance/status.js");
+      await governanceStatusCommand(options);
+    } catch (error) {
+      console.error(`Error: ${formatApiErrorMessage({ error })}`);
+      process.exit(1);
+    }
+  });
 } // end if (governancePreview)
 
 // Add prompt command group
