@@ -17,11 +17,6 @@
  */
 import type { PrismaClient } from "@prisma/client";
 
-import {
-  getClickHouseClientForOrganization,
-  isClickHouseEnabled,
-} from "~/server/clickhouse/clickhouseClient";
-
 export interface GovernanceSetupState {
   hasPersonalVKs: boolean;
   hasRoutingPolicies: boolean;
@@ -103,31 +98,14 @@ export class GovernanceSetupStateService {
   }
 
   private async probeRecentActivity(
-    organizationId: string,
+    _organizationId: string,
   ): Promise<boolean> {
-    if (!isClickHouseEnabled()) return false;
-    const client = await getClickHouseClientForOrganization(organizationId);
-    if (!client) return false;
-    const sinceMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
-    const result = await client.query({
-      query: `
-        SELECT 1 AS hit
-        FROM gateway_activity_events
-        WHERE OrganizationId = {organizationId:String}
-          AND EventTimestamp >= toDateTime64({since:String}, 3)
-        LIMIT 1
-      `,
-      query_params: {
-        organizationId,
-        since: msToClickhouseTime(sinceMs),
-      },
-      format: "JSONEachRow",
-    });
-    const rows = (await result.json()) as Array<{ hit: number }>;
-    return rows.length > 0;
+    // Recent-activity probe queried `gateway_activity_events` which is
+    // being torn down in the unified-trace branch correction. Returns
+    // false until the next commit wires the probe against
+    // `trace_summaries` filtered by `langwatch.origin.kind = "ingestion_source"`
+    // (or against the hidden Governance Project's recent traces, depending
+    // on which lookup path is cheaper).
+    return false;
   }
-}
-
-function msToClickhouseTime(ms: number): string {
-  return new Date(ms).toISOString().replace("T", " ").replace("Z", "");
 }

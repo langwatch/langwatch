@@ -17,7 +17,6 @@ export class App {
   readonly dspySteps: AppDependencies["dspySteps"];
   readonly simulations: AppDependencies["simulations"] & AppCommands["simulations"];
   readonly suiteRuns: AppDependencies["suiteRuns"] & AppCommands["suiteRuns"];
-  readonly activityMonitor: AppCommands["activityMonitor"];
   readonly experiments: AppDependencies["experiments"];
   readonly organizations: AppDependencies["organizations"];
   readonly projects: AppDependencies["projects"];
@@ -64,7 +63,6 @@ export class App {
     this.dspySteps = deps.dspySteps;
     this.simulations = { ...deps.simulations, ...deps.commands.simulations };
     this.suiteRuns = { ...deps.suiteRuns, ...deps.commands.suiteRuns };
-    this.activityMonitor = deps.commands.activityMonitor;
     this.ops = deps.ops;
     this._eventSourcing = deps._eventSourcing;
     this._gracefulCloseables = deps._gracefulCloseables ?? [];
