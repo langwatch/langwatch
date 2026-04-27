@@ -123,17 +123,17 @@ already route through the gateway:
 
 ```bash zsh / bash
 # Add to your ~/.zshrc or ~/.bashrc
-eval "$(langwatch init zsh)"
+eval "$(langwatch init-shell zsh)"
 ```
 
 ```fish fish
 # Add to your ~/.config/fish/config.fish
-langwatch init fish | source
+langwatch init-shell fish | source
 ```
 
 ```powershell PowerShell
 # Add to your $PROFILE
-langwatch init powershell | Invoke-Expression
+langwatch init-shell powershell | Invoke-Expression
 ```
 
 </CodeGroup>
@@ -143,8 +143,8 @@ talks to the gateway too.
 
 ## Your dashboard
 
-Open `https://app.langwatch.ai/me` (or run `langwatch dashboard`)
-to see your usage:
+Open `https://app.langwatch.ai/me` (or run `langwatch me`) to see
+your usage:
 
 - Spent vs. budget for the month
 - Total requests, week-over-week
@@ -189,9 +189,12 @@ budget in real time — no token re-issuance required.
 ## Sign out
 
 ```bash
-$ langwatch logout
+$ langwatch logout-device
 Logged out — credentials cleared.
 ```
 
 This clears `~/.langwatch/config.json` locally **and** revokes your
-refresh token at the server, so leaked-state can't be reused.
+refresh token at the server, so leaked-state can't be reused. The
+`-device` suffix disambiguates from the older `langwatch login` API-
+key flow (which has its own logout via clearing the env var or
+re-running `langwatch login`).
