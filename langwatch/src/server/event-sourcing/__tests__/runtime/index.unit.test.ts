@@ -66,6 +66,7 @@ describe("EventSourcingPipeline", () => {
       const mockFoldProjection: FoldProjectionDefinition<any, Event> = {
         name: "test-fold",
         version: "2025-01-01",
+        lastEventOccurredAtKey: "LastEventOccurredAt",
         eventTypes: ["test.event"],
         init: () => ({}),
         apply: (state) => state,
@@ -112,6 +113,7 @@ describe("EventSourcingPipeline", () => {
       const mockFoldProjection: FoldProjectionDefinition<any, Event> = {
         name: "test-fold",
         version: "2025-01-01",
+        lastEventOccurredAtKey: "LastEventOccurredAt",
         eventTypes: ["test.event"],
         init: () => ({}),
         apply: (state) => state,

@@ -1,0 +1,232 @@
+name: gateway-matrix
+
+# AI Gateway provider × scenario matrix — runs the live-credential
+# Go matrix (services/aigateway/tests/matrix) against real LLM
+# providers + the LangWatch control plane. Costs ~$0.07 per full
+# run (31 cells: 5 canonical scenarios — simple, streamed,
+# tool_calling, structured_outputs, cache — across OpenAI/Anthropic/
+# Gemini/Bedrock/Azure/Vertex on cheap models, plus 1 OpenAI-only
+# streamed-auto-include-usage regression cell). Fires on gateway-
+# touching PRs (path-filtered, drafts skip, concurrency-locked
+# against shared matrix VKs to prevent double-spend on parallel
+# runs — ~$0.07/run × N gateway-touching PRs/day), the nightly
+# cron, and manual workflow_dispatch. Non-gateway PRs and fork PRs
+# (secrets stripped on forks by GitHub) fall back to the unit-test
+# layer that mocks providers at the bifrost adapter boundary.
+#
+# Touches needing this matrix:
+#   - services/aigateway/**          (gateway data plane)
+#   - pkg/**                         (shared HTTP/health helpers)
+#   - langwatch/src/server/gateway/  (control plane)
+#   - langwatch/src/server/event-sourcing/pipelines/trace-processing/
+#     reactors/gatewayBudgetSync.reactor.ts
+# Triggers:
+#   - PR push (path-filtered to gateway-relevant files only — doc-only
+#     PRs don't pay the ~$0.07 cost)
+#   - Nightly cron (catches drift in shared provider infra)
+#   - Manual workflow_dispatch (with optional provider-tag override)
+# Fork PRs without secrets: the per-job guard skips the live run
+# cleanly so external contributors don't see a phantom CI red.
+
+on:
+  workflow_dispatch:
+    inputs:
+      providers:
+        description: 'Build tags (space-separated). Default = all six.'
+        type: string
+        default: 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex'
+      run_id_label:
+        description: 'Optional label appended to trace tags for grep.'
+        type: string
+        default: ''
+  pull_request:
+    # Only fire when gateway-relevant code or this workflow itself
+    # changes — doc-only / unrelated PRs stay free.
+    paths:
+      - 'services/aigateway/**'
+      - 'pkg/**'
+      - 'cmd/**'
+      - 'go.mod'
+      - 'go.sum'
+      - 'langwatch/src/server/gateway/**'
+      - 'langwatch/src/server/event-sourcing/pipelines/trace-processing/reactors/gatewayBudgetSync.reactor.ts'
+      - 'langwatch/src/server/routes/gateway-internal.ts'
+      - 'charts/gateway/**'
+      - '.github/workflows/gateway-matrix.yaml'
+  schedule:
+    # 04:00 UTC daily — quiet provider tier, runs while EMEA is asleep
+    - cron: '0 4 * * *'
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  # Serialize runs against the shared matrix-* VKs and budgets so
+  # parallel invocations don't double-count spend on the same key.
+  group: gateway-matrix-shared-vks
+  cancel-in-progress: false
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Skip on draft PRs (cost discipline) and on fork PRs (GitHub
+    # deliberately strips secrets on `pull_request` from forks, so a
+    # live-credential matrix can never succeed there — running it
+    # would only produce phantom red checks for external contributors).
+    if: |
+      github.event_name != 'pull_request' ||
+      (github.event.pull_request.draft == false &&
+       github.event.pull_request.head.repo.fork == false)
+    env:
+      GATEWAY_URL: http://localhost:5563
+      LW_BASE_URL: http://localhost:5560
+      # Provider creds — set as repo/org secrets, NOT committed.
+      OPENAI_API_KEY: ${{ secrets.MATRIX_OPENAI_API_KEY }}
+      ANTHROPIC_API_KEY: ${{ secrets.MATRIX_ANTHROPIC_API_KEY }}
+      GEMINI_API_KEY: ${{ secrets.MATRIX_GEMINI_API_KEY }}
+      AZURE_OPENAI_ENDPOINT: ${{ secrets.MATRIX_AZURE_OPENAI_ENDPOINT }}
+      AZURE_OPENAI_API_KEY: ${{ secrets.MATRIX_AZURE_OPENAI_API_KEY }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.MATRIX_AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.MATRIX_AWS_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: eu-central-1
+      VERTEX_PROJECT: langwatch
+      VERTEX_LOCATION: us-central1
+      VERTEX_ACCESS_TOKEN: ${{ secrets.MATRIX_VERTEX_ACCESS_TOKEN }}
+      # Gateway / control-plane shared secrets.
+      LW_GATEWAY_INTERNAL_SECRET: ${{ secrets.MATRIX_LW_GATEWAY_INTERNAL_SECRET }}
+      LW_GATEWAY_JWT_SECRET: ${{ secrets.MATRIX_LW_GATEWAY_JWT_SECRET }}
+      LW_VIRTUAL_KEY_PEPPER: ${{ secrets.MATRIX_LW_VIRTUAL_KEY_PEPPER }}
+      # VK secrets minted by `pnpm tsx scripts/seed-gateway-dogfood.ts`
+      # against the long-lived matrix project — capture the script's
+      # final block once + paste into GH org secrets, not regenerate
+      # per-run (the seed script creates a NEW VK on each invocation).
+      TEST_VK_OPENAI: ${{ secrets.MATRIX_TEST_VK_OPENAI }}
+      TEST_VK_ANTHROPIC: ${{ secrets.MATRIX_TEST_VK_ANTHROPIC }}
+      TEST_VK_GEMINI: ${{ secrets.MATRIX_TEST_VK_GEMINI }}
+      TEST_VK_BEDROCK: ${{ secrets.MATRIX_TEST_VK_BEDROCK }}
+      TEST_VK_AZURE: ${{ secrets.MATRIX_TEST_VK_AZURE }}
+      TEST_VK_VERTEX: ${{ secrets.MATRIX_TEST_VK_VERTEX }}
+      LW_PROJECT_API_KEY: ${{ secrets.MATRIX_LW_PROJECT_API_KEY }}
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: langwatch
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+
+      clickhouse:
+        image: clickhouse/clickhouse-server:24.8
+        ports: ['8123:8123', '9000:9000']
+        env:
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ''
+          CLICKHOUSE_DB: langwatch
+
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-go@0aaccfd150d50ccaeb58ebd88d36e91967a5f35b # v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+
+      - uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d # v3
+        with:
+          version: 10
+
+      - uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a # v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: langwatch/pnpm-lock.yaml
+
+      - name: Install langwatch deps
+        working-directory: langwatch
+        run: pnpm install --frozen-lockfile
+
+      - name: Apply DB migrations
+        working-directory: langwatch
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
+        run: pnpm prisma migrate deploy
+
+      - name: Start control plane (background)
+        working-directory: langwatch
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
+          REDIS_URL: redis://localhost:6379
+          CLICKHOUSE_HOST: http://localhost:8123
+        run: |
+          pnpm dev > /tmp/langwatch-dev.log 2>&1 &
+          echo $! > /tmp/langwatch.pid
+          # Wait up to 90s for /api/health
+          for i in {1..45}; do
+            curl -fsS http://localhost:5560/api/health && break
+            sleep 2
+          done
+
+      - name: Start gateway (background)
+        run: |
+          go build -o /tmp/aigateway ./cmd/service
+          /tmp/aigateway aigateway > /tmp/aigateway.log 2>&1 &
+          echo $! > /tmp/aigateway.pid
+          for i in {1..30}; do
+            curl -fsS http://localhost:5563/healthz && break
+            sleep 2
+          done
+
+      - name: Run provider matrix
+        working-directory: services/aigateway
+        env:
+          # Force-include all configured tags so a partial-creds run
+          # still produces useful coverage signal — a missing-cred
+          # cell t.Skips with a clear reason instead of silently
+          # being absent from the report.
+          MATRIX_TAGS: ${{ github.event.inputs.providers || 'live_openai live_anthropic live_gemini live_bedrock live_azure live_vertex' }}
+        run: |
+          go test -tags="$MATRIX_TAGS" -v -count=1 -timeout 1200s \
+            ./tests/matrix/... 2>&1 | tee /tmp/matrix.log
+
+      - name: Extract matrix results
+        if: always()
+        run: |
+          echo "## Matrix run summary" >> $GITHUB_STEP_SUMMARY
+          # Each cell logs `cell <provider>/<scenario>: trace=<id> duration=<ms>s captured_cost=$<usd>`
+          grep -oE 'cell [a-z]+/[a-z_]+: .*captured_cost=\$[0-9.]+' /tmp/matrix.log | \
+            sed 's/^cell /- ✅ /' >> $GITHUB_STEP_SUMMARY || true
+          # Total cost
+          total=$(grep -oE 'captured_cost=\$[0-9.]+' /tmp/matrix.log | \
+            sed 's/captured_cost=\$//' | awk '{s+=$1} END {printf "%.4f", s}')
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Total provider spend this run: \$$total**" >> $GITHUB_STEP_SUMMARY
+
+      - name: Stop services
+        if: always()
+        run: |
+          [ -f /tmp/aigateway.pid ] && kill $(cat /tmp/aigateway.pid) || true
+          [ -f /tmp/langwatch.pid ] && kill $(cat /tmp/langwatch.pid) || true
+
+      - name: Upload logs on failure
+        if: failure()
+        uses: actions/upload-artifact@65c4c4a1ddee5b72f698fdd19549f0f0fb45cf08 # v4
+        with:
+          name: matrix-logs-${{ github.run_id }}
+          path: |
+            /tmp/matrix.log
+            /tmp/aigateway.log
+            /tmp/langwatch-dev.log
+          retention-days: 7

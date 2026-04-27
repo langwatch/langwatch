@@ -245,7 +245,7 @@ export function DatasetSelectionItem({
                 <MoreHorizontal />
               </Button>
             </Menu.Trigger>
-            <Menu.Content zIndex="popover">
+            <Menu.Content>
               <Menu.Item
                 value="delete"
                 css={{ color: "var(--chakra-colors-red-600)" }}

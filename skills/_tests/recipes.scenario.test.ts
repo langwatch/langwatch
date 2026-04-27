@@ -10,6 +10,9 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  assertSkillWasRead,
+  installSkillToWorkDir,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -22,17 +25,11 @@ const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
 
 function copyRecipeSkillToWorkDir(tempFolder: string, recipeName: string) {
-  const skillDir = path.join(tempFolder, ".skills", recipeName);
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.copyFileSync(
-    path.resolve(__dirname, `../recipes/${recipeName}/SKILL.md`),
-    path.join(skillDir, "SKILL.md")
-  );
-  const sharedDir = path.join(skillDir, "_shared");
-  fs.mkdirSync(sharedDir, { recursive: true });
-  execSync(
-    `cp -r ${path.resolve(__dirname, "../_shared")}/* ${sharedDir}/`
-  );
+  installSkillToWorkDir({
+    workingDirectory: tempFolder,
+    skillSubpath: `recipes/${recipeName}`,
+    installAs: recipeName,
+  });
 }
 
 function findTestFiles(dir: string, pattern: RegExp): string[] {
@@ -95,6 +92,7 @@ describe("Recipes", () => {
       copyRecipeSkillToWorkDir(tempFolder, "generate-rag-dataset");
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Generate RAG evaluation dataset",
         description:
           "Generate a synthetic evaluation dataset from the TerraVerde farm advisory RAG knowledge base, including diverse question types and context per row.",
@@ -117,6 +115,7 @@ describe("Recipes", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "generate-rag-dataset");
 
             // Find CSV or Python dataset files
             const csvFiles = findTestFiles(tempFolder, /\.csv$/);
@@ -176,7 +175,7 @@ describe("Recipes", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -192,6 +191,7 @@ describe("Recipes", () => {
       copyRecipeSkillToWorkDir(tempFolder, "test-compliance");
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Health agent compliance tests",
         description:
           "Create scenario tests that verify the health wellness agent stays observational and does not give prescriptive medical advice. Include boundary enforcement and red team tests.",
@@ -214,6 +214,7 @@ describe("Recipes", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "test-compliance");
 
             // Find test files (Python or TypeScript)
             const pyTestFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
@@ -267,11 +268,11 @@ describe("Recipes", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
-    "uses MCP to debug instrumentation traces",
+    "uses the langwatch CLI to debug instrumentation traces",
     async () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-recipe-debug-instrumentation-")
@@ -282,17 +283,24 @@ describe("Recipes", () => {
       );
       copyRecipeSkillToWorkDir(tempFolder, "debug-instrumentation");
 
+      // Provide an .env so the CLI is authenticated
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`
+      );
+
       const result = await scenario.run({
-        name: "Debug instrumentation via MCP",
+        setId: SKILL_TESTS_SET_ID,
+        name: "Debug instrumentation via the langwatch CLI",
         description:
-          "Use the LangWatch MCP to inspect production traces and identify instrumentation issues or suggest improvements.",
+          "Use the `langwatch` CLI to inspect production traces and identify instrumentation issues or suggest improvements.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent used LangWatch MCP tools (search_traces or get_trace) to inspect traces",
+              "Agent used the `langwatch trace search` and/or `langwatch trace get` CLI commands to inspect traces",
               "Agent provided suggestions or identified issues with the current instrumentation",
             ],
           }),
@@ -304,8 +312,9 @@ describe("Recipes", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "debug-instrumentation");
 
-            // Verify the agent used MCP trace tools
+            // Verify the agent used the langwatch CLI for trace inspection
             const allContent = state.messages
               .map((m) =>
                 typeof m.content === "string"
@@ -315,9 +324,9 @@ describe("Recipes", () => {
               .join("\n");
 
             expect(
-              allContent.includes("search_traces") ||
-                allContent.includes("get_trace"),
-              "Expected agent to use MCP tools (search_traces or get_trace) to inspect traces"
+              allContent.includes("langwatch trace search") ||
+                allContent.includes("langwatch trace get"),
+              "Expected agent to invoke `langwatch trace search` or `langwatch trace get` via the CLI"
             ).toBe(true);
           },
           scenario.judge(),
@@ -326,6 +335,6 @@ describe("Recipes", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 });

@@ -15,16 +15,16 @@ export const PlatformGrid: React.FC<PlatformGridProps> = ({
 }) => {
   return (
     <VStack align="stretch" gap={3}>
-      <VStack align="stretch" gap={0}>
-        <Text fontSize="md" fontWeight="semibold">
+      <VStack align="stretch" gap={0.5}>
+        <Text fontSize="md" fontWeight="semibold" letterSpacing="-0.01em">
           Select your platform or language
         </Text>
-        <Text fontSize="xs" color="fg.muted">
+        <Text fontSize="xs" color="fg.muted" lineHeight="tall">
           Choose the platform or language you are using to see a guide on how to
           instrument it.
         </Text>
       </VStack>
-      <HStack gap={3} wrap="wrap">
+      <HStack gap={3} rowGap={4} wrap="wrap" pb={1}>
         {PLATFORM_OPTIONS.map((lang) => (
           <SelectableIconCard
             key={lang.key}

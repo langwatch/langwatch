@@ -94,6 +94,7 @@ export function createMockFoldProjectionDefinition<
   return {
     name,
     version: overrides?.version ?? "2025-01-01",
+    lastEventOccurredAtKey: "LastEventOccurredAt",
     eventTypes: overrides?.eventTypes ?? EVENT_TYPES,
     init: overrides?.init ?? vi.fn().mockReturnValue({}),
     apply: overrides?.apply ?? vi.fn().mockImplementation((state: any) => state),

@@ -1,7 +1,9 @@
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
+import { OrganizationUserRole } from "@prisma/client";
 import {
+  EXTERNAL_MEMBER_PERMISSIONS,
   hasPermissionWithHierarchy,
   organizationRoleHasPermission,
   type Permission,
@@ -9,7 +11,7 @@ import {
 } from "../server/api/rbac";
 import { api } from "../utils/api";
 import { usePublicEnv } from "./usePublicEnv";
-import { publicRoutes, useRequiredSession } from "./useRequiredSession";
+import { noOrgBouncerRoutes, publicRoutes, useRequiredSession } from "./useRequiredSession";
 
 export const useOrganizationTeamProject = (
   {
@@ -210,6 +212,10 @@ export const useOrganizationTeamProject = (
     if (isDemo) return;
 
     if (publicRoutes.includes(router.route)) return;
+    // Routes like /invite/accept and /onboarding/* require auth but
+    // shouldn't bounce zero-org users to /onboarding/welcome — see
+    // `noOrgBouncerRoutes` for the rationale (iter 47 invite race fix).
+    if (noOrgBouncerRoutes.includes(router.route)) return;
     if (!redirectToOnboarding) return;
     if (!organizations.data) return;
 
@@ -252,11 +258,13 @@ export const useOrganizationTeamProject = (
       typeof router.query.project == "string" &&
       finalProject.slug !== router.query.project
     ) {
-      const returnTo = router.query.return_to;
-      const returnToParam = returnTo
-        ? `?return_to=${encodeURIComponent(returnTo as string)}`
+      // Preserve the sub-path so /bad-slug/messages → /good-slug/messages
+      const url = new URL(router.asPath, window.location.origin);
+      const oldPrefix = `/${router.query.project as string}`;
+      const subPath = url.pathname.startsWith(oldPrefix)
+        ? url.pathname.slice(oldPrefix.length)
         : "";
-      void router.push(`/${finalProject.slug}${returnToParam}`);
+      void router.push(`/${finalProject.slug}${subPath}${url.search}`);
     }
   }, [
     isDemo,
@@ -281,10 +289,11 @@ export const useOrganizationTeamProject = (
       isPublicRoute,
       isOrganizationFeatureEnabled: () => false,
       isDemo,
+      organizationRole: undefined,
     };
   }
 
-  const organizationRole = organization?.members[0]?.role;
+  const organizationRole = organization?.members?.[0]?.role;
 
   const isOrganizationFeatureEnabled = (feature: string): boolean => {
     if (!organization?.features) return false;
@@ -324,8 +333,13 @@ export const useOrganizationTeamProject = (
     }
 
     // Team-level permission checking
-    const teamMember = team?.members[0];
-    if (!teamMember) return false;
+    const teamMember = team?.members?.[0];
+    if (!teamMember) {
+      // Users created via the RoleBinding-only flow (no legacy TeamUser row) still
+      // have full team access when they are org admins — mirrors the server-side
+      // behaviour where an org-scoped ADMIN RoleBinding grants all permissions.
+      return organizationRole === OrganizationUserRole.ADMIN;
+    }
 
     // Check if user has custom role assignment
     if (teamMember.assignedRole) {
@@ -339,6 +353,11 @@ export const useOrganizationTeamProject = (
         : [];
 
       return hasPermissionWithHierarchy(userPermissions, permission);
+    }
+
+    // EXTERNAL users get restricted defaults instead of full team role permissions
+    if (organizationRole === OrganizationUserRole.EXTERNAL) {
+      return hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission);
     }
 
     // Only fall back to built-in team role if NO custom role exists
@@ -392,5 +411,6 @@ export const useOrganizationTeamProject = (
     modelProviders: modelProviders.data,
     isOrganizationFeatureEnabled,
     isDemo,
+    organizationRole,
   };
 };

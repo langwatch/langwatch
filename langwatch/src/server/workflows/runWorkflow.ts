@@ -209,6 +209,7 @@ export async function runWorkflow(
             ? inputs.do_not_trace
             : false,
       ...(typeof run_evaluations === "boolean" && { run_evaluations }),
+      origin: "workflow",
     },
   };
 

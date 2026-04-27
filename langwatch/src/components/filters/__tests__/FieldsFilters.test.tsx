@@ -119,6 +119,18 @@ describe("FieldsFilters", () => {
     });
   });
 
+  describe("when filters is undefined", () => {
+    it("renders without crashing", () => {
+      // @regression: FieldsFilter accessed filters["traces.origin"] on
+      // undefined, crashing the drawer. Fixed with optional chaining.
+      expect(() =>
+        renderComponent({
+          filters: undefined as unknown as Record<FilterField, string[]>,
+        }),
+      ).not.toThrow();
+    });
+  });
+
   describe("popover interaction", () => {
     it("opens popover when clicking filter button", async () => {
       const user = userEvent.setup();

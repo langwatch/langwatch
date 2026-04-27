@@ -1,62 +1,11 @@
 import { parseEvaluationResult } from "~/utils/evaluationResults";
+import {
+  computeMetricStats,
+  type MetricStats,
+} from "~/components/shared/MetricStatsTooltip";
 import type { EvaluationResults } from "../types";
 
-/**
- * Statistical breakdown for a numeric metric (latency or cost).
- */
-export type MetricStats = {
-  min: number;
-  max: number;
-  avg: number;
-  median: number; // p50
-  p75: number;
-  p90: number;
-  p95: number;
-  p99: number;
-  total: number;
-  count: number;
-};
-
-/**
- * Computes percentile from a sorted array.
- */
-const computePercentile = (
-  sortedValues: number[],
-  percentile: number,
-): number => {
-  if (sortedValues.length === 0) return 0;
-  const index = (percentile / 100) * (sortedValues.length - 1);
-  const lower = Math.floor(index);
-  const upper = Math.ceil(index);
-  if (lower === upper) return sortedValues[lower]!;
-  return (
-    sortedValues[lower]! +
-    (sortedValues[upper]! - sortedValues[lower]!) * (index - lower)
-  );
-};
-
-/**
- * Computes statistical breakdown for an array of values.
- */
-export const computeMetricStats = (values: number[]): MetricStats | null => {
-  if (values.length === 0) return null;
-
-  const sorted = [...values].sort((a, b) => a - b);
-  const total = values.reduce((sum, v) => sum + v, 0);
-
-  return {
-    min: sorted[0]!,
-    max: sorted[sorted.length - 1]!,
-    avg: total / values.length,
-    median: computePercentile(sorted, 50),
-    p75: computePercentile(sorted, 75),
-    p90: computePercentile(sorted, 90),
-    p95: computePercentile(sorted, 95),
-    p99: computePercentile(sorted, 99),
-    total,
-    count: values.length,
-  };
-};
+export { computeMetricStats, type MetricStats };
 
 /**
  * Aggregate statistics for a target's evaluator results.

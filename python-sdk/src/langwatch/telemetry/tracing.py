@@ -5,7 +5,9 @@ from uuid import UUID
 import httpx
 import threading
 from deprecated import deprecated
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 from langwatch.attributes import AttributeKey
+from langwatch.utils.auth import build_auth_headers
 from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import (
     SerializableWithStringFallback,
@@ -58,6 +60,13 @@ if TYPE_CHECKING:
 __all__ = ["trace", "LangWatchTrace"]
 
 T = TypeVar("T", bound=Callable[..., Any])
+
+_retry_on_transient = retry(
+    retry=retry_if_exception_type((httpx.TimeoutException, httpx.ConnectError)),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
 
 
 class LangWatchTrace:
@@ -300,15 +309,20 @@ class LangWatchTrace:
         trace_id = self.trace_id
         if trace_id is None:
             raise ValueError("Trace ID is not available from trace object")
-        with httpx.Client() as client:
-            response = client.post(
-                f"{endpoint}/api/trace/{trace_id}/share",
-                headers={"X-Auth-Token": get_api_key()},
-                timeout=15,
-            )
-            better_raise_for_status(response)
-            path = response.json()["path"]
-            return f"{endpoint}{path}"
+
+        @_retry_on_transient
+        def _do_share() -> str:
+            with httpx.Client() as client:
+                response = client.post(
+                    f"{endpoint}/api/trace/{trace_id}/share",
+                    headers=build_auth_headers(get_api_key()),
+                    timeout=30,
+                )
+                better_raise_for_status(response)
+                return response.json()["path"]
+
+        path = _do_share()
+        return f"{endpoint}{path}"
 
     def unshare(self):
         """Make this trace private again."""
@@ -317,13 +331,18 @@ class LangWatchTrace:
         trace_id = self.trace_id
         if trace_id is None:
             raise ValueError("Trace ID is not available from trace object")
-        with httpx.Client() as client:
-            response = client.post(
-                f"{endpoint}/api/trace/{trace_id}/unshare",
-                headers={"X-Auth-Token": get_api_key()},
-                timeout=15,
-            )
-            better_raise_for_status(response)
+
+        @_retry_on_transient
+        def _do_unshare() -> None:
+            with httpx.Client() as client:
+                response = client.post(
+                    f"{endpoint}/api/trace/{trace_id}/unshare",
+                    headers=build_auth_headers(get_api_key()),
+                    timeout=30,
+                )
+                better_raise_for_status(response)
+
+        _do_unshare()
 
     def update(
         self,

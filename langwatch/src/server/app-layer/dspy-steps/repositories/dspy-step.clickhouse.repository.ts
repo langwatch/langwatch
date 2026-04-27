@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { createLogger } from "~/utils/logger/server";
 import type {
@@ -87,7 +87,46 @@ function mergeByHash<T extends { hash: string }>(
 }
 
 export class DspyStepClickHouseRepository implements DspyStepRepository {
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly resolveClient: ClickHouseClientResolver) {}
+
+  /**
+   * Direct insert without read-merge-write. Use for migration where the
+   * source data is already complete and dedup is handled externally.
+   */
+  async insertStepDirect(data: DspyStepData): Promise<void> {
+    const summary = computeLlmSummary(data.llmCalls);
+    const id = `${data.tenantId}/${data.runId}/${data.stepIndex}`;
+
+    const record: ClickHouseWriteRecord = {
+      Id: id,
+      TenantId: data.tenantId,
+      ExperimentId: data.experimentId,
+      RunId: data.runId,
+      StepIndex: data.stepIndex,
+      WorkflowVersionId: data.workflowVersionId ?? null,
+      Score: data.score,
+      Label: data.label,
+      OptimizerName: data.optimizerName,
+      OptimizerParameters: JSON.stringify(data.optimizerParameters),
+      Predictors: JSON.stringify(data.predictors),
+      Examples: JSON.stringify(data.examples),
+      LlmCalls: JSON.stringify(data.llmCalls),
+      LlmCallsTotal: summary.total,
+      LlmCallsTotalTokens: summary.totalTokens,
+      LlmCallsTotalCost: summary.totalCost,
+      CreatedAt: new Date(data.createdAt),
+      InsertedAt: new Date(data.insertedAt),
+      UpdatedAt: new Date(data.updatedAt),
+    };
+
+    const client = await this.resolveClient(data.tenantId);
+    await client.insert({
+      table: TABLE_NAME,
+      values: [record],
+      format: "JSONEachRow",
+      clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+    });
+  }
 
   async upsertStep(data: DspyStepData): Promise<void> {
     try {
@@ -134,7 +173,8 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
         UpdatedAt: new Date(data.updatedAt),
       };
 
-      await this.clickHouseClient.insert({
+      const client = await this.resolveClient(data.tenantId);
+      await client.insert({
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",
@@ -161,25 +201,28 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     experimentId: string,
   ): Promise<DspyStepSummaryData[]> {
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             TenantId,
             ExperimentId,
             RunId,
             StepIndex,
-            WorkflowVersionId,
-            Score,
-            Label,
-            OptimizerName,
-            LlmCallsTotal,
-            toString(LlmCallsTotalTokens) AS LlmCallsTotalTokens,
-            LlmCallsTotalCost,
-            toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt
-          FROM ${TABLE_NAME} FINAL
+            argMax(WorkflowVersionId, UpdatedAt) AS WorkflowVersionId,
+            argMax(Score, UpdatedAt) AS Score,
+            argMax(Label, UpdatedAt) AS Label,
+            argMax(OptimizerName, UpdatedAt) AS OptimizerName,
+            argMax(LlmCallsTotal, UpdatedAt) AS LlmCallsTotal,
+            toString(argMax(LlmCallsTotalTokens, UpdatedAt)) AS LlmCallsTotalTokens,
+            argMax(LlmCallsTotalCost, UpdatedAt) AS LlmCallsTotalCost,
+            toString(toUnixTimestamp64Milli(min(CreatedAt))) AS CreatedAt
+          FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND ExperimentId = {experimentId:String}
+          GROUP BY TenantId, ExperimentId, RunId, StepIndex
           ORDER BY CreatedAt ASC
+          LIMIT 10000
         `,
         query_params: { tenantId, experimentId },
         format: "JSONEachRow",
@@ -218,7 +261,8 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     stepIndex: string,
   ): Promise<DspyStepData | null> {
     try {
-      const result = await this.clickHouseClient.query({
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
         query: `
           SELECT
             Id,
@@ -240,7 +284,7 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
             toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt,
             toString(toUnixTimestamp64Milli(InsertedAt)) AS InsertedAt,
             toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt
-          FROM ${TABLE_NAME} FINAL
+          FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND ExperimentId = {experimentId:String}
             AND RunId = {runId:String}
@@ -289,7 +333,8 @@ export class DspyStepClickHouseRepository implements DspyStepRepository {
     experimentId: string,
   ): Promise<void> {
     try {
-      await this.clickHouseClient.command({
+      const client = await this.resolveClient(tenantId);
+      await client.command({
         query: `DELETE FROM ${TABLE_NAME} WHERE TenantId = {tenantId:String} AND ExperimentId = {experimentId:String}`,
         query_params: { tenantId, experimentId },
       });

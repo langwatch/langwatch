@@ -8,7 +8,7 @@ Uses TypedDict for clean interfaces and from_dict methods for type safety.
 
 This service is responsible only for API operations and does not handle local file loading.
 """
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 from langwatch.generated.langwatch_rest_api_client.types import UNSET
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
@@ -18,6 +18,11 @@ from langwatch.generated.langwatch_rest_api_client.api.default import (
     post_api_prompts,
     put_api_prompts_by_id,
     delete_api_prompts_by_id,
+    put_api_prompts_by_id_tags_by_tag,
+    get_api_prompts_tags,
+    post_api_prompts_tags,
+    put_api_prompts_tags_by_tag,
+    delete_api_prompts_tags_by_tag,
 )
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
     GetApiPromptsByIdResponse200,
@@ -59,6 +64,27 @@ from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_
 from langwatch.generated.langwatch_rest_api_client.models.delete_api_prompts_by_id_response_200 import (
     DeleteApiPromptsByIdResponse200,
 )
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_tags_by_tag_body import (
+    PutApiPromptsByIdTagsByTagBody,
+)
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_tags_by_tag_response_200 import (
+    PutApiPromptsByIdTagsByTagResponse200,
+)
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_tags_response_200_item import (
+    GetApiPromptsTagsResponse200Item,
+)
+from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_tags_body import (
+    PostApiPromptsTagsBody,
+)
+from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_tags_response_201 import (
+    PostApiPromptsTagsResponse201,
+)
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_tags_by_tag_body import (
+    PutApiPromptsTagsByTagBody,
+)
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_tags_by_tag_response_200 import (
+    PutApiPromptsTagsByTagResponse200,
+)
 
 from langwatch.utils.initialization import ensure_setup
 from langwatch.state import get_instance
@@ -93,12 +119,18 @@ class PromptApiService:
         return cls(instance.rest_api_client)
 
     @prompt_service_tracing.get
-    def get(self, prompt_id: str, version_number: Optional[int] = None) -> PromptData:
-        """Retrieve a prompt by its ID from the API. You can optionally specify a version number to get a specific version of the prompt."""
+    def get(
+        self,
+        prompt_id: str,
+        version_number: Optional[int] = None,
+        tag: Optional[str] = None,
+    ) -> PromptData:
+        """Retrieve a prompt by its ID from the API. You can optionally specify a version number or tag to get a specific version of the prompt."""
         resp = get_api_prompts_by_id.sync_detailed(
             id=prompt_id,
             client=self._client,
             version=version_number if version_number is not None else UNSET,
+            tag=tag if tag is not None else UNSET,
         )
         ok = unwrap_response(
             resp,
@@ -112,6 +144,104 @@ class PromptApiService:
             )
         return PromptData.from_api_response(ok)
 
+    def assign_tag(
+        self,
+        prompt_id: str,
+        tag: str,
+        version_id: str,
+    ) -> Dict[str, str]:
+        """
+        Assign a tag to a specific prompt version.
+
+        Args:
+            prompt_id: The prompt ID or handle
+            tag: The tag to assign ("production" or "staging")
+            version_id: The version ID to assign the tag to
+
+        Returns:
+            Dictionary with assignment details (configId, versionId, tag, updatedAt)
+        """
+        body = PutApiPromptsByIdTagsByTagBody(version_id=version_id)
+
+        resp = put_api_prompts_by_id_tags_by_tag.sync_detailed(
+            id=prompt_id,
+            tag=tag,
+            client=self._client,
+            body=body,
+        )
+        ok = unwrap_response(
+            resp,
+            ok_type=PutApiPromptsByIdTagsByTagResponse200,
+            subject=f'id="{prompt_id}" tag="{tag}"',
+            op="assign_tag",
+        )
+        if ok is None:
+            raise RuntimeError(
+                f"Failed to assign tag '{tag}' to prompt '{prompt_id}'"
+            )
+        return ok.to_dict()
+
+    def list_tags(self) -> List[Dict[str, Any]]:
+        """List all prompt tags for the organization."""
+        resp = get_api_prompts_tags.sync_detailed(client=self._client)
+        ok = unwrap_response(
+            resp,
+            ok_type=list,
+            subject="tags",
+            op="list_tags",
+        )
+        if ok is None:
+            return []
+        return [item.to_dict() for item in ok]
+
+    def create_tag(self, name: str) -> Dict[str, Any]:
+        """Create a custom prompt tag."""
+        body = PostApiPromptsTagsBody(name=name)
+        resp = post_api_prompts_tags.sync_detailed(
+            client=self._client,
+            body=body,
+        )
+        ok = unwrap_response(
+            resp,
+            ok_type=PostApiPromptsTagsResponse201,
+            subject=f'name="{name}"',
+            op="create_tag",
+        )
+        if ok is None:
+            raise RuntimeError(f"Failed to create tag '{name}'")
+        return ok.to_dict()
+
+    def rename_tag(self, tag: str, new_name: str) -> Dict[str, Any]:
+        """Rename a prompt tag (tag = current name, new_name = new name)."""
+        body = PutApiPromptsTagsByTagBody(name=new_name)
+        resp = put_api_prompts_tags_by_tag.sync_detailed(
+            tag=tag,
+            client=self._client,
+            body=body,
+        )
+        ok = unwrap_response(
+            resp,
+            ok_type=PutApiPromptsTagsByTagResponse200,
+            subject=f'tag="{tag}"',
+            op="rename_tag",
+        )
+        if ok is None:
+            raise RuntimeError(f"Failed to rename tag '{tag}'")
+        return ok.to_dict()
+
+    def delete_tag(self, tag: str) -> None:
+        """Delete a prompt tag by name. Cascades to assignments."""
+        resp = delete_api_prompts_tags_by_tag.sync_detailed(
+            tag=tag,
+            client=self._client,
+        )
+        unwrap_response(
+            resp,
+            ok_type=type(None),
+            subject=f'tag="{tag}"',
+            op="delete_tag",
+        )
+
     def create(
         self,
         handle: str,
@@ -121,6 +251,7 @@ class PromptApiService:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
+        tags: Optional[List[str]] = None,
     ) -> PromptData:
         """
         Create a new prompt with clean dictionary interfaces.
@@ -168,6 +299,7 @@ class PromptApiService:
                 messages=api_messages,
                 inputs=api_inputs,
                 outputs=api_outputs,
+                tags=tags if tags is not None else UNSET,
             ),
         )
         ok = unwrap_response(
@@ -191,6 +323,7 @@ class PromptApiService:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
+        tags: Optional[List[str]] = None,
     ) -> PromptData:
         """
         Update an existing prompt with clean dictionary interfaces.
@@ -240,6 +373,7 @@ class PromptApiService:
                 messages=api_messages,
                 inputs=api_inputs,
                 outputs=api_outputs,
+                tags=tags if tags is not None else UNSET,
             ),
         )
 

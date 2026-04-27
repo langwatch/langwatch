@@ -4,8 +4,6 @@ import {
   runWithContext,
   createContextFromHono,
   createContextFromTRPC,
-  createContextFromNextRequest,
-  createContextFromNextApiRequest,
   createContextFromJobData,
   getLogContext,
   getJobContextMetadata,
@@ -153,32 +151,6 @@ describe("asyncContext", () => {
 
       const ctx = createContextFromTRPC(trpcCtx);
 
-      expect(ctx.userId).toBeUndefined();
-    });
-  });
-
-  describe("createContextFromNextRequest", () => {
-    it("returns empty context for Next.js App Router request", () => {
-      const mockReq = {} as any;
-
-      const ctx = createContextFromNextRequest(mockReq);
-
-      // Business context populated later by route handlers
-      expect(ctx.organizationId).toBeUndefined();
-      expect(ctx.projectId).toBeUndefined();
-      expect(ctx.userId).toBeUndefined();
-    });
-  });
-
-  describe("createContextFromNextApiRequest", () => {
-    it("returns empty context for Next.js Pages Router request", () => {
-      const mockReq = {} as any;
-
-      const ctx = createContextFromNextApiRequest(mockReq);
-
-      // Business context populated later by route handlers
-      expect(ctx.organizationId).toBeUndefined();
-      expect(ctx.projectId).toBeUndefined();
       expect(ctx.userId).toBeUndefined();
     });
   });

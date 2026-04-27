@@ -5,14 +5,13 @@ services:
       SKIP_ENV_VALIDATION: true
       DISABLE_PII_REDACTION: true
       DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
-      ELASTICSEARCH_NODE_URL: http://opensearch:9200
-      IS_OPENSEARCH: true
+      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
       REDIS_URL: redis://redis:6379
       LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
       LANGEVALS_ENDPOINT: http://langevals:5562
+      LANGWATCH_ENDPOINT: http://app:5560
       INSTALL_METHOD: docker
       NODE_ENV: production
-      START_WORKERS: true
     env_file:
       - langwatch/.env
     pull_policy: always
@@ -23,8 +22,34 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      opensearch:
+      clickhouse:
         condition: service_healthy
+
+  workers:
+    image: langwatch/langwatch:latest
+    command: ["pnpm", "run", "start:workers"]
+    working_dir: /app/langwatch
+    environment:
+      SKIP_ENV_VALIDATION: true
+      DISABLE_PII_REDACTION: true
+      DATABASE_URL: postgresql://prisma:prisma@postgres:5432/mydb?schema=mydb
+      CLICKHOUSE_URL: http://default:langwatch@clickhouse:8123/langwatch
+      REDIS_URL: redis://redis:6379
+      LANGWATCH_NLP_SERVICE: http://langwatch_nlp:5561
+      LANGEVALS_ENDPOINT: http://langevals:5562
+      LANGWATCH_ENDPOINT: http://app:5560
+      NODE_ENV: production
+    env_file:
+      - langwatch/.env
+    pull_policy: always
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    restart: always
 
   langwatch_nlp:
     image: langwatch/langwatch_nlp:latest
@@ -36,8 +61,6 @@ services:
     pull_policy: always
     environment:
       - LANGWATCH_ENDPOINT=http://app:5560
-      # For when running on Mac OS
-      # - STUDIO_RUNTIME=async
 
   langevals:
     image: langwatch/langevals:latest
@@ -67,8 +90,6 @@ services:
 
   redis:
     image: redis:alpine
-    ports:
-      - "6379:6379"
     volumes:
       - redis-data:/data
     healthcheck:
@@ -77,50 +98,28 @@ services:
       timeout: 5s
       retries: 5
 
-  opensearch:
-    image: langwatch/opensearch-lite:latest
+  clickhouse:
+    image: langwatch/clickhouse-serverless:0.2.0
     environment:
-      - discovery.type=single-node
-      - DISABLE_SECURITY_PLUGIN=true
-      # Performance settings
-      - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
-      - "cluster.routing.allocation.disk.threshold_enabled=false"
-      - "bootstrap.memory_lock=false" # Changed from true to avoid memory locking warnings
-      # Disk settings
-      - "cluster.routing.allocation.disk.watermark.low=95%"
-      - "cluster.routing.allocation.disk.watermark.high=96%"
-      - "cluster.routing.allocation.disk.watermark.flood_stage=97%"
-      - "cluster.info.update.interval=1m"
-      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Some-random-password-which-is-greater-than-16-chars-long~
-      # System limits
-      - "node.store.allow_mmap=false"
-    ulimits:
-      memlock:
-        soft: -1
-        hard: -1
-      nofile:
-        soft: 65536
-        hard: 65536
+      CLICKHOUSE_PASSWORD: langwatch
     ports:
-      - "9200:9200"
-      - "9600:9600"
+      - "8123:8123"
     volumes:
-      - opensearch-data:/usr/share/opensearch/data
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200 || exit 1"]
-      interval: 30s
-      timeout: 30s
-      retries: 3
-      start_period: 40s
+      - clickhouse-data:/var/lib/clickhouse
     deploy:
       resources:
         limits:
-          memory: 256m
+          memory: 2g
           cpus: "1.0"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     restart: always
-    pull_policy: always
 
 volumes:
   db-data:
   redis-data:
-  opensearch-data:
+  clickhouse-data:

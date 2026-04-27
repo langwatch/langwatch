@@ -11,6 +11,10 @@ import { getApp } from "~/server/app-layer/app";
 import { SuiteService } from "~/server/suites/suite.service";
 import { SuiteDomainError } from "~/server/suites/errors";
 import { ProjectRepository } from "~/server/projects/project.repository";
+import { SimulationFacade } from "~/server/simulations/simulation.facade";
+import { extractSuiteId } from "~/server/suites/suite-set-id";
+import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
+import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { checkProjectPermission } from "../../rbac";
 import { createSuiteSchema, projectSchema, suiteTargetSchema, updateSuiteSchema } from "./schemas";
 
@@ -19,6 +23,7 @@ export const suiteRouter = createTRPCRouter({
     .input(createSuiteSchema)
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
+      await enforceLicenseLimit(ctx, input.projectId, "experiments");
       const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
       return service.create(input);
     }),
@@ -60,6 +65,12 @@ export const suiteRouter = createTRPCRouter({
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
       const service = SuiteService.create({ prisma: ctx.prisma, suiteRunService: getApp().suiteRuns.runs });
+      // Validate source suite exists before checking limits — avoids masking NOT_FOUND with a limit error
+      const source = await service.getById(input);
+      if (!source) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Suite not found" });
+      }
+      await enforceLicenseLimit(ctx, input.projectId, "experiments");
       try {
         return await service.duplicate(input);
       } catch (error) {
@@ -119,6 +130,8 @@ export const suiteRouter = createTRPCRouter({
     .input(projectSchema.extend({
       id: z.string(),
       idempotencyKey: z.string(),
+      /** Optional client-generated batch run ID for immediate placeholder feedback */
+      batchRunId: z.string().optional(),
     }))
     .use(checkProjectPermission("scenarios:manage"))
     .mutation(async ({ ctx, input }) => {
@@ -148,6 +161,7 @@ export const suiteRouter = createTRPCRouter({
           projectId: input.projectId,
           organizationId,
           idempotencyKey: input.idempotencyKey,
+          batchRunId: input.batchRunId,
         });
 
         return {
@@ -168,5 +182,39 @@ export const suiteRouter = createTRPCRouter({
           message,
         });
       }
+    }),
+
+  getSummaries: protectedProcedure
+    .input(
+      projectSchema.extend({
+        startDate: z.number().int().nonnegative().optional(),
+        endDate: z.number().int().nonnegative().optional(),
+      }),
+    )
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ input }) => {
+      const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
+      const startDate = input.startDate ?? Date.now() - THIRTY_DAYS_MS;
+      const endDate = input.endDate ?? Date.now();
+
+      const facade = SimulationFacade.create();
+      const summaries = await facade.getInternalSuiteSummaries({
+        projectId: input.projectId,
+        startDate,
+        endDate,
+      });
+
+      const result: Record<string, SuiteRunSummary> = {};
+      for (const summary of summaries) {
+        const suiteId = extractSuiteId(summary.scenarioSetId);
+        if (!suiteId) continue;
+        result[suiteId] = {
+          passedCount: summary.passedCount,
+          failedCount: summary.failedCount,
+          totalCount: summary.totalCount,
+          lastRunTimestamp: summary.lastRunTimestamp,
+        };
+      }
+      return result;
     }),
 });

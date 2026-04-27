@@ -105,6 +105,7 @@ describe("RecordSpanCommand", () => {
 
         expect(mockRedactSpan).toHaveBeenCalledWith(
           expect.objectContaining({ traceId: "trace-1", spanId: "span-1" }),
+          expect.any(Object),
           "STRICT",
         );
       });
@@ -116,6 +117,7 @@ describe("RecordSpanCommand", () => {
 
         expect(mockRedactSpan).toHaveBeenCalledWith(
           expect.any(Object),
+          expect.anything(),
           "ESSENTIAL",
         );
       });
@@ -133,6 +135,7 @@ describe("RecordSpanCommand", () => {
 
         expect(mockRedactSpan).toHaveBeenCalledWith(
           expect.any(Object),
+          expect.anything(),
           "DISABLED",
         );
       });

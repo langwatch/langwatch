@@ -73,9 +73,6 @@ export function PromptsList({
 }: PromptsListProps) {
   const { project, hasPermission } = useOrganizationTeamProject();
   const hasPromptsViewPermission = hasPermission("prompts:view");
-  const hasPromptsUpdatePermission = hasPermission("prompts:update");
-  const hasPromptsDeletePermission = hasPermission("prompts:delete");
-  const hasPromptsCreatePermission = hasPermission("prompts:create");
 
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [pushToCopiesDialogOpen, setPushToCopiesDialogOpen] = useState(false);
@@ -257,28 +254,12 @@ export function PromptsList({
                         event.stopPropagation();
                       }}
                     >
-                      <Tooltip
-                        content={
-                          !hasPromptsUpdatePermission
-                            ? "You need prompts:update permission to edit prompts"
-                            : undefined
-                        }
-                        disabled={hasPromptsUpdatePermission}
-                        positioning={{ placement: "right" }}
-                        showArrow
-                      >
                         <Menu.Item
                           value="edit"
-                          onClick={(_event) => {
-                            if (hasPromptsUpdatePermission) {
-                              void onEdit(config);
-                            }
-                          }}
-                          disabled={!hasPromptsUpdatePermission}
+                          onClick={() => void onEdit(config)}
                         >
                           <Edit size={16} /> Edit prompt
                         </Menu.Item>
-                      </Tooltip>
                       <Menu.Item value="generate-api-snippet">
                         <GeneratePromptApiSnippetDialog.Trigger>
                           <HStack>
@@ -288,105 +269,41 @@ export function PromptsList({
                         </GeneratePromptApiSnippetDialog.Trigger>
                       </Menu.Item>
                       {config.copiedFromPromptId && (
-                        <Tooltip
-                          content={
-                            !hasPromptsUpdatePermission
-                              ? "You need prompts:update permission to sync from source"
-                              : undefined
-                          }
-                          disabled={hasPromptsUpdatePermission}
-                          positioning={{ placement: "right" }}
-                          showArrow
-                        >
                           <Menu.Item
                             value="sync"
-                            onClick={
-                              hasPromptsUpdatePermission
-                                ? () => void onSyncFromSource(config)
-                                : undefined
-                            }
-                            disabled={!hasPromptsUpdatePermission}
+                            onClick={() => void onSyncFromSource(config)}
                           >
                             <RefreshCw size={16} /> Update from source
                           </Menu.Item>
-                        </Tooltip>
                       )}
                       {(config._count?.copiedPrompts ?? 0) > 0 && (
-                        <Tooltip
-                          content={
-                            !hasPromptsUpdatePermission
-                              ? "You need prompts:update permission to push to replicas"
-                              : undefined
-                          }
-                          disabled={hasPromptsUpdatePermission}
-                          positioning={{ placement: "right" }}
-                          showArrow
-                        >
                           <Menu.Item
                             value="push"
-                            onClick={
-                              hasPromptsUpdatePermission
-                                ? () => void onPushToCopies(config)
-                                : undefined
-                            }
-                            disabled={!hasPromptsUpdatePermission}
+                            onClick={() => void onPushToCopies(config)}
                           >
                             <ArrowUp size={16} /> Push to replicas
                           </Menu.Item>
-                        </Tooltip>
                       )}
-                      <Tooltip
-                        content={
-                          !hasPromptsCreatePermission
-                            ? "You need prompts:create permission to replicate prompts"
-                            : undefined
-                        }
-                        disabled={hasPromptsCreatePermission}
-                        positioning={{ placement: "right" }}
-                        showArrow
-                      >
                         <Menu.Item
                           value="copy"
-                          onClick={
-                            hasPromptsCreatePermission
-                              ? () => {
-                                  setCopyPrompt({
-                                    promptId: config.id,
-                                    promptName:
-                                      config.handle ?? config.name ?? config.id,
-                                  });
-                                  setCopyDialogOpen(true);
-                                }
-                              : undefined
-                          }
-                          disabled={!hasPromptsCreatePermission}
+                          onClick={() => {
+                            setCopyPrompt({
+                              promptId: config.id,
+                              promptName:
+                                config.handle ?? config.name ?? config.id,
+                            });
+                            setCopyDialogOpen(true);
+                          }}
                         >
                           <Copy size={16} /> Replicate to another project
                         </Menu.Item>
-                      </Tooltip>
-                      <Tooltip
-                        content={
-                          !hasPromptsDeletePermission
-                            ? "You need prompts:delete permission to delete prompts"
-                            : undefined
-                        }
-                        disabled={hasPromptsDeletePermission}
-                        positioning={{ placement: "right" }}
-                        showArrow
-                      >
                         <Menu.Item
                           value="delete"
                           color="red.fg"
-                          onClick={(_event) => {
-                            if (hasPromptsDeletePermission) {
-                              void onDelete(config);
-                            }
-                          }}
-                          disabled={!hasPromptsDeletePermission}
+                          onClick={() => void onDelete(config)}
                         >
                           <Trash2 size={16} /> Delete prompt
                         </Menu.Item>
-                      </Tooltip>
                     </Menu.Content>
                   </Menu.Root>
                 </Box>

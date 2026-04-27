@@ -26,14 +26,16 @@ import {
 import type { SimulationSuite } from "@prisma/client";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { MAX_REPEAT_COUNT } from "~/server/suites/constants";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   useDrawer,
   useDrawerParams,
   getFlowCallbacks,
 } from "~/hooks/useDrawer";
+import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { AgentHttpEditorDrawer } from "../agents/AgentHttpEditorDrawer";
 import { ScenarioFormDrawer } from "../scenarios/ScenarioFormDrawer";
 import { Drawer } from "../ui/drawer";
@@ -69,6 +71,10 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
   const [agentHttpEditorOpen, setAgentHttpEditorOpen] = useState(false);
   const [idempotencyKey] = useState(() => crypto.randomUUID());
+  /** Tracks whether the current save is a "save and run" flow.
+   *  When true, the mutation-level onSuccess skips its normal
+   *  close/toast behavior — the per-call onSuccess handles it. */
+  const saveAndRunRef = useRef(false);
   const params = useDrawerParams();
   const utils = api.useContext();
 
@@ -105,6 +111,9 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const isEditMode = !!suiteId;
   const title = isEditMode ? "Edit Run Plan" : "New Run Plan";
 
+  // License enforcement for suite creation
+  const { checkAndProceed } = useLicenseEnforcement("experiments");
+
   const suiteForm = useSuiteForm({
     suite: suite ?? null,
     isOpen,
@@ -129,6 +138,12 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
   const createMutation = api.suites.create.useMutation({
     onSuccess: (data) => {
       void utils.suites.getAll.invalidate();
+      // When saveAndRunRef is set, the per-call onSuccess handles
+      // navigation, drawer close, and running — skip the default path.
+      if (saveAndRunRef.current) {
+        saveAndRunRef.current = false;
+        return;
+      }
       onSaved?.(data);
       closeDrawer();
       toaster.create({
@@ -138,6 +153,9 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       });
     },
     onError: (err) => {
+      saveAndRunRef.current = false;
+      // Skip toast if already handled by global license handler (shows modal instead)
+      if (isHandledByGlobalHandler(err)) return;
       toaster.create({
         title: "Failed to create run plan",
         description: err.message,
@@ -154,6 +172,12 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
         projectId: project?.id ?? "",
         id: data.id,
       });
+      // When saveAndRunRef is set, the per-call onSuccess handles
+      // navigation, drawer close, and running — skip the default path.
+      if (saveAndRunRef.current) {
+        saveAndRunRef.current = false;
+        return;
+      }
       onSaved?.(data);
       closeDrawer();
       toaster.create({
@@ -163,6 +187,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       });
     },
     onError: (err) => {
+      saveAndRunRef.current = false;
       toaster.create({
         title: "Failed to update run plan",
         description: err.message,
@@ -186,10 +211,12 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       if (isEditMode && suite) {
         updateMutation.mutate({ ...payload, id: suite.id });
       } else {
-        createMutation.mutate(payload);
+        checkAndProceed(() => {
+          createMutation.mutate(payload);
+        });
       }
     },
-    [project, isEditMode, suite, createMutation, updateMutation],
+    [project, isEditMode, suite, createMutation, updateMutation, checkAndProceed],
   );
 
   const submitAndRun = useCallback(
@@ -198,6 +225,7 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       const payload = buildMutationPayload(data, project.id);
 
       const onSuccess = (saved: SimulationSuite) => {
+        saveAndRunRef.current = false;
         closeDrawer();
         if (onRunRequested) {
           onRunRequested(saved);
@@ -207,9 +235,13 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       };
 
       if (isEditMode && suite) {
+        saveAndRunRef.current = true;
         updateMutation.mutate({ ...payload, id: suite.id }, { onSuccess });
       } else {
-        createMutation.mutate(payload, { onSuccess });
+        checkAndProceed(() => {
+          saveAndRunRef.current = true;
+          createMutation.mutate(payload, { onSuccess });
+        });
       }
     },
     [
@@ -220,6 +252,9 @@ export function SuiteFormDrawer(_props: SuiteFormDrawerProps) {
       updateMutation,
       closeDrawer,
       onRunRequested,
+      runMutation,
+      idempotencyKey,
+      checkAndProceed,
     ],
   );
 

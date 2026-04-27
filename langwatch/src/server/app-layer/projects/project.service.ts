@@ -4,6 +4,7 @@ import { captureException } from "~/utils/posthogErrorCapture";
 import type {
   ProjectRepository,
   ProjectWithTeam,
+  SearchProjectsResult,
   UpdateProjectMetadataInput,
 } from "./repositories/project.repository";
 
@@ -37,6 +38,14 @@ export class ProjectService {
 
   async updateMetadata(input: UpdateProjectMetadataInput): Promise<void> {
     return this.repo.updateMetadata(input);
+  }
+
+  async searchByQuery(params: {
+    query: string;
+    organizationId?: string;
+    limit?: number;
+  }): Promise<SearchProjectsResult[]> {
+    return this.repo.searchByQuery(params);
   }
 
   async isFeatureEnabled(

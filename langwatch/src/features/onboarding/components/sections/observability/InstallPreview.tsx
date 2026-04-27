@@ -64,10 +64,16 @@ export function InstallPreview({
               language="bash"
               size="sm"
               transition="all 0.3s ease"
-              bg="bg.subtle/20"
+              bg="bg.panel/60"
+              borderRadius="xl"
+              border="1px solid"
+              borderColor="gray.200"
+              backdropFilter="blur(20px) saturate(1.3)"
+              boxShadow="0 2px 16px rgba(0,0,0,0.04)"
+              overflow="hidden"
               meta={{ colorScheme: colorMode }}
             >
-              <CodeBlock.Header borderBottomWidth="1px">
+              <CodeBlock.Header borderBottomWidth="1px" borderColor="gray.200">
                 <Tabs.List w="full" border="0" ms="-1">
                   {tabItems.map((t) => (
                     <Tabs.Trigger

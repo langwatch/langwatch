@@ -4,6 +4,7 @@ import { useDrawer } from "../../hooks/useDrawer";
 import { useLicenseEnforcement } from "../../hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { trackEvent } from "../../utils/tracking";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
@@ -49,12 +50,22 @@ export function CreateProjectDrawer({
   ) => {
     if (!effectiveOrganizationId) return;
 
+    // Safety net: if the form's teamId is empty but the caller passed a
+    // defaultTeamId (e.g. Dashboard "+ New Project" under an org with a
+    // default team), honor it. This complements the ProjectForm
+    // defaultValues seed and covers the race where useForm momentarily
+    // holds the "" before the seed lands.
+    const resolvedTeamId =
+      data.teamId === NEW_TEAM_VALUE
+        ? undefined
+        : data.teamId || defaultTeamId;
+
     checkAndProceed(() => {
       createProject.mutate(
         {
           organizationId: effectiveOrganizationId,
           name: data.name,
-          teamId: data.teamId === NEW_TEAM_VALUE ? undefined : data.teamId,
+          teamId: resolvedTeamId,
           newTeamName: data.newTeamName,
           language: data.language,
           framework: data.framework,
@@ -88,6 +99,7 @@ export function CreateProjectDrawer({
             handleClose();
           },
           onError: (error) => {
+            if (isHandledByGlobalHandler(error)) return;
             toaster.create({
               title: "Error creating project",
               description: error.message,

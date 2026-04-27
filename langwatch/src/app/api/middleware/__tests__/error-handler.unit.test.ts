@@ -64,4 +64,96 @@ describe("handleError()", () => {
       expect(body).toHaveProperty("max", 5);
     });
   });
+
+  describe("when error is a Prisma P2002 unique-constraint violation", () => {
+    it("returns 409 conflict with the constrained field in the message", async () => {
+      const error = Object.assign(
+        new Error("Unique constraint failed on the fields: (`handle`)"),
+        {
+          code: "P2002",
+          meta: { target: ["handle"] },
+        },
+      );
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      expect(res.status).toBe(409);
+      const body = await res.json();
+      expect(body.error).toBe("Conflict");
+      expect(body.message).toContain("handle");
+    });
+  });
+
+  describe("when error is a non-P2002 PrismaClientKnownRequestError", () => {
+    it("does NOT get mislabeled as 409 conflict", async () => {
+      // P2003 (foreign key violation) and similar should bubble as real
+      // 500s — labeling them 409 would hide genuine backend breakage.
+      const error = Object.assign(
+        new Error("Foreign key constraint failed on the field: projectId"),
+        {
+          name: "PrismaClientKnownRequestError",
+          code: "P2003",
+        },
+      );
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      expect(body.error).toBe("Internal server error");
+    });
+  });
+
+  describe("when error has no recognizable shape (fallback 500)", () => {
+    it("includes the underlying error message", async () => {
+      const error = Object.assign(new Error("database connection refused"), {
+        name: "DatabaseError",
+        code: "ECONNREFUSED",
+      });
+      const app = createTestApp(error);
+
+      const res = await app.request("/");
+
+      expect(res.status).toBe(500);
+      const body = await res.json();
+      // Kind stays generic so clients can categorize, but message gains
+      // the actual cause so humans and assistants can act on it.
+      expect(body.error).toBe("Internal server error");
+      expect(body.message).toContain("database connection refused");
+      expect(body.message).toContain("ECONNREFUSED");
+    });
+
+    it("surfaces the underlying message in production too", async () => {
+      // Hiding the message behind a generic string in prod is exactly
+      // the problem this error-handling PR set out to fix — API callers
+      // need a real message to diagnose. Prisma does not leak credentials
+      // via error.message, the codebase is public, and only API-key
+      // holders see these responses.
+      const originalEnv = process.env.NODE_ENV;
+      process.env.NODE_ENV = "production";
+      try {
+        const error = Object.assign(
+          new Error("connect ECONNREFUSED 10.0.0.42:5432"),
+          {
+            name: "PrismaClientInitializationError",
+            code: "P1001",
+          },
+        );
+        const app = createTestApp(error);
+
+        const res = await app.request("/");
+
+        expect(res.status).toBe(500);
+        const body = await res.json();
+        expect(body.error).toBe("Internal server error");
+        expect(body.message).toContain("ECONNREFUSED 10.0.0.42:5432");
+        expect(body.message).toContain("P1001");
+        expect(body.message).toContain("PrismaClientInitializationError");
+      } finally {
+        process.env.NODE_ENV = originalEnv;
+      }
+    });
+  });
 });

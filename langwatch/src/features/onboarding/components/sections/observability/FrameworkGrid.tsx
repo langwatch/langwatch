@@ -30,16 +30,16 @@ export function FrameworkGrid({
 
   return (
     <VStack align="stretch" gap={3}>
-      <VStack align="stretch" gap={0}>
-        <Text fontSize="md" fontWeight="semibold">
+      <VStack align="stretch" gap={0.5}>
+        <Text fontSize="md" fontWeight="semibold" letterSpacing="-0.01em">
           Integrate LangWatch with{" "}
           {framework?.label ?? "your selected framework"}
         </Text>
-        <Text fontSize="xs" color="fg.muted">
+        <Text fontSize="xs" color="fg.muted" lineHeight="tall">
           Pick your model provider or framework to tailor setup guide.
         </Text>
       </VStack>
-      <HStack gap={3} wrap="wrap">
+      <HStack gap={3} rowGap={4} wrap="wrap" pb={1}>
         {frameworks.map((fw) => (
           <SelectableIconCard
             key={fw.key}

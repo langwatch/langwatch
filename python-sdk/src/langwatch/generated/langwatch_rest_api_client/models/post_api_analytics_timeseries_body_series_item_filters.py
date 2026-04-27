@@ -20,6 +20,24 @@ if TYPE_CHECKING:
     from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_guardrails_only_type_2 import (
         PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2,
     )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_label_type_1 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1,
+    )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_label_type_2 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2,
+    )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_passed_type_1 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1,
+    )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_passed_type_2 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2,
+    )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_score_type_1 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1,
+    )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_score_type_2 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2,
+    )
     from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_type_1 import (
         PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1,
     )
@@ -116,12 +134,6 @@ if TYPE_CHECKING:
     from ..models.post_api_analytics_timeseries_body_series_item_filters_metadata_value_type_2 import (
         PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2,
     )
-    from ..models.post_api_analytics_timeseries_body_series_item_filters_sentiment_input_sentiment_type_1 import (
-        PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType1,
-    )
-    from ..models.post_api_analytics_timeseries_body_series_item_filters_sentiment_input_sentiment_type_2 import (
-        PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType2,
-    )
     from ..models.post_api_analytics_timeseries_body_series_item_filters_spans_model_type_1 import (
         PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType1,
     )
@@ -152,6 +164,12 @@ if TYPE_CHECKING:
     from ..models.post_api_analytics_timeseries_body_series_item_filters_traces_error_type_2 import (
         PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType2,
     )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_traces_origin_type_1 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1,
+    )
+    from ..models.post_api_analytics_timeseries_body_series_item_filters_traces_origin_type_2 import (
+        PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2,
+    )
 
 
 T = TypeVar("T", bound="PostApiAnalyticsTimeseriesBodySeriesItemFilters")
@@ -179,6 +197,8 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2 | Unset):
         metadata_prompt_ids (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType1 |
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType2 | Unset):
+        traces_origin (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2 | Unset):
         traces_error (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType1 |
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType2 | Unset):
         spans_type (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansTypeType1 |
@@ -190,6 +210,15 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         evaluations_evaluator_id_guardrails_only (list[str] |
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1 |
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2 | Unset):
+        evaluations_evaluator_id_has_passed (list[str] |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2 | Unset):
+        evaluations_evaluator_id_has_score (list[str] |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2 | Unset):
+        evaluations_evaluator_id_has_label (list[str] |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1 |
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2 | Unset):
         evaluations_passed (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType1 |
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsPassedType2 | Unset):
         evaluations_score (list[str] | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsScoreType1 |
@@ -209,9 +238,6 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         annotations_has_annotation (list[str] |
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType1 |
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType2 | Unset):
-        sentiment_input_sentiment (list[str] |
-            PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType1 |
-            PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType2 | Unset):
     """
 
     topics_topics: (
@@ -268,6 +294,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         | PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataPromptIdsType2
         | Unset
     ) = UNSET
+    traces_origin: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2
+        | Unset
+    ) = UNSET
     traces_error: (
         list[str]
         | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType1
@@ -296,6 +328,24 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         list[str]
         | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1
         | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2
+        | Unset
+    ) = UNSET
+    evaluations_evaluator_id_has_passed: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2
+        | Unset
+    ) = UNSET
+    evaluations_evaluator_id_has_score: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2
+        | Unset
+    ) = UNSET
+    evaluations_evaluator_id_has_label: (
+        list[str]
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1
+        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2
         | Unset
     ) = UNSET
     evaluations_passed: (
@@ -352,12 +402,6 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         | PostApiAnalyticsTimeseriesBodySeriesItemFiltersAnnotationsHasAnnotationType2
         | Unset
     ) = UNSET
-    sentiment_input_sentiment: (
-        list[str]
-        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType1
-        | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType2
-        | Unset
-    ) = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.post_api_analytics_timeseries_body_series_item_filters_annotations_has_annotation_type_1 import (
@@ -365,6 +409,15 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         )
         from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_guardrails_only_type_1 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_label_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_passed_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_score_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1,
         )
         from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_type_1 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1,
@@ -414,9 +467,6 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         from ..models.post_api_analytics_timeseries_body_series_item_filters_metadata_value_type_1 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType1,
         )
-        from ..models.post_api_analytics_timeseries_body_series_item_filters_sentiment_input_sentiment_type_1 import (
-            PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType1,
-        )
         from ..models.post_api_analytics_timeseries_body_series_item_filters_spans_model_type_1 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType1,
         )
@@ -431,6 +481,9 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         )
         from ..models.post_api_analytics_timeseries_body_series_item_filters_traces_error_type_1 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_traces_origin_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1,
         )
 
         topics_topics: dict[str, Any] | list[str] | Unset
@@ -536,6 +589,17 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             metadata_prompt_ids = self.metadata_prompt_ids.to_dict()
 
+        traces_origin: dict[str, Any] | list[str] | Unset
+        if isinstance(self.traces_origin, Unset):
+            traces_origin = UNSET
+        elif isinstance(self.traces_origin, list):
+            traces_origin = self.traces_origin
+
+        elif isinstance(self.traces_origin, PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1):
+            traces_origin = self.traces_origin.to_dict()
+        else:
+            traces_origin = self.traces_origin.to_dict()
+
         traces_error: dict[str, Any] | list[str] | Unset
         if isinstance(self.traces_error, Unset):
             traces_error = UNSET
@@ -595,6 +659,48 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
             evaluations_evaluator_id_guardrails_only = self.evaluations_evaluator_id_guardrails_only.to_dict()
         else:
             evaluations_evaluator_id_guardrails_only = self.evaluations_evaluator_id_guardrails_only.to_dict()
+
+        evaluations_evaluator_id_has_passed: dict[str, Any] | list[str] | Unset
+        if isinstance(self.evaluations_evaluator_id_has_passed, Unset):
+            evaluations_evaluator_id_has_passed = UNSET
+        elif isinstance(self.evaluations_evaluator_id_has_passed, list):
+            evaluations_evaluator_id_has_passed = self.evaluations_evaluator_id_has_passed
+
+        elif isinstance(
+            self.evaluations_evaluator_id_has_passed,
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1,
+        ):
+            evaluations_evaluator_id_has_passed = self.evaluations_evaluator_id_has_passed.to_dict()
+        else:
+            evaluations_evaluator_id_has_passed = self.evaluations_evaluator_id_has_passed.to_dict()
+
+        evaluations_evaluator_id_has_score: dict[str, Any] | list[str] | Unset
+        if isinstance(self.evaluations_evaluator_id_has_score, Unset):
+            evaluations_evaluator_id_has_score = UNSET
+        elif isinstance(self.evaluations_evaluator_id_has_score, list):
+            evaluations_evaluator_id_has_score = self.evaluations_evaluator_id_has_score
+
+        elif isinstance(
+            self.evaluations_evaluator_id_has_score,
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1,
+        ):
+            evaluations_evaluator_id_has_score = self.evaluations_evaluator_id_has_score.to_dict()
+        else:
+            evaluations_evaluator_id_has_score = self.evaluations_evaluator_id_has_score.to_dict()
+
+        evaluations_evaluator_id_has_label: dict[str, Any] | list[str] | Unset
+        if isinstance(self.evaluations_evaluator_id_has_label, Unset):
+            evaluations_evaluator_id_has_label = UNSET
+        elif isinstance(self.evaluations_evaluator_id_has_label, list):
+            evaluations_evaluator_id_has_label = self.evaluations_evaluator_id_has_label
+
+        elif isinstance(
+            self.evaluations_evaluator_id_has_label,
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1,
+        ):
+            evaluations_evaluator_id_has_label = self.evaluations_evaluator_id_has_label.to_dict()
+        else:
+            evaluations_evaluator_id_has_label = self.evaluations_evaluator_id_has_label.to_dict()
 
         evaluations_passed: dict[str, Any] | list[str] | Unset
         if isinstance(self.evaluations_passed, Unset):
@@ -702,19 +808,6 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         else:
             annotations_has_annotation = self.annotations_has_annotation.to_dict()
 
-        sentiment_input_sentiment: dict[str, Any] | list[str] | Unset
-        if isinstance(self.sentiment_input_sentiment, Unset):
-            sentiment_input_sentiment = UNSET
-        elif isinstance(self.sentiment_input_sentiment, list):
-            sentiment_input_sentiment = self.sentiment_input_sentiment
-
-        elif isinstance(
-            self.sentiment_input_sentiment, PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType1
-        ):
-            sentiment_input_sentiment = self.sentiment_input_sentiment.to_dict()
-        else:
-            sentiment_input_sentiment = self.sentiment_input_sentiment.to_dict()
-
         field_dict: dict[str, Any] = {}
 
         field_dict.update({})
@@ -736,6 +829,8 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
             field_dict["metadata.value"] = metadata_value
         if metadata_prompt_ids is not UNSET:
             field_dict["metadata.prompt_ids"] = metadata_prompt_ids
+        if traces_origin is not UNSET:
+            field_dict["traces.origin"] = traces_origin
         if traces_error is not UNSET:
             field_dict["traces.error"] = traces_error
         if spans_type is not UNSET:
@@ -746,6 +841,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
             field_dict["evaluations.evaluator_id"] = evaluations_evaluator_id
         if evaluations_evaluator_id_guardrails_only is not UNSET:
             field_dict["evaluations.evaluator_id.guardrails_only"] = evaluations_evaluator_id_guardrails_only
+        if evaluations_evaluator_id_has_passed is not UNSET:
+            field_dict["evaluations.evaluator_id.has_passed"] = evaluations_evaluator_id_has_passed
+        if evaluations_evaluator_id_has_score is not UNSET:
+            field_dict["evaluations.evaluator_id.has_score"] = evaluations_evaluator_id_has_score
+        if evaluations_evaluator_id_has_label is not UNSET:
+            field_dict["evaluations.evaluator_id.has_label"] = evaluations_evaluator_id_has_label
         if evaluations_passed is not UNSET:
             field_dict["evaluations.passed"] = evaluations_passed
         if evaluations_score is not UNSET:
@@ -764,8 +865,6 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
             field_dict["events.event_details.key"] = events_event_details_key
         if annotations_has_annotation is not UNSET:
             field_dict["annotations.hasAnnotation"] = annotations_has_annotation
-        if sentiment_input_sentiment is not UNSET:
-            field_dict["sentiment.input_sentiment"] = sentiment_input_sentiment
 
         return field_dict
 
@@ -782,6 +881,24 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         )
         from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_guardrails_only_type_2 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdGuardrailsOnlyType2,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_label_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_label_type_2 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_passed_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_passed_type_2 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_score_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_has_score_type_2 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2,
         )
         from ..models.post_api_analytics_timeseries_body_series_item_filters_evaluations_evaluator_id_type_1 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdType1,
@@ -879,12 +996,6 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         from ..models.post_api_analytics_timeseries_body_series_item_filters_metadata_value_type_2 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersMetadataValueType2,
         )
-        from ..models.post_api_analytics_timeseries_body_series_item_filters_sentiment_input_sentiment_type_1 import (
-            PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType1,
-        )
-        from ..models.post_api_analytics_timeseries_body_series_item_filters_sentiment_input_sentiment_type_2 import (
-            PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType2,
-        )
         from ..models.post_api_analytics_timeseries_body_series_item_filters_spans_model_type_1 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersSpansModelType1,
         )
@@ -914,6 +1025,12 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
         )
         from ..models.post_api_analytics_timeseries_body_series_item_filters_traces_error_type_2 import (
             PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesErrorType2,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_traces_origin_type_1 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1,
+        )
+        from ..models.post_api_analytics_timeseries_body_series_item_filters_traces_origin_type_2 import (
+            PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2,
         )
 
         d = dict(src_dict)
@@ -1246,6 +1363,40 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         metadata_prompt_ids = _parse_metadata_prompt_ids(d.pop("metadata.prompt_ids", UNSET))
 
+        def _parse_traces_origin(
+            data: object,
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2
+            | Unset
+        ):
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                traces_origin_type_0 = cast(list[str], data)
+
+                return traces_origin_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                traces_origin_type_1 = PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType1.from_dict(data)
+
+                return traces_origin_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            traces_origin_type_2 = PostApiAnalyticsTimeseriesBodySeriesItemFiltersTracesOriginType2.from_dict(data)
+
+            return traces_origin_type_2
+
+        traces_origin = _parse_traces_origin(d.pop("traces.origin", UNSET))
+
         def _parse_traces_error(
             data: object,
         ) -> (
@@ -1426,6 +1577,126 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         evaluations_evaluator_id_guardrails_only = _parse_evaluations_evaluator_id_guardrails_only(
             d.pop("evaluations.evaluator_id.guardrails_only", UNSET)
+        )
+
+        def _parse_evaluations_evaluator_id_has_passed(
+            data: object,
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2
+            | Unset
+        ):
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                evaluations_evaluator_id_has_passed_type_0 = cast(list[str], data)
+
+                return evaluations_evaluator_id_has_passed_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                evaluations_evaluator_id_has_passed_type_1 = (
+                    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType1.from_dict(data)
+                )
+
+                return evaluations_evaluator_id_has_passed_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            evaluations_evaluator_id_has_passed_type_2 = (
+                PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasPassedType2.from_dict(data)
+            )
+
+            return evaluations_evaluator_id_has_passed_type_2
+
+        evaluations_evaluator_id_has_passed = _parse_evaluations_evaluator_id_has_passed(
+            d.pop("evaluations.evaluator_id.has_passed", UNSET)
+        )
+
+        def _parse_evaluations_evaluator_id_has_score(
+            data: object,
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2
+            | Unset
+        ):
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                evaluations_evaluator_id_has_score_type_0 = cast(list[str], data)
+
+                return evaluations_evaluator_id_has_score_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                evaluations_evaluator_id_has_score_type_1 = (
+                    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType1.from_dict(data)
+                )
+
+                return evaluations_evaluator_id_has_score_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            evaluations_evaluator_id_has_score_type_2 = (
+                PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasScoreType2.from_dict(data)
+            )
+
+            return evaluations_evaluator_id_has_score_type_2
+
+        evaluations_evaluator_id_has_score = _parse_evaluations_evaluator_id_has_score(
+            d.pop("evaluations.evaluator_id.has_score", UNSET)
+        )
+
+        def _parse_evaluations_evaluator_id_has_label(
+            data: object,
+        ) -> (
+            list[str]
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1
+            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2
+            | Unset
+        ):
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, list):
+                    raise TypeError()
+                evaluations_evaluator_id_has_label_type_0 = cast(list[str], data)
+
+                return evaluations_evaluator_id_has_label_type_0
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                evaluations_evaluator_id_has_label_type_1 = (
+                    PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType1.from_dict(data)
+                )
+
+                return evaluations_evaluator_id_has_label_type_1
+            except (TypeError, ValueError, AttributeError, KeyError):
+                pass
+            if not isinstance(data, dict):
+                raise TypeError()
+            evaluations_evaluator_id_has_label_type_2 = (
+                PostApiAnalyticsTimeseriesBodySeriesItemFiltersEvaluationsEvaluatorIdHasLabelType2.from_dict(data)
+            )
+
+            return evaluations_evaluator_id_has_label_type_2
+
+        evaluations_evaluator_id_has_label = _parse_evaluations_evaluator_id_has_label(
+            d.pop("evaluations.evaluator_id.has_label", UNSET)
         )
 
         def _parse_evaluations_passed(
@@ -1770,44 +2041,6 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
 
         annotations_has_annotation = _parse_annotations_has_annotation(d.pop("annotations.hasAnnotation", UNSET))
 
-        def _parse_sentiment_input_sentiment(
-            data: object,
-        ) -> (
-            list[str]
-            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType1
-            | PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType2
-            | Unset
-        ):
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, list):
-                    raise TypeError()
-                sentiment_input_sentiment_type_0 = cast(list[str], data)
-
-                return sentiment_input_sentiment_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                sentiment_input_sentiment_type_1 = (
-                    PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType1.from_dict(data)
-                )
-
-                return sentiment_input_sentiment_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            if not isinstance(data, dict):
-                raise TypeError()
-            sentiment_input_sentiment_type_2 = (
-                PostApiAnalyticsTimeseriesBodySeriesItemFiltersSentimentInputSentimentType2.from_dict(data)
-            )
-
-            return sentiment_input_sentiment_type_2
-
-        sentiment_input_sentiment = _parse_sentiment_input_sentiment(d.pop("sentiment.input_sentiment", UNSET))
-
         post_api_analytics_timeseries_body_series_item_filters = cls(
             topics_topics=topics_topics,
             topics_subtopics=topics_subtopics,
@@ -1818,11 +2051,15 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
             metadata_key=metadata_key,
             metadata_value=metadata_value,
             metadata_prompt_ids=metadata_prompt_ids,
+            traces_origin=traces_origin,
             traces_error=traces_error,
             spans_type=spans_type,
             spans_model=spans_model,
             evaluations_evaluator_id=evaluations_evaluator_id,
             evaluations_evaluator_id_guardrails_only=evaluations_evaluator_id_guardrails_only,
+            evaluations_evaluator_id_has_passed=evaluations_evaluator_id_has_passed,
+            evaluations_evaluator_id_has_score=evaluations_evaluator_id_has_score,
+            evaluations_evaluator_id_has_label=evaluations_evaluator_id_has_label,
             evaluations_passed=evaluations_passed,
             evaluations_score=evaluations_score,
             evaluations_state=evaluations_state,
@@ -1832,7 +2069,6 @@ class PostApiAnalyticsTimeseriesBodySeriesItemFilters:
             events_metrics_value=events_metrics_value,
             events_event_details_key=events_event_details_key,
             annotations_has_annotation=annotations_has_annotation,
-            sentiment_input_sentiment=sentiment_input_sentiment,
         )
 
         return post_api_analytics_timeseries_body_series_item_filters

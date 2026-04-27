@@ -1,0 +1,160 @@
+---
+title: Debugging and Troubleshooting
+description: Debug TypeScript SDK integrations with LangWatch to fix tracing gaps, evaluation mismatches, and agent testing issues.
+sidebarTitle: Debugging
+---
+
+# Debugging and Troubleshooting
+
+This guide covers debugging techniques and troubleshooting common issues when integrating LangWatch with TypeScript applications.
+
+## Console Tracing and Logging
+
+Enable console output and detailed logging for development and troubleshooting.
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    processorType: 'simple' // Use 'simple' for immediate export during debugging
+  },
+  serviceName: "my-service",
+  
+  // Debug options for development
+  debug: {
+    consoleTracing: true, // Log spans to console
+    consoleLogging: true, // Log records to console
+    logLevel: 'debug'     // SDK internal logging
+  }
+});
+```
+
+## Custom Logger
+
+Create a custom logger for better integration with your existing logging system:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+
+// Create a custom logger
+const customLogger = {
+  debug: (message: string) => console.log(`[DEBUG] ${message}`),
+  info: (message: string) => console.log(`[INFO] ${message}`),
+  warn: (message: string) => console.warn(`[WARN] ${message}`),
+  error: (message: string) => console.error(`[ERROR] ${message}`),
+};
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service",
+
+  debug: {
+    logger: customLogger,
+    logLevel: 'debug'
+  }
+});
+```
+
+## Error Handling
+
+Configure error handling behavior for different environments:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY
+  },
+  serviceName: "my-service",
+
+  // Advanced options for error handling
+  advanced: {
+    throwOnSetupError: true, // Throw errors instead of returning no-op handles
+  }
+});
+```
+
+## Common Issues
+
+### Spans Not Appearing in Dashboard
+
+1. **Check API Key**: Ensure your `LANGWATCH_API_KEY` is correctly set
+2. **Verify Endpoint**: Confirm the `LANGWATCH_ENDPOINT` is accessible
+3. **Check Network**: Ensure your application can reach the LangWatch API
+4. **Processor Type**: Use `'simple'` processor for immediate export during debugging
+
+### Performance Issues
+
+1. **Batch Processing**: Use `'batch'` processor for production to reduce API calls
+2. **Sampling**: Implement sampling for high-volume applications
+3. **Data Capture**: Limit data capture to essential information
+
+### Integration Issues
+
+1. **Framework Compatibility**: Ensure you're using the correct integration for your framework
+2. **Version Compatibility**: Check that your LangWatch SDK version is compatible with your framework
+3. **Configuration**: Verify that all required configuration options are set
+
+## Environment-Specific Debugging
+
+### Development Environment
+
+```typescript
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    processorType: 'simple' // Immediate export for debugging
+  },
+  serviceName: "my-service",
+  debug: {
+    consoleTracing: true,
+    consoleLogging: true,
+    logLevel: 'info' // Raise this to `debug` if you're debugging the LangWatch integration
+  }
+});
+```
+
+### Production Environment
+
+```typescript
+const handle = setupObservability({
+  langwatch: {
+    apiKey: process.env.LANGWATCH_API_KEY,
+    processorType: 'batch' // Efficient batching for production
+  },
+  serviceName: "my-service",
+  debug: {
+    consoleTracing: false, // Disable console output in production
+    logLevel: 'warn' // Only log warnings and errors
+  }
+});
+```
+
+## Getting Help
+
+If you're still experiencing issues:
+
+1. **Check Logs**: Review console output and application logs
+2. **Verify Configuration**: Double-check all configuration options
+3. **Test Connectivity**: Ensure your application can reach LangWatch services
+4. **Community Support**: Visit our [Discord community](https://discord.gg/langwatch) for help
+5. **GitHub Issues**: Report bugs and feature requests on [GitHub](https://github.com/langwatch/langwatch/issues) 
+
+## Related Documentation
+
+For more debugging techniques and advanced troubleshooting:
+
+- **[Integration Guide](/integration/typescript/guide)** - Basic setup and common issues
+- **[API Reference](/integration/typescript/reference)** - Configuration options and error handling
+- **[Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation)** - Debugging manual span management
+- **[Framework Integrations](/integration/typescript/integrations)** - Framework-specific debugging guides
+- **[OpenTelemetry Migration](/integration/typescript/tutorials/opentelemetry-migration)** - Troubleshooting migration issues
+
+<Tip>
+For complex debugging scenarios, combine console tracing with [Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation) techniques for detailed span analysis.
+</Tip> 

@@ -15,8 +15,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { AnnotationScoreDataType } from "@prisma/client";
-import Link from "next/link";
-import { useSession } from "next-auth/react";
+import Link from "~/utils/compat/next-link";
+import { useSession } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
 
 import { ChevronDown, MoreVertical, Trash2 } from "react-feather";

@@ -13,6 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { Upload, X } from "lucide-react";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { toaster } from "../ui/toaster";
 import { Radio, RadioGroup } from "~/components/ui/radio";
 import { Select } from "~/components/ui/select";
@@ -61,7 +62,6 @@ interface FormData {
   maxTeams: number;
   maxProjects: number;
   maxMessagesPerMonth: number;
-  evaluationsCredit: number;
   maxWorkflows: number;
   maxPrompts: number;
   maxEvaluators: number;
@@ -91,7 +91,6 @@ const defaultFormData: FormData = {
   maxTeams: ENTERPRISE_TEMPLATE.maxTeams ?? 100,
   maxProjects: ENTERPRISE_TEMPLATE.maxProjects,
   maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-  evaluationsCredit: ENTERPRISE_TEMPLATE.evaluationsCredit,
   maxWorkflows: ENTERPRISE_TEMPLATE.maxWorkflows,
   maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts ?? 1000,
   maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators ?? 1000,
@@ -156,6 +155,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
         });
       },
       onError: (error) => {
+        if (isHandledByGlobalHandler(error)) return;
         toaster.create({
           title: "Failed to generate license",
           description: error.message,
@@ -252,7 +252,6 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
           maxTeams: formData.maxTeams,
           maxProjects: formData.maxProjects,
           maxMessagesPerMonth: formData.maxMessagesPerMonth,
-          evaluationsCredit: formData.evaluationsCredit,
           maxWorkflows: formData.maxWorkflows,
           maxPrompts: formData.maxPrompts,
           maxEvaluators: formData.maxEvaluators,
@@ -494,7 +493,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
             <Select.Trigger width="full">
               <Select.ValueText placeholder="Select plan type" />
             </Select.Trigger>
-            <Select.Content paddingY={2} zIndex="popover">
+            <Select.Content paddingY={2}>
               {planTypeCollection.items.map((item) => (
                 <Select.Item key={item.value} item={item}>
                   {item.label}
@@ -517,7 +516,7 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
             <Select.Trigger width="full">
               <Select.ValueText placeholder="Select usage unit" />
             </Select.Trigger>
-            <Select.Content paddingY={2} zIndex="popover">
+            <Select.Content paddingY={2}>
               {usageUnitCollection.items.map((item) => (
                 <Select.Item key={item.value} item={item}>
                   {item.label}
@@ -558,11 +557,6 @@ export const LicenseGeneratorForm = forwardRef<LicenseGeneratorFormRef, LicenseG
                 label="Max Messages/Month"
                 value={formData.maxMessagesPerMonth}
                 onChange={(value) => handleInputChange("maxMessagesPerMonth", value)}
-              />
-              <NumberField
-                label="Evaluations Credit"
-                value={formData.evaluationsCredit}
-                onChange={(value) => handleInputChange("evaluationsCredit", value)}
               />
               <NumberField
                 label="Max Workflows"

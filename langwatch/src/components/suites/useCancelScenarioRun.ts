@@ -1,9 +1,8 @@
 /**
- * Hook for cancelling scenario runs with server-confirmed status updates.
+ * Hook for cancelling scenario runs via event-sourcing.
  *
- * Provides `cancelJob` (single run) and `cancelBatchRun` (all remaining)
- * mutations. Redis operations are sub-100ms so status updates appear
- * near-instantly after the server confirms via query invalidation.
+ * Dispatches cancel_requested events. The pipeline reactor broadcasts
+ * to workers, and the worker owning the scenario kills its child process.
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
@@ -35,11 +34,6 @@ export interface CancelBatchParams {
  *
  * Callers should invalidate queries in the success callbacks to trigger
  * an immediate refetch of server-confirmed status.
- *
- * @param onCancelJobSuccess - Called when a single job cancel succeeds.
- * @param onCancelJobError - Called with the error when a single job cancel fails.
- * @param onCancelBatchSuccess - Called when a batch cancel succeeds.
- * @param onCancelBatchError - Called with the error when a batch cancel fails.
  */
 export function useCancelScenarioRun({
   onCancelJobSuccess,
@@ -47,7 +41,7 @@ export function useCancelScenarioRun({
   onCancelBatchSuccess,
   onCancelBatchError,
 }: {
-  onCancelJobSuccess?: (method?: "removed" | "signalled") => void;
+  onCancelJobSuccess?: () => void;
   onCancelJobError?: (error: { message: string }) => void;
   onCancelBatchSuccess?: () => void;
   onCancelBatchError?: (error: { message: string }) => void;
@@ -55,7 +49,7 @@ export function useCancelScenarioRun({
   const cancelJobMutation = api.scenarios.cancelJob.useMutation({
     onSuccess: (result) => {
       if (result.cancelled) {
-        onCancelJobSuccess?.(result.method);
+        onCancelJobSuccess?.();
       } else {
         onCancelJobError?.({ message: "Job could not be cancelled — it may have already completed" });
       }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
 import { toaster } from "../../components/ui/toaster";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { createLogger } from "../../utils/logger";
 import type { BaseComponent } from "../types/dsl";
@@ -86,6 +87,7 @@ export const usePostEvent = () => {
       setIsLoading(true);
 
       const onError = (error: Error) => {
+        if (isHandledByGlobalHandler(error)) return;
         // Show error to user
         toaster.create({
           title: "Failed to post message",
@@ -246,8 +248,6 @@ export const useHandleServerMessage = ({
             });
           }
 
-          // Don't auto-open the drawer when execution completes —
-          // let the user open it themselves if they want to inspect results
           break;
         case "execution_state_change":
           logger.debug(
@@ -255,6 +255,22 @@ export const useHandleServerMessage = ({
             "execution_state_change received",
           );
           setWorkflowExecutionState(message.payload.execution_state);
+
+          // Auto-select the target node and expand properties when a
+          // "Run workflow until here" execution completes, so the user
+          // can see the results without clicking manually.
+          if (
+            message.payload.execution_state?.status === "success" ||
+            message.payload.execution_state?.status === "error"
+          ) {
+            const untilNodeId =
+              getWorkflow().state.execution?.until_node_id;
+            if (untilNodeId) {
+              workflowStore.setSelectedNode(untilNodeId);
+              workflowStore.setPropertiesExpanded(true);
+            }
+          }
+
           if (message.payload.execution_state?.status === "error") {
             alertOnError(message.payload.execution_state.error);
             stopWorkflowIfRunning(message.payload.execution_state.error);

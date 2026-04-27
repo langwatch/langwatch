@@ -46,6 +46,7 @@ import { usePromptConfigForm } from "~/prompts/hooks/usePromptConfigForm";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import { areFormValuesEqual } from "~/prompts/utils/areFormValuesEqual";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
+import { localConfigToFormValues } from "./utils/localConfigToFormValues";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValuesWithSystemMessage,
@@ -54,7 +55,8 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import type { LlmConfigInputType } from "~/types";
 import { api } from "~/utils/api";
 import { DEFAULT_MODEL } from "~/utils/constants";
-import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
+import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { getMaxTokenLimit } from "~/components/llmPromptConfigs/utils/tokenUtils";
 
 export type PromptEditorDrawerProps = {
@@ -161,7 +163,7 @@ const extractLocalConfig = (
  * - Supports local tinkering in evaluations context (close without save persists locally)
  */
 export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const { modelMetadata } = useModelProvidersSettings({ projectId: project?.id });
   const { closeDrawer, canGoBack, goBack } = useDrawer();
   const complexProps = getComplexProps();
@@ -171,6 +173,9 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
 
   // License enforcement for prompt creation
   const { checkAndProceed } = useLicenseEnforcement("prompts");
+  const openLiteMemberRestriction = useUpgradeModalStore(
+    (state) => state.openLiteMemberRestriction,
+  );
 
   // Check if we're in evaluations context (targetId in URL params)
   const targetId = drawerParams.targetId as string | undefined;
@@ -290,19 +295,12 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
     return undefined;
   }, [promptQuery.data]);
 
-  // ============================================================================
-  // CONFIG VALUES STATE - Single Source of Truth for Form Initialization
-  // ============================================================================
-  //
-  // configValues: The baseline config that the form uses. Updated on:
-  //   1. Initialization (when drawer opens)
-  //   2. After save (with fresh server data)
-  //
-  // isFormInitialized: Tracks whether we've done the initial setup for this
-  //   drawer session. Prevents re-initialization when deps change.
-  //
+  // Seed configValues from initialLocalConfig so the form watch subscription's
+  // first synchronous fire carries the caller's edits, not defaults. Without
+  // this seed, the subscription fires on defaults before the init useEffect
+  // runs and clobbers the caller's local edits (#3155).
   const [configValues, setConfigValues] = useState<PromptConfigFormValues>(
-    buildDefaultFormValues,
+    () => localConfigToFormValues(props.initialLocalConfig),
   );
   const [isFormInitialized, setIsFormInitialized] = useState(false);
   // Ref set directly in init/reset effects so the watch subscription
@@ -634,7 +632,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       onClose();
     },
     onError: (error) => {
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error creating prompt",
         description: error.message,
@@ -685,6 +683,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // Don't close - let user continue editing or close manually
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error updating prompt",
         description: error.message,
@@ -707,6 +706,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       });
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error renaming prompt",
         description: error.message,
@@ -761,7 +761,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       const saveData = pendingSaveDataRef.current;
 
       if (promptId && promptQuery.data?.id) {
-        // Update existing prompt - no limit check needed
+        // Update existing prompt - check RBAC first
+        if (!hasPermission("prompts:update")) {
+          openLiteMemberRestriction({ resource: "prompts" });
+          return;
+        }
         updateMutation.mutate({
           projectId: project.id,
           id: promptQuery.data.id,
@@ -771,7 +775,11 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
           },
         });
       } else if (newPromptData) {
-        // Create new prompt - check limit first
+        // Create new prompt - check RBAC first, then license limit
+        if (!hasPermission("prompts:create")) {
+          openLiteMemberRestriction({ resource: "prompts" });
+          return;
+        }
         checkAndProceed(() => {
           createMutation.mutate({
             projectId: project.id,
@@ -792,6 +800,8 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       createMutation,
       updateMutation,
       checkAndProceed,
+      hasPermission,
+      openLiteMemberRestriction,
     ],
   );
 
@@ -849,6 +859,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
       // If we have a local config change handler (evaluations context), just close
       // Local config is already being updated on every change
       if (onLocalConfigChange) {
+        debouncedUpdateLocalConfig.flush();
         onClose();
         return;
       }
@@ -861,6 +872,7 @@ export function PromptEditorDrawer(props: PromptEditorDrawerProps) {
         return;
       }
     }
+    debouncedUpdateLocalConfig.flush();
     onClose();
   };
 

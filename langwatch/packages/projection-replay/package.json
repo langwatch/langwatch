@@ -1,0 +1,32 @@
+{
+	"name": "@langwatch/projection-replay",
+	"version": "0.0.1",
+	"private": true,
+	"description": "CLI tool for replaying historical events through fold projections",
+	"type": "module",
+	"packageManager": "pnpm@10.26.0",
+	"scripts": {
+		"dev": "tsx --tsconfig ../../tsconfig.json src/cli.tsx",
+		"typecheck": "tsc --noEmit"
+	},
+	"license": "MIT",
+	"dependencies": {
+		"@clickhouse/client": "^1.15.0",
+		"commander": "^14.0.2",
+		"dotenv": "17.2.3",
+		"fast-glob": "^3.3.3",
+		"ink": "^6.5.1",
+		"ink-select-input": "^6.2.0",
+		"ink-text-input": "^6.0.0",
+		"ioredis": "^5.6.1",
+		"react": "^19.2.3",
+		"react-dom": "^19.1.0"
+	},
+	"devDependencies": {
+		"@types/node": "^20.19.27",
+		"@types/react": "^19.2.7",
+		"@types/react-dom": "^19.2.3",
+		"tsx": "^4.21.0",
+		"typescript": "^5.9.3"
+	}
+}

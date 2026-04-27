@@ -24,8 +24,7 @@ import {
   Select as MultiSelect,
   type SingleValue,
 } from "chakra-react-select";
-import dynamic from "next/dynamic";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import React, {
   type Dispatch,
   type SetStateAction,
@@ -57,6 +56,7 @@ import {
   type UseFieldArrayReturn,
   useFieldArray,
   useForm,
+  useWatch,
 } from "react-hook-form";
 import { LuChartArea, LuPlus } from "react-icons/lu";
 import { useDebounceValue } from "usehooks-ts";
@@ -431,7 +431,17 @@ function AnalyticsCustomGraphContent({
               </Card.Header>
               <Card.Body>
                 {debouncedCustomGraphInput && (
-                  <CustomGraph input={debouncedCustomGraphInput} />
+                  <CustomGraph
+                    input={debouncedCustomGraphInput}
+                    filters={
+                      filterParams.filters as
+                        | Record<
+                            FilterField,
+                            string[] | Record<string, string[]>
+                          >
+                        | undefined
+                    }
+                  />
                 )}
               </Card.Body>
             </Card.Root>
@@ -472,7 +482,7 @@ function AnalyticsCustomGraphContent({
               HTTP POST request to access identical data tailored for the custom
               graphs.
             </Text>
-            <Box padding={4} backgroundColor={"#272822"}>
+            <Box padding={4} backgroundColor="bg.subtle">
               <RenderCode
                 code={`# Set your API key and endpoint URL
 API_KEY="your_langwatch_api_key"
@@ -546,7 +556,7 @@ export const customGraphFormToCustomGraphInput = (
 
   return {
     graphId: "custom",
-    graphType: formData.graphType!.value,
+    graphType: formData.graphType?.value ?? "line",
     series: formData.series.map((series) => {
       if (series.pipeline.field) {
         return {
@@ -633,14 +643,14 @@ function CustomGraphForm({
 }) {
   const [expandedSeries, setExpandedSeries] = useState<string[]>(["0"]);
   const groupByField = form.control.register("groupBy");
-  const graphType = form.watch("graphType");
-  const groupBy = form.watch("groupBy");
-  const title = form.watch("title");
+  const graphType = useWatch({ control: form.control, name: "graphType" });
+  const groupBy = useWatch({ control: form.control, name: "groupBy" });
+  const title = useWatch({ control: form.control, name: "title" });
+  const series = useWatch({ control: form.control, name: "series" });
   const { showFilters, setShowFilters } = useFilterToggle();
 
-  const joinedSeriesNames = form
-    .watch()
-    .series.map((s) => s.name)
+  const joinedSeriesNames = series
+    .map((s) => s.name)
     .join(", ");
 
   useEffect(() => {
@@ -948,38 +958,16 @@ function CustomGraphForm({
           Cancel
         </Button>
         {customId ? (
-          <Tooltip
-            content={
-              !hasPermission("analytics:manage")
-                ? "You need analytics:manage permission to update graphs"
-                : undefined
-            }
-            disabled={hasPermission("analytics:manage")}
-            positioning={{ placement: "top" }}
-            showArrow
-          >
             <Button
               colorPalette="orange"
               onClick={updateGraph}
               loading={updateGraphById.isLoading}
-              disabled={!hasPermission("analytics:manage")}
               marginX={2}
               minWidth="fit-content"
             >
               Update
             </Button>
-          </Tooltip>
         ) : (
-          <Tooltip
-            content={
-              !hasPermission("analytics:create")
-                ? "You need analytics:create permission to create graphs"
-                : undefined
-            }
-            disabled={hasPermission("analytics:create")}
-            positioning={{ placement: "top" }}
-            showArrow
-          >
             <Button
               colorPalette="orange"
               loading={addNewGraph.isLoading}
@@ -988,13 +976,11 @@ function CustomGraphForm({
                   addGraph();
                 });
               }}
-              disabled={!hasPermission("analytics:create")}
               marginX={2}
               minWidth="fit-content"
             >
               Save
             </Button>
-          </Tooltip>
         )}
       </HStack>
     </VStack>
@@ -1016,7 +1002,7 @@ function SeriesFieldItem({
   setExpandedSeries: Dispatch<SetStateAction<string[]>>;
   customId?: string;
 }) {
-  const colorSet = form.watch(`series.${index}.colorSet`);
+  const colorSet = useWatch({ control: form.control, name: `series.${index}.colorSet` });
   const coneColors = rotatingColors[colorSet].map((color, i) => {
     const color_ = getRawColorValue(color.color);
     const len = rotatingColors[colorSet].length;
@@ -1024,8 +1010,9 @@ function SeriesFieldItem({
     return `${color_} ${(i / len) * 100}%, ${color_} ${((i + 1) / len) * 100}%`;
   });
 
-  const seriesLength = form.watch(`series`).length;
-  const groupBy = form.watch("groupBy");
+  const seriesValues = useWatch({ control: form.control, name: "series" });
+  const seriesLength = seriesValues.length;
+  const groupBy = useWatch({ control: form.control, name: "groupBy" });
 
   // Track the previous groupBy to only auto-set colors when user actually changes it
   const prevGroupByRef = useRef<string | undefined>(undefined);
@@ -1069,7 +1056,7 @@ function SeriesFieldItem({
       <Accordion.ItemTrigger
         cursor="pointer"
         role="button"
-        background="gray.100"
+        background="bg.subtle"
         fontWeight="bold"
         paddingLeft={1}
         paddingRight={3}
@@ -1189,21 +1176,31 @@ function SeriesField({
   index: number;
   customId?: string;
 }) {
-  const name = form.watch(`series.${index}.name`);
-  const metric = form.watch(`series.${index}.metric`);
-  const aggregation = form.watch(`series.${index}.aggregation`);
-  const key = form.watch(`series.${index}.key`);
-  const pipelineField = form.watch(`series.${index}.pipeline.field`);
-  const pipelineAggregation = form.watch(
-    `series.${index}.pipeline.aggregation`,
-  );
-  const filters = form.watch(`series.${index}.filters`);
+  const name = useWatch({ control: form.control, name: `series.${index}.name` });
+  const metric = useWatch({ control: form.control, name: `series.${index}.metric` });
+  const aggregation = useWatch({ control: form.control, name: `series.${index}.aggregation` });
+  const key = useWatch({ control: form.control, name: `series.${index}.key` });
+  const pipelineField = useWatch({ control: form.control, name: `series.${index}.pipeline.field` });
+  const pipelineAggregation = useWatch({
+    control: form.control,
+    name: `series.${index}.pipeline.aggregation`,
+  });
+  const filters = useWatch({ control: form.control, name: `series.${index}.filters` });
   const nonEmptyFilters = filterOutEmptyFilters(filters);
 
-  const metricField = form.control.register(`series.${index}.metric`);
   const metric_ = metric ? getMetric(metric) : undefined;
 
-  const { openDrawer } = useDrawer();
+  const { openDrawer, setFlowCallbacks } = useDrawer();
+
+  // Sync aggregation when metric changes — if the current aggregation
+  // isn't allowed by the new metric, switch to the first allowed one.
+  useEffect(() => {
+    if (metric_ && !metric_.allowedAggregations.includes(aggregation)) {
+      const firstAllowed = metric_.allowedAggregations[0] ?? "avg";
+      form.setValue(`series.${index}.aggregation`, firstAllowed);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [metric]);
 
   useEffect(() => {
     const aggregation_ = aggregation
@@ -1255,32 +1252,36 @@ function SeriesField({
       <Field.Root>
         <Field.Label>Metric</Field.Label>
         <Grid width="full" gap={3} templateColumns="repeat(4, 1fr)">
-          <NativeSelect.Root gridColumn="span 2">
-            <NativeSelect.Field
-              {...metricField}
-              onChange={(e) => {
-                const metric_ = getMetric(e.target.value as any);
-                if (!metric_.allowedAggregations.includes(aggregation)) {
-                  form.setValue(
-                    `series.${index}.aggregation`,
-                    metric_.allowedAggregations[0]!,
-                  );
-                }
-                void metricField.onChange(e);
-              }}
-            >
-              {Object.entries(analyticsMetrics).map(([group, metrics]) => (
-                <optgroup key={group} label={camelCaseToTitleCase(group)}>
-                  {Object.entries(metrics).map(([metricKey, metric]) => (
-                    <option key={metricKey} value={`${group}.${metricKey}`}>
-                      {metric.label}
-                    </option>
+          <Controller
+            control={form.control}
+            name={`series.${index}.metric`}
+            render={({ field: metricField }) => (
+              <NativeSelect.Root gridColumn="span 2">
+                <NativeSelect.Field
+                  value={metricField.value ?? ""}
+                  onChange={(e) => {
+                    metricField.onChange(
+                      e.target.value as FlattenAnalyticsMetricsEnum,
+                    );
+                  }}
+                >
+                  {Object.entries(analyticsMetrics).map(([group, metrics]) => (
+                    <optgroup key={group} label={camelCaseToTitleCase(group)}>
+                      {Object.entries(metrics).map(([metricKey, m]) => (
+                        <option
+                          key={metricKey}
+                          value={`${group}.${metricKey}`}
+                        >
+                          {m.label}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
-                </optgroup>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+            )}
+          />
           {metric_?.requiresKey && (
             <Box gridColumn="span 2">
               <Controller
@@ -1317,7 +1318,13 @@ function SeriesField({
           )}
           <NativeSelect.Root gridColumn="span 1">
             <NativeSelect.Field
-              {...form.control.register(`series.${index}.aggregation`)}
+              value={aggregation}
+              onChange={(e) => {
+                form.setValue(
+                  `series.${index}.aggregation`,
+                  e.target.value as AggregationTypes,
+                );
+              }}
             >
               {metric_?.allowedAggregations.map((agg) => (
                 <option key={agg} value={agg}>
@@ -1375,10 +1382,8 @@ function SeriesField({
                   filters={
                     field.value ?? ({} as Record<FilterField, FilterParam>)
                   }
-                  onClick={() =>
-                    openDrawer("seriesFilters", {
-                      filters:
-                        field.value ?? ({} as Record<FilterField, FilterParam>),
+                  onClick={() => {
+                    setFlowCallbacks("seriesFilters", {
                       onChange: ({
                         filters,
                       }: {
@@ -1386,8 +1391,12 @@ function SeriesField({
                       }) => {
                         form.setValue(`series.${index}.filters`, filters);
                       },
-                    })
-                  }
+                    });
+                    openDrawer("seriesFilters", {
+                      filters:
+                        field.value ?? ({} as Record<FilterField, FilterParam>),
+                    });
+                  }}
                 >
                   {Object.keys(nonEmptyFilters).length > 0
                     ? "Edit Filters"
@@ -1524,7 +1533,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
                   {details && (
                     <Text
                       fontSize="sm"
-                      color={props.isSelected ? "white" : "gray.500"}
+                      color={props.isSelected ? "fg" : "fg.muted"}
                     >
                       {details}
                     </Text>
@@ -1553,18 +1562,14 @@ function GraphTypeField({
     })),
   });
 
-  const selectedValue = form.watch("graphType");
-
   return (
     <Controller
       control={form.control}
       name="graphType"
       render={({ field }) => (
         <Select.Root
-          {...field}
-          onChange={undefined}
           collection={graphTypeCollection}
-          value={[field.value!.value]}
+          value={field.value ? [field.value.value] : []}
           onValueChange={(change) => {
             const selectedOption = chartOptions.find(
               (opt) => opt.value === change.value[0],
@@ -1575,10 +1580,10 @@ function GraphTypeField({
           <Select.Trigger>
             <Select.ValueText>
               {() =>
-                selectedValue ? (
+                field.value ? (
                   <HStack gap={2}>
-                    {selectedValue.icon}
-                    <Text>{selectedValue.label}</Text>
+                    {field.value.icon}
+                    <Text>{field.value.label}</Text>
                   </HStack>
                 ) : (
                   <Text>Select graph type</Text>
@@ -1602,7 +1607,5 @@ function GraphTypeField({
   );
 }
 
-// Export as client-side only component to avoid SSR issues with chakra-react-select
-export default dynamic(() => Promise.resolve(AnalyticsCustomGraphContent), {
-  ssr: false,
-});
+// No SSR in Vite — export directly (was wrapped in dynamic() for Next.js SSR avoidance)
+export default AnalyticsCustomGraphContent;

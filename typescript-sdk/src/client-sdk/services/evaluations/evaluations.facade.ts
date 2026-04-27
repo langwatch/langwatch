@@ -35,6 +35,7 @@ import {
   EvaluationsApiError,
 } from "./errors";
 import type { Logger } from "@/logger";
+import { buildAuthHeaders } from "@/internal/api/auth";
 
 type EvaluationsFacadeConfig = {
   endpoint: string;
@@ -151,7 +152,7 @@ export class EvaluationsFacade {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Auth-Token": this.#apiKey,
+          ...buildAuthHeaders({ apiKey: this.#apiKey }),
         },
         body: JSON.stringify(requestBody),
       });

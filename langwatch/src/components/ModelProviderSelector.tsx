@@ -171,7 +171,7 @@ export const ModelProviderSelector = React.memo(function ModelProviderSelector({
           {() => selectValueText}
         </Select.ValueText>
       </Select.Trigger>
-      <Select.Content zIndex="1600">
+      <Select.Content>
         {providerCollection.items.map((item) => (
           <Select.Item key={item.value} item={item}>
             <HStack

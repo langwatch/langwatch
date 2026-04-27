@@ -1,4 +1,5 @@
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { toaster } from "../ui/toaster";
 import { getUserFriendlyLicenseError } from "../../../ee/licensing/constants";
 
@@ -24,6 +25,7 @@ export function useLicenseActions({
       window.location.reload();
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to activate license",
         description: getUserFriendlyLicenseError(error.message),
@@ -43,6 +45,7 @@ export function useLicenseActions({
       window.location.reload();
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to remove license",
         description: error.message,

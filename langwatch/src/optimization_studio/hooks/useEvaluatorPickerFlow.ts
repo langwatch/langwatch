@@ -1,4 +1,5 @@
 import { useCallback, useRef } from "react";
+import { createEvaluatorEditorCallbacks } from "~/evaluations-v3/utils/evaluatorEditorCallbacks";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import type { Component, Field } from "../types/dsl";
 import type { NodeWithOptionalPosition } from "~/types";
@@ -51,7 +52,6 @@ function computeFieldsFromEvaluatorType(evaluatorType: string): {
   if (def.result.score) outputs.push({ identifier: "score", type: "float" });
   if (def.result.passed) outputs.push({ identifier: "passed", type: "bool" });
   if (def.result.label) outputs.push({ identifier: "label", type: "str" });
-  outputs.push({ identifier: "details", type: "str" });
 
   return { inputs, outputs };
 }
@@ -144,7 +144,10 @@ export function useEvaluatorPickerFlow() {
             }
           };
           // Both built-in and workflow evaluator creation paths
-          setFlowCallbacks("evaluatorEditor", { onSave: onEvaluatorSaved });
+          setFlowCallbacks(
+            "evaluatorEditor",
+            createEvaluatorEditorCallbacks({ onSave: onEvaluatorSaved }),
+          );
           setFlowCallbacks("workflowSelectorForEvaluator", { onSave: onEvaluatorSaved });
           openDrawer("evaluatorCategorySelector");
         },

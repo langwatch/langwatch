@@ -22,7 +22,7 @@ import {
   Shield,
   XCircle,
 } from "react-feather";
-import { useDrawer } from "~/hooks/useDrawer";
+import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import type {
   ElasticSearchEvaluation,
   EvaluationResult,
@@ -110,7 +110,7 @@ export function MessageCard({
   const traceSubtopic = topicsMap[trace.metadata.subtopic_id ?? ""];
 
   const Annotation = ({ annotationsCount }: { annotationsCount: number }) => {
-    const { openDrawer } = useDrawer();
+    const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
 
     return (
       <Tooltip content={`See more`}>
@@ -123,7 +123,7 @@ export function MessageCard({
           zIndex="popover"
           borderRadius="full"
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
               selectedTab: "annotations",
             })
@@ -144,7 +144,7 @@ export function MessageCard({
   };
 
   const evaluationsPopover = useDisclosure();
-  const { openDrawer } = useDrawer();
+  const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
 
   const inputIsJson = isJson(stringifyIfObject(trace.input?.value) ?? "");
   const inputIsPythonRepr = isPythonRepr(
@@ -159,7 +159,7 @@ export function MessageCard({
       onClick={(e) => {
         if (!linkActive) e.preventDefault();
         if (linkActive) {
-          openDrawer("traceDetails", {
+          openTraceDetailsDrawer({
             traceId: trace.trace_id,
             selectedTab: "messages",
           });
@@ -184,7 +184,7 @@ export function MessageCard({
                 />
               ) : (
                 <Text lineClamp={1} wordBreak="break-all" lineHeight="2.1em">
-                  <Markdown className="markdown markdown-without-margin">
+                  <Markdown>
                     {getExtractedInput(trace)}
                   </Markdown>
                 </Text>
@@ -223,7 +223,7 @@ export function MessageCard({
                     value={stringifyIfObject(trace.output.value)}
                   />
                 ) : trace.output?.value ? (
-                  <Markdown className="markdown">
+                  <Markdown>
                     {getSlicedOutput(trace)}
                   </Markdown>
                 ) : trace.lastGuardrail ? (

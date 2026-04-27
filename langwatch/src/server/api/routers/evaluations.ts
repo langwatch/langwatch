@@ -7,6 +7,11 @@ import { KSUID_RESOURCES } from "~/utils/constants";
 import { trackServerEvent } from "~/server/posthog";
 
 import { createLogger } from "~/utils/logger/server";
+import {
+  AZURE_SAFETY_ENV_VARS,
+  getAzureSafetyEnvFromProject,
+  isAzureEvaluatorType,
+} from "../../app-layer/evaluations/azure-safety-env";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
   AVAILABLE_EVALUATORS,
@@ -24,15 +29,25 @@ export const evaluationsRouter = createTRPCRouter({
   availableEvaluators: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkProjectPermission("evaluations:view"))
-    .query(async () => {
+    .query(async ({ input }) => {
+      // Azure Safety evaluators are gated by the per-project azure_safety
+      // Model Provider — we no longer read process.env for those. Compute
+      // once and reuse for all three Azure evaluator types.
+      const azureSafetyEnv = await getAzureSafetyEnvFromProject(
+        input.projectId,
+      );
+      const azureMissingEnvVars = azureSafetyEnv
+        ? []
+        : [...AZURE_SAFETY_ENV_VARS];
+
       return Object.fromEntries(
         Object.entries(AVAILABLE_EVALUATORS).map(([key, evaluator]) => [
           key,
           {
             ...evaluator,
-            missingEnvVars: evaluator.envVars.filter(
-              (envVar) => !process.env[envVar],
-            ),
+            missingEnvVars: isAzureEvaluatorType(key)
+              ? azureMissingEnvVars
+              : evaluator.envVars.filter((envVar) => !process.env[envVar]),
           },
         ]),
       );
@@ -84,39 +99,31 @@ export const evaluationsRouter = createTRPCRouter({
         });
       }
 
-      // Dispatch to evaluation processing pipeline when flag is ON
-      const project = await prisma.project.findUnique({
-        where: { id: input.projectId },
-        select: {
-          featureEventSourcingEvaluationIngestion: true,
-        },
-      });
-      if (project?.featureEventSourcingEvaluationIngestion && result) {
+      // Dispatch to evaluation processing pipeline
+      if (result) {
         const evaluationId = generate(KSUID_RESOURCES.EVALUATION).toString();
-        void (async () => {
-          try {
-            const app = getApp();
-            await app.evaluations.reportEvaluation({
-              tenantId: input.projectId,
-              evaluationId,
-              evaluatorId: input.evaluatorType,
-              evaluatorType: input.evaluatorType,
-              traceId: input.traceId,
-              status: result.status,
-              score: result.status === "processed" && typeof result.score === 'number' ? result.score : undefined,
-              passed: result.status === "processed" ? (result.passed ?? undefined) : undefined,
-              label: result.status === "processed" ? (result.label ?? undefined) : undefined,
-              details: result.status === "error" ? result.details : result.status === "processed" ? (result.details ?? undefined) : undefined,
-              error: result.status === "error" ? result.details : undefined,
-              occurredAt: Date.now(),
-            });
-          } catch (error) {
-            logger.warn(
-              { error, evaluationId, evaluatorType: input.evaluatorType },
-              "Failed to dispatch single re-eval to evaluation processing pipeline",
-            );
-          }
-        })();
+        try {
+          const app = getApp();
+          await app.evaluations.reportEvaluation({
+            tenantId: input.projectId,
+            evaluationId,
+            evaluatorId: input.evaluatorType,
+            evaluatorType: input.evaluatorType,
+            traceId: input.traceId,
+            status: result.status,
+            score: result.status === "processed" && typeof result.score === 'number' ? result.score : undefined,
+            passed: result.status === "processed" ? (result.passed ?? undefined) : undefined,
+            label: result.status === "processed" ? (result.label ?? undefined) : undefined,
+            details: result.status === "error" ? result.details : result.status === "processed" ? (result.details ?? undefined) : undefined,
+            error: result.status === "error" ? result.details : undefined,
+            occurredAt: Date.now(),
+          });
+        } catch (error) {
+          logger.warn(
+            { error, evaluationId, evaluatorType: input.evaluatorType },
+            "Failed to dispatch single re-eval to evaluation processing pipeline",
+          );
+        }
       }
 
       return result;

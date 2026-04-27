@@ -25,6 +25,7 @@ import {
   getMaxTokenLimit,
   normalizeMaxTokens,
 } from "./utils/tokenUtils";
+import { clampMaxTokens } from "../../utils/clampMaxTokens";
 
 // Re-export types for backward compatibility
 export type { LLMConfigValues } from "./types";
@@ -105,6 +106,21 @@ export function LLMConfigPopover({
   const maxTokenLimit = useMemo(() => {
     return getMaxTokenLimit(currentModelMetadata);
   }, [currentModelMetadata]);
+
+  // Clamp saved maxTokens against the configured model ceiling.
+  // The configured max (from the custom-model dialog / model metadata) is the
+  // source of truth — a stale form value above it would otherwise display raw
+  // in the collapsed row while the popover silently clamps it, and get persisted
+  // out of bounds on save.
+  useEffect(() => {
+    if (!currentModelMetadata) return;
+    const currentMaxTokens = getParamValue(values, "max_tokens");
+    if (typeof currentMaxTokens !== "number") return;
+    const clamped = clampMaxTokens(currentMaxTokens, maxTokenLimit);
+    if (clamped !== undefined && clamped !== currentMaxTokens) {
+      onChange(normalizeMaxTokens(values, clamped));
+    }
+  }, [currentModelMetadata, maxTokenLimit, values, onChange]);
 
   // Handle parameter change - outputs camelCase keys for form compatibility
   const handleParamChange = (paramName: string, value: number | string) => {

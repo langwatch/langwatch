@@ -16,7 +16,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
 import { useEffect, useRef, useState } from "react";
 import { useBufferedTraceData } from "~/hooks/useBufferedTraceData";
@@ -24,7 +24,10 @@ import { ChevronDown, ChevronUp, Download, Edit, Shield } from "react-feather";
 import { LuChevronsUpDown, LuList, LuRefreshCw } from "react-icons/lu";
 import { useLocalStorage } from "usehooks-ts";
 import { useDrawer } from "~/hooks/useDrawer";
+import { useLiteMemberGuard } from "~/hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useUpgradeModalStore } from "~/stores/upgradeModalStore";
+import { useTraceDetailsDrawer } from "~/hooks/useTraceDetailsDrawer";
 import { useTraceUpdateListener } from "~/hooks/useTraceUpdateListener";
 import { getEvaluatorDefinitions } from "~/server/evaluations/getEvaluator";
 import type { ElasticSearchEvaluation, Trace } from "~/server/tracer/types";
@@ -77,6 +80,11 @@ export function MessagesTable({
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
   const { openDrawer } = useDrawer();
+  const { openTraceDetailsDrawer } = useTraceDetailsDrawer();
+  const { isLiteMember } = useLiteMemberGuard();
+  const openLiteMemberRestriction = useUpgradeModalStore(
+    (s) => s.openLiteMemberRestriction,
+  );
   const queryClient = api.useContext();
 
   const { filterParams, queryOpts } = useFilterParams();
@@ -275,9 +283,8 @@ export function MessagesTable({
             paddingLeft={2}
             marginRight={1}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId,
-                selectedTab: "messages",
               })
             }
           >
@@ -352,7 +359,7 @@ export function MessagesTable({
           <Table.Cell
             key={index}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -438,7 +445,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -457,7 +464,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -480,7 +487,7 @@ export function MessagesTable({
             key={index}
             maxWidth="300px"
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -514,7 +521,7 @@ export function MessagesTable({
           <Table.Cell
             key={index}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -527,7 +534,7 @@ export function MessagesTable({
           <Table.Cell
             key={index}
             onClick={() =>
-              openDrawer("traceDetails", {
+              openTraceDetailsDrawer({
                 traceId: trace.trace_id,
               })
             }
@@ -568,54 +575,50 @@ export function MessagesTable({
 
       value: (trace: Trace) => getSafeRenderOutputValueFromTrace(trace),
     },
-    ...(project?.featureClickHouseDataSourceTraces
-      ? {
-          "traces.origin": {
-            name: "Origin",
-            sortable: false,
-            width: 120,
-            render: (trace: TraceWithGuardrail, index: number) => {
-              const rawOrigin = trace.metadata["langwatch.origin"];
-              const displayOrigin =
-                typeof rawOrigin === "string" && rawOrigin !== ""
-                  ? rawOrigin
-                  : null;
+    "traces.origin": {
+      name: "Origin",
+      sortable: false,
+      width: 120,
+      render: (trace: TraceWithGuardrail, index: number) => {
+        const rawOrigin = trace.metadata["langwatch.origin"];
+        const displayOrigin =
+          typeof rawOrigin === "string" && rawOrigin !== ""
+            ? rawOrigin
+            : null;
 
+        return (
+          <Table.Cell
+            key={index}
+            onClick={() =>
+              openTraceDetailsDrawer({
+                traceId: trace.trace_id,
+              })
+            }
+          >
+            {displayOrigin && (() => {
+              const colors = getOriginColor(displayOrigin);
               return (
-                <Table.Cell
-                  key={index}
-                  onClick={() =>
-                    openDrawer("traceDetails", {
-                      traceId: trace.trace_id,
-                    })
-                  }
+                <Badge
+                  size="sm"
+                  paddingX={2}
+                  background={colors.background}
+                  color={colors.color}
+                  fontSize="12px"
                 >
-                  {displayOrigin && (() => {
-                    const colors = getOriginColor(displayOrigin);
-                    return (
-                      <Badge
-                        size="sm"
-                        paddingX={2}
-                        background={colors.background}
-                        color={colors.color}
-                        fontSize="12px"
-                      >
-                        {getOriginLabel(displayOrigin)}
-                      </Badge>
-                    );
-                  })()}
-                </Table.Cell>
+                  {getOriginLabel(displayOrigin)}
+                </Badge>
               );
-            },
-            value: (trace: Trace) => {
-              const rawOrigin = trace.metadata["langwatch.origin"];
-              return typeof rawOrigin === "string" && rawOrigin !== ""
-                ? rawOrigin
-                : "";
-            },
-          } satisfies HeaderColumn,
-        }
-      : {}),
+            })()}
+          </Table.Cell>
+        );
+      },
+      value: (trace: Trace) => {
+        const rawOrigin = trace.metadata["langwatch.origin"];
+        return typeof rawOrigin === "string" && rawOrigin !== ""
+          ? rawOrigin
+          : "";
+      },
+    } satisfies HeaderColumn,
     "metadata.labels": {
       name: "Labels",
       sortable: true,
@@ -646,7 +649,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -674,7 +677,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -702,7 +705,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -719,7 +722,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -736,7 +739,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -756,7 +759,7 @@ export function MessagesTable({
           minWidth="300px"
           maxWidth="300px"
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -775,7 +778,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -799,7 +802,7 @@ export function MessagesTable({
         <Table.Cell
           key={index}
           onClick={() =>
-            openDrawer("traceDetails", {
+            openTraceDetailsDrawer({
               traceId: trace.trace_id,
             })
           }
@@ -1054,7 +1057,7 @@ export function MessagesTable({
           </Button>
         )}
         <Spacer />
-        {!hideExport && (
+        {!hideExport && !isLiteMember && (
           <Tooltip
             disabled={navigationFooter.totalHits < 10_000}
             content={
@@ -1300,11 +1303,12 @@ export function MessagesTable({
           left="50%"
           transform="translateX(-50%)"
           zIndex={20}
-          backgroundColor="#ffffff"
+          backgroundColor="bg.emphasized"
           padding="8px"
           paddingX="16px"
-          border="1px solid #ccc"
-          boxShadow="0 0 15px rgba(0, 0, 0, 0.2)"
+          border="1px solid"
+          borderColor="border.muted"
+          boxShadow="lg"
           borderRadius="md"
         >
           <HStack gap={3}>
@@ -1318,9 +1322,13 @@ export function MessagesTable({
                   colorPalette="black"
                   minWidth="fit-content"
                   variant="outline"
-                  onClick={() =>
-                    openExportDialog({ selectedTraceIds })
-                  }
+                  onClick={() => {
+                    if (isLiteMember) {
+                      openLiteMemberRestriction({ resource: "traces" });
+                      return;
+                    }
+                    openExportDialog({ selectedTraceIds });
+                  }}
                 >
                   Export <Download size={16} style={{ marginLeft: 8 }} />
                 </Button>
@@ -1334,6 +1342,10 @@ export function MessagesTable({
               variant="outline"
               minWidth="fit-content"
               onClick={() => {
+                if (isLiteMember) {
+                  openLiteMemberRestriction({ resource: "datasets" });
+                  return;
+                }
                 openDrawer("addDatasetRecord", {
                   selectedTraceIds,
                 });
@@ -1344,16 +1356,16 @@ export function MessagesTable({
             {!hideAddToQueue && (
               <Dialog.Root
                 open={dialog.open}
-                onOpenChange={(e) =>
-                  e.open ? dialog.onOpen() : dialog.onClose()
-                }
+                onOpenChange={(e) => {
+                  if (e.open && isLiteMember) {
+                    openLiteMemberRestriction({ resource: "annotations" });
+                    return;
+                  }
+                  e.open ? dialog.onOpen() : dialog.onClose();
+                }}
               >
                 <Dialog.Trigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => dialog.onOpen()}
-                  >
+                  <Button variant="outline" size="sm">
                     Add to Queue
                   </Button>
                 </Dialog.Trigger>

@@ -28,9 +28,9 @@ export const formatTimeAgo = (
  * Format a timestamp as a compact relative time string (e.g., "2m ago", "1h ago").
  * Used for space-constrained UI like command bar recent items.
  */
-export function formatTimeAgoCompact(timestamp: number): string {
+export function formatTimeAgoCompact(timestamp: number, nowMs?: number): string {
   const date = new Date(timestamp);
-  const now = new Date();
+  const now = nowMs ? new Date(nowMs) : new Date();
 
   const minutes = differenceInMinutes(now, date);
   if (minutes < 1) return "now";

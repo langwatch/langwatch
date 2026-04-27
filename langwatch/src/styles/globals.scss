@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+
 html,
 body {
     padding: 0;
@@ -62,19 +64,6 @@ label {
         0 0 5px #ed8926;
 }
 
-.markdown {
-    p {
-        padding: 6px 0;
-    }
-
-    ol,
-    ul {
-        padding-left: 40px;
-        &:dir(rtl) {
-            padding-right: 40px;
-        }
-    }
-}
 
 div input[type="number"] {
     appearance: auto;
@@ -299,4 +288,9 @@ span[data-highlight]::after {
 
 .trace-highlight-new td {
     animation: trace-highlight-fade 2s ease-out;
+}
+
+/* Suppress recharts focus outlines for mouse clicks only; keep :focus-visible for keyboard users */
+.recharts-wrapper *:focus:not(:focus-visible) {
+    outline: none;
 }

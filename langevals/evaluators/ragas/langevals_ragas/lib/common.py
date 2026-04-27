@@ -54,7 +54,7 @@ def prepare_llm(
     settings: RagasSettings = RagasSettings(),
     temperature: float = 0,
 ):
-    os.environ["AZURE_API_VERSION"] = "2023-07-01-preview"
+    os.environ.setdefault("AZURE_API_VERSION", "2024-02-01")
     if evaluator.env:
         for key, env in evaluator.env.items():
             os.environ[key] = env

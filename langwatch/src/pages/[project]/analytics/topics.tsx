@@ -1,34 +1,26 @@
 import {
-  Box,
   Card,
   GridItem,
   Heading,
   HStack,
   SimpleGrid,
-  VStack,
 } from "@chakra-ui/react";
 import { BarChart2 } from "react-feather";
 import {
   CustomGraph,
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
-import {
-  DocumentsCountsSummary,
-  DocumentsCountsTable,
-} from "~/components/analytics/DocumentsCountsTable";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import GraphsLayout from "~/components/GraphsLayout";
-import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { TopicsSelector } from "../../../components/filters/TopicsSelector";
 import { withPermissionGuard } from "../../../components/WithPermissionGuard";
-import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY;
 
 const threadsPerTopic = {
-  graphId: "custom",
+  graphId: "threadsPerTopic",
   graphType: "stacked_bar",
   series: [
     {
@@ -44,8 +36,8 @@ const threadsPerTopic = {
   height: 300,
 };
 
-const mostDisucussedTopics = {
-  graphId: "custom",
+const mostDiscussedTopics = {
+  graphId: "mostDiscussedTopics",
   graphType: "horizontal_bar",
   series: [
     {
@@ -98,19 +90,7 @@ function TopicsContent() {
                 </HStack>
               </Card.Header>
               <Card.Body>
-                <CustomGraph input={mostDisucussedTopics as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
-          <GridItem colSpan={4}>
-            <Card.Root>
-              <Card.Body>
-                <HStack gap={2}>
-                  <Heading size="sm">Total documents</Heading>
-                </HStack>
-
-                <DocumentsCountsSummary />
-                <DocumentsCountsTable />
+                <CustomGraph input={mostDiscussedTopics as CustomGraphInput} />
               </Card.Body>
             </Card.Root>
           </GridItem>

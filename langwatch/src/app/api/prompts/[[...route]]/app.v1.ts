@@ -10,7 +10,19 @@ import {
 } from "~/prompts/schemas/field-schemas";
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
+import { prisma } from "~/server/db";
+import { NotFoundError, ShorthandParseError } from "~/server/prompt-config/errors";
+import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
+import {
+  PromptTagConflictError,
+  PromptTagNotFoundError,
+  PromptTagProtectedError,
+  PromptTagService,
+  PromptTagValidationError,
+} from "~/server/prompt-config/prompt-tag.service";
 import { createLogger } from "~/utils/logger/server";
+import { parsePromptShorthand } from "~/server/prompt-config/parsePromptShorthand";
 import {
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
@@ -22,6 +34,7 @@ import {
   promptServiceMiddleware,
 } from "../../middleware/prompt-service";
 import { baseResponses, conflictResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import {
   type ApiResponsePrompt,
   apiResponsePromptWithVersionDataSchema,
@@ -83,8 +96,309 @@ app.get(
     });
 
     return c.json(
-      apiResponsePromptWithVersionDataSchema.array().parse(configs),
+      apiResponsePromptWithVersionDataSchema.array().parse(configs).map((p) => ({
+        ...p,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/prompts`,
+        }),
+      })),
     );
+  },
+);
+
+// Assign tag to a prompt version
+const assignTagResponseSchema = z.object({
+  configId: z.string(),
+  versionId: z.string(),
+  tag: z.string(),
+  updatedAt: z.date(),
+});
+
+app.put(
+  "/:id{.+?}/tags/:tag",
+  describeRoute({
+    description:
+      'Assign a tag (e.g. "production", "staging") to a specific prompt version',
+    parameters: [
+      {
+        name: "tag",
+        in: "path",
+        description: 'The tag to assign (e.g., "production", "staging", or a custom tag)',
+        required: true,
+        schema: { type: "string" },
+      },
+    ],
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(assignTagResponseSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+      422: {
+        description: "Invalid tag or version",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  zValidator("json", z.object({ versionId: z.string() })),
+  async (c) => {
+    const service = c.get("promptService");
+    const project = c.get("project");
+    const organization = c.get("organization");
+    const { id, tag } = c.req.param();
+    const { versionId } = c.req.valid("json");
+
+    logger.info(
+      { projectId: project.id, promptId: id, tag, versionId },
+      "Assigning tag to prompt version",
+    );
+
+    try {
+      const config = await service.repository.getPromptByIdOrHandle({
+        idOrHandle: id,
+        projectId: project.id,
+        organizationId: organization.id,
+      });
+
+      if (!config) {
+        throw new HTTPException(404, {
+          message: `Prompt not found: ${id}`,
+        });
+      }
+
+      const result = await service.assignTag({
+        configId: config.id,
+        versionId,
+        tag,
+        projectId: config.projectId,
+        organizationId: organization.id,
+      });
+
+      logger.info(
+        { projectId: project.id, configId: config.id, tag, versionId },
+        "Successfully assigned tag to prompt version",
+      );
+
+      return c.json(
+        assignTagResponseSchema.parse({
+          configId: result.configId,
+          versionId: result.versionId,
+          tag: result.promptTag.name,
+          updatedAt: result.updatedAt,
+        }),
+      );
+    } catch (error: unknown) {
+      if (error instanceof TagValidationError) {
+        throw new HTTPException(422, {
+          message: error.message,
+        });
+      }
+      throw error;
+    }
+  },
+);
+
+// --- Tag definition CRUD (org-level) ---
+
+// List all tag definitions for the org
+app.get(
+  "/tags",
+  describeRoute({
+    description: "List all prompt tag definitions for the organization",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Success",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.array(
+                z.object({
+                  id: z.string(),
+                  name: z.string(),
+                  createdAt: z.coerce.date(),
+                }),
+              ),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const organization = c.get("organization");
+    const tagService = PromptTagService.create(prisma);
+    const tags = await tagService.getAll({ organizationId: organization.id });
+
+    return c.json(
+      tags.map((tag) => ({
+        id: tag.id,
+        name: tag.name,
+        createdAt: tag.createdAt,
+      })),
+    );
+  },
+);
+
+// Create a tag definition
+app.post(
+  "/tags",
+  describeRoute({
+    description: "Create a custom prompt tag definition for the organization",
+    responses: {
+      ...baseResponses,
+      201: {
+        description: "Tag created",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                id: z.string(),
+                name: z.string(),
+                createdAt: z.coerce.date(),
+              }),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  zValidator("json", z.object({ name: z.string() })),
+  async (c) => {
+    const organization = c.get("organization");
+    const { name } = c.req.valid("json");
+    const tagService = PromptTagService.create(prisma);
+
+    try {
+      const tag = await tagService.create({
+        organizationId: organization.id,
+        name,
+      });
+
+      logger.info({ organizationId: organization.id, name }, "Custom prompt tag created via REST");
+
+      return c.json(
+        { id: tag.id, name: tag.name, createdAt: tag.createdAt },
+        201,
+      );
+    } catch (error) {
+      if (error instanceof PromptTagValidationError) {
+        throw new HTTPException(422, { message: error.message });
+      }
+      if (error instanceof PromptTagConflictError) {
+        throw new HTTPException(409, { message: error.message });
+      }
+      throw error;
+    }
+  },
+);
+
+// Rename a tag definition
+app.put(
+  "/tags/:tag",
+  describeRoute({
+    description: "Rename a prompt tag definition",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Tag renamed",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                id: z.string(),
+                name: z.string(),
+                createdAt: z.coerce.date(),
+              }),
+            ),
+          },
+        },
+      },
+    },
+  }),
+  zValidator("json", z.object({ name: z.string() })),
+  async (c) => {
+    const organization = c.get("organization");
+    const { tag: oldName } = c.req.param();
+    const { name: newName } = c.req.valid("json");
+    const tagService = PromptTagService.create(prisma);
+
+    try {
+      const tag = await tagService.rename({
+        organizationId: organization.id,
+        oldName,
+        newName,
+      });
+
+      logger.info(
+        { organizationId: organization.id, oldName, newName },
+        "Custom prompt tag renamed via REST",
+      );
+
+      return c.json({ id: tag.id, name: tag.name, createdAt: tag.createdAt });
+    } catch (error) {
+      if (error instanceof PromptTagValidationError) {
+        throw new HTTPException(422, { message: error.message });
+      }
+      if (error instanceof PromptTagConflictError) {
+        throw new HTTPException(409, { message: error.message });
+      }
+      if (error instanceof PromptTagProtectedError) {
+        throw new HTTPException(422, { message: error.message });
+      }
+      if (error instanceof PromptTagNotFoundError) {
+        throw new HTTPException(404, { message: error.message });
+      }
+      throw error;
+    }
+  },
+);
+
+// Delete a tag definition
+app.delete(
+  "/tags/:tag",
+  describeRoute({
+    description: "Delete a prompt tag definition and cascade to assignments",
+    responses: {
+      ...baseResponses,
+      204: { description: "Tag deleted" },
+    },
+  }),
+  async (c) => {
+    const organization = c.get("organization");
+    const { tag: tagName } = c.req.param();
+    const tagService = PromptTagService.create(prisma);
+
+    try {
+      const tag = await tagService.deleteByName({
+        organizationId: organization.id,
+        name: tagName,
+      });
+
+      if (!tag) {
+        throw new HTTPException(404, {
+          message: `Tag not found: ${tagName}`,
+        });
+      }
+
+      logger.info(
+        { organizationId: organization.id, tagName },
+        "Custom prompt tag deleted via REST",
+      );
+
+      return new Response(null, { status: 204 });
+    } catch (error) {
+      if (error instanceof PromptTagProtectedError) {
+        throw new HTTPException(422, { message: error.message });
+      }
+      throw error;
+    }
   },
 );
 
@@ -130,8 +444,72 @@ app.get(
     );
 
     return c.json(
-      apiResponsePromptWithVersionDataSchema.array().parse(versions),
+      apiResponsePromptWithVersionDataSchema.array().parse(versions).map((v) => ({
+        ...v,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/prompts`,
+        }),
+      })),
     );
+  },
+);
+
+// Restore (rollback to) a specific version
+app.post(
+  "/:id{.+?}/versions/:versionId/restore",
+  describeRoute({
+    description:
+      "Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(
+        apiResponsePromptWithVersionDataSchema,
+      ),
+      404: {
+        description: "Prompt or version not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const service = c.get("promptService");
+    const project = c.get("project");
+    const organization = c.get("organization");
+    const { id, versionId } = c.req.param();
+
+    logger.info(
+      { projectId: project.id, promptId: id, versionId },
+      "Restoring prompt version",
+    );
+
+    try {
+      const restored = await service.restoreVersion({
+        versionId,
+        projectId: project.id,
+        organizationId: organization.id,
+      });
+
+      logger.info(
+        { projectId: project.id, promptId: id, versionId },
+        "Successfully restored prompt version",
+      );
+
+      return c.json({
+        ...apiResponsePromptWithVersionDataSchema.parse(restored),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/prompts`,
+        }),
+      });
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        return c.json({ error: error.message }, 404);
+      }
+      throw error;
+    }
   },
 );
 
@@ -139,14 +517,42 @@ app.get(
 app.get(
   "/:id{.+}",
   describeRoute({
-    description: "Get a specific prompt",
+    description:
+      "Get a specific prompt by slug, with optional shorthand syntax for tags and versions. " +
+      'Pass a bare slug like "pizza-prompt" to get the latest version, ' +
+      '"pizza-prompt:production" to resolve a tagged version, or ' +
+      '"pizza-prompt:2" to fetch version 2. ' +
+      "Alternatively, use the tag or version query parameters with a bare slug.",
     parameters: [
+      {
+        name: "id",
+        in: "path",
+        description:
+          "Prompt slug or shorthand. Supports three formats: " +
+          '(1) bare slug — "pizza-prompt" returns the latest version; ' +
+          '(2) slug:tag — "pizza-prompt:production" returns the version pointed to by that tag; ' +
+          '(3) slug:version — "pizza-prompt:2" returns that specific version number. ' +
+          '"slug:latest" is equivalent to the bare slug. ' +
+          "Cannot be combined with the tag or version query parameters.",
+        required: true,
+        schema: { type: "string" },
+      },
       {
         name: "version",
         in: "query",
-        description: "Specific version number to retrieve",
+        description:
+          "Specific version number to retrieve. Cannot be used when the id path already contains a shorthand suffix.",
         required: false,
         schema: { type: "integer", minimum: 0 },
+      },
+      {
+        name: "tag",
+        in: "query",
+        description:
+          "Fetch the version pointed to by this tag (e.g., \"production\", \"staging\"). " +
+          "Cannot be used when the id path already contains a shorthand suffix.",
+        required: false,
+        schema: { type: "string" },
       },
     ],
     responses: {
@@ -165,26 +571,75 @@ app.get(
     const project = c.get("project");
     const organization = c.get("organization");
     const { id } = c.req.param();
-    const version = c.req.query("version")
-      ? parseInt(c.req.query("version")!)
-      : undefined;
 
-    logger.info({ projectId: project.id, id, version }, "Getting prompt");
+    try {
+      // Parse shorthand syntax (e.g., "pizza-prompt:production" or "pizza-prompt:2")
+      const shorthand = parsePromptShorthand(id);
 
-    const config = await service.getPromptByIdOrHandle({
-      idOrHandle: id,
-      projectId: project.id,
-      organizationId: organization.id,
-      version,
-    });
+      const queryVersion = c.req.query("version")
+        ? parseInt(c.req.query("version") ?? "")
+        : undefined;
+      const queryTag = c.req.query("tag") ?? undefined;
 
-    if (!config) {
-      throw new HTTPException(404, {
-        message: "Prompt not found",
+      // Reject conflicting shorthand + query param.
+      // hadSuffix is true even for "latest" (which normalizes away), so
+      // "foo:latest?tag=production" is correctly rejected.
+      if (shorthand.hadSuffix && (queryTag || queryVersion)) {
+        throw new HTTPException(422, {
+          message: `Conflict: shorthand syntax in path cannot be combined with tag or version query parameters. Use one or the other, not both.`,
+        });
+      }
+
+      const version = shorthand.version ?? queryVersion;
+      const tag = shorthand.tag ?? queryTag;
+
+      logger.info(
+        { projectId: project.id, id: shorthand.slug, version, tag },
+        "Getting prompt",
+      );
+
+      const config = await service.getPromptByIdOrHandle({
+        idOrHandle: shorthand.slug,
+        projectId: project.id,
+        organizationId: organization.id,
+        version,
+        tag,
       });
-    }
 
-    return c.json(apiResponsePromptWithVersionDataSchema.parse(config));
+      if (!config) {
+        throw new HTTPException(404, {
+          message: "Prompt not found",
+        });
+      }
+
+      return c.json({
+        ...apiResponsePromptWithVersionDataSchema.parse(config),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/prompts`,
+        }),
+      });
+    } catch (error: unknown) {
+      if (error instanceof HTTPException) {
+        throw error;
+      }
+      if (error instanceof TagValidationError) {
+        throw new HTTPException(422, {
+          message: error.message,
+        });
+      }
+      if (error instanceof NotFoundError) {
+        throw new HTTPException(404, {
+          message: error.message,
+        });
+      }
+      if (error instanceof ShorthandParseError) {
+        throw new HTTPException(422, {
+          message: error.message,
+        });
+      }
+      throw error;
+    }
   },
 );
 
@@ -205,7 +660,7 @@ app.post(
     const service = c.get("promptService");
     const project = c.get("project");
     const organization = c.get("organization");
-    const data = c.req.valid("json");
+    const { tags, ...data } = c.req.valid("json");
 
     logger.info(
       {
@@ -213,6 +668,7 @@ app.post(
         scope: data.scope,
         projectId: project.id,
         organizationId: organization.id,
+        tags,
       },
       "Creating new prompt with initial version",
     );
@@ -229,9 +685,55 @@ app.post(
         "Successfully created prompt with initial version",
       );
 
-      return c.json(apiResponsePromptWithVersionDataSchema.parse(newConfig));
+      let responseConfig: ApiResponsePrompt = newConfig;
+
+      if (tags && tags.length > 0) {
+        await Promise.all(
+          tags.map((tag) =>
+            service.assignTag({
+              configId: newConfig.id,
+              versionId: newConfig.versionId,
+              tag,
+              projectId: newConfig.projectId,
+              organizationId: organization.id,
+            }),
+          ),
+        );
+
+        logger.info(
+          { promptId: newConfig.id, tags },
+          "Assigned tags to initial version",
+        );
+
+        const refetched = await service.getPromptByIdOrHandle({
+          idOrHandle: newConfig.id,
+          projectId: project.id,
+          organizationId: organization.id,
+        });
+        if (refetched) {
+          responseConfig = refetched;
+        }
+      }
+
+      afterPromptCreated({
+        prisma,
+        projectId: project.id,
+      });
+
+      return c.json({
+        ...apiResponsePromptWithVersionDataSchema.parse(responseConfig),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/prompts`,
+        }),
+      });
     } catch (error: any) {
       logger.error({ projectId: project.id, error }, "Error creating prompt");
+      if (error instanceof TagValidationError) {
+        throw new HTTPException(422, {
+          message: error.message,
+        });
+      }
       handlePossibleConflictError(error, data.scope);
 
       // Re-throw other errors to be handled by the error middleware
@@ -327,6 +829,13 @@ app.post(
         "Successfully synced prompt",
       );
 
+      if (syncResult.action === "created") {
+        afterPromptCreated({
+          prisma,
+          projectId: project.id,
+        });
+      }
+
       return c.json(response);
     } catch (error: any) {
       logger.error(
@@ -339,6 +848,16 @@ app.post(
           message: error.message,
         });
       }
+
+      if (error instanceof TagValidationError) {
+        throw new HTTPException(422, {
+          message: error.message,
+        });
+      }
+
+      // Translate Prisma unique-constraint violations on handle into a
+      // readable 409 instead of bubbling up as "Internal server error".
+      handlePossibleConflictError(error);
 
       // Re-throw other errors to be handled by the error middleware
       throw error;
@@ -373,8 +892,9 @@ app.put(
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");
+    const organization = c.get("organization");
     const { id } = c.req.param();
-    const data = c.req.valid("json");
+    const { tags, ...data } = c.req.valid("json");
     const projectId = project.id;
 
     if (Object.keys(data).length === 0) {
@@ -388,6 +908,7 @@ app.put(
         projectId: project.id,
         handleOrId: id,
         data,
+        tags,
       },
       "Updating prompt",
     );
@@ -405,6 +926,36 @@ app.put(
         });
       }
 
+      let responseConfig: ApiResponsePrompt = updatedConfig;
+
+      if (tags && tags.length > 0) {
+        await Promise.all(
+          tags.map((tag) =>
+            service.assignTag({
+              configId: updatedConfig.id,
+              versionId: updatedConfig.versionId,
+              tag,
+              projectId: updatedConfig.projectId,
+              organizationId: organization.id,
+            }),
+          ),
+        );
+
+        logger.info(
+          { projectId, promptId: id, tags, versionId: updatedConfig.versionId },
+          "Assigned tags to updated version",
+        );
+
+        const refetched = await service.getPromptByIdOrHandle({
+          idOrHandle: updatedConfig.id,
+          projectId,
+          organizationId: organization.id,
+        });
+        if (refetched) {
+          responseConfig = refetched;
+        }
+      }
+
       logger.info(
         {
           projectId,
@@ -415,11 +966,20 @@ app.put(
         "Successfully updated prompt",
       );
 
-      return c.json(
-        apiResponsePromptWithVersionDataSchema.parse(updatedConfig),
-      );
+      return c.json({
+        ...apiResponsePromptWithVersionDataSchema.parse(responseConfig),
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/prompts`,
+        }),
+      });
     } catch (error: any) {
       logger.error({ projectId, promptId: id, error }, "Error updating prompt");
+      if (error instanceof TagValidationError) {
+        throw new HTTPException(422, {
+          message: error.message,
+        });
+      }
       handlePossibleConflictError(error, data.scope);
       handleSystemPromptConflict(error);
 

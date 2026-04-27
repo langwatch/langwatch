@@ -21,13 +21,14 @@ import {
   type SubmitHandler,
   type UseFormReturn,
   useFieldArray,
+  useWatch,
 } from "react-hook-form";
+import { ProjectAvatar } from "../../components/ProjectAvatar";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useDrawer } from "../../hooks/useDrawer";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { TeamProjectsList } from "../../pages/settings/projects";
-import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
+import type { TeamWithProjectsAndMembersAndUsers } from "../../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../utils/api";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Select } from "../ui/select";
@@ -36,6 +37,55 @@ import {
   type TeamUserRoleForm,
   teamRolesOptions,
 } from "./TeamUserRoleField";
+
+function TeamProjectsList({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
+  const queryClient = api.useContext();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const archiveProject = api.project.archiveById.useMutation({
+    onSuccess: () => {
+      void queryClient.organization.getAll.invalidate();
+    },
+  });
+
+  return (
+    <Table.Body>
+      {team.projects.map((teamProject) => (
+        <Table.Row key={teamProject.id}>
+          <Table.Cell>
+            <HStack gap={2}>
+              <ProjectAvatar name={teamProject.name} />
+              <Link href={`/${teamProject.slug}`}>{teamProject.name}</Link>
+            </HStack>
+          </Table.Cell>
+          <Table.Cell textAlign="right">
+            {teamProject.id !== project?.id && hasPermission("project:delete") && (
+              <Button
+                variant="ghost"
+                color="red.fg"
+                size="sm"
+                onClick={() => {
+                  if (!project) return;
+                  if (confirm("Are you sure you want to archive this project? Contact LangWatch support to restore it.")) {
+                    archiveProject.mutate({ projectId: project.id, projectToArchiveId: teamProject.id });
+                  }
+                }}
+              >
+                <Trash2 size={16} />
+              </Button>
+            )}
+          </Table.Cell>
+        </Table.Row>
+      ))}
+      {team.projects.length === 0 && (
+        <Table.Row>
+          <Table.Cell colSpan={2}>
+            <Text>No projects on this team</Text>
+          </Table.Cell>
+        </Table.Row>
+      )}
+    </Table.Body>
+  );
+}
 
 export type TeamFormData = {
   name: string;
@@ -81,10 +131,21 @@ export const TeamForm = ({
     [users.data],
   );
 
-  const userCollection = useMemo(
-    () => createListCollection({ items: userOptions }),
-    [userOptions],
-  );
+  const watchedMembers = useWatch({ control, name: "members" });
+
+  const perRowCollections = useMemo(() => {
+    const rows = watchedMembers ?? [];
+    return rows.map((_, index) => {
+      const selectedIds = new Set(
+        rows
+          .filter((_, i) => i !== index)
+          .map((m) => m.userId?.value)
+          .filter(Boolean),
+      );
+      const filtered = userOptions.filter((o) => !selectedIds.has(o.value));
+      return createListCollection({ items: filtered });
+    });
+  }, [watchedMembers, userOptions]);
 
   return (
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
@@ -150,11 +211,7 @@ export const TeamForm = ({
                       <HStack width="full">
                         {member.saved ? (
                           <>
-                            <Link
-                              href={`/settings/members/${member.userId?.value}`}
-                            >
-                              {member.userId?.label}
-                            </Link>
+                            <Text>{member.userId?.label}</Text>
                           </>
                         ) : (
                           <>
@@ -162,34 +219,37 @@ export const TeamForm = ({
                               control={control}
                               name={`members.${index}.userId`}
                               rules={{ required: "User is required" }}
-                              render={({ field }) => (
-                                <Select.Root
-                                  collection={userCollection}
-                                  value={field.value ? [field.value.value] : []}
-                                  onValueChange={(details) => {
-                                    const selectedValue = details.value[0];
-                                    if (selectedValue) {
-                                      const selectedOption = userOptions.find(
-                                        (o) => o.value === selectedValue,
-                                      );
-                                      if (selectedOption) {
-                                        field.onChange(selectedOption);
+                              render={({ field }) => {
+                                const rowCollection = perRowCollections[index] ?? createListCollection({ items: userOptions });
+                                return (
+                                  <Select.Root
+                                    collection={rowCollection}
+                                    value={field.value ? [field.value.value] : []}
+                                    onValueChange={(details) => {
+                                      const selectedValue = details.value[0];
+                                      if (selectedValue) {
+                                        const selectedOption = userOptions.find(
+                                          (o) => o.value === selectedValue,
+                                        );
+                                        if (selectedOption) {
+                                          field.onChange(selectedOption);
+                                        }
                                       }
-                                    }
-                                  }}
-                                >
-                                  <Select.Trigger width="full" background="bg">
-                                    <Select.ValueText placeholder="Select..." />
-                                  </Select.Trigger>
-                                  <Select.Content paddingY={2} zIndex="popover">
-                                    {userOptions.map((option) => (
-                                      <Select.Item key={option.value} item={option}>
-                                        {option.label}
-                                      </Select.Item>
-                                    ))}
-                                  </Select.Content>
-                                </Select.Root>
-                              )}
+                                    }}
+                                  >
+                                    <Select.Trigger width="full" background="bg">
+                                      <Select.ValueText placeholder="Select..." />
+                                    </Select.Trigger>
+                                    <Select.Content paddingY={2}>
+                                      {rowCollection.items.map((option) => (
+                                        <Select.Item key={option.value} item={option}>
+                                          {option.label}
+                                        </Select.Item>
+                                      ))}
+                                    </Select.Content>
+                                  </Select.Root>
+                                );
+                              }}
                             />
                             <Tooltip
                               content={

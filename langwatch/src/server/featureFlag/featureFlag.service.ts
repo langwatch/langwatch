@@ -39,7 +39,7 @@ import type { FeatureFlagOptions, FeatureFlagServiceInterface } from "./types";
  * );
  * ```
  *
- * @see docs/adr/005-feature-flags.md for architecture decisions
+ * @see dev/docs/adr/005-feature-flags.md for architecture decisions
  * @see FeatureFlagServicePostHog for PostHog implementation details
  */
 export class FeatureFlagService implements FeatureFlagServiceInterface {
@@ -74,6 +74,22 @@ export class FeatureFlagService implements FeatureFlagServiceInterface {
         "Flag resolved via env override",
       );
       return envOverride;
+    }
+    // Comma-separated FEATURE_FLAG_FORCE_ENABLE list. Complements the
+    // per-flag `RELEASE_UI_*_ENABLED=1` envOverride pattern — one list
+    // can flip many flags at once for internal-dogfood windows. Runs at
+    // the top-level so BOTH the posthog and memory sub-services get the
+    // override (sergey iter 66 follow-up).
+    const forceOn = (process.env.FEATURE_FLAG_FORCE_ENABLE ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    if (forceOn.includes(flagKey)) {
+      this.logger.debug(
+        { flagKey, distinctId },
+        "Flag resolved via FEATURE_FLAG_FORCE_ENABLE",
+      );
+      return true;
     }
     const result = await this.service.isEnabled(
       flagKey,

@@ -1,0 +1,83 @@
+---
+title: Langflow Integration
+sidebarTitle: Langflow
+description: Integrate Langflow with LangWatch to capture node execution, prompt behavior, and evaluation metrics for AI agent testing.
+---
+
+[Langflow](https://www.langflow.org/) is a low-code tool for building LLM pipelines. If you are using Langflow, you can easily enable LangWatch from their UI for analytics, evaluations and much more.
+
+## Setup
+
+<Steps>
+<Step title="Obtain your API Key">
+[Create your LangWatch account](https://app.langwatch.ai/) and project to obtain your API Key from the dashboard
+</Step>
+<Step title="Environment Variables">
+Add the following key to Langflow .env file:
+```bash
+LANGWATCH_API_KEY="your-api-key"
+```
+Or export in in your terminal:
+```bash
+export LANGWATCH_API_KEY="your-api-key"
+```
+</Step>
+<Step title="Restart Langflow">
+Restart Langflow using `langflow run --env-file .env`
+</Step>
+<Step title="Test the integration">
+Run a message through your Langflow project and check the LangWatch dashboard for monitoring and observability.
+
+![Langflow project](/images/integration/langflow/langflow-1.png)
+
+That's it! You should now see your Langflow component traces on the LangWatch dashboard.
+
+![LangWatch results](/images/integration/langflow/langflow-2.png)
+</Step>
+</Steps>
+
+## Defining custom input and output
+
+You can customize what LangWatch captures as the final input and output of your Langflow component for better observability.
+
+To do this, you can add this two lines of code in the execution function of any Langflow component:
+
+```python
+import langwatch
+langwatch.get_current_trace().update(input="The user input", output="My bot output")
+```
+
+You can do this by first clicking on the `<> Code` button in any appropriate component:
+
+![Langflow code button](/images/integration/langflow/langflow-code.png)
+
+Then scroll down to find the `def` responsible for execution of that component and paste the code above, mapping the variables as needed for your case:
+
+![Langflow code editor](/images/integration/langflow/langflow-langwatch-call.png)
+
+The message on LangWatch will render as you defined:
+
+![LangWatch message](/images/integration/langflow/langwatch-message.png)
+
+
+## Capturing additional metadata
+
+You can also capture additional metadata from your Langflow component. This can be useful for capturing information about the user, the conversation, or any specific information from your system.
+
+Just like for the input and output, you can capture metadata by updating the trace, two very useful cases to capture for example are the user_id and trace_id that groups messages from the same conversation,
+but you can also capture any other information that you want to track.
+
+```python
+import langwatch
+langwatch.get_current_trace().update(
+  metadata={
+    "user_id": self.sender_name,
+    "thread_id": self.session_id,
+    # any other metadata you want
+  }
+)
+```
+
+---
+
+For more information, check out [Langflow docs](https://docs.langflow.org/).

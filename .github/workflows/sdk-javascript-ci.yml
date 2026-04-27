@@ -1,3 +1,6 @@
+# Always-run workflow with internal path gating + aggregator. See #3223.
+# Branch protection requires `sdk-javascript-complete`; upstream jobs
+# skip when paths don't match, and `alls-green` reports the final status.
 name: sdk-javascript-ci
 
 on:
@@ -5,16 +8,9 @@ on:
     branches:
       - main
   pull_request:
-    paths:
-      - "typescript-sdk/**"
-      - ".github/workflows/sdk-javascript-ci.yml"
-      - ".github/.release-please-manifest.json"
   pull_request_target:
     types: [labeled]
-    paths:
-      - "typescript-sdk/**"
-      - ".github/workflows/sdk-javascript-ci.yml"
-      - ".github/.release-please-manifest.json"
+  merge_group:
   workflow_dispatch:
 
 concurrency:
@@ -26,11 +22,28 @@ env:
   LANGWATCH_ENDPOINT: http://localhost:5560
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.detect.outputs.relevant }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: ./.github/actions/detect-changes
+        id: detect
+        with:
+          filters: |
+            relevant:
+              - 'typescript-sdk/**'
+              - '.github/workflows/sdk-javascript-ci.yml'
+              - '.github/.release-please-manifest.json'
+
   ci:
+    needs: changes
     if: >
-      github.event_name != 'pull_request_target'
-      || (github.event.label.name == 'approved-ci'
-          && github.event.pull_request.user.login == 'dependabot[bot]')
+      needs.changes.outputs.relevant == 'true'
+      && (github.event_name != 'pull_request_target'
+          || (github.event.label.name == 'approved-ci'
+              && github.event.pull_request.user.login == 'dependabot[bot]'))
     runs-on: ubuntu-latest
     # Run lint, typecheck, tests, and build for TypeScript SDK
     defaults:
@@ -38,24 +51,14 @@ jobs:
         working-directory: typescript-sdk
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+      - uses: ./.github/actions/setup-pnpm-node
         with:
-          version: 10.24.0
-
-      - name: Setup Node
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: "pnpm"
           cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          install-dir: typescript-sdk
 
       - name: Install TypeScript Native Preview
         run: pnpm install -D @typescript/native-preview
@@ -75,10 +78,12 @@ jobs:
         run: pnpm test
 
   e2e:
+    needs: changes
     if: >
-      github.event_name != 'pull_request_target'
-      || (github.event.label.name == 'approved-ci'
-          && github.event.pull_request.user.login == 'dependabot[bot]')
+      needs.changes.outputs.relevant == 'true'
+      && (github.event_name != 'pull_request_target'
+          || (github.event.label.name == 'approved-ci'
+              && github.event.pull_request.user.login == 'dependabot[bot]'))
     runs-on: ubuntu-latest
 
     env:
@@ -88,32 +93,37 @@ jobs:
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
       NEXTAUTH_URL: "http://localhost:5560"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
-      ELASTICSEARCH_NODE_URL: "http://127.0.0.1:9200"
-      IS_OPENSEARCH: "true"
+      CLICKHOUSE_URL: "http://default:ci_password@localhost:8123/langwatch"
+      REDIS_URL: "redis://localhost:6379"
       NODE_ENV: "test"
       SKIP_ENV_VALIDATION: "true"
       DISABLE_PII_REDACTION: "true"
-      SKIP_CLICKHOUSE_MIGRATE: "true"
-      SKIP_REDIS: "true"
       LANGWATCH_LICENSE_PUBLIC_KEY: ${{ secrets.TEST_LICENSE_PUBLIC_KEY }}
 
     services:
-      opensearch:
-        image: langwatch/opensearch-lite:latest
+      clickhouse:
+        image: clickhouse/clickhouse-server:latest
         ports:
-          - 9200:9200
+          - 8123:8123
         env:
-          discovery.type: single-node
-          DISABLE_SECURITY_PLUGIN: "true"
-          OPENSEARCH_JAVA_OPTS: "-Xms256m -Xmx256m"
-          cluster.routing.allocation.disk.threshold_enabled: "false"
-          bootstrap.memory_lock: "false"
-          node.store.allow_mmap: "false"
+          CLICKHOUSE_DB: default
+          CLICKHOUSE_USER: default
+          CLICKHOUSE_PASSWORD: ci_password
         options: >-
-          --health-cmd "curl -s http://localhost:9200 || exit 1"
-          --health-interval 30s
-          --health-timeout 30s
-          --health-retries 3
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
       postgres:
         image: postgres:16
@@ -124,7 +134,7 @@ jobs:
           POSTGRES_PASSWORD: ci_password
           POSTGRES_DB: langwatch_test
         options: >-
-          --health-cmd "pg_isready -U langwatch_ci"
+          --health-cmd "PGPASSWORD=ci_password psql -U langwatch_ci -d langwatch_test -c 'select 1'"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -135,29 +145,31 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2
         with:
           version: 10.24.0
 
+      # Single setup-node call covers all three pnpm lockfiles used by the
+      # e2e job (typescript-sdk, langwatch app, mcp-server). Calling
+      # setup-node twice silently discards the first cache config.
       - name: Setup Node
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version: 24
           cache: "pnpm"
-          cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
+          cache-dependency-path: |
+            typescript-sdk/pnpm-lock.yaml
+            langwatch/pnpm-lock.yaml
+            mcp-server/pnpm-lock.yaml
 
-      # Install LangWatch app dependencies
-      - name: Setup Node for LangWatch
-        uses: actions/setup-node@v6
-        with:
-          node-version: 24
-          cache: "pnpm"
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+      - name: Build mcp-server
+        working-directory: mcp-server
+        run: pnpm install --frozen-lockfile && pnpm run build
 
       - name: Install LangWatch app dependencies
         working-directory: langwatch
@@ -175,9 +187,15 @@ jobs:
         working-directory: langwatch
         run: pnpm prisma:seed
 
-      - name: Setup OpenSearch
+      - name: Install goose
+        # Override job-level defaults.run.working-directory (typescript-sdk)
+        # so the script path resolves from the repo root.
+        working-directory: .
+        run: bash .github/scripts/install-goose.sh
+
+      - name: Setup ClickHouse
         working-directory: langwatch
-        run: pnpm elastic:migrate
+        run: pnpm clickhouse:migrate
 
       # Build the app so we can run a production server (dev mode is
       # unreliable in CI — turbopack JIT compilation can hang under
@@ -186,10 +204,13 @@ jobs:
         working-directory: langwatch
         run: NODE_ENV=test pnpm build
 
-      - name: Start LangWatch server
+      - name: Start LangWatch server and worker
         working-directory: langwatch
         run: |
           NODE_ENV=production pnpm run start &
+          # Start the worker process so the event-sourcing pipeline
+          # consumes traces from Redis and writes them to ClickHouse
+          pnpm run start:workers &
           # Wait for server to be ready
           timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
           echo "✅ LangWatch server is ready"
@@ -207,3 +228,13 @@ jobs:
           E2E_TIMEOUT: 120000
           E2E_POLL_TIMEOUT: 120000
         run: pnpm test:e2e
+
+  sdk-javascript-complete:
+    needs: [changes, ci, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: re-actors/alls-green@05ac9388f0aebcb5727afa17fcccfecd6f8ec5fe # v1.2.2
+        with:
+          jobs: ${{ toJSON(needs) }}
+          allowed-skips: ci, e2e

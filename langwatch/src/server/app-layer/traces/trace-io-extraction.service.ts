@@ -59,23 +59,42 @@ export class TraceIOExtractionService {
 
         const firstSpan = spansWithInput[0];
 
-        if (!firstSpan) {
+        if (firstSpan) {
+          const input = this.extractRichIOFromSpan(firstSpan, "input");
           otelSpan.setAttributes({
-            "input.found": false,
-            "fallback.used": true,
+            "input.found": true,
+            "span.type": getSpanType(firstSpan),
+            "input.length": input?.text.length ?? 0,
           });
-          const fallback = this.getHttpFallback(orderedSpans);
-          return fallback ? { raw: fallback, text: fallback, source: "langwatch" as const } : null;
+          return input;
         }
 
-        const input = this.extractRichIOFromSpan(firstSpan, "input");
-        otelSpan.setAttributes({
-          "input.found": true,
-          "span.type": getSpanType(firstSpan),
-          "input.length": input?.text.length ?? 0,
-        });
+        // No semantic match — try stringified-payload fallback against the
+        // topmost span that HAS an input attribute, so `ComputedInput` is
+        // non-null when the trace genuinely carries data. Fallback is
+        // applied only after every semantic candidate has been exhausted,
+        // so it can never shadow a real match.
+        for (const span of orderedSpans) {
+          if (shouldExcludeSpan(span)) continue;
+          const fb = this.extractFallbackIOFromSpan(span, "input");
+          if (fb) {
+            otelSpan.setAttributes({
+              "input.found": true,
+              "input.source": "stringified_fallback",
+              "input.length": fb.text.length,
+            });
+            return fb;
+          }
+        }
 
-        return input;
+        otelSpan.setAttributes({
+          "input.found": false,
+          "fallback.used": true,
+        });
+        const httpFallback = this.getHttpFallback(orderedSpans);
+        return httpFallback
+          ? { raw: httpFallback, text: httpFallback, source: "langwatch" as const }
+          : null;
       },
     );
   }
@@ -133,25 +152,44 @@ export class TraceIOExtractionService {
 
         const lastSpan = sortedByEndTime[0];
 
-        if (!lastSpan) {
+        if (lastSpan) {
+          const output = this.extractRichIOFromSpan(lastSpan, "output");
           otelSpan.setAttributes({
-            "output.found": false,
-            "fallback.used": true,
+            "output.found": true,
+            "span.type": getSpanType(lastSpan),
+            "output.source": "last_finishing",
+            "output.length": output?.text.length ?? 0,
           });
-          const fallback = this.getHttpStatusFallback(tree);
-          return fallback ? { raw: fallback, text: fallback, source: "langwatch" as const } : null;
+          return output;
         }
 
-        const output = this.extractRichIOFromSpan(lastSpan, "output");
+        // No semantic match on any span — try stringified-payload fallback
+        // against the span that finished last. See `extractFirstInput` for
+        // rationale: fallback is never allowed to shadow a semantic match.
+        const allByEndTime = [...spans].sort(
+          (a, b) => b.endTimeUnixMs - a.endTimeUnixMs,
+        );
+        for (const span of allByEndTime) {
+          if (shouldExcludeSpan(span)) continue;
+          const fb = this.extractFallbackIOFromSpan(span, "output");
+          if (fb) {
+            otelSpan.setAttributes({
+              "output.found": true,
+              "output.source": "stringified_fallback",
+              "output.length": fb.text.length,
+            });
+            return fb;
+          }
+        }
 
         otelSpan.setAttributes({
-          "output.found": true,
-          "span.type": getSpanType(lastSpan),
-          "output.source": "last_finishing",
-          "output.length": output?.text.length ?? 0,
+          "output.found": false,
+          "fallback.used": true,
         });
-
-        return output;
+        const httpFallback = this.getHttpStatusFallback(tree);
+        return httpFallback
+          ? { raw: httpFallback, text: httpFallback, source: "langwatch" as const }
+          : null;
       },
     );
   }
@@ -190,18 +228,56 @@ export class TraceIOExtractionService {
       }
     }
 
-    // Priority 2: LangWatch attribute
+    // Priority 2: LangWatch attribute — semantic matches only.
+    // Returns non-null ONLY when the payload yields a meaningful text
+    // (direct string or heuristic hit on a recognized wrapper key).
+    // If the payload is an unknown shape, callers should fall back to
+    // `extractFallbackIOFromSpan` as a last-resort rather than letting
+    // a stringified mystery object shadow a real match on another span.
     const langwatchValue = attrs[keys.langwatch];
     if (langwatchValue !== undefined && langwatchValue !== null) {
-      const text =
-        typeof langwatchValue === "string"
-          ? langwatchValue
-          : messagesToText(langwatchValue, type);
-      if (text) {
-        return { raw: langwatchValue, text, source: "langwatch" };
+      if (typeof langwatchValue === "string") {
+        if (langwatchValue.length > 0) {
+          return { raw: langwatchValue, text: langwatchValue, source: "langwatch" };
+        }
+      } else {
+        const heuristicText = messagesToText(langwatchValue, type);
+        if (heuristicText) {
+          return { raw: langwatchValue, text: heuristicText, source: "langwatch" };
+        }
       }
     }
 
+    return null;
+  }
+
+  /**
+   * Last-resort stringified fallback for spans that HAVE a langwatch.input/output
+   * attribute but whose shape defeats every semantic heuristic. Returning a
+   * stringified payload here is strictly better than leaving `ComputedInput` /
+   * `ComputedOutput` NULL (renders as `<empty>` in the UI), but callers must
+   * prefer `extractRichIOFromSpan` so a fallback match never shadows a real
+   * semantic match on another span in the same trace.
+   */
+  extractFallbackIOFromSpan(
+    span: NormalizedSpan,
+    type: "input" | "output",
+  ): ExtractedIO | null {
+    const attrs = span.spanAttributes;
+    const keys = TraceIOExtractionService.IO_ATTR_KEYS[type];
+    const langwatchValue = attrs[keys.langwatch];
+
+    if (langwatchValue === undefined || langwatchValue === null) return null;
+    if (typeof langwatchValue === "string") {
+      return langwatchValue.length > 0
+        ? { raw: langwatchValue, text: langwatchValue, source: "langwatch" }
+        : null;
+    }
+
+    const fallbackText = stringifyForText(langwatchValue);
+    if (fallbackText) {
+      return { raw: langwatchValue, text: fallbackText, source: "langwatch" };
+    }
     return null;
   }
 
@@ -320,6 +396,135 @@ function shouldExcludeSpan(span: NormalizedSpan): boolean {
   return type === "evaluation" || type === "guardrail";
 }
 
+/**
+ * Common keys that wrap a single text value in JSON payloads from various
+ * frameworks (LangChain, Haystack, Flowise, Optimization Studio, etc.).
+ * Order matters: first match wins.
+ */
+const COMMON_TEXT_KEYS = [
+  "text",
+  "input",
+  "question",
+  "user_query",
+  "query",
+  "message",
+  "input_value",
+  "output",
+  "answer",
+  "content",
+  "prompt",
+] as const;
+
+/**
+ * Maximum recursion depth for plain-JSON text extraction. Guards against
+ * pathological nesting (accidental or adversarial) — real-world payloads
+ * rarely exceed a depth of ~4-5, so 32 is generous and still safe.
+ */
+const MAX_PLAIN_JSON_RECURSION_DEPTH = 32;
+
+/**
+ * Extracts a human-readable text representation from a plain JSON object
+ * that is NOT message-shaped (no role/content structure).
+ *
+ * Handles common wrapper patterns like `{ input: "hello" }` or
+ * `{ question: "what is 2+2?" }` that are used by various frameworks.
+ */
+function extractTextFromPlainJson(
+  obj: Record<string, unknown>,
+  depth = 0,
+): string | null {
+  if (depth >= MAX_PLAIN_JSON_RECURSION_DEPTH) return null;
+
+  for (const key of COMMON_TEXT_KEYS) {
+    const val = obj[key];
+    if (val === undefined) continue;
+    if (typeof val === "string" && val.length > 0) return val;
+    if (typeof val === "number" || typeof val === "boolean") return String(val);
+    // Nested object with a known key (e.g. { inputs: { input: "hello" } })
+    if (val && typeof val === "object" && !Array.isArray(val)) {
+      const nested = extractTextFromPlainJson(
+        val as Record<string, unknown>,
+        depth + 1,
+      );
+      if (nested) return nested;
+    }
+  }
+
+  // LangChain: { inputs: { input: ... } } / { outputs: { output: ... } }
+  const wrapper = obj.inputs ?? obj.outputs;
+  if (wrapper && typeof wrapper === "object" && !Array.isArray(wrapper)) {
+    const nested = extractTextFromPlainJson(
+      wrapper as Record<string, unknown>,
+      depth + 1,
+    );
+    if (nested) return nested;
+  }
+
+  // Single-key wrapper fallback: many frameworks emit the real payload under an
+  // arbitrary wrapper key like `{ data: {...} }`, `{ result: {...} }`,
+  // `{ response: {...} }`. Recurse into the inner object so the COMMON_TEXT_KEYS
+  // loop above gets a chance to find `content`/`answer`/`text`/... inside.
+  const entries = Object.entries(obj);
+  if (entries.length === 1) {
+    const [, only] = entries[0]!;
+    if (only && typeof only === "object" && !Array.isArray(only)) {
+      const nested = extractTextFromPlainJson(
+        only as Record<string, unknown>,
+        depth + 1,
+      );
+      if (nested) return nested;
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Recursively checks whether a value carries at least one meaningful leaf
+ * (non-empty string, number, or boolean). Empty strings, null/undefined, empty
+ * arrays/objects, and wrappers whose leaves are all of the above (e.g. `{ data:
+ * {} }`, `{ result: [] }`, `{ a: { b: "" } }`) are treated as empty. Uses a
+ * WeakSet to guard against circular references.
+ */
+function hasMeaningfulLeaf(
+  value: unknown,
+  seen: WeakSet<object> = new WeakSet(),
+): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "string") return value.length > 0;
+  if (typeof value === "number" || typeof value === "boolean") return true;
+  if (typeof value !== "object") return false;
+  if (seen.has(value as object)) return false;
+  seen.add(value as object);
+  if (Array.isArray(value)) return value.some((v) => hasMeaningfulLeaf(v, seen));
+  return Object.values(value as Record<string, unknown>).some((v) =>
+    hasMeaningfulLeaf(v, seen),
+  );
+}
+
+/**
+ * Produces a short-enough, non-empty text representation of an already-parsed
+ * JSON-serializable value. Used as the last-resort fallback when heuristic text
+ * extraction fails — storing `JSON.stringify(value)` in `ComputedOutput` is
+ * strictly better than storing `NULL` (which renders as `<empty>` in the UI).
+ *
+ * Callers guarantee `value` is not null/undefined and not a string (those are
+ * handled earlier via semantic extraction), so only number/boolean/array/object
+ * cases matter here. Wrappers with no meaningful leaf (e.g. `{ data: {} }`) are
+ * rejected so they don't end up as non-null-but-useless computed I/O.
+ */
+function stringifyForText(value: unknown): string | null {
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  if (!hasMeaningfulLeaf(value)) return null;
+  try {
+    return JSON.stringify(value) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 function messagesToText(
   messages: unknown,
   mode: "input" | "output" = "output",
@@ -353,5 +558,14 @@ function messagesToText(
     return texts.length > 0 ? texts.join("\n") : null;
   }
 
-  return extractMessageContentText(messages);
+  // Try message-shaped extraction first (content, parts, text, value)
+  const messageText = extractMessageContentText(messages);
+  if (messageText) return messageText;
+
+  // Fall back to common JSON wrapper keys (input, question, query, etc.)
+  if (typeof messages === "object" && messages !== null) {
+    return extractTextFromPlainJson(messages as Record<string, unknown>);
+  }
+
+  return null;
 }

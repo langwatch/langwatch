@@ -39,7 +39,7 @@ export class TiktokenClient implements TokenizerClient {
     if (this.cache.has(model)) return this.cache.get(model)!;
 
     // Deduplicate concurrent loads for the same encoding
-    const encodingName = this.resolveEncoding(model);
+    const encodingName = await this.resolveEncoding(model);
     if (this.loading.has(encodingName)) return this.loading.get(encodingName)!;
 
     const promise = this.loadEncoder(encodingName);
@@ -54,14 +54,12 @@ export class TiktokenClient implements TokenizerClient {
     }
   }
 
-  private resolveEncoding(model: string): string {
+  private async resolveEncoding(model: string): Promise<string> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const models = require("tiktoken/model_to_encoding.json") as Record<
-        string,
-        string
-      >;
-      if (model in models) return models[model]!;
+      const models = (await import("tiktoken/model_to_encoding.json")) as {
+        default: Record<string, string>;
+      };
+      if (model in models.default) return models.default[model]!;
     } catch {
       // fall through
     }
@@ -74,11 +72,11 @@ export class TiktokenClient implements TokenizerClient {
     try {
       const { Tiktoken } = await import("tiktoken/lite");
       const { load } = await import("tiktoken/load");
-      // @ts-ignore — JSON import has no type declarations
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const registry = require("tiktoken/registry.json");
+      const registry = (await import("tiktoken/registry.json")) as {
+        default: Record<string, unknown>;
+      };
 
-      const registryInfo = registry[encodingName];
+      const registryInfo = registry.default[encodingName];
       if (!registryInfo) {
         logger.warn(
           { encodingName },
@@ -135,10 +133,9 @@ export class TiktokenClient implements TokenizerClient {
 
   private async remoteFetch(url: string): Promise<string> {
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      const NodeFetchCache = require("node-fetch-cache");
-      const cachedFetch = NodeFetchCache.create({
-        cache: new NodeFetchCache.FileSystemCache({
+      const nodeFetchCache = await import("node-fetch-cache");
+      const cachedFetch = nodeFetchCache.default.create({
+        cache: new nodeFetchCache.FileSystemCache({
           cacheDirectory: "node_modules/.cache/tiktoken",
           ttl: 1000 * 60 * 60 * 24 * 365, // 1 year
         }),

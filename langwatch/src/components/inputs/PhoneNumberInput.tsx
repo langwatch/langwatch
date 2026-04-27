@@ -191,6 +191,13 @@ export function PhoneNumberInput(
             onChange={(e) => handleCountryChange(e.target.value as CountryCode)}
             color="transparent"
             textShadow="0 0 0 transparent"
+            css={{
+              colorScheme: "light dark",
+              "& option, & optgroup": {
+                color: "CanvasText",
+                backgroundColor: "Canvas",
+              },
+            }}
           >
             {(() => {
               const renderOption = (code: CountryCode) => {
@@ -232,7 +239,7 @@ export function PhoneNumberInput(
           alignItems="center"
           px="3"
           pr="8"
-          color="inherit"
+          color="fg.DEFAULT"
         >
           {`${countryCodeToFlagEmoji(country)} +${getCountryCallingCode(
             country,

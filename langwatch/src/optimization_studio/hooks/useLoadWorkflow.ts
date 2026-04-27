@@ -1,4 +1,4 @@
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 

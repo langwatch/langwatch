@@ -53,6 +53,27 @@ describe("SerializedPromptConfigAdapter", () => {
     } as Awaited<ReturnType<typeof generateText>>);
   });
 
+  /**
+   * Intentional design: the prompt adapter uses Liquid template interpolation
+   * for its inputs ({{input}}, {{messages}}) rather than fieldMappings.
+   * fieldMappings are only applicable to code and HTTP adapters where input
+   * fields are explicitly declared. Verify the constructor does not accept them.
+   */
+  it("does not accept fieldMappings in its constructor", () => {
+    // SerializedPromptConfigAdapter constructor: (config, litellmParams, nlpServiceUrl)
+    // Verify it constructs successfully with the expected constructor params only.
+    const adapter = new SerializedPromptConfigAdapter(
+      defaultConfig,
+      defaultLitellmParams,
+      "http://localhost:8080",
+    );
+
+    // The adapter exposes no fieldMappings property
+    expect(
+      "fieldMappings" in adapter,
+    ).toBe(false);
+  });
+
   it("has AGENT role", () => {
     const adapter = new SerializedPromptConfigAdapter(
       defaultConfig,

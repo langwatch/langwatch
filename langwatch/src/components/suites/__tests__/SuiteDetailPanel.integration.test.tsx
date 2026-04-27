@@ -85,7 +85,7 @@ vi.mock("~/utils/formatTimeAgo", () => ({
   formatTimeAgoCompact: (ts: number) => "2h ago",
 }));
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: {},
     push: mockRouterPush,

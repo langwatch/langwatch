@@ -3,11 +3,8 @@ import * as path from "path";
 import chalk from "chalk";
 import ora from "ora";
 import prompts from "prompts";
-import { DEFAULT_ENDPOINT } from "@/internal/constants";
-
-const getEndpoint = (): string => {
-  return process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
-};
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
+import { getEndpoint } from "@/cli/utils/endpoint";
 
 const updateEnvFile = (
   apiKey: string,
@@ -48,8 +45,29 @@ const updateEnvFile = (
   return { created: false, updated: found, path: envPath };
 };
 
-export const loginCommand = async (): Promise<void> => {
+export const loginCommand = async (options?: { apiKey?: string }): Promise<void> => {
   try {
+    // Non-interactive mode: --api-key flag provided
+    if (options?.apiKey) {
+      const apiKey = options.apiKey.trim();
+      if (apiKey.length < 10) {
+        console.error(chalk.red("Error: API key seems too short. Please check and try again."));
+        process.exit(1);
+      }
+
+      const envResult = updateEnvFile(apiKey);
+      console.log(chalk.green("API key saved successfully."));
+      if (envResult.created) {
+        console.log(chalk.gray(`Created .env file at ${envResult.path}`));
+      } else if (envResult.updated) {
+        console.log(chalk.gray(`Updated existing API key in ${envResult.path}`));
+      } else {
+        console.log(chalk.gray(`Added API key to ${envResult.path}`));
+      }
+      return;
+    }
+
+    // Interactive mode: open browser and prompt for key
     console.log(chalk.blue("🔐 LangWatch Login"));
     console.log(
       chalk.gray(
@@ -127,7 +145,7 @@ export const loginCommand = async (): Promise<void> => {
     console.error(
       chalk.red(
         `Error during login: ${
-          error instanceof Error ? error.message : "Unknown error"
+          formatApiErrorMessage({ error })
         }`,
       ),
     );

@@ -1,0 +1,135 @@
+---
+title: Third-Party Integrations
+description: "Configure email, error tracking, analytics, and external services for LangWatch"
+---
+
+LangWatch integrates with several third-party services for notifications, error tracking, and evaluation capabilities.
+
+## Email (SendGrid)
+
+Email is used for alerts, team invitations, and system notifications.
+
+### Helm Configuration
+
+```yaml
+app:
+  email:
+    enabled: true
+    defaultFrom: "langwatch@yourcompany.com"
+    provider: sendgrid
+    providers:
+      sendgrid:
+        apiKey:
+          secretKeyRef:
+            name: langwatch-email
+            key: sendgridApiKey
+```
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `EMAIL_ENABLED` | `true` to enable email |
+| `EMAIL_PROVIDER` | `sendgrid` |
+| `SENDGRID_API_KEY` | Your SendGrid API key |
+| `EMAIL_DEFAULT_FROM` | Default sender address |
+
+### Setup Steps
+
+1. Create a [SendGrid account](https://sendgrid.com/) and generate an API key
+2. Verify your sender domain in SendGrid
+3. Configure the API key via the Helm chart or environment variable
+4. Test by inviting a team member in the LangWatch UI
+
+## Error Tracking (Sentry)
+
+Capture application errors and exceptions for debugging.
+
+### Configuration
+
+| Variable | Description |
+|----------|-------------|
+| `SENTRY_DSN` | Sentry DSN for the LangWatch app |
+
+```yaml
+app:
+  extraEnvs:
+    - name: SENTRY_DSN
+      value: "https://examplePublicKey@o0.ingest.sentry.io/0"
+```
+
+## Usage Analytics
+
+LangWatch collects anonymous usage analytics by default to help improve the product. No trace data or PII is collected.
+
+### Disable Telemetry
+
+```yaml
+app:
+  telemetry:
+    usage:
+      enabled: false
+```
+
+Or via environment variable:
+
+| Variable | Description |
+|----------|-------------|
+| `DISABLE_USAGE_STATS` | Set to `true` to disable anonymous usage analytics |
+
+## LLM Providers for Evaluations
+
+LangWatch evaluators use external LLM providers for model-based evaluations (LLM-as-a-Judge, safety checks, etc.). Configure these if you want to use built-in evaluators.
+
+### Azure OpenAI
+
+Used for jailbreak detection and content safety evaluators.
+
+```yaml
+app:
+  evaluators:
+    azureOpenAI:
+      enabled: true
+      endpoint:
+        secretKeyRef: { name: langwatch-evaluators, key: azureEndpoint }
+      apiKey:
+        secretKeyRef: { name: langwatch-evaluators, key: azureApiKey }
+```
+
+| Variable | Description |
+|----------|-------------|
+| `AZURE_OPENAI_EVALUATOR_ENABLED` | `true` to enable |
+| `AZURE_OPENAI_EVALUATOR_ENDPOINT` | Azure OpenAI endpoint URL |
+| `AZURE_OPENAI_EVALUATOR_API_KEY` | Azure OpenAI API key |
+
+### Google AI
+
+Used for PII detection evaluators.
+
+```yaml
+app:
+  evaluators:
+    google:
+      enabled: true
+      credentials:
+        secretKeyRef: { name: langwatch-evaluators, key: googleCredentials }
+```
+
+| Variable | Description |
+|----------|-------------|
+| `GOOGLE_EVALUATOR_ENABLED` | `true` to enable |
+| `GOOGLE_CREDENTIALS_JSON` | Service account credentials JSON |
+
+<Note>
+You don't need to configure evaluator providers to use LangWatch. They're only required if you want to use built-in evaluators that rely on specific LLM providers. You can always configure your own LLM provider API keys in the LangWatch UI for evaluations.
+</Note>
+
+## Slack
+
+LangWatch can send notifications to Slack channels via webhooks for alerts and automations. This is configured in the LangWatch UI under **Automations**, not via environment variables.
+
+## S3 / Object Storage
+
+Used for dataset storage and ClickHouse cold storage/backups. See:
+- [Backups](/self-hosting/configuration/backups) for ClickHouse cold storage and backup configuration
+- [Environment Variables](/self-hosting/configuration/environment-variables#object-storage-s3) for S3 configuration reference

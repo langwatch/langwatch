@@ -1,13 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { createExecuteEvaluationCommandClass } from "../executeEvaluation.command";
+import { ExecuteEvaluationCommand } from "../executeEvaluation.command";
 import type { ExecuteEvaluationCommandData } from "../../schemas/commands";
-
-const ExecuteEvaluationCommand = createExecuteEvaluationCommandClass({
-  prisma: {} as any,
-  spanStorage: {} as any,
-  traceEvents: {} as any,
-  evaluationExecution: {} as any,
-});
 
 function makePayload(
   overrides: Partial<ExecuteEvaluationCommandData> = {},

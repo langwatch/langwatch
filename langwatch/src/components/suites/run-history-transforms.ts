@@ -6,15 +6,11 @@
  */
 
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioRunData, SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "~/server/scenarios/internal-set-id";
+import { computeMetricStats, type MetricStats } from "~/components/shared/MetricStatsTooltip";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
 
-export type SuiteRunSummary = {
-  passedCount: number;
-  totalCount: number;
-  lastRunTimestamp: number | null;
-};
 
 /** Valid values for the grouping dimension. */
 export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;
@@ -59,14 +55,23 @@ export type BatchRun = RunGroup & {
 
 /** Summary statistics for a run group (batch, scenario, or target). */
 export type RunGroupSummary = {
-  passRate: number;
+  /** Pass rate as percentage (0-100), or null when no runs have a verdict (all stalled/cancelled/in-progress). */
+  passRate: number | null;
   passedCount: number;
   failedCount: number;
   stalledCount: number;
   cancelledCount: number;
+  /** Runs with an actual verdict: passed + failed (SUCCESS + FAILED + ERROR). */
+  completedCount: number;
   totalCount: number;
   inProgressCount: number;
   queuedCount: number;
+  totalCost: number | null;
+  averageAgentLatencyMs: number | null;
+  totalDurationMs: number | null;
+  agentLatencyStats: MetricStats | null;
+  agentCostStats: MetricStats | null;
+  averageAgentCost: number | null;
 };
 
 /** Backward-compatible alias for RunGroupSummary. */
@@ -117,9 +122,19 @@ const UNKNOWN_GROUP_KEY = "__unknown__";
 
 /**
  * Computes the maximum timestamp from a list of scenario runs.
+ * Used for scenario/target groups where "most recently active" ordering makes sense.
  */
 function maxTimestamp(runs: ScenarioRunData[]): number {
   return runs.reduce((max, r) => Math.max(max, r.timestamp), 0);
+}
+
+/**
+ * Computes the minimum timestamp from a list of scenario runs.
+ * Used as the batch "creation time" so batches maintain stable ordering
+ * even when individual runs within them get updated.
+ */
+function minTimestamp(runs: ScenarioRunData[]): number {
+  return runs.reduce((min, r) => Math.min(min, r.timestamp), Infinity);
 }
 
 /**
@@ -134,7 +149,8 @@ function sortByTimestampDesc<T extends RunGroup>(groups: T[]): T[] {
  * Groups a flat list of scenario runs by their batchRunId.
  *
  * Returns batch runs sorted by timestamp descending (most recent first).
- * Each batch uses the maximum timestamp from its scenario runs.
+ * Each batch uses the minimum timestamp (creation time) from its scenario runs
+ * so batches maintain stable ordering even when individual runs update.
  * When scenarioSetIds is provided, each batch run includes its scenarioSetId.
  */
 export function groupRunsByBatchId({
@@ -157,7 +173,7 @@ export function groupRunsByBatchId({
 
   const batchRuns: BatchRun[] = [];
   for (const [batchRunId, scenarioRuns] of batchMap) {
-    const timestamp = maxTimestamp(scenarioRuns);
+    const timestamp = minTimestamp(scenarioRuns);
     const scenarioSetId = scenarioSetIds?.[batchRunId];
     batchRuns.push({
       groupKey: batchRunId,
@@ -276,8 +292,15 @@ export function computeBatchRunSummary({
 /**
  * Computes pass/fail summary for any RunGroup (batch, scenario, or target).
  *
- * Pass rate = passed / all finished (SUCCESS, ERROR, FAILED, STALLED, CANCELLED).
- * In-progress and pending runs are tracked separately.
+ * Pass rate = passed / settled. "Settled" = passed + failed + stalled + cancelled
+ * (all terminal states). Only in-progress and queued runs are excluded from the
+ * denominator since we don't know their outcome yet.
+ * When no runs have settled yet (settledCount == 0), passRate is null.
+ *
+ * ⚠️  KEEP IN SYNC: The sidebar uses a separate ClickHouse aggregation query
+ * with its own pass rate formula. If you change the formula here, also update:
+ *   - simulation.clickhouse.repository.ts → getSetSummaries() (sidebar query)
+ *   - SuiteSidebar.tsx → RunSummaryLine() (sidebar display)
  */
 export function computeGroupSummary({
   group,
@@ -314,8 +337,32 @@ export function computeGroupSummary({
     }
   }
 
-  const finishedCount = passedCount + failedCount + stalledCount + cancelledCount;
-  const passRate = finishedCount > 0 ? (passedCount / finishedCount) * 100 : 0;
+  const completedCount = passedCount + failedCount;
+  const settledCount = passedCount + failedCount + stalledCount + cancelledCount;
+  const totalCount = group.scenarioRuns.length;
+  const passRate = settledCount > 0
+    ? (passedCount / settledCount) * 100
+    : (totalCount > 0 ? null : 0);
+
+  let totalCost = 0;
+  let totalDurationMs = 0;
+  const allAgentLatencies: number[] = [];
+  const allAgentCosts: number[] = [];
+  for (const run of group.scenarioRuns) {
+    if (run.totalCost != null) totalCost += run.totalCost;
+    if (run.durationInMs > 0) totalDurationMs += run.durationInMs;
+    const agentLatencies = run.roleLatencies?.["Agent"];
+    if (agentLatencies) {
+      allAgentLatencies.push(...agentLatencies);
+    }
+    const agentCosts = run.roleCosts?.["Agent"];
+    if (agentCosts) {
+      allAgentCosts.push(...agentCosts);
+    }
+  }
+
+  const agentLatencyStats = computeMetricStats(allAgentLatencies);
+  const agentCostStats = computeMetricStats(allAgentCosts);
 
   return {
     passRate,
@@ -323,9 +370,16 @@ export function computeGroupSummary({
     failedCount,
     stalledCount,
     cancelledCount,
-    totalCount: group.scenarioRuns.length,
+    completedCount,
+    totalCount,
     inProgressCount,
     queuedCount,
+    totalCost: totalCost > 0 ? totalCost : null,
+    averageAgentLatencyMs: agentLatencyStats?.avg ?? null,
+    totalDurationMs: totalDurationMs > 0 ? totalDurationMs : null,
+    agentLatencyStats,
+    agentCostStats,
+    averageAgentCost: agentCostStats?.avg ?? null,
   };
 }
 
@@ -512,6 +566,7 @@ export function computeSuiteRunSummaries({
     const summary = computeBatchRunSummary({ batchRun: latestBatch });
     map.set(suiteId, {
       passedCount: summary.passedCount,
+      failedCount: summary.failedCount,
       totalCount: summary.totalCount,
       lastRunTimestamp: latestBatch.timestamp,
     });

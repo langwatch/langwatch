@@ -1,11 +1,11 @@
 import { Button, Heading, HStack, Input, Spacer, VStack } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useState } from "react";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { isHandledByGlobalLicenseHandler } from "~/utils/trpcError";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Drawer } from "../ui/drawer";
 import { toaster } from "../ui/toaster";
@@ -65,7 +65,7 @@ export function DashboardNameDrawer({
             handleClose();
           },
           onError: (error) => {
-            if (isHandledByGlobalLicenseHandler(error)) return;
+            if (isHandledByGlobalHandler(error)) return;
             toaster.create({
               title: "Error creating dashboard",
               type: "error",

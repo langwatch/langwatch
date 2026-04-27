@@ -1,0 +1,46 @@
+{{- $fullname := include "clickhouse-serverless.fullname" . }}
+# ClusterIP service for app connections
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}
+  labels:
+    {{- include "clickhouse-serverless.selectorLabels" . | nindent 4 }}
+    {{- include "clickhouse-serverless.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 8123
+      targetPort: 8123
+      protocol: TCP
+    - name: native
+      port: 9000
+      targetPort: 9000
+      protocol: TCP
+  selector:
+    {{- include "clickhouse-serverless.selectorLabels" . | nindent 4 }}
+---
+# Headless service for StatefulSet pod identity and DNS discovery
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}-headless
+  labels:
+    {{- include "clickhouse-serverless.selectorLabels" . | nindent 4 }}
+    {{- include "clickhouse-serverless.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+    - name: http
+      port: 8123
+      targetPort: 8123
+      protocol: TCP
+    - name: native
+      port: 9000
+      targetPort: 9000
+      protocol: TCP
+  selector:
+    {{- include "clickhouse-serverless.selectorLabels" . | nindent 4 }}

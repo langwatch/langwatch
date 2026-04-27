@@ -15,4 +15,10 @@ if [ -n "$CHROMIUM_PATH" ]; then
   EXTRA_ARGS+=(--executable-path "$CHROMIUM_PATH")
 fi
 
-exec npx @playwright/mcp@latest --headless "${EXTRA_ARGS[@]}" "$@"
+HEADLESS_FLAG="--headless"
+if [ "$1" = "--headed" ]; then
+  HEADLESS_FLAG=""
+  shift
+fi
+
+exec npx @playwright/mcp@latest $HEADLESS_FLAG "${EXTRA_ARGS[@]}" "$@"

@@ -5,6 +5,7 @@ import type { PlanProviderUser } from "~/server/app-layer/subscription/plan-prov
 export const ENTERPRISE_FEATURE_ERRORS = {
   RBAC: "Custom roles require an Enterprise plan",
   AUDIT_LOGS: "Audit logs require an Enterprise plan",
+  SCIM: "SCIM provisioning requires an Enterprise plan",
 } as const;
 
 export function isEnterpriseTier(planType: string): boolean {

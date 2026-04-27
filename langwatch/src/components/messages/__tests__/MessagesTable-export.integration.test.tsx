@@ -134,7 +134,7 @@ vi.mock("../ExportProgress", () => ({
   },
 }));
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: {},
     pathname: "/[project]/messages",

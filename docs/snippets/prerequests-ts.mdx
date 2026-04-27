@@ -1,0 +1,30 @@
+#### Prerequisites
+
+- Obtain your `LANGWATCH_API_KEY` from the [LangWatch dashboard](https://app.langwatch.ai/).
+
+#### Installation
+
+```sh
+npm install langwatch
+```
+
+#### Configuration
+
+Ensure `LANGWATCH_API_KEY` is set:
+
+<Tabs>
+<Tab title="Environment variable">
+```bash .env
+LANGWATCH_API_KEY='your_api_key_here'
+```
+</Tab>
+<Tab title="Client parameters">
+```typescript
+import { LangWatch } from 'langwatch';
+
+const langwatch = new LangWatch({
+  apiKey: 'your_api_key_here',
+});
+```
+</Tab>
+</Tabs>

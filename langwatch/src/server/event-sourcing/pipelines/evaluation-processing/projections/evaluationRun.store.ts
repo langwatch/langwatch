@@ -25,14 +25,24 @@ export class EvaluationRunStore
   async storeBatch(
     entries: Array<{ state: EvaluationRunData; context: ProjectionStoreContext }>,
   ): Promise<void> {
-    await Promise.all(
-      entries.map(({ state, context }) => {
-        const stateWithId = state.evaluationId
-          ? state
-          : { ...state, evaluationId: String(context.aggregateId) };
-        return this.repo.upsert(stateWithId, String(context.tenantId));
-      }),
-    );
+    if (entries.length === 0) return;
+
+    const batchEntries = entries.map(({ state, context }) => ({
+      data: state.evaluationId
+        ? state
+        : { ...state, evaluationId: String(context.aggregateId) },
+      tenantId: String(context.tenantId),
+    }));
+
+    if (this.repo.upsertBatch) {
+      await this.repo.upsertBatch(batchEntries);
+    } else {
+      await Promise.all(
+        batchEntries.map(({ data, tenantId }) =>
+          this.repo.upsert(data, tenantId),
+        ),
+      );
+    }
   }
 
   async get(

@@ -8,14 +8,6 @@ describe("PLAN_LIMITS", () => {
       expect(PLAN_LIMITS[PlanTypes.PRO].maxProjects).toBe(9999);
     });
 
-    it("sets GROWTH evaluationsCredit to 50", () => {
-      expect(PLAN_LIMITS[PlanTypes.GROWTH].evaluationsCredit).toBe(50);
-    });
-
-    it("sets ENTERPRISE evaluationsCredit to 500", () => {
-      expect(PLAN_LIMITS[PlanTypes.ENTERPRISE].evaluationsCredit).toBe(500);
-    });
-
     it("sets ENTERPRISE maxProjects to 9999", () => {
       expect(PLAN_LIMITS[PlanTypes.ENTERPRISE].maxProjects).toBe(9999);
     });

@@ -1,7 +1,6 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClient } from "~/server/clickhouse/client";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import { createLogger } from "~/utils/logger/server";
 import type { FilterParam } from "~/hooks/useFilterParams";
@@ -24,7 +23,6 @@ import type { FilterField } from "./types";
  * 3. Returns null for unsupported filters, allowing fallback to Elasticsearch
  */
 export class ClickHouseFilterService {
-  private readonly clickHouseClient: ClickHouseClient | null;
   private readonly logger = createLogger(
     "langwatch:filters:clickhouse-service",
   );
@@ -32,9 +30,7 @@ export class ClickHouseFilterService {
     "langwatch.filters.clickhouse-service",
   );
 
-  constructor(private readonly prisma: PrismaClient) {
-    this.clickHouseClient = getClickHouseClient();
-  }
+  constructor(private readonly prisma: PrismaClient) {}
 
   /**
    * Static factory method for creating ClickHouseFilterService with default dependencies.
@@ -59,35 +55,6 @@ export class ClickHouseFilterService {
       return null;
     }
     return filterDef as SupportedClickHouseFilterDefinition;
-  }
-
-  /**
-   * Check if ClickHouse is enabled for the given project.
-   */
-  async isClickHouseEnabled(projectId: string): Promise<boolean> {
-    return await this.tracer.withActiveSpan(
-      "ClickHouseFilterService.isClickHouseEnabled",
-      {
-        attributes: { "tenant.id": projectId },
-      },
-      async (span) => {
-        if (!this.clickHouseClient) {
-          return false;
-        }
-
-        const project = await this.prisma.project.findUnique({
-          where: { id: projectId },
-          select: { featureClickHouseDataSourceTraces: true },
-        });
-
-        span.setAttribute(
-          "project.feature.clickhouse",
-          project?.featureClickHouseDataSourceTraces === true,
-        );
-
-        return project?.featureClickHouseDataSourceTraces === true;
-      },
-    );
   }
 
   /**
@@ -129,8 +96,9 @@ export class ClickHouseFilterService {
         },
       },
       async (span) => {
-        // Check if ClickHouse is available
-        if (!this.clickHouseClient) {
+        // Resolve ClickHouse client for this project
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
           span.setAttribute("clickhouse.available", false);
           throw new Error(
             "ClickHouse client is not available — check ClickHouse connection configuration",
@@ -197,7 +165,7 @@ export class ClickHouseFilterService {
           const actualKey = options.key?.replaceAll("·", ".") ?? "";
           const actualSubkey = options.subkey?.replaceAll("·", ".") ?? "";
 
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: sqlQuery,
             query_params: {
               tenantId: projectId,

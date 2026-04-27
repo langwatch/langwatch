@@ -13,7 +13,7 @@ import {
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { EvaluationExecutionMode } from "@prisma/client";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Edit2, HelpCircle } from "react-feather";
 import {

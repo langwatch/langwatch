@@ -85,3 +85,4 @@ export const resolveOriginCommandDataSchema = z.object({
 export type ResolveOriginCommandData = z.infer<
   typeof resolveOriginCommandDataSchema
 >;
+

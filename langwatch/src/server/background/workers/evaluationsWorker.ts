@@ -35,12 +35,13 @@ class UserConfigError extends Error {
     this.name = "UserConfigError";
   }
 }
-import { createCostChecker } from "../../license-enforcement/license-enforcement.repository";
 import {
   getProjectModelProviders,
   prepareEnvKeys,
   prepareLitellmParams,
 } from "../../api/routers/modelProviders.utils";
+import { resolveMaxTokensCeiling } from "../../modelProviders/resolveMaxTokensCeiling";
+import { clampMaxTokens } from "../../../utils/clampMaxTokens";
 import { prisma } from "../../db";
 import {
   DEFAULT_MAPPINGS,
@@ -55,6 +56,10 @@ import {
 } from "../../metrics";
 import { connection } from "../../redis";
 import {
+  hasThreadMappings,
+  resolveThreadMappingsIntoData,
+} from "../../evaluations/threadMappingResolver";
+import {
   type MappingState,
   mapTraceToDatasetEntry,
   SERVER_ONLY_THREAD_SOURCES,
@@ -64,6 +69,11 @@ import {
   tryAndConvertTo,
 } from "../../tracer/tracesMapping";
 import { formatSpansDigest } from "../../tracer/spanToReadableSpan";
+import {
+  AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
+  getAzureSafetyEnvFromProject,
+  isAzureEvaluatorType,
+} from "../../app-layer/evaluations/azure-safety-env";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
 import {
   EVALUATIONS_QUEUE,
@@ -114,19 +124,6 @@ export async function runEvaluationJob(
     workflowId,
   });
 }
-
-/**
- * Check if any mapping has type "thread"
- * Single Responsibility: Detect if thread-based mappings are present
- */
-const hasThreadMappings = (mappingState: MappingState | null): boolean => {
-  if (!mappingState) {
-    return false;
-  }
-  return Object.values(mappingState.mapping).some(
-    (mapping) => "type" in mapping && mapping.type === "thread",
-  );
-};
 
 /**
  * Build thread-based data for evaluation
@@ -386,6 +383,22 @@ const buildDataForEvaluation = async (
     }
 
     data = mappedData;
+
+    // Resolve any thread-typed mappings mixed into trace-level evaluations
+    if (mappings && hasThreadMappings(mappings)) {
+      await resolveThreadMappingsIntoData({
+        data: data as Record<string, unknown>,
+        trace,
+        mappings,
+        getThreadTraces: (threadId) =>
+          getTracesGroupedByThreadId({
+            connConfig: { projectId },
+            threadId,
+            protections,
+            includeSpans: true,
+          }),
+      });
+    }
   }
 
   // Workflow evaluators and custom evaluators pass data through as-is
@@ -498,27 +511,6 @@ export const runEvaluation = async ({
   workflowId?: string | null;
   retries?: number;
 }): Promise<SingleEvaluationResult> => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId, archivedAt: null },
-    include: { team: true },
-  });
-  if (!project) {
-    throw new Error("Project not found");
-  }
-  const costChecker = createCostChecker(prisma);
-  const maxMonthlyUsage = await costChecker.maxMonthlyUsageLimit(
-    project.team.organizationId,
-  );
-  const getCurrentCost = await costChecker.getCurrentMonthCost(
-    project.team.organizationId,
-  );
-  if (getCurrentCost >= maxMonthlyUsage) {
-    return {
-      status: "skipped",
-      details: "Monthly usage limit exceeded",
-    };
-  }
-
   if (data.type === "custom") {
     return customEvaluation(
       projectId,
@@ -540,9 +532,23 @@ export const runEvaluation = async ({
 
   const evaluator = AVAILABLE_EVALUATORS[builtInEvaluatorType];
 
-  let evaluatorEnv: Record<string, string> = Object.fromEntries(
-    (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
-  );
+  // Hard cutover: Azure Content Safety evaluators never read from process.env.
+  // Require per-project azure_safety Model Provider credentials.
+  let evaluatorEnv: Record<string, string>;
+  if (isAzureEvaluatorType(builtInEvaluatorType)) {
+    const azureEnv = await getAzureSafetyEnvFromProject(projectId);
+    if (!azureEnv) {
+      return {
+        status: "skipped",
+        details: AZURE_SAFETY_NOT_CONFIGURED_MESSAGE,
+      };
+    }
+    evaluatorEnv = azureEnv;
+  } else {
+    evaluatorEnv = Object.fromEntries(
+      (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
+    );
+  }
 
   const setupModelEnv = async (
     model: string,
@@ -593,9 +599,13 @@ export const runEvaluation = async ({
       "seed",
       "reasoning_effort",
     ];
+    const maxTokensCeiling = resolveMaxTokensCeiling(model, modelProvider);
     for (const param of generationParams) {
-      const value = settings?.[param];
+      let value = settings?.[param];
       if (value !== undefined && value !== null) {
+        if (param === "max_tokens" && typeof value === "number") {
+          value = clampMaxTokens(value, maxTokensCeiling);
+        }
         const envKey = embeddings
           ? `X_LITELLM_EMBEDDINGS_${param}`
           : `X_LITELLM_${param}`;

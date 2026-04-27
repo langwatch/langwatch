@@ -1,4 +1,4 @@
-import type { ClickHouseClient } from "@clickhouse/client";
+import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "../../../../../utils/logger";
 import type { AppendStore } from "../../../projections/mapProjection.types";
 import type { ProjectionStoreContext } from "../../../projections/projectionStoreContext";
@@ -17,14 +17,14 @@ const logger = createLogger(
  * AppendStore interface used by MapProjection definitions.
  */
 export function createExperimentRunItemAppendStore(
-  clickhouse: ClickHouseClient | null,
+  resolveClient: ClickHouseClientResolver | null,
 ): AppendStore<ClickHouseExperimentRunResultRecord> {
   return {
     async append(
       record: ClickHouseExperimentRunResultRecord,
-      _context: ProjectionStoreContext,
+      context: ProjectionStoreContext,
     ): Promise<void> {
-      if (!clickhouse) {
+      if (!resolveClient) {
         logger.warn(
           { recordId: record.ProjectionId },
           "ClickHouse client not available, skipping experiment run result storage",
@@ -32,7 +32,8 @@ export function createExperimentRunItemAppendStore(
         return;
       }
 
-      await clickhouse.insert({
+      const client = await resolveClient(context.tenantId);
+      await client.insert({
         table: TABLE_NAME,
         values: [record],
         format: "JSONEachRow",

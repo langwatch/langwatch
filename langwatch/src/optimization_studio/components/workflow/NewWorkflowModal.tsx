@@ -1,12 +1,9 @@
 import {
-  Box,
   Button,
   Grid,
   Heading,
   HStack,
   Separator,
-  Text,
-  VStack,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronLeft, File, Upload } from "react-feather";
@@ -205,23 +202,20 @@ export const NewWorkflowModal = ({
                   }
                 />
               ))}
-              <Box
-                as="div"
-                borderWidth="2px"
-                borderRadius="lg"
-                borderStyle="dashed"
-                cursor="pointer"
-                backgroundColor="white"
+              <WorkflowCard
                 data-testid="new-workflow-card-import"
+                name="From Export"
+                icon={
+                  <Upload color="var(--chakra-colors-fg-muted)" size={16} />
+                }
+                description="Import a workflow from an exported JSON file"
                 onClick={handleClick}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
                 onDrop={handleDrop}
-                borderColor={isDragging ? "blue.500" : "border"}
-                transition="all 0.2s"
-                _hover={{ borderColor: "blue.300" }}
-                paddingX={4}
-                paddingY={3}
+                {...(isDragging
+                  ? { borderStyle: "dashed", borderColor: "blue.500" }
+                  : {})}
               >
                 <input
                   ref={fileInputRef}
@@ -230,19 +224,7 @@ export const NewWorkflowModal = ({
                   style={{ display: "none" }}
                   onChange={handleFileInputChange}
                 />
-                <VStack align="center" gap={2}>
-                  <HStack p={2}>
-                    <Upload color="var(--chakra-colors-fg-muted)" size={16} />
-                    <Text fontWeight="bold">From Export</Text>
-                  </HStack>
-                  <Text fontSize="sm" color="fg.muted" textAlign="center">
-                    Import a workflow from an exported JSON file
-                  </Text>
-                  <Text fontSize="xs" color="fg.muted">
-                    Drag and drop or click to select
-                  </Text>
-                </VStack>
-              </Box>
+              </WorkflowCard>
             </Grid>
           </Dialog.Body>
         ) : (

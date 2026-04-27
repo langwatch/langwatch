@@ -15,16 +15,14 @@ import { useCallback, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 import { useModelProvidersSettings } from "../../hooks/useModelProvidersSettings";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
-import { DEFAULT_MODEL } from "../../utils/constants";
 import { createLogger } from "../../utils/logger";
-import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { toaster } from "../ui/toaster";
 import type { ScenarioFormData } from "./ScenarioForm";
 import {
   generateScenarioWithAI,
   type GeneratedScenario,
 } from "./services/scenarioGeneration";
+import { getDefaultModelState } from "./utils/defaultModelState";
 
 const logger = createLogger("langwatch:scenarios:ai-generation");
 
@@ -103,12 +101,6 @@ export function formHasContent(form: UseFormReturn<ScenarioFormData>): boolean {
   return name.length > 0 || situation.length > 0 || criteria.length > 0;
 }
 
-export function extractProviderFromModel(modelId: string): string {
-  const PROVIDER_SEPARATOR = "/";
-  const UNKNOWN_PROVIDER = "unknown";
-  return modelId.split(PROVIDER_SEPARATOR)[0] ?? UNKNOWN_PROVIDER;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 // Constants
 // ─────────────────────────────────────────────────────────────────────────────
@@ -130,19 +122,17 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
   const { generate, status } = useScenarioGeneration(project?.id);
 
   // Check if any model providers are configured
-  const { hasEnabledProviders } = useModelProvidersSettings({
+  const { hasEnabledProviders, providers } = useModelProvidersSettings({
     projectId: project?.id,
   });
 
-  // Check if the default model is enabled
-  const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
-  const { modelOption } = useModelSelectionOptions(
-    allModelOptions,
-    defaultModel,
-    "chat",
-  );
-  const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
-  const providerName = extractProviderFromModel(defaultModel);
+  const defaultModelState = getDefaultModelState({
+    hasEnabledProviders,
+    providers,
+    defaultModel: project?.defaultModel,
+  });
+
+  const isDefaultModelDisabled = !defaultModelState.ok;
 
   const hasExistingContent = form !== null && formHasContent(form);
 
@@ -241,6 +231,17 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
                   Configure model provider
                 </Link>
               </Text>
+
+              <Button colorPalette="blue" asChild size="sm">
+                <a
+                  data-testid="scenario-ai-configure-model-provider-button"
+                  href="/settings/model-providers"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  Configure model provider
+                </a>
+              </Button>
             </VStack>
           </Card.Body>
         </Card.Root>
@@ -307,11 +308,36 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             Describe what your agent does and the scenario you want to test.
           </Text>
 
-          {isDefaultModelDisabled && (
-            <AddModelProviderKey
-              runWhat="generate scenarios"
-              nodeProvidersWithoutCustomKeys={[providerName]}
-            />
+          {defaultModelState.ok === false && defaultModelState.reason === "no-default" && (
+            <DefaultModelErrorBanner>
+              No default model set. Configure one in{" "}
+              <Link
+                href="/settings/model-providers"
+                target="_blank"
+                rel="noopener noreferrer"
+                color="blue.500"
+                fontWeight="medium"
+              >
+                Settings → Model Providers
+              </Link>
+              .
+            </DefaultModelErrorBanner>
+          )}
+
+          {defaultModelState.ok === false && defaultModelState.reason === "stale-default" && (
+            <DefaultModelErrorBanner>
+              Your default model&apos;s provider is disabled. Configure a new default in{" "}
+              <Link
+                href="/settings/model-providers"
+                target="_blank"
+                rel="noopener noreferrer"
+                color="blue.500"
+                fontWeight="medium"
+              >
+                Settings → Model Providers
+              </Link>
+              .
+            </DefaultModelErrorBanner>
           )}
 
           {status === "done" && hasHistory && (
@@ -375,5 +401,38 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
         </VStack>
       </Card.Body>
     </Card.Root>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Subcomponents
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DefaultModelErrorBanner({ children }: { children: React.ReactNode }) {
+  return (
+    <VStack
+      gap={2}
+      padding={2}
+      bg="orange.50"
+      borderRadius="md"
+      fontSize="xs"
+      color="orange.700"
+      align="flex-start"
+    >
+      <HStack gap={2} align="flex-start">
+        <Icon as={AlertTriangle} boxSize={3} flexShrink={0} mt="1px" />
+        <Text>{children}</Text>
+      </HStack>
+      <Button colorPalette="blue" asChild size="sm">
+        <a
+          data-testid="scenario-ai-configure-default-model-button"
+          href="/settings/model-providers"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Configure default model
+        </a>
+      </Button>
+    </VStack>
   );
 }

@@ -63,7 +63,10 @@ describe("<ScenarioTargetRow/> cancel button", () => {
   });
 
   describe("given a stalled scenario run with onCancel", () => {
-    it("displays the cancel button", () => {
+    it("does not display the cancel button", () => {
+      // STALLED is not in CANCELLABLE_STATUSES — the enum explicitly lists it as
+      // a terminal status alongside SUCCESS, FAILED, ERROR, and CANCELLED.
+      // Only QUEUED, PENDING, and IN_PROGRESS are cancellable.
       render(
         <ScenarioTargetRow
           scenarioRun={makeScenarioRunData({ status: ScenarioRunStatus.STALLED, durationInMs: 0 })}
@@ -74,7 +77,7 @@ describe("<ScenarioTargetRow/> cancel button", () => {
         { wrapper: Wrapper },
       );
 
-      expect(screen.getByTestId("cancel-run-button")).toBeInTheDocument();
+      expect(screen.queryByTestId("cancel-run-button")).not.toBeInTheDocument();
     });
   });
 
@@ -143,7 +146,9 @@ describe("<ScenarioTargetRow/> cancel button", () => {
 
   describe("when the cancel button is clicked", () => {
     it("calls onCancel and does not propagate to row onClick", async () => {
-      const user = userEvent.setup();
+      // pointerEventsCheck disabled because the cancel button uses CSS
+      // _groupHover to toggle pointer-events, which jsdom cannot simulate
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
       const onCancel = vi.fn();
       const onClick = vi.fn();
 
@@ -274,7 +279,9 @@ describe("<RunRow/> cancel all button", () => {
 
   describe("when Cancel All button is clicked", () => {
     it("calls onCancelAll and does not toggle the row", async () => {
-      const user = userEvent.setup();
+      // pointerEventsCheck disabled because the cancel button uses CSS
+      // _groupHover to toggle pointer-events, which jsdom cannot simulate
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
       const onCancelAll = vi.fn();
       const onToggle = vi.fn();
 

@@ -75,7 +75,7 @@ export function ScenarioMessageRenderer({
                       "& > .markdown > *:last-child": { marginBottom: 0 },
                     }}
                   >
-                    <Markdown className="markdown">{item.content}</Markdown>
+                    <Markdown>{item.content}</Markdown>
                   </Box>
                 ) : (
                   <Box

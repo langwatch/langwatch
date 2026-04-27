@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.suite_runs
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}UpdatedAt)
 PARTITION BY toYearWeek(StartedAt)
 ORDER BY (TenantId, ScenarioSetId, BatchRunId)
-SETTINGS index_granularity = 8192, storage_policy = 'local_primary';
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 
 -- +goose StatementEnd
 -- +goose ENVSUB OFF

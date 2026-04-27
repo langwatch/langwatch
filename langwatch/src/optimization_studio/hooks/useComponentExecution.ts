@@ -131,6 +131,7 @@ export const useComponentExecution = () => {
           },
           node_id: node.id,
           inputs: inputs_,
+          origin: "workflow",
         },
       };
 

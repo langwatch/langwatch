@@ -5,14 +5,15 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TargetAggregate } from "../../../utils/computeAggregates";
 import { TargetSummary } from "../TargetSummary";
 
-// Mock name hooks to avoid tRPC queries (these may be used by EvaluatorChip indirectly)
 vi.mock("../../../hooks/useEvaluatorName", () => ({
-  useEvaluatorName: () => "Exact Match",
+  useEvaluatorNames: vi.fn(),
 }));
+
+import { useEvaluatorNames } from "../../../hooks/useEvaluatorName";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
   <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>
@@ -38,6 +39,10 @@ const createAggregate = (
 });
 
 describe("TargetSummary", () => {
+  beforeEach(() => {
+    vi.mocked(useEvaluatorNames).mockReturnValue(new Map());
+  });
+
   afterEach(() => {
     cleanup();
   });
@@ -162,6 +167,54 @@ describe("TargetSummary", () => {
     expect(screen.getAllByText("75%").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("0.80").length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByText("1.2s").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows evaluator display names in the tooltip instead of evaluator ids", async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(useEvaluatorNames).mockReturnValue(
+      new Map([["eval-1", "Exact Match"]]),
+    );
+
+    const aggregates = createAggregate({
+      completedRows: 3,
+      totalRows: 3,
+      overallAverageScore: 0.78,
+      evaluators: [
+        {
+          evaluatorId: "eval-1",
+          total: 3,
+          passed: 0,
+          failed: 0,
+          errors: 0,
+          passRate: null,
+          averageScore: 0.78,
+        },
+      ],
+    });
+
+    render(
+      <TargetSummary
+        aggregates={aggregates}
+        evaluators={[
+          {
+            id: "eval-1",
+            evaluatorType: "langevals/exact_match",
+            dbEvaluatorId: "db-eval-1",
+            mappings: {},
+            inputs: [],
+          },
+        ]}
+      />,
+      { wrapper: Wrapper },
+    );
+
+    await user.hover(screen.getByTestId("target-summary"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Exact Match")).toBeInTheDocument();
+    });
+    expect(screen.queryByText("eval-1")).not.toBeInTheDocument();
   });
 
   it("shows combined metrics: pass rate, score, and errors", () => {

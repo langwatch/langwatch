@@ -1,0 +1,165 @@
+---
+title: Budgets
+description: Hierarchical, windowed spend limits enforced at the gateway.
+sidebarTitle: Budgets
+---
+
+A budget is a spend cap attached to a scope in your LangWatch hierarchy. Every gateway request is checked against every budget that applies to it; any hard-block breach blocks the request, any warn breach surfaces a header.
+
+## Scopes
+
+| Scope | Applies to |
+|---|---|
+| `organization` | All gateway traffic across every project in the org. |
+| `team` | All gateway traffic in projects belonging to the team. |
+| `project` | All gateway traffic in this project. |
+| `virtual_key` | This specific VK. |
+| `principal` | This user or service account across any VK they use. |
+
+A request is evaluated against **every** budget whose scope applies. For example, a request made by user Alice in project `demo` of team `platform` in org `acme` with VK `prod-key` is checked against:
+
+- Org `acme`'s budgets (all windows).
+- Team `platform`'s budgets (all windows).
+- Project `demo`'s budgets (all windows).
+- VK `prod-key`'s budgets (all windows).
+- Alice's principal budgets (all windows).
+
+If **any** budget hard-blocks, the request is rejected. If **any** warn-threshold is breached, a warning header is added. Hard-block wins over warn.
+
+## Windows
+
+- `minute`, `hour`, `day`, `week`, `month`, `total`.
+- Calendar-aligned: `month` resets on day 1 of the next month in the org's default timezone (UTC unless the org overrides). `week` starts Monday in ISO-8601.
+- `total` never resets — useful for one-off grant-style budgets.
+
+## on_breach
+
+- `block` — hard-cap. The next request after `spent_usd >= limit_usd` returns `402 budget_exceeded` with an OpenAI-compatible error envelope.
+- `warn` — soft-cap. The request passes but the response gains `X-LangWatch-Budget-Warning: <scope>:<pct_used>`. Multiple soft caps can fire on one request.
+
+## Creating a budget
+
+**AI Gateway → Budgets → New budget.**
+
+| Field | Example |
+|---|---|
+| Name | `eng-team-monthly` |
+| Scope | `team` |
+| Target | `platform` team |
+| Window | `month` |
+| Limit (USD) | `5000` |
+| on_breach | `warn` at 80%, `block` at 100% (see "Multiple tiers" below) |
+
+Save. The budget is in force immediately; the next request counts against it.
+
+## Multiple tiers on the same scope
+
+A single scope can carry multiple budgets with different `on_breach` values. Common pattern:
+
+- Budget A: `team`, `month`, `$4000`, `warn`. Surfaces `X-LangWatch-Budget-Warning: team:80` once 80% of the real ceiling is spent.
+- Budget B: `team`, `month`, `$5000`, `block`. Hard-caps at $5k.
+
+The UI surfaces this as "Warning thresholds" on a single budget row; each threshold is stored as its own `GatewayBudget` row in the schema for simplicity.
+
+## Debit model
+
+Gateway operations are debited **after** the response completes, using the provider-reported token counts. Every debit carries a `gateway_request_id` (ULID) and is **idempotent** by that id so gateway retries and trace replays never double-bill.
+
+Debit flow:
+
+1. Gateway streams the response to the client.
+2. When the response closes, the gateway captures the provider's token counts and emits an OTel span carrying `gen_ai.usage.*` plus `langwatch.virtual_key_id` and `langwatch.gateway_request_id`.
+3. The gateway also posts a post-response debit event to the control plane for the primary ledger path.
+4. The control plane recomputes USD cost from `tokens × pricing catalog` (the gateway-side cost is authoritative only when it short-circuits without a provider call, e.g. `blocked_by_guardrail`) and writes a ledger row in a transaction that also increments `spent_usd` on every affected scope (org, team, project, VK, principal).
+5. In parallel, the trace-processing pipeline reads the same span, resolves the applicable budgets, and writes one row per budget to the ClickHouse ledger (`gateway_budget_ledger_events`, rolled up into `gateway_budget_scope_totals` by a materialised view). This CH path is idempotent by `(tenant, budget, gateway_request_id)` on the underlying ReplacingMergeTree.
+
+<Note>
+The ClickHouse path is the primary read when CH is enabled (SaaS and any self-host with the LangWatch CH cluster wired up); the Postgres `spentUsd` column remains as the read fallback for self-hosted installs without CH. Both write paths run in parallel today; the Postgres write path retires in a follow-up. Customer-visible behaviour is unchanged — a $1 budget still blocks at $1 of spend during and after the cutover.
+</Note>
+
+## Pre-request check
+
+Before dispatching to the provider, the gateway runs a **two-tier precheck** designed to keep the hot path free while avoiding stale-snapshot races as budgets approach their caps:
+
+### Tier 1 — cached snapshot (always)
+
+The gateway checks the VK's in-memory budget snapshot (refreshed via the `/changes` long-poll on every debit). If the snapshot already shows a hard-breach, the request is rejected immediately with `402 budget_exceeded` — saving the provider spend and the wall-clock round-trip entirely. This costs ~0 μs: it's an in-process map lookup.
+
+### Tier 2 — live reconciliation (near-limit only)
+
+If any scope applicable to the request has `spent_usd / limit_usd >= 0.90`, the gateway makes a signed `POST /api/internal/gateway/budget/check` call to the control plane with ONLY those hot scopes. The control plane returns the real-time `spent_usd` from the authoritative ledger, and the gateway re-evaluates. Timeout is 200 ms; if the call fails, tier 1's decision is used (fail-open).
+
+This closes the **stale-snapshot race** where two gateway nodes each see a cached `spent=$24.90 / limit=$25.00` and both admit a $0.50 request — producing $25.80 in actual spend against a $25 cap. With tier 2 active on the near-limit 10% band, the control plane sees both requests and rejects the second based on the live ledger.
+
+Cold scopes (under 90%) skip the live call entirely — no latency tax on the common case.
+
+```
+request → tier 1 (always, ~0μs) → pass?
+                                → breach? → 402 (saved provider spend)
+
+tier 1 pass, any scope ≥ 90%? → tier 2 (live, ~5-50ms via HMAC-signed POST)
+                              → live spent says breach? → 402
+                              → live says OK? → dispatch
+                              → timeout / 5xx? → dispatch (fail-open)
+```
+
+Gateway env knobs:
+
+- `LW_GATEWAY_BUDGET_LIVE_THRESHOLD` — default `0.9` (90%). Lower it for stricter enforcement at some latency cost.
+- `LW_GATEWAY_BUDGET_LIVE_TIMEOUT` — Go duration string, default `200ms`. Accepts `200ms`, `500ms`, `1s`, etc.
+
+## What "USD cost" means
+
+Token × unit-price lookup, computed per provider using their published pricing. Updates land as provider pricing changes (pricing table is a separate Prisma table owned by LangWatch).
+
+Cache reads / writes are priced **separately** per provider — Anthropic cache reads are ~10% of regular input tokens, Anthropic cache writes are 125%. The gateway respects these. See [Caching Passthrough](/ai-gateway/caching-passthrough).
+
+## Viewing budget spend (UI)
+
+The **/gateway/budgets** list shows every budget with a utilization bar, hard cap, and remaining amount:
+
+- **Spent/Limit column** carries a colored progress bar and a matching %-badge (green ≤ 50%, orange 50-80%, red ≥ 80%/100%) so scanning "which budgets are hot" is a one-glance read.
+- **Window column** wraps `hour` / `day` / `week` / `month` / `total` in a subtle gray identifier badge matching the rest of the product.
+- **Resets column** shows a humanised relative time ("in 3 days" / "in 11 hours" / "in 15 minutes") with a hover tooltip for the exact UTC timestamp. `total`-window budgets render a muted `never`.
+- **Scope column** resolves the raw scope id into the target's human name and link: `organization acme-demo`, `team platform`, `virtual_key prod-openai` (linking to the VK detail page), `principal user@example.com`. Resolution is batched per scope type so the column adds no per-row DB cost.
+
+Clicking a row opens **/gateway/budgets/[id]** — a detail page mirroring the VK detail layout:
+
+- **Header action bar**: **Audit history** (deep-links to `/settings/audit-log?targetKind=budget&targetId=<budget_id>` pre-filtered to this budget's events; stays visible on archived budgets so forensic investigations can start from the archived state), **Edit**, **Archive**.
+- **Utilization header**: hard cap, spent, remaining, `on_breach` mode.
+- **Identity**: name, description, window, timezone, created/updated timestamps.
+- **Resolved scope target**: same resolution as the list Scope column, plus a full-width link card to the target resource.
+- **Recent 20 debits**: each row shows When (humanised relative + hover-for-exact), Amount (smart-decimals — e.g. `$0.0183`, not `$0.02`), Model, originating VK (deep-linked to the VK detail page), and the `gateway_request_id` for trace search.
+
+Paired with **/gateway/usage**, which shows a byDay sparkline between the stat tiles and "Top virtual keys". The sparkline is gated on ≥ 2 data buckets so the 24-hour preset doesn't render a single-point chart. Top-VK rows link to each VK's detail page for drill-down.
+
+Programmatic equivalent:
+
+```bash
+# List budgets
+langwatch gateway-budgets list
+
+# Spend detail (same data the UI detail page renders)
+curl -sS https://app.langwatch.ai/api/gateway/v1/budgets/<id> \
+  -H "Authorization: Bearer $LANGWATCH_API_KEY"
+```
+
+The REST response includes the resolved scope-target fields the UI uses; the `gatewayBudgets.get` tRPC procedure powers both surfaces from a shared service method.
+
+## Permissions
+
+| Action | Permission |
+|---|---|
+| View budgets | `gatewayBudgets:view` |
+| Create | `gatewayBudgets:create` |
+| Edit | `gatewayBudgets:update` |
+| Delete | `gatewayBudgets:delete` |
+| All of the above | `gatewayBudgets:manage` |
+
+See [RBAC](/ai-gateway/rbac).
+
+## Trace attributes
+
+- `langwatch.cost_usd` — cost of this single request.
+- `langwatch.budget.breached_scope` — present when the request was blocked; format `scope:window` (e.g. `project:month`).
+- `langwatch.budget.warnings` — comma-separated list of `scope:pct_used` entries for soft breaches.

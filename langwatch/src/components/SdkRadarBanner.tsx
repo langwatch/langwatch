@@ -1,5 +1,5 @@
 import { Alert, Button, HStack, Text } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { LuArrowRight } from "react-icons/lu";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";

@@ -28,7 +28,8 @@ import {
 } from "../../../../../ee/licensing/__tests__/fixtures/testLicenses";
 import { TEST_PUBLIC_KEY, TEST_PRIVATE_KEY } from "../../../../../ee/licensing/__tests__/fixtures/testKeys";
 import { parseLicenseKey, verifySignature, PRO_TEMPLATE, ENTERPRISE_TEMPLATE } from "../../../../../ee/licensing";
-import { OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole, RoleBindingScopeType, TeamUserRole } from "@prisma/client";
+import { nanoid } from "nanoid";
 
 // Mock getLicenseHandler to use test public key
 vi.mock("../../../subscriptionHandler", async (importOriginal) => {
@@ -91,6 +92,21 @@ describe("License Router Integration", () => {
       },
     });
 
+    // Grant admin user an org-scoped ADMIN RoleBinding so permission checks pass
+    await prisma.roleBinding.deleteMany({
+      where: { organizationId, userId: adminUser.id },
+    });
+    await prisma.roleBinding.create({
+      data: {
+        id: `rb-lic-admin-${nanoid(8)}`,
+        organizationId,
+        userId: adminUser.id,
+        role: TeamUserRole.ADMIN,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      },
+    });
+
     // Create member user
     const memberUser = await prisma.user.upsert({
       where: { email: "license-router-member@test.com" },
@@ -117,6 +133,21 @@ describe("License Router Integration", () => {
       },
     });
 
+    // Grant member an org-scoped MEMBER RoleBinding so organization:view checks pass
+    await prisma.roleBinding.deleteMany({
+      where: { organizationId, userId: memberUser.id },
+    });
+    await prisma.roleBinding.create({
+      data: {
+        id: `rb-lic-member-${nanoid(8)}`,
+        organizationId,
+        userId: memberUser.id,
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.ORGANIZATION,
+        scopeId: organizationId,
+      },
+    });
+
     // Create admin caller
     const adminCtx = createInnerTRPCContext({
       session: {
@@ -138,6 +169,7 @@ describe("License Router Integration", () => {
 
   afterAll(async () => {
     // Cleanup
+    await prisma.roleBinding.deleteMany({ where: { organizationId } });
     await prisma.organizationUser.deleteMany({
       where: { organizationId },
     });
@@ -357,7 +389,6 @@ describe("License Router Integration", () => {
         maxTeams: 10,
         maxProjects: 20,
         maxMessagesPerMonth: 100000,
-        evaluationsCredit: 500,
         maxWorkflows: 50,
         maxPrompts: 50,
         maxEvaluators: 50,
@@ -436,7 +467,6 @@ describe("License Router Integration", () => {
           maxTeams: ENTERPRISE_TEMPLATE.maxTeams ?? 100,
           maxProjects: ENTERPRISE_TEMPLATE.maxProjects,
           maxMessagesPerMonth: ENTERPRISE_TEMPLATE.maxMessagesPerMonth,
-          evaluationsCredit: ENTERPRISE_TEMPLATE.evaluationsCredit,
           maxWorkflows: ENTERPRISE_TEMPLATE.maxWorkflows,
           maxPrompts: ENTERPRISE_TEMPLATE.maxPrompts ?? 1000,
           maxEvaluators: ENTERPRISE_TEMPLATE.maxEvaluators ?? 1000,

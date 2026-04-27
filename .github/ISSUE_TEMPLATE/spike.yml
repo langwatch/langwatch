@@ -1,0 +1,38 @@
+name: Spike
+description: Time-boxed investigation of a tool, approach, or architecture
+labels: ["spike"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What problem does this spike investigate?
+    validations:
+      required: true
+  - type: textarea
+    id: approach
+    attributes:
+      label: Approach
+      description: What tool/technique are we evaluating? Why this one?
+    validations:
+      required: true
+  - type: textarea
+    id: plan
+    attributes:
+      label: Spike Plan
+      description: Concrete steps to evaluate (1-2 days max)
+    validations:
+      required: true
+  - type: textarea
+    id: success-criteria
+    attributes:
+      label: Success Criteria
+      description: How do we know if it worked? Measurable outcomes.
+    validations:
+      required: true
+  - type: textarea
+    id: deliverable
+    attributes:
+      label: Deliverable
+      description: What gets updated/produced? (Default - update this issue body with results)
+      value: Update this issue body with results and recommendation.

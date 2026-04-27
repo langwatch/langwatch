@@ -185,6 +185,34 @@ describe("Activity tracking hook", () => {
     });
   });
 
+  describe("given a user who has not completed onboarding (no organization)", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      currentNurturing = mockNurturing;
+      resetActivityTrackingCache();
+    });
+
+    describe("when the auth session callback fires", () => {
+      it("does not call identifyUser to avoid creating ghost people in Customer.io", () => {
+        fireActivityTrackingNurturing({
+          userId: "user-no-org",
+          hasOrganization: false,
+        });
+
+        expect(mockNurturing.identifyUser).not.toHaveBeenCalled();
+      });
+
+      it("does not populate the debounce cache", () => {
+        fireActivityTrackingNurturing({
+          userId: "user-no-org",
+          hasOrganization: false,
+        });
+
+        expect(getActivityTrackingCacheSize()).toBe(0);
+      });
+    });
+  });
+
   describe("given nurturing is undefined", () => {
     beforeEach(() => {
       vi.clearAllMocks();

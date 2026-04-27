@@ -1,0 +1,557 @@
+---
+title: "Prompts CLI"
+description: "Use the LangWatch Prompts CLI to manage prompts as code with version control and support A/B testing for AI agent evaluations."
+---
+
+<Tip>
+  **Automated setup available.** [Copy the prompts skill prompt](/skills/code-prompts#version-my-prompts) into your coding agent to set up prompt versioning automatically.
+</Tip>
+
+The `langwatch prompt` command provides dependency management for AI prompts as plain YAML files, enabling you to version prompts locally with Git while synchronizing with the LangWatch platform for testing, evaluation, and team collaboration.
+
+## Installation
+
+Install the CLI globally:
+
+```bash
+npm install -g langwatch
+```
+
+Authenticate:
+
+```bash
+langwatch login
+```
+
+## Quick Start
+
+### 1. Initialize Your Project
+
+Create a new prompts project:
+
+```bash
+langwatch prompt init
+```
+
+This will create the following structure to manage your prompts:
+
+```bash
+├── prompts # directory to create your prompts
+│   └── .materialized # where remote fetched prompts will be stored
+├── prompts.json # prompt dependencies
+└── prompts-lock.json # lock file
+```
+
+### 2. Add Your First Prompt
+
+Create a local prompt:
+
+```bash
+langwatch prompt create my-summarizer
+```
+
+Or add an existing remote prompt dependency:
+
+```bash
+langwatch prompt add agent/customer-service
+```
+
+Your newly created or fetched prompt will be on a yaml file in the `prompts/` directory, and look like this:
+
+```yaml
+model: openai/gpt-5
+modelParameters:
+  temperature: 1.0
+messages:
+  - role: system
+    content: You are a helpful assistant.
+  - role: user
+    content: "{{input}}"
+```
+
+### 3. Synchronize
+
+Sync all prompts (fetch remote, push local changes):
+
+```bash
+langwatch prompt sync
+```
+
+Go to [app.langwatch.ai](https://app.langwatch.ai) to see your new synced prompts.
+
+## Using the Prompts
+
+Once you've created your prompts, you can use them in your application code. The LangWatch SDK provides a simple interface to fetch and compile prompts with dynamic variables.
+
+<Tabs>
+<Tab title="Python">
+```python
+import langwatch
+from litellm import completion
+
+# Get the latest prompt by handle
+prompt = langwatch.prompts.get("my-summarizer")
+
+# Compile prompt with variables
+compiled_prompt = prompt.compile(
+    user_input="Summarize this article for me...",
+    context="Article content here"
+)
+
+# Use with LiteLLM (supports all major providers)
+response = completion(
+    model=prompt.model,
+    messages=compiled_prompt.messages,
+    temperature=prompt.temperature,
+    max_tokens=prompt.max_tokens
+)
+
+print(response.choices[0].message.content)
+```
+
+</Tab>
+
+<Tab title="TypeScript">
+```typescript
+import { LangWatch } from "langwatch";
+import { openai } from "@ai-sdk/openai";
+import { generateText } from "ai";
+
+const langwatch = new LangWatch({
+  apiKey: process.env.LANGWATCH_API_KEY
+});
+
+// Get the latest prompt by handle
+const prompt = await langwatch.prompts.get("my-summarizer");
+
+// Compile prompt with variables
+const compiledPrompt = prompt.compile({
+  user_input: "Summarize this article for me...",
+  context: "Article content here"
+});
+
+// Use with Vercel AI SDK
+const result = await generateText({
+  model: openai(prompt.model.replace("openai/", "")),
+  messages: compiledPrompt.messages,
+  temperature: prompt.temperature,
+  maxTokens: prompt.maxTokens
+});
+
+console.log(result.text);
+```
+
+</Tab>
+</Tabs>
+
+### Working with Local and Remote Prompts
+
+The SDK loads prompts dynamically at runtime, so you don't need to worry about whether they're local or remote:
+
+- **Local prompts**: Fetched directly from your LangWatch project
+- **Remote prompts**: Also fetched from LangWatch after being synced from the materialized files
+
+<Info>
+For production deployments, the CLI materializes prompts locally so you have a complete snapshot of all dependencies. The SDK can automatically use these materialized prompts for [guaranteed availability](/prompt-management/features/advanced/guaranteed-availability) in offline or air-gapped environments. However, when online, the SDK always fetches the latest version from the server unless you specify a version.
+
+Learn more about [guaranteed availability and offline deployments](/prompt-management/features/advanced/guaranteed-availability).
+</Info>
+
+### Loading Specific Versions
+
+You can also load specific prompt versions instead of always using the latest:
+
+<CodeGroup>
+```python Python
+# Get a specific version
+prompt = langwatch.prompts.get("my-summarizer", version=5)
+```
+
+```typescript TypeScript
+// Get a specific version
+const prompt = await langwatch.prompts.get("my-summarizer", { version: 5 });
+```
+</CodeGroup>
+
+### Prompt Variables
+
+Prompts use `{{variable_name}}` syntax for dynamic content. When you compile a prompt, provide all required variables:
+
+```yaml my-prompt.prompt.yaml
+messages:
+  - role: system
+    content: |
+      You are a {{role}} assistant.
+      User: {{user_name}}
+      Context: {{context}}
+  - role: user
+    content: "{{user_input}}"
+```
+
+Then compile with all variables:
+
+<CodeGroup>
+```python Python
+compiled = prompt.compile(
+    role="customer support",
+    user_name="John Doe",
+    context="Premium user since 2020",
+    user_input="I need help with my account"
+)
+```
+
+```typescript TypeScript
+const compiled = prompt.compile({
+  role: "customer support",
+  user_name: "John Doe",
+  context: "Premium user since 2020",
+  user_input: "I need help with my account"
+});
+```
+</CodeGroup>
+
+<Check>
+The compiled prompt contains fully rendered messages ready to send to your LLM provider, with all variables replaced and the correct model configuration applied.
+</Check>
+
+## Core Concepts
+
+### Dependency Management
+
+The CLI uses two configuration files:
+
+**`prompts.json`** - Declares your prompt dependencies:
+
+```json
+{
+  "prompts": {
+    "agent/customer-service": "latest",
+    "shared/guidelines": "5",
+    "my-local-prompt": "file:./prompts/my-local-prompt.prompt.yaml"
+  }
+}
+```
+
+**`prompts-lock.json`** - Tracks resolved versions and materialized file paths:
+
+```json
+{
+  "lockfileVersion": 1,
+  "prompts": {
+    "agent/customer-service": {
+      "version": 12,
+      "versionId": "prompt_version_scRQwSRMIyJvoSxTqP2nR",
+      "materialized": "prompts/.materialized/agent/customer-service.prompt.yaml"
+    }
+  }
+}
+```
+
+### Local vs Remote Prompts
+
+**Remote Prompts** (`agent/customer-service@latest`)
+
+- Pulled from LangWatch platform
+- Fetched and materialized locally in `./prompts/.materialized/`
+- Read-only locally
+
+**Local Prompts** (`file:./prompts/my-prompt.prompt.yaml`)
+
+- Stored as local YAML files
+- Version controlled with Git
+- Pushed to platform during sync for sharing and evaluation
+
+### YAML Format
+
+Prompts files end with `.prompt.yaml` extension and follow this format:
+
+```yaml
+model: openai/gpt-5
+modelParameters:
+  temperature: 0.7
+  max_tokens: 1000
+messages:
+  - role: system
+    content: You are a helpful assistant specializing in customer service.
+  - role: user
+    content: |
+      Please help the customer with their inquiry:
+
+      {{customer_message}}
+```
+
+This is the same structure as [GitHub Prompts](https://docs.github.com/en/github-models/use-github-models/storing-prompts-in-github-repositories).
+
+## Commands Reference
+
+### `langwatch prompt init`
+
+Initialize a new prompts project in the current directory.
+
+```bash
+langwatch prompt init
+```
+
+### `langwatch prompt add <spec> [localFile]`
+
+Add a new prompt dependency and immediately fetch/materialize it.
+
+```bash
+# Add remote prompt
+langwatch prompt add shared/guidelines@latest
+
+# Add specific version
+langwatch prompt add agent/support@5
+
+# Add local file as dependency
+langwatch prompt add my-prompt ./prompts/my-prompt.prompt.yaml
+```
+
+**Arguments:**
+
+- `<spec>` - Prompt specification (name@version or name for latest)
+- `[localFile]` - Optional path to local YAML file to add
+
+**Behavior:**
+
+- Updates `prompts.json` with new dependency
+- Fetches prompt from server and materializes locally
+- Updates `prompts-lock.json` with resolved version
+
+### `langwatch prompt remove <name>`
+
+Remove a prompt dependency and clean up associated files.
+
+```bash
+langwatch prompt remove agent/support
+```
+
+**Behavior:**
+
+- Removes entry from `prompts.json`
+- Removes entry from `prompts-lock.json`
+- Deletes materialized file
+- For local prompts: deletes source file and warns about server state
+
+### `langwatch prompt create <name>`
+
+Create a new local prompt file with default content.
+
+```bash
+langwatch prompt create my-new-prompt
+```
+
+**Behavior:**
+
+- Creates `./prompts/<name>.prompt.yaml` with template content
+- Automatically adds to `prompts.json` as `file:` dependency
+- Updates `prompts-lock.json`
+
+### `langwatch prompt sync`
+
+Synchronize all prompts between local files and the server. This runs both `pull` and `push` in sequence.
+
+```bash
+langwatch prompt sync
+```
+
+**Behavior:**
+
+- Fetches remote prompts if new versions available
+- Pushes local prompt changes to server
+- Handles conflict resolution interactively
+- Cleans up orphaned materialized files
+- Reports what was synced
+
+**Conflict Resolution:**
+When local and remote versions have both changed:
+
+```
+Conflict detected for my-prompt:
+Local changes: Updated system message
+Remote changes: Added temperature parameter
+
+Choose resolution:
+  l) Use local version (will create new version on server)
+  r) Use remote version (will overwrite local file)
+  a) Abort sync for this prompt
+```
+
+### `langwatch prompt pull`
+
+Pull remote prompts from the server and materialize them locally. Does not push any local changes.
+
+```bash
+langwatch prompt pull
+```
+
+**Behavior:**
+
+- Fetches remote prompts if new versions are available
+- Materializes them into `prompts/.materialized/`
+- Updates `prompts-lock.json` with resolved versions
+- Cleans up orphaned materialized files
+- Does **not** push local prompts to the server
+
+Use this when you want to update your local materialized files without pushing any local prompt changes, for example during CI/CD deployments or after a teammate updates a shared prompt.
+
+### `langwatch prompt push`
+
+Push local prompts to the server. Does not pull any remote changes.
+
+```bash
+langwatch prompt push
+```
+
+**Behavior:**
+
+- Pushes local prompt changes (those declared as `file:` dependencies) to the server
+- Handles conflict resolution interactively if remote has diverged
+- Updates `prompts-lock.json` with new version info
+- Does **not** fetch or update remote prompts locally
+
+Use this when you want to publish your local prompt changes without fetching remote updates.
+
+### `langwatch prompt list`
+
+Display current prompt dependencies and their status.
+
+```bash
+langwatch prompt list
+```
+
+## CI/CD Integration
+
+Integrate prompt materialization into your deployment pipeline:
+
+```yaml .github/workflows/deploy.yml
+name: Deploy with Prompts
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Install LangWatch CLI
+        run: npm install -g langwatch
+
+      - name: Materialize prompts
+        env:
+          LANGWATCH_API_KEY: ${{ secrets.LANGWATCH_API_KEY }}
+        run: langwatch prompt pull
+
+      - name: Build application
+        run: npm run build
+
+      - name: Deploy with materialized prompts
+        run: |
+          # Deploy application including prompts/.materialized/
+          # Your deployment commands here
+```
+
+## Workflows
+
+### Team Collaboration
+
+**Setup:**
+
+1. One team member initializes project with `langwatch prompt init`
+2. Commit `prompts.json` and `prompts-lock.json` to Git
+3. Add `prompts/.materialized` to `.gitignore`
+4. Team members run `langwatch prompt pull` after pulling
+
+**Adding Shared Prompts:**
+
+```bash
+# Add organization prompts
+langwatch prompt add company/brand-guidelines@latest
+langwatch prompt add legal/privacy-policy@^2
+
+# Sync to materialize
+langwatch prompt sync
+```
+
+**Creating Local Prompts:**
+
+```bash
+# Create and develop locally
+langwatch prompt create feature/user-onboarding
+
+# Edit the file
+vim prompts/feature/user-onboarding.prompt.yaml
+
+# Push to platform for evaluation
+langwatch prompt push
+```
+
+### Version Management
+
+**Pinning Versions:**
+
+```json
+{
+  "prompts": {
+    "critical/system-prompt": "5", // Exact version
+    "experimental/new-feature": "latest" // Auto-update
+  }
+}
+```
+
+**Upgrading Dependencies:**
+
+```bash
+# Edit prompts.json to change versions
+# Then sync to fetch new versions
+langwatch prompt sync
+```
+
+**Rolling Back:**
+
+```bash
+# Restore from Git
+git checkout prompts.json prompts-lock.json
+
+# Re-sync to match committed state
+langwatch prompt sync
+```
+
+**Development Workflow:**
+
+```bash
+# Create new feature prompt
+langwatch prompt create features/new-capability
+
+# Edit and test locally
+# When ready, sync to platform
+langwatch prompt sync
+
+# Platform team can now evaluate and provide feedback
+```
+
+## Coding Assistant Integration
+
+Since prompts are just YAML files, you refer to them directly from other tools or coding assistants.
+
+### Cursor Integration
+
+Reference prompts in a `.cursor/rules/*.mdc` file:
+
+```yaml
+---
+description:
+globs:
+alwaysApply: true
+---
+
+@/prompts/.materialized/company/java-code-guidelines.prompt.yaml
+```
+
+### Cloud Code Integration
+
+Include prompt content in cloud development environments by referencing the YAML files in the `prompts/.materialized` directory.

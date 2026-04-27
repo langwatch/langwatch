@@ -1,6 +1,6 @@
 import { Box, HStack, Link, Spinner, Text } from "@chakra-ui/react";
 import { ChevronDown, ExternalLink, Plus } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useState } from "react";
 import { createInitialState } from "~/evaluations-v3/types";
 import { extractPersistedState } from "~/evaluations-v3/types/persistence";

@@ -1,4 +1,5 @@
 import { createEnvConfig } from "../../env-create.mjs";
+import { parseRedisDbIndex } from "../redis-db-index";
 
 export type ProcessRole = "web" | "worker" | "migration";
 
@@ -8,9 +9,9 @@ export interface AppConfig {
   // Infrastructure
   databaseUrl: string;
   clickhouseUrl?: string;
-  enableClickhouse?: boolean;
   redisUrl?: string;
   redisClusterEndpoints?: string;
+  redisDbIndex?: number;
 
   // Services
   langevalsEndpoint?: string;
@@ -21,9 +22,6 @@ export interface AppConfig {
   hubspotPortalId?: string;
   hubspotReachedLimitFormId?: string;
   hubspotFormId?: string;
-
-  // Event sourcing
-  enableEventSourcing?: boolean;
 
   // Process role — controls which event-sourcing consumers run.
   // "web": dispatch commands only (no BullMQ workers)
@@ -56,9 +54,9 @@ export function createAppConfigFromEnv(overrides?: {
     nodeEnv: env.NODE_ENV,
     databaseUrl: env.DATABASE_URL,
     clickhouseUrl: env.CLICKHOUSE_URL,
-    enableClickhouse: env.ENABLE_CLICKHOUSE,
     redisUrl: env.REDIS_URL,
     redisClusterEndpoints: env.REDIS_CLUSTER_ENDPOINTS,
+    redisDbIndex: parseRedisDbIndex(env.REDIS_DB_INDEX),
     langevalsEndpoint: env.LANGEVALS_ENDPOINT,
     baseHost: env.BASE_HOST,
     slackPlanLimitChannel: env.SLACK_PLAN_LIMIT_CHANNEL,
@@ -69,7 +67,6 @@ export function createAppConfigFromEnv(overrides?: {
     hubspotFormId: env.HUBSPOT_FORM_ID,
     customerIoApiKey: env.CUSTOMER_IO_API_KEY,
     customerIoRegion: env.CUSTOMER_IO_REGION,
-    enableEventSourcing: env.ENABLE_EVENT_SOURCING,
     processRole: overrides?.processRole,
     isSaas: env.IS_SAAS,
     skipRedis: env.SKIP_REDIS,

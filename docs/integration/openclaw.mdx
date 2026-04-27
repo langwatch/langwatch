@@ -1,0 +1,135 @@
+---
+title: OpenClaw Integration
+sidebarTitle: OpenClaw
+description: Send OpenTelemetry traces from your OpenClaw agent to LangWatch for observability, cost tracking, and evaluation.
+---
+
+<Note>
+**⚠️ Experimental** — OpenClaw's `diagnostics-otel` plugin is under active development. The instrumentation spec is stabilizing but may change. Follow the discussion at [PR #11100](https://github.com/openclaw/openclaw/pull/11100) for the latest.
+</Note>
+
+[OpenClaw](https://github.com/openclaw/openclaw) is an open-source AI agent framework that runs as a personal assistant or production copilot — handling tasks like code reviews, monitoring, incident response, and more. Its built-in `diagnostics-otel` plugin emits [OpenTelemetry GenAI Semantic Conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/)-compliant traces that LangWatch can ingest natively.
+
+## Setup
+
+<Steps>
+<Step title="Get your LangWatch API Key">
+Go to [app.langwatch.ai/authorize](https://app.langwatch.ai/authorize) to create your account and project, then grab your API key.
+</Step>
+<Step title="Configure OpenClaw">
+Add the following to your `~/.openclaw/openclaw.json`:
+
+```json
+{
+  "diagnostics": {
+    "enabled": true,
+    "otel": {
+      "enabled": true,
+      "endpoint": "https://app.langwatch.ai/api/otel",
+      "traces": true,
+      "metrics": true,
+      "headers": {
+        "X-Auth-Token": "sk-lw-YOUR_API_KEY_HERE"
+      },
+      "serviceName": "my-clawdbot",
+      "sampleRate": 1,
+      "captureContent": true
+    }
+  },
+  "plugins": {
+    "allow": ["diagnostics-otel"],
+    "entries": {
+      "diagnostics-otel": {
+        "enabled": true
+      }
+    }
+  }
+}
+```
+
+<Note>
+If you already have an `openclaw.json`, just merge the `diagnostics` and `plugins` sections into your existing config.
+</Note>
+</Step>
+<Step title="Restart the gateway">
+```bash
+openclaw gateway restart
+```
+</Step>
+<Step title="Test the integration">
+Send a message to your agent and check the LangWatch dashboard. Each agent turn produces a trace with the full execution tree.
+</Step>
+</Steps>
+
+## What You Get
+
+Each agent turn produces a span tree like this:
+
+```
+run (root span)
+├── chat claude-opus-4-6        (LLM inference)
+│   ├── tool.Read               (tool execution)
+│   └── tool.Edit               (tool execution)
+├── chat claude-opus-4-6        (follow-up LLM call)
+│   └── tool.exec               (tool execution)
+└── chat claude-opus-4-6        (final LLM call)
+```
+
+LLM spans are children of the run. Tool spans are children of the LLM call that invoked them. Each span includes:
+
+- **Model info** — which model was requested and which was used
+- **Token usage** — prompt tokens, completion tokens, cache read/write breakdown
+- **Latency** — duration of each LLM call and tool execution
+- **Cost** — calculated from token usage
+- **Content** — full input/output messages when `captureContent` is enabled
+
+## Content Capture
+
+The `captureContent` flag controls whether message content is included in traces.
+
+When **enabled**, traces include:
+
+- `gen_ai.input.messages` — the full prompt sent to the model
+- `gen_ai.output.messages` — the model's response
+- `gen_ai.system_instructions` — the system prompt
+- `gen_ai.request.tools` — tool definitions available to the model
+- Tool input/output on execution spans
+
+When **disabled**, you still get the full trace structure, token counts, latency, and model metadata — just no message content. Useful if you want observability without logging sensitive conversations.
+
+## Configuration Reference
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `diagnostics.otel.enabled` | Turn OTEL export on/off | `false` |
+| `diagnostics.otel.endpoint` | OTLP endpoint URL | — |
+| `diagnostics.otel.traces` | Export traces | `true` |
+| `diagnostics.otel.metrics` | Export metrics | `true` |
+| `diagnostics.otel.logs` | Export logs | `false` |
+| `diagnostics.otel.headers` | Auth headers (include your API key) | `{}` |
+| `diagnostics.otel.serviceName` | Service name in traces | `"openclaw"` |
+| `diagnostics.otel.sampleRate` | Sampling rate (0.0–1.0) | `1.0` |
+| `diagnostics.otel.captureContent` | Include message content in traces | `false` |
+
+For high-volume deployments, consider reducing `sampleRate` to control costs. A rate of `0.1` samples 10% of traces.
+
+## GenAI Semantic Conventions
+
+The plugin emits traces compliant with the [OTEL GenAI semantic conventions](https://opentelemetry.io/docs/specs/semconv/gen-ai/):
+
+| Attribute | Description |
+|-----------|-------------|
+| `gen_ai.operation.name` | `"chat"` for LLM inference spans |
+| `gen_ai.system` | Provider identifier (e.g. `"anthropic"`, `"openai"`) |
+| `gen_ai.request.model` | Model requested |
+| `gen_ai.response.model` | Model actually used |
+| `gen_ai.usage.input_tokens` | Total input tokens (including cached) |
+| `gen_ai.usage.output_tokens` | Completion tokens |
+| `gen_ai.usage.cache_read_input_tokens` | Tokens served from cache |
+| `gen_ai.usage.cache_creation_input_tokens` | Tokens written to cache |
+
+LLM spans use `SPAN_KIND_CLIENT` per the GenAI spec (outbound RPCs to model providers).
+
+---
+
+For more information, check out the [OpenClaw documentation](https://docs.openclaw.ai) and the [diagnostics-otel discussion](https://github.com/openclaw/openclaw/pull/11100).

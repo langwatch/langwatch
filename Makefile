@@ -1,6 +1,6 @@
 .PHONY: start sync-all-openapi user-delete-dry-run user-delete es-delete-dry-run es-delete
 .PHONY: dev dev-nlp dev-scenarios dev-full down logs clean ps quickstart worktree
-.PHONY: dev-up dev-down dev-logs setup-hooks
+.PHONY: dev-up dev-down dev-logs setup-hooks service service-watch
 
 # =============================================================================
 # DOCKER DEV ENVIRONMENT (compose.dev.yml)
@@ -12,30 +12,54 @@ COMPOSE = docker compose -f compose.dev.yml
 
 # Install git hooks (idempotent, runs automatically before dev targets)
 setup-hooks:
-	@cp .githooks/post-checkout .git/hooks/post-checkout 2>/dev/null || true
+	@git config core.hooksPath .githooks 2>/dev/null || true
 
-# Minimal: postgres + redis + app (no opensearch)
-dev: setup-hooks
+# Run a Go service via the mono-binary.
+# Usage: make service svc=aigateway
+#
+# Sources every var from langwatch/.env into the Go process's environment.
+# The gateway + control-plane intentionally share secrets (LW_GATEWAY_*,
+# LW_VIRTUAL_KEY_PEPPER etc.) — one flat .env is simpler than namespace
+# prefixes. Vars the Go service doesn't need are ignored.
+DEV_ENV_FILE ?= langwatch/.env
+service:
+	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
+	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed langwatch/.env first" && exit 1)
+	@set -a && . $(DEV_ENV_FILE) && set +a && \
+		export LOG_FORMAT=pretty && \
+		exec go run ./cmd/service $(svc)
+
+# Run a Go service with live reload on file changes.
+# Usage: make service-watch svc=aigateway
+service-watch:
+	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
+	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed langwatch/.env first" && exit 1)
+	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
+	@set -a && . $(DEV_ENV_FILE) && set +a && \
+		export LOG_FORMAT=pretty && \
+		air --build.cmd "go build -o ./tmp/$(svc) ./cmd/service" \
+			--build.bin "./tmp/$(svc) $(svc)" \
+			--build.include_ext "go" \
+			--build.exclude_dir "tmp,vendor,node_modules"
+
+# Minimal: postgres + redis + clickhouse + app
+dev:
 	$(COMPOSE) up
 
-# + opensearch (for traces/search features)
-dev-search: setup-hooks
-	$(COMPOSE) --profile search up
-
 # + NLP service + langevals (for evaluations)
-dev-nlp: setup-hooks
+dev-nlp:
 	$(COMPOSE) --profile nlp up
 
-# + scenario worker + bullboard + NLP (no opensearch needed)
-dev-scenarios: setup-hooks
+# + scenario worker + bullboard + NLP
+dev-scenarios:
 	$(COMPOSE) --profile scenarios up
 
 # + AI test server (for HTTP agent testing)
-dev-test: setup-hooks
+dev-test:
 	$(COMPOSE) --profile test up
 
 # Everything
-dev-full: setup-hooks
+dev-full:
 	$(COMPOSE) --profile full up
 
 # Stop all services
@@ -89,7 +113,7 @@ quickstart:
 # Port info saved to .dev-port for agent/skill discovery.
 
 # Start isolated instance (detached). Usage: make dev-up [PROFILE=scenarios]
-dev-up: setup-hooks
+dev-up:
 	@./scripts/dev-up.sh $(PROFILE)
 
 # Stop isolated instance

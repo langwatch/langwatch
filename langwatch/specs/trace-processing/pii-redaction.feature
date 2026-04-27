@@ -22,10 +22,22 @@ Feature: PII Redaction in Trace Processing
     Then no redaction occurs
 
   @unit
-  Scenario: Only scans specific PII-bearing keys
-    Given a span with attribute "other.attribute" containing PII
+  Scenario: Scans all string attributes for PII
+    Given a span with attribute "custom.sdk.input" containing PII
     When the span is processed with PII redaction level "STRICT"
-    Then the attribute value is NOT redacted
+    Then the attribute value is redacted
+
+  @unit
+  Scenario: Redacts PII from resource attributes
+    Given a span with resource attribute "langwatch.metadata.custom" containing PII
+    When the span is processed with PII redaction level "STRICT"
+    Then the resource attribute value is redacted
+
+  @unit
+  Scenario: Sends all string values in a single batch call
+    Given a span with multiple string attributes containing PII
+    When the span is processed with PII redaction level "STRICT"
+    Then a single batch PII detection call is made for all values
 
   @unit
   Scenario: Does not mutate original command data

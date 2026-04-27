@@ -58,7 +58,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
 
   // Form Hook
   const {
-    register,
     handleSubmit,
     reset,
     watch,
@@ -286,7 +285,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
               <DatasetSelector
                 datasets={datasets.data}
                 localStorageDatasetId={datasetId}
-                register={register}
                 errors={errors}
                 setValue={setValue}
                 onCreateNew={editDataset.onOpen}

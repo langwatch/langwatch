@@ -40,7 +40,6 @@ describe("UsageStatsService", () => {
       getEvaluatorCount: vi.fn().mockResolvedValue(0),
       getAgentCount: vi.fn().mockResolvedValue(0),
       getExperimentCount: vi.fn().mockResolvedValue(0),
-      getEvaluationsCreditUsed: vi.fn().mockResolvedValue(0),
     } as unknown as ILicenseEnforcementRepository;
 
     mockTraceUsage = {

@@ -19,6 +19,7 @@ import {
   YAxis,
 } from "recharts";
 
+import { ChartTooltip } from "../analytics/ChartTooltip";
 import type { BatchEvaluationData, ComparisonRunData } from "./types";
 import { RUN_COLORS } from "./useMultiRunData";
 
@@ -320,11 +321,16 @@ export const ComparisonCharts = ({
     }
   };
 
-  // Default X-axis: "runs" if multiple runs, "target" if single run with multiple targets
+  // Default X-axis: "runs" if multiple runs, "target" if single run with multiple real targets.
+  // When all targets are evaluators (simple evaluations without a prompt/agent target),
+  // each evaluator gets its own column but grouping by "target" is not useful — default to "runs".
   const defaultXAxis = useMemo((): XAxisOption => {
     if (comparisonData.length >= 2) return "runs";
-    const targetCount = comparisonData[0]?.data?.targetColumns.length ?? 0;
-    if (targetCount >= 2) return "target";
+    const targets = comparisonData[0]?.data?.targetColumns ?? [];
+    const hasRealTarget = targets.some(
+      (t) => t.type !== "evaluator" && !t.id.startsWith("_eval_"),
+    );
+    if (targets.length >= 2 && hasRealTarget) return "target";
     return "runs";
   }, [comparisonData]);
 
@@ -502,9 +508,9 @@ export const ComparisonCharts = ({
       }
 
       // Use the stored name for display, include color from targetColors
-      return Array.from(targetGroups.entries()).map(([id, data]) => ({
+      return Array.from(targetGroups.entries()).map(([id, data], index) => ({
         name: data.name,
-        color: targetColors[id],
+        color: targetColors[id] ?? RUN_COLORS[index % RUN_COLORS.length]!,
         cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
         latency:
           data.latencies.reduce((a, b) => a + b, 0) /
@@ -629,8 +635,9 @@ export const ComparisonCharts = ({
       }
     }
 
-    return Array.from(propertyGroups.entries()).map(([_key, data]) => ({
+    return Array.from(propertyGroups.entries()).map(([_key, data], index) => ({
       name: data.displayName,
+      color: RUN_COLORS[index % RUN_COLORS.length]!,
       cost: data.costs.reduce((a, b) => a + b, 0) / (data.costs.length || 1),
       latency:
         data.latencies.reduce((a, b) => a + b, 0) /
@@ -973,6 +980,8 @@ export const ComparisonCharts = ({
                 width="280px"
                 flexShrink={0}
                 bg="bg.subtle"
+                border="1px solid"
+                borderColor="border"
                 borderRadius="md"
                 padding={3}
                 paddingBottom={1}
@@ -1020,7 +1029,9 @@ export const ComparisonCharts = ({
                       tickLine={false}
                     />
                     <Tooltip
+                      content={<ChartTooltip />}
                       formatter={(value) => formatCost(value as number)}
+                      cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
                     />
                     <Bar dataKey="cost" name="Cost">
                       {chartData.map((entry, index) => (
@@ -1045,6 +1056,8 @@ export const ComparisonCharts = ({
                 width="280px"
                 flexShrink={0}
                 bg="bg.subtle"
+                border="1px solid"
+                borderColor="border"
                 borderRadius="md"
                 padding={3}
                 paddingBottom={1}
@@ -1092,7 +1105,9 @@ export const ComparisonCharts = ({
                       tickLine={false}
                     />
                     <Tooltip
+                      content={<ChartTooltip />}
                       formatter={(value) => formatLatency(value as number)}
+                      cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
                     />
                     <Bar dataKey="latency" name="Latency">
                       {chartData.map((entry, index) => (
@@ -1120,6 +1135,8 @@ export const ComparisonCharts = ({
                     width="280px"
                     flexShrink={0}
                     bg="bg.subtle"
+                    border="1px solid"
+                    borderColor="border"
                     borderRadius="md"
                     padding={3}
                     paddingBottom={1}
@@ -1170,7 +1187,9 @@ export const ComparisonCharts = ({
                           tickLine={false}
                         />
                         <Tooltip
+                          content={<ChartTooltip />}
                           formatter={(value) => (value as number).toFixed(2)}
+                          cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
                         />
                         <Bar dataKey={`score_${ev.id}`}>
                           {chartData.map((entry, index) => (
@@ -1199,6 +1218,8 @@ export const ComparisonCharts = ({
                     width="280px"
                     flexShrink={0}
                     bg="bg.subtle"
+                    border="1px solid"
+                    borderColor="border"
                     borderRadius="md"
                     padding={3}
                     paddingBottom={1}
@@ -1252,6 +1273,8 @@ export const ComparisonCharts = ({
                           tickLine={false}
                         />
                         <Tooltip
+                          content={<ChartTooltip />}
+                          cursor={{ fill: "currentColor", fillOpacity: 0.1 }}
                           formatter={(value) =>
                             `${Math.round((value as number) * 100)}%`
                           }

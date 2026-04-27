@@ -1,10 +1,17 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
   MASKED_KEY_PLACEHOLDER,
 } from "../constants";
+
+// Mock the registry module so we can control getProviderModelOptions
+vi.mock("../../server/modelProviders/registry", () => ({
+  getProviderModelOptions: vi.fn().mockReturnValue([]),
+}));
+
+import { getProviderModelOptions } from "../../server/modelProviders/registry";
 import {
   buildCustomKeyState,
   getDisplayKeysForProvider,
@@ -15,10 +22,14 @@ import {
   isProviderDefaultModel,
   isProviderEffectiveDefault,
   isProviderUsedForDefaultModels,
+  resolveModelForProvider,
+  shouldAutoEnableAsDefault,
 } from "../modelProviderHelpers";
 
+const mockGetProviderModelOptions = vi.mocked(getProviderModelOptions);
+
 describe("modelProviderHelpers", () => {
-  describe("getProviderFromModel", () => {
+  describe("getProviderFromModel()", () => {
     it("extracts provider key from model string", () => {
       expect(getProviderFromModel("openai/gpt-4")).toBe("openai");
       expect(getProviderFromModel("anthropic/claude-sonnet-4")).toBe(
@@ -40,7 +51,7 @@ describe("modelProviderHelpers", () => {
     });
   });
 
-  describe("getEffectiveDefaults", () => {
+  describe("getEffectiveDefaults()", () => {
     it("returns project defaults when all are set", () => {
       const project = {
         defaultModel: "openai/gpt-4o",
@@ -100,7 +111,7 @@ describe("modelProviderHelpers", () => {
     });
   });
 
-  describe("isProviderDefaultModel", () => {
+  describe("isProviderDefaultModel()", () => {
     it("returns true when provider matches default model", () => {
       const project = { defaultModel: "openai/gpt-4o" };
       expect(isProviderDefaultModel("openai", project)).toBe(true);
@@ -123,7 +134,7 @@ describe("modelProviderHelpers", () => {
     });
   });
 
-  describe("isProviderEffectiveDefault", () => {
+  describe("isProviderEffectiveDefault()", () => {
     it("returns true when provider is used for default model", () => {
       const project = {
         defaultModel: "openai/gpt-4o",
@@ -171,7 +182,7 @@ describe("modelProviderHelpers", () => {
     });
   });
 
-  describe("isProviderUsedForDefaultModels", () => {
+  describe("isProviderUsedForDefaultModels()", () => {
     it("returns true when provider matches default model", () => {
       expect(
         isProviderUsedForDefaultModels("openai", "openai/gpt-4o", null, null),
@@ -218,7 +229,7 @@ describe("modelProviderHelpers", () => {
     });
   });
 
-  describe("getSchemaShape", () => {
+  describe("getSchemaShape()", () => {
     it("returns shape from schema with shape property", () => {
       const schema = {
         shape: { OPENAI_API_KEY: {}, OPENAI_BASE_URL: {} },
@@ -251,7 +262,7 @@ describe("modelProviderHelpers", () => {
     });
   });
 
-  describe("getDisplayKeysForProvider", () => {
+  describe("getDisplayKeysForProvider()", () => {
     const schemaShape = {
       AZURE_OPENAI_API_KEY: {},
       AZURE_OPENAI_ENDPOINT: {},
@@ -290,7 +301,7 @@ describe("modelProviderHelpers", () => {
     });
   });
 
-  describe("buildCustomKeyState", () => {
+  describe("buildCustomKeyState()", () => {
     it("returns stored keys when available", () => {
       const displayKeyMap = { OPENAI_API_KEY: {}, OPENAI_BASE_URL: {} };
       const storedKeys = {
@@ -380,7 +391,7 @@ describe("modelProviderHelpers", () => {
     });
   });
 
-  describe("hasUserEnteredNewApiKey", () => {
+  describe("hasUserEnteredNewApiKey()", () => {
     it("returns true when user entered a new API key", () => {
       expect(
         hasUserEnteredNewApiKey({
@@ -440,6 +451,173 @@ describe("modelProviderHelpers", () => {
 
     it("returns false for empty object", () => {
       expect(hasUserEnteredNewApiKey({})).toBe(false);
+    });
+  });
+
+  describe("resolveModelForProvider()", () => {
+    describe("when current model already matches the provider", () => {
+      it("returns it unchanged", () => {
+        const result = resolveModelForProvider({
+          current: "azure/gpt-4o",
+          providerKey: "azure",
+          storedModels: null,
+          mode: "chat",
+        });
+
+        expect(result).toBe("azure/gpt-4o");
+      });
+    });
+
+    describe("when current model does not match provider", () => {
+      it("picks from stored models first", () => {
+        const result = resolveModelForProvider({
+          current: "openai/gpt-5.2",
+          providerKey: "azure",
+          storedModels: ["gpt-4o", "gpt-4-turbo"],
+          mode: "chat",
+        });
+
+        expect(result).toBe("azure/gpt-4o");
+      });
+
+      it("falls back to registry models when no stored models exist", () => {
+        mockGetProviderModelOptions.mockReturnValueOnce([
+          { value: "claude-sonnet-4", label: "claude-sonnet-4" },
+          { value: "claude-haiku-3.5", label: "claude-haiku-3.5" },
+        ]);
+
+        const result = resolveModelForProvider({
+          current: "openai/gpt-5.2",
+          providerKey: "anthropic",
+          storedModels: null,
+          mode: "chat",
+        });
+
+        expect(result).toBe("anthropic/claude-sonnet-4");
+        expect(mockGetProviderModelOptions).toHaveBeenCalledWith(
+          "anthropic",
+          "chat",
+        );
+      });
+
+      it("returns current model when no provider models exist anywhere", () => {
+        mockGetProviderModelOptions.mockReturnValueOnce([]);
+
+        const result = resolveModelForProvider({
+          current: "openai/gpt-5.2",
+          providerKey: "custom-provider",
+          storedModels: null,
+          mode: "chat",
+        });
+
+        expect(result).toBe("openai/gpt-5.2");
+      });
+    });
+
+    describe("when mode is embedding", () => {
+      it("resolves embedding models from registry", () => {
+        mockGetProviderModelOptions.mockReturnValueOnce([
+          {
+            value: "text-embedding-3-small",
+            label: "text-embedding-3-small",
+          },
+        ]);
+
+        const result = resolveModelForProvider({
+          current: "openai/text-embedding-3-small",
+          providerKey: "azure",
+          storedModels: null,
+          mode: "embedding",
+        });
+
+        expect(mockGetProviderModelOptions).toHaveBeenCalledWith(
+          "azure",
+          "embedding",
+        );
+        expect(result).toBe("azure/text-embedding-3-small");
+      });
+    });
+  });
+
+  describe("shouldAutoEnableAsDefault()", () => {
+    describe("when provider is the default model provider", () => {
+      it("returns true", () => {
+        const project = { defaultModel: "openai/gpt-4o" };
+
+        const result = shouldAutoEnableAsDefault({
+          providerKey: "openai",
+          project,
+          enabledProvidersCount: 5,
+        });
+
+        expect(result).toBe(true);
+      });
+    });
+
+    describe("when enabledProvidersCount is 1", () => {
+      it("returns true regardless of default model", () => {
+        const project = { defaultModel: "openai/gpt-5.2" };
+
+        const result = shouldAutoEnableAsDefault({
+          providerKey: "azure",
+          project,
+          enabledProvidersCount: 1,
+        });
+
+        expect(result).toBe(true);
+      });
+    });
+
+    describe("when enabledProvidersCount is 0", () => {
+      it("returns true for first-provider setup", () => {
+        const project = { defaultModel: "openai/gpt-5.2" };
+
+        const result = shouldAutoEnableAsDefault({
+          providerKey: "azure",
+          project,
+          enabledProvidersCount: 0,
+        });
+
+        expect(result).toBe(true);
+      });
+    });
+
+    describe("when provider is not default and enabledProvidersCount > 1", () => {
+      it("returns false", () => {
+        const project = { defaultModel: "openai/gpt-5.2" };
+
+        const result = shouldAutoEnableAsDefault({
+          providerKey: "azure",
+          project,
+          enabledProvidersCount: 2,
+        });
+
+        expect(result).toBe(false);
+      });
+    });
+
+    describe("when project is null", () => {
+      it("returns true when provider matches DEFAULT_MODEL", () => {
+        const expectedProvider = DEFAULT_MODEL.split("/")[0]!;
+
+        const result = shouldAutoEnableAsDefault({
+          providerKey: expectedProvider,
+          project: null,
+          enabledProvidersCount: 3,
+        });
+
+        expect(result).toBe(true);
+      });
+
+      it("returns true when enabledProvidersCount is 1", () => {
+        const result = shouldAutoEnableAsDefault({
+          providerKey: "azure",
+          project: null,
+          enabledProvidersCount: 1,
+        });
+
+        expect(result).toBe(true);
+      });
     });
   });
 });

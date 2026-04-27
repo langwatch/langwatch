@@ -1,4 +1,5 @@
-import { Button, Field, HStack, VStack } from "@chakra-ui/react";
+import { Box, Button, Field, HStack, Input, VStack } from "@chakra-ui/react";
+import { SmallLabel } from "../SmallLabel";
 import { useCallback, useMemo, useState } from "react";
 import { z } from "zod";
 import { useDrawer } from "../../hooks/useDrawer";
@@ -20,6 +21,7 @@ import { CredentialsSection } from "./ModelProviderCredentialsSection";
 import { CustomModelInputSection } from "./ModelProviderCustomModelInput";
 import { DefaultProviderSection } from "./ModelProviderDefaultSection";
 import { ExtraHeadersSection } from "./ModelProviderExtraHeadersSection";
+import { ProviderScopeSection } from "./ModelProviderScopeSection";
 
 export type EditModelProviderFormProps = {
   projectId?: string | undefined;
@@ -38,7 +40,9 @@ export const EditModelProviderForm = ({
     projectId: projectId,
   });
   const { closeDrawer } = useDrawer();
-  const { project } = useOrganizationTeamProject();
+  const { project, team, organization, hasPermission } = useOrganizationTeamProject();
+  const canManageOrganization = hasPermission("organization:manage");
+  const canManageTeam = hasPermission("team:manage");
 
   // Count enabled providers to determine if this is the only one
   // Include the current provider being edited since it will be enabled when saved
@@ -57,9 +61,15 @@ export const EditModelProviderForm = ({
 
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  // Get provider - first try by ID, then fallback to provider key
+  // Get provider - first try by ID, then fallback to provider key.
+  // The `modelProviderId === "new"` sentinel forces a blank form even
+  // when the same providerKey is already configured — that's the
+  // multi-instance flow (iter 109): a user can have multiple OpenAI
+  // rows at different scopes, and the "Add Model Provider" menu routes
+  // through this path.
   const provider: MaybeStoredModelProvider = useMemo(() => {
-    if (providers) {
+    const isExplicitNew = modelProviderId === "new";
+    if (providers && !isExplicitNew) {
       // First try to find by ID
       if (modelProviderId) {
         const existing = Object.values(providers).find(
@@ -97,7 +107,12 @@ export const EditModelProviderForm = ({
     provider,
     projectId,
     project,
+    enabledProvidersCount,
     isUsingEnvVars,
+    teamId: team?.id,
+    organizationId: organization?.id,
+    canManageOrganization,
+    canManageTeam,
     onSuccess: () => {
       closeDrawer();
     },
@@ -107,6 +122,8 @@ export const EditModelProviderForm = ({
     modelProvidersRegistry[
       provider.provider as keyof typeof modelProvidersRegistry
     ];
+
+  const isLlmProvider = providerDefinition?.type === "llm";
 
   const {
     validate: validateApiKey,
@@ -162,23 +179,26 @@ export const EditModelProviderForm = ({
       }
     }
 
-    // ALWAYS validate API key on save
-    if (userEnteredNewApiKey) {
-      // User entered new API key - validate it (against custom or default URL)
-      const isValid = await validateApiKey();
-      if (!isValid) return;
-    } else if (customBaseUrl) {
-      // Stored/env key + custom URL - validate against custom URL
-      const isValid = await validateWithCustomUrl(customBaseUrl);
-      if (!isValid) return;
-    } else {
-      // Stored/env key + default URL - validate against default URL
-      const isValid = await validateWithCustomUrl();
-      if (!isValid) return;
+    // Validate API key on save for LLM providers. Safety providers like
+    // azure_safety point at content moderation endpoints and can't be
+    // validated with the OpenAI-compatible chat-completion probe, so we
+    // skip client-side validation and let runtime usage surface errors.
+    if (isLlmProvider) {
+      if (userEnteredNewApiKey) {
+        const isValid = await validateApiKey();
+        if (!isValid) return;
+      } else if (customBaseUrl) {
+        const isValid = await validateWithCustomUrl(customBaseUrl);
+        if (!isValid) return;
+      } else {
+        const isValid = await validateWithCustomUrl();
+        if (!isValid) return;
+      }
     }
 
     void actions.submit();
   }, [
+    isLlmProvider,
     isUsingEnvVars,
     providerDefinition,
     state.customKeys,
@@ -192,7 +212,28 @@ export const EditModelProviderForm = ({
   return (
     <VStack gap={4} align="start" width="full">
       <VStack align="start" width="full" gap={4}>
-        {provider.provider === "azure" && (
+        <Field.Root width="full" required>
+          <SmallLabel>
+            Name
+            <Field.RequiredIndicator />
+          </SmallLabel>
+          <Box width="full">
+            <Input
+              value={state.name}
+              onChange={(e) => actions.setName(e.target.value)}
+              placeholder={provider.provider}
+              width="full"
+              maxLength={128}
+            />
+          </Box>
+          <Field.HelperText>
+            Distinguish multiple instances (e.g. "OpenAI – EU prod" vs
+            "OpenAI – Dev"). Shown in the provider list and model
+            selectors.
+          </Field.HelperText>
+        </Field.Root>
+
+        {isLlmProvider && provider.provider === "azure" && (
           <Field.Root>
             <Switch
               onCheckedChange={(details) => {
@@ -217,26 +258,54 @@ export const EditModelProviderForm = ({
           onApiKeyValidationClear={clearApiKeyError}
         />
 
+        <ProviderScopeSection
+          state={state}
+          actions={actions}
+          provider={provider}
+          teamId={team?.id}
+          teamName={team?.name}
+          organizationId={organization?.id}
+          organizationName={organization?.name}
+          projectId={project?.id}
+          projectName={project?.name}
+          availableTeams={
+            organization?.teams?.map((t) => ({ id: t.id, name: t.name })) ?? []
+          }
+          availableProjects={
+            organization?.teams?.flatMap((t) =>
+              t.projects.map((p) => ({
+                id: p.id,
+                name: `${p.name} · ${t.name}`,
+                teamId: t.id,
+              })),
+            ) ?? []
+          }
+        />
+
         <ExtraHeadersSection
           state={state}
           actions={actions}
           provider={provider}
         />
 
-        <CustomModelInputSection
-          state={state}
-          actions={actions}
-          provider={provider}
-        />
+        {isLlmProvider && (
+          <>
+            <CustomModelInputSection
+              state={state}
+              actions={actions}
+              provider={provider}
+            />
 
-        <DefaultProviderSection
-          state={state}
-          actions={actions}
-          provider={provider}
-          enabledProvidersCount={enabledProvidersCount}
-          project={project}
-          providers={providers}
-        />
+            <DefaultProviderSection
+              state={state}
+              actions={actions}
+              provider={provider}
+              enabledProvidersCount={enabledProvidersCount}
+              project={project}
+              providers={providers}
+            />
+          </>
+        )}
 
         <HStack width="full" justify="end">
           <Button

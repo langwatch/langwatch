@@ -57,6 +57,7 @@ describe("groupEvaluationsByEvaluator()", () => {
 
       expect(groups).toHaveLength(1);
       expect(groups[0]!.evaluatorId).toBe("toxicity");
+      expect(groups[0]!.groupKey).toBe("evaluator-toxicity");
       expect(groups[0]!.runs).toHaveLength(3);
     });
 
@@ -186,6 +187,8 @@ describe("groupEvaluationsByEvaluator()", () => {
       const groups = groupEvaluationsByEvaluator(evaluations);
 
       expect(groups).toHaveLength(2);
+      expect(groups[0]!.groupKey).toBe("ungrouped-eval_2");
+      expect(groups[1]!.groupKey).toBe("ungrouped-eval_1");
       expect(groups[0]!.runs).toHaveLength(1);
       expect(groups[1]!.runs).toHaveLength(1);
     });
@@ -331,8 +334,11 @@ describe("groupEvaluationsByEvaluator()", () => {
 
       expect(groups).toHaveLength(3);
       expect(groups[0]!.evaluatorId).toBe("beta");
+      expect(groups[0]!.groupKey).toBe("evaluator-beta");
       expect(groups[1]!.evaluatorId).toBe("gamma");
+      expect(groups[1]!.groupKey).toBe("evaluator-gamma");
       expect(groups[2]!.evaluatorId).toBe("alpha");
+      expect(groups[2]!.groupKey).toBe("evaluator-alpha");
     });
 
     it("produces the same order regardless of input order", () => {
@@ -411,9 +417,12 @@ describe("groupEvaluationsByEvaluator()", () => {
       expect(groups).toHaveLength(3);
       // Grouped entry comes first, even though ungrouped have higher timestamps
       expect(groups[0]!.evaluatorId).toBe("toxicity");
+      expect(groups[0]!.groupKey).toBe("evaluator-toxicity");
       // Ungrouped entries follow, sorted by timestamp descending
       expect(groups[1]!.latest.evaluation_id).toBe("eval_ungrouped_2");
+      expect(groups[1]!.groupKey).toBe("ungrouped-eval_ungrouped_2");
       expect(groups[2]!.latest.evaluation_id).toBe("eval_ungrouped_1");
+      expect(groups[2]!.groupKey).toBe("ungrouped-eval_ungrouped_1");
     });
   });
 

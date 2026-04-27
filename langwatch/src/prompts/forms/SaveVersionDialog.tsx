@@ -7,7 +7,11 @@ import { z } from "zod";
 import { Dialog } from "~/components/ui/dialog";
 
 const saveVersionFormSchema = z.object({
-  commitMessage: z.string().trim().min(1, "Commit message is required"),
+  commitMessage: z
+    .string()
+    .trim()
+    .min(1, "Commit message is required")
+    .max(200, "Commit message must be 200 characters or less"),
 });
 
 export type SaveDialogFormValues = {
@@ -79,6 +83,7 @@ export function SaveVersionDialog({
               <Input
                 placeholder="Enter a description for this version"
                 autoFocus
+                maxLength={200}
                 {...register("commitMessage", {
                   required: "Description is required",
                 })}

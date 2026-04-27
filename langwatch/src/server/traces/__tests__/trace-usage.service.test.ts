@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { OrganizationRepository } from "~/server/repositories/organization.repository";
 import {
-  clearMonthCountCache,
   TraceUsageService,
 } from "../trace-usage.service";
 
@@ -10,15 +9,18 @@ import {
 // ---------------------------------------------------------------------------
 
 const {
-  mockGetClickHouseClient,
+  mockIsClickHouseEnabled,
+  mockGetClickHouseClientForProject,
   mockQueryTraceSummariesTotalUniq,
 } = vi.hoisted(() => ({
-  mockGetClickHouseClient: vi.fn(),
+  mockIsClickHouseEnabled: vi.fn(),
+  mockGetClickHouseClientForProject: vi.fn(),
   mockQueryTraceSummariesTotalUniq: vi.fn(),
 }));
 
-vi.mock("~/server/clickhouse/client", () => ({
-  getClickHouseClient: mockGetClickHouseClient,
+vi.mock("~/server/clickhouse/clickhouseClient", () => ({
+  isClickHouseEnabled: mockIsClickHouseEnabled,
+  getClickHouseClientForProject: mockGetClickHouseClientForProject,
 }));
 
 vi.mock("../../../../ee/billing/services/billableEventsQuery", () => ({
@@ -44,22 +46,18 @@ describe("TraceUsageService", () => {
     },
   };
 
-  const mockClickHouseClient = {
-    query: vi.fn(),
-  };
-
   let service: TraceUsageService;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    clearMonthCountCache();
-    // Default: no ClickHouse (ES path) — pass null so splitProjectsByFlag returns early
-    mockGetClickHouseClient.mockReturnValue(null);
+    // Default: no ClickHouse (ES path) — pass false so splitProjectsByFlag returns early
+    mockIsClickHouseEnabled.mockReturnValue(false);
+    mockGetClickHouseClientForProject.mockResolvedValue(null);
     service = new TraceUsageService(
       mockOrganizationRepository,
       mockEsClientFactory,
       mockPrisma as any,
-      null,
+      false,
     );
   });
 
@@ -106,11 +104,11 @@ describe("TraceUsageService", () => {
           mockEsClient.count.mockResolvedValue({ count: 100 });
 
           // First call populates cache
-          await service.getCurrentMonthCount({ organizationId: "org-123" });
+          await service.getCurrentMonthCount({ organizationId: "org-es-cache-1" });
 
           // Second call uses cache
           const result = await service.getCurrentMonthCount({
-            organizationId: "org-123",
+            organizationId: "org-es-cache-1",
           });
 
           expect(result).toBe(100);
@@ -125,7 +123,7 @@ describe("TraceUsageService", () => {
 
     describe("when ClickHouse is available", () => {
       beforeEach(() => {
-        mockGetClickHouseClient.mockReturnValue({}); // truthy value
+        mockIsClickHouseEnabled.mockReturnValue(true); // ClickHouse available
         vi.mocked(
           mockOrganizationRepository.getProjectIds,
         ).mockResolvedValue(["proj-1"]);
@@ -135,7 +133,7 @@ describe("TraceUsageService", () => {
         mockQueryTraceSummariesTotalUniq.mockResolvedValue(500);
 
         const result = await service.getCurrentMonthCount({
-          organizationId: "org-123",
+          organizationId: "org-ch-total-1",
         });
 
         expect(result).toBe(500);
@@ -149,7 +147,7 @@ describe("TraceUsageService", () => {
         mockQueryTraceSummariesTotalUniq.mockResolvedValue(null);
 
         const result = await service.getCurrentMonthCount({
-          organizationId: "org-123",
+          organizationId: "org-ch-null-1",
         });
 
         expect(result).toBe(0);
@@ -168,11 +166,11 @@ describe("TraceUsageService", () => {
           mockQueryTraceSummariesTotalUniq.mockResolvedValue(300);
 
           // First call populates cache
-          await service.getCurrentMonthCount({ organizationId: "org-123" });
+          await service.getCurrentMonthCount({ organizationId: "org-ch-cache-1" });
 
           // Second call uses cache
           const result = await service.getCurrentMonthCount({
-            organizationId: "org-123",
+            organizationId: "org-ch-cache-1",
           });
 
           expect(result).toBe(300);
@@ -187,30 +185,9 @@ describe("TraceUsageService", () => {
   // ==========================================================================
 
   describe("getCountByProjects", () => {
-    describe("when ClickHouse is not available (ES path)", () => {
-      it("queries ES for each project", async () => {
-        mockPrisma.project.findMany.mockResolvedValue([
-          { id: "proj-1", featureClickHouseDataSourceTraces: false },
-          { id: "proj-2", featureClickHouseDataSourceTraces: false },
-        ]);
-        mockEsClient.count.mockResolvedValue({ count: 10 });
-
-        const result = await service.getCountByProjects({
-          organizationId: "org-123",
-          projectIds: ["proj-1", "proj-2"],
-        });
-
-        expect(result).toEqual([
-          { projectId: "proj-1", count: 10 },
-          { projectId: "proj-2", count: 10 },
-        ]);
-        expect(mockEsClient.count).toHaveBeenCalledTimes(2);
-      });
-    });
-
     describe("when ClickHouse is available", () => {
       beforeEach(() => {
-        mockGetClickHouseClient.mockReturnValue({}); // truthy value
+        mockIsClickHouseEnabled.mockReturnValue(true); // ClickHouse available
       });
 
       it("queries trace summaries per project", async () => {

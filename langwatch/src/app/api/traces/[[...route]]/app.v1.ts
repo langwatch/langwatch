@@ -8,10 +8,15 @@ import { prisma } from "~/server/db";
 import type { Span, Trace } from "~/server/tracer/types";
 import { formatSpansDigest } from "~/server/tracer/spanToReadableSpan";
 import { generateAsciiTree, formatTraceSummaryDigest } from "~/server/traces/trace-formatting";
-import { TraceService } from "~/server/traces/trace.service";
+import { enrichTracesWithEvaluations } from "~/server/traces/enrich-evaluations";
+import {
+  AmbiguousTraceIdPrefixError,
+  TraceService,
+} from "~/server/traces/trace.service";
 import { createLogger } from "~/utils/logger/server";
 import type { AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
+import { platformUrl } from "../../shared/platform-url";
 import { coerceToEpoch, flexibleDateSchema } from "../../shared/schemas";
 import { getAllForProjectInput } from "~/server/api/routers/traces.schemas";
 
@@ -115,10 +120,14 @@ app.post(
     );
 
     const rawTraces = results.groups.flat() as Trace[];
+    const enrichedTraces = enrichTracesWithEvaluations({
+      traces: rawTraces,
+      traceChecks: results.traceChecks,
+    });
 
     let traces: unknown[];
     if (format === "digest") {
-      traces = rawTraces.map((trace) => ({
+      traces = enrichedTraces.map((trace) => ({
         trace_id: trace.trace_id,
         formatted_trace: formatTraceSummaryDigest(trace),
         input: trace.input,
@@ -126,9 +135,20 @@ app.post(
         timestamps: trace.timestamps,
         metadata: trace.metadata,
         error: trace.error,
+        evaluations: trace.evaluations,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/messages/${trace.trace_id}`,
+        }),
       }));
     } else {
-      traces = rawTraces;
+      traces = enrichedTraces.map((trace) => ({
+        ...trace,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/messages/${trace.trace_id}`,
+        }),
+      }));
     }
 
     return c.json({
@@ -145,12 +165,13 @@ app.post(
 app.get(
   "/:traceId",
   describeRoute({
-    description: "Get a single trace by ID. Defaults to AI-readable digest format.",
+    description: "Get a single trace by ID.",
     parameters: [
       {
         name: "traceId",
         in: "path",
-        description: "The trace ID",
+        description:
+          "The trace ID — either the full 32-char ID or a unique prefix (≥ 8 chars). Prefix lookup is scoped to the authenticated project.",
         required: true,
         schema: { type: "string" },
       },
@@ -190,6 +211,20 @@ app.get(
           },
         },
       },
+      409: {
+        description:
+          "Ambiguous trace ID prefix — the prefix matches more than one trace",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                message: z.string(),
+                candidateTraceIds: z.array(z.string()),
+              }),
+            ),
+          },
+        },
+      },
     },
   }),
   async (c) => {
@@ -210,7 +245,22 @@ app.get(
       projectId: project.id,
     });
     const traceService = TraceService.create(prisma);
-    const trace = await traceService.getById(project.id, traceId, protections);
+
+    let trace;
+    try {
+      trace = await traceService.getById(project.id, traceId, protections);
+    } catch (err) {
+      if (err instanceof AmbiguousTraceIdPrefixError) {
+        return c.json(
+          {
+            message: err.message,
+            candidateTraceIds: err.candidateTraceIds,
+          },
+          409,
+        );
+      }
+      throw err;
+    }
 
     if (!trace) {
       throw new HTTPException(404, {
@@ -218,20 +268,29 @@ app.get(
       });
     }
 
+    // If the caller passed a prefix, the resolved trace has the full ID.
+    // Use that everywhere downstream so the response, links, and evaluation
+    // lookup all key off the real trace ID.
+    const resolvedTraceId = trace.trace_id;
+
     const evaluationsMap = await traceService.getEvaluationsMultiple(
       project.id,
-      [traceId],
+      [resolvedTraceId],
       protections,
     );
-    const evaluations = evaluationsMap[traceId] ?? [];
+    const evaluations = evaluationsMap[resolvedTraceId] ?? [];
 
     if (format === "digest") {
       return c.json({
-        trace_id: traceId,
+        trace_id: resolvedTraceId,
         formatted_trace: await formatSpansDigest(trace.spans ?? []),
         timestamps: trace.timestamps,
         metadata: trace.metadata,
         evaluations,
+        platformUrl: platformUrl({
+          projectSlug: project.slug,
+          path: `/messages/${resolvedTraceId}`,
+        }),
       });
     }
 
@@ -240,6 +299,10 @@ app.get(
       ...trace,
       evaluations,
       ascii_tree: asciiTree,
+      platformUrl: platformUrl({
+        projectSlug: project.slug,
+        path: `/messages/${resolvedTraceId}`,
+      }),
     });
   },
 );

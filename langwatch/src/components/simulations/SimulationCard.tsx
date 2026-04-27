@@ -22,67 +22,6 @@ export interface SimulationCardProps {
   children: React.ReactNode;
 }
 
-// Glass inset highlight (top edge + bottom edge)
-const GLASS_INSET =
-  "inset 0 1px 0 0 rgba(255,255,255,0.1), inset 0 -1px 0 0 rgba(255,255,255,0.05)";
-const GLASS_INSET_HOVER =
-  "inset 0 1px 0 0 rgba(255,255,255,0.2), inset 0 -1px 0 0 rgba(255,255,255,0.1)";
-
-interface GlowConfig {
-  subtle: string;
-  bright: string;
-}
-
-const STATUS_GLOW: Record<ScenarioRunStatus, GlowConfig> = {
-  [ScenarioRunStatus.SUCCESS]: {
-    subtle: "0 0 8px rgba(74,222,128,0.08), 0 0 20px rgba(34,197,94,0.05)",
-    bright:
-      "0 0 10px rgba(74,222,128,0.45), 0 0 25px rgba(34,197,94,0.3), 0 0 50px rgba(22,163,74,0.15)",
-  },
-  [ScenarioRunStatus.FAILED]: {
-    subtle: "0 0 8px rgba(248,113,113,0.08), 0 0 20px rgba(239,68,68,0.05)",
-    bright:
-      "0 0 10px rgba(248,113,113,0.45), 0 0 25px rgba(239,68,68,0.3), 0 0 50px rgba(220,38,38,0.15)",
-  },
-  [ScenarioRunStatus.ERROR]: {
-    subtle: "0 0 8px rgba(248,113,113,0.08), 0 0 20px rgba(239,68,68,0.05)",
-    bright:
-      "0 0 10px rgba(248,113,113,0.45), 0 0 25px rgba(239,68,68,0.3), 0 0 50px rgba(220,38,38,0.15)",
-  },
-  [ScenarioRunStatus.CANCELLED]: {
-    subtle: "0 0 8px rgba(161,161,170,0.06), 0 0 20px rgba(113,113,122,0.04)",
-    bright: "0 0 10px rgba(161,161,170,0.35), 0 0 25px rgba(113,113,122,0.2)",
-  },
-  [ScenarioRunStatus.STALLED]: {
-    subtle: "0 0 8px rgba(251,191,36,0.08), 0 0 20px rgba(245,158,11,0.05)",
-    bright:
-      "0 0 10px rgba(251,191,36,0.45), 0 0 25px rgba(245,158,11,0.3), 0 0 50px rgba(217,119,6,0.15)",
-  },
-  [ScenarioRunStatus.IN_PROGRESS]: {
-    subtle: "0 0 8px rgba(251,146,60,0.08), 0 0 20px rgba(234,88,12,0.05)",
-    bright:
-      "0 0 10px rgba(251,146,60,0.45), 0 0 25px rgba(234,88,12,0.3), 0 0 50px rgba(194,65,12,0.15)",
-  },
-  [ScenarioRunStatus.PENDING]: {
-    subtle: "0 0 8px rgba(148,163,184,0.06), 0 0 20px rgba(100,116,139,0.04)",
-    bright: "0 0 10px rgba(148,163,184,0.35), 0 0 25px rgba(100,116,139,0.2)",
-  },
-  [ScenarioRunStatus.QUEUED]: {
-    subtle: "0 0 8px rgba(96,165,250,0.08), 0 0 20px rgba(59,130,246,0.05)",
-    bright:
-      "0 0 10px rgba(96,165,250,0.45), 0 0 25px rgba(59,130,246,0.3), 0 0 50px rgba(37,99,235,0.15)",
-  },
-  [ScenarioRunStatus.RUNNING]: {
-    subtle: "0 0 8px rgba(251,146,60,0.08), 0 0 20px rgba(234,88,12,0.05)",
-    bright:
-      "0 0 10px rgba(251,146,60,0.45), 0 0 25px rgba(234,88,12,0.3), 0 0 50px rgba(194,65,12,0.15)",
-  },
-};
-
-const DEFAULT_GLOW: GlowConfig = {
-  subtle: "0 0 8px rgba(148,163,184,0.06), 0 0 20px rgba(100,116,139,0.04)",
-  bright: "0 0 10px rgba(148,163,184,0.3), 0 0 25px rgba(100,116,139,0.15)",
-};
 
 function SimulationCardHeader({
   title,
@@ -301,13 +240,6 @@ function SimulationStatusBadge({ status }: { status: ScenarioRunStatus }) {
 
 /**
  * SimulationCard renders each scenario run as a visual card.
- *
- * Performance notes:
- * - The resting box-shadow (glass inset + subtle glow) is static — no transition.
- * - On hover, the shadow swaps instantly (no `transition: box-shadow`).
- *   Transitioning box-shadow triggers expensive per-frame repaints across
- *   dozens of cards; an instant swap is a single repaint on enter/leave.
- * - `contain: content` isolates each card's layout/paint from siblings.
  */
 export function SimulationCard({
   title,
@@ -323,10 +255,6 @@ export function SimulationCard({
     : false;
 
   const shouldDim = isComplete && !isActive;
-  const glow = status ? STATUS_GLOW[status] : DEFAULT_GLOW;
-
-  const defaultShadow = `${GLASS_INSET}, ${glow.subtle}`;
-  const hoverShadow = `${GLASS_INSET_HOVER}, ${glow.bright}`;
 
   return (
     <Card.Root
@@ -338,10 +266,7 @@ export function SimulationCard({
       css={{
         overflow: "hidden !important",
         contain: "content",
-        boxShadow: defaultShadow,
-        "&:hover": {
-          boxShadow: hoverShadow,
-        },
+        boxShadow: "sm",
         "&:hover .simulation-card-content": {
           opacity: 1,
         },

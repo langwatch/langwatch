@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import type { PrismaClient } from "@prisma/client";
-import type { Session } from "next-auth";
+import type { Session } from "~/server/auth";
 import { createLicenseEnforcementService } from "./index";
 import { LimitExceededError, ProjectNotFoundError } from "./errors";
 import type { LimitType } from "./types";

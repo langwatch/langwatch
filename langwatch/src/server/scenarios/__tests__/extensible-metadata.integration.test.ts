@@ -262,4 +262,72 @@ describe("extensible metadata integration", () => {
       });
     });
   });
+
+  describe("given a scenario event with empty-string scenarioSetId", () => {
+    describe("when the event is ingested via the Zod schema and stored", () => {
+      it("coerces scenarioSetId to 'default' through the full round-trip", async () => {
+        const ids = generateTestIds("empty-set-id");
+
+        // Simulate what the API does: validate through Zod schema first
+        const rawEvent = {
+          type: ScenarioEventType.RUN_STARTED,
+          timestamp: Date.now(),
+          batchRunId: ids.batchRunId,
+          scenarioId: ids.scenarioId,
+          scenarioRunId: ids.scenarioRunId,
+          scenarioSetId: "",
+          metadata: { name: "Empty set regression" },
+        };
+
+        const { scenarioEventSchema } = await import(
+          "~/server/scenarios/schemas/event-schemas"
+        );
+        const parsed = scenarioEventSchema.parse(rawEvent);
+
+        // Verify coercion happened before storage
+        expect(parsed.scenarioSetId).toBe("default");
+
+        // Store the coerced event and verify it persists correctly
+        const client = await esClient({ test: true });
+        const now = Date.now();
+
+        await client.bulk({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: [
+            { index: {} },
+            {
+              type: ScenarioEventType.RUN_STARTED,
+              timestamp: now,
+              project_id: project.id,
+              scenario_id: ids.scenarioId,
+              scenario_run_id: ids.scenarioRunId,
+              batch_run_id: ids.batchRunId,
+              scenario_set_id: parsed.scenarioSetId,
+              metadata: { name: "Empty set regression" },
+            },
+          ],
+          refresh: true,
+        });
+
+        // Read back from ES to verify "default" was stored, not ""
+        const result = (await client.search({
+          index: SCENARIO_EVENTS_INDEX.alias,
+          body: {
+            query: {
+              bool: {
+                must: [
+                  { term: { scenario_run_id: ids.scenarioRunId } },
+                  { term: { project_id: project.id } },
+                ],
+              },
+            },
+          },
+        })) as any;
+
+        const hits = result.hits.hits;
+        expect(hits).toHaveLength(1);
+        expect(hits[0]._source.scenario_set_id).toBe("default");
+      });
+    });
+  });
 });

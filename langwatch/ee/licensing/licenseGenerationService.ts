@@ -54,7 +54,7 @@ export function generateLicenseKey({
     maxTeams: template.maxTeams,
     maxProjects: template.maxProjects,
     maxMessagesPerMonth: template.maxMessagesPerMonth,
-    evaluationsCredit: template.evaluationsCredit,
+    evaluationsCredit: template.evaluationsCredit ?? 0,
     maxWorkflows: template.maxWorkflows,
     maxPrompts: template.maxPrompts,
     maxEvaluators: template.maxEvaluators,

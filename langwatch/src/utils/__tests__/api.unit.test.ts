@@ -3,6 +3,7 @@ import { TRPCClientError } from "@trpc/client";
 import {
   extractLimitExceededInfo,
   extractLiteMemberRestrictionInfo,
+  isHandledByGlobalHandler,
   isHandledByGlobalLicenseHandler,
   isHandledByLiteMemberHandler,
   markAsHandledByLicenseHandler,
@@ -332,6 +333,30 @@ describe("Global mutation error handler", () => {
     it("handles null/undefined gracefully", () => {
       expect(isHandledByGlobalLicenseHandler(null)).toBe(false);
       expect(isHandledByGlobalLicenseHandler(undefined)).toBe(false);
+    });
+  });
+
+  describe("isHandledByGlobalHandler (combined check)", () => {
+    it("returns false for unhandled errors", () => {
+      const error = new Error("Some error");
+      expect(isHandledByGlobalHandler(error)).toBe(false);
+    });
+
+    it("returns true for license-handled errors", () => {
+      const error = new Error("Limit exceeded");
+      markAsHandledByLicenseHandler(error);
+      expect(isHandledByGlobalHandler(error)).toBe(true);
+    });
+
+    it("returns true for lite-member-handled errors", () => {
+      const error = new Error("Restricted");
+      markAsHandledByLiteMemberHandler(error);
+      expect(isHandledByGlobalHandler(error)).toBe(true);
+    });
+
+    it("handles null/undefined gracefully", () => {
+      expect(isHandledByGlobalHandler(null)).toBe(false);
+      expect(isHandledByGlobalHandler(undefined)).toBe(false);
     });
   });
 

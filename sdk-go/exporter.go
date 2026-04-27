@@ -24,19 +24,31 @@ type LangWatchExporter struct {
 
 // exporterConfig holds configuration for the exporter.
 type exporterConfig struct {
-	apiKey   string
-	endpoint string
-	filters  []Filter
+	apiKey    string
+	projectID string
+	endpoint  string
+	filters   []Filter
 }
 
 // ExporterOption configures the LangWatchExporter.
 type ExporterOption func(*exporterConfig)
 
-// WithAPIKey sets the LangWatch API key.
+// WithAPIKey sets the LangWatch API key or Personal Access Token.
 // If not set, reads from LANGWATCH_API_KEY environment variable.
 func WithAPIKey(key string) ExporterOption {
 	return func(c *exporterConfig) {
 		c.apiKey = key
+	}
+}
+
+// WithProjectID sets the LangWatch project identifier.
+//
+// Required when the API key is a Personal Access Token (pat-lw-*); ignored
+// for legacy sk-lw-* keys. If not set, reads from the
+// LANGWATCH_PROJECT_ID environment variable.
+func WithProjectID(projectID string) ExporterOption {
+	return func(c *exporterConfig) {
+		c.projectID = projectID
 	}
 }
 
@@ -60,8 +72,9 @@ func WithFilters(filters ...Filter) ExporterOption {
 // resolveConfig applies options and environment fallbacks.
 func resolveConfig(opts ...ExporterOption) *exporterConfig {
 	cfg := &exporterConfig{
-		apiKey:   os.Getenv("LANGWATCH_API_KEY"),
-		endpoint: os.Getenv("LANGWATCH_ENDPOINT"),
+		apiKey:    os.Getenv("LANGWATCH_API_KEY"),
+		projectID: os.Getenv("LANGWATCH_PROJECT_ID"),
+		endpoint:  os.Getenv("LANGWATCH_ENDPOINT"),
 	}
 	if cfg.endpoint == "" {
 		cfg.endpoint = DefaultEndpoint
@@ -72,14 +85,15 @@ func resolveConfig(opts ...ExporterOption) *exporterConfig {
 	return cfg
 }
 
-// buildHeaders constructs the LangWatch-specific headers.
-func buildHeaders(apiKey string) map[string]string {
-	return map[string]string{
-		"Authorization":            "Bearer " + apiKey,
-		"x-langwatch-sdk-name":     "langwatch-sdk-go",
-		"x-langwatch-sdk-language": "go",
-		"x-langwatch-sdk-version":  Version,
-	}
+// buildHeaders constructs the LangWatch-specific headers, delegating
+// auth-header assembly to buildAuthHeaders so PATs route through Basic
+// Auth when a project ID is available.
+func buildHeaders(apiKey, projectID string) map[string]string {
+	headers := buildAuthHeaders(apiKey, projectID)
+	headers["x-langwatch-sdk-name"] = "langwatch-sdk-go"
+	headers["x-langwatch-sdk-language"] = "go"
+	headers["x-langwatch-sdk-version"] = Version
+	return headers
 }
 
 // NewExporter creates a LangWatch exporter with auto-configuration.
@@ -95,7 +109,7 @@ func NewExporter(ctx context.Context, opts ...ExporterOption) (*LangWatchExporte
 
 	otlpExporter, err := otlptracehttp.New(ctx,
 		otlptracehttp.WithEndpointURL(endpointURL),
-		otlptracehttp.WithHeaders(buildHeaders(cfg.apiKey)),
+		otlptracehttp.WithHeaders(buildHeaders(cfg.apiKey, cfg.projectID)),
 	)
 	if err != nil {
 		return nil, err

@@ -137,7 +137,6 @@ describe("createSaaSPlanProvider", () => {
           maxMembers: 10,
           maxProjects: null,
           maxMessagesPerMonth: null,
-          evaluationsCredit: null,
         };
 
         const db = createMockDb({ findFirstResult: subscription });
@@ -157,7 +156,6 @@ describe("createSaaSPlanProvider", () => {
             maxMembers: null,
             maxProjects: null,
             maxMessagesPerMonth: null,
-            evaluationsCredit: null,
           };
 
           const db = createMockDb({
@@ -353,6 +351,33 @@ describe("createSaaSPlanProvider", () => {
           expect(plan.maxMessagesPerMonth).toBe(50_000);
           expect(plan.maxMembers).toBe(15);
         });
+      });
+    });
+
+    describe("when subscription is CANCELLED", () => {
+      it("resolves to free tier limits", async () => {
+        // A CANCELLED subscription must not appear in active subscription query.
+        // The findFirst query filters by status: ACTIVE, so cancelled subs are excluded.
+        // This regression test ensures a cancelled Growth Seat sub doesn't leak 20 maxMembers.
+        const db = createMockDb({
+          findFirstResult: null, // cancelled sub is not returned by the ACTIVE-only query
+        });
+        const provider = createSaaSPlanProvider(db);
+        const plan = await provider.getActivePlan("org_1");
+
+        expect(plan.type).toBe(PlanTypes.FREE);
+        expect(plan.free).toBe(true);
+        expect(plan.maxMembers).toBe(2);
+        expect(plan.maxMessagesPerMonth).toBe(50_000);
+
+        // Lock in the query filter: only ACTIVE subscriptions are fetched
+        expect(db.subscription.findFirst).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              status: { in: [SubscriptionStatus.ACTIVE] },
+            }),
+          }),
+        );
       });
     });
   });

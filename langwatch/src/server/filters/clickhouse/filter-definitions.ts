@@ -10,6 +10,42 @@ import {
 } from "./query-helpers";
 import type { ClickHouseFilterDefinition } from "./types";
 
+/** Label values that represent pass/fail status rather than classification labels. */
+const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
+
+/**
+ * Factory for evaluator_id ClickHouse filter definitions.
+ * All 5 variants share the same query template, differing only in an additional WHERE clause.
+ */
+function buildEvaluatorIdClickHouseFilter(
+  additionalWhere: string,
+): ClickHouseFilterDefinition {
+  return {
+    tableName: "evaluation_runs",
+    buildQuery: (params) => {
+      const { sql: scopeSql } = buildScopeConditions(params);
+      const scopeJoin = scopeSql
+        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
+        : "";
+      return `
+        SELECT
+          EvaluatorId as field,
+          if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
+          count() as count
+        FROM evaluation_runs
+        WHERE ${buildEvaluationRunsConditions(params)}
+          ${additionalWhere}
+          ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
+          ${scopeJoin}
+        GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
+        ORDER BY label ASC
+        LIMIT 10000
+      `;
+    },
+    extractResults: extractStandardResults,
+  };
+}
+
 /**
  * ClickHouse filter definitions for each filter field.
  * Each definition specifies how to query filter options from ClickHouse.
@@ -355,54 +391,23 @@ export const clickHouseFilters: Record<
   // Evaluation filters - using evaluation_runs table
   // Note: evaluation_runs filters require a join with trace_summaries for scope conditions
   // For now, we'll add scope via a subquery when scopeFilters are present
-  "evaluations.evaluator_id": {
-    tableName: "evaluation_runs",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
-      return `
-        SELECT
-          EvaluatorId as field,
-          if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
-          count() as count
-        FROM evaluation_runs
-        WHERE ${buildEvaluationRunsConditions(params)}
-          ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
-          ${scopeJoin}
-        GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
-        ORDER BY label ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
+  "evaluations.evaluator_id": buildEvaluatorIdClickHouseFilter(""),
 
-  "evaluations.evaluator_id.guardrails_only": {
-    tableName: "evaluation_runs",
-    buildQuery: (params) => {
-      const { sql: scopeSql } = buildScopeConditions(params);
-      const scopeJoin = scopeSql
-        ? `AND TraceId IN (SELECT TraceId FROM trace_summaries ts WHERE ${buildTraceSummariesConditions(params)} ${scopeSql})`
-        : "";
-      return `
-        SELECT
-          EvaluatorId as field,
-          if(EvaluatorName != '', concat('[', EvaluatorType, '] ', EvaluatorName), concat('[', EvaluatorType, '] ', EvaluatorId)) as label,
-          count() as count
-        FROM evaluation_runs
-        WHERE ${buildEvaluationRunsConditions(params)}
-          AND IsGuardrail = 1
-          ${params.query ? `AND lower(ifNull(EvaluatorName, '')) LIKE lower(concat({query:String}, '%'))` : ""}
-          ${scopeJoin}
-        GROUP BY EvaluatorId, EvaluatorType, EvaluatorName
-        ORDER BY label ASC
-        LIMIT 10000
-      `;
-    },
-    extractResults: extractStandardResults,
-  },
+  "evaluations.evaluator_id.guardrails_only": buildEvaluatorIdClickHouseFilter(
+    "AND IsGuardrail = 1",
+  ),
+
+  "evaluations.evaluator_id.has_passed": buildEvaluatorIdClickHouseFilter(
+    "AND Passed IS NOT NULL",
+  ),
+
+  "evaluations.evaluator_id.has_score": buildEvaluatorIdClickHouseFilter(
+    "AND Score IS NOT NULL",
+  ),
+
+  "evaluations.evaluator_id.has_label": buildEvaluatorIdClickHouseFilter(
+    `AND Label IS NOT NULL AND Label != '' AND Label NOT IN ('${STATUS_LABEL_VALUES.join("', '")}')`,
+  ),
 
   "evaluations.passed": {
     tableName: "evaluation_runs",
@@ -484,7 +489,7 @@ export const clickHouseFilters: Record<
         FROM evaluation_runs
         WHERE ${buildEvaluationRunsConditions(params)}
           AND EvaluatorId = {key:String}
-          AND Status NOT IN ('succeeded', 'failed')
+          AND Status NOT IN ('${STATUS_LABEL_VALUES.join("', '")}')
           ${scopeJoin}
         GROUP BY Status
         ORDER BY Status ASC
@@ -514,7 +519,7 @@ export const clickHouseFilters: Record<
           AND EvaluatorId = {key:String}
           AND Label IS NOT NULL
           AND Label != ''
-          AND Label NOT IN ('succeeded', 'failed')
+          AND Label NOT IN ('${STATUS_LABEL_VALUES.join("', '")}')
           ${params.query ? `AND lower(Label) LIKE lower(concat({query:String}, '%'))` : ""}
           ${scopeJoin}
         GROUP BY Label

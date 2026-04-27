@@ -31,6 +31,7 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { Permission } from "../../server/api/rbac";
 import { getTeamRolePermissions } from "../../server/api/rbac";
 import { api } from "../../utils/api";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 
 /**
  * Role Management Settings Page
@@ -149,6 +150,7 @@ function RolesManagement({
       onClose();
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to create role",
         description: error.message,
@@ -166,6 +168,7 @@ function RolesManagement({
       });
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to delete role",
         description: error.message,
@@ -185,6 +188,7 @@ function RolesManagement({
       setEditingRole(null);
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Failed to update role",
         description: error.message,

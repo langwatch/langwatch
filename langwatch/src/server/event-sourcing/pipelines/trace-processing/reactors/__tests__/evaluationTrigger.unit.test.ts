@@ -7,6 +7,7 @@ import {
   createEvaluationTriggerReactor,
   type EvaluationTriggerReactorDeps,
 } from "../evaluationTrigger.reactor";
+import { DEFERRED_CHECK_DELAY_MS } from "../originGate.reactor";
 
 function makeEvent(overrides: Partial<TraceProcessingEvent> = {}): TraceProcessingEvent {
   return {
@@ -72,19 +73,13 @@ function createDeps(overrides: Partial<EvaluationTriggerReactorDeps> = {}): Eval
       getEnabledOnMessageMonitors: vi.fn().mockResolvedValue([]),
     } as any,
     evaluation: vi.fn().mockResolvedValue(undefined),
-    resolveOrigin: vi.fn().mockResolvedValue(undefined),
-    traceSummaryStore: {
-      get: vi.fn().mockResolvedValue(null),
-      store: vi.fn().mockResolvedValue(undefined),
-    },
-    scheduleDeferred: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }
 
 describe("evaluationTrigger reactor", () => {
   describe("when monitor is trace-level (no threadIdleTimeout)", () => {
-    it("sends without per-send options", async () => {
+    it("sends with dedup TTL outlasting deferred origin window", async () => {
       const monitor = makeMonitor({ threadIdleTimeout: null });
       const deps = createDeps();
       vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
@@ -97,7 +92,10 @@ describe("evaluationTrigger reactor", () => {
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
-      expect(options).toBeUndefined();
+      expect(options).toBeDefined();
+      expect(options!.deduplication).toBeDefined();
+      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
+      expect(options!.delay).toBeUndefined();
     });
   });
 
@@ -129,7 +127,7 @@ describe("evaluationTrigger reactor", () => {
   });
 
   describe("when monitor has threadIdleTimeout but no threadId on trace", () => {
-    it("sends without per-send options (falls back to trace-level)", async () => {
+    it("falls back to trace-level dedup (6-min TTL, no delay override)", async () => {
       const monitor = makeMonitor({ threadIdleTimeout: 300 });
       const deps = createDeps();
       vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
@@ -142,12 +140,14 @@ describe("evaluationTrigger reactor", () => {
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
-      expect(options).toBeUndefined();
+      expect(options).toBeDefined();
+      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
+      expect(options!.delay).toBeUndefined();
     });
   });
 
   describe("when monitor has threadIdleTimeout of 0", () => {
-    it("sends without per-send options (trace-level default)", async () => {
+    it("falls back to trace-level dedup (6-min TTL, no delay override)", async () => {
       const monitor = makeMonitor({ threadIdleTimeout: 0 });
       const deps = createDeps();
       vi.mocked(deps.monitors.getEnabledOnMessageMonitors).mockResolvedValue([monitor]);
@@ -160,7 +160,9 @@ describe("evaluationTrigger reactor", () => {
 
       expect(deps.evaluation).toHaveBeenCalledTimes(1);
       const [_payload, options] = vi.mocked(deps.evaluation).mock.calls[0]!;
-      expect(options).toBeUndefined();
+      expect(options).toBeDefined();
+      expect(options!.deduplication!.ttlMs).toBe(DEFERRED_CHECK_DELAY_MS + 60_000);
+      expect(options!.delay).toBeUndefined();
     });
   });
 });

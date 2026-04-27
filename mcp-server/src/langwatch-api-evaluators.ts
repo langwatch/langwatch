@@ -68,3 +68,13 @@ export async function updateEvaluator(params: {
     data,
   ) as Promise<EvaluatorSummary>;
 }
+
+/** Archives (soft-deletes) an evaluator. */
+export async function deleteEvaluator(
+  idOrSlug: string,
+): Promise<{ id: string; archived: boolean }> {
+  return makeRequest(
+    "DELETE",
+    `/api/evaluators/${encodeURIComponent(idOrSlug)}`,
+  ) as Promise<{ id: string; archived: boolean }>;
+}

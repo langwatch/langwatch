@@ -109,6 +109,7 @@ export const useWorkflowExecution = () => {
           until_node_id: untilNodeId,
           inputs: inputs,
           manual_execution_mode: true,
+          origin: "workflow",
         },
       };
       postEvent(payload);

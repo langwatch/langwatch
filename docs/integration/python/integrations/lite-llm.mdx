@@ -1,0 +1,68 @@
+---
+title: LiteLLM Instrumentation
+sidebarTitle: LiteLLM
+description: Instrument LiteLLM calls with the LangWatch Python SDK to capture LLM traces, measure quality, and support AI agent testing workflows.
+keywords: litellm, instrumentation, autotrack, langwatch, python, tracing
+---
+
+LangWatch integrates with LiteLLM to capture detailed information about your LLM calls across multiple providers through a unified interface.
+
+## Installation
+
+<CodeGroup>
+```bash pip
+pip install langwatch litellm
+```
+
+```bash uv
+uv add langwatch litellm
+```
+</CodeGroup>
+
+## Usage
+
+<Info>
+The LangWatch API key is configured by default via the `LANGWATCH_API_KEY` environment variable.
+</Info>
+
+Use `autotrack_litellm_calls()` to automatically capture all LiteLLM calls within a trace.
+
+```python
+import langwatch
+import litellm
+import os
+import asyncio
+from typing import cast
+from litellm import CustomStreamWrapper
+from litellm.types.utils import StreamingChoices
+
+langwatch.setup()
+
+
+@langwatch.trace(name="LiteLLM Autotrack Example")
+def get_litellm_response_autotrack(user_message: str):
+    langwatch.get_current_trace().autotrack_litellm_calls(litellm)
+
+    response = litellm.completion(
+        model="groq/llama-3.1-8b-instant",
+        messages=[
+        {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": user_message},
+        ],
+    )
+
+    return response.choices[0].message.content
+
+
+if __name__ == "__main__":
+    reply = get_litellm_response_autotrack("Tell me a joke")
+    print("AI Response:", reply)
+```
+
+The `@langwatch.trace()` decorator creates a parent trace, and `autotrack_litellm_calls()` enables automatic tracking of all LiteLLM calls for the duration of that trace.
+
+## Related
+
+- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
+- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your LiteLLM applications

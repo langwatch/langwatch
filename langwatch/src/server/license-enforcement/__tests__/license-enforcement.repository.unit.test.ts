@@ -57,6 +57,9 @@ const createMockPrisma = () => ({
   agent: {
     count: vi.fn().mockResolvedValue(0),
   },
+  experiment: {
+    count: vi.fn().mockResolvedValue(0),
+  },
   batchEvaluation: {
     count: vi.fn().mockResolvedValue(0),
   },
@@ -104,13 +107,13 @@ describe("LicenseEnforcementRepository", () => {
   });
 
   describe("getPromptCount", () => {
-    it("queries prompts with organization filter (no archive filter)", async () => {
+    it("queries prompts with organization filter and deletedAt null", async () => {
       mockPrisma.llmPromptConfig.count.mockResolvedValue(10);
 
       const result = await repository.getPromptCount(organizationId);
 
       expect(mockPrisma.llmPromptConfig.count).toHaveBeenCalledWith({
-        where: { project: { team: { organizationId } } },
+        where: { project: { team: { organizationId } }, deletedAt: null },
       });
       expect(result).toBe(10);
     });
@@ -614,49 +617,41 @@ describe("LicenseEnforcementRepository", () => {
     });
   });
 
-  describe("getEvaluationsCreditUsed", () => {
-    it("queries batch evaluations with date filter for current month", async () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date("2024-01-15T12:00:00.000Z"));
+  describe("getExperimentCount", () => {
+    it("excludes real_time experiments from count", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([
+        { id: "proj-1" },
+        { id: "proj-2" },
+      ]);
+      mockPrisma.experiment.count.mockResolvedValue(3);
 
-      mockPrisma.batchEvaluation.count.mockResolvedValue(50);
+      const result = await repository.getExperimentCount(organizationId);
 
-      const result = await repository.getEvaluationsCreditUsed(organizationId);
-
-      expect(mockPrisma.batchEvaluation.count).toHaveBeenCalledWith({
+      expect(mockPrisma.project.findMany).toHaveBeenCalledWith({
+        where: { team: { organizationId } },
+        select: { id: true },
+      });
+      expect(mockPrisma.experiment.count).toHaveBeenCalledWith({
         where: {
-          project: { team: { organizationId } },
-          createdAt: { gte: expect.any(Date) },
+          projectId: { in: ["proj-1", "proj-2"] },
+          NOT: {
+            workbenchState: {
+              path: ["task"],
+              equals: "real_time",
+            },
+          },
         },
       });
-      expect(result).toBe(50);
-
-      vi.useRealTimers();
+      expect(result).toBe(3);
     });
 
-    it("returns zero when no evaluations this month", async () => {
-      mockPrisma.batchEvaluation.count.mockResolvedValue(0);
+    it("returns zero when no projects exist (skips experiment query)", async () => {
+      mockPrisma.project.findMany.mockResolvedValue([]);
 
-      const result = await repository.getEvaluationsCreditUsed(organizationId);
+      const result = await repository.getExperimentCount(organizationId);
 
+      expect(mockPrisma.experiment.count).not.toHaveBeenCalled();
       expect(result).toBe(0);
-    });
-
-    it("uses start of current month for date filter", async () => {
-      vi.useFakeTimers();
-      vi.setSystemTime(new Date("2024-03-20T15:30:00.000Z"));
-
-      await repository.getEvaluationsCreditUsed(organizationId);
-
-      const call = mockPrisma.batchEvaluation.count.mock.calls[0]?.[0];
-      const dateFilter = call?.where?.createdAt?.gte as Date;
-
-      // Should be start of March 2024
-      expect(dateFilter.getFullYear()).toBe(2024);
-      expect(dateFilter.getMonth()).toBe(2); // March (0-indexed)
-      expect(dateFilter.getDate()).toBe(1);
-
-      vi.useRealTimers();
     });
   });
 

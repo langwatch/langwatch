@@ -17,7 +17,7 @@ const mockReplace = vi.fn();
 
 let mockQuery: Record<string, string> = {};
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockQuery,
     push: mockPush,

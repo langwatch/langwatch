@@ -21,8 +21,8 @@ export function buildTraceSummariesConditions(
 ): string {
   const conditions: string[] = [
     "TenantId = {tenantId:String}",
-    "CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
-    "CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
+    "OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})",
+    "OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})",
   ];
   return conditions.join(" AND ");
 }

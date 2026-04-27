@@ -21,7 +21,18 @@ export interface CioPersonTraits {
   utm_campaign: string;
   how_heard: string;
   createdAt: string;
-  product_interest: string;
+  integration_method: string;
+
+  // Attribution (first-touch URL params — captured client-side, forwarded
+  // via signUpData). Optional because callers always use
+  // `Partial<CioPersonTraits>` and set them conditionally; marking them
+  // required would lie about the runtime contract.
+  lead_source?: string;
+  utm_source?: string;
+  utm_medium?: string;
+  utm_term?: string;
+  utm_content?: string;
+  referrer?: string;
 
   // Trace milestones (customerIoTraceSync reactor)
   has_traces: boolean;
@@ -59,6 +70,7 @@ export interface CioPersonTraits {
 
   // Billing
   plan: string;
+  has_subscription: boolean;
 }
 
 // ---------------------------------------------------------------------------

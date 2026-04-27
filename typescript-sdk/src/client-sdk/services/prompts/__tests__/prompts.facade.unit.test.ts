@@ -244,6 +244,21 @@ describe("Prompt Retrieval", () => {
     });
   });
 
+  describe("Scenario: Shorthand syntax passthrough (thin client)", () => {
+    describe("when fetching with colon-separated shorthand", () => {
+      it("passes the full string to the API without parsing", async () => {
+        const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
+        localPromptsService.get.mockResolvedValue(null);
+        promptsApiService.get.mockResolvedValue(productionPrompt);
+
+        const result = await facade.get(`${testHandle}:production`);
+
+        expect(promptsApiService.get).toHaveBeenCalledWith(`${testHandle}:production`, undefined);
+        expect(result).toEqual(new Prompt(productionPrompt));
+      });
+    });
+  });
+
   describe("Scenario: Cache TTL - Version Isolation", () => {
     beforeEach(() => vi.useFakeTimers());
     afterEach(() => vi.useRealTimers());
@@ -279,6 +294,182 @@ describe("Prompt Retrieval", () => {
         fetchPolicy: FetchPolicy.CACHE_TTL,
         cacheTtlMinutes: 5,
         version: "2",
+      });
+    });
+  });
+
+  describe("Scenario: Fetch by Tag", () => {
+    describe("when fetching with a tag using MATERIALIZED_FIRST", () => {
+      it("passes tag through to API service when no local prompt exists", async () => {
+        const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
+        localPromptsService.get.mockResolvedValue(null);
+        promptsApiService.get.mockResolvedValue(productionPrompt);
+
+        const result = await facade.get(testHandle, {
+          tag: "production",
+          fetchPolicy: FetchPolicy.MATERIALIZED_FIRST,
+        });
+
+        expect(promptsApiService.get).toHaveBeenCalledWith(testHandle, {
+          tag: "production",
+          fetchPolicy: FetchPolicy.MATERIALIZED_FIRST,
+        });
+        expect(result).toEqual(new Prompt(productionPrompt));
+      });
+    });
+
+    describe("when fetching with a tag using ALWAYS_FETCH", () => {
+      it("passes tag through to API service", async () => {
+        const stagingPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
+        promptsApiService.get.mockResolvedValue(stagingPrompt);
+
+        const result = await facade.get(testHandle, {
+          tag: "staging",
+          fetchPolicy: FetchPolicy.ALWAYS_FETCH,
+        });
+
+        expect(promptsApiService.get).toHaveBeenCalledWith(testHandle, {
+          tag: "staging",
+          fetchPolicy: FetchPolicy.ALWAYS_FETCH,
+        });
+        expect(result).toEqual(new Prompt(stagingPrompt));
+      });
+    });
+  });
+
+  describe("Scenario: Invalid Tag Error", () => {
+    describe("when the API returns an error for an invalid tag", () => {
+      it("throws an error when API rejects and no local fallback exists", async () => {
+        promptsApiService.get.mockRejectedValue(
+          new Error("Invalid tag: must be 'production' or 'staging'")
+        );
+        localPromptsService.get.mockResolvedValue(null);
+
+        await expect(
+          facade.get(testHandle, {
+            tag: "production",
+            fetchPolicy: FetchPolicy.ALWAYS_FETCH,
+          })
+        ).rejects.toThrow(`Prompt "${testHandle}" not found locally or on server`);
+      });
+    });
+  });
+
+  describe("Scenario: Cache Key Isolation by Tag", () => {
+    beforeEach(() => vi.useFakeTimers());
+    afterEach(() => vi.useRealTimers());
+
+    it("returns cached prompt on second call with same tag within TTL", async () => {
+      const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
+      promptsApiService.get.mockResolvedValue(productionPrompt);
+
+      await facade.get(testHandle, {
+        fetchPolicy: FetchPolicy.CACHE_TTL,
+        cacheTtlMinutes: 5,
+        tag: "production",
+      });
+
+      // Second call within TTL should hit cache (API called only once)
+      await facade.get(testHandle, {
+        fetchPolicy: FetchPolicy.CACHE_TTL,
+        cacheTtlMinutes: 5,
+        tag: "production",
+      });
+
+      expect(promptsApiService.get).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns cached untagged prompt on second call within TTL", async () => {
+      const latestPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
+      promptsApiService.get.mockResolvedValue(latestPrompt);
+
+      await facade.get(testHandle, {
+        fetchPolicy: FetchPolicy.CACHE_TTL,
+        cacheTtlMinutes: 5,
+      });
+
+      // Second call without tag within TTL should hit cache (API called only once)
+      await facade.get(testHandle, {
+        fetchPolicy: FetchPolicy.CACHE_TTL,
+        cacheTtlMinutes: 5,
+      });
+
+      expect(promptsApiService.get).toHaveBeenCalledTimes(1);
+    });
+
+    it("returns different prompts for different tags with CACHE_TTL", async () => {
+      const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
+      const stagingPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
+      promptsApiService.get.mockResolvedValueOnce(productionPrompt);
+      promptsApiService.get.mockResolvedValueOnce(stagingPrompt);
+
+      const productionResult = await facade.get(testHandle, {
+        fetchPolicy: FetchPolicy.CACHE_TTL,
+        cacheTtlMinutes: 5,
+        tag: "production",
+      });
+
+      const stagingResult = await facade.get(testHandle, {
+        fetchPolicy: FetchPolicy.CACHE_TTL,
+        cacheTtlMinutes: 5,
+        tag: "staging",
+      });
+
+      expect(promptsApiService.get).toHaveBeenCalledTimes(2);
+      expect(productionResult).toEqual(new Prompt(productionPrompt));
+      expect(stagingResult).toEqual(new Prompt(stagingPrompt));
+    });
+
+    it("returns latest version for untagged request even when tagged version is cached", async () => {
+      const productionPrompt = promptResponseFactory.build({ handle: testHandle, version: 3 });
+      const latestPrompt = promptResponseFactory.build({ handle: testHandle, version: 4 });
+      promptsApiService.get.mockResolvedValueOnce(productionPrompt);
+      promptsApiService.get.mockResolvedValueOnce(latestPrompt);
+
+      const productionResult = await facade.get(testHandle, {
+        fetchPolicy: FetchPolicy.CACHE_TTL,
+        cacheTtlMinutes: 5,
+        tag: "production",
+      });
+
+      const latestResult = await facade.get(testHandle, {
+        fetchPolicy: FetchPolicy.CACHE_TTL,
+        cacheTtlMinutes: 5,
+      });
+
+      expect(promptsApiService.get).toHaveBeenCalledTimes(2);
+      expect(productionResult).toEqual(new Prompt(productionPrompt));
+      expect(latestResult).toEqual(new Prompt(latestPrompt));
+    });
+  });
+});
+
+describe("PromptsFacade.tags.rename", () => {
+  let facade: PromptsFacade;
+  let promptsApiService: MockProxy<PromptsApiService>;
+  let localPromptsService: MockProxy<LocalPromptsService>;
+
+  beforeEach(() => {
+    localPromptsService = mock<LocalPromptsService>();
+    promptsApiService = mock<PromptsApiService>();
+    facade = new PromptsFacade({
+      localPromptsService,
+      promptsApiService,
+      langwatchApiClient: {} as InternalConfig["langwatchApiClient"],
+      logger: {} as InternalConfig["logger"],
+    });
+    vi.clearAllMocks();
+  });
+
+  describe("when renaming a tag", () => {
+    it("delegates to promptsApiService.renameTag with old and new names", async () => {
+      promptsApiService.renameTag.mockResolvedValue(undefined);
+
+      await facade.tags.rename("old-name", "new-name");
+
+      expect(promptsApiService.renameTag).toHaveBeenCalledWith({
+        tag: "old-name",
+        name: "new-name",
       });
     });
   });

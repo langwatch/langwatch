@@ -30,6 +30,7 @@ import { organizationRouter } from "./routers/organization";
 import { planRouter } from "./routers/plan";
 import { projectRouter } from "./routers/project";
 import { promptsRouter } from "./routers/prompts";
+import { promptTagsRouter } from "./routers/prompt-tags.trpc-router";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { roleRouter } from "./routers/role";
 import { subscriptionRouter } from "./routers/subscription";
@@ -45,8 +46,18 @@ import { topicsRouter } from "./routers/topics";
 import { tracesRouter } from "./routers/traces";
 import { translateRouter } from "./routers/translate";
 import { automationRouter } from "./routers/automations";
+import { scimTokenRouter } from "./routers/scimToken";
+import { roleBindingRouter } from "./routers/roleBinding";
+import { personalAccessTokenRouter } from "./routers/personalAccessToken";
+import { groupRouter } from "./routers/group";
 import { userRouter } from "./routers/user";
+import { gatewayBudgetsRouter } from "./routers/gatewayBudgets";
+import { gatewayCacheRulesRouter } from "./routers/gatewayCacheRules";
+import { gatewayUsageRouter } from "./routers/gatewayUsage";
+import { gatewayProvidersRouter } from "./routers/gatewayProviders";
+import { virtualKeysRouter } from "./routers/virtualKeys";
 import { workflowRouter } from "./routers/workflows";
+import { opsRouter } from "./routers/ops";
 
 const coreRouters = {
   agents: agentsRouter,
@@ -90,11 +101,22 @@ const coreRouters = {
   suites: suiteRouter,
   role: roleRouter,
   prompts: promptsRouter,
+  promptTags: promptTagsRouter,
   savedViews: savedViewsRouter,
   sdkRadar: sdkRadarRouter,
   secrets: secretsRouter,
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,
+  scimToken: scimTokenRouter,
+  roleBinding: roleBindingRouter,
+  personalAccessToken: personalAccessTokenRouter,
+  group: groupRouter,
+  ops: opsRouter,
+  virtualKeys: virtualKeysRouter,
+  gatewayProviders: gatewayProvidersRouter,
+  gatewayBudgets: gatewayBudgetsRouter,
+  gatewayCacheRules: gatewayCacheRulesRouter,
+  gatewayUsage: gatewayUsageRouter,
 };
 
 const eeRouters = {

@@ -36,7 +36,9 @@ export const tracesRouter = createTRPCRouter({
       });
 
       const traceService = TraceService.create(ctx.prisma);
-      return traceService.getAllTracesForProject(input, protections);
+      return traceService.getAllTracesForProject(input, protections, {
+        scrollId: input.scrollId,
+      });
     }),
 
   getById: publicProcedure

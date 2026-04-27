@@ -10,6 +10,7 @@ import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { createLogger } from "~/utils/logger";
 
 const logger = createLogger(
@@ -64,6 +65,7 @@ export function EditPromptHandleButton() {
     };
 
     const onError = (error: Error) => {
+      if (isHandledByGlobalHandler(error)) return;
       console.error(error);
       toaster.create({
         title: "Error changing prompt handle",

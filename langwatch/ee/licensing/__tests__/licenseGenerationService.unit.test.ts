@@ -36,7 +36,6 @@ describe("generateLicenseKey", () => {
       expect(plan.maxTeams).toBe(DEFAULT_LIMIT);
       expect(plan.maxProjects).toBe(DEFAULT_LIMIT);
       expect(plan.maxMessagesPerMonth).toBe(DEFAULT_LIMIT);
-      expect(plan.evaluationsCredit).toBe(DEFAULT_LIMIT);
       expect(plan.maxWorkflows).toBe(DEFAULT_LIMIT);
       expect(plan.maxPrompts).toBe(DEFAULT_LIMIT);
       expect(plan.maxEvaluators).toBe(DEFAULT_LIMIT);

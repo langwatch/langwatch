@@ -92,60 +92,64 @@ Feature: Simulation Runner Service
     And the event includes pass/fail for each criterion
 
   # ============================================================================
-  # Worker-Based Execution with OTEL Isolation (Issue #1088)
+  # Event-Driven Execution with OTEL Isolation
   # ============================================================================
+  # Scenario execution is fully event-driven:
+  # 1. API dispatches queueRun command → queued event
+  # 2. Execution reactor picks up the event → submits to execution pool
+  # 3. Pool spawns an isolated child process
+  # No BullMQ is used — the event-sourcing GroupQueue distributes work.
 
   @integration
-  Scenario: Execute scenario in isolated worker thread
+  Scenario: Execute scenario in isolated child process via execution reactor
     Given scenario "Test" exists with criteria
     And prompt "Test Prompt" is configured as target
-    When SimulationRunnerService.execute is called
-    Then a worker thread is spawned
-    And the worker receives serialized scenario data
-    And the worker receives serialized LiteLLM params
+    When a queued event is processed by the execution reactor
+    Then the execution pool spawns an isolated child process
+    And the child receives serialized scenario data
 
   @integration
-  Scenario: Worker thread has isolated OTEL context
-    Given a scenario run is started via worker
-    When the worker thread initializes
+  Scenario: Child process has isolated OTEL context
+    Given a scenario run is started via the execution pool
+    When the child process initializes
     Then it creates its own OTEL TracerProvider
     And the provider exports to LangWatch endpoint
     And traces are not mixed with server global telemetry
 
   @integration
-  Scenario: Worker traces include scenario metadata
+  Scenario: Child traces include scenario metadata
     Given scenario "Refund Test" with labels ["support", "billing"]
-    When the scenario executes in a worker
+    When the scenario executes in a child process
     Then exported traces include scenarioId as resource attribute
     And exported traces include batchRunId as resource attribute
 
   @integration
-  Scenario: Worker events include scenario set ID
+  Scenario: Child events include scenario set ID
     Given scenario "Refund Test" in set "production-tests"
-    When the scenario executes in a worker
+    When the scenario executes in a child process
     Then emitted events include scenarioSetId "production-tests"
     And the events are NOT stored in the default set
 
   @integration
-  Scenario: OTEL context is cleaned up after worker execution
-    Given a scenario run completes in a worker
-    When the worker finishes execution
+  Scenario: OTEL context is cleaned up after child execution
+    Given a scenario run completes in a child process
+    When the child process finishes
     Then the TracerProvider is shut down
     And pending spans are flushed before termination
 
   @integration
-  Scenario: Worker returns execution result to manager
+  Scenario: Execution pool reports success to failure handler
     Given a scenario run completes successfully
-    When the worker sends results back
-    Then SimulationRunnerService receives success status
-    And the result includes the runId
+    When the child process exits with code 0
+    Then the execution pool logs success
+    And no failure events are emitted
 
   @integration
-  Scenario: Worker reports errors to manager
-    Given scenario execution fails in worker
-    When the worker encounters an error
-    Then SimulationRunnerService receives failure status
-    And the result includes the error message
+  Scenario: Execution pool reports errors to failure handler
+    Given scenario execution fails in the child process
+    When the child process exits with non-zero code
+    Then the failure handler emits ERROR events
+    And the error message is included in the event
 
   # ============================================================================
   # Error Handling - Early Validation (API Level)

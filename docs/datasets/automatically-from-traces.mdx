@@ -1,0 +1,28 @@
+---
+title: Automatically build datasets from real-time traces
+description: Automatically build datasets from real-time traces to power LLM evaluations, regression tests, and AI agent testing workflows.
+---
+
+You can keep continously populating the dataset with new data arriving from production by using **Automations**, mapping trace fields to any dataset columns you prefer.
+
+Simply go to the Messages page and select a filter (for example, by model), the Add Automation button will be enabled:
+
+<div style={{ display: "flex", justifyContent: "center" }}>
+  <Frame caption="Add Automation" style={{ maxWidth: "300px" }}>
+    <img
+      className="block"
+      src="/images/add-automation-filter.png"
+      alt="LangWatch"
+    />
+  </Frame>
+</div>
+For Action, select **Add To Dataset**, and chose the right fields to map from the trace to the dataset:
+
+<Frame caption="Add To Dataset">
+<img
+  className="block"
+  src="/images/add-to-dataset-automation.png"
+  alt="LangWatch"
+/>
+</Frame>
+Hit save, and that's it! Now every time a new message matches the filter, the automation will be fired and the dataset will be populated with the new row.

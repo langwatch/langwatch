@@ -1,5 +1,5 @@
 import { Heading, HStack, Text, VStack } from "@chakra-ui/react";
-import dynamic from "next/dynamic";
+import dynamic from "~/utils/compat/next-dynamic";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";

@@ -271,11 +271,10 @@ export async function thenISeeScenarioTable(page: Page) {
  * Then I see the simulations page content
  */
 export async function thenISeeSimulationsPageContent(page: Page) {
-  // Either empty state or simulation results
-  const emptyStateHeading = page.getByRole("heading", { name: /scenario.*agentic.*simulations/i });
-  const simulationSetsHeading = page.getByRole("heading", { name: /simulation sets/i });
+  // The unified simulations page shows a "Simulations" heading
+  const simulationsHeading = page.getByRole("heading", { name: /^simulations$/i });
 
-  await expect(emptyStateHeading.or(simulationSetsHeading)).toBeVisible({ timeout: 15000 });
+  await expect(simulationsHeading).toBeVisible({ timeout: 15000 });
 }
 
 /**

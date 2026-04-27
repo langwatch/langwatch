@@ -10,6 +10,11 @@ export const queueRunCommandDataSchema = z.object({
   name: z.string().optional(),
   description: z.string().optional(),
   metadata: z.record(z.unknown()).optional(),
+  /** Target for execution. Used by the execution reactor to spawn the right adapter. */
+  target: z.object({
+    type: z.enum(["prompt", "http", "code", "workflow"]),
+    referenceId: z.string(),
+  }).optional(),
   occurredAt: z.number(),
 });
 export type QueueRunCommandData = z.infer<typeof queueRunCommandDataSchema>;
@@ -69,6 +74,21 @@ export const textMessageEndCommandDataSchema = z.object({
   occurredAt: z.number(),
 });
 export type TextMessageEndCommandData = z.infer<typeof textMessageEndCommandDataSchema>;
+
+export const computeRunMetricsCommandDataSchema = z.object({
+  tenantId: z.string(),
+  scenarioRunId: z.string(),
+  traceId: z.string(),
+  /** ECST payload: metrics carried from trace-side reactor. Omitted in pull mode. */
+  metrics: z.object({
+    totalCost: z.number(),
+    roleCosts: z.record(z.string(), z.number()),
+    roleLatencies: z.record(z.string(), z.number()),
+  }).optional(),
+  retryCount: z.number().default(0),
+  occurredAt: z.number(),
+});
+export type ComputeRunMetricsCommandData = z.infer<typeof computeRunMetricsCommandDataSchema>;
 
 export const deleteRunCommandDataSchema = z.object({
   tenantId: z.string(),

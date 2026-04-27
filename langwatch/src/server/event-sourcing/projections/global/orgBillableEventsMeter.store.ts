@@ -1,6 +1,6 @@
 import type { AppendStore } from "../mapProjection.types";
 import type { ProjectionStoreContext } from "../projectionStoreContext";
-import { getClickHouseClient } from "~/server/clickhouse/client";
+import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
 import { resolveOrganizationId } from "~/server/organizations/resolveOrganizationId";
 
@@ -31,18 +31,18 @@ export const orgBillableEventsMeterStore: AppendStore<BillableEventRecord> = {
     record: BillableEventRecord,
     _context: ProjectionStoreContext,
   ): Promise<void> {
-    const client = getClickHouseClient();
-    if (!client) {
-      logger.debug("ClickHouse not configured, skipping billable event insert");
-      return;
-    }
-
     const organizationId = await resolveOrganizationId(record.tenantId);
     if (!organizationId) {
       logger.warn(
         { projectId: record.tenantId },
         "orphan project detected, has no organization -- skipping billable event insert",
       );
+      return;
+    }
+
+    const client = await getClickHouseClientForOrganization(organizationId);
+    if (!client) {
+      logger.debug("ClickHouse not configured, skipping billable event insert");
       return;
     }
 

@@ -1,6 +1,6 @@
-import { VStack } from "@chakra-ui/react";
+import { Box, HStack, VStack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
@@ -12,7 +12,6 @@ import { trackEventOnce } from "~/utils/tracking";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { OnboardingContainer } from "../components/containers/OnboardingContainer";
 import { OnboardingNavigation } from "../components/navigation/OnboardingNavigation";
-import { slideVariants, transition } from "../constants/onboarding-data";
 import { OnboardingFormProvider } from "../contexts/form-context";
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
 import { useCreateWelcomeScreens } from "./create-welcome-screens";
@@ -47,6 +46,9 @@ export const WelcomeScreen: React.FC = () => {
     api.onboarding.initializeOrganization.useMutation();
 
   useEffect(() => {
+    // Wait until org data has finished loading before deciding
+    if (organizationIsLoading) return;
+
     const hasAnyProject =
       organizations?.some((org) =>
         org.teams.some((t) => t.projects.length > 0),
@@ -66,7 +68,7 @@ export const WelcomeScreen: React.FC = () => {
     } else {
       setOnboardingNeeded(true);
     }
-  }, [project?.slug]);
+  }, [organizationIsLoading, organizations, project?.slug]);
 
   function handleFinalizeSubmit() {
     const form = getFormData();
@@ -82,7 +84,7 @@ export const WelcomeScreen: React.FC = () => {
           companySize: form.companySize,
           yourRole: form.role,
           featureUsage: form.selectedDesires.join("\n"),
-          utmCampaign: form.utmCampaign,
+          ...form.attribution,
         },
       },
       {
@@ -136,55 +138,112 @@ export const WelcomeScreen: React.FC = () => {
   return (
     <AnalyticsBoundary name="onboarding_welcome" sendViewedEvent>
       <OnboardingContainer
-        title={currentScreen?.heading ?? "Welcome aboard 👋"}
+        title={currentScreen?.heading ?? "Welcome aboard"}
         subTitle={currentScreen?.subHeading}
+        showBackButton={false}
       >
-        <VStack gap={4} align="stretch" position="relative" minH="400px">
-          <AnimatePresence initial={false} custom={direction} mode="popLayout">
-            <motion.div
-              key={currentScreenIndex}
+        <VStack gap={5} align="stretch" w="full" minW="0">
+          <Box position="relative" overflow="hidden" py="1" px="2" my="-1" mx="-2">
+            <AnimatePresence
+              mode="popLayout"
               custom={direction}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={transition}
-              style={{ width: "100%" }}
+              initial={false}
             >
-              <AnalyticsBoundary
-                name={currentScreen?.id ?? "unknown"}
-                attributes={{
-                  screenIndex: currentVisibleIndex,
-                  variant: flow.variant,
-                  total: flow.total,
-                  isFirst: isFirstScreen,
-                  isLast: isLastScreen,
+              <motion.div
+                key={currentScreenIndex}
+                custom={direction}
+                initial="enter"
+                animate="center"
+                exit="exit"
+                layout
+                variants={{
+                  enter: (dir: number) => ({
+                    opacity: 0,
+                    x: dir > 0 ? 30 : -30,
+                    filter: "blur(3px)",
+                  }),
+                  center: {
+                    opacity: 1,
+                    x: 0,
+                    filter: "blur(0px)",
+                  },
+                  exit: (dir: number) => ({
+                    opacity: 0,
+                    x: dir > 0 ? -30 : 30,
+                    filter: "blur(3px)",
+                    position: "absolute" as const,
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                  }),
                 }}
-                sendViewedEvent
+                transition={{
+                  duration: 0.3,
+                  ease: [0.32, 0.72, 0, 1],
+                }}
+                style={{ width: "100%" }}
               >
-                <OnboardingFormProvider value={formContextValue}>
-                  <fieldset disabled={pendingOrSuccessful}>
-                    {currentScreen?.component ? (
-                      <currentScreen.component />
-                    ) : null}
-                  </fieldset>
-                </OnboardingFormProvider>
-              </AnalyticsBoundary>
-            </motion.div>
-          </AnimatePresence>
+                <AnalyticsBoundary
+                  name={currentScreen?.id ?? "unknown"}
+                  attributes={{
+                    screenIndex: currentVisibleIndex,
+                    variant: flow.variant,
+                    total: flow.total,
+                    isFirst: isFirstScreen,
+                    isLast: isLastScreen,
+                  }}
+                  sendViewedEvent
+                >
+                  <OnboardingFormProvider value={formContextValue}>
+                    <fieldset
+                      disabled={pendingOrSuccessful}
+                      style={{ width: "100%", minWidth: 0 }}
+                    >
+                      {currentScreen?.component ? (
+                        <currentScreen.component />
+                      ) : null}
+                    </fieldset>
+                  </OnboardingFormProvider>
+                </AnalyticsBoundary>
+              </motion.div>
+            </AnimatePresence>
+          </Box>
 
-          <OnboardingNavigation
-            currentScreenIndex={currentScreenIndex}
-            onPrev={navigation.prevScreen}
-            onNext={navigation.nextScreen}
-            onSkip={navigation.skipScreen}
-            canProceed={navigation.canProceed()}
-            isSkippable={!currentScreen?.required}
-            isSubmitting={pendingOrSuccessful}
-            onFinish={handleFinalizeSubmit}
-            isFirstScreen={isFirstScreen}
-            isLastScreen={isLastScreen}
-          />
+          <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
+            <OnboardingNavigation
+              currentScreenIndex={currentScreenIndex}
+              onPrev={navigation.prevScreen}
+              onNext={navigation.nextScreen}
+              onSkip={navigation.skipScreen}
+              canProceed={navigation.canProceed()}
+              isSkippable={!currentScreen?.required}
+              isSubmitting={pendingOrSuccessful}
+              onFinish={handleFinalizeSubmit}
+              isFirstScreen={isFirstScreen}
+              isLastScreen={isLastScreen}
+            />
+          </motion.div>
+
+          <motion.div layout transition={{ duration: 0.3, ease: [0.32, 0.72, 0, 1] }}>
+            <HStack justify="center" gap={1.5}>
+              {flow.visibleScreens.map((_, idx) => (
+                <Box
+                  key={idx}
+                  w={currentVisibleIndex === idx ? "16px" : "5px"}
+                  h="5px"
+                  borderRadius="full"
+                  bg={
+                    currentVisibleIndex === idx
+                      ? "orange.400"
+                      : idx < currentVisibleIndex
+                        ? "orange.300"
+                        : "gray.200"
+                  }
+                  transition="all 0.3s ease"
+                />
+              ))}
+            </HStack>
+          </motion.div>
         </VStack>
       </OnboardingContainer>
     </AnalyticsBoundary>

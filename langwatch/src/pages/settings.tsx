@@ -1,5 +1,4 @@
 import {
-  Alert,
   Badge,
   Button,
   Card,
@@ -24,7 +23,6 @@ import { Lock } from "react-feather";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { Tooltip } from "~/components/ui/tooltip";
-import { ApiKeyManagementSection } from "../components/settings/ApiKeyManagementSection";
 import { ProjectSelector } from "../components/DashboardLayout";
 import SettingsLayout from "../components/SettingsLayout";
 import {
@@ -37,9 +35,10 @@ import { Switch } from "../components/ui/switch";
 import { toaster } from "../components/ui/toaster";
 import { withPermissionGuard } from "../components/WithPermissionGuard";
 import { useActivePlan } from "../hooks/useActivePlan";
+import { useLiteMemberGuard } from "../hooks/useLiteMemberGuard";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
-import type { FullyLoadedOrganization } from "../server/api/routers/organization";
+import type { FullyLoadedOrganization } from "../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../utils/api";
 
 type OrganizationFormData = {
@@ -72,6 +71,7 @@ function SettingsForm({
   project: Project;
 }) {
   const { hasPermission } = useOrganizationTeamProject();
+  const { isLiteMember } = useLiteMemberGuard();
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
     s3Endpoint: organization.s3Endpoint ?? "",
@@ -182,6 +182,17 @@ function SettingsForm({
                   <Text>{organization.slug}</Text>
                 )}
               </HorizontalFormControl>
+              <HorizontalFormControl
+                label="Project ID"
+                helper="Use this ID when authenticating with Personal Access Tokens"
+              >
+                <Input
+                  width="full"
+                  disabled
+                  type="text"
+                  value={project.id}
+                />
+              </HorizontalFormControl>
 
               {organization.useCustomS3 && (
                 <HorizontalFormControl
@@ -254,15 +265,17 @@ function SettingsForm({
               )}
             </VStack>
 
-            <HStack width="full" justify="flex-end" paddingTop={4}>
-              <Button
-                type="submit"
-                colorPalette="blue"
-                loading={updateOrganization.isLoading}
-              >
-                Save Changes
-              </Button>
-            </HStack>
+            {!isLiteMember && (
+              <HStack width="full" justify="flex-end" paddingTop={4}>
+                <Button
+                  type="submit"
+                  colorPalette="blue"
+                  loading={updateOrganization.isLoading}
+                >
+                  Save Changes
+                </Button>
+              </HStack>
+            )}
           </VStack>
         </form>
 
@@ -751,8 +764,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               )}
             />
           </HorizontalFormControl>
-
-          <ApiKeyManagementSection project={project} />
 
           {organization?.useCustomS3 && (
             <HorizontalFormControl

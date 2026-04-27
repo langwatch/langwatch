@@ -10,8 +10,11 @@ import {
   promptingTechniqueSchema,
   responseFormatSchema,
 } from "~/prompts/schemas";
+import { afterPromptCreated } from "~/../ee/billing/nurturing/hooks/promptCreation";
 import { enforceLicenseLimit } from "~/server/license-enforcement";
 import { PromptService } from "~/server/prompt-config";
+import { NotFoundError } from "~/server/prompt-config/errors";
+import { TagValidationError } from "~/server/prompt-config/repositories/llm-config-tag.repository";
 import { checkProjectPermission, hasProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
@@ -218,11 +221,19 @@ export const promptsRouter = createTRPCRouter({
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
 
-      return await service.createPrompt({
+      const result = await service.createPrompt({
         ...input.data,
         projectId: input.projectId,
         authorId,
       });
+
+      afterPromptCreated({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        userId: authorId,
+      });
+
+      return result;
     }),
 
   /**
@@ -314,12 +325,30 @@ export const promptsRouter = createTRPCRouter({
         versionId: z.string().optional(),
         /** Optional: fetch a specific version by number */
         version: z.number().optional(),
+        /** Optional: fetch the version pointed to by this tag */
+        tag: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
-      const service = new PromptService(ctx.prisma);
-      return await service.getPromptByIdOrHandle(input);
+      try {
+        const service = new PromptService(ctx.prisma);
+        return await service.getPromptByIdOrHandle(input);
+      } catch (error) {
+        if (error instanceof TagValidationError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+          });
+        }
+        if (error instanceof NotFoundError) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
     }),
 
   /**
@@ -511,6 +540,12 @@ export const promptsRouter = createTRPCRouter({
       await ctx.prisma.llmPromptConfig.update({
         where: { id: copiedPrompt.id },
         data: { copiedFromPromptId: sourcePrompt.id },
+      });
+
+      afterPromptCreated({
+        prisma: ctx.prisma,
+        projectId: input.projectId,
+        userId: authorId,
       });
 
       return { ...copiedPrompt, copiedFromPromptId: sourcePrompt.id };
@@ -827,5 +862,57 @@ export const promptsRouter = createTRPCRouter({
         selectedCopies: copiesToPush.length,
         results,
       };
+    }),
+
+  // --- Tag Operations ---
+
+  /**
+   * Get all tags for a prompt config.
+   */
+  getTagsForConfig: protectedProcedure
+    .input(z.object({ projectId: z.string(), configId: z.string() }))
+    .use(checkProjectPermission("prompts:view"))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return service.getTagsForConfig({
+        configId: input.configId,
+        projectId: input.projectId,
+      });
+    }),
+
+  /**
+   * Assign (or reassign) a tag to a specific prompt version.
+   * Accepts built-in tags (production, staging) and custom tags defined for the org.
+   */
+  assignTag: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        configId: z.string(),
+        versionId: z.string(),
+        tag: z.string().min(1),
+      }),
+    )
+    .use(checkProjectPermission("prompts:update"))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+
+      try {
+        return await service.assignTag({
+          configId: input.configId,
+          versionId: input.versionId,
+          tag: input.tag,
+          projectId: input.projectId,
+          userId: ctx.session?.user?.id,
+        });
+      } catch (error) {
+        if (error instanceof TagValidationError) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: error.message,
+          });
+        }
+        throw error;
+      }
     }),
 });

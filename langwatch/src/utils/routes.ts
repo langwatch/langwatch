@@ -128,7 +128,7 @@ export const projectRoutes = {
   },
   simulation_runs: {
     path: "/[project]/simulations",
-    title: "Run History",
+    title: "Runs",
     parent: "simulations",
   },
   scenarios: {
@@ -141,19 +141,81 @@ export const projectRoutes = {
     title: "Run Plans",
     parent: "simulations",
   },
-  simulations_batch: {
-    path: "/[project]/simulations/[scenarioSetId]/[batchRunId]",
-    title: "Runs",
-    parent: "simulations",
+  simulations_suite_detail: {
+    path: "/[project]/simulations/run-plans/[suiteSlug]",
+    title: "Run Plan",
+    parent: "simulation_runs",
+  },
+  simulations_suite_batch: {
+    path: "/[project]/simulations/run-plans/[suiteSlug]/[batchId]",
+    title: "Run Plan",
+    parent: "simulation_runs",
+  },
+  simulations_external_set: {
+    path: "/[project]/simulations/[externalSetSlug]",
+    title: "Simulation Run",
+    parent: "simulation_runs",
+  },
+  simulations_external_batch: {
+    path: "/[project]/simulations/[externalSetSlug]/[batchId]",
+    title: "Simulation Run",
+    parent: "simulation_runs",
   },
   simulations_run: {
     path: "/[project]/simulations/[scenarioSetId]/[batchRunId]/[scenarioRunId]",
     title: "Simulation Run",
-    parent: "simulations",
+    parent: "simulation_runs",
   },
   evaluators: {
     path: "/[project]/evaluators",
     title: "Evaluators",
+  },
+  gateway: {
+    path: "/[project]/gateway",
+    title: "AI Gateway",
+  },
+  gateway_virtual_keys: {
+    path: "/[project]/gateway/virtual-keys",
+    title: "Virtual Keys",
+    parent: "gateway",
+  },
+  gateway_virtual_key_detail: {
+    path: "/[project]/gateway/virtual-keys/[id]",
+    title: "Virtual Key",
+    parent: "gateway_virtual_keys",
+  },
+  gateway_budgets: {
+    path: "/[project]/gateway/budgets",
+    title: "Budgets",
+    parent: "gateway",
+  },
+  gateway_budget_detail: {
+    path: "/[project]/gateway/budgets/[id]",
+    title: "Budget",
+    parent: "gateway_budgets",
+  },
+  gateway_providers: {
+    path: "/[project]/gateway/providers",
+    title: "Providers",
+    parent: "gateway",
+  },
+  gateway_usage: {
+    path: "/[project]/gateway/usage",
+    title: "Usage",
+    parent: "gateway",
+  },
+  gateway_cache_rules: {
+    path: "/[project]/gateway/cache-rules",
+    title: "Cache Rules",
+    parent: "gateway",
+  },
+  ops: {
+    path: "/ops",
+    title: "Ops",
+  },
+  opsDejaview: {
+    path: "/ops/dejaview",
+    title: "Deja View",
   },
 } as const;
 

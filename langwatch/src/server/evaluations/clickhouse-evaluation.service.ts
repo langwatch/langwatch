@@ -1,14 +1,13 @@
-import type { ClickHouseClient } from "@clickhouse/client";
 import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
-import { getClickHouseClient } from "~/server/clickhouse/client";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
 import { createLogger } from "~/utils/logger/server";
 import type { ClickHouseEvaluationRunRow } from "./evaluation-run.mappers";
 import { mapClickHouseEvaluationToTraceEvaluation } from "./evaluation-run.mappers";
 import type { TraceEvaluation } from "./evaluation-run.types";
-import { isClickHouseReadEnabled } from "~/server/evaluations-v3/services/isClickHouseReadEnabled";
+
 
 /**
  * Service for fetching per-trace evaluation runs from ClickHouse.
@@ -20,7 +19,6 @@ import { isClickHouseReadEnabled } from "~/server/evaluations-v3/services/isClic
  * ReplacingMergeTree versions.
  */
 export class ClickHouseEvaluationService {
-  private readonly clickHouseClient: ClickHouseClient | null;
   private readonly logger = createLogger(
     "langwatch:evaluations:clickhouse-service",
   );
@@ -28,9 +26,7 @@ export class ClickHouseEvaluationService {
     "langwatch.evaluations.clickhouse-service",
   );
 
-  constructor(private readonly prisma: PrismaClient) {
-    this.clickHouseClient = getClickHouseClient();
-  }
+  constructor(private readonly prisma: PrismaClient) {}
 
   /**
    * Static factory method for creating ClickHouseEvaluationService with default dependencies.
@@ -39,30 +35,6 @@ export class ClickHouseEvaluationService {
     prisma: PrismaClient = defaultPrisma,
   ): ClickHouseEvaluationService {
     return new ClickHouseEvaluationService(prisma);
-  }
-
-  /**
-   * Check if ClickHouse evaluations data source is enabled for the given project.
-   */
-  async isClickHouseEnabled(projectId: string): Promise<boolean> {
-    return await this.tracer.withActiveSpan(
-      "ClickHouseEvaluationService.isClickHouseEnabled",
-      { attributes: { "tenant.id": projectId } },
-      async (span) => {
-        if (!this.clickHouseClient) {
-          return false;
-        }
-
-        const enabled = await isClickHouseReadEnabled(this.prisma, projectId);
-
-        span.setAttribute(
-          "project.feature.clickhouse.evaluations",
-          enabled,
-        );
-
-        return enabled;
-      },
-    );
   }
 
   /**
@@ -87,8 +59,8 @@ export class ClickHouseEvaluationService {
       "ClickHouseEvaluationService.getEvaluationsForTrace",
       { attributes: { "tenant.id": projectId, "trace.id": traceId } },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -98,14 +70,19 @@ export class ClickHouseEvaluationService {
         );
 
         try {
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: `
               SELECT *
               FROM evaluation_runs
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
-              ORDER BY EvaluationId, UpdatedAt DESC
-              LIMIT 1 BY TenantId, EvaluationId
+                AND (TenantId, EvaluationId, UpdatedAt) IN (
+                  SELECT TenantId, EvaluationId, max(UpdatedAt)
+                  FROM evaluation_runs
+                  WHERE TenantId = {tenantId:String}
+                    AND TraceId = {traceId:String}
+                  GROUP BY TenantId, EvaluationId
+                )
             `,
             query_params: {
               tenantId: projectId,
@@ -160,8 +137,8 @@ export class ClickHouseEvaluationService {
         },
       },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        const clickHouseClient = await getClickHouseClientForProject(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -175,14 +152,19 @@ export class ClickHouseEvaluationService {
         );
 
         try {
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: `
               SELECT *
               FROM evaluation_runs
               WHERE TenantId = {tenantId:String}
                 AND TraceId IN ({traceIds:Array(String)})
-              ORDER BY EvaluationId, UpdatedAt DESC
-              LIMIT 1 BY TenantId, EvaluationId
+                AND (TenantId, EvaluationId, UpdatedAt) IN (
+                  SELECT TenantId, EvaluationId, max(UpdatedAt)
+                  FROM evaluation_runs
+                  WHERE TenantId = {tenantId:String}
+                    AND TraceId IN ({traceIds:Array(String)})
+                  GROUP BY TenantId, EvaluationId
+                )
             `,
             query_params: {
               tenantId: projectId,

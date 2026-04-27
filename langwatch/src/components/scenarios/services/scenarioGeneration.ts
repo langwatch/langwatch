@@ -1,15 +1,20 @@
+import { z } from "zod";
+
 // ─────────────────────────────────────────────────────────────────────────────
-// Types
+// Schema & Types
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Zod schema for validating AI-generated scenario responses */
+export const generatedScenarioSchema = z.object({
+  name: z.string(),
+  situation: z.string(),
+  criteria: z.array(z.string()),
+});
 
 /**
  * Represents a generated scenario from the AI
  */
-export type GeneratedScenario = {
-  name: string;
-  situation: string;
-  criteria: string[];
-};
+export type GeneratedScenario = z.infer<typeof generatedScenarioSchema>;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Service
@@ -52,5 +57,10 @@ export async function generateScenarioWithAI(
     throw new Error("Invalid response: missing scenario data");
   }
 
-  return data.scenario;
+  const parsed = generatedScenarioSchema.safeParse(data.scenario);
+  if (!parsed.success) {
+    throw new Error(`Invalid scenario data: ${parsed.error.message}`);
+  }
+
+  return parsed.data;
 }

@@ -10,6 +10,9 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  assertSkillWasRead,
+  installSkillToWorkDir,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -22,17 +25,7 @@ const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
 
 function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "level-up");
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.copyFileSync(
-    path.resolve(__dirname, "../level-up/SKILL.md"),
-    path.join(skillDir, "SKILL.md")
-  );
-  const sharedDir = path.join(skillDir, "_shared");
-  fs.mkdirSync(sharedDir, { recursive: true });
-  execSync(
-    `cp -r ${path.resolve(__dirname, "../_shared")}/* ${sharedDir}/`
-  );
+  installSkillToWorkDir({ workingDirectory: tempFolder, skillSubpath: "level-up" });
 }
 
 describe("Level-up Skill", () => {
@@ -49,6 +42,7 @@ describe("Level-up Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python OpenAI level-up",
         description:
           "Taking a Python OpenAI bot to the next level with full LangWatch integration.",
@@ -60,17 +54,18 @@ describe("Level-up Skill", () => {
             criteria: [
               "Agent should have added LangWatch tracing to the code",
               "Agent should have set up some form of evaluation or experiment",
-              "Agent should have used the LangWatch MCP to check documentation",
+              "Agent should have used the `langwatch docs` and/or `langwatch scenario-docs` CLI commands to read documentation",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "level-up");
             // Verify tracing was added
             const mainPy = fs.readFileSync(
               `${tempFolder}/main.py`,
@@ -99,6 +94,7 @@ describe("Level-up Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Vercel AI level-up",
         description:
           "Taking a TypeScript Vercel AI bot to the next level with full LangWatch integration.",
@@ -110,17 +106,18 @@ describe("Level-up Skill", () => {
             criteria: [
               "Agent should have added LangWatch tracing to the code",
               "Agent should have set up some form of evaluation or testing",
-              "Agent should have used the LangWatch MCP to check documentation",
+              "Agent should have used the `langwatch docs` and/or `langwatch scenario-docs` CLI commands to read documentation",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "level-up");
             const indexTs = fs.readFileSync(
               `${tempFolder}/index.ts`,
               "utf8"
@@ -147,6 +144,7 @@ describe("Level-up Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python LangGraph level-up",
         description:
           "Taking a Python LangGraph agent to the next level with full LangWatch integration.",
@@ -163,11 +161,12 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "level-up");
             const mainPy = fs.readFileSync(
               `${tempFolder}/main.py`,
               "utf8"
@@ -194,6 +193,7 @@ describe("Level-up Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Mastra level-up",
         description:
           "Taking a TypeScript Mastra agent to the next level with full LangWatch integration.",
@@ -210,11 +210,12 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests. Be concise, no need to run anything."
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "level-up");
             const indexTs = fs.readFileSync(
               `${tempFolder}/index.ts`,
               "utf8"

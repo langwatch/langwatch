@@ -7,7 +7,11 @@
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { Evaluator, PrismaClient } from "@prisma/client";
-import { EvaluatorService, type EvaluatorField } from "../evaluator.service";
+import {
+  EvaluatorService,
+  STANDARD_EVALUATOR_OUTPUT_FIELDS,
+  type EvaluatorField,
+} from "../evaluator.service";
 import type { EvaluatorRepository } from "../evaluator.repository";
 
 // Mock AVAILABLE_EVALUATORS
@@ -49,6 +53,23 @@ vi.mock("~/server/evaluations/evaluators.generated", () => ({
     },
   },
 }));
+
+describe("STANDARD_EVALUATOR_OUTPUT_FIELDS", () => {
+  it("does not include details (regression: sticky details bug #2514)", () => {
+    const identifiers = STANDARD_EVALUATOR_OUTPUT_FIELDS.map(
+      (f) => f.identifier,
+    );
+    expect(identifiers).not.toContain("details");
+  });
+
+  it("includes passed, score, and label only", () => {
+    expect(STANDARD_EVALUATOR_OUTPUT_FIELDS).toEqual([
+      { identifier: "passed", type: "bool" },
+      { identifier: "score", type: "float" },
+      { identifier: "label", type: "str" },
+    ]);
+  });
+});
 
 describe("EvaluatorService", () => {
   describe("field computation for built-in evaluators", () => {
@@ -168,7 +189,7 @@ describe("EvaluatorService", () => {
       expect(result!.fields).toEqual([]);
     });
 
-    it("computes output fields with only passed + details for exact_match", async () => {
+    it("computes output fields with only passed for exact_match (no sticky details)", async () => {
       const mockPrisma = {} as PrismaClient;
       const mockRepository = {
         findById: vi.fn().mockResolvedValue({
@@ -186,11 +207,10 @@ describe("EvaluatorService", () => {
 
       expect(result!.outputFields).toEqual([
         { identifier: "passed", type: "bool" },
-        { identifier: "details", type: "str" },
       ]);
     });
 
-    it("computes output fields with score + details for ragas", async () => {
+    it("computes output fields with only score for ragas (no sticky details)", async () => {
       const mockPrisma = {} as PrismaClient;
       const mockRepository = {
         findById: vi.fn().mockResolvedValue({
@@ -208,11 +228,10 @@ describe("EvaluatorService", () => {
 
       expect(result!.outputFields).toEqual([
         { identifier: "score", type: "float" },
-        { identifier: "details", type: "str" },
       ]);
     });
 
-    it("computes all output fields for PII detection (score + passed + label + details)", async () => {
+    it("computes output fields for PII detection (score + passed + label, no sticky details)", async () => {
       const mockPrisma = {} as PrismaClient;
       const mockRepository = {
         findById: vi.fn().mockResolvedValue({
@@ -232,7 +251,6 @@ describe("EvaluatorService", () => {
         { identifier: "score", type: "float" },
         { identifier: "passed", type: "bool" },
         { identifier: "label", type: "str" },
-        { identifier: "details", type: "str" },
       ]);
     });
 
@@ -256,7 +274,6 @@ describe("EvaluatorService", () => {
         { identifier: "passed", type: "bool" },
         { identifier: "score", type: "float" },
         { identifier: "label", type: "str" },
-        { identifier: "details", type: "str" },
       ]);
     });
 

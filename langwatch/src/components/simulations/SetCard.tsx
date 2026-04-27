@@ -40,10 +40,7 @@ export function SetCard({
       p="5"
       _hover={{
         borderColor: "border.emphasized",
-        transform: "translateY(-1px)",
-        shadow: "xl",
       }}
-      transition="all 0.15s ease"
       cursor="pointer"
       onClick={onClick}
       position="relative"

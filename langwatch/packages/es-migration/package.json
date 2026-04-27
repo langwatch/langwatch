@@ -1,0 +1,22 @@
+{
+  "name": "@langwatch/es-migration",
+  "version": "1.0.0",
+  "description": "Migrate simulation and batch evaluation data from Elasticsearch to ClickHouse via event sourcing",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "tsx -r tsconfig-paths/register src/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clickhouse/client": "1.18.2",
+    "@elastic/elasticsearch": "^8.17.0",
+    "@opentelemetry/otlp-transformer-next": "npm:@opentelemetry/otlp-transformer@0.208.0",
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.3"
+  }
+}

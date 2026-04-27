@@ -133,4 +133,14 @@ export interface ProjectionStore<
     projection: ProjectionType,
     context: ProjectionStoreWriteContext,
   ): Promise<void>;
+
+  /**
+   * Optional batch store for persisting multiple projections in a single INSERT.
+   * Used by projection-replay to batch thousands of rows per ClickHouse INSERT.
+   * Falls back to sequential storeProjection() calls if not implemented.
+   */
+  storeProjectionBatch?(
+    projections: ProjectionType[],
+    context: ProjectionStoreWriteContext,
+  ): Promise<void>;
 }

@@ -1,6 +1,8 @@
 import type { ElasticSearchEvaluation } from "../../server/tracer/types";
 
 export interface EvaluationGroup {
+  /** Stable unique key for this group, suitable for use as a React key. */
+  groupKey: string;
   /** The evaluator_id shared by all runs in this group, or null for ungrouped entries. */
   evaluatorId: string | null;
   /** All runs sorted from most recent to oldest. */
@@ -69,6 +71,7 @@ export function groupEvaluationsByEvaluator(
   for (const [evaluatorId, runs] of grouped) {
     const sortedRuns = [...runs].sort(sortByTimestampDesc);
     groupedEntries.push({
+      groupKey: `evaluator-${evaluatorId}`,
       evaluatorId,
       runs: sortedRuns,
       latest: sortedRuns[0]!,
@@ -87,6 +90,7 @@ export function groupEvaluationsByEvaluator(
   const ungroupedEntries: EvaluationGroup[] = ungrouped
     .sort(sortByTimestampDesc)
     .map((evaluation) => ({
+      groupKey: `ungrouped-${evaluation.evaluation_id}`,
       evaluatorId: null,
       runs: [evaluation],
       latest: evaluation,

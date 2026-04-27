@@ -2,6 +2,7 @@ import type { EvaluationRunData } from "../types";
 
 export interface EvaluationRunRepository {
   upsert(data: EvaluationRunData, tenantId: string): Promise<void>;
+  upsertBatch?(entries: Array<{ data: EvaluationRunData; tenantId: string }>): Promise<void>;
   getByEvaluationId(
     tenantId: string,
     evaluationId: string,

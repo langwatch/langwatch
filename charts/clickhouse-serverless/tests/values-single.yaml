@@ -1,0 +1,13 @@
+image:
+  # Workflow builds the local image as `:next`; chart default `:0.2.0`
+  # would ErrImageNeverPull under pullPolicy: Never.
+  tag: "next"
+  pullPolicy: Never
+replicas: 1
+memory: 1Gi
+cpu: "500m"
+storage:
+  size: 1Gi
+
+auth:
+  password: "e2etest"

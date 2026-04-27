@@ -11,14 +11,13 @@ import {
   Center,
   HStack,
   IconButton,
+  Skeleton,
   Spacer,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import type { SimulationSuite } from "@prisma/client";
 import {
-  CircleAlert,
-  CircleCheck,
   List,
   MoreVertical,
   PanelLeftOpen,
@@ -28,8 +27,13 @@ import {
 import type React from "react";
 import { useMemo, useState } from "react";
 import { Tooltip } from "~/components/ui/tooltip";
+import {
+  getPassRateGradientColor,
+  PassRateCircle,
+} from "~/components/shared/PassRateIndicator";
+import { useNow } from "~/hooks/useNow";
 import { formatTimeAgoCompact } from "~/utils/formatTimeAgo";
-import type { SuiteRunSummary } from "./run-history-transforms";
+import type { SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import type { ExternalSetSummary } from "~/server/scenarios/scenario-event.types";
 import {
   ALL_RUNS_ID,
@@ -39,27 +43,11 @@ import { SearchInput } from "../ui/SearchInput";
 
 export const SUITE_SIDEBAR_COLLAPSED_KEY = "suite-sidebar-collapsed" as const;
 
-/** 1px border line + soft downward shadow, matching the prompt playground divider. */
-function ShadowDivider() {
-  return (
-    <Box width="full" flexShrink={0} position="relative">
-      <Box
-        width="full"
-        height="1px"
-        bg="border.muted"
-      />
-      <Box
-        width="full"
-        height="4px"
-        background="linear-gradient(to bottom, var(--chakra-colors-border-muted), transparent)"
-        opacity={0.4}
-      />
-    </Box>
-  );
-}
+import { ShadowDivider } from "~/components/ui/ShadowDivider";
 
 
 type SuiteSidebarProps = {
+  projectSlug: string;
   suites: SimulationSuite[];
   selectedSuiteSlug: string | typeof ALL_RUNS_ID | null;
   runSummaries?: Map<string, SuiteRunSummary>;
@@ -67,9 +55,13 @@ type SuiteSidebarProps = {
   onSelectSuite: (slug: string | typeof ALL_RUNS_ID) => void;
   onRunSuite: (id: string) => void;
   onContextMenu: (e: React.MouseEvent, suiteId: string) => void;
+  isLoading?: boolean;
 };
 
+const SKELETON_COUNT = 6;
+
 export function SuiteSidebar({
+  projectSlug,
   suites,
   selectedSuiteSlug,
   runSummaries,
@@ -77,6 +69,7 @@ export function SuiteSidebar({
   onSelectSuite,
   onRunSuite,
   onContextMenu,
+  isLoading = false,
 }: SuiteSidebarProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [isCollapsed, setIsCollapsed] = useState(() => {
@@ -156,6 +149,7 @@ export function SuiteSidebar({
           <SidebarButton
             icon={<List size={14} />}
             label="All Runs"
+            href={`/${projectSlug}/simulations`}
             isSelected={selectedSuiteSlug === ALL_RUNS_ID}
             onClick={() => onSelectSuite(ALL_RUNS_ID)}
           />
@@ -174,7 +168,20 @@ export function SuiteSidebar({
         gap={isCollapsed ? 0 : 1}
         align="stretch"
       >
-        {!isCollapsed && hasNoResults && suites.length === 0 && externalSets.length === 0 && (
+        {isLoading && !isCollapsed && (
+          Array.from({ length: SKELETON_COUNT }).map((_, i) => (
+            <Skeleton
+              key={i}
+              data-testid="suite-sidebar-skeleton"
+              height="60px"
+              width="100%"
+              borderRadius="md"
+              marginBottom={1}
+            />
+          ))
+        )}
+
+        {!isLoading && !isCollapsed && hasNoResults && suites.length === 0 && externalSets.length === 0 && (
           <Text
             fontSize="sm"
             color="fg.muted"
@@ -185,7 +192,7 @@ export function SuiteSidebar({
             No run plans yet
           </Text>
         )}
-        {!isCollapsed && hasNoResults &&
+        {!isLoading && !isCollapsed && hasNoResults &&
           (suites.length > 0 || externalSets.length > 0) && (
             <Text
               fontSize="sm"
@@ -198,7 +205,7 @@ export function SuiteSidebar({
             </Text>
           )}
 
-        {filteredSuites.map((suite) =>
+        {!isLoading && filteredSuites.map((suite) =>
           isCollapsed ? (
             <Tooltip
               key={suite.id}
@@ -228,6 +235,7 @@ export function SuiteSidebar({
             <SuiteListItem
               key={suite.id}
               suite={suite}
+              projectSlug={projectSlug}
               isSelected={suite.slug === selectedSuiteSlug}
               runSummary={runSummaries?.get(suite.id)}
               onSelect={() => onSelectSuite(suite.slug)}
@@ -237,7 +245,7 @@ export function SuiteSidebar({
           ),
         )}
 
-        {filteredExternalSets.length > 0 && (
+        {!isLoading && filteredExternalSets.length > 0 && (
           <>
             {!isCollapsed && (
               <Text
@@ -297,6 +305,7 @@ export function SuiteSidebar({
                 <ExternalSetListItem
                   key={extSet.scenarioSetId}
                   externalSet={extSet}
+                  projectSlug={projectSlug}
                   isSelected={
                     selectedSuiteSlug ===
                     toExternalSetSelection(extSet.scenarioSetId)
@@ -333,17 +342,25 @@ export function SuiteSidebar({
 function SidebarButton({
   icon,
   label,
+  href,
   isSelected = false,
   onClick,
 }: {
   icon: React.ReactNode;
   label: string;
+  href?: string;
   isSelected?: boolean;
   onClick: () => void;
 }) {
+  const handleClick = (e: React.MouseEvent) => {
+    if (e.metaKey || e.ctrlKey || e.button === 1) return;
+    e.preventDefault();
+    onClick();
+  };
+
   return (
     <HStack
-      as="button"
+      asChild
       width="full"
       paddingX={2}
       paddingY={1.5}
@@ -351,56 +368,44 @@ function SidebarButton({
       cursor="pointer"
       bg={isSelected ? "bg.emphasized" : "transparent"}
       _hover={{ bg: isSelected ? "bg.emphasized" : "bg.subtle" }}
-      onClick={onClick}
+      onClick={handleClick}
       gap={2}
+      textDecoration="none"
+      color="inherit"
     >
-      {icon}
-      <Text fontSize="sm">{label}</Text>
+      <a href={href ?? "#"}>
+        {icon}
+        <Text fontSize="sm">{label}</Text>
+      </a>
     </HStack>
   );
 }
 
-function StatusIcon({ passed, total }: { passed: number; total: number }) {
-  if (total === 0) return null;
-  if (passed === total) {
-    return (
-      <CircleCheck
-        size={12}
-        color="var(--chakra-colors-green-500)"
-        data-testid="status-icon-pass"
-      />
-    );
-  }
-  return (
-    <CircleAlert
-      size={12}
-      color="var(--chakra-colors-red-500)"
-      data-testid="status-icon-fail"
-    />
-  );
-}
-
+/**
+ * ⚠️  KEEP IN SYNC with run-history-transforms.ts → computeGroupSummary()
+ * Pass rate = passed / settled (totalCount here IS settled count from query).
+ */
 function RunSummaryLine({
   passedCount,
+  failedCount,
   totalCount,
-  lastRunTimestamp,
 }: {
   passedCount: number;
+  failedCount: number;
   totalCount: number;
-  lastRunTimestamp: number | null;
 }) {
-  if (totalCount === 0) return null;
+  // totalCount = settled count from the ClickHouse query (excludes in-progress/queued)
+  const passRate = totalCount > 0 ? (passedCount / totalCount) * 100 : null;
+
   return (
-    <HStack gap={1}>
-      <StatusIcon passed={passedCount} total={totalCount} />
-      <Text fontSize="xs">
+    <HStack gap={1} color="fg.muted">
+      <PassRateCircle passRate={passRate} size="8px" />
+      <Text fontSize="xs" color={getPassRateGradientColor(passRate)} fontWeight="medium">
+        {passRate === null ? "-" : `${Math.round(passRate)}%`}
+      </Text>
+      <Text fontSize="xs" color="gray.350">·</Text>
+      <Text fontSize="xs" color="fg.subtle">
         {passedCount} passed
-        {lastRunTimestamp && (
-          <Text as="span" color="fg.muted">
-            {" · "}
-            {formatTimeAgoCompact(lastRunTimestamp)}
-          </Text>
-        )}
       </Text>
     </HStack>
   );
@@ -408,6 +413,7 @@ function RunSummaryLine({
 
 function SidebarListItemWrapper({
   isSelected,
+  href,
   onClick,
   onContextMenu,
   className,
@@ -415,14 +421,23 @@ function SidebarListItemWrapper({
   children,
 }: {
   isSelected: boolean;
+  href?: string;
   onClick: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
   className?: string;
   "data-testid"?: string;
   children: React.ReactNode;
 }) {
+  const handleClick = (e: React.MouseEvent) => {
+    // Allow cmd+click / ctrl+click / middle-click to open in new tab naturally
+    if (e.metaKey || e.ctrlKey || e.button === 1) return;
+    e.preventDefault();
+    onClick();
+  };
+
   return (
     <HStack
+      asChild
       className={className}
       data-testid={dataTestId}
       data-selected={isSelected || undefined}
@@ -435,28 +450,22 @@ function SidebarListItemWrapper({
       border={isSelected ? "1px solid border.emphasized" : "none"}
       _hover={{ bg: isSelected ? "bg.emphasized" : "bg.subtle" }}
       onContextMenu={onContextMenu}
-      onClick={onClick}
+      onClick={handleClick}
       justify="space-between"
       width="full"
-      _before={{
-        content: '""',
-        position: "absolute",
-        transform: "translateY(-50%)",
-        top: "50%",
-        left: 0,
-        width: "2px",
-        height: "33%",
-        backgroundColor: "border.emphasized",
-        display: isSelected ? "block" : "none",
-      }}
+      textDecoration="none"
+      color="inherit"
     >
-      {children}
+      <a href={href ?? "#"}>
+        {children}
+      </a>
     </HStack>
   );
 }
 
 function SuiteListItem({
   suite,
+  projectSlug,
   isSelected,
   runSummary,
   onSelect,
@@ -464,16 +473,19 @@ function SuiteListItem({
   onContextMenu,
 }: {
   suite: SimulationSuite;
+  projectSlug: string;
   isSelected: boolean;
   runSummary?: SuiteRunSummary;
   onSelect: () => void;
   onRun: () => void;
   onContextMenu: (e: React.MouseEvent) => void;
 }) {
+  const now = useNow();
   return (
     <SidebarListItemWrapper
       className="group"
       data-testid="suite-list-item"
+      href={`/${projectSlug}/simulations/run-plans/${suite.slug}`}
       isSelected={isSelected}
       onClick={onSelect}
       onContextMenu={onContextMenu}
@@ -486,14 +498,20 @@ function SuiteListItem({
         textAlign="left"
       >
         <HStack gap={1.5} width="full">
-          <Text fontSize="sm" fontWeight="medium" truncate>
-            {suite.name}
+          <Text fontSize="13px" fontWeight="medium" lineClamp={1}>
+            {suite.name || "<empty>"}
           </Text>
           <Spacer />
+          {runSummary?.lastRunTimestamp && (
+            <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
+              {formatTimeAgoCompact(runSummary.lastRunTimestamp, now)}
+            </Text>
+          )}
           <HStack gap={0} flexShrink={0}>
             <Box
               as="button"
               onClick={(e: React.MouseEvent) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onRun();
               }}
@@ -515,6 +533,7 @@ function SuiteListItem({
               aria-label="Run plan options"
               data-testid="suite-menu-button"
               onClick={(e: React.MouseEvent) => {
+                e.preventDefault();
                 e.stopPropagation();
                 onContextMenu(e);
               }}
@@ -533,11 +552,11 @@ function SuiteListItem({
             </Box>
           </HStack>
         </HStack>
-        {runSummary && runSummary.totalCount > 0 && (
+        {runSummary && (
           <RunSummaryLine
             passedCount={runSummary.passedCount}
+            failedCount={runSummary.failedCount}
             totalCount={runSummary.totalCount}
-            lastRunTimestamp={runSummary.lastRunTimestamp}
           />
         )}
       </VStack>
@@ -548,16 +567,20 @@ function SuiteListItem({
 /** Read-only list item for external SDK/CI sets. No Run button or context menu. */
 function ExternalSetListItem({
   externalSet,
+  projectSlug,
   isSelected,
   onSelect,
 }: {
   externalSet: ExternalSetSummary;
+  projectSlug: string;
   isSelected: boolean;
   onSelect: () => void;
 }) {
+  const now = useNow();
   return (
     <SidebarListItemWrapper
       data-testid="external-set-list-item"
+      href={`/${projectSlug}/simulations/${externalSet.scenarioSetId}`}
       isSelected={isSelected}
       onClick={onSelect}
     >
@@ -568,16 +591,22 @@ function ExternalSetListItem({
         overflow="hidden"
         textAlign="left"
       >
-        <Text fontSize="sm" fontWeight="medium" truncate>
-          {externalSet.scenarioSetId}
-        </Text>
-        {externalSet.totalCount > 0 && (
-          <RunSummaryLine
-            passedCount={externalSet.passedCount}
-            totalCount={externalSet.totalCount}
-            lastRunTimestamp={externalSet.lastRunTimestamp}
-          />
-        )}
+        <HStack gap={1.5} width="full">
+          <Text fontSize="13px" fontWeight="medium" lineClamp={1}>
+            {externalSet.scenarioSetId || "<empty>"}
+          </Text>
+          <Spacer />
+          {externalSet.lastRunTimestamp && (
+            <Text fontSize="11px" color="fg.subtle" flexShrink={0} whiteSpace="nowrap">
+              {formatTimeAgoCompact(externalSet.lastRunTimestamp, now)}
+            </Text>
+          )}
+        </HStack>
+        <RunSummaryLine
+          passedCount={externalSet.passedCount}
+          failedCount={externalSet.failedCount}
+          totalCount={externalSet.totalCount}
+        />
       </VStack>
     </SidebarListItemWrapper>
   );

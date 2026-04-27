@@ -12,6 +12,9 @@ import {
   getTraceAvailableSources,
   getThreadAvailableSources,
 } from "~/server/tracer/tracesMapping";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("EvaluatorMappingsSection");
 
 export type EvaluatorMappingsSectionProps = {
   evaluatorDef:
@@ -32,7 +35,7 @@ export type EvaluatorMappingsSectionProps = {
   /** Initial mappings - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback to persist changes to store */
-  onMappingChange: (
+  onMappingChange?: (
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
@@ -166,8 +169,17 @@ export function EvaluatorMappingsSection({
         return next;
       });
 
-      // Persist to store
-      onMappingChange(identifier, mapping);
+      // Persist to store. The callback should always be wired via setFlowCallbacks
+      // — warn in dev if it's missing so we catch regressions to issue #3087 early
+      // rather than silently dropping the user's mapping edit.
+      if (onMappingChange) {
+        onMappingChange(identifier, mapping);
+      } else if (process.env.NODE_ENV !== "production") {
+        logger.warn(
+          { identifier },
+          "Mapping change dropped: no onMappingChange callback registered. Callers must set `flowCallbacks.onMappingChange` before opening the evaluator editor drawer (see issue #3087).",
+        );
+      }
     },
     [onMappingChange],
   );

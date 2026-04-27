@@ -75,7 +75,7 @@ describe("Persistence", () => {
     it("excludes transient UI state from persisted state", () => {
       const state = createInitialState();
       state.ui.selectedRows = new Set([0, 1, 2]);
-      state.ui.rowHeightMode = "expanded";
+      state.ui.rowHeightMode = "fit";
 
       const persisted = extractPersistedState(state);
 

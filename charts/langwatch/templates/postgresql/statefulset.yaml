@@ -1,0 +1,92 @@
+{{- if .Values.postgresql.chartManaged }}
+{{- $secretName := .Values.postgresql.auth.existingSecret | default (printf "%s-postgresql" .Release.Name) }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ .Release.Name }}-postgresql
+  labels:
+    {{- include "langwatch.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgresql
+spec:
+  serviceName: {{ .Release.Name }}-postgresql-hl
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Release.Name }}-postgresql
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ .Release.Name }}-postgresql
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: postgresql
+    spec:
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        runAsNonRoot: true
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: postgresql
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          image: "{{ .Values.postgresql.image.repository }}:{{ .Values.postgresql.image.tag }}"
+          imagePullPolicy: {{ .Values.postgresql.image.pullPolicy | default "IfNotPresent" }}
+          ports:
+            - name: postgresql
+              containerPort: 5432
+              protocol: TCP
+          env:
+            - name: POSTGRES_USER
+              value: {{ default "postgres" .Values.postgresql.auth.username | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.postgresql.auth.database | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $secretName }}
+                  key: {{ if .Values.postgresql.auth.existingSecret }}{{ .Values.postgresql.auth.secretKeys.adminPasswordKey | default "postgres-password" }}{{ else }}postgres-password{{ end }}
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          {{- with .Values.postgresql.primary.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U {{ default "postgres" .Values.postgresql.auth.username | quote }}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 6
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U {{ default "postgres" .Values.postgresql.auth.username | quote }}
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.postgresql.primary.persistence.storageClass }}
+        storageClassName: {{ .Values.postgresql.primary.persistence.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgresql.primary.persistence.size | default "8Gi" }}
+{{- end }}

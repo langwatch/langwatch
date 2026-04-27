@@ -9,6 +9,7 @@ import {
 import * as fs from "node:fs";
 import * as path from "node:path";
 import * as os from "node:os";
+import * as crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import { migrateUp } from "~/server/clickhouse/goose";
 
@@ -71,6 +72,42 @@ function createStoragePolicyConfigFile(): string {
   return configPath;
 }
 
+const MIGRATIONS_HASH_FILE = path.join(
+  os.tmpdir(),
+  "langwatch-test-migrations-hash.txt",
+);
+
+/**
+ * Computes a hash of all migration files so we can detect when new
+ * migrations are added and need to be applied to the reused container.
+ */
+function computeMigrationsHash(): string {
+  const migrationsDir = path.join(__dirname, "../../../../server/clickhouse/migrations");
+  if (!fs.existsSync(migrationsDir)) return "";
+  const files = fs.readdirSync(migrationsDir).filter(f => f.endsWith(".sql")).sort();
+  const hash = crypto.createHash("md5");
+  for (const file of files) {
+    hash.update(file);
+    hash.update(fs.readFileSync(path.join(migrationsDir, file)));
+  }
+  return hash.digest("hex");
+}
+
+function needsMigrationRerun(): boolean {
+  const currentHash = computeMigrationsHash();
+  if (!currentHash) return false;
+  try {
+    const savedHash = fs.readFileSync(MIGRATIONS_HASH_FILE, "utf8").trim();
+    return savedHash !== currentHash;
+  } catch {
+    return true; // no saved hash = first run or file deleted
+  }
+}
+
+function saveMigrationsHash(): void {
+  fs.writeFileSync(MIGRATIONS_HASH_FILE, computeMigrationsHash());
+}
+
 let clickHouseContainer: StartedClickHouseContainer | null = null;
 let redisContainer: StartedRedisContainer | null = null;
 
@@ -119,14 +156,20 @@ export async function setup(): Promise<void> {
   const clickHouseBaseUrl = clickHouseContainer.getConnectionUrl();
   const redisUrl = redisContainer.getConnectionUrl();
 
-  // Run goose migrations to create database and tables
-  // Important: Pass the database name explicitly since the container's URL uses 'test' as default
-  console.log("[globalSetup] Running ClickHouse migrations...");
-  await migrateUp({
-    connectionUrl: clickHouseBaseUrl,
-    database: TEST_DATABASE,
-    verbose: false,
-  });
+  // Run goose migrations to create database and tables.
+  // With reusable containers, only re-run if migration files changed.
+  const migrationsChanged = needsMigrationRerun();
+  if (migrationsChanged) {
+    console.log("[globalSetup] Migration files changed, running ClickHouse migrations...");
+    await migrateUp({
+      connectionUrl: clickHouseBaseUrl,
+      database: TEST_DATABASE,
+      verbose: false,
+    });
+    saveMigrationsHash();
+  } else {
+    console.log("[globalSetup] Migration files unchanged, skipping migrations.");
+  }
 
   // Create URL with the correct database name for test workers
   const urlWithDatabase = new URL(clickHouseBaseUrl);

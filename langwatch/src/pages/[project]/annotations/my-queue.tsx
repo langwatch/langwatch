@@ -8,7 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { AnnotationQueueItem } from "@prisma/client";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight } from "react-feather";
 import AnnotationsLayout from "~/components/AnnotationsLayout";

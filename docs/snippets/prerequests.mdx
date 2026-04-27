@@ -1,0 +1,42 @@
+#### Prerequisites
+
+- Obtain your `LANGWATCH_API_KEY` from the [LangWatch dashboard](https://app.langwatch.ai/).
+
+#### Installation
+
+```sh
+pip install langwatch
+```
+
+#### Configuration
+
+Ensure `LANGWATCH_API_KEY` is set:
+
+<Tabs>
+<Tab title="Environment variable">
+```bash
+export LANGWATCH_API_KEY='your_api_key_here'
+```
+</Tab>
+<Tab title="Runtime">
+You can set `LANGWATCH_API_KEY` globally at runtime:
+
+```python
+import langwatch
+import os
+
+langwatch.api_key = os.getenv("LANGWATCH_API_KEY")
+```
+
+Or on the specific trace being tracked:
+
+```python
+import langwatch
+import os
+
+@langwatch.trace(api_key=os.getenv("LANGWATCH_API_KEY"))
+def main():
+    ...
+```
+</Tab>
+</Tabs>

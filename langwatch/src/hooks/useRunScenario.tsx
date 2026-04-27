@@ -1,4 +1,3 @@
-import { Text, VStack } from "@chakra-ui/react";
 import { useCallback, useState } from "react";
 import type { TargetValue } from "../components/scenarios/TargetSelector";
 import { toaster } from "../components/ui/toaster";
@@ -25,6 +24,7 @@ interface RunScenarioParams {
   scenarioId: string;
   target: TargetValue;
   setId?: string;
+  batchRunId?: string;
 }
 
 export function useRunScenario({
@@ -44,66 +44,53 @@ export function useRunScenario({
 
   const runScenario = useCallback(
     async (params: RunScenarioParams) => {
-      const { scenarioId, target, setId } = params;
+      const { scenarioId, target, setId, batchRunId } = params;
       if (!projectId || !projectSlug || !target) return;
 
       // Check if model providers are configured before attempting to run
       if (!hasEnabledProviders) {
         toaster.create({
           title: "No model provider configured",
-          description: (
-            <VStack align="start" gap={1}>
-              <Text>
-                A model provider must be configured to run scenarios.
-              </Text>
-              <a
-                href="/settings/model-providers"
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{
-                  display: "inline-block",
-                  padding: "4px 8px",
-                  marginTop: "4px",
-                  fontSize: "12px",
-                  backgroundColor: "white",
-                  color: "#c53030",
-                  borderRadius: "4px",
-                  textDecoration: "none",
-                }}
-              >
-                Configure model providers
-              </a>
-            </VStack>
-          ),
+          description: "A model provider must be configured to run scenarios.",
           type: "error",
           meta: { closable: true },
+          action: {
+            label: "Configure model providers",
+            onClick: () =>
+              window.open(
+                "/settings/model-providers",
+                "_blank",
+                "noopener,noreferrer"
+              ),
+          },
         });
         return;
       }
 
       try {
-        const { setId: returnedSetId, batchRunId } = await runMutation.mutateAsync({
+        const { setId: returnedSetId, batchRunId: returnedBatchRunId } = await runMutation.mutateAsync({
           projectId,
           scenarioId,
           target: { type: target.type, referenceId: target.id },
           setId,
+          batchRunId,
         });
 
         setIsPolling(true);
         const result = await pollForScenarioRun(
           utils.scenarios.getBatchRunData.fetch,
-          { projectId, scenarioSetId: returnedSetId, batchRunId },
+          { projectId, scenarioSetId: returnedSetId, batchRunId: returnedBatchRunId },
         );
 
         if (result.success) {
           onRunComplete?.({
             scenarioRunId: result.scenarioRunId,
             setId: returnedSetId,
-            batchRunId,
+            batchRunId: returnedBatchRunId,
           });
         } else if (result.error === "run_error") {
           const runResult = result.scenarioRunId
-            ? { scenarioRunId: result.scenarioRunId, setId: returnedSetId, batchRunId }
+            ? { scenarioRunId: result.scenarioRunId, setId: returnedSetId, batchRunId: returnedBatchRunId }
             : null;
           toaster.create({
             title: "Scenario run failed",

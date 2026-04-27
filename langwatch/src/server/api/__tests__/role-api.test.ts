@@ -21,15 +21,23 @@ const mockPrisma = {
   team: {
     findFirst: vi.fn(),
     findUnique: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
   },
   teamUser: {
     findFirst: vi.fn(),
     findUnique: vi.fn(),
     update: vi.fn(),
   },
+  roleBinding: {
+    deleteMany: vi.fn(),
+    create: vi.fn(),
+  },
   organizationUser: {
     findFirst: vi.fn(),
   },
+  $transaction: vi.fn().mockImplementation((fn: (tx: any) => Promise<any>) =>
+    fn(mockPrisma),
+  ),
 } as any;
 
 describe("RoleService Tests", () => {
@@ -306,7 +314,11 @@ describe("RoleService Tests", () => {
 
       mockPrisma.customRole.findUnique.mockResolvedValue(mockCustomRole);
       mockPrisma.team.findUnique.mockResolvedValue(mockTeam);
+      mockPrisma.team.findUniqueOrThrow.mockResolvedValue(mockTeam);
       mockPrisma.teamUser.findUnique.mockResolvedValue(mockTeamUser);
+      mockPrisma.roleBinding.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.roleBinding.create.mockResolvedValue({});
+      mockPrisma.teamUser.update.mockResolvedValue({});
 
       const result = await roleService.assignRoleToUser(
         "user-123",
@@ -315,18 +327,20 @@ describe("RoleService Tests", () => {
       );
 
       expect(result).toEqual({ success: true });
-      expect(mockPrisma.teamUser.update).toHaveBeenCalledWith({
-        where: {
-          userId_teamId: {
+      expect(mockPrisma.roleBinding.deleteMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ userId: "user-123", scopeType: "TEAM", scopeId: "team-123" }),
+        }),
+      );
+      expect(mockPrisma.roleBinding.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
             userId: "user-123",
-            teamId: "team-123",
-          },
-        },
-        data: {
-          role: TeamUserRole.CUSTOM,
-          assignedRoleId: "role-123",
-        },
-      });
+            role: TeamUserRole.CUSTOM,
+            customRoleId: "role-123",
+          }),
+        }),
+      );
     });
 
     it("should throw NOT_FOUND when custom role does not exist", async () => {
@@ -391,24 +405,33 @@ describe("RoleService Tests", () => {
 
   describe("removeRoleFromUser", () => {
     it("should remove custom role from user", async () => {
+      mockPrisma.team.findUniqueOrThrow.mockResolvedValue({
+        id: "team-123",
+        organizationId: "org-123",
+      });
+      mockPrisma.roleBinding.deleteMany.mockResolvedValue({ count: 0 });
+      mockPrisma.roleBinding.create.mockResolvedValue({});
+      mockPrisma.teamUser.update.mockResolvedValue({});
+
       const result = await roleService.removeRoleFromUser(
         "user-123",
         "team-123",
       );
 
       expect(result).toEqual({ success: true });
-      expect(mockPrisma.teamUser.update).toHaveBeenCalledWith({
-        where: {
-          userId_teamId: {
+      expect(mockPrisma.roleBinding.deleteMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ userId: "user-123", scopeType: "TEAM", scopeId: "team-123" }),
+        }),
+      );
+      expect(mockPrisma.roleBinding.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
             userId: "user-123",
-            teamId: "team-123",
-          },
-        },
-        data: {
-          role: TeamUserRole.VIEWER,
-          assignedRoleId: null,
-        },
-      });
+            role: TeamUserRole.VIEWER,
+          }),
+        }),
+      );
     });
   });
 });

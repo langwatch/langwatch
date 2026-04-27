@@ -32,7 +32,6 @@ type PlanOverrides = Pick<
   | "maxMembers"
   | "maxProjects"
   | "maxMessagesPerMonth"
-  | "evaluationsCredit"
   | "prices"
 > &
   Partial<Omit<PlanInfo, "free">>;
@@ -67,7 +66,6 @@ const LAUNCH_PLAN = definePaidPlan({
   maxMembers: 3,
   maxProjects: 99,
   maxMessagesPerMonth: 20_000,
-  evaluationsCredit: 10,
   prices: {
     USD: 59,
     EUR: 59,
@@ -80,7 +78,6 @@ const ACCELERATE_PLAN = definePaidPlan({
   maxMembers: 5,
   maxProjects: 99,
   maxMessagesPerMonth: 20_000,
-  evaluationsCredit: 10,
   prices: {
     USD: 199,
     EUR: 199,
@@ -109,7 +106,6 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     maxDashboards: 3,
     maxCustomGraphs: 3,
     maxAutomations: 3,
-    evaluationsCredit: 2,
     canPublish: true,
     prices: {
       USD: 0,
@@ -122,7 +118,6 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     maxMembers: 5,
     maxProjects: 9999,
     maxMessagesPerMonth: 10_000,
-    evaluationsCredit: 10,
     prices: {
       USD: 99,
       EUR: 99,
@@ -154,7 +149,6 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     maxMembers: 10,
     maxProjects: 99,
     maxMessagesPerMonth: 100_000,
-    evaluationsCredit: 50,
     prices: {
       USD: 399,
       EUR: 399,
@@ -169,7 +163,6 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
         maxMembers: 20,
         maxProjects: 99,
         maxMessagesPerMonth: UNLIMITED_MESSAGES,
-        evaluationsCredit: 9999,
         userPrice: { EUR: 29, USD: 32 },
         prices: { USD: 0, EUR: 0 },
       }),
@@ -181,7 +174,6 @@ export const PLAN_LIMITS: Record<PlanType, PlanInfo> = {
     maxMembers: 1000,
     maxProjects: 9999,
     maxMessagesPerMonth: 1_000_000,
-    evaluationsCredit: 500,
     prices: {
       USD: 999,
       EUR: 999,

@@ -1,0 +1,179 @@
+---
+title: Scaling
+description: Horizontal scaling, autoscaling, capacity, and benchmarks for the LangWatch AI Gateway.
+sidebarTitle: Scaling
+---
+
+The gateway is a stateless proxy — scale it horizontally. JWTs are self-contained and every replica can serve every virtual key, so there is no sticky-session requirement. The auth cache is in-process LRU; replicas are independent. Capacity is dominated by **upstream provider latency** and **concurrent in-flight connections**, not gateway-side CPU.
+
+## Horizontal Pod Autoscaler
+
+The chart ships an HPA with CPU-based scaling plus an opt-in Prometheus custom metric (`charts/gateway/values.yaml: autoscaling.*`):
+
+```yaml
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  customMetrics:
+    - type: Pods
+      pods:
+        metric:
+          name: lw_gateway_rps
+        target:
+          type: AverageValue
+          averageValue: "150"
+```
+
+- **Use CPU first.** It's free (no Prometheus dependency), correct in most deployments, and avoids feedback loops between the metric pipeline and the autoscaler.
+- **Add `lw_gateway_rps` only if you run prometheus-adapter** and the gateway's `/metrics` endpoint is scraped. Without the adapter the HPA will silently ignore the custom metric line. Verify with `kubectl describe hpa langwatch-gateway` — `External metric ... not active` means the adapter isn't wired.
+- **3 replicas is a sane minimum** for production: the chart's PDB requires `minAvailable: 1`, so 3 replicas tolerates one rolling-deploy pod going down plus one ad-hoc node drain.
+
+If you scale beyond ~30 replicas, watch your control plane: every gateway replica polls the auth cache change feed independently, so QPS to the control plane scales linearly with replica count. Below 30 replicas the load is negligible.
+
+## Pod Disruption Budget
+
+Chart default (`charts/gateway/values.yaml: podDisruptionBudget`):
+
+```yaml
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+```
+
+This is conservative — `kubectl drain` for AZ rotation, node upgrades, or eviction always leaves at least one replica serving. Bump to `minAvailable: 2` for higher-availability tiers (paired with `minReplicas: 3+`).
+
+## Topology spread
+
+Pair the HPA with a topology-spread constraint so replicas spread across zones:
+
+```yaml
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: langwatch-gateway
+```
+
+Add this to the chart via the `affinity` value (you can lift it directly into `affinity.podAntiAffinity` semantics, or set `topologySpreadConstraints` on the deployment via a values override). With 3 replicas across 3 AZs you survive an AZ outage; at 6+ replicas you maintain ≥2 per AZ.
+
+## Resource sizing
+
+Chart defaults (`charts/gateway/values.yaml: resources`):
+
+```yaml
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: 1
+    memory: 512Mi
+```
+
+The 256Mi request/512Mi limit fits the in-process auth-cache LRU (default 50,000 entries × ~1 KB ≈ 50 MB) plus Go runtime overhead. For tenants with > 100,000 active virtual keys, raise the LRU size in `values.yaml` (`cache.lruSize`, currently a forward-compat knob — see "Future tunables" below) and bump memory accordingly.
+
+CPU limits matter more than they look: streaming responses pin one goroutine per connection, so tight CPU limits stretch tail latency under SSE load. Keep the limit at least 5× the request — the chart's 200m → 1000m default is the right ratio.
+
+## Connection pooling
+
+The gateway uses Go's default `net/http.Transport` (unbounded `MaxIdleConnsPerHost`, 90s `IdleConnTimeout`). At ~5K req/s sustained per replica, expect ~1.5K live keepalive connections to your primary upstream. Under provider failover, the live count multiplies by the fallback chain length — budget headroom.
+
+If you observe ephemeral-port exhaustion on a replica handling > 10K req/s, scale out (cheaper, stateless replication is the design point) or bump the host's `net.ipv4.ip_local_port_range` via a privileged init container.
+
+There are no current `LW_GATEWAY_UPSTREAM_*` env vars to tune the transport directly; bound concurrency upstream by adding replicas, not by tightening per-pod connection caps.
+
+## Cold-start cost
+
+There is no boot-time cache warm-up in the current gateway. The `auth_cache_warm` readiness probe was removed because it created a chicken-and-egg with `/startupz` (the warm-up itself called the control plane, which couldn't accept traffic until *its* startup gate flipped). Instead the resolver warms organically on the first request per VK; an unwarmed gateway adds at most one extra ~50–200 ms control-plane round-trip on cold-cache requests. Subsequent requests hit the in-process cache and skip the round-trip entirely until the cache entry's soft-expiry passes.
+
+The cache is in-process and per-replica. Replicas warm independently; there is no cross-replica L2 cache in the current gateway. A Bootstrap-pull design that pre-loads keys before flipping `/startupz` to 200 is tracked under `specs/ai-gateway/auth-cache.feature` for v1.1+ when tenant key counts make the first-request tax visible at scale.
+
+## Blue-green / canary
+
+Because JWTs use symmetric-secret signing (`LW_GATEWAY_JWT_SECRET`) and the secret is shared across all gateway pods, JWTs minted by one replica validate on every other. That makes blue-green / canary trivial:
+
+1. Deploy the new release as `langwatch-gateway-canary` with its own Service + targets a fraction of LB traffic.
+2. Verify `/readyz` and `/v1/chat/completions` against a synthetic VK.
+3. Shift traffic by adjusting LB weights; existing JWTs continue to verify.
+4. Drain blue once green is stable.
+
+Two operational invariants:
+- Roll **the same** `LW_GATEWAY_JWT_SECRET` (and `LW_GATEWAY_INTERNAL_SECRET`) onto both colors.
+- For HMAC-secret rotation specifically, use the dual-secret rotation path (chart value `secrets.jwtSecretPreviousKey`) — see [Config](/ai-gateway/self-hosting/config) for the rotation procedure.
+
+## Regional placement
+
+For latency-sensitive deployments place the gateway in the same region as:
+
+1. Your LangWatch control plane (saves ~50–100 ms on auth-resolver round-trips when the cache misses).
+2. Your primary upstream provider's regional endpoint (single-digit milliseconds to OpenAI us-east-1, Anthropic us-west-2, etc.).
+
+Multi-region: run independent gateway fleets per region with their own HPA. There is no cross-region state in the gateway today; each region's auth cache is local to that fleet. The control plane is the source of truth and is reachable from every region.
+
+## Hot-path overhead — microbenchmarks
+
+The hot-path primitives are benchmarked under `services/aigateway/.../*_test.go` and tracked in [`services/aigateway/BENCHMARKS.md`](https://github.com/langwatch/langwatch/blob/main/services/aigateway/BENCHMARKS.md). Reproduce locally with:
+
+```bash
+go test -bench=. -benchmem -run=^$ \
+  ./services/aigateway/adapters/controlplane/ \
+  ./services/aigateway/adapters/authresolver/ \
+  ./services/aigateway/adapters/budget/ \
+  ./services/aigateway/adapters/httpapi/ \
+  ./pkg/retry/
+```
+
+Indicative happy-path-per-request budget (Apple M3 Pro, Go 1.26.1):
+
+| Operation                  | ns/op | allocs | Fires on                                       |
+|----------------------------|------:|-------:|------------------------------------------------|
+| `HashKey`                  |  83.8 |      1 | Every request (VK → L1 lookup key)             |
+| `Precheck` (cached, 3 scopes)|  4.6 |      0 | Every request (budget evaluation)              |
+| `Walk_PrimarySuccess`      |  71.7 |      0 | Every request (retry engine, primary succeeds) |
+| `NewULID`                  |  76.0 |      2 | Every request (`gateway_request_id`)           |
+
+Total pre-dispatch overhead: **~0.24 μs**. A full router benchmark (chi routing + middleware + JSON serialization) lands at ~4.8 μs in `httptest`; production with connection reuse and kernel zero-copy is in the 3–4 μs range. Bifrost + upstream RTT dominate wall time; the gateway's own tax is negligible.
+
+`BENCHMARKS.md` is the source of truth — these numbers re-run on every `pull_request` against `services/aigateway/**` and regressions > 2× any baseline block merges. Refer to it for current values; the table above is illustrative.
+
+## End-to-end load tests
+
+Microbenchmarks validate per-primitive correctness, not end-to-end throughput. For full request testing, point a load generator at a running gateway:
+
+```bash
+# k6 — non-streaming, 30s, ramping to 500 VUs
+k6 run --vus 500 --duration 30s ./hack/bench/chat.js
+
+# vegeta — sustained 1000 req/s on /v1/chat/completions
+echo 'POST https://gateway.your-corp.com/v1/chat/completions
+Authorization: Bearer '"$LW_BENCH_VK"'
+Content-Type: application/json
+@body.json' | vegeta attack -duration=30s -rate=1000/s | vegeta report
+```
+
+Targets to validate against (gateway-added latency, excluding upstream provider time):
+
+- p50 < 5 ms — well under the microbenchmark sum even with realistic OS scheduling
+- p99 < 25 ms — tail captured by L1 cache miss → control-plane round-trip
+- Cold-start time-to-ready (50K VKs) < 5 s
+
+If you're outside these ranges, check [Health Checks](/ai-gateway/self-hosting/health-checks) for probe state and [Config](/ai-gateway/self-hosting/config) for tuning knobs before escalating.
+
+## Future tunables (forward-compat in `values.yaml`)
+
+Several knobs are exposed in `charts/gateway/values.yaml` that the v1 gateway code does not yet read — they exist as a forward-compat surface for v1.1. Setting them today has no effect; setting them once they're wired will be a no-op deploy (env vars already present in the chart configmap). They are documented here so operators can stage their own runbooks ahead of time.
+
+- `cache.lruSize` — explicit auth-cache LRU bound (default 50,000)
+- `cache.refreshInterval` / `cache.jwtRefreshThreshold` — proactive auth-cache refresh cadence
+- `cache.bootstrapAllKeys` — full prefetch on boot (enterprise tier; control plane must support the bulk endpoint)
+- `redis.url` / `redis.existingSecretName` — L2 auth cache shared across replicas
+- `bifrost.poolSize` / `bifrost.streamBufferSize` — Bifrost-side connection sizing
+- `admin.addr` / `admin.existingAuthSecretName` — operator pprof / debug listener
+- `guardrails.preTimeout` / `guardrails.postTimeout` / `guardrails.streamChunkWindow` — guardrail evaluation budgets
+- `startup.netcheckHosts` / `startup.netcheckTimeout` — boot-time DNS + TCP probe of upstream providers
+
+When these features land in the gateway code, the chart's `templates/configmap.yaml` will be updated to inject the corresponding env vars (matching the canonical `Hydrate`-resolved names — the same pattern the existing `SERVER_ADDR`, `LW_GATEWAY_BASE_URL`, `LOG_LEVEL`, `OTEL_OTLP_ENDPOINT` follow). Until then, setting these `values.yaml` entries is a no-op.

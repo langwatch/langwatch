@@ -10,13 +10,26 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("~/hooks/useSSESubscription", () => ({
+  useSSESubscription: () => ({
+    connectionState: "connected",
+    isConnected: true,
+    isConnecting: false,
+    hasError: false,
+    isDisconnected: false,
+    retryCount: 0,
+    lastData: undefined,
+    lastError: undefined,
+  }),
+}));
+
 // Capture the archive mutation's onSuccess so tests can trigger it manually
 let capturedArchiveOnSuccess: (() => void) | undefined;
 
 vi.mock("~/utils/api", () => ({
   api: {
     useContext: () => ({
-      suites: { getAll: { invalidate: vi.fn() } },
+      suites: { getAll: { invalidate: vi.fn() }, getSummaries: { invalidate: vi.fn() } },
     }),
     suites: {
       getAll: {
@@ -53,11 +66,17 @@ vi.mock("~/utils/api", () => ({
       duplicate: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
+      getSummaries: {
+        useQuery: () => ({ data: {}, isLoading: false }),
+      },
       run: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
     scenarios: {
+      getAll: {
+        useQuery: () => ({ data: [], isLoading: false, error: null }),
+      },
       getSuiteRunData: {
         useQuery: () => ({
           data: { runs: [], scenarioSetIds: {}, hasMore: false, nextCursor: undefined },
@@ -94,16 +113,17 @@ vi.mock("~/hooks/useDrawer", () => ({
 }));
 
 const mockPush = vi.fn();
+const mockReplace = vi.fn();
 let mockRouterQuery: Record<string, string | string[] | undefined> = { project: "my-project" };
-
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
-    asPath: mockRouterQuery.suite
-      ? `/my-project/simulations/suites?suite=${mockRouterQuery.suite as string}`
-      : "/my-project/simulations/suites",
+    pathname: "/[project]/simulations/[[...path]]",
+    asPath: "/my-project/simulations",
     push: mockPush,
+    replace: mockReplace,
     isReady: true,
+    events: { on: vi.fn(), off: vi.fn(), emit: vi.fn() },
   }),
 }));
 
@@ -133,6 +153,7 @@ describe("All Runs default selection (Issue #1771)", () => {
   beforeEach(() => {
     mockRouterQuery = { project: "my-project" };
     mockPush.mockClear();
+    mockReplace.mockClear();
   });
 
   afterEach(() => {
@@ -145,11 +166,11 @@ describe("All Runs default selection (Issue #1771)", () => {
     it("selects 'All Runs' as the default sidebar item and displays the All Runs panel", async () => {
       mockRouterQuery = { project: "my-project" };
 
-      const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/index"
+      const { default: SimulationsPage } = await import(
+        "~/components/suites/SimulationsPage"
       );
 
-      render(<SuitesPage />, { wrapper: Wrapper });
+      render(<SimulationsPage />, { wrapper: Wrapper });
 
       expect(screen.getByTestId("all-runs-panel")).toBeInTheDocument();
       expect(screen.queryByTestId("suite-detail-panel")).not.toBeInTheDocument();
@@ -159,14 +180,14 @@ describe("All Runs default selection (Issue #1771)", () => {
 
   describe("when the user archives the selected suite", () => {
     it("navigates to all-runs after archiving", async () => {
-      // Start with a suite selected in the URL
-      mockRouterQuery = { project: "my-project", suite: "my-suite" };
+      // Start with a suite selected in the URL (catch-all path)
+      mockRouterQuery = { project: "my-project", path: ["run-plans", "my-suite"] };
 
-      const { default: SuitesPage } = await import(
-        "~/pages/[project]/simulations/suites/index"
+      const { default: SimulationsPage } = await import(
+        "~/components/suites/SimulationsPage"
       );
 
-      render(<SuitesPage />, { wrapper: Wrapper });
+      render(<SimulationsPage />, { wrapper: Wrapper });
 
       const user = userEvent.setup();
 
@@ -188,11 +209,8 @@ describe("All Runs default selection (Issue #1771)", () => {
 
       // Archiving the currently selected suite navigates to all-runs
       expect(mockPush).toHaveBeenCalledWith(
-        {
-          pathname: "/[project]/simulations/suites",
-          query: { project: "my-project" },
-        },
-        "/my-project/simulations/suites",
+        { pathname: "/[project]/simulations/[[...path]]", query: { project: "my-project" } },
+        "/my-project/simulations",
         { shallow: true },
       );
     });

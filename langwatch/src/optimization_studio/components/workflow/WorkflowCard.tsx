@@ -20,6 +20,7 @@ import { Tooltip } from "../../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import type { AppRouter } from "../../../server/api/root";
 import { api } from "../../../utils/api";
+import { isHandledByGlobalHandler } from "../../../utils/trpcError";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
 import { CopyWorkflowDialog } from "./CopyWorkflowDialog";
 import { PushToCopiesDialog } from "./PushToCopiesDialog";
@@ -107,13 +108,10 @@ export function WorkflowCard({
   description?: string;
   children?: React.ReactNode;
 } & React.ComponentProps<typeof WorkflowCardBase>) {
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
   const archiveWorkflow = api.workflow.archive.useMutation();
   const cascadeArchiveWorkflow = api.workflow.cascadeArchive.useMutation();
   const syncFromSource = api.workflow.syncFromSource.useMutation();
-  const hasWorkflowsDeletePermission = hasPermission("workflows:delete");
-  const hasWorkflowsCreatePermission = hasPermission("workflows:create");
-  const hasWorkflowsUpdatePermission = hasPermission("workflows:update");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const [isPushToCopiesDialogOpen, setIsPushToCopiesDialogOpen] =
@@ -155,6 +153,7 @@ export function WorkflowCard({
           });
         },
         onError: (error) => {
+          if (isHandledByGlobalHandler(error)) return;
           toaster.create({
             title: "Error updating workflow",
             description: error.message || "Please try again later.",
@@ -277,100 +276,43 @@ export function WorkflowCard({
                 {isCopiedWorkflow && (
                   <Tooltip
                     content={
-                      !hasWorkflowsUpdatePermission
-                        ? "You need workflows:update permission to sync from source"
-                        : sourceProjectPath
-                          ? `Copied from: ${sourceProjectPath}`
-                          : undefined
+                      sourceProjectPath
+                        ? `Copied from: ${sourceProjectPath}`
+                        : undefined
                     }
-                    disabled={
-                      !hasWorkflowsUpdatePermission && !sourceProjectPath
-                    }
+                    disabled={!sourceProjectPath}
                     positioning={{ placement: "right" }}
                     showArrow
                   >
                     <Menu.Item
                       value="sync"
-                      onClick={
-                        hasWorkflowsUpdatePermission
-                          ? () => onSyncFromSource()
-                          : undefined
-                      }
-                      disabled={!hasWorkflowsUpdatePermission}
+                      onClick={() => onSyncFromSource()}
                     >
                       <RefreshCw size={16} /> Update from source
                     </Menu.Item>
                   </Tooltip>
                 )}
                 {hasCopies && (
-                  <Tooltip
-                    content={
-                      !hasWorkflowsUpdatePermission
-                        ? "You need workflows:update permission to push to replicas"
-                        : undefined
-                    }
-                    disabled={hasWorkflowsUpdatePermission}
-                    positioning={{ placement: "right" }}
-                    showArrow
-                  >
                     <Menu.Item
                       value="push"
-                      onClick={
-                        hasWorkflowsUpdatePermission
-                          ? () => onPushToCopies()
-                          : undefined
-                      }
-                      disabled={!hasWorkflowsUpdatePermission}
+                      onClick={() => onPushToCopies()}
                     >
                       <ArrowUp size={16} /> Push to replicas
                     </Menu.Item>
-                  </Tooltip>
                 )}
-                <Tooltip
-                  content={
-                    !hasWorkflowsCreatePermission
-                      ? "You need workflows:create permission to replicate workflows"
-                      : undefined
-                  }
-                  disabled={hasWorkflowsCreatePermission}
-                  positioning={{ placement: "right" }}
-                  showArrow
-                >
                   <Menu.Item
                     value="copy"
-                    onClick={
-                      hasWorkflowsCreatePermission
-                        ? () => setIsCopyDialogOpen(true)
-                        : undefined
-                    }
-                    disabled={!hasWorkflowsCreatePermission}
+                    onClick={() => setIsCopyDialogOpen(true)}
                   >
                     <Copy size={16} /> Replicate to another project
                   </Menu.Item>
-                </Tooltip>
-                <Tooltip
-                  content={
-                    !hasWorkflowsDeletePermission
-                      ? "You need workflows:delete permission to delete workflows"
-                      : undefined
-                  }
-                  disabled={hasWorkflowsDeletePermission}
-                  positioning={{ placement: "right" }}
-                  showArrow
-                >
                   <Menu.Item
                     value="delete"
                     color="red.500"
-                    onClick={
-                      hasWorkflowsDeletePermission
-                        ? () => setIsDeleteDialogOpen(true)
-                        : undefined
-                    }
-                    disabled={!hasWorkflowsDeletePermission}
+                    onClick={() => setIsDeleteDialogOpen(true)}
                   >
                     <Trash2 size={16} /> Delete
                   </Menu.Item>
-                </Tooltip>
               </Menu.Content>
             </Menu.Root>
           )}

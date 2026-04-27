@@ -3,7 +3,7 @@ import type { PrismaClient } from "@prisma/client";
 import { getLangWatchTracer } from "langwatch";
 import type { TraceWithGuardrail } from "~/components/messages/MessageCard";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
-import { getClickHouseClient } from "~/server/clickhouse/client";
+import { getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import { prisma as defaultPrisma } from "~/server/db";
 import type { Protections } from "~/server/elasticsearch/protections";
 import {
@@ -55,23 +55,25 @@ interface ClickHouseScrollCursor {
 /**
  * Service for fetching traces from ClickHouse.
  *
- * This service provides a ClickHouse-based alternative to the Elasticsearch
- * trace fetching logic. It:
- * 1. Checks if ClickHouse Traces Data Source is enabled for the project (via project.featureClickHouseDataSourceTraces flag)
- * 2. Fetches trace summaries and spans using a JOIN query
- * 3. Maps the ClickHouse types to the legacy Trace/Span types
- *
- * Returns null when ClickHouse is not enabled for the project, allowing
- * the caller to fall back to Elasticsearch.
+ * Fetches trace summaries and, when needed, span rows via separate ClickHouse
+ * queries, combines them in application code, and maps to legacy Trace/Span types.
  */
 export class ClickHouseTraceService {
-  private readonly clickHouseClient: ClickHouseClient | null;
   private readonly logger = createLogger("langwatch:traces:clickhouse-service");
   private readonly tracer = getLangWatchTracer(
     "langwatch.traces.clickhouse-service",
   );
-  constructor(private readonly prisma: PrismaClient) {
-    this.clickHouseClient = getClickHouseClient();
+  constructor(private readonly prisma: PrismaClient) {}
+
+  /**
+   * Resolve the ClickHouse client for a given project.
+   *
+   * The returned client is already wrapped with wrapWithDefaultSettings
+   * by getClickHouseClientForProject, so every query automatically receives
+   * memory-safety limits (max_memory_usage, max_bytes_before_external_group_by).
+   */
+  private async resolveClient(projectId: string) {
+    return getClickHouseClientForProject(projectId);
   }
 
   /**
@@ -79,35 +81,6 @@ export class ClickHouseTraceService {
    */
   static create(prisma: PrismaClient = defaultPrisma): ClickHouseTraceService {
     return new ClickHouseTraceService(prisma);
-  }
-
-  /**
-   * Check if ClickHouse is enabled for the given project.
-   */
-  async isClickHouseEnabled(projectId: string): Promise<boolean> {
-    return await this.tracer.withActiveSpan(
-      "ClickHouseTraceService.isClickHouseEnabled",
-      {
-        attributes: { "tenant.id": projectId },
-      },
-      async (span) => {
-        if (!this.clickHouseClient) {
-          return false;
-        }
-
-        const project = await this.prisma.project.findUnique({
-          where: { id: projectId },
-          select: { featureClickHouseDataSourceTraces: true },
-        });
-
-        span.setAttribute(
-          "project.feature.clickhouse",
-          project?.featureClickHouseDataSourceTraces === true,
-        );
-
-        return project?.featureClickHouseDataSourceTraces === true;
-      },
-    );
   }
 
   /**
@@ -133,9 +106,8 @@ export class ClickHouseTraceService {
         attributes: { "tenant.id": projectId },
       },
       async () => {
-        // Check if ClickHouse is enabled
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -189,6 +161,83 @@ export class ClickHouseTraceService {
   }
 
   /**
+   * Resolve a trace ID prefix to matching full trace IDs within a project.
+   *
+   * Used for git-style shortcut lookups where a user provides a prefix of the
+   * full trace ID (for example, the 20-char truncated ID shown by `langwatch
+   * trace search`). Returns up to `limit` distinct trace IDs so the caller can
+   * detect ambiguity.
+   *
+   * Callers MUST pass an `occurredAt` range to keep the scan bounded. Per
+   * repository conventions, filtering on the partition key (OccurredAt) is
+   * required — without it ClickHouse scans every partition (including cold
+   * S3 storage) for every lookup miss.
+   *
+   * Returns null if the ClickHouse client is not available for the project.
+   */
+  async resolveTraceIdByPrefix({
+    projectId,
+    prefix,
+    occurredAt,
+    limit = 2,
+  }: {
+    /** The project ID (scoped via TenantId) */
+    projectId: string;
+    /** The trace ID prefix to search for */
+    prefix: string;
+    /** Partition-key bound (epoch millis) — required for partition pruning */
+    occurredAt: { from: number; to: number };
+    /** Maximum distinct trace IDs to return (default 2 — enough to detect ambiguity) */
+    limit?: number;
+  }): Promise<string[] | null> {
+    return await this.tracer.withActiveSpan(
+      "ClickHouseTraceService.resolveTraceIdByPrefix",
+      { attributes: { "tenant.id": projectId, "trace.id.prefix": prefix } },
+      async () => {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
+          return null;
+        }
+
+        try {
+          const result = await clickHouseClient.query({
+            query: `
+              SELECT DISTINCT TraceId
+              FROM trace_summaries
+              WHERE TenantId = {tenantId:String}
+                AND OccurredAt >= fromUnixTimestamp64Milli({fromMs:Int64})
+                AND OccurredAt <= fromUnixTimestamp64Milli({toMs:Int64})
+                AND startsWith(TraceId, {prefix:String})
+              LIMIT {limit:UInt32}
+            `,
+            query_params: {
+              tenantId: projectId,
+              fromMs: occurredAt.from,
+              toMs: occurredAt.to,
+              prefix,
+              limit,
+            },
+            format: "JSONEachRow",
+          });
+
+          const rows = (await result.json()) as Array<{ TraceId: string }>;
+          return rows.map((r) => r.TraceId);
+        } catch (error) {
+          this.logger.error(
+            {
+              projectId,
+              prefix,
+              error: error instanceof Error ? error.message : error,
+            },
+            "Failed to resolve trace ID by prefix from ClickHouse",
+          );
+          throw new Error("Failed to resolve trace ID by prefix");
+        }
+      },
+    );
+  }
+
+  /**
    * Get traces by thread ID.
    *
    * Queries trace_summaries using the Attributes map to find traces
@@ -214,9 +263,8 @@ export class ClickHouseTraceService {
         attributes: { "tenant.id": projectId, "thread.id": threadId },
       },
       async () => {
-        // Check if ClickHouse is enabled
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -228,7 +276,7 @@ export class ClickHouseTraceService {
         try {
           // Query trace_summaries for traces with matching thread_id
           // Thread ID can be stored under different attribute keys
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: `
               SELECT DISTINCT TraceId
               FROM trace_summaries
@@ -252,7 +300,20 @@ export class ClickHouseTraceService {
           }
 
           // Fetch full traces with spans
-          return this.getTracesWithSpans(projectId, traceIds, protections);
+          const traces = await this.getTracesWithSpans(
+            projectId,
+            traceIds,
+            protections,
+          );
+          if (!traces) return null;
+
+          // Re-sort by timestamp — getTracesWithSpans returns in TraceId
+          // order which doesn't match the chronological order we need.
+          traces.sort(
+            (a, b) =>
+              (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0),
+          );
+          return traces;
         } catch (error) {
           this.logger.error(
             {
@@ -297,9 +358,8 @@ export class ClickHouseTraceService {
         },
       },
       async () => {
-        // Check if ClickHouse is enabled
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -315,7 +375,7 @@ export class ClickHouseTraceService {
         try {
           // Query trace_summaries for traces with matching thread_ids
           // Thread ID can be stored under different attribute keys
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: `
               SELECT DISTINCT TraceId
               FROM trace_summaries
@@ -339,7 +399,20 @@ export class ClickHouseTraceService {
           }
 
           // Fetch full traces with spans
-          return this.getTracesWithSpans(projectId, traceIds, protections);
+          const traces = await this.getTracesWithSpans(
+            projectId,
+            traceIds,
+            protections,
+          );
+          if (!traces) return null;
+
+          // Re-sort by timestamp — getTracesWithSpans returns in TraceId
+          // order which doesn't match the chronological order we need.
+          traces.sort(
+            (a, b) =>
+              (a.timestamps.started_at ?? 0) - (b.timestamps.started_at ?? 0),
+          );
+          return traces;
         } catch (error) {
           this.logger.error(
             {
@@ -372,12 +445,16 @@ export class ClickHouseTraceService {
   async getAllTracesForProject(
     input: GetAllTracesForProjectInput,
     protections: Protections,
-    options: { includeSpans?: boolean } = {},
+    options: {
+      includeSpans?: boolean;
+      scrollId?: string | null;
+    } = {},
   ): Promise<TracesForProjectResult | null> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.getAllTracesForProject",
       async (_span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(input.projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -386,19 +463,16 @@ export class ClickHouseTraceService {
           const sortDirection =
             (input.sortDirection as "asc" | "desc") ?? "desc";
 
-          // Parse cursor from scrollId if present
+          // Parse cursor from scrollId if present (matches ES service contract)
           let cursor: ClickHouseScrollCursor | null = null;
-          if (input.scrollId) {
+          if (options.scrollId) {
             this.logger.debug(
-              {
-                scrollId: input.scrollId,
-                hasScrollId: !!input.scrollId,
-              },
+              { scrollId: options.scrollId },
               "Parsing scrollId from request",
             );
             try {
               cursor = JSON.parse(
-                Buffer.from(input.scrollId, "base64").toString("utf-8"),
+                Buffer.from(options.scrollId, "base64").toString("utf-8"),
               );
 
               // Validate that cursor parameters match current request
@@ -435,7 +509,7 @@ export class ClickHouseTraceService {
             } catch (e) {
               this.logger.warn(
                 {
-                  scrollId: input.scrollId,
+                  scrollId: options.scrollId,
                   error: e instanceof Error ? e.message : e,
                 },
                 "Invalid scrollId, starting from beginning",
@@ -460,17 +534,19 @@ export class ClickHouseTraceService {
 
           // Build the query with keyset pagination
           let { traces, totalHits, lastTrace } =
-            await this.fetchTracesWithPagination(
-              input.projectId,
+            await this.fetchTracesWithPagination({
+              projectId: input.projectId,
               pageSize,
               sortDirection,
               cursor,
               protections,
-              input.startDate,
-              input.endDate,
+              startDate: input.startDate,
+              endDate: input.endDate,
               filterConditions,
               filterParams,
-            );
+              traceIds: input.traceIds,
+              query: input.query,
+            });
 
           // When includeSpans is requested, fetch and attach actual spans
           if (options.includeSpans && traces.length > 0) {
@@ -531,15 +607,20 @@ export class ClickHouseTraceService {
           // Enrich with evaluations — direct ClickHouse query, no extra isClickHouseEnabled roundtrip
           const traceIds = groups.flat().map((t) => t.trace_id);
           let traceChecks: TracesForProjectResult["traceChecks"] = {};
-          if (traceIds.length > 0 && this.clickHouseClient) {
-            const evalResult = await this.clickHouseClient.query({
+          if (traceIds.length > 0 && clickHouseClient) {
+            const evalResult = await clickHouseClient.query({
               query: `
                 SELECT *
                 FROM evaluation_runs
                 WHERE TenantId = {tenantId:String}
                   AND TraceId IN ({traceIds:Array(String)})
-                ORDER BY EvaluationId, UpdatedAt DESC
-                LIMIT 1 BY TenantId, EvaluationId
+                  AND (TenantId, EvaluationId, UpdatedAt) IN (
+                    SELECT TenantId, EvaluationId, max(UpdatedAt)
+                    FROM evaluation_runs
+                    WHERE TenantId = {tenantId:String}
+                      AND TraceId IN ({traceIds:Array(String)})
+                    GROUP BY TenantId, EvaluationId
+                  )
               `,
               query_params: {
                 tenantId: input.projectId,
@@ -604,8 +685,8 @@ export class ClickHouseTraceService {
       "ClickHouseTraceService.getTopicCounts",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(input.projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(input.projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -625,7 +706,7 @@ export class ClickHouseTraceService {
 
           const whereClause = conditions.join(" AND ");
 
-          const result = await this.clickHouseClient.query({
+          const result = await clickHouseClient.query({
             query: `
               SELECT
                 TopicId,
@@ -635,6 +716,7 @@ export class ClickHouseTraceService {
               WHERE ${whereClause}
                 AND (TopicId IS NOT NULL OR SubTopicId IS NOT NULL)
               GROUP BY TopicId, SubTopicId
+              LIMIT 10000
             `,
             query_params: {
               tenantId: input.projectId,
@@ -708,8 +790,8 @@ export class ClickHouseTraceService {
       "ClickHouseTraceService.getCustomersAndLabels",
       { attributes: { "tenant.id": input.projectId } },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(input.projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(input.projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
@@ -730,7 +812,7 @@ export class ClickHouseTraceService {
           const whereClause = conditions.join(" AND ");
 
           // Query for unique customer IDs
-          const customerResult = await this.clickHouseClient.query({
+          const customerResult = await clickHouseClient.query({
             query: `
               SELECT DISTINCT Attributes['langwatch.customer_id'] as customer_id
               FROM trace_summaries
@@ -752,7 +834,7 @@ export class ClickHouseTraceService {
 
           // Query for unique labels
           // Labels are stored as JSON array in langwatch.labels attribute
-          const labelsResult = await this.clickHouseClient.query({
+          const labelsResult = await clickHouseClient.query({
             query: `
               SELECT DISTINCT Attributes['langwatch.labels'] as labels_json
               FROM trace_summaries
@@ -830,15 +912,15 @@ export class ClickHouseTraceService {
       "ClickHouseTraceService.getSpanForPromptStudio",
       { attributes: { "tenant.id": projectId, "span.id": spanId } },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
         try {
           // Fetch ALL spans in the trace in a single query so we can
           // both extract LLM data and walk ancestors for prompt reference.
-          const queryResult = await this.clickHouseClient.query({
+          const queryResult = await clickHouseClient.query({
             query: `
               SELECT
                 SpanId,
@@ -846,8 +928,8 @@ export class ClickHouseTraceService {
                 ParentSpanId,
                 SpanName,
                 SpanAttributes,
-                StartTime,
-                EndTime,
+                toUnixTimestamp64Milli(StartTime) AS StartTime,
+                toUnixTimestamp64Milli(EndTime) AS EndTime,
                 DurationMs,
                 StatusCode,
                 StatusMessage
@@ -859,6 +941,7 @@ export class ClickHouseTraceService {
                     AND SpanId = {spanId:String}
                   LIMIT 1
                 )
+              LIMIT 1000
             `,
             query_params: {
               tenantId: projectId,
@@ -900,7 +983,8 @@ export class ClickHouseTraceService {
           );
 
           // If the LLM span itself doesn't have a prompt reference,
-          // walk up ancestor spans to find it (SDK sets it on the parent span)
+          // search ancestors and their siblings to find it (SDK sets it on
+          // sibling spans like Prompt.compile or PromptApiService.get)
           if (!result.promptHandle) {
             const ancestorSpans = allRows.map((r) => {
               const attributes: Record<string, unknown> = {};
@@ -919,6 +1003,7 @@ export class ClickHouseTraceService {
               return {
                 spanId: r.SpanId,
                 parentSpanId: r.ParentSpanId ?? null,
+                startTime: r.StartTime,
                 attributes,
               };
             });
@@ -930,6 +1015,7 @@ export class ClickHouseTraceService {
             if (ancestorRef?.promptHandle) {
               result.promptHandle = ancestorRef.promptHandle;
               result.promptVersionNumber = ancestorRef.promptVersionNumber;
+              result.promptTag = ancestorRef.promptTag;
               result.promptVariables = ancestorRef.promptVariables;
             }
           }
@@ -1101,6 +1187,7 @@ export class ClickHouseTraceService {
           : null,
       promptHandle: promptRef.promptHandle,
       promptVersionNumber: promptRef.promptVersionNumber,
+      promptTag: promptRef.promptTag,
       promptVariables: promptRef.promptVariables,
     };
   }
@@ -1119,14 +1206,14 @@ export class ClickHouseTraceService {
       "ClickHouseTraceService.getDistinctFieldNames",
       { attributes: { "tenant.id": projectId } },
       async () => {
-        const isEnabled = await this.isClickHouseEnabled(projectId);
-        if (!isEnabled || !this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           return null;
         }
 
         try {
           // Get distinct span names from stored_spans
-          const spanResult = await this.clickHouseClient.query({
+          const spanResult = await clickHouseClient.query({
             query: `
               SELECT DISTINCT SpanName
               FROM stored_spans
@@ -1135,6 +1222,7 @@ export class ClickHouseTraceService {
                 AND StartTime <= fromUnixTimestamp64Milli({endDate:UInt64})
                 AND SpanName != ''
               ORDER BY SpanName ASC
+              LIMIT 1000
             `,
             query_params: {
               tenantId: projectId,
@@ -1154,7 +1242,7 @@ export class ClickHouseTraceService {
           }));
 
           // Get distinct metadata keys from trace_summaries Attributes
-          const metaResult = await this.clickHouseClient.query({
+          const metaResult = await clickHouseClient.query({
             query: `
               SELECT DISTINCT arrayJoin(mapKeys(Attributes)) AS key
               FROM trace_summaries
@@ -1162,6 +1250,7 @@ export class ClickHouseTraceService {
                 AND CreatedAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND CreatedAt <= fromUnixTimestamp64Milli({endDate:UInt64})
               ORDER BY key ASC
+              LIMIT 1000
             `,
             query_params: {
               tenantId: projectId,
@@ -1199,24 +1288,39 @@ export class ClickHouseTraceService {
    * Fetch traces with keyset pagination.
    * @internal
    */
-  private async fetchTracesWithPagination(
-    projectId: string,
-    pageSize: number,
-    sortDirection: "asc" | "desc",
-    cursor: ClickHouseScrollCursor | null,
-    protections: Protections,
-    startDate?: number,
-    endDate?: number,
-    filterConditions?: string[],
-    filterParams?: Record<string, unknown>,
-  ): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
+  private async fetchTracesWithPagination({
+    projectId,
+    pageSize,
+    sortDirection,
+    cursor,
+    protections,
+    startDate,
+    endDate,
+    filterConditions,
+    filterParams,
+    traceIds,
+    query,
+  }: {
+    projectId: string;
+    pageSize: number;
+    sortDirection: "asc" | "desc";
+    cursor: ClickHouseScrollCursor | null;
+    protections: Protections;
+    startDate?: number;
+    endDate?: number;
+    filterConditions?: string[];
+    filterParams?: Record<string, unknown>;
+    traceIds?: string[];
+    query?: string;
+  }): Promise<{ traces: Trace[]; totalHits: number; lastTrace: Trace | null }> {
     return await this.tracer.withActiveSpan(
       "ClickHouseTraceService.fetchTracesWithPagination",
       {
         attributes: { "tenant.id": projectId },
       },
       async (_span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
 
@@ -1225,6 +1329,37 @@ export class ClickHouseTraceService {
           filterConditions && filterConditions.length > 0
             ? " AND " + filterConditions.join(" AND ")
             : "";
+
+        // Explicit trace ID filter — when callers provide specific trace IDs
+        const traceIdFilter =
+          traceIds && traceIds.length > 0
+            ? " AND ts.TraceId IN ({traceIds:Array(String)})"
+            : "";
+
+        // Text search on computed I/O — lower(ifNull(...)) matches the ngrambf_v1 indexed expression
+        const effectiveQuery = query && query.length >= 3 ? query : undefined;
+
+        // If the user can't see input/output, searching their content is not allowed
+        if (
+          effectiveQuery &&
+          protections.canSeeCapturedInput === false &&
+          protections.canSeeCapturedOutput === false
+        ) {
+          return { traces: [], totalHits: 0, lastTrace: null };
+        }
+
+        const searchableColumns = [
+          ...(protections.canSeeCapturedInput !== false
+            ? ["lower(ifNull(ts.ComputedInput, ''))"]
+            : []),
+          ...(protections.canSeeCapturedOutput !== false
+            ? ["lower(ifNull(ts.ComputedOutput, ''))"]
+            : []),
+        ];
+
+        const searchFilter = effectiveQuery
+          ? ` AND (${searchableColumns.map((col) => `${col} LIKE {searchQuery:String}`).join(" OR ")})`
+          : "";
 
         // Keyset cursor condition — only for the data query
         let cursorCondition = "";
@@ -1242,6 +1377,12 @@ export class ClickHouseTraceService {
           startDate: startDate ?? 0,
           endDate: endDate ?? Date.now(),
           ...filterParams,
+          ...(traceIds && traceIds.length > 0 ? { traceIds } : {}),
+          ...(effectiveQuery
+            ? {
+                searchQuery: `%${effectiveQuery.replace(/[%_\\]/g, "\\$&").toLowerCase()}%`,
+              }
+            : {}),
         };
 
         // Run count + data queries in parallel.
@@ -1250,7 +1391,7 @@ export class ClickHouseTraceService {
         // query fetches full data for just those IDs.
         // uniq() uses HyperLogLog (~2 % error) which is fine for pagination.
         const [countResult, summaryResult] = await Promise.all([
-          this.clickHouseClient.query({
+          clickHouseClient.query({
             query: `
               SELECT uniq(ts.TraceId) as total
               FROM trace_summaries ts
@@ -1258,11 +1399,13 @@ export class ClickHouseTraceService {
                 AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
                 AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
                 ${extraFilters}
+                ${traceIdFilter}
+                ${searchFilter}
             `,
             query_params: sharedParams,
             format: "JSONEachRow",
           }),
-          this.clickHouseClient.query({
+          clickHouseClient.query({
             query: `
               SELECT
                 ts.TraceId AS ts_TraceId,
@@ -1283,6 +1426,7 @@ export class ClickHouseTraceService {
                 ts.TopicId AS ts_TopicId,
                 ts.SubTopicId AS ts_SubTopicId,
                 ts.HasAnnotation AS ts_HasAnnotation,
+                ts.AnnotationIds AS ts_AnnotationIds,
                 ts.ComputedInput AS ts_ComputedInput,
                 ts.ComputedOutput AS ts_ComputedOutput,
                 ts.Attributes AS ts_Attributes,
@@ -1292,19 +1436,30 @@ export class ClickHouseTraceService {
               FROM trace_summaries ts
               WHERE ts.TenantId = {tenantId:String}
                 AND ts.TraceId IN (
-                  SELECT ts.TraceId
-                  FROM trace_summaries ts
-                  WHERE ts.TenantId = {tenantId:String}
-                    AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
-                    AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
-                    ${extraFilters}
-                    ${cursorCondition}
-                  ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}, ts.UpdatedAt DESC
-                  LIMIT 1 BY ts.TraceId
+                  SELECT s.TraceId
+                  FROM (
+                    SELECT ts.TraceId AS TraceId,
+                           argMax(ts.OccurredAt, ts.UpdatedAt) AS _oa
+                    FROM trace_summaries ts
+                    WHERE ts.TenantId = {tenantId:String}
+                      AND ts.OccurredAt >= fromUnixTimestamp64Milli({startDate:UInt64})
+                      AND ts.OccurredAt <= fromUnixTimestamp64Milli({endDate:UInt64})
+                      ${extraFilters}
+                      ${traceIdFilter}
+                      ${searchFilter}
+                      ${cursorCondition}
+                    GROUP BY ts.TraceId
+                  ) s
+                  ORDER BY s._oa ${orderDirection}, s.TraceId ${orderDirection}
                   LIMIT {pageSize:UInt32}
                 )
-              ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}, ts.UpdatedAt DESC
-              LIMIT 1 BY ts.TraceId
+                AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+                  SELECT TenantId, TraceId, max(UpdatedAt)
+                  FROM trace_summaries
+                  WHERE TenantId = {tenantId:String}
+                  GROUP BY TenantId, TraceId
+                )
+              ORDER BY ts.OccurredAt ${orderDirection}, ts.TraceId ${orderDirection}
             `,
             query_params: {
               ...sharedParams,
@@ -1369,8 +1524,9 @@ export class ClickHouseTraceService {
       blockedByGuardrail: false,
       topicId: row.ts_TopicId,
       subTopicId: row.ts_SubTopicId,
-      hasAnnotation: row.ts_HasAnnotation,
+      annotationIds: row.ts_AnnotationIds ?? [],
       attributes: row.ts_Attributes,
+      lastEventOccurredAt: 0,
       occurredAt: row.ts_OccurredAt,
       createdAt: row.ts_CreatedAt,
       updatedAt: row.ts_UpdatedAt,
@@ -1464,13 +1620,14 @@ export class ClickHouseTraceService {
         attributes: { "tenant.id": projectId },
       },
       async (_span) => {
-        if (!this.clickHouseClient) {
+        const clickHouseClient = await this.resolveClient(projectId);
+        if (!clickHouseClient) {
           throw new Error("ClickHouse client not available");
         }
 
         // Two parallel queries: trace summaries (with I/O) and spans (separate table)
         const [summaryResult, spansResult] = await Promise.all([
-          this.clickHouseClient.query({
+          clickHouseClient.query({
             query: `
         SELECT
           TraceId AS ts_TraceId,
@@ -1493,20 +1650,27 @@ export class ClickHouseTraceService {
           TopicId AS ts_TopicId,
           SubTopicId AS ts_SubTopicId,
           HasAnnotation AS ts_HasAnnotation,
+          AnnotationIds AS ts_AnnotationIds,
           Attributes AS ts_Attributes,
           toUnixTimestamp64Milli(OccurredAt) AS ts_OccurredAt,
           toUnixTimestamp64Milli(CreatedAt) AS ts_CreatedAt,
           toUnixTimestamp64Milli(UpdatedAt) AS ts_UpdatedAt
-        FROM trace_summaries
-        WHERE TenantId = {tenantId:String}
-          AND TraceId IN ({traceIds:Array(String)})
-        ORDER BY TraceId, UpdatedAt DESC
-        LIMIT 1 BY TraceId
+        FROM trace_summaries AS t
+        WHERE t.TenantId = {tenantId:String}
+          AND t.TraceId IN ({traceIds:Array(String)})
+          AND (t.TenantId, t.TraceId, t.UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM trace_summaries
+            WHERE TenantId = {tenantId:String}
+              AND TraceId IN ({traceIds:Array(String)})
+            GROUP BY TenantId, TraceId
+          )
+        ORDER BY t.TraceId
       `,
             query_params: { tenantId: projectId, traceIds },
             format: "JSONEachRow",
           }),
-          this.clickHouseClient.query({
+          clickHouseClient.query({
             query: `
         SELECT
           SpanId,
@@ -1533,16 +1697,18 @@ export class ClickHouseTraceService {
           \`Links.TraceId\` AS Links_TraceId,
           \`Links.SpanId\` AS Links_SpanId,
           \`Links.Attributes\` AS Links_Attributes
-        FROM (
-          SELECT *
-          FROM stored_spans
-          WHERE TenantId = {tenantId:String}
-            AND TraceId IN ({traceIds:Array(String)})
-          ORDER BY SpanId, StartTime DESC
-          LIMIT 1 BY TenantId, TraceId, SpanId
-        )
-        ORDER BY TraceId, StartTime ASC
-        LIMIT 200 BY TraceId
+        FROM stored_spans AS t
+        WHERE t.TenantId = {tenantId:String}
+          AND t.TraceId IN ({traceIds:Array(String)})
+          AND (t.TenantId, t.TraceId, t.SpanId, t.StartTime) IN (
+            SELECT TenantId, TraceId, SpanId, max(StartTime)
+            FROM stored_spans
+            WHERE TenantId = {tenantId:String}
+              AND TraceId IN ({traceIds:Array(String)})
+            GROUP BY TenantId, TraceId, SpanId
+          )
+        ORDER BY t.TraceId, t.StartTime ASC
+        LIMIT 200 BY t.TraceId
       `,
             query_params: { tenantId: projectId, traceIds },
             format: "JSONEachRow",
@@ -1639,8 +1805,9 @@ export class ClickHouseTraceService {
       blockedByGuardrail: false,
       topicId: row.ts_TopicId,
       subTopicId: row.ts_SubTopicId,
-      hasAnnotation: row.ts_HasAnnotation,
+      annotationIds: row.ts_AnnotationIds ?? [],
       attributes: row.ts_Attributes,
+      lastEventOccurredAt: 0,
       occurredAt: row.ts_OccurredAt,
       createdAt: row.ts_CreatedAt,
       updatedAt: row.ts_UpdatedAt,
@@ -1852,6 +2019,7 @@ interface TraceSummaryRow {
   ts_TopicId: string | null;
   ts_SubTopicId: string | null;
   ts_HasAnnotation: boolean | null;
+  ts_AnnotationIds: string[];
   ts_Attributes: Record<string, string>;
   ts_OccurredAt: number;
   ts_CreatedAt: number;

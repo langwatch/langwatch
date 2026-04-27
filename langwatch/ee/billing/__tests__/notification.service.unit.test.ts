@@ -283,6 +283,70 @@ describe("NotificationService", () => {
         });
       });
     });
+
+    describe("when sending a cancelled subscription event", () => {
+      it("sends Slack blocks with 'Subscription cancelled' header", async () => {
+        config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
+
+        await service.sendSlackSubscriptionEvent({
+          type: "cancelled",
+          organizationId: "org_1",
+          organizationName: "Acme",
+          plan: "GROWTH_SEAT_EUR_MONTHLY",
+          subscriptionId: "sub_1",
+          cancellationDate: new Date("2026-03-15T10:00:00Z"),
+        });
+
+        expect(mockSlackSend).toHaveBeenCalledWith({
+          blocks: expect.arrayContaining([
+            expect.objectContaining({
+              type: "header",
+              text: expect.objectContaining({
+                text: "Subscription cancelled",
+              }),
+            }),
+          ]),
+        });
+      });
+
+      it("includes organization name and plan in the body", async () => {
+        config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
+
+        await service.sendSlackSubscriptionEvent({
+          type: "cancelled",
+          organizationId: "org_1",
+          organizationName: "Acme",
+          plan: "GROWTH_SEAT_EUR_MONTHLY",
+          subscriptionId: "sub_1",
+          cancellationDate: new Date("2026-03-15T10:00:00Z"),
+        });
+
+        const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
+        const bodyBlock = sentBlocks.find(
+          (b: any) => b.type === "section" && b.text?.type === "mrkdwn",
+        );
+        expect(bodyBlock.text.text).toContain("Acme");
+        expect(bodyBlock.text.text).toContain("cancelled");
+        expect(bodyBlock.text.text).toContain("GROWTH_SEAT_EUR_MONTHLY");
+      });
+
+      it("includes an admin link button", async () => {
+        config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
+
+        await service.sendSlackSubscriptionEvent({
+          type: "cancelled",
+          organizationId: "org_1",
+          organizationName: "Acme",
+          plan: "GROWTH_SEAT_EUR_MONTHLY",
+          subscriptionId: "sub_1",
+        });
+
+        const sentBlocks = mockSlackSend.mock.calls[0]![0].blocks;
+        const actionsBlock = sentBlocks.find((b: any) => b.type === "actions");
+        expect(actionsBlock).toBeDefined();
+        expect(actionsBlock.elements[0].url).toContain("org_1");
+      });
+    });
   });
 
   describe("sendSlackSignupEvent()", () => {

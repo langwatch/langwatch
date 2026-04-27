@@ -1,6 +1,7 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type { Event, EventStoreReadContext } from "../";
+import type { Event } from "../domain/types";
+import type { EventStoreReadContext } from "./eventStore.types";
 import { createLogger } from "../../../utils/logger/server";
 import { AbstractEventStore } from "./abstractEventStore";
 import type { EventRepository } from "./repositories/eventRepository.types";

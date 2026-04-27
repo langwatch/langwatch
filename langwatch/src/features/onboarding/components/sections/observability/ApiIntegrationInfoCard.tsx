@@ -66,11 +66,11 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
 
   return (
     <VStack align="stretch" gap={3}>
-      <VStack align="stretch" gap={0}>
-        <Text fontSize="md" fontWeight="semibold">
+      <VStack align="stretch" gap={0.5}>
+        <Text fontSize="md" fontWeight="semibold" letterSpacing="-0.01em">
           Your LangWatch Integration Info
         </Text>
-        <Text fontSize="xs" color="fg.muted">
+        <Text fontSize="xs" color="fg.muted" lineHeight="tall">
           {
             "You can access your API key again anytime in the project's settings "
           }

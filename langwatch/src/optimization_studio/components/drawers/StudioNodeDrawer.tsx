@@ -43,10 +43,11 @@ const ComponentPropertiesPanelMap: Partial<
  * for unified play/expand/close controls.
  */
 export function StudioNodeDrawer() {
-  const { selectedNode, deselectAllNodes } = useWorkflowStore(
+  const { selectedNode, deselectAllNodes, isDraggingNode } = useWorkflowStore(
     useShallow((state) => ({
       selectedNode: state.nodes.find((n) => n.selected),
       deselectAllNodes: state.deselectAllNodes,
+      isDraggingNode: state.isDraggingNode,
     })),
   );
 
@@ -69,7 +70,9 @@ export function StudioNodeDrawer() {
   const hasUrlDrawer = !!currentDrawer;
 
   const effectiveNode =
-    !hasUrlDrawer && !isEmptyEvaluator && !isEmptyAgent ? selectedNode : undefined;
+    !hasUrlDrawer && !isEmptyEvaluator && !isEmptyAgent && !isDraggingNode
+      ? selectedNode
+      : undefined;
 
   const PanelComponent = effectiveNode
     ? ComponentPropertiesPanelMap[effectiveNode.type as ComponentType]

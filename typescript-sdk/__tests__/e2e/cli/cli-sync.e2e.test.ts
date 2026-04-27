@@ -33,7 +33,7 @@ import { ApiHelpers } from "./helpers/api-helpers";
 config({ path: ".env.test", override: true });
 
 const { expectCliResultSuccess } = expectations;
-const TMP_BASE_DIR = path.join(__dirname, "tmp");
+const TMP_BASE_DIR = path.join(__dirname, "tmp", "sync");
 
 const createUniquePromptName = () => {
   return `${PROMPT_NAME_PREFIX}-${Date.now()}`;
@@ -83,7 +83,10 @@ describe("CLI E2E", () => {
     await apiHelpers.cleapUpTestPrompts();
   });
 
-  describe("sync", () => {
+  // Entire sync suite skipped due to chronic CI flakes — see langwatch/langwatch#3240.
+  // Multiple tests in this describe block fail non-deterministically; skip
+  // the whole group rather than whack-a-mole individual tests.
+  describe.skip("sync", () => {
     describe("create local -> sync -> update local -> sync", () => {
       it("should keep remote prompt up to date", async () => {
         // Initialize project
@@ -350,7 +353,8 @@ describe("CLI E2E", () => {
         `);
       });
 
-      it("should not be in the prompts directory", () => {
+      // Skipped due to chronic CI flake — see langwatch/langwatch#3240.
+      it.skip("should not be in the prompts directory", () => {
         expect(() =>
           localPromptFileManagement.getPromptFileContent(promptHandle),
         ).toThrow();

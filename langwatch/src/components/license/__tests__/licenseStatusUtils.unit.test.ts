@@ -49,8 +49,6 @@ const baseResourceFields = {
   maxAutomations: 10,
   currentMessagesPerMonth: 500,
   maxMessagesPerMonth: 10000,
-  currentEvaluationsCredit: 25,
-  maxEvaluationsCredit: 100,
 } as const;
 
 /**

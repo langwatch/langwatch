@@ -200,6 +200,67 @@ describe("ClickHouse metrics", () => {
       );
     });
 
+    it("queries system.backups for backup status", async () => {
+      const partsResult = {
+        json: vi.fn().mockResolvedValue({ data: [] }),
+      };
+      const backupResult = {
+        json: vi.fn().mockResolvedValue({
+          data: [
+            {
+              status: "BACKUP_CREATED",
+              cnt: "3",
+              last_success_time: "2024-01-15 10:00:00",
+              last_success_size: "1073741824",
+            },
+          ],
+        }),
+      };
+      const diskResult = {
+        json: vi.fn().mockResolvedValue({
+          data: [
+            { name: "default", total_space: "322122547200", free_space: "214748364800", used_space: "107374182400" },
+          ],
+        }),
+      };
+      const mockClient = {
+        query: vi.fn()
+          .mockResolvedValueOnce(partsResult)
+          .mockResolvedValueOnce(backupResult)
+          .mockResolvedValueOnce(diskResult),
+      } as unknown as ClickHouseClient;
+
+      await metrics.collectStorageStats(mockClient);
+
+      // Should have been called 3 times: parts, backups, disks
+      expect(mockClient.query).toHaveBeenCalledTimes(3);
+      expect(mockClient.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.stringContaining("system.backups"),
+        })
+      );
+      expect(mockClient.query).toHaveBeenCalledWith(
+        expect.objectContaining({
+          query: expect.stringContaining("system.disks"),
+        })
+      );
+    });
+
+    it("handles system.backups query failure gracefully", async () => {
+      const partsResult = {
+        json: vi.fn().mockResolvedValue({ data: [] }),
+      };
+      const mockClient = {
+        query: vi.fn()
+          .mockResolvedValueOnce(partsResult)
+          .mockRejectedValueOnce(new Error("system.backups not found"))
+          .mockResolvedValueOnce({ json: vi.fn().mockResolvedValue({ data: [] }) }),
+      } as unknown as ClickHouseClient;
+
+      // Should not throw — backup errors are handled gracefully
+      await expect(metrics.collectStorageStats(mockClient)).resolves.toBeUndefined();
+    });
+
     it("handles query errors gracefully", async () => {
       const mockClient = {
         query: vi.fn().mockRejectedValue(new Error("Connection failed")),
@@ -207,6 +268,34 @@ describe("ClickHouse metrics", () => {
 
       // Should not throw
       await expect(metrics.collectStorageStats(mockClient)).resolves.toBeUndefined();
+    });
+  });
+
+  describe("backup metric setters", () => {
+    it("sets backup last success timestamp without throwing", () => {
+      expect(() => metrics.setClickHouseBackupLastSuccessTimestamp(1711929600)).not.toThrow();
+    });
+
+    it("sets backup last size bytes without throwing", () => {
+      expect(() => metrics.setClickHouseBackupLastSizeBytes(1073741824)).not.toThrow();
+    });
+
+    it("sets backup status count without throwing", () => {
+      expect(() => metrics.setClickHouseBackupStatusCount("BACKUP_CREATED", 5)).not.toThrow();
+    });
+  });
+
+  describe("disk metric setters", () => {
+    it("sets disk total bytes without throwing", () => {
+      expect(() => metrics.setClickHouseDiskTotalBytes("default", 322122547200)).not.toThrow();
+    });
+
+    it("sets disk used bytes without throwing", () => {
+      expect(() => metrics.setClickHouseDiskUsedBytes("default", 107374182400)).not.toThrow();
+    });
+
+    it("sets disk free bytes without throwing", () => {
+      expect(() => metrics.setClickHouseDiskFreeBytes("default", 214748364800)).not.toThrow();
     });
   });
 });

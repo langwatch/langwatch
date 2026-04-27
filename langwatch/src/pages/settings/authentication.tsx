@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { signIn, useSession } from "next-auth/react";
+import { linkAccount, useSession } from "~/utils/auth-client";
 import { useForm } from "react-hook-form";
 import { LuKeyRound, LuX } from "react-icons/lu";
 import { z } from "zod";
@@ -71,6 +71,7 @@ export default function AuthenticationSettings() {
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const apiContext = api.useContext();
+  const { data: ssoStatus } = api.user.getSsoStatus.useQuery({});
 
   const passwordForm = useForm<ChangePasswordFormValues>({
     resolver: zodResolver(changePasswordSchema),
@@ -82,17 +83,27 @@ export default function AuthenticationSettings() {
   });
 
   const hasSSOProvider = !!organization?.ssoProvider;
+  const pendingSsoSetup = ssoStatus?.pendingSsoSetup ?? false;
 
   if (!isAuthProvider) {
     return null;
   }
 
   const handleLinkProvider = () => {
-    if (isAuthProvider) {
-      void signIn(isAuthProvider, {
+    if (!isAuthProvider) return;
+    void (async () => {
+      const result = await linkAccount(isAuthProvider, {
         callbackUrl: window.location.href,
       });
-    }
+      if (result.error) {
+        toaster.create({
+          title: "Failed to link sign-in method",
+          description: result.error,
+          type: "error",
+          meta: { closable: true },
+        });
+      }
+    })();
   };
 
   const handleUnlink = async (accountId: string) => {
@@ -272,9 +283,11 @@ export default function AuthenticationSettings() {
                   <Button
                     onClick={handleLinkProvider}
                     colorPalette="orange"
-                    disabled={hasSSOProvider}
+                    disabled={hasSSOProvider && !pendingSsoSetup}
                   >
-                    Link New Sign-in Method
+                    {pendingSsoSetup
+                      ? "Link SSO Sign-in Method"
+                      : "Link New Sign-in Method"}
                   </Button>
                 </VStack>
               )}

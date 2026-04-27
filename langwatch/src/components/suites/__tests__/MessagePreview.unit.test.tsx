@@ -4,7 +4,7 @@
  * Unit tests for MessagePreview component.
  *
  * Tests content extraction from various message formats:
- * string, array with text objects, tool_use, tool_result,
+ * string, array with text objects, tool calls, tool results,
  * and message alignment based on role.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -23,10 +23,12 @@ describe("<MessagePreview/>", () => {
   afterEach(cleanup);
 
   describe("when messages array is empty", () => {
-    it("renders 'No messages' text", () => {
-      render(<MessagePreview messages={[]} />, { wrapper: Wrapper });
+    it("renders skeleton placeholders", () => {
+      const { container } = render(<MessagePreview messages={[]} />, { wrapper: Wrapper });
 
-      expect(screen.getByText("No messages")).toBeInTheDocument();
+      // Should render shimmer skeletons, not "No messages" text
+      expect(screen.queryByText("No messages")).not.toBeInTheDocument();
+      expect(container.querySelectorAll("div").length).toBeGreaterThan(0);
     });
   });
 
@@ -43,12 +45,12 @@ describe("<MessagePreview/>", () => {
   });
 
   describe("when message content is an array with text objects", () => {
-    it("renders text from { text } items", () => {
+    it("renders text from { type: 'text', text } items", () => {
       const messages = [
         {
           id: "msg_1",
           role: "assistant",
-          content: [{ text: "First part" }, { text: "Second part" }],
+          content: [{ type: "text", text: "First part" }, { type: "text", text: "Second part" }],
         },
       ] as unknown as Messages;
 
@@ -60,35 +62,36 @@ describe("<MessagePreview/>", () => {
     });
   });
 
-  describe("when message content contains tool_use items", () => {
-    it("renders [Tool: name] for tool_use entries", () => {
+  describe("when message content contains tool calls", () => {
+    it("renders tool function name", () => {
       const messages = [
         {
           id: "msg_1",
           role: "assistant",
-          content: [{ type: "tool_use", name: "search_db" }],
+          content: "None",
+          tool_calls: [{ function: { name: "search_db" } }],
         },
       ] as unknown as Messages;
 
       render(<MessagePreview messages={messages} />, { wrapper: Wrapper });
 
-      expect(screen.getByText("[Tool: search_db]")).toBeInTheDocument();
+      expect(screen.getByText("search_db")).toBeInTheDocument();
     });
   });
 
-  describe("when message content contains tool_result items", () => {
-    it("renders [Tool result] for tool_result entries", () => {
+  describe("when message content contains tool results", () => {
+    it("renders the tool result content", () => {
       const messages = [
         {
           id: "msg_1",
-          role: "assistant",
-          content: [{ type: "tool_result" }],
+          role: "tool",
+          content: "Result data here",
         },
       ] as unknown as Messages;
 
       render(<MessagePreview messages={messages} />, { wrapper: Wrapper });
 
-      expect(screen.getByText("[Tool result]")).toBeInTheDocument();
+      expect(screen.getByText("Result data here")).toBeInTheDocument();
     });
   });
 

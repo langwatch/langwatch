@@ -209,6 +209,46 @@ describe("mapNormalizedSpanToSpan", () => {
     });
   });
 
+  describe("when span has model and token counts", () => {
+    it("computes cost from static model registry", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "llm",
+          "gen_ai.request.model": "gpt-5-mini",
+          "gen_ai.usage.input_tokens": 100,
+          "gen_ai.usage.output_tokens": 50,
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.metrics).not.toBeNull();
+      expect(result.metrics?.cost).not.toBeNull();
+      expect(result.metrics!.cost).toBeGreaterThan(0);
+    });
+  });
+
+  describe("when token counts are strings (ClickHouse)", () => {
+    it("coerces string tokens and computes cost", () => {
+      const span = makeSpan({
+        spanAttributes: {
+          "langwatch.span.type": "llm",
+          "gen_ai.request.model": "gpt-5-mini",
+          "gen_ai.usage.input_tokens": "100",
+          "gen_ai.usage.output_tokens": "50",
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.metrics).not.toBeNull();
+      expect(result.metrics?.prompt_tokens).toBe(100);
+      expect(result.metrics?.completion_tokens).toBe(50);
+      expect(result.metrics?.cost).not.toBeNull();
+      expect(result.metrics!.cost).toBeGreaterThan(0);
+    });
+  });
+
   describe("when langwatch.input is a deserialized {type, value} wrapper", () => {
     it("unwraps text wrapper to plain text type", () => {
       // After ClickHouse round-trip: canonicalization unwraps text wrapper to just the value string,
@@ -360,6 +400,139 @@ describe("mapNormalizedSpanToSpan", () => {
         type: "guardrail_result",
         value: { status: "processed", passed: false, score: 0.1 },
       });
+    });
+  });
+
+  describe("when extracting error information", () => {
+    it("returns null when statusCode is not ERROR", () => {
+      const span = makeSpan({
+        statusCode: NormalizedStatusCode.OK,
+        statusMessage: "Bad Request",
+        spanAttributes: { "exception.message": "ignored" },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.error).toBeNull();
+    });
+
+    it("prefers the exception event's exception.message over statusMessage", () => {
+      // Regression: Trace Details showed only the HTTP status ("Bad Request")
+      // because statusMessage was read before the OTel exception event. Lane A
+      // (gateway) attaches rich actionable text on the event attrs — that's
+      // what the renderer should surface (finding #78).
+      const span = makeSpan({
+        statusCode: NormalizedStatusCode.ERROR,
+        statusMessage: "Bad Request",
+        spanAttributes: {
+          "langwatch.span.type": "llm",
+          "gen_ai.request.model": "openai/gpt-5-mini",
+        },
+        events: [
+          {
+            name: "exception",
+            timeUnixMs: 1500,
+            attributes: {
+              "exception.type": "provider_not_bound",
+              "exception.message":
+                "provider openai not bound to this virtual key — define an alias or bind the provider",
+              "exception.stacktrace": "frame1\nframe2",
+            },
+          },
+        ],
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.error?.message).toBe(
+        "provider openai not bound to this virtual key — define an alias or bind the provider",
+      );
+      expect(result.error?.stacktrace).toEqual(["frame1", "frame2"]);
+    });
+
+    it("falls back to span-level exception.message when no exception event is attached", () => {
+      const span = makeSpan({
+        statusCode: NormalizedStatusCode.ERROR,
+        statusMessage: "Bad Request",
+        spanAttributes: {
+          "exception.message": "upstream timeout after 30s",
+        },
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.error?.message).toBe("upstream timeout after 30s");
+    });
+
+    it("falls back to statusMessage when no exception info is present", () => {
+      const span = makeSpan({
+        statusCode: NormalizedStatusCode.ERROR,
+        statusMessage: "Bad Request",
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.error?.message).toBe("Bad Request");
+    });
+
+    it("falls back to 'Unknown error' when nothing is set", () => {
+      const span = makeSpan({
+        statusCode: NormalizedStatusCode.ERROR,
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.error?.message).toBe("Unknown error");
+    });
+
+    it("uses the newest exception event when multiple are attached", () => {
+      // Matches the OTel spec allowing multiple exception events per span —
+      // the last one is the actionable one (e.g. Bifrost's final error after
+      // all fallbacks were exhausted).
+      const span = makeSpan({
+        statusCode: NormalizedStatusCode.ERROR,
+        events: [
+          {
+            name: "exception",
+            timeUnixMs: 1000,
+            attributes: { "exception.message": "first transient error" },
+          },
+          {
+            name: "other_event",
+            timeUnixMs: 1200,
+            attributes: {},
+          },
+          {
+            name: "exception",
+            timeUnixMs: 1500,
+            attributes: { "exception.message": "final fatal error" },
+          },
+        ],
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.error?.message).toBe("final fatal error");
+    });
+
+    it("ignores non-string or empty exception.message", () => {
+      const span = makeSpan({
+        statusCode: NormalizedStatusCode.ERROR,
+        statusMessage: "Bad Request",
+        events: [
+          {
+            name: "exception",
+            timeUnixMs: 1500,
+            attributes: {
+              "exception.message": "", // empty string should be skipped
+            },
+          },
+        ],
+      });
+
+      const result = mapNormalizedSpanToSpan(span);
+
+      expect(result.error?.message).toBe("Bad Request");
     });
   });
 });

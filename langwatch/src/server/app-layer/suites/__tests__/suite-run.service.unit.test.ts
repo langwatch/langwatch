@@ -11,10 +11,9 @@ vi.mock("~/utils/logger/server", () => ({
   }),
 }));
 
-vi.mock("~/server/scenarios/scenario.queue", () => ({
+vi.mock("~/server/scenarios/scenario.ids", () => ({
   generateBatchRunId: () => "batch-run-123",
-  scheduleScenarioRun: vi.fn().mockResolvedValue({ id: "job-1" }),
-  scenarioQueue: { getJob: vi.fn() },
+  generateScenarioRunId: () => "scenario-run-id-1",
 }));
 
 vi.mock("~/server/suites/suite-set-id", () => ({

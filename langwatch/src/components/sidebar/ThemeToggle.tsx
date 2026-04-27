@@ -1,10 +1,8 @@
 import { Box, HStack } from "@chakra-ui/react";
 import { useTheme } from "next-themes";
 import { LuMonitor, LuMoon, LuSun } from "react-icons/lu";
-import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import { useColorModeValue } from "../ui/color-mode";
 import { MENU_ITEM_HEIGHT } from "./SideMenuLink";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export type ThemeToggleProps = {
   showLabel?: boolean;
@@ -19,18 +17,6 @@ const themeOptions: { value: ThemeOption; icon: React.ReactNode }[] = [
 ];
 
 export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
-  const { organization, projectId } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-    redirectToProjectOnboarding: false,
-  });
-
-  const { enabled: isDarkModeEnabled } = useFeatureFlag(
-    "release_ui_dark_mode_enabled", {
-      organizationId: organization?.id,
-      projectId: projectId,
-      enabled: !!organization?.id && !!projectId,
-    },
-  );
   const { theme, setTheme } = useTheme();
 
   const selectedIndex = themeOptions.findIndex((o) => o.value === theme);
@@ -41,7 +27,7 @@ export const ThemeToggle = ({ showLabel = true }: ThemeToggleProps) => {
     "0 1px 3px rgba(0,0,0,0.3), 0 0 0 1px rgba(255,255,255,0.05)",
   );
 
-  if (!isDarkModeEnabled || !currentOption) return null;
+  if (!currentOption) return null;
 
   const cycleTheme = () => {
     const nextIndex = (safeIndex + 1) % themeOptions.length;

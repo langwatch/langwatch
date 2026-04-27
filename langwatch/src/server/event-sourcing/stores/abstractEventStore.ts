@@ -1,10 +1,10 @@
+import type { AggregateType } from "../domain/aggregateType";
+import type { Event } from "../domain/types";
 import type {
-  AggregateType,
   EventStore as BaseEventStore,
-  Event,
   EventStoreReadContext,
-} from "../";
-import { EventUtils } from "../";
+} from "./eventStore.types";
+import { EventUtils } from "../utils/event.utils";
 import { ValidationError } from "../services/errorHandling";
 import {
   deduplicateEvents,

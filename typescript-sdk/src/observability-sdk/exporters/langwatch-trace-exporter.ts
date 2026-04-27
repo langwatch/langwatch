@@ -9,6 +9,7 @@ import {
   LANGWATCH_SDK_VERSION,
   TRACES_PATH,
 } from "../../internal/constants";
+import { buildAuthHeaders } from "../../internal/api/auth";
 import {
   type TraceFilter,
   type Criteria,
@@ -28,6 +29,12 @@ import {
 export interface LangWatchTraceExporterOptions {
   endpoint?: string;
   apiKey?: string;
+  /**
+   * Project identifier. Required when `apiKey` is a Personal Access Token
+   * (`pat-lw-*`); ignored for legacy `sk-lw-*` keys. Falls back to
+   * `LANGWATCH_PROJECT_ID`.
+   */
+  projectId?: string;
   filters?: TraceFilter[] | null;
 }
 
@@ -175,6 +182,7 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
    */
   constructor(opts?: LangWatchTraceExporterOptions) {
     const apiKey = opts?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
+    const projectId = opts?.projectId ?? process.env.LANGWATCH_PROJECT_ID;
     const endpoint =
       opts?.endpoint ??
       process.env.LANGWATCH_ENDPOINT ??
@@ -189,7 +197,7 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
         "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
         "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
         "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
-        ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
+        ...buildAuthHeaders({ apiKey, projectId }),
       },
       url: otelEndpoint.toString(),
     });

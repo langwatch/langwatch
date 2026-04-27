@@ -9,10 +9,10 @@ import {
 import { Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import React from "react";
 import type {
-  ExtraHeader,
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
+import type { ExtraHeader } from "../../hooks/useExtraHeaders";
 import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
 import { SmallLabel } from "../SmallLabel";
 
@@ -33,7 +33,11 @@ export const ExtraHeadersSection = ({
   actions: UseModelProviderFormActions;
   provider: MaybeStoredModelProvider;
 }) => {
-  if (provider.provider !== "azure" && provider.provider !== "custom") {
+  if (
+    provider.provider !== "azure" &&
+    provider.provider !== "custom" &&
+    provider.provider !== "azure_safety"
+  ) {
     return null;
   }
 

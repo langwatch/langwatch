@@ -7,7 +7,7 @@ import {
   teamRoleHasPermission,
 } from "../../server/api/rbac";
 import { api } from "../../utils/api";
-import { isHandledByGlobalLicenseHandler } from "../../utils/trpcError";
+import { isHandledByGlobalHandler } from "../../utils/trpcError";
 import { Dialog } from "../ui/dialog";
 import { Select } from "../ui/select";
 import { toaster } from "../ui/toaster";
@@ -94,7 +94,7 @@ export const CopyDatasetDialog = ({
       onClose();
     } catch (error) {
       // Skip toast if the global license handler already showed the upgrade modal
-      if (isHandledByGlobalLicenseHandler(error)) return;
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error replicating dataset",
         description: error instanceof Error ? error.message : "Unknown error",
@@ -121,7 +121,7 @@ export const CopyDatasetDialog = ({
                 <Select.Trigger>
                   <Select.ValueText placeholder="Select project" />
                 </Select.Trigger>
-                <Select.Content zIndex="1600">
+                <Select.Content>
                   {projectCollection.items.map((project) => (
                     <Select.Item key={project.value} item={project}>
                       {project.label}

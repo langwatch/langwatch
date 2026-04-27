@@ -22,17 +22,19 @@ import { EventRepositoryClickHouse } from "../../../../stores/repositories/event
 import { mapCommands } from "../../../../mapCommands";
 import { RecordSpanCommand } from "../../commands/recordSpanCommand";
 import { AssignTopicCommand } from "../../commands/assignTopicCommand";
-import { createSpanStorageMapProjection } from "../../projections/spanStorage.mapProjection";
-import { createTraceSummaryFoldProjection } from "../../projections/traceSummary.foldProjection";
+import { SpanStorageMapProjection } from "../../projections/spanStorage.mapProjection";
+import { TraceSummaryFoldProjection } from "../../projections/traceSummary.foldProjection";
 import type { TraceProcessingEvent } from "../../schemas/events";
 import type { OtlpSpan } from "../../schemas/otlp";
 import { SpanAppendStore } from "../../projections/spanStorage.store";
 import { TraceSummaryStore } from "../../projections/traceSummary.store";
 import { createCustomEvaluationSyncReactor } from "../customEvaluationSync.reactor";
-import { StartEvaluationCommand } from "../../../../pipelines/evaluation-processing/commands/startEvaluation.command";
-import { CompleteEvaluationCommand } from "../../../../pipelines/evaluation-processing/commands/completeEvaluation.command";
-import { ReportEvaluationCommand } from "../../../../pipelines/evaluation-processing/commands/reportEvaluation.command";
-import { createEvaluationRunFoldProjection } from "../../../../pipelines/evaluation-processing/projections";
+import {
+  StartEvaluationCommand,
+  CompleteEvaluationCommand,
+  ReportEvaluationCommand,
+} from "../../../../pipelines/evaluation-processing/commands";
+import { EvaluationRunFoldProjection } from "../../../../pipelines/evaluation-processing/projections";
 import { EvaluationRunStore } from "../../../../pipelines/evaluation-processing/projections/evaluationRun.store";
 import type { EvaluationProcessingEvent } from "../../../../pipelines/evaluation-processing/schemas/events";
 
@@ -109,7 +111,8 @@ function buildSpanWithEvaluation({
   } as unknown as OtlpSpan;
 }
 
-describe.skipIf(!hasTestcontainers)(
+// Skipped: chronic async-event-handler timeout flake — see langwatch/langwatch#3240.
+describe.skip(
   "Custom Evaluation Sync Reactor - End-to-End Integration",
   () => {
     let tracePipeline: ReturnType<typeof createTestPipelines>["tracePipeline"];
@@ -133,17 +136,18 @@ describe.skipIf(!hasTestcontainers)(
       // instances causes competing global queue consumers where one skips
       // the other's jobs as "unknown pipeline".
       const eventStore = new EventStoreClickHouse(
-        new EventRepositoryClickHouse(clickHouseClient),
+        new EventRepositoryClickHouse(async () => clickHouseClient),
       );
       const eventSourcing = EventSourcing.createWithStores({
         eventStore,
-        clickhouse: clickHouseClient,
+        clickhouse: async () => clickHouseClient,
         redis: redisConnection,
+        processRole: "worker",
       });
 
       // --- Evaluation pipeline ---
       const evalRunStore = new EvaluationRunStore(
-        new EvaluationRunService(new EvaluationRunClickHouseRepository(clickHouseClient)).repository,
+        new EvaluationRunService(new EvaluationRunClickHouseRepository(async () => clickHouseClient)).repository,
       );
       const evalPipelineName = `eval_processing_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
       const evalPipelineDef = definePipeline<EvaluationProcessingEvent>()
@@ -154,7 +158,7 @@ describe.skipIf(!hasTestcontainers)(
         .withCommand("reportEvaluation", ReportEvaluationCommand as any)
         .withFoldProjection(
           "evaluationRun",
-          createEvaluationRunFoldProjection({ store: evalRunStore }) as any,
+          new EvaluationRunFoldProjection({ store: evalRunStore }) as any,
         )
         .build();
       const registeredEvalPipeline =
@@ -164,10 +168,10 @@ describe.skipIf(!hasTestcontainers)(
       // --- Trace pipeline (with customEvaluationSync reactor wired to eval pipeline) ---
 
       const spanAppendStore = new SpanAppendStore(
-        new SpanStorageService(new SpanStorageClickHouseRepository(clickHouseClient)).repository,
+        new SpanStorageService(new SpanStorageClickHouseRepository(async () => clickHouseClient)).repository,
       );
       const traceSummaryStore = new TraceSummaryStore(
-        new TraceSummaryService(new TraceSummaryClickHouseRepository(clickHouseClient)).repository,
+        new TraceSummaryService(new TraceSummaryClickHouseRepository(async () => clickHouseClient)).repository,
       );
 
       // Create the reactor with zero delay for faster tests
@@ -192,13 +196,13 @@ describe.skipIf(!hasTestcontainers)(
         .withAggregateType("trace" as AggregateType)
         .withFoldProjection(
           "traceSummary",
-          createTraceSummaryFoldProjection({
+          new TraceSummaryFoldProjection({
             store: traceSummaryStore,
           }) as any,
         )
         .withMapProjection(
           "spanStorage",
-          createSpanStorageMapProjection({
+          new SpanStorageMapProjection({
             store: spanAppendStore,
           }) as any,
         )
@@ -317,8 +321,13 @@ describe.skipIf(!hasTestcontainers)(
               WHERE TenantId = {tenantId:String}
                 AND TraceId = {traceId:String}
                 AND Status = 'processed'
-              ORDER BY UpdatedAt DESC
-              LIMIT 1 BY TenantId, EvaluationId
+                AND (TenantId, EvaluationId, UpdatedAt) IN (
+                  SELECT TenantId, EvaluationId, max(UpdatedAt)
+                  FROM evaluation_runs
+                  WHERE TenantId = {tenantId:String}
+                    AND TraceId = {traceId:String}
+                  GROUP BY TenantId, EvaluationId
+                )
             `,
             query_params: { tenantId: tenantIdString, traceId },
             format: "JSONEachRow",

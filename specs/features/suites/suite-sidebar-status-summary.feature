@@ -5,7 +5,6 @@ Feature: Suite sidebar status summary
 
   Background:
     Given I am logged into project "my-project"
-    And the feature flag "release_ui_suites_enabled" is enabled
 
   # Pass count and recency display
 

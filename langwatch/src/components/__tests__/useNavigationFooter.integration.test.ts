@@ -14,7 +14,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 const mockPush = vi.fn();
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "my-project", pageOffset: "0", pageSize: "25" },
     pathname: "/[project]/messages",

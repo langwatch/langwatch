@@ -486,7 +486,6 @@ describe("useEvaluatorPickerFlow()", () => {
             ],
             outputs: [
               { identifier: "passed", type: "bool" },
-              { identifier: "details", type: "str" },
             ],
           }),
         }),
@@ -539,7 +538,6 @@ describe("useEvaluatorPickerFlow()", () => {
             ],
             outputs: [
               { identifier: "score", type: "float" },
-              { identifier: "details", type: "str" },
             ],
           }),
         }),

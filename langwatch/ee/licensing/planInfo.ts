@@ -18,7 +18,6 @@ export type PlanInfo = {
   maxTeams: number;
   maxProjects: number;
   maxMessagesPerMonth: number;
-  evaluationsCredit: number;
   maxWorkflows: number;
   maxPrompts: number;
   maxEvaluators: number;

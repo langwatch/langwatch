@@ -1,10 +1,19 @@
-import type { CreateEvaluatorBody, EvaluatorResponse } from "./types";
+import type {
+  CreateEvaluatorBody,
+  DeleteEvaluatorResponse,
+  EvaluatorResponse,
+  UpdateEvaluatorBody,
+} from "./types";
 import {
   createLangWatchApiClient,
   type LangwatchApiClient,
 } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import { EvaluatorsApiError } from "./errors";
+import {
+  extractStatusFromResponse,
+  formatApiErrorForOperation,
+} from "@/client-sdk/services/_shared/format-api-error";
 
 /**
  * Service for retrieving evaluator resources via the LangWatch API.
@@ -19,26 +28,10 @@ export class EvaluatorsApiService {
   }
 
   private handleApiError(operation: string, error: unknown): never {
-    const errorMessage =
-      typeof error === "string"
-        ? error
-        : error != null &&
-            typeof error === "object" &&
-            "error" in error &&
-            error.error != null
-          ? typeof error.error === "string"
-            ? error.error
-            : (error.error as { message?: string }).message ??
-              JSON.stringify(error.error)
-          : error instanceof Error
-            ? error.message
-            : "Unknown error occurred";
-
-    throw new EvaluatorsApiError(
-      `Failed to ${operation}: ${errorMessage}`,
-      operation,
-      error,
-    );
+    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
+      status: extractStatusFromResponse(error),
+    } });
+    throw new EvaluatorsApiError(message, operation, error);
   }
 
   /**
@@ -76,6 +69,37 @@ export class EvaluatorsApiService {
       body: params,
     });
     if (error) this.handleApiError("create evaluator", error);
+    return data;
+  }
+
+  /**
+   * Updates an evaluator by its ID.
+   */
+  async update(id: string, params: UpdateEvaluatorBody): Promise<EvaluatorResponse> {
+    const { data, error } = await this.apiClient.PUT(
+      "/api/evaluators/{id}",
+      {
+        params: { path: { id } },
+        body: params,
+      },
+    );
+    if (error)
+      this.handleApiError(`update evaluator with ID "${id}"`, error);
+    return data;
+  }
+
+  /**
+   * Deletes (archives) an evaluator by its ID.
+   */
+  async delete(id: string): Promise<DeleteEvaluatorResponse> {
+    const { data, error } = await this.apiClient.DELETE(
+      "/api/evaluators/{id}",
+      {
+        params: { path: { id } },
+      },
+    );
+    if (error)
+      this.handleApiError(`delete evaluator with ID "${id}"`, error);
     return data;
   }
 }

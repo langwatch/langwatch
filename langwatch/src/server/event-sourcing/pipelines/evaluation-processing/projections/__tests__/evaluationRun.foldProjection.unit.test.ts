@@ -6,7 +6,7 @@ import type {
   EvaluationReportedEvent,
   EvaluationStartedEvent,
 } from "../../schemas/events";
-import { createEvaluationRunFoldProjection } from "../evaluationRun.foldProjection";
+import { EvaluationRunFoldProjection } from "../evaluationRun.foldProjection";
 
 function createStubStore(): FoldProjectionStore<EvaluationRunData> {
   return {
@@ -16,7 +16,7 @@ function createStubStore(): FoldProjectionStore<EvaluationRunData> {
 }
 
 function createInitState(): EvaluationRunData {
-  const projection = createEvaluationRunFoldProjection({
+  const projection = new EvaluationRunFoldProjection({
     store: createStubStore(),
   });
   return projection.init();
@@ -107,7 +107,7 @@ describe("evaluationRun foldProjection", () => {
   describe("apply()", () => {
     describe("when EvaluationCompletedEvent arrives after EvaluationStartedEvent", () => {
       it("applies completed state normally", () => {
-        const projection = createEvaluationRunFoldProjection({
+        const projection = new EvaluationRunFoldProjection({
           store: createStubStore(),
         });
         const state = createInitState();
@@ -124,23 +124,21 @@ describe("evaluationRun foldProjection", () => {
     });
 
     describe("when EvaluationCompletedEvent arrives with empty evaluationId in state", () => {
-      it("throws an error to trigger retry", () => {
-        const projection = createEvaluationRunFoldProjection({
+      it("falls back to evaluationId from the event", () => {
+        const projection = new EvaluationRunFoldProjection({
           store: createStubStore(),
         });
         const emptyState = createInitState();
 
-        expect(() =>
-          projection.apply(emptyState, createCompletedEvent()),
-        ).toThrow(
-          /Received EvaluationCompletedEvent for evaluation eval-1 but state has no evaluationId/,
-        );
+        const result = projection.apply(emptyState, createCompletedEvent());
+
+        expect(result.evaluationId).toBe("eval-1");
       });
     });
 
     describe("when EvaluationReportedEvent is applied", () => {
       it("sets all fields in one shot", () => {
-        const projection = createEvaluationRunFoldProjection({
+        const projection = new EvaluationRunFoldProjection({
           store: createStubStore(),
         });
         const state = createInitState();
@@ -163,7 +161,7 @@ describe("evaluationRun foldProjection", () => {
       });
 
       it("does not require a prior started event", () => {
-        const projection = createEvaluationRunFoldProjection({
+        const projection = new EvaluationRunFoldProjection({
           store: createStubStore(),
         });
         const emptyState = createInitState();
@@ -174,7 +172,7 @@ describe("evaluationRun foldProjection", () => {
       });
 
       it("defaults optional fields to null or false", () => {
-        const projection = createEvaluationRunFoldProjection({
+        const projection = new EvaluationRunFoldProjection({
           store: createStubStore(),
         });
         const state = createInitState();
@@ -198,7 +196,7 @@ describe("evaluationRun foldProjection", () => {
       });
 
       it("preserves inputs when present", () => {
-        const projection = createEvaluationRunFoldProjection({
+        const projection = new EvaluationRunFoldProjection({
           store: createStubStore(),
         });
         const state = createInitState();
@@ -228,7 +226,7 @@ describe("evaluationRun foldProjection", () => {
       });
 
       it("defaults inputs to null when not provided", () => {
-        const projection = createEvaluationRunFoldProjection({
+        const projection = new EvaluationRunFoldProjection({
           store: createStubStore(),
         });
         const state = createInitState();
@@ -240,7 +238,7 @@ describe("evaluationRun foldProjection", () => {
 
     describe("when EvaluationCompletedEvent has inputs", () => {
       it("preserves inputs in state", () => {
-        const projection = createEvaluationRunFoldProjection({
+        const projection = new EvaluationRunFoldProjection({
           store: createStubStore(),
         });
         const state = createInitState();

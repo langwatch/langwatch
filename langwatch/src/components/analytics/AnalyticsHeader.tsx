@@ -1,6 +1,6 @@
 import { Box, Button, Heading, HStack, Input, Spacer } from "@chakra-ui/react";
 import { Edit2 } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useRef, useState } from "react";
 import { LuListTree } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";

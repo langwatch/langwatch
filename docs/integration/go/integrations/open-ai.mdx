@@ -1,0 +1,85 @@
+---
+title: OpenAI Instrumentation
+sidebarTitle: Go
+description: Instrument OpenAI API calls with the Go SDK to trace LLM interactions, measure performance, and support agent evaluation pipelines.
+icon: golang
+keywords: openai, instrumentation, golang, go, langwatch, middleware, streaming
+---
+
+LangWatch provides automatic instrumentation for the official `openai-go` client library through a dedicated middleware that captures detailed information about your OpenAI API calls.
+
+## Installation
+
+```bash
+go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go
+```
+
+## Usage
+
+<Info>
+Set `LANGWATCH_API_KEY` and `OPENAI_API_KEY` environment variables before running.
+</Info>
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+	"os"
+
+	langwatch "github.com/langwatch/langwatch/sdk-go"
+	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai"
+	"github.com/openai/openai-go"
+	oaioption "github.com/openai/openai-go/option"
+	"go.opentelemetry.io/otel"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+)
+
+func main() {
+	ctx := context.Background()
+
+	// Set up LangWatch exporter
+	exporter, err := langwatch.NewDefaultExporter(ctx)
+	if err != nil {
+		log.Fatalf("failed to create exporter: %v", err)
+	}
+	tp := sdktrace.NewTracerProvider(sdktrace.WithBatcher(exporter))
+	otel.SetTracerProvider(tp)
+	defer tp.Shutdown(ctx) // Critical: ensures traces are flushed
+
+	// Create OpenAI client with LangWatch middleware
+	client := openai.NewClient(
+		oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
+		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
+			otelopenai.WithCaptureInput(),
+			otelopenai.WithCaptureOutput(),
+		)),
+	)
+
+	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
+		Model: openai.ChatModelGPT5,
+		Messages: []openai.ChatCompletionMessageParamUnion{
+			openai.SystemMessage("You are a helpful assistant."),
+			openai.UserMessage("Hello, OpenAI!"),
+		},
+	})
+	if err != nil {
+		log.Fatalf("Chat completion failed: %v", err)
+	}
+
+	log.Printf("Response: %s", response.Choices[0].Message.Content)
+}
+```
+
+The middleware automatically captures request/response content, token usage, and model information. Streaming responses are fully supported and automatically accumulated.
+
+<Warning>
+The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
+</Warning>
+
+## Related
+
+- [Capturing RAG](/integration/python/tutorials/capturing-rag) - Learn how to capture RAG data from retrievers and tools
+- [Capturing Metadata and Attributes](/integration/python/tutorials/capturing-metadata) - Add custom metadata and attributes to your traces and spans
+- [Capturing Evaluations & Guardrails](/integration/python/tutorials/capturing-evaluations-guardrails) - Log evaluations and implement guardrails in your OpenAI applications

@@ -1,0 +1,268 @@
+---
+title: Capturing RAG
+sidebarTitle: TypeScript/JS
+description: Learn how to capture Retrieval-Augmented Generation (RAG) data with LangWatch to support evaluations and agent testing.
+icon: square-js
+keywords: RAG, Retrieval Augmented Generation, LangChain, LangWatch, LangChain RAG, RAG Span, RAG Chunk, RAG Tool
+---
+
+Retrieval Augmented Generation (RAG) is a common pattern in LLM applications where you first retrieve relevant context from a knowledge base and then use that context to generate a response. LangWatch provides specific ways to capture RAG data, enabling better observability and evaluation of your RAG pipelines.
+
+By capturing the `contexts` (retrieved documents) used by the LLM, you unlock several benefits in LangWatch:
+- Specialized RAG evaluators (e.g., Faithfulness, Context Relevancy).
+- Analytics on document usage (e.g., which documents are retrieved most often, which ones lead to better responses).
+- Deeper insights into the retrieval step of your pipeline.
+
+There are two main ways to capture RAG spans: manually creating a RAG span or using framework-specific integrations like the one for LangChain.
+
+## Manual RAG Span Creation
+
+You can manually create a RAG span by using `tracer.withActiveSpan()` with `type: "rag"`. Inside this span, you should perform the retrieval and then update the span with the retrieved contexts.
+
+The `contexts` should be a list of `LangWatchSpanRAGContext` objects. The `LangWatchSpanRAGContext` object allows you to provide more metadata about each retrieved chunk, such as `document_id`, `chunk_id`, and `content`.
+
+Here's an example:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+import type { LangWatchSpanRAGContext } from "langwatch/observability";
+
+// Setup observability
+setupObservability();
+
+const tracer = getLangWatchTracer("rag-example");
+
+async function generateAnswerFromContext(contexts: string[], userQuery: string): Promise<string> {
+  return await tracer.withActiveSpan("GenerateAnswerFromContext", async (span) => {
+    span.setType("llm");
+    span.setRequestModel("gpt-5-mini");
+    
+    // Simulate LLM call using the contexts
+    await new Promise(resolve => setTimeout(resolve, 500));
+    const response = `Based on the context, the answer to '${userQuery}' is...`;
+    
+    // You can update the LLM span with model details, token counts, etc.
+    span.setInput("text", `Contexts: ${contexts.join(", ")}\nQuery: ${userQuery}`);
+    span.setOutput("text", response);
+    
+    return response;
+  });
+}
+
+async function performRAG(userQuery: string): Promise<string> {
+  return await tracer.withActiveSpan("My Custom RAG Process", async (span) => {
+    span.setType("rag");
+    
+    // 1. Retrieve contexts
+    // Simulate retrieval from a vector store or other source
+    await new Promise(resolve => setTimeout(resolve, 300));
+    const retrievedDocs = [
+      "LangWatch helps monitor LLM applications.",
+      "RAG combines retrieval with generation for better answers.",
+      "TypeScript is a popular language for AI development."
+    ];
+
+    // Update the current RAG span with the retrieved contexts
+    // You can pass a list of strings directly
+    const ragContexts: LangWatchSpanRAGContext[] = retrievedDocs.map((content, index) => ({
+      document_id: `doc${index + 1}`,
+      chunk_id: `chunk${index + 1}`,
+      content
+    }));
+    
+    span.setRAGContexts(ragContexts);
+
+    // Alternatively, for simpler context information:
+    // span.setRAGContexts(retrievedDocs.map(content => ({
+    //   document_id: "unknown",
+    //   chunk_id: "unknown", 
+    //   content
+    // })));
+
+    // 2. Generate answer using the contexts
+    const finalAnswer = await generateAnswerFromContext(contexts: retrievedDocs, userQuery: userQuery);
+
+    // The RAG span automatically captures its input (userQuery) and output (finalAnswer)
+    // if dataCapture is not set to "none".
+    return finalAnswer;
+  });
+}
+
+async function handleUserQuestion(question: string): Promise<string> {
+  return await tracer.withActiveSpan("User Question Handler", async (span) => {
+    span.setInput("text", question);
+    span.setAttributes({ "user_id": "example_user_123" });
+
+    const answer = await performRAG(userQuery: question);
+
+    span.setOutput("text", answer);
+    return answer;
+  });
+}
+
+// Example usage
+async function main() {
+  const userQuestion = "What is LangWatch used for?";
+  const response = await handleUserQuestion(userQuestion);
+  console.log(`Question: ${userQuestion}`);
+  console.log(`Answer: ${response}`);
+}
+
+main().catch(console.error);
+```
+
+In this example:
+1.  `performRAG` uses `tracer.withActiveSpan()` with `type: "rag"`.
+2.  Inside `performRAG`, we simulate a retrieval step.
+3.  `span.setRAGContexts(ragContexts)` is called to explicitly log the retrieved documents.
+4.  The generation step (`generateAnswerFromContext`) is called, which itself can be another span (e.g., an LLM span).
+
+## Advanced RAG Patterns
+
+### Multiple Retrieval Sources
+
+You can capture RAG contexts from multiple sources in a single span:
+
+```typescript
+async function multiSourceRAG(query: string): Promise<string> {
+  return await tracer.withActiveSpan("Multi-Source RAG", async (span) => {
+    span.setType("rag");
+    
+    // Simulate retrieval from multiple sources
+    const vectorStoreContexts: LangWatchSpanRAGContext[] = [
+      {
+        document_id: "vector_doc_1",
+        chunk_id: "vector_chunk_1",
+        content: "Information from vector store"
+      }
+    ];
+    
+    const databaseContexts: LangWatchSpanRAGContext[] = [
+      {
+        document_id: "db_doc_1", 
+        chunk_id: "db_chunk_1",
+        content: "Information from database"
+      }
+    ];
+    
+    const apiContexts: LangWatchSpanRAGContext[] = [
+      {
+        document_id: "api_doc_1",
+        chunk_id: "api_chunk_1", 
+        content: "Information from API"
+      }
+    ];
+    
+    // Combine all contexts
+    const allContexts = [
+      ...vectorStoreContexts,
+      ...databaseContexts,
+      ...apiContexts
+    ];
+    
+    span.setRAGContexts(allContexts);
+    
+    // Generate response using all contexts
+    const response = `Based on ${allContexts.length} sources: ${query}`;
+    return response;
+  });
+}
+```
+
+### RAG with Metadata
+
+You can include additional metadata in your RAG contexts:
+
+```typescript
+async function ragWithMetadata(query: string): Promise<string> {
+  return await tracer.withActiveSpan("RAG with Metadata", async (span) => {
+    span.setType("rag");
+    
+    const contexts: LangWatchSpanRAGContext[] = [
+      {
+        document_id: "doc_123",
+        chunk_id: "chunk_456",
+        content: "Relevant content here"
+      }
+    ];
+    
+    // Add additional metadata to the span
+    span.setAttributes({
+      "rag.source": "vector_store",
+      "rag.retrieval_method": "semantic_search",
+      "rag.top_k": 5,
+      "rag.threshold": 0.7
+    });
+    
+    span.setRAGContexts(contexts);
+    
+    const response = `Based on the retrieved context: ${query}`;
+    return response;
+  });
+}
+```
+
+## Error Handling
+
+When working with RAG operations, it's important to handle errors gracefully and capture error information in your spans:
+
+```typescript
+async function robustRAGRetrieval(query: string): Promise<LangWatchSpanRAGContext[]> {
+  return await tracer.withActiveSpan("Robust RAG Retrieval", async (span) => {
+    span.setType("rag");
+    span.setInput("text", query);
+    
+    try {
+      // Simulate retrieval that might fail
+      const retrievedContexts: LangWatchSpanRAGContext[] = [
+        {
+          document_id: "doc_123",
+          chunk_id: "chunk_456",
+          content: "Relevant information from document 123"
+        }
+      ];
+      
+      span.setRAGContexts(retrievedContexts);
+      span.setOutput("json", { status: "success", count: retrievedContexts.length });
+      
+      return retrievedContexts;
+    } catch (error) {
+      // Capture error information in the span
+      span.setOutput("json", { 
+        status: "error", 
+        error_message: error instanceof Error ? error.message : String(error),
+        error_type: error instanceof Error ? error.constructor.name : typeof error
+      });
+      
+      // Re-throw the error (withActiveSpan will automatically mark the span as ERROR)
+      throw error;
+    }
+  });
+}
+```
+
+## Best Practices
+
+1. **Use Descriptive Span Names**: Name your RAG spans clearly to identify the retrieval method or source.
+2. **Include Metadata**: Add relevant attributes like retrieval method, thresholds, or source information.
+3. **Handle Errors Gracefully**: Wrap RAG operations in try-catch blocks and capture error information.
+4. **Optimize Context Size**: Be mindful of the size of context content to avoid performance issues.
+5. **Use Consistent Document IDs**: Use consistent naming conventions for document and chunk IDs.
+6. **Control Data Capture**: Use data capture configuration to manage what gets captured in sensitive operations.
+
+By effectively capturing RAG spans, you gain much richer data in LangWatch, enabling more powerful analysis and evaluation of your RAG systems. Refer to the SDK examples for more detailed implementations.
+
+## Related Documentation
+
+For more advanced RAG patterns and framework-specific implementations:
+
+- **[Integration Guide](/integration/typescript/guide)** - Basic setup and core concepts
+- **[Manual Instrumentation](/integration/typescript/tutorials/manual-instrumentation)** - Advanced span management for RAG pipelines
+- **[Semantic Conventions](/integration/typescript/tutorials/semantic-conventions)** - RAG-specific attributes and naming conventions
+- **[LangChain Integration](/integration/typescript/integrations/langchain)** - Automatic RAG instrumentation with LangChain
+- **[Capturing Metadata](/integration/typescript/tutorials/capturing-metadata)** - Adding custom metadata to RAG contexts
+
+<Tip>
+For production RAG applications, combine manual RAG spans with [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) for consistent observability and better analytics.
+</Tip>

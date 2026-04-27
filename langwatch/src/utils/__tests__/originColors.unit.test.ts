@@ -27,19 +27,27 @@ describe("originColors", () => {
       });
     });
 
-    it("returns purple for playground origin", () => {
+    it("returns teal for playground origin", () => {
       const result = getOriginColor("playground");
+      expect(result).toEqual({
+        background: "teal.subtle",
+        color: "teal.emphasized",
+      });
+    });
+
+    it("returns purple for gateway origin", () => {
+      const result = getOriginColor("gateway");
       expect(result).toEqual({
         background: "purple.subtle",
         color: "purple.emphasized",
       });
     });
 
-    it("returns teal for workflow origin", () => {
+    it("returns cyan for workflow origin", () => {
       const result = getOriginColor("workflow");
       expect(result).toEqual({
-        background: "teal.subtle",
-        color: "teal.emphasized",
+        background: "cyan.subtle",
+        color: "cyan.emphasized",
       });
     });
 

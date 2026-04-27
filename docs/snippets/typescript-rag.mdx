@@ -1,0 +1,31 @@
+To capture a RAG, you can simply start a RAG span inside the trace, giving it the input query being used:
+
+```typescript
+const ragSpan = trace.startRAGSpan({
+  name: "my-vectordb-retrieval", // optional
+  input: { type: "text", value: "search query" },
+});
+
+// proceed to do the retrieval normally
+```
+
+Then, after doing the retrieval, you can end the RAG span with the contexts that were retrieved and will be used by the LLM:
+
+```typescript
+ragSpan.end({
+  contexts: [
+    {
+      documentId: "doc1",
+      content: "document chunk 1",
+    },
+    {
+      documentId: "doc2",
+      content: "document chunk 2",
+    },
+  ],
+});
+```
+
+<Note>
+On LangChain.js, RAG spans are captured automatically by the LangWatch callback when using LangChain Retrievers, with `source` as the documentId.
+</Note>

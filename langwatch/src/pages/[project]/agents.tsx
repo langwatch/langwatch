@@ -7,9 +7,10 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Bot, Plus } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useState } from "react";
 import { AgentCard } from "~/components/agents/AgentCard";
+import { getAgentEditorDrawer } from "~/components/agents/getAgentEditorDrawer";
 import { CopyAgentDialog } from "~/components/agents/CopyAgentDialog";
 import { PushToCopiesDialog } from "~/components/agents/PushToCopiesDialog";
 import { CascadeArchiveDialog } from "~/components/CascadeArchiveDialog";
@@ -21,6 +22,7 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { TypedAgent } from "~/server/agents/agent.repository";
 import { api } from "~/utils/api";
+import { isHandledByGlobalHandler } from "~/utils/trpcError";
 
 /**
  * Agents management page
@@ -35,7 +37,6 @@ function Page() {
   const utils = api.useContext();
   const router = useRouter();
 
-  const hasEvaluationsManagePermission = hasPermission("evaluations:manage");
 
   // State for tracking which agent is being deleted
   const [agentToDelete, setAgentToDelete] = useState<TypedAgent | null>(null);
@@ -63,6 +64,7 @@ function Page() {
       });
     },
     onError: (error) => {
+      if (isHandledByGlobalHandler(error)) return;
       toaster.create({
         title: "Error updating agent",
         description: error.message ?? "Please try again later.",
@@ -122,22 +124,9 @@ function Page() {
   });
 
   const handleEditAgent = (agent: TypedAgent) => {
-    // Open the appropriate editor based on agent type
-    switch (agent.type) {
-      case "code":
-        openDrawer("agentCodeEditor", { urlParams: { agentId: agent.id } });
-        break;
-      case "http":
-        openDrawer("agentHttpEditor", { urlParams: { agentId: agent.id } });
-        break;
-      case "workflow":
-        // Workflow agents can't be edited directly, just view
-        openDrawer("workflowSelector", { urlParams: { agentId: agent.id } });
-        break;
-      default: {
-        throw new Error(`Unhandled agent type: ${agent.type}`);
-      }
-    }
+    openDrawer(getAgentEditorDrawer(agent.type), {
+      urlParams: { agentId: agent.id },
+    });
   };
 
   const handleDeleteAgent = (agent: TypedAgent) => {
@@ -256,7 +245,6 @@ function Page() {
                     urlParams: { agentId: agent.id, agentName: agent.name },
                   })
                 }
-                hasEvaluationsManagePermission={hasEvaluationsManagePermission}
               />
             ))}
           </Grid>

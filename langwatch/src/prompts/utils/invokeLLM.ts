@@ -185,6 +185,7 @@ function createEventPayload(
       workflow,
       node_id: nodeId,
       inputs,
+      origin: "playground",
     },
   };
 }

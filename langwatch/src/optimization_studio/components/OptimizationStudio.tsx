@@ -22,7 +22,7 @@ import { DndProvider, useDrop } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
 import "@xyflow/react/dist/style.css";
-import Head from "next/head";
+import Head from "~/utils/compat/next-head";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BarChart2 } from "react-feather";
 import {
@@ -98,6 +98,7 @@ export default function OptimizationStudio() {
     onNodesDelete,
     onEdgesChange,
     onConnect,
+    setIsDraggingNode,
     openResultsPanelRequest,
     setOpenResultsPanelRequest,
     executionStatus,
@@ -115,6 +116,7 @@ export default function OptimizationStudio() {
         onNodesDelete: state.onNodesDelete,
         onEdgesChange: state.onEdgesChange,
         onConnect: state.onConnect,
+        setIsDraggingNode: state.setIsDraggingNode,
         openResultsPanelRequest: state.openResultsPanelRequest,
         setOpenResultsPanelRequest: state.setOpenResultsPanelRequest,
         executionStatus: state.state.execution?.status,
@@ -308,6 +310,13 @@ export default function OptimizationStudio() {
                                   },
                                 });
                               }
+                            }}
+                            selectNodesOnDrag={false}
+                            onNodeDragStart={() => {
+                              setIsDraggingNode(true);
+                            }}
+                            onNodeDragStop={() => {
+                              setIsDraggingNode(false);
                             }}
                             onPaneClick={() => {
                               if (currentDrawer) closeDrawer();

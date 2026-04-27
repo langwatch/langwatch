@@ -1,4 +1,4 @@
-import { getClickHouseClient } from "../../../src/server/clickhouse/client";
+import { getClickHouseClientForOrganization, getClickHouseClientForProject } from "../../../src/server/clickhouse/clickhouseClient";
 import { createLogger } from "~/utils/logger/server";
 
 const logger = createLogger("langwatch:billing:billableEventsQuery");
@@ -48,7 +48,7 @@ export async function queryBillableEventsTotal({
   organizationId: string;
   billingMonth: string;
 }): Promise<number | null> {
-  const client = getClickHouseClient();
+  const client = await getClickHouseClientForOrganization(organizationId);
   if (!client) {
     logger.warn(
       { organizationId },
@@ -88,7 +88,7 @@ export async function queryBillableEventsTotalUniq({
   organizationId: string;
   billingMonth: string;
 }): Promise<number | null> {
-  const client = getClickHouseClient();
+  const client = await getClickHouseClientForOrganization(organizationId);
   if (!client) {
     logger.warn(
       { organizationId },
@@ -132,7 +132,7 @@ export async function queryTraceSummariesTotalUniq({
     return 0;
   }
 
-  const client = getClickHouseClient();
+  const client = await getClickHouseClientForProject(projectIds[0]!);
   if (!client) {
     logger.warn(
       { projectIds },
@@ -172,7 +172,7 @@ export async function queryBillableEventsByProjectApprox({
   organizationId: string;
   billingMonth: string;
 }): Promise<Array<{ projectId: string; count: number }>> {
-  const client = getClickHouseClient();
+  const client = await getClickHouseClientForOrganization(organizationId);
   if (!client) {
     logger.warn(
       { organizationId },
@@ -215,7 +215,7 @@ export async function queryBillableEventsByProject({
   organizationId: string;
   billingMonth: string;
 }): Promise<Array<{ projectId: string; count: number }>> {
-  const client = getClickHouseClient();
+  const client = await getClickHouseClientForOrganization(organizationId);
   if (!client) {
     logger.warn(
       { organizationId },

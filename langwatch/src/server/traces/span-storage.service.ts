@@ -1,5 +1,5 @@
 import type { Span } from "~/server/tracer/types";
-import { getClickHouseClient } from "~/server/clickhouse/client";
+import { isClickHouseEnabled, getClickHouseClientForProject } from "~/server/clickhouse/clickhouseClient";
 import {
   SpanStorageClickHouseRepository,
   type SpanStorageRepository,
@@ -15,15 +15,23 @@ class NullSpanStorageRepository implements SpanStorageRepository {
 }
 
 export class SpanStorageService {
-  constructor(private readonly repository: SpanStorageRepository) {}
+  private readonly useClickHouse: boolean;
+
+  constructor(private readonly repository: SpanStorageRepository | null, clickHouseAvailable: boolean) {
+    this.useClickHouse = clickHouseAvailable;
+  }
 
   static create(): SpanStorageService {
-    const client = getClickHouseClient();
-    if (!client) return new SpanStorageService(new NullSpanStorageRepository());
-    return new SpanStorageService(new SpanStorageClickHouseRepository(client));
+    return new SpanStorageService(null, isClickHouseEnabled());
   }
 
   async getSpansByTraceId(tenantId: string, traceId: string): Promise<Span[]> {
-    return this.repository.getSpansByTraceId(tenantId, traceId);
+    if (!this.useClickHouse) {
+      return [];
+    }
+    const client = await getClickHouseClientForProject(tenantId);
+    if (!client) return [];
+    const repo = new SpanStorageClickHouseRepository(client);
+    return repo.getSpansByTraceId(tenantId, traceId);
   }
 }

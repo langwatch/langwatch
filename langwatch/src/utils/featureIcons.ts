@@ -10,6 +10,7 @@ import {
   FileText,
   FolderOpen,
   Home,
+  KeyRound,
   ListTree,
   type LucideIcon,
   Pencil,
@@ -18,6 +19,7 @@ import {
   PlayCircle,
   Settings,
   Table,
+  TrainFront,
   TrendingUp,
   Workflow,
 } from "lucide-react";
@@ -37,7 +39,8 @@ export type FeatureKey =
   | "annotations"
   | "settings"
   | "agents"
-  | "evaluators";
+  | "evaluators"
+  | "gateway";
 
 export type FeatureConfig = {
   icon: LucideIcon;
@@ -78,7 +81,7 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
   simulation_runs: {
     icon: PlayCircle,
     color: "pink.500",
-    label: "Run History",
+    label: "Runs",
   },
   suites: {
     icon: FolderOpen,
@@ -124,6 +127,11 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     icon: Percent,
     color: "green.500",
     label: "Evaluators",
+  },
+  gateway: {
+    icon: TrainFront,
+    color: "orange.500",
+    label: "AI Gateway",
   },
 };
 

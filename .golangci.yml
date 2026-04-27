@@ -1,0 +1,143 @@
+version: "2"
+
+run:
+  timeout: 5m
+  modules-download-mode: readonly
+  # Pin analysis target to the highest Go version golangci-lint v2.11.4 was
+  # built with (1.25). Without this, lint refuses to analyze code whose
+  # go.mod targets a newer Go than the linter's own build toolchain.
+  # Track upstream: golangci-lint follows "latest-1" — bump when v2.x ships
+  # built with go1.26.
+  go: "1.25"
+
+linters:
+  # ── Defaults (always on) ───────────────────────────────────────────────
+  #   errcheck, govet, ineffassign, staticcheck, unused
+  #
+  # ── Additional linters, grouped by intent ──────────────────────────────
+  enable:
+    # Bug prevention — these catch real production issues.
+    - bodyclose        # unclosed HTTP response bodies leak file descriptors
+    - durationcheck    # duration × duration is always wrong
+    - exhaustive       # missing enum cases in switches
+    - fatcontext       # context.WithValue in a loop leaks memory
+    - nilerr           # returning nil when err != nil
+    - nilnesserr       # checking err but returning a different nil
+    - noctx            # HTTP requests without context.Context
+    - spancheck        # OTel spans not ended or status not set
+    - sqlclosecheck    # unclosed sql.Rows / Stmt
+
+    # Code quality — reduces accidental complexity.
+    - gocritic         # broad opinionated diagnostics
+    - unconvert        # useless type conversions
+    - unparam          # unused function parameters (dead API surface)
+    - wastedassign     # writes never read
+    - recvcheck        # mixed pointer/value receivers on same type
+    - errorlint        # correct use of errors.Is/As
+
+    # Security — static analysis for vulnerabilities.
+    - gosec            # inspects source code for security problems
+
+    # Hygiene — keeps the codebase tidy.
+    - dupword          # repeated words in comments
+    - misspell         # typos in identifiers and comments
+    - nolintlint       # nolint directives must be specific + explained
+    - predeclared      # shadowing builtins (nil, len, cap, etc.)
+    - tagalign         # aligned, consistently ordered struct tags
+    - usestdlibvars    # http.MethodGet instead of "GET", etc.
+    - whitespace       # stray blank lines at start/end of blocks
+
+    # Testing — better assertions and helpers.
+    - testifylint      # idiomatic testify usage
+    - thelper          # test helpers missing t.Helper()
+    - usetesting       # prefer testing pkg equivalents
+
+  settings:
+    gocritic:
+      enabled-tags:
+        - diagnostic
+        - performance
+      disabled-checks:
+        - ifElseChain       # style preference, not a defect
+        - hugeParam         # too noisy with domain structs
+
+    exhaustive:
+      default-signifies-exhaustive: true
+
+    errorlint:
+      asserts: false  # type assertions on error are fine internally
+
+    misspell:
+      locale: US
+
+    spancheck:
+      checks:
+        - end
+        - set-status
+
+    testifylint:
+      enable:
+        - error-is-as
+        - require-error
+        - contains
+        - empty
+
+    gosec:
+      excludes:
+        - G101  # false positives on OTel attribute names and test tokens
+        - G104  # already covered by errcheck
+        - G115  # integer narrowing — reviewed case-by-case
+        - G304  # file path from variable is fine in a server
+        - G602  # slice bounds — guarded by upstream length checks
+        - G705  # XSS — gateway proxies JSON/SSE, not HTML
+
+    tagalign:
+      align: true
+      sort: true
+      order:
+        - json
+        - yaml
+        - env
+        - validate
+
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+
+  exclusions:
+    presets:
+      - common-false-positives
+      - std-error-handling
+
+    rules:
+      # Tests: relax rules that trade readability for strictness.
+      - path: _test\.go
+        linters:
+          - errcheck
+          - noctx
+          - unparam
+          - bodyclose
+
+      # paramTypeCombine is style, not a bug.
+      - linters:
+          - gocritic
+        text: "paramTypeCombine"
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
+
+  settings:
+    goimports:
+      local-prefixes:
+        - github.com/langwatch/langwatch
+
+  exclusions:
+    paths:
+      - vendor
+      - node_modules

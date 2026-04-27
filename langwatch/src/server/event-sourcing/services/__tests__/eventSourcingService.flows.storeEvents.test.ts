@@ -49,7 +49,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
     });
 
-    it("logs publishing errors but does not fail storage operation", async () => {
+    it("logs projection dispatch errors but does not fail storage operation", async () => {
       const eventStore = createMockEventStore<Event>();
       const logger = {
         debug: vi.fn(),
@@ -63,12 +63,17 @@ describe("EventSourcingService - Store Events Flow", () => {
         silent: false,
       };
 
-      const publishError = new Error("Publishing failed");
+      // Create a map projection that throws to trigger the error logging path
+      const failingMapDef = createMockMapProjectionDefinition("failing-handler");
+      (failingMapDef.map as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new Error("Projection dispatch failed");
+      });
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
         aggregateType,
         eventStore,
+        mapProjections: [failingMapDef],
         logger: logger as any,
       });
 
@@ -87,9 +92,8 @@ describe("EventSourcingService - Store Events Flow", () => {
         expect.objectContaining({
           aggregateType,
           eventCount: 1,
-          error: "Publishing failed",
         }),
-        "Failed to publish events to external system",
+        "Failed to dispatch events to projections",
       );
     });
   });
@@ -335,7 +339,7 @@ describe("EventSourcingService - Store Events Flow", () => {
       expect(callOrder[1]).toBe("projection");
       expect(callOrder[2]).toBe("storeProjection");
       expect(callOrder[3]).toBe("handler");
-      expect(callOrder.length).toBeGreaterThanOrEqual(5);
+      expect(callOrder.length).toBeGreaterThanOrEqual(4);
     });
 
     it("works with all components configured together", async () => {

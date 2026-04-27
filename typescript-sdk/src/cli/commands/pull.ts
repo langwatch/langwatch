@@ -11,6 +11,7 @@ import type { PromptsConfig, PromptsLock, SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 /**
  * Core pull logic: fetches remote prompts and materializes them locally.
@@ -21,11 +22,13 @@ export const pullPrompts = async ({
   lock,
   promptsApiService,
   result,
+  tag,
 }: {
   config: PromptsConfig;
   lock: PromptsLock;
   promptsApiService: PromptsApiService;
   result: SyncResult;
+  tag?: string;
 }): Promise<void> => {
   const remoteDeps = Object.entries(config.prompts).filter(
     ([, dependency]) => {
@@ -51,9 +54,13 @@ export const pullPrompts = async ({
             ? dependency
             : dependency.version ?? "latest";
 
+        const displaySpec = tag ?? versionSpec;
+
         const lockEntry = lock.prompts[name];
 
-        const prompt = await promptsApiService.get(name, { version: versionSpec });
+        const prompt = tag
+          ? await promptsApiService.get(name, { tag })
+          : await promptsApiService.get(name, { version: versionSpec });
 
         if (prompt) {
           const needsUpdate =
@@ -73,7 +80,7 @@ export const pullPrompts = async ({
             result.fetched.push({
               name,
               version: prompt.version,
-              versionSpec,
+              versionSpec: displaySpec,
             });
 
             FileManager.updateLockEntry(
@@ -84,7 +91,7 @@ export const pullPrompts = async ({
             );
 
             fetchSpinner.text = `Fetched ${chalk.cyan(
-              `${name}@${versionSpec}`
+              `${name}@${displaySpec}`
             )} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(
               relativePath
             )}`;
@@ -96,7 +103,7 @@ export const pullPrompts = async ({
         }
       } catch (error) {
         const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
+          formatApiErrorMessage({ error });
         result.errors.push({ name, error: errorMessage });
       }
     }
@@ -164,7 +171,7 @@ const printPullResults = ({
 
   if (result.errors.length > 0) {
     for (const { name, error } of result.errors) {
-      console.log(chalk.red(`✗ Failed ${chalk.cyan(name)}: ${error}`));
+      console.error(chalk.red(`✗ Failed ${chalk.cyan(name)}: ${error}`));
     }
   }
 
@@ -185,7 +192,7 @@ const printPullResults = ({
   }
 };
 
-export const pullCommand = async (): Promise<void> => {
+export const pullCommand = async (options?: { tag?: string }): Promise<void> => {
   console.log("⬇️  Pulling remote prompts...");
 
   const startTime = Date.now();
@@ -208,7 +215,7 @@ export const pullCommand = async (): Promise<void> => {
       errors: [],
     };
 
-    await pullPrompts({ config, lock, promptsApiService, result });
+    await pullPrompts({ config, lock, promptsApiService, result, tag: options?.tag });
 
     FileManager.savePromptsLock(lock);
 
@@ -225,7 +232,7 @@ export const pullCommand = async (): Promise<void> => {
       console.error(
         chalk.red(
           `Unexpected error: ${
-            error instanceof Error ? error.message : "Unknown error"
+            formatApiErrorMessage({ error })
           }`
         )
       );

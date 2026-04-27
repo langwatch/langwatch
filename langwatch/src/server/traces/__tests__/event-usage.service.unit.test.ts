@@ -4,10 +4,10 @@ import { EventUsageService } from "../event-usage.service";
 const mockQueryBillableEventsTotalUniq = vi.fn();
 const mockQueryBillableEventsByProjectApprox = vi.fn();
 const mockGetBillingMonth = vi.fn().mockReturnValue("2026-03");
-const mockGetClickHouseClient = vi.fn();
+const mockIsClickHouseEnabled = vi.fn();
 
-vi.mock("~/server/clickhouse/client", () => ({
-  getClickHouseClient: () => mockGetClickHouseClient(),
+vi.mock("~/server/clickhouse/clickhouseClient", () => ({
+  isClickHouseEnabled: () => mockIsClickHouseEnabled(),
 }));
 
 vi.mock("../../../../ee/billing/services/billableEventsQuery", () => ({
@@ -23,7 +23,7 @@ describe("EventUsageService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetClickHouseClient.mockReturnValue({});
+    mockIsClickHouseEnabled.mockReturnValue(true);
     service = new EventUsageService();
   });
 
@@ -54,7 +54,7 @@ describe("EventUsageService", () => {
 
     describe("when ClickHouse is unavailable", () => {
       it("returns 0 (fail-open)", async () => {
-        mockGetClickHouseClient.mockReturnValue(null);
+        mockIsClickHouseEnabled.mockReturnValue(false);
 
         const result = await service.getCurrentMonthCount({
           organizationId: "org-1",
@@ -114,7 +114,7 @@ describe("EventUsageService", () => {
 
     describe("when ClickHouse is unavailable", () => {
       it("returns zeros for all projects (fail-open)", async () => {
-        mockGetClickHouseClient.mockReturnValue(null);
+        mockIsClickHouseEnabled.mockReturnValue(false);
 
         const result = await service.getCountByProjects({
           organizationId: "org-1",
