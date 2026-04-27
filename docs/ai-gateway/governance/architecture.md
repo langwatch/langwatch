@@ -318,13 +318,13 @@ docs/ai-gateway/self-hosting/                        # Operator docs
 
 - [`gateway.md`](https://github.com/langwatch/langwatch) — full
   product strategy doc that drives this architecture.
-- [`feature-flag-gating.feature`](../../../specs/ai-gateway/governance/feature-flag-gating.feature)
+- [`feature-flag-gating.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/feature-flag-gating.feature)
   — the single-flag / single-env-var contract.
-- [`activity-monitor.feature`](../../../specs/ai-gateway/governance/activity-monitor.feature)
+- [`activity-monitor.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/activity-monitor.feature)
   — admin-side oversight UI contract.
-- [`ingestion-sources.feature`](../../../specs/ai-gateway/governance/ingestion-sources.feature)
+- [`ingestion-sources.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/governance/ingestion-sources.feature)
   — admin-side IngestionSource setup forms + lifecycle.
-- [`personal-keys-deployment.feature`](../../../specs/ai-gateway/self-hosting/personal-keys-deployment.feature)
+- [`personal-keys-deployment.feature`](https://github.com/langwatch/langwatch/blob/main/specs/ai-gateway/self-hosting/personal-keys-deployment.feature)
   — self-host deployment contract for the personal-keys flow.
 - [`admin-setup.mdx`](./admin-setup.mdx) — admin's day-1 walkthrough.
 - [`personal-keys.mdx`](./personal-keys.mdx) — end-user dev story.
