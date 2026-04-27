@@ -175,6 +175,59 @@ func decodeStudioClientEvent(r *http.Request, body []byte) (*app.WorkflowRequest
 	}, nil
 }
 
+// peekStudioControlEventType returns "is_alive" or "stop_execution"
+// when the body is one of the bare Studio control envelopes that
+// short-circuit before workflow decode. Returns "" for any other type
+// (including execute_*) so the caller falls through to the normal
+// engine path. Tolerates malformed JSON by returning "" — the regular
+// decoder downstream will surface the structured error.
+func peekStudioControlEventType(body []byte) string {
+	var peek struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(body, &peek); err != nil {
+		return ""
+	}
+	switch peek.Type {
+	case "is_alive", "stop_execution":
+		return peek.Type
+	default:
+		return ""
+	}
+}
+
+// emitStudioControlEvent writes the SSE response for a Studio control
+// event. Mirrors the Python sidecar contract:
+//   - is_alive       → `is_alive_response` then `done`
+//   - stop_execution → `done` only
+//
+// We write the SSE headers and a 200 ourselves rather than going
+// through the full executeStreamHandler boilerplate so the control
+// path stays cheap (no engine, no heartbeat goroutine, no streamCtx)
+// and so the response shape can't accidentally diverge from the bare
+// frames Studio's TS reducer expects.
+func emitStudioControlEvent(w http.ResponseWriter, eventType string) {
+	flusher, ok := w.(http.Flusher)
+	if !ok {
+		// Same flusher constraint as the main path; surface a
+		// structured error before any 200 OK lands on the wire.
+		herr.WriteHTTP(w, herr.New(context.Background(), domain.ErrInternal, herr.M{
+			"reason": "no_flusher",
+		}, errors.New("response writer does not support flushing")))
+		return
+	}
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	if eventType == "is_alive" {
+		writeSSE(w, flusher, "is_alive_response", nil)
+	}
+	writeSSE(w, flusher, "done", nil)
+}
+
 // withOrigin is a small wrapper around llmexecutor.WithOrigin so the
 // adapter can shed the executor import if we later move origin
 // propagation into the engine layer (where it arguably belongs).
@@ -222,6 +275,24 @@ func executeStreamHandler(application *app.App) http.HandlerFunc {
 			}, err))
 			return
 		}
+		// Studio fires `is_alive` (every ~7s) and `stop_execution` (on
+		// user-initiated stop) as bare control events with no workflow
+		// body. Pre-fix these went to the legacy `/studio/execute` path
+		// and broke Studio UX whenever the Python sidecar wasn't running
+		// (the post-100% target topology) — see PR #3483 dogfood
+		// finding. Short-circuit before workflow decode and answer with
+		// the same SSE frames the Python sidecar emits today: an
+		// `is_alive_response` (the heartbeat pong Studio's
+		// usePostEvent.tsx switches on) followed by `done`. For
+		// `stop_execution` we emit `done` only — there's no in-process
+		// execution to cancel since each request is independent; the
+		// real cancel happens on the next /go/studio/execute via
+		// client-context disconnection.
+		if peeked := peekStudioControlEventType(body); peeked != "" {
+			emitStudioControlEvent(w, peeked)
+			return
+		}
+
 		req, herrErr := decodeStudioClientEvent(r, body)
 		if herrErr != nil {
 			herr.WriteHTTP(w, *herrErr)

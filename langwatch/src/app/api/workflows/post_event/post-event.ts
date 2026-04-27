@@ -10,16 +10,24 @@ import { createLogger } from "../../../../utils/logger/server";
 
 const logger = createLogger("langwatch:post_event");
 
-/** Event types the Go engine handles natively. Others (is_alive,
- *  stop_execution, execute_optimization) keep going to the Python sidecar
- *  even when the FF is on — `is_alive` and `stop_execution` are
- *  Studio-control plumbing that hasn't been ported yet, and
- *  `execute_optimization` is intentionally rejected at the route layer
- *  with a 410 (DSPy is gone). */
+/** Event types the Go engine handles natively when the FF is on. The
+ *  only outlier is `execute_optimization`, intentionally rejected at
+ *  the route layer with 410 (DSPy is gone). Studio fires `is_alive`
+ *  every ~7s as a heartbeat and `stop_execution` when the user clicks
+ *  Stop — if either of those still routes to the legacy
+ *  `/studio/execute` path while the engine is on `/go/`, an operator
+ *  running without the Python sidecar (the post-100% target topology)
+ *  gets a perpetual "Connecting…" status plus a misleading "Bad Gateway
+ *  child upstream unavailable" toast every heartbeat tick. So both
+ *  passthrough types belong on the Go path; nlpgo answers them with
+ *  bare SSE frames (see executeStreamHandler in
+ *  services/nlpgo/adapters/httpapi/handlers.go). */
 const GO_ENGINE_EVENT_TYPES = new Set([
   "execute_flow",
   "execute_component",
   "execute_evaluation",
+  "is_alive",
+  "stop_execution",
 ]);
 
 export const studioBackendPostEvent = async ({
