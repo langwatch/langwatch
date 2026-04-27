@@ -40,7 +40,16 @@ fi
 # Configure via SERVER_ADDR (parent) and NLPGO_CHILD_* (uvicorn args).
 export SERVER_ADDR=":$PORT"
 export NLPGO_CHILD_COMMAND="${NLPGO_CHILD_COMMAND:-uv}"
-export NLPGO_CHILD_ARGS="${NLPGO_CHILD_ARGS:---no-cache,run,--no-sync,--no-editable,uvicorn,langwatch_nlp.main:app,--host,127.0.0.1,--port,5561,--timeout-keep-alive,$KEEP_ALIVE}"
+# Space-separated, NOT comma-separated: services/nlpgo/deps.go's
+# splitArgs() splits on space/tab. Original entrypoint shipped commas
+# (a4de2dc95) which silently broke the uvicorn child on every container
+# start — uv would see "--no-cache,run,..." as a single positional
+# argument and exit 2 before serving anything. Caught smoke-testing
+# the lambda image during the PR #3483 deploy pre-flight: nlpgo started
+# fine, /go/* worked, but the child never came up so anything that
+# fell through to legacy /studio/* /api/* paths got 502. Anchored on
+# spaces here to match the deps.go contract.
+export NLPGO_CHILD_ARGS="${NLPGO_CHILD_ARGS:---no-cache run --no-sync --no-editable uvicorn langwatch_nlp.main:app --host 127.0.0.1 --port 5561 --timeout-keep-alive $KEEP_ALIVE}"
 export NLPGO_CHILD_HEALTH_URL="${NLPGO_CHILD_HEALTH_URL:-http://127.0.0.1:5561/health}"
 export NLPGO_CHILD_UPSTREAM_URL="${NLPGO_CHILD_UPSTREAM_URL:-http://127.0.0.1:5561}"
 

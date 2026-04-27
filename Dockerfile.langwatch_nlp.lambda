@@ -4,7 +4,14 @@ FROM ${LAMBDA_ADAPTER_IMAGE} AS lambda-adapter
 # Build the nlpgo Go binary. Lives in services/nlpgo/ + cmd/service/.
 # The binary is a subcommand of the cmd/service multi-binary; we run
 # `service nlpgo` at runtime via the entrypoint.
-FROM golang:1.23-bookworm AS nlpgo-build
+#
+# Go version pinned to match go.mod (`go 1.26.2`). The aigateway image
+# (Dockerfile.go_service) already uses 1.26.2-alpine; this file lagged
+# behind during a main rebase and the build failed with "go.mod requires
+# go >= 1.26.2 (running go 1.23.12)". Caught during the PR #3483 lambda
+# build pre-flight. Keep the bookworm (debian) base — parity with the
+# python image below — and let CGO_ENABLED=0 produce the static binary.
+FROM golang:1.26.2-bookworm AS nlpgo-build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
