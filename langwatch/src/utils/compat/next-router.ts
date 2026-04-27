@@ -41,6 +41,7 @@ const ROUTE_PATTERNS = [
   "/settings",
   "/settings/governance",
   "/settings/governance/ingestion-sources",
+  "/settings/governance/anomaly-rules",
   "/settings/*",
   // Personal-scope governance routes — must precede the "/:project/*" patterns
   // so the auto-detection in components/useWorkspaceCurrent doesn't classify
