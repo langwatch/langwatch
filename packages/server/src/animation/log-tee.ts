@@ -12,9 +12,18 @@ const COLORS: Record<string, (s: string) => string> = {
   redis: chalk.dim,
   clickhouse: chalk.dim,
   bullboard: chalk.gray,
+  "prepare:app": chalk.blue,
+  "prepare:langwatch": chalk.green,
+  "prepare:langwatch_nlp": chalk.cyan,
+  "prepare:langevals": chalk.magenta,
+  "migrate:prisma": chalk.dim,
+  "migrate:clickhouse": chalk.dim,
 };
 
-const LABEL_WIDTH = 14;
+// Wide enough to fit `prepare:langwatch_nlp` (21) without breaking alignment
+// when the install phase falls back to the prefixed-line renderer (no TTY,
+// non-interactive shells, etc).
+const LABEL_WIDTH = 22;
 
 function paint(service: string): string {
   const fn = COLORS[service] ?? chalk.white;

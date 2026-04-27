@@ -32,13 +32,13 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
       const expected = hashFileSafely(spec.lockFile);
       if (existsSync(venvDir) && readFileSafely(hashFile) === expected) return;
 
-      bus.emit({ type: "starting", service: `uv:${spec.name}` as never });
+      bus.emit({ type: "starting", service: `prepare:${spec.name}` as never });
       const start = Date.now();
 
       mkdirSync(venvDir, { recursive: true });
       await execAndPipe(
         bus,
-        `uv:${spec.name}`,
+        `prepare:${spec.name}`,
         uvBin,
         ["sync", "--project", spec.projectDir],
         {
@@ -49,7 +49,7 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
         },
       );
       writeFileSync(hashFile, expected);
-      bus.emit({ type: "healthy", service: `uv:${spec.name}` as never, durationMs: Date.now() - start });
+      bus.emit({ type: "healthy", service: `prepare:${spec.name}` as never, durationMs: Date.now() - start });
     }),
   );
 }

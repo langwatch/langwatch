@@ -97,7 +97,7 @@ program
     //   - everything else → `concurrently`-style prefixed scroll lines
     //     in animation/log-tee.ts.
     // The router buffers events that arrive before listr2's task subscribes
-    // (typical race: app:relocate emits 'starting' before the panels render
+    // (typical race: prepare:app emits 'starting' before the panels render
     // resolves the task callbacks).
     const installRouter = makeInstallPanelRouter();
     const panelsPromise = renderInstallPanels(installRouter);

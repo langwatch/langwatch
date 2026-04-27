@@ -66,7 +66,7 @@ export async function ensureAppDir(ctx: RuntimeContext, bus: EventBus): Promise<
     if (installed === ctx.version) return;
   }
 
-  bus.emit({ type: "starting", service: "app:relocate" as never });
+  bus.emit({ type: "starting", service: "prepare:app" as never });
   const start = Date.now();
 
   mkdirSync(dst, { recursive: true });
@@ -96,7 +96,7 @@ export async function ensureAppDir(ctx: RuntimeContext, bus: EventBus): Promise<
   }
 
   writeFileSync(versionMarker, ctx.version);
-  bus.emit({ type: "healthy", service: "app:relocate" as never, durationMs: Date.now() - start });
+  bus.emit({ type: "healthy", service: "prepare:app" as never, durationMs: Date.now() - start });
 }
 
 /**

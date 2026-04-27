@@ -4,10 +4,10 @@ import type { RuntimeEvent } from "../shared/runtime-contract.ts";
 const RING_SIZE = 5;
 
 const INSTALL_TASKS = [
-  { title: "relocating @langwatch/server tree", service: "app:relocate" },
-  { title: "syncing langwatch_nlp venv (uv)", service: "uv:langwatch_nlp" },
-  { title: "syncing langevals venv (uv)", service: "uv:langevals" },
-  { title: "installing langwatch app deps (pnpm)", service: "pnpm:langwatch" },
+  { title: "preparing langwatch app", service: "prepare:app" },
+  { title: "installing langwatch_nlp deps", service: "prepare:langwatch_nlp" },
+  { title: "installing langevals deps", service: "prepare:langevals" },
+  { title: "installing langwatch deps", service: "prepare:langwatch" },
 ] as const;
 
 const INSTALL_SERVICES: ReadonlySet<string> = new Set(INSTALL_TASKS.map((t) => t.service));
