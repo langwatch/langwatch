@@ -29,6 +29,13 @@ If your IT team is the bottleneck, you can start on the self-serve path today (s
 - Your IdP's SAML metadata or OIDC discovery URL (Okta, Azure AD,
   Google Workspace, Auth0).
 
+<Note>**Governance is currently behind a preview flag.** The `/governance` UI surface (and the **Govern** main-menu entry) require the `release_ui_ai_governance_enabled` flag enabled for your org.
+
+- **Self-hosted**: set `FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_governance_enabled` in your LangWatch app environment, restart, and the menu + routes are visible to every admin.
+- **SaaS**: contact your LangWatch account rep — we'll enable the flag for your org. The CLI side (`langwatch governance status`, `langwatch ingest list/tail/health`) is gated independently behind the env var `LANGWATCH_GOVERNANCE_PREVIEW=1`.
+
+Once the flag is on, fresh admins can reach `/governance` even with no project created yet — governance is org-scoped, not project-scoped.</Note>
+
 ## 1. Connect SSO
 
 In **Settings → SSO**, click **Connect identity provider**.

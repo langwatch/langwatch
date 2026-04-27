@@ -12,6 +12,8 @@ all of those tools share.
 This page is the **end-user** flow. If you're an admin setting it up
 for your organization, see [Admin setup](/ai-gateway/governance/admin-setup).
 
+<Note>**Governance is currently a preview**. The CLI side gates the `governance` and `ingest` subcommands behind `LANGWATCH_GOVERNANCE_PREVIEW=1`; if you don't see them in `langwatch --help`, export that env var first (and ask your admin to confirm the LangWatch web flag `release_ui_ai_governance_enabled` is on for your org).</Note>
+
 ## What you get
 
 - One CLI command to sign in: `langwatch login`
