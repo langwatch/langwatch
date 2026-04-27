@@ -56,6 +56,14 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
+    project: {
+      getResolvedDefaultModel: {
+        useQuery: () => ({
+          data: { resolvedDefaultModel: null },
+          isLoading: false,
+        }),
+      },
+    },
     licenseEnforcement: {
       checkLimit: {
         useQuery: () => ({
