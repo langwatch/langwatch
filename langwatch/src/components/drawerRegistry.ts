@@ -53,6 +53,8 @@ import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { ScenarioRunDetailDrawer } from "./simulations/ScenarioRunDetailDrawer";
 import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
+// Traces V2 drawers
+import { TraceV2DrawerShell } from "../features/traces-v2/components/TraceDrawer";
 // Evaluations V3 drawers
 import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
 
@@ -62,6 +64,7 @@ import { TargetTypeSelectorDrawer } from "./targets/TargetTypeSelectorDrawer";
  */
 export const drawers = {
   traceDetails: TraceDetailsDrawer,
+  traceV2Details: TraceV2DrawerShell,
   batchEvaluation: BatchEvaluationDrawer,
   automation: AutomationDrawer,
   editModelProvider: EditModelProviderDrawer,

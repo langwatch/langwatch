@@ -175,6 +175,44 @@ export const useDrawerParams = () => {
  * Functions, plain objects, Dates, and arrays containing objects are NOT serializable
  * and go to `complexProps` (module-level ephemeral store).
  */
+/**
+ * Split a Next.js asPath into (path, query, hash). Handles both `?q#h` and
+ * `#h?q` orderings — important for lens routes like `/traces#conversations`
+ * where naive concatenation can leave drawer query params parked after the
+ * hash, which Next's `router.query` (backed by `location.search`) cannot see.
+ */
+function splitAsPath(asPath: string): {
+  path: string;
+  queryString: string;
+  hash: string;
+} {
+  const queryIdx = asPath.indexOf("?");
+  const hashIdx = asPath.indexOf("#");
+  let pathEnd = asPath.length;
+  if (queryIdx !== -1) pathEnd = Math.min(pathEnd, queryIdx);
+  if (hashIdx !== -1) pathEnd = Math.min(pathEnd, hashIdx);
+  const path = asPath.slice(0, pathEnd);
+  const rest = asPath.slice(pathEnd);
+  if (rest.startsWith("?")) {
+    const h = rest.indexOf("#");
+    if (h === -1) return { path, queryString: rest.slice(1), hash: "" };
+    return { path, queryString: rest.slice(1, h), hash: rest.slice(h + 1) };
+  }
+  if (rest.startsWith("#")) {
+    const q = rest.indexOf("?");
+    if (q === -1) return { path, queryString: "", hash: rest.slice(1) };
+    return { path, queryString: rest.slice(q + 1), hash: rest.slice(1, q) };
+  }
+  return { path, queryString: "", hash: "" };
+}
+
+function buildUrl(path: string, queryString: string, hash: string): string {
+  let url = path;
+  if (queryString) url += `?${queryString}`;
+  if (hash) url += `#${hash}`;
+  return url;
+}
+
 function isUrlSerializable(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   if (typeof value === "function") return false;
@@ -235,7 +273,7 @@ export const useDrawer = () => {
       // Build query from the actual browser URL (router.asPath), not
       // router.query which may be stale after (url, as) shallow pushes.
       // This preserves filter params that only exist in the asPath URL.
-      const queryString = router.asPath.split("?")[1] ?? "";
+      const { path, queryString, hash } = splitAsPath(router.asPath);
       const currentQueryOnly = Object.fromEntries(
         Object.entries(
           qs.parse(queryString, {
@@ -261,10 +299,8 @@ export const useDrawer = () => {
         },
       );
 
-      // Preserve the current URL path (from asPath) and append the new query
-      const currentPath = router.asPath.split("?")[0]!;
       void router[options.replace ? "replace" : "push"](
-        `${currentPath}?${newQuery}`,
+        buildUrl(path, newQuery, hash),
         undefined,
         { shallow: true },
       );
@@ -385,7 +421,7 @@ export const useDrawer = () => {
 
     // Build clean URL from asPath (not router.query which may be stale
     // after (url, as) shallow pushes and misses filter params).
-    const currentQs = router.asPath.split("?")[1] ?? "";
+    const { path, queryString: currentQs, hash } = splitAsPath(router.asPath);
     const parsedQuery = qs.parse(currentQs, {
       allowDots: true,
       comma: true,
@@ -396,19 +432,16 @@ export const useDrawer = () => {
         ([key]) => !key.startsWith("drawer") && key !== "span",
       ),
     );
-    const queryString = qs.stringify(cleanQuery, {
+    const newQueryString = qs.stringify(cleanQuery, {
       allowDots: true,
       arrayFormat: "comma",
       // @ts-ignore - allowEmptyArrays exists
       allowEmptyArrays: true,
     });
 
-    const currentPath = router.asPath.split("?")[0]!;
-    void router.push(
-      queryString ? `${currentPath}?${queryString}` : currentPath,
-      undefined,
-      { shallow: true },
-    );
+    void router.push(buildUrl(path, newQueryString, hash), undefined, {
+      shallow: true,
+    });
   }, [router]);
 
   /**

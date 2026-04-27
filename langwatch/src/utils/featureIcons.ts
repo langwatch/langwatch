@@ -7,7 +7,7 @@ import {
   Bot,
   CheckSquare,
   Drama,
-  FileText,
+  Bird,
   FolderOpen,
   Home,
   KeyRound,
@@ -17,6 +17,7 @@ import {
   Percent,
   Play,
   PlayCircle,
+  Scan,
   Settings,
   Table,
   TrainFront,
@@ -28,6 +29,7 @@ export type FeatureKey =
   | "home"
   | "analytics"
   | "traces"
+  | "traces_v2"
   | "simulations"
   | "scenarios"
   | "simulation_runs"
@@ -67,6 +69,11 @@ export const featureIcons: Record<FeatureKey, FeatureConfig> = {
     icon: ListTree,
     color: "blue.500",
     label: "Traces",
+  },
+  traces_v2: {
+    icon: Bird,
+    color: "blue.500",
+    label: "Traces Evolved",
   },
   simulations: {
     icon: Play,

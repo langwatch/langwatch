@@ -50,6 +50,7 @@ import { ProjectAvatar } from "./ProjectAvatar";
 import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { CommandBarTrigger } from "../features/command-bar";
+import { WelcomeScreen } from "../features/traces-v2/components/Welcome";
 
 const Breadcrumbs = ({ currentRoute }: { currentRoute: Route | undefined }) => {
   const { project } = useOrganizationTeamProject();
@@ -596,7 +597,9 @@ export const DashboardLayout = ({
           display="flex"
           minHeight="calc(100vh - 56px)"
           maxHeight="calc(100vh - 56px)"
+          position="relative"
         >
+          <WelcomeScreen />
           <VStack width="full" gap={0} {...props}>
             {/* Alert banners */}
             {publicEnv.data &&

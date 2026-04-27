@@ -17,6 +17,7 @@ import React, { useState } from "react";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { useOpsPermission } from "../hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { useFeatureFlag } from "../hooks/useFeatureFlag";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
@@ -43,6 +44,11 @@ export const MainMenu = React.memo(function MainMenu({
   const { project, hasPermission, isPublicRoute } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
+
+  const { enabled: tracesV2Enabled } = useFeatureFlag(
+    "release_ui_traces_v2_enabled",
+    { projectId: project?.id, enabled: !!project },
+  );
 
   const pendingItemsCount = api.annotation.getPendingItemsCount.useQuery(
     { projectId: project?.id ?? "" },
@@ -134,6 +140,18 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/messages")}
               showLabel={showExpanded}
             />
+            {tracesV2Enabled && (
+              <PageMenuLink
+                path={projectRoutes.traces_v2.path}
+                icon={featureIcons.traces_v2.icon}
+                label={projectRoutes.traces_v2.title}
+                project={project}
+                isActive={router.pathname.includes("/traces")}
+                showLabel={showExpanded}
+                beta="This feature is in alpha"
+                betaLabel="Alpha"
+              />
+            )}
 
             <Text
               fontSize="11px"
@@ -493,6 +511,8 @@ type PageMenuLinkProps = {
   badgeNumber?: number;
   isActive: boolean;
   showLabel?: boolean;
+  beta?: string | boolean;
+  betaLabel?: string;
 };
 
 const PageMenuLink = ({
@@ -503,6 +523,8 @@ const PageMenuLink = ({
   badgeNumber,
   isActive,
   showLabel = true,
+  beta,
+  betaLabel,
 }: PageMenuLinkProps) => {
   const { isTableView } = useTableView();
 
@@ -524,6 +546,8 @@ const PageMenuLink = ({
       isActive={isActive}
       badgeNumber={badgeNumber}
       showLabel={showLabel}
+      beta={beta}
+      betaLabel={betaLabel}
     />
   );
 };

@@ -15,6 +15,10 @@ export const projectRoutes = {
     path: "/[project]/messages",
     title: "Traces",
   },
+  traces_v2: {
+    path: "/[project]/traces",
+    title: "iykyk",
+  },
   evaluations: {
     path: "/[project]/evaluations",
     title: "Evaluations",
