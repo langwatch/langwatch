@@ -399,7 +399,9 @@ renders live cards + per-user table + source-health strip.
 |---------|------------------|------|
 | `/settings/governance` — setup checklist + first real source visible in the health strip | live (`api.activityMonitor.{summary, spendByUser, ingestionSourcesHealth, recentAnomalies}`) | [open](https://i.img402.dev/hhghiq7gbb.png) |
 | `/settings/governance/ingestion-sources` — list page after the iter-13 customer-name scrub | live (`api.ingestionSources.list`) | [open](https://i.img402.dev/kfvazcuczp.png) |
-| `/settings/governance/anomaly-rules` — placeholder until the detection backend ships | placeholder (real backend stub persists rules; eval engine is the next slice) | [open](https://i.img402.dev/rcgdx6lio6.png) |
+| `/settings/governance/anomaly-rules` — empty list (no rules yet) | live (`api.anomalyRules.list`) | [open](https://i.img402.dev/9fjdw9we08.png) |
+| `/settings/governance/anomaly-rules` — composer (name + severity + ruleType + scope + JSONB threshold/destination configs) | live (`api.anomalyRules.create`) | [open](https://i.img402.dev/9v33n8zzrk.png) |
+| `/settings/governance/anomaly-rules` — list after Create roundtrip; persisted rule grouped under Critical with the honest "rules persist now; evaluation + alerts arrive with the detection backend" banner | live (PG persistence; eval engine = Sergey Option C, deferred) | [open](https://i.img402.dev/15z3h6k32v.png) |
 
 Tier 2 / Tier 5 are deferred; the architecture doesn't preclude them
 and the control-plane primitives already accommodate them.
