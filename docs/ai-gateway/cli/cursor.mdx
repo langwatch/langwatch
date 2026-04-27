@@ -6,6 +6,8 @@ sidebarTitle: Cursor
 
 Cursor supports "Custom OpenAI API" endpoints under **Settings → Models → OpenAI API Key**. Point it at the LangWatch AI Gateway to apply VK budgets, per-team governance, and fallback to every Cursor request.
 
+<Note>**Why the GUI paste, not a wrapper?** Cursor is a GUI app whose AI configuration lives in `~/Library/Application Support/Cursor/User/settings.json` — not env vars. The `langwatch cursor` wrapper exists and exec's Cursor with `OPENAI_BASE_URL` / `OPENAI_API_KEY` set, which is useful for inheriting governance config in some shell-launched flows, but Cursor's own AI panel still reads its `settings.json` first. The canonical and reliable setup for governance is the in-app paste described below.</Note>
+
 ## Setup
 
 1. Open **Settings** (⌘,).

@@ -15,14 +15,16 @@ The gateway exposes both OpenAI-compatible and Anthropic-compatible endpoints on
 
 ## At a glance
 
-| CLI | Endpoint used | Env vars | Notes |
-|---|---|---|---|
-| [Claude Code](/ai-gateway/cli/claude-code) | `/v1/messages` | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` | Tool-call deltas preserved byte-for-byte. Pin to dated model name (e.g. `claude-haiku-4-5-20251001`). |
-| [Codex CLI](/ai-gateway/cli/codex) | `/v1/responses` | `~/.codex/config.toml` `model_providers`, `wire_api = "responses"` | Codex 0.122+ requires `wire_api = "responses"` (chat dropped). Pin model to a Bifrost-registered name. |
-| [Gemini CLI](/ai-gateway/cli/gemini-cli) | `/v1beta/models/{model}:generateContent` | `GOOGLE_GEMINI_BASE_URL`, `GEMINI_API_KEY` | Native Gemini API passthrough. Works with all Gemini models supported by your VK's Vertex/Gemini credential. |
-| [opencode](/ai-gateway/cli/opencode) | `/v1/chat/completions` (or `/v1/messages`) | Per-provider config in `opencode.json` | Pin opencode `1.13.x` — `1.14.x` has a known regression with custom providers. |
-| [Cursor](/ai-gateway/cli/cursor) | `/v1/chat/completions` | Custom "OpenAI API base URL" in settings | Agent mode benefits most from budgets. |
-| [Aider](/ai-gateway/cli/aider) | `/v1/chat/completions` | `OPENAI_API_BASE`, `OPENAI_API_KEY` | Confirmed working with model aliases. |
+The `langwatch` CLI ships wrappers for the 4 most common coding CLIs — they auto-inject the right env vars from your governance config so you don't have to. Native env-var setup still works everywhere if you prefer.
+
+| CLI | Wrapper | Endpoint | Native env vars | Notes |
+|---|---|---|---|---|
+| [Claude Code](/ai-gateway/cli/claude-code) | `langwatch claude` | `/v1/messages` | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` | Tool-call deltas preserved byte-for-byte. Pin to dated model name (e.g. `claude-haiku-4-5-20251001`). |
+| [Codex CLI](/ai-gateway/cli/codex) | `langwatch codex` | `/v1/responses` | `~/.codex/config.toml` `model_providers`, `wire_api = "responses"` | Codex 0.122+ requires `wire_api = "responses"` (chat dropped). Pin model to a Bifrost-registered name. |
+| [Gemini CLI](/ai-gateway/cli/gemini-cli) | `langwatch gemini` | `/v1beta/models/{model}:generateContent` | `GOOGLE_GEMINI_BASE_URL`, `GEMINI_API_KEY` | Native Gemini API passthrough. Works with all Gemini models supported by your VK's Vertex/Gemini credential. |
+| [Cursor](/ai-gateway/cli/cursor) | `langwatch cursor` * | `/v1/chat/completions` | Custom "OpenAI API base URL" in settings | * Cursor is a GUI app — its AI panel reads from settings, not env vars, so the wrapper is mostly cosmetic for terminal launches. The canonical setup is the in-app paste. Agent mode benefits most from budgets. |
+| [opencode](/ai-gateway/cli/opencode) | — | `/v1/chat/completions` (or `/v1/messages`) | Per-provider config in `opencode.json` | No wrapper today — set the per-provider config explicitly. Pin opencode `1.13.x` — `1.14.x` has a known regression with custom providers. |
+| [Aider](/ai-gateway/cli/aider) | — | `/v1/chat/completions` | `OPENAI_API_BASE`, `OPENAI_API_KEY` | No wrapper today — manual env-var path. Confirmed working with model aliases. |
 
 ## Why this matters for the enterprise
 
