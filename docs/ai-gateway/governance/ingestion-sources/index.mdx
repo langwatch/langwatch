@@ -1,0 +1,72 @@
+---
+title: Ingestion sources
+description: Per-platform integration matrix for LangWatch governance Activity Monitor receivers.
+sidebarTitle: Ingestion sources
+---
+
+The Activity Monitor pillar normalises events from upstream agent and audit-log platforms into a single OCSF Actor / Action / Target schema, dedupes by `eventId`, and surfaces them in the [admin oversight dashboard](/ai-gateway/governance/control-plane), the per-source detail page, and the [`langwatch ingest tail`](/ai-gateway/governance/cli-debug) CLI.
+
+This section documents each supported `sourceType` honestly: what's wired up today, what's still envelope-only, and what's a configuration contract awaiting an adapter.
+
+## State of each receiver — at a glance
+
+| Source type | Mode | Receiver wired | Normaliser depth | State |
+|-------------|------|----------------|-------------------|--------|
+| [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic) | push (OTLP) | `POST /api/ingest/otel/:id` | Full — span → Actor/Action/Target/cost/tokens | **Production-ready** |
+| [`claude_cowork`](/ai-gateway/governance/ingestion-sources/claude-cowork) | push (OTLP) | `POST /api/ingest/otel/:id` | Generic OTel — Cowork-specific extraction pending | **Receiver works, attribute-mapping pending** |
+| [`workato`](/ai-gateway/governance/ingestion-sources/workato) | push (webhook) | `POST /api/ingest/webhook/:id` | Envelope-only — raw payload retained | **Receiver works, audit-shape parser pending** |
+| [`s3_custom`](/ai-gateway/governance/ingestion-sources/s3-custom) | s3 + webhook callback | `POST /api/ingest/webhook/:id` (callback mode) | Envelope-only — DSL parser pending | **Callback-mode works, S3 puller pending** |
+| [`copilot_studio`](/ai-gateway/governance/ingestion-sources/copilot-studio) | pull (Purview Audit API) | None | None — Azure AD app config persisted, poller pending | **Setup contract only** |
+| [`openai_compliance`](/ai-gateway/governance/ingestion-sources/openai-compliance) | s3 (Enterprise Compliance JSONL) | None | None — S3 + role config persisted, puller pending | **Setup contract only** |
+| [`claude_compliance`](/ai-gateway/governance/ingestion-sources/claude-compliance) | pull (Anthropic compliance API) | None | None — workspace API key persisted, poller pending | **Setup contract only** |
+
+**Production-ready** = receiver accepts traffic, normaliser maps to ActivityEvent fields, web detail page + CLI tail render with cost/token deltas.
+
+**Receiver works** = endpoint accepts and ack's traffic, source flips to `active`, but attribute extraction beyond the OCSF defaults is pending. The CLI tail will show events with `eventType: agent.action` and the raw payload in `rawPayload`.
+
+**Setup contract only** = the source can be created via the admin composer and persists the per-platform fields the eventual adapter will use, but no traffic flows yet. Creating a source flips no flag and `langwatch ingest health` will show zeros indefinitely.
+
+## How a source becomes "active"
+
+Independent of source type, the lifecycle is:
+
+1. Admin opens `/governance/ingestion-sources`, picks a source type, fills the per-type config form, clicks Create.
+2. Backend mints a `lw_is_<base64url>` ingest secret, hashes it, persists the source with status `awaiting_first_event`. The secret is shown **once** in a one-time-reveal modal — it's never returned by the list/get endpoints again.
+3. Admin pastes the secret + per-source endpoint into the upstream platform (OTLP exporter, webhook destination URL, Azure app secret, S3 bucket policy, etc).
+4. First event arrives at the receiver → service calls `recordEventReceived(sourceId)` → status flips to `active` and `lastEventAt` updates.
+5. Web detail page polls every 10s, CLI tail polls every 3s in `--follow` mode — both see the flip and the new event simultaneously.
+
+For source types where the receiver is not yet wired (the three "setup contract only" rows above), step 4 won't fire; the source stays at `awaiting_first_event` until the adapter for that source type lands.
+
+## Auth contract — same shape across every receiver
+
+All push-mode receivers use `Authorization: Bearer lw_is_<secret>` (the same shape the gateway uses for its `lw_vk_` virtual keys, just a different prefix). Mismatched `:sourceId` path vs. resolved-secret source ID returns `401 unauthorized` without leaking which one exists. The 24-hour rotation grace window is documented in [Architecture → IngestionSource lifecycle](/ai-gateway/governance/architecture).
+
+## Verification — same loop for every push-mode source
+
+Once a source is active, verify with the [governance CLI debug helpers](/ai-gateway/governance/cli-debug):
+
+```bash
+# What does the org see?
+langwatch ingest list
+
+# How healthy is one source?
+langwatch ingest health <sourceId>
+
+# What events landed in real time?
+langwatch ingest tail <sourceId> --follow
+```
+
+The CLI hits the same backend the web detail page hits, byte-for-byte (`--json` mode is contract-stable against `api.activityMonitor.eventsForSource` and `api.activityMonitor.sourceHealthMetrics`).
+
+## Adapter roadmap
+
+The order in which adapters land depends on customer pull. The current priority is:
+
+1. **Cowork attribute extraction** — Cowork pushes OTLP today; we already accept it but the spans haven't been mapped to Cowork's `tool_use` taxonomy. This is the smallest gap to close.
+2. **Workato audit-shape parser** — Workato has a stable JSON envelope for job-completed events; mapping to Actor/Action/Target is straightforward but isn't done yet.
+3. **Microsoft Copilot Studio (Purview Audit) poller** — needs an Azure AD app + cron worker; the config is persisted but the worker isn't.
+4. **OpenAI / Anthropic Enterprise Compliance pullers** — S3 + Anthropic compliance API respectively; config persisted, pullers pending.
+5. **`s3_custom` DSL parser** — generic-shape parser for homegrown audit logs; the customer-facing DSL design is in flight.
+
+If you have a need for one of the unwired adapters that's blocking a deployment, file an issue tagged `governance/activity-monitor/adapter-roadmap` and we'll sequence accordingly.

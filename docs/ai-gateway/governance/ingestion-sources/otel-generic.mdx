@@ -1,0 +1,105 @@
+---
+title: Generic OTel
+description: OTLP/HTTP push — the fully proven Activity Monitor path.
+sidebarTitle: Generic OTel
+---
+
+`otel_generic` is the production-ready Activity Monitor path. Anything that speaks OTLP/HTTP — your own agents, third-party SDKs, tracing libraries — points at the source's URL with the source's bearer secret and events flow end-to-end into the admin oversight dashboard, the per-source detail page, and the [`langwatch ingest tail`](/ai-gateway/governance/cli-debug) CLI.
+
+## Currently implemented
+
+- **Receiver:** `POST /api/ingest/otel/:sourceId` (also accepts `claude_cowork` sources, see [Anthropic Cowork](/ai-gateway/governance/ingestion-sources/claude-cowork)).
+- **Auth:** `Authorization: Bearer lw_is_<secret>`.
+- **Body:** OTLP/HTTP JSON envelope (`resource_spans` / `scope_spans` / `spans`). `snake_case` and `camelCase` both accepted.
+- **Normaliser:** [`normalizeOtlpJson`](https://github.com/langwatch/langwatch/blob/main/langwatch/src/server/governance/activity-monitor/normalizers/otel.ts) — emits one `ActivityEvent` per span. The full path with cost / token / actor / target extraction is wired up.
+- **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`.
+
+## What the admin configures upstream
+
+After clicking Create on the composer, the one-time-reveal modal exposes:
+
+| Field | Value |
+|---|---|
+| OTLP URL | `https://<your-langwatch>/api/ingest/otel/<sourceId>` |
+| Bearer secret | `lw_is_<base64url>` (shown once, never returned by the list endpoints) |
+
+The composer also persists one optional config field:
+
+- `allowedSourceTypeLabel` — when set, only events whose `LangWatchSourceType` resource attribute matches this label are accepted. Leave blank to accept any.
+
+In the upstream platform's OTLP exporter config:
+
+```yaml
+# OpenTelemetry Collector example
+exporters:
+  otlphttp/langwatch:
+    endpoint: https://<your-langwatch>/api/ingest/otel/<sourceId>
+    headers:
+      Authorization: Bearer lw_is_<secret>
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      exporters: [otlphttp/langwatch]
+```
+
+```python
+# Python OpenTelemetry SDK example
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+
+exporter = OTLPSpanExporter(
+    endpoint="https://<your-langwatch>/api/ingest/otel/<sourceId>",
+    headers={"Authorization": "Bearer lw_is_<secret>"},
+)
+```
+
+## Event shape we accept today
+
+The normaliser maps OTLP attributes onto the ActivityEvent contract using the precedence below. Span resource attributes are merged with span-level attributes (span-level wins on collision):
+
+| ActivityEvent field | OTLP attribute precedence |
+|---|---|
+| `eventId` | `span.spanId` ▸ `span.traceId` ▸ random UUID |
+| `eventType` | Heuristic on `span.name` + attrs: `api.call` (if `chat`/`messages`/`completion`), `tool.invocation` (if `tool.name` set or name matches `/tool|function/`), `auth.action` (if name matches `/auth|signin|signout|login/`), else `agent.action` |
+| `action` | `span.name` |
+| `actor` | `langwatch.user.id` ▸ `user.email` ▸ `user.id` ▸ `enduser.id` |
+| `target` | `llm.model` ▸ `gen_ai.request.model` ▸ `model` ▸ `tool.name` |
+| `costUsd` | `llm.cost.usd` ▸ `gen_ai.usage.cost` ▸ `gen_ai.usage.cost_usd` ▸ `langwatch.cost.usd` |
+| `tokensInput` | `llm.token_count.prompt` ▸ `gen_ai.usage.prompt_tokens` ▸ `gen_ai.usage.input_tokens` ▸ `input_tokens` |
+| `tokensOutput` | `llm.token_count.completion` ▸ `gen_ai.usage.completion_tokens` ▸ `gen_ai.usage.output_tokens` ▸ `output_tokens` |
+| `eventTimestamp` | `span.startTimeUnixNano` (parsed as nanoseconds) ▸ now |
+| `rawPayload` | The verbatim request body — kept for debug + future re-normalisation. |
+
+If a field doesn't resolve from the precedence list, the event row stores an empty string / 0 — the row is still persisted and visible in the CLI tail.
+
+## What is still envelope-only / follow-up work
+
+- **Resource log records.** The receiver currently only walks `resource_spans`. OTLP `resource_logs` payloads are accepted (returned 202) but produce zero ActivityEvents. If you push log-only data, the source still flips to `active` (because `recordEventReceived` is called regardless) but `langwatch ingest tail` will stay empty. Adapter on the roadmap.
+- **gRPC.** Only OTLP/HTTP JSON is implemented. OTLP/HTTP protobuf and gRPC are not yet wired. Use the JSON exporter on the upstream side.
+- **Span events / span links.** Not extracted into separate ActivityEvent rows in this slice; surface only the parent span's data.
+
+## Verify with CLI + web
+
+After wiring the upstream exporter:
+
+```bash
+# Wait until the source flips to active
+langwatch ingest list
+
+# Watch new spans land in real time
+langwatch ingest tail <sourceId> --follow
+
+# Confirm 24h / 7d / 30d totals
+langwatch ingest health <sourceId>
+```
+
+The web equivalent is `/governance/ingestion-sources/<sourceId>` — same data, same poll cadence semantics.
+
+A successful smoke test produces output like:
+
+```text
+$ langwatch ingest tail JxQztBgN90QeX12-afJ0C --limit 1
+2026-04-27T07:11:18.963Z  api.call  chat_completion → claude-3-5-sonnet
+```
+
+If `eventType` shows `agent.action` instead of `api.call` / `tool.invocation`, the upstream span isn't carrying the attributes the heuristic looks for — the source still works, but you'll get less filtering precision in the admin dashboard. The fix is on the upstream side: emit `gen_ai.request.model` and (if applicable) `tool.name`.

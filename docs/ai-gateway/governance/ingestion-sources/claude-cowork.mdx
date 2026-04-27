@@ -1,0 +1,50 @@
+---
+title: Anthropic Claude (Cowork)
+description: Receiver works on the Generic OTel path; Cowork-specific attribute extraction is pending.
+sidebarTitle: Anthropic Claude (Cowork)
+---
+
+Claude Cowork pushes telemetry over OTLP/HTTP. The receiver is wired and accepts traffic; the per-attribute mapping that turns Cowork's `tool_use` taxonomy into precise ActivityEvent fields is the next step on the [adapter roadmap](/ai-gateway/governance/ingestion-sources#adapter-roadmap).
+
+## Currently implemented
+
+- **Receiver:** `POST /api/ingest/otel/:sourceId` — same endpoint as [`otel_generic`](/ai-gateway/governance/ingestion-sources/otel-generic).
+- **Auth:** `Authorization: Bearer lw_is_<secret>`.
+- **Body:** OTLP/HTTP JSON envelope.
+- **Normaliser:** the generic OTel normaliser (no Cowork-specific overlay yet). Spans are extracted, span IDs become `eventId`, and the OCSF heuristic picks `api.call` / `tool.invocation` / `agent.action` based on span name patterns.
+- **Status flip:** receiver calls `recordEventReceived(sourceId)` after any successful 202; source flips from `awaiting_first_event` → `active`.
+
+## What the admin configures upstream
+
+The composer collects:
+
+| Field | Required | Stored |
+|---|---|---|
+| Anthropic workspace ID (`wsp_...`) | yes | `IngestionSource.payloadConfig.workspaceId` — used for correlation with Anthropic's admin console; the receiver itself doesn't enforce it today |
+
+The one-time-reveal modal exposes:
+
+| Field | Value |
+|---|---|
+| OTLP URL | `https://<your-langwatch>/api/ingest/otel/<sourceId>` |
+| Bearer secret | `lw_is_<base64url>` |
+
+In Anthropic's admin console: **Workspace → Telemetry**, paste the OTLP URL + the bearer header. Cowork starts pushing.
+
+## What event shape we accept today
+
+Whatever OTLP body Cowork emits — `resource_spans` are walked, each span turns into one ActivityEvent. Cowork's tool-call spans land as `eventType: tool.invocation` (the heuristic catches `tool` in the span name); model-call spans land as `eventType: api.call` (the heuristic catches `chat`/`messages`/`completion`).
+
+## What is still envelope-only / follow-up work
+
+- **Cowork tool taxonomy.** Cowork attaches a richer `tool_use` attribute set than the generic OTel heuristic looks for (e.g. `anthropic.cowork.tool.intent`, `anthropic.cowork.tool.outcome`). These attributes are kept in `rawPayload` but aren't promoted to top-level ActivityEvent fields. A Cowork-specific overlay normaliser will pick them up.
+- **Workspace ID enforcement.** The `workspaceId` config field is currently informational. A future change will reject events whose Cowork-emitted workspace attribute doesn't match the configured one (defence-in-depth against secret leaks).
+- **Cowork-specific cost normalisation.** Anthropic's spans don't carry `gen_ai.usage.cost_usd` directly; cost is derived later by the cost-enrichment pipeline. Until then, `costUsd` will be `0` on the CLI tail output.
+
+## Verify with CLI + web
+
+```bash
+langwatch ingest tail <sourceId> --follow
+```
+
+You should see Cowork events landing as `tool.invocation` and `api.call`. If everything shows `agent.action`, the heuristic isn't matching Cowork's span names — file an issue with a sample span name and the [Cowork adapter](https://github.com/langwatch/langwatch/blob/main/langwatch/src/server/governance/activity-monitor/normalizers/otel.ts) heuristic will be tightened.

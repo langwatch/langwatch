@@ -1,0 +1,54 @@
+---
+title: OpenAI Enterprise Compliance
+description: Setup contract only — S3 bucket + cross-account role config captured; the JSONL puller is pending.
+sidebarTitle: OpenAI Enterprise Compliance
+---
+
+`openai_compliance` pulls compliance JSONL drops from an S3 bucket OpenAI writes to (Enterprise Compliance API). Today the source can be created and the AWS credentials/S3 config are persisted, but the puller worker hasn't shipped — events do not flow yet.
+
+This page documents the configuration contract so admins can pre-stage IAM trust policies and bucket access; the matching adapter is on the [roadmap](/ai-gateway/governance/ingestion-sources#adapter-roadmap).
+
+## Currently implemented
+
+- **CRUD:** the source can be created via the admin composer at `/governance/ingestion-sources` and via `api.ingestionSources.create`. It will appear in `langwatch ingest list` with status `awaiting_first_event`.
+- **Receiver:** none. There is no `/api/ingest/openai-compliance/:id` endpoint and the OTLP / webhook receivers reject `openai_compliance` sources with `400 wrong_endpoint`.
+- **Puller:** none.
+- **Normaliser:** none.
+- **Status flip:** the source will stay `awaiting_first_event` indefinitely until the puller ships.
+
+## What the admin configures upstream
+
+The composer collects:
+
+| Field | Required | Stored | Used by |
+|---|---|---|---|
+| S3 bucket name | yes | `IngestionSource.payloadConfig.bucket` | (future puller) |
+| S3 key prefix | no | `payloadConfig.prefix` (default `compliance/`) | (future puller) |
+| Cross-account role ARN | yes | `payloadConfig.roleArn` | (future puller) |
+| Polling cadence (seconds) | no | `payloadConfig.pollEverySec` (default 60) | (future puller) |
+
+In OpenAI's Enterprise Compliance setup:
+
+1. Open a ticket with OpenAI to enable Enterprise Compliance for your tenant. They'll want the S3 bucket name above + the AWS account that owns it.
+2. OpenAI starts writing compliance JSONL files under `s3://<bucket>/<prefix>/`. Files are gzipped, one JSON object per line, hourly cadence.
+
+In your AWS account:
+
+1. Create an IAM role with a trust policy allowing LangWatch's account (provided during onboarding) to assume it.
+2. Attach an inline policy granting `s3:ListBucket` + `s3:GetObject` on the bucket / prefix above.
+3. Paste the role ARN into the LangWatch composer.
+
+There is no LangWatch-side URL or bearer secret to paste back into OpenAI. The future puller will assume the role you grant and read S3 directly.
+
+## What event shape we accept today
+
+None — no events flow until the puller ships.
+
+## What is still envelope-only / follow-up work
+
+- **S3 puller worker.** A cron job that assumes the configured `roleArn`, lists objects under `s3://<bucket>/<prefix>/` newer than the last watermark, fetches them, gunzips, and walks line-by-line.
+- **JSONL → ActivityEvent mapping.** OpenAI Enterprise Compliance JSONL has a documented schema (event type, user ID, model, prompt + completion tokens, content classification flags). Mapping into Actor / Action / Target / cost / token fields is pending and will live in an `openai-compliance.ts` normaliser.
+- **Cost reconciliation.** OpenAI's compliance feed includes per-event token counts but not USD cost. The cost-enrichment pipeline already handles this for `gateway_activity_events` once the puller lands — no extra work needed on the receiver side.
+- **Watermark + dedup.** S3 keys are timestamped; the worker tracks high-water key in `IngestionSource.payloadConfig.watermark` to avoid replays.
+
+When the puller ships, this page is updated with the real event shape, the CLI verification flow, and the per-source detail behaviour.

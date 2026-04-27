@@ -1,0 +1,61 @@
+---
+title: Custom S3 audit log
+description: Webhook callback receiver works (envelope-only). S3 puller + DSL parser are pending.
+sidebarTitle: Custom S3
+---
+
+`s3_custom` is the catch-all for homegrown agent systems writing audit logs to an S3 bucket — internal agents, CI tools, custom orchestrators. The data plane has two intended ingestion modes:
+
+1. **S3 polling** — the configured bucket + prefix is polled on a cadence; new objects are fetched and parsed via a customer-supplied DSL.
+2. **Webhook callback** — the upstream system can POST to the same `/api/ingest/webhook/:id` endpoint Workato uses, when polling isn't acceptable.
+
+Today, only the **callback mode** is wired. The S3 puller and the DSL parser are on the [adapter roadmap](/ai-gateway/governance/ingestion-sources#adapter-roadmap).
+
+## Currently implemented
+
+- **Receiver (callback mode):** `POST /api/ingest/webhook/:sourceId`.
+- **Auth:** `Authorization: Bearer lw_is_<secret>`.
+- **Body:** any JSON payload — typically one log line per request.
+- **Persistence:** envelope-only. One ActivityEvent with `eventType: agent.action`, the verbatim payload in `rawPayload`, and `actor` / `target` / `costUsd` / token counts unset (parser pending).
+- **Status flip:** flips `awaiting_first_event` → `active` after the first callback.
+
+## What the admin configures upstream
+
+The composer collects:
+
+| Field | Required | Stored | Used by |
+|---|---|---|---|
+| S3 bucket name | yes | `IngestionSource.payloadConfig.bucket` | (future puller) |
+| S3 key prefix | no | `payloadConfig.prefix` | (future puller) |
+| Cross-account role ARN | yes | `payloadConfig.roleArn` | (future puller) |
+| Polling cadence (seconds) | no | `payloadConfig.pollEverySec` | (future puller) |
+| Parser DSL | no | `payloadConfig.parserDsl` | (future parser) |
+
+The one-time-reveal modal exposes the same `lw_is_<secret>` and webhook URL as the [Workato](/ai-gateway/governance/ingestion-sources/workato) source type.
+
+The S3 + role ARN fields are **persisted but not yet used** — they reflect the configuration the puller will need when it ships. Setting them today doesn't cause any AWS calls.
+
+## Event shape we accept today
+
+In callback mode, identical to the Workato envelope-only shape — see [Workato → Event shape](/ai-gateway/governance/ingestion-sources/workato#event-shape-we-accept-today).
+
+## What is still envelope-only / follow-up work
+
+- **S3 puller.** A cron worker that assumes the configured `roleArn`, lists new objects under `s3://<bucket>/<prefix>/` since the last watermark, fetches them, and dispatches them through the (future) parser.
+- **Parser DSL.** A small DSL letting the customer describe how each line / object maps onto OCSF Actor / Action / Target / cost / tokens. Design is in flight.
+- **High-volume parser.** S3 objects can be large; the parser will need streaming + chunked persistence. The webhook callback path's "one delivery, one event" assumption doesn't carry over to S3 pulls.
+
+## Verify with CLI + web
+
+In callback mode:
+
+```bash
+curl -X POST https://<your-langwatch>/api/ingest/webhook/<sourceId> \
+  -H "Authorization: Bearer lw_is_<secret>" \
+  -H "Content-Type: application/json" \
+  -d '{"actor":"agent-42","action":"file.read","target":"/etc/secrets","ts":"2026-04-27T08:00:00Z"}'
+```
+
+`langwatch ingest tail <sourceId>` shows one envelope row (no field promotion — the parser DSL isn't wired). The fields you sent live inside `rawPayload`; click-to-expand on the web detail page shows the verbatim JSON.
+
+When the puller + DSL ship, this same source will start receiving polled events automatically without any config change on the customer side. The bearer secret remains valid; the puller uses it as the same source-of-truth correlator.

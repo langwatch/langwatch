@@ -559,7 +559,20 @@
               "ai-gateway/governance/personal-keys",
               "ai-gateway/governance/admin-setup",
               "ai-gateway/governance/routing-policies",
-              "ai-gateway/governance/cli-debug"
+              "ai-gateway/governance/cli-debug",
+              {
+                "group": "Ingestion sources",
+                "pages": [
+                  "ai-gateway/governance/ingestion-sources/index",
+                  "ai-gateway/governance/ingestion-sources/otel-generic",
+                  "ai-gateway/governance/ingestion-sources/claude-cowork",
+                  "ai-gateway/governance/ingestion-sources/workato",
+                  "ai-gateway/governance/ingestion-sources/s3-custom",
+                  "ai-gateway/governance/ingestion-sources/copilot-studio",
+                  "ai-gateway/governance/ingestion-sources/openai-compliance",
+                  "ai-gateway/governance/ingestion-sources/claude-compliance"
+                ]
+              }
             ]
           },
           {
