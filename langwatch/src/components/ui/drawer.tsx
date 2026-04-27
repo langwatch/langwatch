@@ -35,9 +35,6 @@ export const DrawerContent = React.forwardRef<
         <ChakraDrawer.Content
           ref={ref}
           margin={2}
-          borderRadius="lg"
-          background="bg.surface/80"
-          backdropFilter="blur(25px)"
           pointerEvents="auto"
           {...rest}
           marginTop={marginTopProp}

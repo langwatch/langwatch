@@ -1,6 +1,6 @@
 "use client";
 
-import type { IconButtonProps, SpanProps } from "@chakra-ui/react";
+import type { IconButtonProps, SpanProps, Tokens } from "@chakra-ui/react";
 import { ClientOnly, IconButton, Skeleton, Span } from "@chakra-ui/react";
 import type { ThemeProviderProps } from "next-themes";
 import { ThemeProvider, useTheme } from "next-themes";
@@ -15,13 +15,12 @@ export const colorSystem = {
     700: { value: "#2d2d3d" },
     600: { value: "#3d3d4d" },
     500: { value: "#5c5c6e" },
+    450: { value: "#7B8394" },
     400: { value: "#9CA3AF" },
-    375: { value: "#B8BDBD" },
-    350: { value: "#DDDDDD" },
-    300: { value: "#E0E2E6" },
-    200: { value: "#E8EBF2" },
-    100: { value: "#F2F4F8" },
-    50: { value: "#F7FAFC" },
+    300: { value: "#cbd5e1" },
+    200: { value: "#e2e8f0" },
+    100: { value: "#f1f5f9" },
+    50: { value: "#f8fafc" },
   },
   red: {
     50: { value: "#FFF5F5" },
@@ -226,7 +225,7 @@ export function useColorRawValue(variable: string): string {
   return getRawColorValue(variable);
 }
 
-export function useColorModeValue<T>(light: T, dark: T) {
+export function useColorModeValue<T = Tokens["colors"]>(light: T, dark: T) {
   const { colorMode } = useColorMode();
   return colorMode === "dark" ? dark : light;
 }
