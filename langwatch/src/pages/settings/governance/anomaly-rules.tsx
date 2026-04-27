@@ -47,23 +47,34 @@ const SEVERITY_OPTIONS: Array<{ value: Severity; label: string; tone: string }> 
   { value: "info", label: "Info", tone: "blue" },
 ];
 
+// Reactor evaluates organization / source_type / source today; team and
+// project are persisted but skipped at evaluation time, so they're held
+// back from the composer until the reactor adds them. See
+// docs/ai-gateway/governance/anomaly-rules.mdx scope coverage table.
 const SCOPE_OPTIONS: Array<{ value: Scope; label: string }> = [
   { value: "organization", label: "Organization" },
-  { value: "team", label: "Team" },
-  { value: "project", label: "Project" },
   { value: "source_type", label: "Ingestion source type" },
   { value: "source", label: "Specific ingestion source" },
 ];
 
-const RULE_TYPE_SUGGESTIONS = [
-  "spend_spike",
-  "rate_limit",
-  "tool_mismatch",
-  "after_hours",
-  "unusual_model",
-  "pii_leak",
-  "custom",
-];
+// Only spend_spike is wired to the anomaly reactor today; the other rule
+// types accept persistence but the reactor logs debug + skips them. The
+// composer offers only the live type — admins typing a custom value can
+// still override (the field stays freeform), but autocomplete won't
+// promise something the runtime doesn't deliver. Doc page lists the full
+// preview roadmap.
+const RULE_TYPE_SUGGESTIONS = ["spend_spike"];
+
+const SPEND_SPIKE_THRESHOLD_TEMPLATE = JSON.stringify(
+  {
+    windowSec: 86400,
+    ratioVsBaseline: 2.0,
+    minBaselineUsd: 1.0,
+    baselineOffsetSec: 604800,
+  },
+  null,
+  2,
+);
 
 interface ComposerState {
   id?: string;
@@ -84,7 +95,7 @@ const blankComposer = (): ComposerState => ({
   ruleType: "spend_spike",
   scope: "organization",
   scopeId: "",
-  thresholdConfig: "{}",
+  thresholdConfig: SPEND_SPIKE_THRESHOLD_TEMPLATE,
   destinationConfig: "{}",
 });
 
@@ -497,16 +508,42 @@ function RuleComposer({
               backgroundColor="white"
               list="rule-type-suggestions"
               value={composer.ruleType}
-              onChange={(e) =>
-                setComposer({ ...composer, ruleType: e.target.value })
-              }
-              placeholder="spend_spike, rate_limit, ..."
+              onChange={(e) => {
+                const nextRuleType = e.target.value;
+                setComposer({
+                  ...composer,
+                  ruleType: nextRuleType,
+                  // Auto-fill the threshold template when the user picks
+                  // spend_spike from a blank composer — saves them
+                  // grepping the reactor for the schema. If they've
+                  // already customised the JSON, leave it alone.
+                  thresholdConfig:
+                    nextRuleType === "spend_spike" &&
+                    (composer.thresholdConfig.trim() === "" ||
+                      composer.thresholdConfig.trim() === "{}")
+                      ? SPEND_SPIKE_THRESHOLD_TEMPLATE
+                      : composer.thresholdConfig,
+                });
+              }}
+              placeholder="spend_spike"
             />
             <datalist id="rule-type-suggestions">
               {RULE_TYPE_SUGGESTIONS.map((s) => (
                 <option key={s} value={s} />
               ))}
             </datalist>
+            <Text fontSize="xs" color="fg.muted">
+              Only <code>spend_spike</code> is evaluated by the anomaly
+              reactor today. Other rule types (<code>rate_limit</code>,
+              <code>after_hours</code>, …) are{" "}
+              <Link
+                href="/ai-gateway/governance/anomaly-rules"
+                color="orange.600"
+              >
+                preview
+              </Link>{" "}
+              — persisted as active but not yet detected.
+            </Text>
           </VStack>
           <VStack align="stretch" gap={1} flex={1}>
             <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -567,25 +604,30 @@ function RuleComposer({
           />
         </VStack>
 
-        <VStack align="stretch" gap={1}>
-          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-            Destination config (where alerts go — JSON)
+        <Box
+          borderWidth="1px"
+          borderColor="purple.300"
+          backgroundColor="purple.50"
+          padding={3}
+          borderRadius="sm"
+        >
+          <Text fontSize="xs" color="purple.900">
+            <strong>Alert destinations:</strong> alerts surface on the{" "}
+            <Link href="/governance" color="orange.600">
+              governance dashboard
+            </Link>{" "}
+            today. Slack, PagerDuty, webhook, and email destinations ship
+            in a follow-up release — the composer will gain structured
+            destination fields then. (See{" "}
+            <Link
+              href="/ai-gateway/governance/anomaly-rules"
+              color="orange.600"
+            >
+              anomaly rules docs
+            </Link>{" "}
+            for the dispatch coverage table.)
           </Text>
-          <Textarea
-            size="sm"
-            backgroundColor="white"
-            rows={3}
-            fontFamily="mono"
-            value={composer.destinationConfig}
-            onChange={(e) =>
-              setComposer({
-                ...composer,
-                destinationConfig: e.target.value,
-              })
-            }
-            placeholder='{"slack": {"webhookUrl": "..."}}'
-          />
-        </VStack>
+        </Box>
 
         <HStack gap={3}>
           <Spacer />
