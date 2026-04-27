@@ -18,12 +18,15 @@ import {
 import { useState } from "react";
 import Head from "~/utils/compat/next-head";
 
+import { NotFoundScene } from "~/components/NotFoundScene";
 import MyLayout from "~/components/me/MyLayout";
 import {
   type PersonalApiKeyRow,
   usePersonalContext,
 } from "~/components/me/usePersonalContext";
 import { toaster } from "~/components/ui/toaster";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 const fmtRelative = (iso: string | null): string => {
@@ -46,6 +49,14 @@ const fmtUsd = (amount: number): string =>
     : `$${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
 export default function MySettingsPage() {
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+  const { enabled: governancePreviewEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    { projectId: project?.id, enabled: !!project },
+  );
   const ctx = usePersonalContext();
   const [prefs, setPrefs] = useState(ctx.notificationPrefs);
   const [newKeyLabel, setNewKeyLabel] = useState("");
@@ -117,6 +128,10 @@ export default function MySettingsPage() {
     if (!ctx.organizationId) return;
     revokeMutation.mutate({ organizationId: ctx.organizationId, id });
   };
+
+  if (!governancePreviewEnabled) {
+    return <NotFoundScene />;
+  }
 
   return (
     <MyLayout>

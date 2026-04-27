@@ -19,9 +19,11 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
+import { NotFoundScene } from "~/components/NotFoundScene";
 import SettingsLayout from "~/components/SettingsLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { toaster } from "~/components/ui/toaster";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api, type RouterOutputs } from "~/utils/api";
 
@@ -56,10 +58,14 @@ const STRATEGY_OPTIONS: Array<{ value: Strategy; label: string }> = [
 ];
 
 function RoutingPoliciesPage() {
-  const { organization } = useOrganizationTeamProject({
+  const { organization, project } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const orgId = organization?.id ?? "";
+  const { enabled: governancePreviewEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    { projectId: project?.id, enabled: !!project },
+  );
 
   const policiesQuery = api.routingPolicy.list.useQuery(
     { organizationId: orgId },
@@ -218,6 +224,10 @@ function RoutingPoliciesPage() {
       });
     }
   };
+
+  if (!governancePreviewEnabled) {
+    return <NotFoundScene />;
+  }
 
   return (
     <SettingsLayout>

@@ -337,8 +337,11 @@ export const DashboardLayout = ({
     {},
     { enabled: !!session },
   );
-  const { enabled: gatewayMenuEnabled } = useFeatureFlag(
-    "release_ui_ai_gateway_menu_enabled",
+  // The "My Workspace" entry in the user-avatar dropdown is part of the
+  // governance preview surface, distinct from the existing AI Gateway
+  // menu (which keeps shipping unblocked under release_ui_ai_gateway_menu_enabled).
+  const { enabled: governancePreviewEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
     { projectId: project?.id, enabled: !!project },
   );
 
@@ -566,7 +569,7 @@ export const DashboardLayout = ({
                   <Menu.ItemGroup
                     title={`${session.user.name} (${session.user.email})`}
                   >
-                    {gatewayMenuEnabled && (
+                    {governancePreviewEnabled && (
                       <Menu.Item value="my-workspace" asChild>
                         <Link href="/me">My Workspace</Link>
                       </Menu.Item>

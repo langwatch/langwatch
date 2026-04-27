@@ -10,9 +10,12 @@ import {
 import numeral from "numeral";
 import Head from "~/utils/compat/next-head";
 
+import { NotFoundScene } from "~/components/NotFoundScene";
 import { BudgetExceededBanner } from "~/components/me/BudgetExceededBanner";
 import MyLayout from "~/components/me/MyLayout";
 import { usePersonalContext } from "~/components/me/usePersonalContext";
+import { useFeatureFlag } from "~/hooks/useFeatureFlag";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 const fmtUsd = (amount: number) =>
   amount === 0 ? "$0.00" : numeral(amount).format("$0,0.00");
@@ -23,6 +26,14 @@ const fmtPctDelta = (pct: number | null) =>
     : `${pct >= 0 ? "↑" : "↓"} ${Math.abs(pct)}% vs last month`;
 
 export default function MyUsagePage() {
+  const { project } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+  const { enabled: governancePreviewEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    { projectId: project?.id, enabled: !!project },
+  );
   const ctx = usePersonalContext();
   const {
     summary,
@@ -32,6 +43,10 @@ export default function MyUsagePage() {
     recentActivity,
     organizationName,
   } = ctx;
+
+  if (!governancePreviewEnabled) {
+    return <NotFoundScene />;
+  }
 
   const isOverBudget = budget.status === "exceeded";
   const is80Pct = budget.status === "warning";
