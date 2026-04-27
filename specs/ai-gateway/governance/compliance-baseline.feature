@@ -12,12 +12,20 @@
 # Cryptographic tamper-evidence (Merkle-root publication, write-once
 # verification, key management) is FILED but NOT SHIPPED in this PR. It is
 # the next hardening layer for the regulated finance / healthcare / govt
-# segment. See specs/ai-gateway/governance/tamper-evidence-deferred.feature
-# (planned follow-up) for the cryptographic-proof contract.
+# segment.
 #
 # Source-of-truth: append-only event_log + recorded_spans + log_records.
 # Derived projections: governance_kpis fold, governance_ocsf_events fold.
 # Routing artifact: hidden Governance Project per org, never user-visible.
+#
+# Companion specs (this file references but does not duplicate):
+# - event-log-durability.feature → append-only invariants, projection-rebuild semantics
+# - retention.feature             → per-origin retention class mechanics + plan ceiling
+# - folds.feature                 → governance_kpis + governance_ocsf_events derivation
+# - receiver-shapes.feature       → per-source-type wire shape (spans vs logs)
+# - architecture-invariants.feature → cross-cutting unified-substrate invariants
+# - ui-contract.feature           → /governance UI contract + hidden-project filter discipline
+# - siem-export.feature           → OCSF read API contract + thin push wrapper
 
 Feature: Governance compliance baseline — append-only event log + retention + RBAC
 
@@ -29,62 +37,39 @@ Feature: Governance compliance baseline — append-only event log + retention + 
     And cryptographic tamper-evidence is filed as a follow-up hardening layer
 
   # ─────────────────────────────────────────────────────────────────────
-  # Per-origin retention class — SOC2 / HIPAA / EU AI Act audit retention
+  # Per-origin retention class — see retention.feature for mechanics
   # ─────────────────────────────────────────────────────────────────────
+  #
+  # The retention-class mechanics (per-IngestionSource config, langwatch.
+  # governance.retention_class attribute stamping, CH TTL enforcement,
+  # org-plan ceiling, default class) are the source of truth in
+  # retention.feature. This compliance baseline references that contract
+  # and asserts only the COMPLIANCE GUARANTEES it underwrites:
 
-  Scenario: An IngestionSource carries a retention class and the unified store honours it
-    Given an org admin creates an IngestionSource with retention_class set to "archive"
-    When events from that source land in the unified observability store
-    Then each row carries the langwatch.governance.retention_class attribute set to "archive"
-    And the underlying CH TTL policy applies the archive retention window to those rows
-    And rows tagged with retention_class "operational" decay at the operational window
-    And rows tagged with retention_class "compliance" decay at the compliance window
-
-  Scenario Outline: Retention classes match the contractual posture customers expect
-    Given an IngestionSource configured with retention_class "<class>"
-    When a governance event lands tagged with that class
-    Then the row is retained for at least "<minimum_retention>"
-    And the org-plan ceiling caps the retention at the plans configured maximum
-
-    Examples:
-      | class       | minimum_retention | use_case                                        |
-      | operational | 30 days           | day-to-day debugging, lowest cost               |
-      | compliance  | 1 year            | SOC2 Type II / ISO 27001 audit window           |
-      | archive     | 7 years           | EU AI Act high-risk / HIPAA / financial audit   |
-
-  Scenario: Org-plan ceiling prevents over-configuration
-    Given the orgs plan caps retention at 1 year
-    When an admin attempts to set IngestionSource retention_class to "archive"
-    Then the composer rejects the change with an explicit "plan ceiling: 1 year" error
-    And no event is ever stored beyond the plan ceiling
+  Scenario: Retention class implementation underwrites the SOC2/HIPAA/EU-AI-Act audit windows
+    Given retention.feature defines operational (30d) / compliance (1y) / archive (7y) classes with org-plan ceiling
+    When a customer asks "can your retention meet our SOC2 / HIPAA / EU AI Act window?"
+    Then the answer maps to the class their plan permits per retention.feature
+    And no governance event survives past the plan ceiling regardless of source request
 
   # ─────────────────────────────────────────────────────────────────────
-  # Hidden Governance Project — internal routing artifact, never visible
+  # Hidden Governance Project — see architecture-invariants.feature + ui-contract.feature
   # ─────────────────────────────────────────────────────────────────────
+  #
+  # Auto-creation, kind-enum, never-leaks-to-user-visible-surfaces
+  # invariants are the source of truth in architecture-invariants.feature
+  # (the global rule) and ui-contract.feature (the UI-side enforcement
+  # at every Project consumer). This compliance baseline references those
+  # contracts and asserts only the COMPLIANCE GUARANTEE the invariants
+  # underwrite:
 
-  Scenario: Hidden Governance Project is auto-created on first IngestionSource mint
-    Given an org has zero IngestionSources
-    When an admin creates the orgs first IngestionSource
-    Then a Project with kind "internal_governance" is auto-created for the org
-    And the auto-created project never appears in any user-facing project surface
-
-  Scenario: Hidden Governance Project never leaks to user-visible surfaces
-    Given an org has a hidden Governance Project (kind = "internal_governance")
-    When a user opens the project picker
-    Then the hidden project does not appear in the picker
-    When a user fetches GET /api/v1/projects
-    Then the hidden project is not in the response
-    When a user views the org billing export
-    Then the hidden project is not in the export rows
-    When a user views the project list in any admin / settings surface
-    Then the hidden project does not appear in the list
-    When the docs reference projects in a customer-facing context
-    Then no docs page exposes the hidden Governance Project as a user concept
-
-  Scenario: Project consumers must filter on kind to enforce the invariant
-    Given a Project consumer renders a list of an orgs projects
-    Then the consumer applies a filter "kind != 'internal_governance'"
-    And any consumer missing this filter is treated as a bug, not a design tradeoff
+  Scenario: Hidden Governance Project routing underwrites the access-control compliance posture
+    Given architecture-invariants.feature defines Project.kind=internal_governance as auto-created and hidden
+    And ui-contract.feature defines the filter discipline at every Project consumer
+    When an auditor asks "can a non-org-admin reach our governance audit data?"
+    Then the answer is no — RBAC via project-membership on the hidden project blocks them per ui-contract.feature
+    And the hidden project never leaks to user-visible surfaces per architecture-invariants.feature
+    And this satisfies the SOC2 Type II / ISO 27001 access-control control families for the audit-data scope
 
   # ─────────────────────────────────────────────────────────────────────
   # RBAC — org admin / auditor read-only access; project members blocked
@@ -113,21 +98,23 @@ Feature: Governance compliance baseline — append-only event log + retention + 
     And the auditor cannot read non-governance projects unless granted separately
 
   # ─────────────────────────────────────────────────────────────────────
-  # Append-only event log — SOC2 / EU AI Act non-repudiation foundation
+  # Append-only event log — see event-log-durability.feature for mechanics
   # ─────────────────────────────────────────────────────────────────────
+  #
+  # The append-only invariants (event_log immutability, projection rebuild
+  # from event_log, deletion-of-derived-view-does-not-affect-event_log)
+  # are the source of truth in event-log-durability.feature. This
+  # compliance baseline references that contract and asserts only the
+  # COMPLIANCE GUARANTEE the durability invariant underwrites:
 
-  Scenario: Governance events are durable via the existing event_log
-    Given a governance event lands at the receiver
-    When the event is processed through the trace-processing pipeline
-    Then the event is appended to event_log before any projection writes
-    And the event_log row is immutable (no UPDATE / DELETE on event_log)
-    And projection rebuilds always replay from event_log as source of truth
-
-  Scenario: UI deletion of derived view does not delete event_log evidence
-    Given an admin clicks "Delete" on an entry in /governance dashboard
-    Then the derived projection row may be hidden or marked deleted
-    But the event_log row that produced it remains durable
-    And re-running the projection from event_log re-creates the derived row
+  Scenario: Append-only event_log is the SOC2/ISO-27001/EU-AI-Act non-repudiation foundation
+    Given event-log-durability.feature defines event_log as append-only with no UPDATE/DELETE API
+    When an auditor asks "can a row be retroactively edited or deleted?"
+    Then the answer is no — the durability invariants in event-log-durability.feature hold
+    And projection rebuilds always replay from event_log as source of truth (per that spec)
+    And derived-view deletion in the UI does not delete event_log evidence (per that spec)
+    And this is what satisfies SOC2 Type II / ISO 27001 / EU AI Act non-repudiation requirements
+    And cryptographic Merkle-root publication is filed as a follow-up hardening (see Tamper-evidence section below)
 
   # ─────────────────────────────────────────────────────────────────────
   # Tamper-evidence — explicitly deferred to a follow-up

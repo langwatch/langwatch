@@ -20,6 +20,14 @@
 # Source of truth: recorded_spans + log_records (unified observability
 # substrate). Derived: governance_ocsf_events fold (per-event OCSF
 # Actor/Action/Target/Time/Severity shape).
+#
+# Companion specs (this file references but does not duplicate):
+# - folds.feature                 → governance_ocsf_events fold derivation + cursor pull mechanics
+# - retention.feature             → per-origin TTL applied to fold rows in lockstep with source rows
+# - event-log-durability.feature  → projection rebuild from event_log; derived-data invariants
+# - compliance-baseline.feature   → SOC2/ISO/EU AI Act framework coverage; tamper-evidence deferral
+# - architecture-invariants.feature → cross-cutting unified-substrate + folds-as-derived invariants
+# - ui-contract.feature           → /governance UI surface (separate from this REST/SIEM-export contract)
 
 Feature: SIEM export — OCSF read projection over the unified governance store
 
