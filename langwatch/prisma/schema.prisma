@@ -311,6 +311,20 @@ model Project {
   team                     Team                                @relation(fields: [teamId], references: [id])
   language                 String
   framework                String
+  /// Project kind:
+  ///   - "application": user-facing workspace where developers send their
+  ///     own app traces. The default for everything created via the
+  ///     onboarding/quickstart flow.
+  ///   - "internal_governance": hidden per-org routing/tenancy artifact
+  ///     for IngestionSource ingest data. Auto-created lazily on the
+  ///     first IngestionSource mint via ensureHiddenGovernanceProject().
+  ///     MUST be filtered out of every user-visible Project surface
+  ///     (project picker, /api/v1/projects, billing exports, RBAC
+  ///     pickers, etc.) — the regression-test invariant in
+  ///     specs/ai-gateway/governance/ui-contract.feature codifies this.
+  /// Stored as a free-form string (matching IngestionSource.sourceType
+  /// pattern) so future routing kinds can ship without schema migrations.
+  kind                     String                              @default("application")
   firstMessage             Boolean                             @default(false)
   integrated               Boolean                             @default(false)
   createdAt                DateTime                            @default(now())
@@ -372,6 +386,7 @@ model Project {
   @@index([teamId])
   @@index([isPersonal])
   @@index([ownerUserId])
+  @@index([teamId, kind])
 }
 
 enum INVITE_STATUS {
@@ -1734,6 +1749,19 @@ model IngestionSource {
   /// Status flag. 'active' (default), 'disabled' (admin paused), or
   /// 'awaiting_first_event' (created but never received).
   status String @default("awaiting_first_event")
+
+  /// Per-origin retention class applied to every span/log emitted by
+  /// this source's events when they land in the unified observability
+  /// store (recorded_spans / log_records). Drives the CH TTL policy.
+  /// Values:
+  ///   - "thirty_days": operational debugging window (default)
+  ///   - "one_year":    compliance baseline (SOC2 / ISO 27001 / EU AI Act)
+  ///   - "seven_years": long-form audit (regulated industry)
+  /// Org plan ceiling enforced at the composer / API layer.
+  /// Stored as string for extensibility — the canonical set lives in
+  /// code (governance retention policy registry).
+  /// Spec: specs/ai-gateway/governance/retention.feature
+  retentionClass String @default("thirty_days")
 
   /// Last event timestamp observed (any direction). Surfaces in the
   /// admin UI as "last event 2 minutes ago".
