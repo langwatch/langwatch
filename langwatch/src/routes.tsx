@@ -191,6 +191,10 @@ const routes: RouteObject[] = [
     path: "/settings/governance",
     ...page(() => import("./pages/settings/governance")),
   },
+  {
+    path: "/settings/governance/ingestion-sources",
+    ...page(() => import("./pages/settings/governance/ingestion-sources")),
+  },
 
   // Personal-scope governance routes (must precede the /:project catch-all
   // so "me" doesn't get treated as a project slug)

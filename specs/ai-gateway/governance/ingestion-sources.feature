@@ -17,7 +17,7 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
     And the admin has organization:manage permission
 
   Scenario: Admin lands on the IngestionSources index
-    When the admin navigates to "/settings/ingestion-sources"
+    When the admin navigates to "/settings/governance/ingestion-sources"
     Then a list shows every configured source with: name, source type,
       ingestion mode (push/pull/s3), last event timestamp, status
     And each row links to a per-source detail page with health metrics

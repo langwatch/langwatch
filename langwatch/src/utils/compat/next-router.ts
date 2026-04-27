@@ -39,6 +39,8 @@ const ROUTE_PATTERNS = [
   "/onboarding/product",
   "/onboarding/welcome",
   "/settings",
+  "/settings/governance",
+  "/settings/governance/ingestion-sources",
   "/settings/*",
   // Personal-scope governance routes — must precede the "/:project/*" patterns
   // so the auto-detection in components/useWorkspaceCurrent doesn't classify

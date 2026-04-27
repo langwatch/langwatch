@@ -278,7 +278,7 @@ function GovernanceOverviewPage() {
                 No ingestion sources configured.
               </Text>
               <Link
-                href="/settings/governance/ingestion-sources/new"
+                href="/settings/governance/ingestion-sources"
                 color="orange.600"
               >
                 + Add your first source
@@ -436,7 +436,7 @@ function SourceChip({
 
   return (
     <Link
-      href={`/settings/governance/ingestion-sources/${source.id}`}
+      href="/settings/governance/ingestion-sources"
       _hover={{ textDecoration: "none" }}
     >
       <HStack
