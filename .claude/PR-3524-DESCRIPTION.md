@@ -314,9 +314,9 @@ trail. The mechanical delete commit (`f3de1ae07`) is the boundary between
 | `governance_ocsf_events` fold projection | Lane S | next slice |
 | Per-origin retention TTL hook on recorded_spans + log_records | Lane S | next slice |
 | Anomaly reactor rewire onto `governance_kpis` fold | Lane S | next slice |
-| End-to-end HTTP receiver integration test | Lane A | in flight (Andre) |
-| Layer-2 per-consumer integration test | Lane B | in flight (Alexis) |
-| UI verification screenshots | Lane B | in flight (Alexis) |
+| End-to-end HTTP receiver integration test | Lane A | ✅ shipped `d20a1b403` (13 tests) |
+| Layer-2 per-consumer integration test | Lane B | superseded — Layer-1 + Andre's helper composition + UI dogfood cover the invariant; further per-consumer assertions deferred to post-step-3/3 when the consumer registry has more surfaces to assert against |
+| UI verification screenshots | Lane B | ✅ shipped — 8 screenshots embedded above (iter22 dogfood) |
 | Customer-facing docs flip + dev/docs/ ADR + per-platform mapping page | Lane A | gated on step 3/3 (Andre) |
 
 ---
@@ -335,29 +335,89 @@ trail. The mechanical delete commit (`f3de1ae07`) is the boundary between
 
 ### The unified-substrate dogfood path
 
-1. **Anomaly rules list** — `/settings/governance/anomaly-rules`. Critical /
-   Warning / Info severity sections; one active rule each. Cross-link from
-   the governance overview when the rule fires.
+The customer journey, captured frame-by-frame against the running dev
+server post-`33a8cf6d0` (full receiver rewire shipped):
+
+1. **`/governance` admin overview** — chrome + KPI strip + IngestionSources
+   panel + Recent anomalies. Org-scoped surface; the top-nav shows the
+   "Organization-scoped — not tied to a project" indicator (iter 19 work)
+   confirming the page is not gated on the active project context.
+   ![Governance dashboard](https://i.img402.dev/sqnfqmiabr.png)
+
+2. **`/settings/governance/ingestion-sources` list** — fleet management
+   for the per-platform feeds. "+ Add source" CTA opens the composer.
+   Active sources show last-event timestamps, status, and a Rotate
+   secret affordance (24h grace window — old secret stays valid while
+   the new one rolls out upstream).
+   ![Ingestion sources list](https://i.img402.dev/sfmg6nsxbd.png)
+
+3. **Add ingestion source composer** — the headline UI artifact of
+   Sergey's 2b-i: source-type dropdown, display name, description, and
+   the **retention class dropdown** with three options gated by org
+   plan ceiling — Operational (30 days, SOC 2 / ISO 27001 baseline) /
+   Compliance (1 year, EU AI Act / GDPR / HIPAA-most-uses) /
+   Long-form audit (7 years, regulated industry).
+   **Crucially, NO Project field** — the hidden Governance Project is
+   internal routing only, never user-configurable. Per
+   `master_orchestrator` + `rchaves` directive 2026-04-27.
+   ![Ingestion source composer](https://i.img402.dev/9220teidwj.png)
+
+4. **WorkspaceSwitcher BEFORE the helper fires** — only the
+   user-visible "tes" application project appears under the "test"
+   organization. Baseline state: no IngestionSource exists, no hidden
+   Governance Project minted yet (the helper is lazy — feature-flag
+   activation alone does not create one).
+   ![Workspace switcher pre-helper](https://i.img402.dev/urj4u15h3y.png)
+
+5. **SecretModal post-create** — one-time bearer reveal + copy-paste
+   curl example. Notice the section heading reads "OTLP **ingestion**
+   endpoint" (not "audit-event endpoint") and the caption explains
+   "Spans push into the LangWatch trace store with this source's
+   origin tag... If you are sending agent traces from your own
+   LangWatch SDK, use `/api/otel/v1/traces` with your project API
+   key — different auth, **same trace store**."
+   This is the unified-substrate framing locked by the branch
+   correction (commit `7cf097a22`) — explicitly NOT the
+   parallel-audit-events framing the original direction implied.
+   ![Secret modal post-create](https://i.img402.dev/2favdzd7k4.png)
+
+6. **WorkspaceSwitcher AFTER `ensureHiddenGovernanceProject` fires** —
+   the create-source flow just minted a real `Project.kind =
+   "internal_governance"` row through Sergey's lazy-ensure helper. The
+   dropdown is unchanged: still ONLY "tes" appears. The Layer-1
+   filter at `PrismaOrganizationRepository.getAllForUser` (commit
+   `94426716e`) hides the routing artifact from every user-visible
+   Project surface — proven end-to-end through real DB state, not
+   synthetic test data. **This is the hidden-Governance-Project
+   non-leak invariant operating in live UI.**
+   ![Workspace switcher post-helper](https://i.img402.dev/nmrpej53qr.png)
+
+7. **Anomaly rules list** — `/settings/governance/anomaly-rules`.
+   Critical / Warning / Info severity sections; one active rule each.
+   Cross-link from the governance overview when the rule fires.
    ![Anomaly rules list](https://i.img402.dev/x7qg8aqgfq.png)
 
-2. **AnomalyRule composer** — Name + Severity + Description + Rule type +
-   Scope + Threshold JSON. v1 ships `spend_spike` rule type + log-only
-   dispatch; `rate_limit` / `after_hours` / Slack / PagerDuty / webhook /
-   email destinations are explicitly **preview** in the composer copy
-   (config persists, evaluation/dispatch in follow-up). Honest framing — no
-   mocked-v0 surfaces per @rchaves "no mocks in UI" directive.
+8. **AnomalyRule composer** — Name + Severity + Description + Rule
+   type + Scope + Threshold JSON. v1 ships `spend_spike` rule type +
+   log-only dispatch; `rate_limit` / `after_hours` / Slack / PagerDuty
+   / webhook / email destinations are explicitly **preview** in the
+   composer copy (config persists, evaluation/dispatch in follow-up).
+   Honest framing — no mocked-v0 surfaces per @rchaves "no mocks in
+   UI" directive.
    ![Anomaly composer](https://i.img402.dev/yx701f85e8.png)
-
-> Lane-B's full 8-shot iter22 set is queued for fold-in. Remaining flows
-> (governance dashboard / IngestionSource composer / SecretModal / WorkspaceSwitcher
-> Layer-1 non-leak proof) ship alongside Lane-A's narrative fold.
 
 ### Screenshot cross-references — what each shot proves
 
 | Shot | Proves | Spec scenario |
 |---|---|---|
-| Anomaly rules list | AnomalyRule + AnomalyAlert read paths render against real PG state | `architecture-invariants.feature` AnomalyRule lifecycle |
-| Anomaly composer | Composer offers retention-class + scope + threshold; Preview-rule-type framing matches spec contract | `ui-contract.feature` composer scenarios |
+| 1. /governance dashboard | Org-scoped admin surface renders chrome + KPI strip + IngestionSources panel against live PG | `ui-contract.feature` "single governance surface" |
+| 2. Ingestion sources list | Fleet management surface + per-source action affordances | `ingestion-sources.feature` list + rotation |
+| 3. Composer | Retention-class dropdown with canonical enum values; NO project picker (Governance Project is internal routing only) | `ui-contract.feature` "composer offers retention class" + "no project picker" |
+| 4. WorkspaceSwitcher pre-helper | Baseline state — no Gov Project exists | `architecture-invariants.feature` lazy-ensure semantics |
+| 5. Secret modal post-create | Unified-substrate copy ("OTLP ingestion endpoint" + "different auth, same trace store"), not parallel-audit-events framing | `ui-contract.feature` SecretModal copy + commit `7cf097a22` revert |
+| 6. WorkspaceSwitcher post-helper | Hidden Governance Project never leaks into user-visible Project surfaces, **proven against real DB state** | `architecture-invariants.feature` "hidden Gov Project never appears in user-visible Project surfaces" + Layer-1 filter at `getAllForUser` |
+| 7. Anomaly rules list | AnomalyRule + AnomalyAlert read paths render against real PG state | `architecture-invariants.feature` AnomalyRule lifecycle |
+| 8. Anomaly composer | Composer offers retention-class + scope + threshold; Preview-rule-type framing matches spec contract | `ui-contract.feature` composer scenarios |
 
 ---
 
