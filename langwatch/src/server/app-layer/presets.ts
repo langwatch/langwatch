@@ -100,6 +100,7 @@ import { SuiteRunStateRepositoryClickHouse, SuiteRunStateRepositoryMemory } from
 import { SimulationRunStateRepositoryClickHouse, SimulationRunStateRepositoryMemory } from "../event-sourcing/pipelines/simulation-processing/repositories";
 import { ExperimentRunStateRepositoryClickHouse, ExperimentRunStateRepositoryMemory } from "../event-sourcing/pipelines/experiment-run-processing/repositories";
 import { createExperimentRunItemAppendStore } from "../event-sourcing/pipelines/experiment-run-processing/projections/experimentRunResultStorage.store";
+import { createActivityEventAppendStore } from "../event-sourcing/pipelines/activity-monitor-processing";
 import type { PipelineRepositories } from "../event-sourcing/pipelineRegistry";
 
 /**
@@ -329,6 +330,9 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       ? new MetricRecordStorageClickHouseRepository(resolveClickHouseClient)
       : new NullMetricRecordStorageRepository(),
     experimentRunItemStorage: createExperimentRunItemAppendStore(
+      clickhouseEnabled ? resolveClickHouseClient : null,
+    ),
+    activityEventStorage: createActivityEventAppendStore(
       clickhouseEnabled ? resolveClickHouseClient : null,
     ),
   };
@@ -616,6 +620,9 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
       billing: {
         reportUsageForMonth: noop,
       } as AppCommands["billing"],
+      activityMonitor: {
+        recordActivityEvent: noop,
+      } as AppCommands["activityMonitor"],
       scenarioExecutionHandle: { reactor: { name: "scenarioExecution", options: { runIn: ["worker"] }, handle: async () => {} }, setPool: () => {} },
     },
     ...overrides,

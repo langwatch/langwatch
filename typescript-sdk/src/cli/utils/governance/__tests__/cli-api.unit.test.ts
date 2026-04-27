@@ -34,21 +34,25 @@ interface SeenCall {
 }
 
 function spyFetch(response: Response): {
-  fetchImpl: (url: string, init: RequestInit) => Promise<Response>;
+  fetchImpl: typeof fetch;
   seen: SeenCall[];
 } {
   const seen: SeenCall[] = [];
-  const fetchImpl = vi
-    .fn<(url: string, init: RequestInit) => Promise<Response>>()
-    .mockImplementation(async (url: string, init: RequestInit) => {
-      const headers = init.headers as Record<string, string> | undefined;
-      seen.push({
-        url,
-        authHeader: headers?.Authorization,
-        acceptHeader: headers?.Accept,
-      });
-      return response;
+  const fetchImpl: typeof fetch = async (input, init) => {
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.toString()
+          : input.url;
+    const headers = (init?.headers ?? {}) as Record<string, string>;
+    seen.push({
+      url,
+      authHeader: headers.Authorization,
+      acceptHeader: headers.Accept,
     });
+    return response;
+  };
   return { fetchImpl, seen };
 }
 

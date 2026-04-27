@@ -27,6 +27,10 @@ import {
   TRACE_PROCESSING_COMMAND_TYPES,
   TRACE_PROCESSING_EVENT_TYPES,
 } from "../pipelines/trace-processing/schemas/constants";
+import {
+  ACTIVITY_MONITOR_PROCESSING_COMMAND_TYPES,
+  ACTIVITY_MONITOR_PROCESSING_EVENT_TYPES,
+} from "../pipelines/activity-monitor-processing/schemas/constants";
 
 /**
  * Test event type identifiers for integration tests.
@@ -43,6 +47,7 @@ export const EVENT_TYPE_IDENTIFIERS = [
   ...EXPERIMENT_RUN_PROCESSING_EVENT_TYPES,
   ...SIMULATION_PROCESSING_EVENT_TYPES,
   ...SUITE_RUN_PROCESSING_EVENT_TYPES,
+  ...ACTIVITY_MONITOR_PROCESSING_EVENT_TYPES,
   ...TEST_EVENT_TYPES,
 ] as const;
 
@@ -56,6 +61,7 @@ export const COMMAND_TYPE_IDENTIFIERS = [
   ...SIMULATION_RUN_PROCESSING_COMMAND_TYPES,
   ...SUITE_RUN_PROCESSING_COMMAND_TYPES,
   ...BILLING_REPORTING_COMMAND_TYPES,
+  ...ACTIVITY_MONITOR_PROCESSING_COMMAND_TYPES,
 ] as const;
 
 /**
@@ -76,6 +82,7 @@ export const AGGREGATE_TYPE_IDENTIFIERS = [
   "simulation_run",
   "suite_run",
   "billing_report",
+  "activity_event",
   "global",
   TEST_AGGREGATE_TYPE,
 ] as const;

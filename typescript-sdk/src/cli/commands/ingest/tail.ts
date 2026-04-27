@@ -93,13 +93,7 @@ export async function ingestTailCommand(
       process.stderr.write(chalk.yellow(`warn: ${msg} (retrying)\n`));
       continue;
     }
-    const fresh = next
-      .filter(
-        (e) =>
-          e.eventTimestampIso > cursorIso ||
-          (e.eventTimestampIso === cursorIso && !seen.has(e.eventId)),
-      )
-      .reverse(); // print chronological
+    const fresh = pickFreshEvents(next, { cursorIso, seen });
     for (const e of fresh) {
       if (options.json) {
         console.log(JSON.stringify(e));
@@ -112,7 +106,46 @@ export async function ingestTailCommand(
   }
 }
 
-function printEventLine(e: ActivityEventDetailRow): void {
+/**
+ * Pure dedup filter for the --follow polling loop. Given the latest
+ * batch from the server (DESC by eventTimestamp) and the current
+ * `(cursorIso, seen)` watermark, returns the events that are new
+ * AND have not yet been printed, in chronological (oldest-first) order.
+ *
+ * Two paths produce a "new" event:
+ *   1. eventTimestampIso strictly greater than cursorIso.
+ *   2. eventTimestampIso equal to cursorIso AND eventId not in `seen`
+ *      — handles multiple events that share the same second-resolution
+ *      timestamp on the server's clock.
+ *
+ * Exported for unit testing; the follow loop owns the mutable state
+ * (Set + cursor) and advances them after each printed row.
+ */
+export function pickFreshEvents(
+  next: readonly ActivityEventDetailRow[],
+  state: { cursorIso: string; seen: ReadonlySet<string> },
+): ActivityEventDetailRow[] {
+  return next
+    .filter(
+      (e) =>
+        e.eventTimestampIso > state.cursorIso ||
+        (e.eventTimestampIso === state.cursorIso &&
+          !state.seen.has(e.eventId)),
+    )
+    .slice()
+    .reverse();
+}
+
+/**
+ * Renders a single event row for the human (non-JSON) output mode.
+ * Pure — no I/O — so it can be unit-tested by capturing stdout via
+ * a spy or by calling `formatEventLine` directly.
+ *
+ * Cost is suppressed when ≤ 0 (no upstream cost attribute), tokens
+ * are suppressed when both counts are zero. Both fields are rendered
+ * as separate trailing meta cells separated by a single space.
+ */
+export function formatEventLine(e: ActivityEventDetailRow): string {
   const ts = chalk.gray(e.eventTimestampIso);
   const evt = chalk.cyan(e.eventType);
   const action = chalk.white(e.action);
@@ -123,5 +156,9 @@ function printEventLine(e: ActivityEventDetailRow): void {
       ? chalk.gray(`${e.tokensInput}/${e.tokensOutput} tok`)
       : "";
   const meta = [cost, tokens].filter(Boolean).join(" ");
-  console.log(`${ts}  ${evt}  ${action} → ${target}  ${meta}`);
+  return `${ts}  ${evt}  ${action} → ${target}  ${meta}`;
+}
+
+function printEventLine(e: ActivityEventDetailRow): void {
+  console.log(formatEventLine(e));
 }

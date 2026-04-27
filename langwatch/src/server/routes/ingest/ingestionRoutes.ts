@@ -1,35 +1,71 @@
 /**
  * IngestionSource receivers — push-mode entry points for the Activity
- * Monitor pillar. Two endpoints in this slice (foundation):
+ * Monitor pillar. Two endpoints:
  *
  *   POST /api/ingest/otel/:sourceId      OTLP/HTTP passthrough
  *   POST /api/ingest/webhook/:sourceId   Generic JSON webhook
- *
- * Per-platform adapters (Cowork-flavoured OTel, Workato-shaped
- * webhook, S3 drops with custom DSL, Office365 puller) get their own
- * routes/jobs in follow-up slices. This file establishes the
- * authentication contract + the OCSF normalisation handoff that all
- * push-mode receivers share.
  *
  * Auth: Authorization: Bearer <ingestSecret>. The IngestionSource is
  * resolved by raw secret → hash lookup, with a 24h grace window for
  * rotated secrets (see IngestionSourceService.findByIngestSecret).
  *
+ * Event sourcing (since C1): the receiver normalises the body and
+ * appends an `ActivityEventReceived` event into event_log via
+ * `getApp().activityMonitor.recordActivityEvent`. The
+ * activityEventStorage map projection then writes the row to
+ * `gateway_activity_events`. The receiver no longer writes CH
+ * directly — see docs/ai-gateway/governance/activity-monitor-event-sourcing.md
+ * for the architecture rationale (rchaves directive 2026-04-27 +
+ * PR #3351 pattern).
+ *
  * Out of scope for this slice (deferred to follow-up):
- *   - Real OCSF/AOS event normalisation (today: capture raw, tag with
- *     SourceType + SourceId, defer parse to a downstream pipeline)
- *   - Per-platform adapter logic
- *   - Anomaly detection
- *   - Alert routing
+ *   - Per-platform deeper normalisers (Workato audit, Copilot Studio
+ *     poller, S3 custom DSL, Compliance API pullers)
+ *   - Anomaly detection (Option C2 — anomaly reactor on the same
+ *     pipeline)
+ *   - Alert routing destinations beyond log-only (Option C3)
  */
 import type { Context } from "hono";
 import { Hono } from "hono";
 
+import type { IngestionSource } from "@prisma/client";
+
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { IngestionSourceService } from "~/server/governance/activity-monitor/ingestionSource.service";
-import { ActivityEventRepository } from "~/server/governance/activity-monitor/activityEvent.repository";
 import { normalizeOtlpJson } from "~/server/governance/activity-monitor/normalizers/otel";
 import { createLogger } from "~/utils/logger/server";
+
+/**
+ * The activity-monitor event-sourcing pipeline writes events to
+ * `event_log` (ClickHouse), which resolves its CH client by treating
+ * the event's `tenantId` as a Project id. IngestionSources are
+ * org-scoped (no projectId), so we need a representative project for
+ * the org to anchor the event-log writes.
+ *
+ * This cache holds (organizationId → projectId) for the resolved
+ * representative project. Misses do a single lookup, hits are O(1).
+ * The CH `gateway_activity_events.TenantId` column still carries
+ * `IngestionSource.id` (set by the map projection from data.sourceId),
+ * so the storage table's tenancy semantics are unchanged — only the
+ * event_log layer is bridged through a project id.
+ */
+const orgRepresentativeProjectCache = new Map<string, string>();
+
+async function resolveEventLogProjectId(
+  source: IngestionSource,
+): Promise<string | null> {
+  const cached = orgRepresentativeProjectCache.get(source.organizationId);
+  if (cached) return cached;
+  const project = await prisma.project.findFirst({
+    where: { team: { organizationId: source.organizationId } },
+    select: { id: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!project) return null;
+  orgRepresentativeProjectCache.set(source.organizationId, project.id);
+  return project.id;
+}
 
 const logger = createLogger("langwatch:ingest");
 
@@ -77,25 +113,51 @@ app.post("/otel/:sourceId", async (c: Context) => {
     );
   }
 
-  // Parse + normalise + persist. Even if parse fails we still 202-ack
-  // (upstream platforms shouldn't retry-bomb us); the source's
-  // lastEventAt still flips so the admin sees the connection is alive.
+  // Parse + normalise + enqueue events into the event-sourcing pipeline.
+  // Even if parse fails we still 202-ack (upstream platforms shouldn't
+  // retry-bomb us); the source's lastEventAt still flips synchronously
+  // so the admin sees the connection is alive. The map projection
+  // writes the row to gateway_activity_events.
   let bodyBytes = 0;
   let eventCount = 0;
   let raw = "";
+  const eventLogProjectId = await resolveEventLogProjectId(source);
   try {
     raw = await c.req.text();
     bodyBytes = raw.length;
     const events = normalizeOtlpJson(source, raw);
     eventCount = events.length;
-    if (events.length > 0) {
-      const repo = new ActivityEventRepository();
-      await repo.insert(events);
+    if (!eventLogProjectId) {
+      logger.warn(
+        { sourceId: source.id, organizationId: source.organizationId },
+        "no project in org — activity events not enqueued (lastEventAt still flips)",
+      );
+    } else {
+      const occurredAt = Date.now();
+      for (const ev of events) {
+        await getApp().activityMonitor.recordActivityEvent({
+          tenantId: eventLogProjectId,
+          occurredAt,
+          sourceId: source.id,
+          organizationId: source.organizationId,
+          sourceType: ev.sourceType,
+          eventType: ev.eventType,
+          eventId: ev.eventId,
+          actor: ev.actor ?? "",
+          action: ev.action ?? "",
+          target: ev.target ?? "",
+          costUsd: ev.costUsd,
+          tokensInput: ev.tokensInput ?? 0,
+          tokensOutput: ev.tokensOutput ?? 0,
+          rawPayload: ev.rawPayload ?? "",
+          eventTimestampMs: ev.eventTimestamp.getTime(),
+        });
+      }
     }
   } catch (err) {
     logger.warn(
       { sourceId: source.id, err: String(err) },
-      "otel ingest persist failed (still ack'ing)",
+      "otel ingest enqueue failed (still ack'ing)",
     );
   }
 
@@ -150,35 +212,47 @@ app.post("/webhook/:sourceId", async (c: Context) => {
     );
   }
 
-  // Webhook receivers are platform-specific in shape — for this
-  // foundation slice we only persist a single envelope event with the
-  // raw payload. Per-platform normalisers (workato audit shape, S3
+  // Webhook receivers are platform-specific in shape — for the
+  // foundation we only enqueue a single envelope event with the raw
+  // payload. Per-platform normalisers (workato audit shape, S3
   // custom DSL, etc.) ship in follow-up adapter slices and replace
   // this minimal envelope with their richer normalised events.
   let bodyBytes = 0;
   let envelopeId = "";
   let raw = "";
+  const eventLogProjectId = await resolveEventLogProjectId(source);
   try {
     raw = await c.req.text();
     bodyBytes = raw.length;
-    const repo = new ActivityEventRepository();
     envelopeId = `envelope-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
-    await repo.insert([
-      {
-        tenantId: source.id,
+    if (!eventLogProjectId) {
+      logger.warn(
+        { sourceId: source.id, organizationId: source.organizationId },
+        "no project in org — webhook event not enqueued (lastEventAt still flips)",
+      );
+    } else {
+      const occurredAt = Date.now();
+      await getApp().activityMonitor.recordActivityEvent({
+        tenantId: eventLogProjectId,
+        occurredAt,
+        sourceId: source.id,
         organizationId: source.organizationId,
         sourceType: source.sourceType,
-        sourceId: source.id,
-        eventId: envelopeId,
         eventType: "agent.action",
+        eventId: envelopeId,
+        actor: "",
+        action: "",
+        target: "",
+        tokensInput: 0,
+        tokensOutput: 0,
         rawPayload: raw,
-        eventTimestamp: new Date(),
-      },
-    ]);
+        eventTimestampMs: occurredAt,
+      });
+    }
   } catch (err) {
     logger.warn(
       { sourceId: source.id, err: String(err) },
-      "webhook ingest persist failed (still ack'ing)",
+      "webhook ingest enqueue failed (still ack'ing)",
     );
   }
 

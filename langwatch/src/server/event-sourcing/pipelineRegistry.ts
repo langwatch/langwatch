@@ -21,6 +21,10 @@ import type { TraceSummaryService } from "../app-layer/traces/trace-summary.serv
 
 import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-processing/pipeline";
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
+import {
+  createActivityMonitorProcessingPipeline,
+  type ClickHouseActivityEventRecord,
+} from "./pipelines/activity-monitor-processing";
 import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
 import { createSimulationProcessingPipeline } from "./pipelines/simulation-processing/pipeline";
 import type { SimulationRunStateData } from "./pipelines/simulation-processing/projections/simulationRunState.foldProjection";
@@ -146,6 +150,8 @@ export interface PipelineRepositories {
   logRecordStorage: LogRecordStorageRepository;
   metricRecordStorage: MetricRecordStorageRepository;
   experimentRunItemStorage: AppendStore<ClickHouseExperimentRunResultRecord>;
+  /** Activity-monitor map projection write target — gateway_activity_events CH table. */
+  activityEventStorage: AppendStore<ClickHouseActivityEventRecord>;
 }
 
 export interface PipelineRegistryDeps {
@@ -204,6 +210,7 @@ export class PipelineRegistry {
 
     const experimentRunPipeline = this.registerExperimentRunPipeline({ wireExperimentDeps });
     const billingPipeline = this.registerBillingReportingPipeline();
+    const activityMonitorPipeline = this.registerActivityMonitorPipeline();
 
     logger.info("All pipelines registered");
 
@@ -214,9 +221,18 @@ export class PipelineRegistry {
       simulations: mapCommands(simulationPipeline.commands),
       suiteRuns: mapCommands(suiteRunPipeline.commands),
       billing: mapCommands(billingPipeline.commands),
+      activityMonitor: mapCommands(activityMonitorPipeline.commands),
       /** Late-bind the execution pool for scenario execution reactor. */
       scenarioExecutionHandle,
     };
+  }
+
+  private registerActivityMonitorPipeline() {
+    return this.deps.eventSourcing.register(
+      createActivityMonitorProcessingPipeline({
+        activityEventAppendStore: this.deps.repositories.activityEventStorage,
+      }),
+    );
   }
 
   private registerEvaluationPipeline() {
