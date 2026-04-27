@@ -1,8 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { platformUrl } from "../platform-url";
 
-// Mutable env object so individual tests can override BASE_HOST
-const mockEnv = { BASE_HOST: "https://app.langwatch.ai" as string | undefined };
+// vi.mock factories are hoisted above top-level declarations, so the
+// mutable env object must be created via vi.hoisted to be available
+// when the mock factory runs.
+const { mockEnv } = vi.hoisted(() => ({
+  mockEnv: { BASE_HOST: "https://app.langwatch.ai" as string | undefined },
+}));
 
 vi.mock("~/env.mjs", () => ({ env: mockEnv }));
 
