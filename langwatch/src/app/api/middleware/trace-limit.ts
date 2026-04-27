@@ -36,6 +36,16 @@ export const blockTraceUsageExceededMiddleware: MiddlewareHandler = async (
       logger.error({ error, projectId: project.id }, "Plan limit notification failed");
     }
 
+    logger.info(
+      {
+        projectId: project.id,
+        currentMonthMessagesCount: result.count,
+        activePlanName: result.planName,
+        maxMessagesPerMonth: result.maxMessagesPerMonth,
+      },
+      "Project has reached plan limit",
+    );
+
     return c.json({ error: "ERR_PLAN_LIMIT", message: result.message }, 429);
   }
 
