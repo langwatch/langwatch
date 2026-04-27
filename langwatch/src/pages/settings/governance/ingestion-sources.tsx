@@ -973,7 +973,7 @@ function SecretModal({
             {usesPushUrl && (
               <VStack align="stretch" gap={1}>
                 <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  OTLP endpoint URL (paste into upstream exporter)
+                  OTLP audit-event endpoint (paste into upstream exporter)
                 </Text>
                 <HStack gap={2}>
                   <Code flex={1} padding={2} fontSize="xs">
@@ -987,6 +987,21 @@ function SecretModal({
                     <Copy size={14} />
                   </Button>
                 </HStack>
+                <Text fontSize="xs" color="fg.muted">
+                  This endpoint is for cross-platform audit events
+                  (Workato / Cowork / Copilot Studio / etc.). If you
+                  are sending agent traces from your own LangWatch
+                  SDK, use{" "}
+                  <Code fontSize="xs">/api/otel/v1/traces</Code> with
+                  your project API key instead — see{" "}
+                  <Link
+                    href="/ai-gateway/governance/ingestion-sources/otel-generic"
+                    color="orange.600"
+                  >
+                    Choosing the right OTel endpoint
+                  </Link>
+                  .
+                </Text>
               </VStack>
             )}
             {usesWebhookUrl && (

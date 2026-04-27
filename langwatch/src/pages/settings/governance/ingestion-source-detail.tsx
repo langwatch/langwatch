@@ -370,9 +370,23 @@ function EmptyEventsHint({ source }: { source: Source }) {
   return (
     <VStack align="stretch" gap={3}>
       <Text fontSize="sm" color="fg.muted">
-        No events yet. Push an event to{" "}
+        No audit events yet. Push an event to{" "}
         <Code fontSize="xs">{endpoint}</Code> with the source&apos;s
         bearer secret to start populating.
+      </Text>
+      <Text fontSize="xs" color="fg.muted">
+        This endpoint is for cross-platform <strong>audit events</strong>{" "}
+        (governance roll-up). If you are sending agent traces from your
+        own LangWatch SDK, use{" "}
+        <Code fontSize="xs">/api/otel/v1/traces</Code> with your project
+        API key instead — see{" "}
+        <Link
+          href="/ai-gateway/governance/ingestion-sources/otel-generic"
+          color="orange.600"
+        >
+          Choosing the right OTel endpoint
+        </Link>
+        .
       </Text>
       <Text fontSize="xs" color="fg.muted">
         Lost the secret? Click <strong>Rotate secret</strong> above —
