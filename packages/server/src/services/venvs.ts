@@ -11,6 +11,7 @@ type VenvSpec = {
   name: "langwatch_nlp" | "langevals";
   projectDir: string;
   lockFile: string;
+  extras?: string[];
 };
 
 /**
@@ -36,11 +37,12 @@ export async function syncVenvs(ctx: RuntimeContext, bus: EventBus): Promise<voi
       const start = Date.now();
 
       mkdirSync(venvDir, { recursive: true });
+      const extraArgs = (spec.extras ?? []).flatMap((e) => ["--extra", e]);
       await execAndPipe(
         bus,
         `prepare:${spec.name}`,
         uvBin,
-        ["sync", "--project", spec.projectDir],
+        ["sync", "--project", spec.projectDir, ...extraArgs],
         {
           env: {
             ...process.env,
@@ -66,6 +68,21 @@ function resolveVenvSpecs(): VenvSpec[] {
       name: "langevals",
       projectDir: join(root, "langevals"),
       lockFile: join(root, "langevals", "uv.lock"),
+      // langevals's evaluator routes (ROUGE Score, exact match, llm-as-judge,
+      // etc.) live in subpackages declared as optional dependencies in
+      // langevals/pyproject.toml: langevals-ragas, langevals-openai,
+      // langevals-langevals, langevals-azure, langevals-lingua,
+      // langevals-presidio, langevals-legacy. Each is a separate `langevals_*`
+      // distribution; server.py auto-registers FastAPI routes for any
+      // `langevals_*` package found via importlib.metadata.distributions().
+      // Without --extra all, only langevals + langevals-core get installed
+      // and `/openapi.json` reports just `/healthcheck` and `/` — every
+      // evaluator request 404s, langwatch app's runEvaluation throws
+      // `404 {"detail":"Not Found"}`, and the experiments workbench column
+      // shows 'Internal error' for every row. We install all extras so the
+      // evaluator dispatch from langwatch_nlp + the legacy-eval REST route
+      // can reach a real evaluator implementation.
+      extras: ["all"],
     },
   ];
 }
