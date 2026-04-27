@@ -47,7 +47,7 @@ export function QueryStringFieldsFilters({
 }: {
 	hideTriggerButton?: boolean;
 }) {
-	const { nonEmptyFilters, setFilters } = useFilterParams();
+	const { nonEmptyFilters, setFilters, filterParams } = useFilterParams();
 
 	const { openDrawer } = useDrawer();
 	const { project, hasPermission } = useOrganizationTeamProject();
@@ -58,6 +58,7 @@ export function QueryStringFieldsFilters({
 		<FieldsFilters
 			filters={nonEmptyFilters}
 			setFilters={(filters) => setFilters(filterOutEmptyFilters(filters))}
+			negated={!!filterParams.negateFilters}
 			actionButton={
 				<HStack gap={1}>
 					{hasAnyFilters && (
@@ -86,10 +87,12 @@ export function FieldsFilters({
 	filters,
 	setFilters,
 	actionButton,
+	negated = false,
 }: {
 	filters: Record<FilterField, FilterParam>;
 	setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
 	actionButton?: React.ReactNode;
+	negated?: boolean;
 }) {
 	const filterKeys: FilterField[] = [
 		"traces.origin",
@@ -101,6 +104,7 @@ export function FieldsFilters({
 		"evaluations.passed",
 		"evaluations.score",
 		"evaluations.label",
+		"events.event_type",
 		"events.metrics.value",
 		"metadata.user_id",
 		"metadata.thread_id",
@@ -133,6 +137,7 @@ export function FieldsFilters({
 						filter={filter}
 						filters={filters}
 						setFilters={setFilters}
+						negated={negated}
 					/>
 				))}
 			</VStack>
@@ -154,11 +159,13 @@ function FieldsFilter({
 	filter,
 	filters,
 	setFilters,
+	negated = false,
 }: {
 	filterId: FilterField;
 	filter: FilterDefinition;
 	filters: Record<FilterField, FilterParam>;
 	setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
+	negated?: boolean;
 }) {
 	const gray400 = useColorRawValue("gray.400");
 
@@ -235,13 +242,30 @@ function FieldsFilter({
 				<Popover.Trigger asChild>
 					<Button
 						variant="subtle"
-						backgroundColor="bg.muted"
+						backgroundColor={
+							currentStringList.length > 0 && negated
+								? "red.subtle"
+								: currentStringList.length > 0
+									? "blue.subtle"
+									: "bg.muted"
+						}
 						size="sm"
 						width="100%"
 						fontWeight="normal"
 					>
 						<HStack width="full" gap={1}>
-							<Text color="fg.muted" fontWeight="500" paddingRight={4}>
+							<Text
+								color={
+									currentStringList.length > 0 && negated
+										? "red.fg"
+										: currentStringList.length > 0
+											? "blue.fg"
+											: "fg.muted"
+								}
+								fontWeight="500"
+								paddingRight={4}
+							>
+								{currentStringList.length > 0 && negated ? "NOT " : ""}
 								{filter.name}
 							</Text>
 							{currentStringList.length > 0 ? (
@@ -253,6 +277,7 @@ function FieldsFilter({
 											justifyContent="center"
 											display="flex"
 											flexShrink={0}
+											colorPalette={negated ? "red" : "blue"}
 										>
 											<Tag.Label>{currentStringList.length}</Tag.Label>
 										</Tag.Root>
@@ -628,11 +653,11 @@ function ListSelection({
 	// Handle mouse hover on options
 	const handleMouseMove = useCallback(
 		(index: number) => {
-			if (isKeyboardNav || highlightedIndex === index) return;
+			if (highlightedIndex === index) return;
 			onKeyboardNavChange?.(false);
 			onHighlightChange?.(index);
 		},
-		[isKeyboardNav, highlightedIndex, onKeyboardNavChange, onHighlightChange],
+		[highlightedIndex, onKeyboardNavChange, onHighlightChange],
 	);
 
 	if (
@@ -723,6 +748,7 @@ function ListSelection({
 						>
 							<HStack
 								width="full"
+								cursor="pointer"
 								background={isHighlighted ? "bg.muted" : undefined}
 								borderRadius="md"
 								paddingX={2}
@@ -734,7 +760,6 @@ function ListSelection({
 									gap={2}
 									size="sm"
 									checked={currentValues.includes(field.toString())}
-									onClick={onChange_}
 									onChange={onChange_}
 								>
 									<VStack width="full" align="start" gap={0}>
@@ -779,6 +804,7 @@ function ListSelection({
 						top={0}
 						left={0}
 						transform={`translateY(${virtualizer.getTotalSize()}px)`}
+						cursor="pointer"
 						background={
 							highlightedIndex === customValueIndex ? "bg.muted" : undefined
 						}
@@ -792,7 +818,6 @@ function ListSelection({
 							gap={2}
 							size="sm"
 							checked={currentValues.includes(customValueQuery)}
-							onClick={handleCustomValueSelect}
 							onChange={handleCustomValueSelect}
 						>
 							<OverflownTextWithTooltip
@@ -878,17 +903,7 @@ function RangeFilter({
 	}, [!!filterData.data]);
 
 	return (
-		<HStack width="full" gap={3} paddingX={3} paddingY={2}>
-			<Input
-				width="56px"
-				paddingX={1}
-				textAlign="center"
-				size="sm"
-				value={currentValues[0]}
-				onChange={(e) => {
-					onChange([e.target.value, currentValues[1] ?? max.toString()]);
-				}}
-			/>
+		<VStack width="full" gap={2} paddingX={3} paddingY={3}>
 			<Slider.Root
 				width="full"
 				min={min}
@@ -896,7 +911,10 @@ function RangeFilter({
 				step={0.1}
 				value={
 					currentValues && currentValues.length == 2
-						? currentValues?.map((v) => +v)
+						? currentValues.map((v, i) => {
+								const n = +v;
+								return isNaN(n) ? (i === 0 ? min : max) : n;
+							})
 						: [min, max]
 				}
 				onValueChange={(values) => {
@@ -916,17 +934,30 @@ function RangeFilter({
 					</Slider.Thumb>
 				</Slider.Control>
 			</Slider.Root>
-			<Input
-				width="56px"
-				paddingX={1}
-				textAlign="center"
-				size="sm"
-				value={currentValues[1]}
-				onChange={(e) => {
-					onChange([currentValues[0] ?? min.toString(), e.target.value]);
-				}}
-			/>
-		</HStack>
+			<HStack width="full" gap={2}>
+				<Input
+					width="full"
+					paddingX={2}
+					textAlign="center"
+					size="sm"
+					value={currentValues[0]}
+					onChange={(e) => {
+						onChange([e.target.value, currentValues[1] ?? max.toString()]);
+					}}
+				/>
+				<Text color="fg.subtle" fontSize="xs" flexShrink={0}>to</Text>
+				<Input
+					width="full"
+					paddingX={2}
+					textAlign="center"
+					size="sm"
+					value={currentValues[1]}
+					onChange={(e) => {
+						onChange([currentValues[0] ?? min.toString(), e.target.value]);
+					}}
+				/>
+			</HStack>
+		</VStack>
 	);
 }
 
@@ -956,7 +987,7 @@ function ThumbsUpDownVoteFilter({
 			].map(({ field, label }) => {
 				const isChecked = !!(min && max && min <= field && max >= field);
 				return (
-					<HStack key={field} width="full" paddingX={1}>
+					<HStack key={field} width="full" paddingX={1} cursor="pointer">
 						<Checkbox
 							width="full"
 							paddingY="4px"
