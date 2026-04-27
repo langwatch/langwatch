@@ -15,6 +15,7 @@ import type { SpanStorageService } from "./traces/span-storage.service";
 import type { TokenizerService } from "./traces/tokenizer.service";
 import type { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import type { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
+import type { TraceListService } from "./traces/trace-list.service";
 import type { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
 import type { TraceSummaryService } from "./traces/trace-summary.service";
 import type { PlanProvider } from "./subscription/plan-provider";
@@ -46,6 +47,7 @@ export interface AppDependencies {
 
   traces: {
     summary: TraceSummaryService;
+    list: TraceListService;
     spans: SpanStorageService;
     logRecords: LogRecordStorageService;
     metricRecords: MetricRecordStorageService;

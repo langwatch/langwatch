@@ -51,6 +51,9 @@ interface ClickHouseSummaryRecord {
   OutputFromRootSpan: number;
   OutputSpanEndTimeMs: number;
   BlockedByGuardrail: number;
+  RootSpanName: string | null;
+  RootSpanType: string | null;
+  ContainsAi: number;
   TopicId: string | null;
   SubTopicId: string | null;
   AnnotationIds: string[];
@@ -220,6 +223,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
             t.OutputFromRootSpan AS OutputFromRootSpan,
             t.OutputSpanEndTimeMs AS OutputSpanEndTimeMs,
             t.BlockedByGuardrail AS BlockedByGuardrail,
+            t.RootSpanName AS RootSpanName,
+            t.RootSpanType AS RootSpanType,
+            t.ContainsAi AS ContainsAi,
             t.TopicId AS TopicId,
             t.SubTopicId AS SubTopicId,
             t.AnnotationIds AS AnnotationIds,
@@ -289,6 +295,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       outputFromRootSpan: !!record.OutputFromRootSpan,
       outputSpanEndTimeMs: Number(record.OutputSpanEndTimeMs),
       blockedByGuardrail: !!record.BlockedByGuardrail,
+      rootSpanName: record.RootSpanName,
+      rootSpanType: record.RootSpanType,
+      containsAi: !!record.ContainsAi,
       topicId: record.TopicId,
       subTopicId: record.SubTopicId,
       annotationIds: record.AnnotationIds ?? [],
@@ -346,6 +355,9 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       OutputFromRootSpan: data.outputFromRootSpan ? 1 : 0,
       OutputSpanEndTimeMs: data.outputSpanEndTimeMs,
       BlockedByGuardrail: data.blockedByGuardrail ? 1 : 0,
+      RootSpanName: data.rootSpanName,
+      RootSpanType: data.rootSpanType,
+      ContainsAi: data.containsAi ? 1 : 0,
       TopicId: data.topicId,
       SubTopicId: data.subTopicId,
       AnnotationIds: data.annotationIds,

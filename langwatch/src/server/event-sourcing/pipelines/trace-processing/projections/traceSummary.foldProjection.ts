@@ -1,4 +1,5 @@
 import { CanonicalizeSpanAttributesService } from "~/server/app-layer/traces/canonicalisation";
+import { ATTR_KEYS } from "~/server/app-layer/traces/canonicalisation/extractors/_constants";
 import {
   enrichRagContextIds,
   SpanNormalizationPipelineService,
@@ -50,6 +51,8 @@ import {
 export type { TraceSummaryData };
 
 const COMPUTED_IO_SCHEMA_VERSION = "2025-12-18" as const;
+
+const AI_SPAN_TYPES = new Set(["llm", "agent", "tool", "rag"]);
 
 // ─── Main composition ───────────────────────────────────────────────
 
@@ -132,6 +135,17 @@ export function applySpanToSummary({
 
   const events = accumulateEvents({ state, span });
 
+  const isRoot = span.parentSpanId === null;
+  const spanType = String(span.spanAttributes[ATTR_KEYS.SPAN_TYPE] ?? "");
+
+  const rootSpanName =
+    isRoot && state.rootSpanName === null ? span.name : state.rootSpanName;
+  const rootSpanType =
+    isRoot && state.rootSpanType === null
+      ? spanType || null
+      : state.rootSpanType;
+  const containsAi = state.containsAi || AI_SPAN_TYPES.has(spanType);
+
   return {
     ...state,
     traceId: state.traceId || span.traceId,
@@ -149,6 +163,9 @@ export function applySpanToSummary({
     outputFromRootSpan: io.outputFromRootSpan,
     outputSpanEndTimeMs: io.outputSpanEndTimeMs,
     blockedByGuardrail: io.blockedByGuardrail,
+    rootSpanName,
+    rootSpanType,
+    containsAi,
     attributes,
     ...roleAccumulation,
     events,
@@ -212,6 +229,9 @@ export class TraceSummaryFoldProjection
       outputFromRootSpan: false,
       outputSpanEndTimeMs: 0,
       blockedByGuardrail: false,
+      rootSpanName: null,
+      rootSpanType: null,
+      containsAi: false,
       topicId: null,
       subTopicId: null,
       annotationIds: [],
