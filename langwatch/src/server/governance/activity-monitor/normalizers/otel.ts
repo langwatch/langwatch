@@ -161,6 +161,7 @@ function pickCost(attrs: Record<string, string>): string | undefined {
   const raw =
     attrs["llm.cost.usd"] ??
     attrs["gen_ai.usage.cost"] ??
+    attrs["gen_ai.usage.cost_usd"] ??
     attrs["langwatch.cost.usd"];
   if (!raw) return undefined;
   const n = Number.parseFloat(raw);
@@ -177,11 +178,13 @@ function pickTokens(
       ? [
           "llm.token_count.prompt",
           "gen_ai.usage.prompt_tokens",
+          "gen_ai.usage.input_tokens",
           "input_tokens",
         ]
       : [
           "llm.token_count.completion",
           "gen_ai.usage.completion_tokens",
+          "gen_ai.usage.output_tokens",
           "output_tokens",
         ];
   for (const k of candidates) {
