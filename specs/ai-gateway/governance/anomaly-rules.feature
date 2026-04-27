@@ -1,33 +1,39 @@
 Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
-  As an organization admin (Persona 3 from gateway.md), I need to define
-  the anomaly rules that fire alerts on the Activity Monitor — what
-  counts as "weird" varies per organization and we should let admins
-  encode their own thresholds + scopes + destinations rather than
-  hardcoding a one-size-fits-all rule set.
+  As an organization admin (Persona 3 from gateway.md), I author the
+  anomaly rules that the detection reactor evaluates against the
+  activity-monitor event stream. What counts as "weird" varies per
+  organization — admins encode their own thresholds + scopes +
+  destinations rather than living with hardcoded one-size-fits-all rules.
 
-  This page is the authoring surface for the rules whose firings show
-  up on /settings/governance (the admin oversight dashboard's "Active
+  This page is the authoring surface for AnomalyRule rows; their
+  firings (`AnomalyAlert` rows) are produced by the detection reactor
+  and surface on `/governance` (admin oversight dashboard's "Active
   anomaly alerts" section). One rule = one named threshold + scope +
   destination tuple.
 
-  IMPORTANT — schema disclaimer:
-    The rule schema captured here is **v0 placeholder**. The backend
-    rule-evaluation slice (Sergey's Option C) may revise field shapes
-    once server-side evaluation is implemented. The UI stays open-enum
-    on rule type / severity / destination so the migration is
-    mechanical when the contract is locked. Until that backend slice
-    lands, this page renders MOCK_RULES fixtures only — no tRPC
-    procedure is invoked.
+  Scope boundary:
+    THIS spec covers rule CRUD (the config entity authoring UI +
+    `api.anomalyRules.*` mutations). Evaluation, firing semantics, and
+    dispatch contracts live in `anomaly-detection.feature` — that is
+    Sergey's event-sourcing reactor pattern (PR #3351 alignment per
+    rchaves's "event sourcing is the one true way" directive). When
+    these specs disagree on field shapes, the detection feature is
+    canonical because it owns the reactor's input contract.
 
-  Iter-12 ships the UI gated behind release_ui_ai_governance_enabled
-  with deterministic mock data + a "Preview · mocked data" badge in
-  the header so admins can evaluate the UX. Real-data wire-up follows
-  when api.anomalyRules.* exists.
+  Current ship state (as of iter 14):
+    - api.anomalyRules.{list, create, update, archive} are LIVE — rule
+      rows persist to the AnomalyRule table.
+    - The detection reactor (Sergey C1+C2) is being staged; alert
+      generation arrives once the activity-monitor event-sourcing
+      pipeline projects + the anomaly reactor reads fold state.
+    - The UI ships an honest "rules persist now; evaluation + alert
+      dispatch arrive with the detection backend" banner so admins
+      know what's wired vs. what's pending.
 
   Background:
-    Given user "platform-admin@miro.com" is signed in to organization "miro"
+    Given the feature flag "release_ui_ai_governance_enabled" is enabled
+      for the organization
     And the user has the "organization:manage" permission
-    And the feature flag "release_ui_ai_governance_enabled" is enabled
 
   # ---------------------------------------------------------------------------
   # Page scaffold + permission gate
@@ -35,10 +41,9 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
 
   @bdd @ui @anomaly-rules @permission
   Scenario: A non-admin user is redirected away from the rules page
-    Given user "engineer@miro.com" is signed in but does NOT have
-      "organization:manage"
-    When she navigates to "/settings/governance/anomaly-rules"
-    Then she is redirected (or shown the existing settings-permission
+    Given a user without "organization:manage" is signed in
+    When they navigate to "/settings/governance/anomaly-rules"
+    Then they are redirected (or shown the existing settings-permission
       "Not allowed" page)
 
   @bdd @ui @anomaly-rules @permission
@@ -55,77 +60,74 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
     And no telemetry is emitted that reveals the page exists
 
   # ---------------------------------------------------------------------------
-  # Mocked-v0 caveat
+  # Honest current-state banner
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @anomaly-rules @mocked-v0
-  Scenario: v0 ships with deterministic mock data (no backend wire-up yet)
-    When the page renders in v0 (release_ui_ai_governance_enabled is on but
-      api.anomalyRules.* doesn't exist yet — Sergey's C-backend deferred)
-    Then the page header has a "Preview · mocked data" badge
-    And every rule row is populated from a deterministic in-memory fixture
-    And clicking "+ New rule" opens an inline composer that does NOT
-      submit to a backend (only updates local state); a banner reads
-      "Rules persist once the anomaly-detection backend lands. v0 is a
-      preview surface only."
-    And the badge + banner disappear once the C-backend lands and the
-      page switches to live tRPC mutations
+  @bdd @ui @anomaly-rules @honest-state
+  Scenario: Page banner reflects "rules persist, evaluation pending" state
+    When the page renders while the detection reactor is still being staged
+    Then a banner near the heading reads:
+      "Heads up: rules persist now. Evaluation + alert dispatch arrive
+      with the detection backend."
+    And no "Preview · mocked data" badge is shown (mocks were removed
+      iter 13)
+    And once the reactor + dispatch ship, this banner is removed in a
+      follow-up so the page reads as fully-live
 
   # ---------------------------------------------------------------------------
-  # Rule list grouped by severity
+  # Rule list grouped by severity (real api.anomalyRules.list data)
   # ---------------------------------------------------------------------------
 
   @bdd @ui @anomaly-rules @list
   Scenario: Rules group by severity (critical first)
-    When the page renders for an org with N defined rules
+    Given the org has authored rules across all three severities
+    When the page calls `api.anomalyRules.list({organizationId})` and renders
     Then the rules are grouped into three sections in this order:
       | severity | tone   |
       | critical | red    |
       | warning  | amber  |
       | info     | blue   |
     And each section shows a count + "+ New rule" CTA
-    And each rule row shows: name, rule type, scope, destination, last
-      fired (relative timestamp), enabled toggle
+    And each rule row shows: name, rule type, scope + scopeId, destination
+      summary, status (active / disabled / archived)
 
   @bdd @ui @anomaly-rules @list @empty
   Scenario: Empty-state when no rules are defined
-    Given the org has zero anomaly rules
+    Given `api.anomalyRules.list` returns an empty array
     When the page renders
-    Then a top-level prompt reads "No anomaly rules yet — pick a starting
-      template or create from scratch"
-    And four template tiles offer 1-click rule creation:
-      | template            | description                                 |
-      | weekend-spend-spike | flag spending > 2x weekday avg on Sat/Sun  |
-      | unusual-model       | flag any model outside the configured list  |
-      | tool-policy-violation | flag any virtual key call to a blocked tool |
-      | new-user-burst      | flag a brand-new user spending > $X in 24h |
-    And clicking a tile pre-fills the composer with that template's defaults
+    Then a top-level prompt reads "No anomaly rules yet — create your
+      first rule below"
+    And the inline composer is visible without needing to click "+ New rule"
 
   # ---------------------------------------------------------------------------
-  # Rule composer
+  # Rule composer — wired to api.anomalyRules.create
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @anomaly-rules @composer
-  Scenario: Admin authors a new rule from scratch
-    When the admin clicks "+ New rule" in the warning section
+  @bdd @ui @anomaly-rules @composer @real-create
+  Scenario: Admin authors a new rule via the live mutation
+    When the admin clicks "+ New rule" in any severity section
     Then an inline composer expands inline below the section header with
-      these fields (v0 placeholder schema — see header disclaimer):
-      | field        | type                 | description                        |
-      | name         | text                 | display name                       |
-      | severity     | enum                 | critical / warning / info          |
-      | ruleType     | enum (open)          | spend-spike / unusual-model / ...  |
-      | scopeType    | enum                 | org / team / project / user / source |
-      | scopeId      | text or autocomplete | ID at the chosen scope             |
-      | thresholdJson| JSON textarea        | rule-type-specific config          |
-      | destinations | multi-checkbox       | slack / email / webhook / pagerduty|
-    And submitting the composer (in v0) only adds the rule to local state
-      and toasts "Rule saved (v0 — not persisted)"
-    And the new rule appears at the top of the relevant severity section
+      these fields (shape aligned to anomaly-detection.feature, which
+      owns the reactor's input contract):
+      | field             | type                 | description                          |
+      | name              | text                 | display name                         |
+      | severity          | enum                 | critical / warning / info            |
+      | ruleType          | text + datalist      | spend_spike / after_hours / ...      |
+      | scope             | enum                 | organization / team / project / source_type / source |
+      | scopeId           | text                 | ID at the chosen scope (where applicable) |
+      | thresholdConfig   | JSON textarea        | rule-type-specific config (JSONB)    |
+      | destinationConfig | JSON textarea        | webhook / slack / log-only (JSONB)   |
+    And submitting the composer calls `api.anomalyRules.create(...)`
+    And on success the new rule row appears at the top of the matching
+      severity section
+    And on validation error the field-level message is surfaced inline
+    And ruleType is open-enum (text + datalist) so admins aren't blocked
+      when the reactor adds new rule types between releases
 
-  @bdd @ui @anomaly-rules @composer @threshold-json
-  Scenario: thresholdJson editor explains shape per rule type
-    Given the composer is open and ruleType="spend-spike"
-    Then the thresholdJson editor pre-fills with the spend-spike shape:
+  @bdd @ui @anomaly-rules @composer @threshold-shape
+  Scenario: thresholdConfig examples are documented inline per rule type
+    Given the composer is open and ruleType="spend_spike"
+    Then a help affordance shows the v1 spend_spike shape:
       """
       {
         "windowSec": 86400,
@@ -133,57 +135,99 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
         "minBaselineUsd": 10
       }
       """
-    And a help link reads "Threshold config schema → spend-spike (docs)"
-    When the admin selects ruleType="unusual-model"
-    Then the thresholdJson editor swaps to the unusual-model shape:
+    When the admin selects ruleType="after_hours"
+    Then the help affordance updates to the after_hours shape:
       """
       {
-        "allowedModelGlobs": ["gpt-5-*", "claude-3-*"]
+        "startHour": 18,
+        "endHour": 6,
+        "timezone": "UTC",
+        "requestsThreshold": 100,
+        "windowSec": 3600
       }
       """
-    And the help link's docs target updates accordingly
+    # Authoritative shapes live in anomaly-detection.feature — that's
+    # the reactor's input contract. The UI mirrors them as guidance only.
 
   # ---------------------------------------------------------------------------
-  # Per-rule actions
+  # Per-rule actions — wired to api.anomalyRules.update / archive
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @anomaly-rules @actions
-  Scenario: Admin disables a rule without deleting it
-    Given a rule "Weekend spend spike" exists, enabled
+  @bdd @ui @anomaly-rules @actions @real-update
+  Scenario: Admin disables a rule without archiving it
+    Given an active rule "Weekend spend spike" exists
     When the admin toggles its enabled-switch off
-    Then the rule row dims and shows "Disabled" badge
-    And no new firings will register for this rule when re-enabled does
-      NOT replay missed events (forward-only semantics)
-    When the admin toggles the switch back on
-    Then the rule resumes producing firings on subsequent matches
+    Then `api.anomalyRules.update({id, status: "disabled"})` is called
+    And on success the row dims and shows a "Disabled" badge
+    And the disabled rule is skipped by the detection reactor
+      (see anomaly-detection.feature: "disabled rules are not evaluated")
+    And re-enabling it does NOT replay missed events (forward-only
+      semantics — confirmed in the detection reactor spec)
 
-  @bdd @ui @anomaly-rules @actions
+  @bdd @ui @anomaly-rules @actions @real-update
   Scenario: Admin edits an existing rule
-    Given a rule "Weekend spend spike" exists
+    Given a rule exists
     When the admin clicks "Edit" on its row
     Then the composer pre-fills with the rule's current values
-    And on save the row updates with the new field values
-    And in v0 the change is local-only (toast: "edit saved — not persisted")
+    And on save `api.anomalyRules.update(...)` is called with the
+      changed fields only
+    And the row updates inline with the new values
 
-  @bdd @ui @anomaly-rules @actions
-  Scenario: Admin deletes a rule with confirmation
-    When the admin clicks the trash icon on a rule row
-    Then a confirmation modal warns "Delete rule 'X'? Existing alert
-      firings remain in the audit log."
-    And on confirm the rule disappears from the list
-    And in v0 the change is local-only
+  @bdd @ui @anomaly-rules @actions @real-archive
+  Scenario: Admin archives a rule with confirmation
+    When the admin clicks the archive icon on a rule row
+    Then a confirmation modal warns: "Archive rule 'X'? Existing alert
+      firings remain in the audit log; the rule stops evaluating."
+    And on confirm `api.anomalyRules.archive({id})` is called
+    And the rule disappears from the active list (still queryable
+      via list filter status="archived" for audit)
+    And the detection reactor stops considering this rule on the next
+      event append
+
+  # ---------------------------------------------------------------------------
+  # Tenant isolation
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @anomaly-rules @tenant-isolation
+  Scenario: Rules from other orgs are never visible
+    Given two orgs each have authored rules
+    When admin of org A loads "/settings/governance/anomaly-rules"
+    Then `api.anomalyRules.list` returns ONLY org A's rules
+    And no rule belonging to org B is queryable from the org A session
+      (enforced by the existing org-scoped procedure pattern; the
+      AnomalyRule model is in EXEMPT_MODELS for projectId middleware
+      because rules are organization-scoped, not project-scoped)
 
   # ---------------------------------------------------------------------------
   # Cross-page wiring
   # ---------------------------------------------------------------------------
 
   @bdd @ui @anomaly-rules @cross-page
-  Scenario: Each anomaly on /settings/governance links to its rule
-    Given the admin oversight dashboard shows alerts that fired
-    When the admin clicks an anomaly row's rule name
+  Scenario: Each anomaly on /governance links to its source rule
+    Given the admin oversight dashboard shows AnomalyAlert rows produced
+      by the detection reactor
+    When the admin clicks an alert row's rule name
     Then the browser navigates to
       "/settings/governance/anomaly-rules?ruleId=<id>" and that rule's
       row is auto-scrolled into view + briefly highlighted
+
+  # ---------------------------------------------------------------------------
+  # Test/dogfood harness — proxied to anomaly-detection.feature
+  # ---------------------------------------------------------------------------
+
+  @bdd @ui @anomaly-rules @evaluate-now
+  Scenario: "Test rule" button uses the production reactor (no parallel poller)
+    Given the admin has authored a new rule
+    When they click "Test rule" on its row
+    Then the UI calls `api.anomalyRules.evaluateNow({id})`
+    And per anomaly-detection.feature, that endpoint appends a synthetic
+      ActivityEventReceived to the event_log against the rule's scope —
+      the production reactor evaluates it identically to a real ingest
+    And the result toasts "Test fired (alert <id>)" or "No threshold
+      breach with current data"
+    # NOTE: this is explicitly NOT a parallel evaluation pathway — it
+    # exercises the same reactor that real events go through. Owned by
+    # anomaly-detection.feature; mirrored here for UI completeness.
 
   # ---------------------------------------------------------------------------
   # Accessibility
