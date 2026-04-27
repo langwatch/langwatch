@@ -8,7 +8,19 @@ sidebarTitle: Gemini CLI
 
 The LangWatch AI Gateway exposes a Gemini-native passthrough at `/v1beta/*` that forwards requests verbatim to `generativelanguage.googleapis.com`, with the standard auth + tracing + budget + cache + guardrail middleware applied. So Gemini CLI works against the gateway with one env-var change.
 
-## Setup
+## Quick path — `langwatch gemini` wrapper (recommended for personal IDE keys)
+
+If you've authenticated via `langwatch login --device` ([Personal IDE keys](/ai-gateway/governance/personal-keys)), the simplest invocation is the wrapper. It exec's the Gemini CLI with the right env vars already pointing at your gateway:
+
+```bash
+langwatch gemini "your task here"
+```
+
+All Gemini CLI flags pass through unchanged.
+
+## Manual setup — service VK / shared workstation
+
+If you have a **service-virtual-key** for non-personal traffic, or you want every plain `gemini` invocation to route through the gateway without the wrapper:
 
 ```bash
 export GOOGLE_GEMINI_BASE_URL="https://gateway.langwatch.ai"

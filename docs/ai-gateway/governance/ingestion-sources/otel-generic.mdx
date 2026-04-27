@@ -103,3 +103,61 @@ $ langwatch ingest tail JxQztBgN90QeX12-afJ0C --limit 1
 ```
 
 If `eventType` shows `agent.action` instead of `api.call` / `tool.invocation`, the upstream span isn't carrying the attributes the heuristic looks for — the source still works, but you'll get less filtering precision in the admin dashboard. The fix is on the upstream side: emit `gen_ai.request.model` and (if applicable) `tool.name`.
+
+## Test it now — copy-paste curl
+
+A complete OTLP/HTTP JSON body that hits the full normaliser and produces one row in `langwatch ingest tail` / the per-source detail page. Substitute `<otlpUrl>` and `<secret>` from the one-time-reveal modal:
+
+```bash
+curl -X POST '<otlpUrl>' \
+  -H 'Authorization: Bearer <secret>' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "resource_spans": [{
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "smoke-test"}}
+        ]
+      },
+      "scope_spans": [{
+        "spans": [{
+          "spanId": "0123456789abcdef",
+          "traceId": "0123456789abcdef0123456789abcdef",
+          "name": "chat.completion",
+          "startTimeUnixNano": "'$(date +%s)'000000000",
+          "attributes": [
+            {"key": "gen_ai.request.model", "value": {"stringValue": "claude-3-5-sonnet"}},
+            {"key": "user.email", "value": {"stringValue": "you@your.org"}},
+            {"key": "gen_ai.usage.cost_usd", "value": {"doubleValue": 0.01}},
+            {"key": "gen_ai.usage.input_tokens", "value": {"intValue": 100}},
+            {"key": "gen_ai.usage.output_tokens", "value": {"intValue": 250}}
+          ]
+        }]
+      }]
+    }]
+  }'
+```
+
+Expected response:
+
+```json
+HTTP/1.1 202 Accepted
+Content-Type: application/json
+{"accepted":true,"bytes":<n>,"events":1}
+```
+
+`events:1` confirms the body parsed and the row landed. `events:0` with `bytes>0` means the body was accepted but no spans were extracted — common causes:
+- `resource_spans` / `resourceSpans` not present at the top level (wrong nesting)
+- `spans` array empty within a `scope_spans` entry
+- Body is not OTLP-shaped JSON (e.g. you posted a Workato-style envelope to the OTLP endpoint).
+
+After the curl succeeds, verify with:
+
+```bash
+langwatch ingest tail <sourceId> --limit 1
+# → 2026-04-27T...  api.call  chat.completion → claude-3-5-sonnet  $0.0100  100/250 tok
+```
+
+### OTLP attribute value keys are camelCase
+
+The OTLP/HTTP JSON spec uses camelCase for attribute value field names — `stringValue` / `intValue` / `doubleValue` / `boolValue`. Snake_case (`string_value` / `int_value`) is **not** accepted by the normaliser today. If you're hand-authoring OTLP bodies for tests, match the casing exactly or you'll see `events:0` despite a 202.
