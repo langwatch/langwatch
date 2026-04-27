@@ -57,15 +57,19 @@ const optimizerOptions: {
 }));
 
 export function Optimize() {
+  // All hooks MUST run before any conditional return — see the "Rules of
+  // Hooks". The flag-gated early return below requires every hook used in
+  // this component to be called above it.
   const { open, onToggle, onClose, setOpen } = useDisclosure();
 
   const { project } = useOrganizationTeamProject();
   const { optimizationState } = useWorkflowStore(({ state }) => ({
     optimizationState: state.optimization,
   }));
-
-  const isRunning = optimizationState?.status === "running";
-
+  const engineMode = api.workflow.engineMode.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id, staleTime: 60_000 },
+  );
   const form = useForm<OptimizeForm>({
     defaultValues: {
       version: "",
@@ -74,6 +78,16 @@ export function Optimize() {
       params: {},
     },
   });
+
+  // Hide the Optimize button when the project is on the Go NLP engine.
+  // Optimization was DSPy-only and the Go engine intentionally drops DSPy
+  // (see specs/nlp-go/feature-flag.feature). Server-side guards reject
+  // optimize websocket events too — UI hide is the visible half.
+  if (engineMode.data && !engineMode.data.optimizeEnabled) {
+    return null;
+  }
+
+  const isRunning = optimizationState?.status === "running";
 
   return (
     <>

@@ -48,10 +48,8 @@ import { isHandledByGlobalHandler } from "~/utils/trpcError";
 import { ScenarioInputMappingSection, isScenarioMappingValid } from "~/components/suites/ScenarioInputMappingSection";
 import { computeBestMatchMappings } from "~/server/scenarios/execution/resolve-field-mappings";
 
-const DEFAULT_CODE = `import dspy
-
-class Code(dspy.Module):
-    def forward(self, input: str):
+const DEFAULT_CODE = `class Code:
+    def __call__(self, input: str):
         # Your code goes here
 
         return {"output": input.upper()}
@@ -476,7 +474,8 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                   <Field.Root>
                     <Field.Label>Python Code</Field.Label>
                     <Text fontSize="sm" color="fg.muted" marginBottom={2}>
-                      Write a DSPy module that takes inputs and returns outputs.
+                      Define a Python class with a `__call__` method that takes
+                      inputs and returns outputs.
                     </Text>
                     <CodeBlockEditor
                       code={code}

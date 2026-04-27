@@ -50,40 +50,44 @@ def generate_topic_names(
         else ""
     )
 
+    messages = [
+        {
+            "role": "system",
+            "content": f'You are a highly knowledgeable assistant tasked with taxonomy for naming topics \
+                based on a list of examples. Provide a single, descriptive name for each topic. \
+                Avoid using "and" or "&" in the name, try to summarize it with a single concept. \
+                Topic names should not be similar to each other, as the data is already organized, \
+                the disambiguation between two similar topics should be clear from the name alone.\
+                    {existing_message}',
+        },
+        {"role": "user", "content": f"{topic_examples_str}"},
+    ]
+    tools = [
+        {
+            "type": "function",
+            "function": {
+                "name": "topicNames",
+                "parameters": {
+                    "type": "object",
+                    "properties": dict(
+                        [
+                            (f"topic_{index}", {"type": "string"})
+                            for index in range(len(topic_examples))
+                        ]
+                    ),
+                },
+                "description": 'use this function to name the topics based on the examples provided, avoid using "and" or "&" in the name, try to name it with a single 2-3 words concept.',
+            },
+        }
+    ]
+    tool_choice = {"type": "function", "function": {"name": "topicNames"}}
+
     try:
         response = litellm.completion(
             temperature=0.0,
-            messages=[
-                {
-                    "role": "system",
-                    "content": f'You are a highly knowledgeable assistant tasked with taxonomy for naming topics \
-                        based on a list of examples. Provide a single, descriptive name for each topic. \
-                        Avoid using "and" or "&" in the name, try to summarize it with a single concept. \
-                        Topic names should not be similar to each other, as the data is already organized, \
-                        the disambiguation between two similar topics should be clear from the name alone.\
-                            {existing_message}',
-                },
-                {"role": "user", "content": f"{topic_examples_str}"},
-            ],
-            tools=[
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "topicNames",
-                        "parameters": {
-                            "type": "object",
-                            "properties": dict(
-                                [
-                                    (f"topic_{index}", {"type": "string"})
-                                    for index in range(len(topic_examples))
-                                ]
-                            ),
-                        },
-                        "description": 'use this function to name the topics based on the examples provided, avoid using "and" or "&" in the name, try to name it with a single 2-3 words concept.',
-                    },
-                }
-            ],
-            tool_choice={"type": "function", "function": {"name": "topicNames"}},
+            messages=messages,
+            tools=tools,
+            tool_choice=tool_choice,
             **litellm_params,  # type: ignore
         )
     except Exception as e:
@@ -97,8 +101,11 @@ def generate_topic_names(
         )
 
     total_cost = completion_cost(response)
+    topic_names_dict = json.loads(
+        response.choices[0].message.tool_calls[0].function.arguments  # type: ignore
+    )
 
-    topic_names: list[str] = list(json.loads(response.choices[0].message.tool_calls[0].function.arguments).values())  # type: ignore
+    topic_names: list[str] = list(topic_names_dict.values())
     topic_names = topic_names[0 : len(topic_examples)]
     if len(topic_names) != len(topic_examples):
         raise ValueError("topic_names and topic_examples must have the same length.")

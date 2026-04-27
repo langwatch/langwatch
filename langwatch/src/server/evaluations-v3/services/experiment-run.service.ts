@@ -82,13 +82,28 @@ export class ExperimentRunService {
    * @param params.projectId - The project ID
    * @param params.experimentId - The experiment ID
    * @param params.runId - The run ID
-   * @returns The full experiment run with dataset entries and evaluations
+   * @returns The full experiment run with dataset entries and evaluations,
+   *   or `null` when the run row hasn't materialised yet in ClickHouse.
+   *
+   * **Why nullable**: the run row is written by the
+   * `experiment-run-processing` event-sourcing pipeline (consumed off the
+   * fold queue), so there's a window between
+   * `runOrchestrator → commands.startExperimentRun()` returning and the
+   * row landing in CH. Pre-fix this method threw a 500 in that window
+   * and the UI's 1s poll loop stayed in a perpetual spinner with the
+   * error toast cascading every tick — caught during PR #3483 dogfood.
+   * The two consumers (`BatchEvaluationV2EvaluationResults` +
+   * `useMultiRunData`) already optional-chain on `data?.dataset` /
+   * `queries[idx]?.data ?? null`, so returning null surfaces as a clean
+   * "loading" state until the next refetch picks up the materialised row.
+   * `listRuns` is unaffected (it reads aggregated CH data via a
+   * different query path that already coalesces empties to `{}`).
    */
   async getRun(params: {
     projectId: string;
     experimentId: string;
     runId: string;
-  }): Promise<ExperimentRunWithItems> {
+  }): Promise<ExperimentRunWithItems | null> {
     return this.tracer.withActiveSpan(
       "ExperimentRunService.getRun",
       {
@@ -100,13 +115,7 @@ export class ExperimentRunService {
       async (span) => {
         span.setAttribute("backend", "clickhouse");
 
-        const result = await this.clickHouseService.getRun(params);
-        if (result === null) {
-          throw new Error(
-            "ClickHouse is enabled but returned null for getRun — check ClickHouse client configuration",
-          );
-        }
-        return result;
+        return this.clickHouseService.getRun(params);
       },
     );
   }

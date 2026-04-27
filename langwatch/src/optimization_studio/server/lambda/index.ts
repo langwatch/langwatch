@@ -358,12 +358,22 @@ export const invokeLambda = async (
   projectId: string,
   event: StudioClientEvent,
   s3CacheKey: string | undefined,
+  options: {
+    /** Path under the NLP service. Defaults to `/studio/execute` for the
+     *  legacy Python SSE handler. Set to `/go/studio/execute` to route
+     *  the same SSE event shape to the Go engine. */
+    path?: string;
+    /** Extra headers merged after the defaults (e.g. X-LangWatch-Origin). */
+    headers?: Record<string, string>;
+  } = {},
 ): Promise<ReadableStreamDefaultReader<Uint8Array>> => {
+  const path = options.path ?? "/studio/execute";
   const payload = {
     body: JSON.stringify(event),
     headers: {
       "Content-Type": "application/json",
       ...(s3CacheKey ? { "X-S3-Cache-Key": s3CacheKey } : {}),
+      ...(options.headers ?? {}),
     },
   };
 
@@ -378,7 +388,7 @@ export const invokeLambda = async (
       FunctionName: functionArn,
       InvocationType: "RequestResponse",
       Payload: JSON.stringify({
-        rawPath: "/studio/execute",
+        rawPath: path,
         requestContext: {
           http: {
             method: "POST",
@@ -461,7 +471,7 @@ export const invokeLambda = async (
     return webStream.getReader();
   } else {
     const response = await fetch(
-      `${process.env.LANGWATCH_NLP_SERVICE}/studio/execute`,
+      `${process.env.LANGWATCH_NLP_SERVICE}${path}`,
       {
         method: "POST",
         ...payload,

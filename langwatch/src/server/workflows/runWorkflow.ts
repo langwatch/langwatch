@@ -1,14 +1,13 @@
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
 import { addEnvs } from "../../optimization_studio/server/addEnvs";
-import { getProjectLambdaArn } from "../../optimization_studio/server/lambda";
 import type {
   ExecutionStatus,
   Workflow,
 } from "../../optimization_studio/types/dsl";
 import type { StudioClientEvent } from "../../optimization_studio/types/events";
 import { getEntryInputs } from "../../optimization_studio/utils/nodeUtils";
-import { lambdaFetch } from "../../utils/lambdaFetch";
+import { nlpgoFetch, type NLPOrigin } from "../nlpgo/nlpgoFetch";
 import { getProjectModelProviders } from "../api/routers/modelProviders.utils";
 import { prisma } from "../db";
 import type { SingleEvaluationResult } from "../evaluations/evaluators.generated";
@@ -118,6 +117,7 @@ export async function runEvaluationWorkflow(
       versionId,
       true, // do_not_trace
       false, // run_evaluations - disable evaluators inside the workflow when running as an online evaluation
+      "evaluation",
     );
 
     // Process the result
@@ -161,6 +161,7 @@ export async function runWorkflow(
   versionId?: string,
   do_not_trace?: boolean,
   run_evaluations?: boolean,
+  origin: NLPOrigin = "workflow",
 ) {
   const workflow = await prisma.workflow.findUnique({
     where: { id: workflowId, projectId },
@@ -209,24 +210,20 @@ export async function runWorkflow(
             ? inputs.do_not_trace
             : false,
       ...(typeof run_evaluations === "boolean" && { run_evaluations }),
-      origin: "workflow",
+      origin,
     },
   };
 
   const event = await addEnvs(messageWithoutEnvs, projectId);
-  const functionArn = process.env.LANGWATCH_NLP_LAMBDA_CONFIG
-    ? await getProjectLambdaArn(projectId)
-    : process.env.LANGWATCH_NLP_SERVICE!;
 
-  const response = await lambdaFetch<{
+  const response = await nlpgoFetch<{
     result: any;
     status: ExecutionStatus;
-  }>(functionArn, "/studio/execute_sync", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(event),
+  }>({
+    projectId,
+    path: "/studio/execute_sync",
+    body: event,
+    origin,
   });
 
   if (!response.ok) {

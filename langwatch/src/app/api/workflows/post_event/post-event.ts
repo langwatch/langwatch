@@ -1,6 +1,7 @@
 import { captureException } from "~/utils/posthogErrorCapture";
 import { getS3CacheKey } from "../../../../optimization_studio/server/addEnvs";
 import { invokeLambda } from "../../../../optimization_studio/server/lambda";
+import { isNlpGoEnabled } from "~/server/nlpgo/nlpgoFetch";
 import type {
   StudioClientEvent,
   StudioServerEvent,
@@ -8,6 +9,26 @@ import type {
 import { createLogger } from "../../../../utils/logger/server";
 
 const logger = createLogger("langwatch:post_event");
+
+/** Event types the Go engine handles natively when the FF is on. The
+ *  only outlier is `execute_optimization`, intentionally rejected at
+ *  the route layer with 410 (DSPy is gone). Studio fires `is_alive`
+ *  every ~7s as a heartbeat and `stop_execution` when the user clicks
+ *  Stop — if either of those still routes to the legacy
+ *  `/studio/execute` path while the engine is on `/go/`, an operator
+ *  running without the Python sidecar (the post-100% target topology)
+ *  gets a perpetual "Connecting…" status plus a misleading "Bad Gateway
+ *  child upstream unavailable" toast every heartbeat tick. So both
+ *  passthrough types belong on the Go path; nlpgo answers them with
+ *  bare SSE frames (see executeStreamHandler in
+ *  services/nlpgo/adapters/httpapi/handlers.go). */
+const GO_ENGINE_EVENT_TYPES = new Set([
+  "execute_flow",
+  "execute_component",
+  "execute_evaluation",
+  "is_alive",
+  "stop_execution",
+]);
 
 export const studioBackendPostEvent = async ({
   projectId,
@@ -25,7 +46,14 @@ export const studioBackendPostEvent = async ({
   try {
     const s3CacheKey = getS3CacheKey(projectId);
 
-    reader = await invokeLambda(projectId, message, s3CacheKey);
+    const goEnabled =
+      GO_ENGINE_EVENT_TYPES.has(message.type) &&
+      (await isNlpGoEnabled({ projectId }));
+
+    reader = await invokeLambda(projectId, message, s3CacheKey, {
+      path: goEnabled ? "/go/studio/execute" : "/studio/execute",
+      headers: goEnabled ? { "X-LangWatch-Origin": "workflow" } : undefined,
+    });
   } catch (error) {
     if (
       (error as any)?.cause?.code === "ECONNREFUSED" ||

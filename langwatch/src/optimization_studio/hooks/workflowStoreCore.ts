@@ -312,9 +312,14 @@ export const updateCodeClassName = (
     p.identifier === "code"
       ? {
           ...p,
+          // Match both the new plain-Python default (`class Code:`)
+          // and legacy dspy-flavored (`class Code(dspy.Module):`) so
+          // renaming preserves whatever base-class clause the customer
+          // had — captured in $1 as the parenthesized fragment, empty
+          // for plain classes.
           value: (p.value as string).replace(
-            /class .*?\(dspy\.Module\):/,
-            `class ${snakeCaseToPascalCase(newId)}(dspy.Module):`,
+            /class\s+\w+(\s*\([^)]*\))?\s*:/,
+            `class ${snakeCaseToPascalCase(newId)}$1:`,
           ),
         }
       : p,
@@ -349,11 +354,17 @@ export const updateInputFields = (parameters: Field[], inputs: Field[]) => {
 
   return parameters.map((p) => {
     if (p.identifier === "code") {
+      // Match either the new idiomatic-Python entrypoint (`__call__`)
+      // or the legacy/torch-style `forward` and preserve whichever the
+      // customer's code already uses — silently rewriting a legacy
+      // `forward` into `__call__` on field-add would surprise users
+      // and break diffs in their commit history.
       let code = (p.value as string).replace(
-        /def forward\([\s\S]*?\):/,
-        `def forward(self, ${inputs
-          .map((i) => `${i.identifier}: ${typesMap[i.type]}`)
-          .join(", ")}):`,
+        /def (__call__|forward)\([\s\S]*?\):/,
+        (_match, methodName: string) =>
+          `def ${methodName}(self, ${inputs
+            .map((i) => `${i.identifier}: ${typesMap[i.type]}`)
+            .join(", ")}):`,
       );
       if (code.includes(": Any") && !code.includes("from typing import Any")) {
         code = `from typing import Any\n${code}`;

@@ -104,6 +104,7 @@ jobs:
             --ignore=evaluators/langevals/tests/ \
             --ignore=evaluators/openai/tests/ \
             --ignore=evaluators/azure/tests/ \
+            --ignore=evaluators/topic_clustering/tests/ \
             --ignore=tests/
 
   docker-build:
