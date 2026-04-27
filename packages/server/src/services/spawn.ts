@@ -61,26 +61,37 @@ export function supervise({
     writeFileSync(pidPath, String(child.pid));
   }
 
-  pipeLines(child, "stdout", spec.name, logStream, bus);
-  pipeLines(child, "stderr", spec.name, logStream, bus);
+  // Track stdout + stderr "end" events so we can drain any buffered lines
+  // BEFORE closing the log file. If we end() the logStream synchronously
+  // on child 'exit', the readline transformer may still be flushing the
+  // last chunk and we lose tail data — caught by spawn.integration.test
+  // intermittently failing on the 'row-2' assertion. Wait for both pipes
+  // to finish before closing.
+  const pipesDrained: Promise<void>[] = [
+    pipeLines(child, "stdout", spec.name, logStream, bus),
+    pipeLines(child, "stderr", spec.name, logStream, bus),
+  ];
 
   let stopped = false;
   let exited = false;
 
   child.on("exit", (code, signal) => {
     exited = true;
-    logStream.end();
     safeUnlink(pidPath);
-    if (!stopped && (code !== 0 || signal !== null)) {
-      bus.emit({
-        type: "crashed",
-        service: spec.name,
-        code: code ?? -1,
-        signal: signal ?? undefined,
-      });
-    } else {
-      bus.emit({ type: "stopped", service: spec.name });
-    }
+
+    void Promise.all(pipesDrained).then(() => {
+      logStream.end();
+      if (!stopped && (code !== 0 || signal !== null)) {
+        bus.emit({
+          type: "crashed",
+          service: spec.name,
+          code: code ?? -1,
+          signal: signal ?? undefined,
+        });
+      } else {
+        bus.emit({ type: "stopped", service: spec.name });
+      }
+    });
   });
 
   const stop = async (): Promise<void> => {
@@ -103,14 +114,18 @@ function pipeLines(
   service: ServiceName,
   logStream: WriteStream,
   bus: EventBus,
-): void {
+): Promise<void> {
   const stream = child[streamName];
-  if (!stream) return;
+  if (!stream) return Promise.resolve();
   const rl = createInterface({ input: stream });
   rl.on("line", (line) => {
     logStream.write(`${line}\n`);
     bus.emit({ type: "log", service, stream: streamName, line });
   });
+  // Resolve when readline finishes draining the pipe (stream EOF). The
+  // child's 'exit' handler awaits this before closing the logStream so
+  // the last lines aren't truncated.
+  return new Promise<void>((resolve) => rl.once("close", () => resolve()));
 }
 
 function waitForExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {

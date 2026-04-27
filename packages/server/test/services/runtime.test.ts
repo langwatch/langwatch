@@ -229,7 +229,26 @@ describe("services/runtime", () => {
         }
       })();
       await runtime.startAll(ctx);
-      await collector;
+      // Watchdog: if a regression makes one of the supervised services
+      // skip its "healthy" emit, the collector loop above will block
+      // forever waiting for the 7th event. Race against a 5s timeout so
+      // the test fails loud instead of hanging the runner.
+      await Promise.race([
+        collector,
+        new Promise<void>((_, reject) =>
+          setTimeout(
+            () =>
+              reject(
+                new Error(
+                  `runtime.events collector did not see 7 healthy events within 5s — got ${
+                    collected.filter((e) => e.type === "healthy").length
+                  }`,
+                ),
+              ),
+            5_000,
+          ),
+        ),
+      ]);
       const startingServices = collected
         .filter((e) => e.type === "starting")
         .map((e) => (e as { service: string }).service);
