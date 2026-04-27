@@ -2,7 +2,11 @@ version = 1
 revision = 3
 requires-python = ">=3.11"
 
+[options]
+exclude-newer = "2026-04-19T17:07:22.760707Z"
+exclude-newer-span = "P7D"
+
 [[package]]
 name = "langwatch-server"
-version = "2.0.2"
+version = "3.1.0"
 source = { editable = "." }

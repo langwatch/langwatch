@@ -53,6 +53,7 @@ build-backend = "hatchling.build"
 
 # Mark as non-publishable (equivalent to package-mode = false)
 [tool.uv]
+exclude-newer = "7 days"
 package = false
 
 [tool.uv.sources]

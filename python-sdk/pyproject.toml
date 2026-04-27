@@ -115,3 +115,6 @@ tests = [
     "pytest-asyncio>=0.21.2",
     "python-dotenv==1.2.1"
 ]
+
+[tool.uv]
+exclude-newer = "7 days"

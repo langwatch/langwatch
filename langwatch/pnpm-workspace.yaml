@@ -4,6 +4,8 @@ packages:
   - "packages/*"
   - "../mcp-server"
 
+minimumReleaseAge: 10080
+
 overrides:
   pino: ^10.3.0
   pino-pretty: ^13.0.0
