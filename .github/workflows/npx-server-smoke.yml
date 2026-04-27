@@ -86,15 +86,12 @@ jobs:
           version: 10.24.0
           run_install: false
 
-      # NO Go setup. The npx flow ships only the prebuilt aigateway monobinary
-      # download path; LANGWATCH_AIGATEWAY_DEV_BUILD is intentionally unset.
-      # Earlier versions installed Go here as a "local-build fallback" but
-      # that hid a real prod-path bug from CI for weeks (rchaves caught it on
-      # rare-marsh in beta.8) — the matrix happily passed because the silent
-      # fallback compiled aigateway in 30s instead of failing on a missing
-      # GH release. Without Go on the runner, a missing GH release artifact
-      # surfaces as a hard install failure here, not a regression in user
-      # land. Leave this OFF.
+      # No Go setup. The npx flow ships only the prebuilt aigateway monobinary
+      # download path; LANGWATCH_AIGATEWAY_DEV_BUILD is intentionally unset
+      # so the env-gated local-build fallback can never trigger. We don't
+      # try to remove Go from PATH (every GitHub-hosted runner ships it
+      # baked in) — the env-var gate plus the binary-identity assertions
+      # below (version match + stripped check) are what catch a regression.
 
       # Install ONLY tools that aren't predeps but the CLI needs to operate
       # (lsof for port-collision detection on linux). Postgres, redis,
@@ -109,13 +106,6 @@ jobs:
           if [[ "$RUNNER_OS" == "Linux" ]]; then
             sudo apt-get update
             sudo apt-get install -y --no-install-recommends lsof file
-          fi
-          if command -v go >/dev/null 2>&1; then
-            echo "✗ go is on PATH ($(go version)) — npx-server-smoke must NOT have go installed."
-            echo "  Why: Go's presence enabled the aigateway local-build fallback to silently"
-            echo "  succeed in CI even when the prebuilt download was broken. Drop the setup-go"
-            echo "  step; LANGWATCH_AIGATEWAY_DEV_BUILD must remain unset."
-            exit 1
           fi
 
       - name: Install pnpm dependencies (workspace)
