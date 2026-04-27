@@ -251,9 +251,46 @@ In flight on the same branch:
 - 🚧 IngestionSource setup forms (per-source-type, in lane B —
   wires to `api.ingestionSources.create`, surfaces the
   one-time secret in a "paste this into upstream" modal).
-- 🚧 Dogfood proof: synthetic source row + curl OTel span →
-  202 ack → `lastEventAt` flip → screenshot for the PR.
 - 🚧 Architecture deep-dive doc (the diagram + per-tier internals).
+
+## Verified end-to-end (D2 foundation)
+
+The IngestionSource auth path, the OTel receiver, and the
+`lastEventAt` flip were dogfooded against `pnpm dev` on `:6660`.
+The transcript IS the proof artifact (no UI to screenshot at this
+layer — that's lane B's setup form, in flight).
+
+```
+$ pnpm tsx tmp/dogfood-ingestion.ts
+✓ Planted IngestionSource
+  org:   123123123-NiG5AY
+  id:    uotNPpD9TpASqQHTv6OXo
+  name:  dogfood-otel-1777270498068
+  status: awaiting_first_event
+  ingestSecret: lw_is_kgOa878p…REDACTED
+
+$ curl -sS -X POST \
+    -H 'Authorization: Bearer lw_is_kgOa878p…REDACTED' \
+    -d '{"resource_spans":[…]}' \
+    :6660/api/ingest/otel/uotNPpD9TpASqQHTv6OXo
+
+{"accepted":true,"bytes":68}
+HTTP 202
+
+$ pnpm tsx tmp/dogfood-ingestion.ts --check
+status:        active                            ← flipped from awaiting_first_event
+lastEventAt:   2026-04-27T06:15:03.361Z
+```
+
+Auth matrix verified in the same dogfood pass:
+
+| Authorization header | Path source-id | Expected | Observed |
+|----------------------|---------------|----------|----------|
+| (none) | valid | 401 | 401 |
+| `Bearer lw_is_unknown` | valid | 401 | 401 |
+| `Bearer <valid>` | wrong | 401 | 401 |
+| `Bearer <valid>` | matching | 202 | 202 |
+| `Bearer <valid>` (replay) | matching | 202 + `lastEventAt` advances monotonically | 202, advanced |
 
 Tier 2 / Tier 5 are deferred; the architecture doesn't preclude them
 and the control-plane primitives already accommodate them.
