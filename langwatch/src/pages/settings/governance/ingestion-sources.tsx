@@ -813,15 +813,99 @@ function SecretModal({
   onClose: () => void;
 }) {
   const [copied, setCopied] = useState(false);
-  if (!details) return null;
   const baseUrl =
     typeof window !== "undefined" ? window.location.origin : "https://langwatch.invalid";
-  const otlpUrl = `${baseUrl}/api/ingest/otel/${details.sourceId}`;
-  const webhookUrl = `${baseUrl}/api/ingest/webhook/${details.sourceId}`;
+  const otlpUrl = details
+    ? `${baseUrl}/api/ingest/otel/${details.sourceId}`
+    : "";
+  const webhookUrl = details
+    ? `${baseUrl}/api/ingest/webhook/${details.sourceId}`
+    : "";
   const usesPushUrl =
-    details.sourceType === "otel_generic" ||
-    details.sourceType === "claude_cowork";
-  const usesWebhookUrl = details.sourceType === "workato";
+    details?.sourceType === "otel_generic" ||
+    details?.sourceType === "claude_cowork";
+  const usesWebhookUrl = details?.sourceType === "workato";
+
+  // F-OTEL-3 (Sergey draft): a copy-paste curl that exercises the full
+  // happy path — body parses, attribute parser sees the canonical
+  // gen_ai.* + user.email keys, KPI strip moves on the first event.
+  // Timestamp is fresh at modal open so the test event lands inside
+  // the 24h health window even if the user delays a bit before
+  // pasting.
+  const testCurl = useMemo(() => {
+    if (!details) return null;
+    if (usesPushUrl) {
+      const nowNs = `${Date.now()}000000`;
+      const otlpBody = JSON.stringify({
+        resource_spans: [
+          {
+            resource: {
+              attributes: [
+                {
+                  key: "service.name",
+                  value: { stringValue: details.sourceName },
+                },
+              ],
+            },
+            scope_spans: [
+              {
+                spans: [
+                  {
+                    name: "chat.completion",
+                    startTimeUnixNano: nowNs,
+                    attributes: [
+                      {
+                        key: "gen_ai.usage.input_tokens",
+                        value: { intValue: 120 },
+                      },
+                      {
+                        key: "gen_ai.usage.output_tokens",
+                        value: { intValue: 480 },
+                      },
+                      {
+                        key: "gen_ai.usage.cost_usd",
+                        value: { doubleValue: 0.025 },
+                      },
+                      { key: "user.email", value: { stringValue: "you@your.org" } },
+                      {
+                        key: "gen_ai.request.model",
+                        value: { stringValue: "claude-sonnet-4" },
+                      },
+                    ],
+                  },
+                ],
+              },
+            ],
+          },
+        ],
+      });
+      return [
+        `curl -X POST '${otlpUrl}' \\`,
+        `  -H 'Authorization: Bearer ${details.secret}' \\`,
+        `  -H 'Content-Type: application/json' \\`,
+        `  -d '${otlpBody}'`,
+      ].join("\n");
+    }
+    if (usesWebhookUrl) {
+      return [
+        `curl -X POST '${webhookUrl}' \\`,
+        `  -H 'Authorization: Bearer ${details.secret}' \\`,
+        `  -H 'Content-Type: application/json' \\`,
+        `  -d '{"event":"test.smoke","actor":"you@your.org"}'`,
+      ].join("\n");
+    }
+    return null;
+  }, [
+    details?.secret,
+    details?.sourceName,
+    details,
+    otlpUrl,
+    webhookUrl,
+    usesPushUrl,
+    usesWebhookUrl,
+  ]);
+
+  if (!details) return null;
 
   const copy = (value: string) => {
     void navigator.clipboard?.writeText(value);
@@ -924,6 +1008,40 @@ function SecretModal({
                 </HStack>
               </VStack>
             )}
+            {testCurl && (
+              <VStack align="stretch" gap={1}>
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                  Test it now — paste this into a terminal
+                </Text>
+                <Box position="relative">
+                  <Code
+                    display="block"
+                    padding={3}
+                    fontSize="xs"
+                    whiteSpace="pre"
+                    overflowX="auto"
+                  >
+                    {testCurl}
+                  </Code>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    position="absolute"
+                    top={2}
+                    right={2}
+                    onClick={() => copy(testCurl)}
+                  >
+                    <Copy size={12} /> {copied ? "Copied" : "Copy"}
+                  </Button>
+                </Box>
+                <Text fontSize="xs" color="fg.muted">
+                  Returns HTTP 202 with{" "}
+                  <Code fontSize="xs">events: 1</Code> on success. If you
+                  get <Code fontSize="xs">events: 0</Code> with a hint,
+                  the body shape didn&apos;t parse — check the docs.
+                </Text>
+              </VStack>
+            )}
             <Box
               borderWidth="1px"
               borderColor="amber.300"
@@ -941,6 +1059,11 @@ function SecretModal({
           </VStack>
         </DialogBody>
         <DialogFooter>
+          <Link
+            href={`/settings/governance/ingestion-sources/${details.sourceId}`}
+          >
+            <Button variant="outline">View source page →</Button>
+          </Link>
           <Button colorPalette="blue" onClick={onClose}>
             I&apos;ve saved it
           </Button>
