@@ -58,6 +58,7 @@ import { gatewayProvidersRouter } from "./routers/gatewayProviders";
 import { virtualKeysRouter } from "./routers/virtualKeys";
 import { personalVirtualKeysRouter } from "./routers/personalVirtualKeys";
 import { routingPoliciesRouter } from "./routers/routingPolicies";
+import { ingestionSourcesRouter } from "./routers/ingestionSources";
 import { workflowRouter } from "./routers/workflows";
 import { opsRouter } from "./routers/ops";
 
@@ -117,6 +118,7 @@ const coreRouters = {
   virtualKeys: virtualKeysRouter,
   personalVirtualKeys: personalVirtualKeysRouter,
   routingPolicy: routingPoliciesRouter,
+  ingestionSources: ingestionSourcesRouter,
   gatewayProviders: gatewayProvidersRouter,
   gatewayBudgets: gatewayBudgetsRouter,
   gatewayCacheRules: gatewayCacheRulesRouter,

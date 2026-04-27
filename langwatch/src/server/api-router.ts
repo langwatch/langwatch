@@ -41,6 +41,7 @@ import { app as annotationsApp } from "./routes/annotations";
 import { app as authApp } from "./routes/auth";
 import { app as authCliApp } from "./routes/auth-cli";
 import { app as collectorApp } from "./routes/collector";
+import { app as ingestionRoutesApp } from "./routes/ingest/ingestionRoutes";
 import { app as cronApp } from "./routes/cron";
 import { app as evaluationsLegacyApp } from "./routes/evaluations-legacy";
 import { app as healthApp } from "./routes/health";
@@ -107,6 +108,7 @@ export function createApiRouter() {
   api.route("/", authCliApp);  // /api/auth/cli/* — RFC 8628 device-flow for CLI
   api.route("/", authApp);
   api.route("/", collectorApp);
+  api.route("/", ingestionRoutesApp); // /api/ingest/* — Activity Monitor receivers
   api.route("/", cronApp);
   api.route("/", evaluationsLegacyApp);
   api.route("/", healthApp);
