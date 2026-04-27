@@ -56,6 +56,14 @@ export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput):
   sectionBreak("LANGWATCH INTERNAL SERVICES");
   set("LANGWATCH_NLP_SERVICE", `http://localhost:${ports.nlp}`);
   set("LANGEVALS_ENDPOINT", `http://localhost:${ports.langevals}`);
+  // langwatch_nlp's python SDK reads `LANGWATCH_ENDPOINT` to decide where to
+  // POST evaluator runs and dataset uploads. The default in the SDK is
+  // https://app.langwatch.ai (cloud) — which is wrong for self-host: the
+  // SDK then 401s every callback against the hosted API, evaluators
+  // produce no scores, and the experiments workbench just shows the
+  // evaluator title with no value. Pinning to our local langwatch app
+  // routes those callbacks to the running stack.
+  set("LANGWATCH_ENDPOINT", host);
   set("DISABLE_PII_REDACTION", "true");
 
   sectionBreak("AI GATEWAY");
