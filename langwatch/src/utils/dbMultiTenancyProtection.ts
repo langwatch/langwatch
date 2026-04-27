@@ -139,6 +139,13 @@ const EXEMPT_MODELS = [
    * layer authorises by organizationId membership before any mutation.
    */
   "AnomalyRule",
+  /**
+   * AnomalyAlert (iter governance-platform / D2 anomaly detection) is
+   * org-scoped persisted detections. Same rationale as AnomalyRule —
+   * org-scoped, no projectId, service layer authorises by
+   * organizationId before any mutation.
+   */
+  "AnomalyAlert",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {

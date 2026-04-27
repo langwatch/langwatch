@@ -240,6 +240,7 @@ model Organization {
   routingPolicies        RoutingPolicy[]
   ingestionSources       IngestionSource[]
   anomalyRules           AnomalyRule[]
+  anomalyAlerts          AnomalyAlert[]
 
   @@index([ssoProvider])
 }
@@ -1817,6 +1818,62 @@ model AnomalyRule {
   @@index([scope, scopeId])
   @@index([ruleType])
   @@index([status])
+
+  alerts AnomalyAlert[]
+}
+
+/// Persisted anomaly detection. Inserted by the anomaly-detection
+/// reactor (event-sourcing pipeline; modeled on PR #3351's
+/// alertTrigger pattern) when a rule's threshold trips while
+/// processing a freshly-arrived ActivityEventReceived event.
+/// Read by api.activityMonitor.recentAnomalies for the admin dashboard.
+///
+/// Dedup: (ruleId, triggerWindowStart) — re-evaluating the same
+/// window updates the existing row rather than creating a duplicate.
+/// Acknowledgement / resolution are admin actions on the row.
+///
+/// Spec: specs/ai-gateway/governance/anomaly-detection.feature
+model AnomalyAlert {
+  id             String       @id @default(nanoid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  ruleId         String
+  rule           AnomalyRule  @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  /// Denormalised from rule for fast WHERE filtering on the
+  /// dashboard query (no join needed for the common path).
+  severity String
+  ruleName String
+  ruleType String
+
+  /// Window the trigger refers to (UTC).
+  triggerWindowStart DateTime
+  triggerWindowEnd   DateTime
+
+  /// Numeric trigger context. Per-rule-type detail in `detail` JSONB.
+  triggerSpendUsd   Decimal? @db.Decimal(18, 6)
+  triggerEventCount Int?
+
+  /// Per-rule-type extra context: {topActors: [...], baseline: ...,
+  /// observed: ..., timezone: ..., etc}.
+  detail Json @default("{}")
+
+  /// 'open' | 'acknowledged' | 'resolved'.
+  state String @default("open")
+
+  /// Per-destination dispatch outcome:
+  ///   { webhook: { lastAttemptIso, lastError?, attemptCount, statusCode? },
+  ///     slack: ..., pagerduty: ..., siem: ..., email: ... }
+  destinationStatus Json @default("{}")
+
+  detectedAt     DateTime  @default(now())
+  acknowledgedAt DateTime?
+  resolvedAt     DateTime?
+
+  @@unique([ruleId, triggerWindowStart])
+  @@index([organizationId, detectedAt])
+  @@index([ruleId])
+  @@index([state])
 }
 
 model GatewayProviderCredential {
