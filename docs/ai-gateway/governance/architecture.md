@@ -62,10 +62,12 @@ this as a ladder, deepest control on top:
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
-A real customer ends up as a mix. Miro is Tier A for custom agents,
-Tier C for Cowork/Workato/Copilot Studio/Claude-for-Work, Tier D for
-Cowork's OTel-emitted spans, and Tier E later (for high-trust agents
-they want sandboxed).
+A real organization typically uses several tiers concurrently:
+Tier A for in-house custom agents and any BYOK SaaS, Tier C for
+closed platforms whose runtime they don't own (Claude Cowork,
+Workato, Copilot Studio, Claude for Work), Tier D for whichever of
+those platforms expose OTel export, and Tier E later for high-trust
+agents they want sandboxed inside their LangWatch deployment.
 
 ## The control plane, end to end
 

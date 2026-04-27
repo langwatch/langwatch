@@ -14,6 +14,25 @@ locate the surface you're configuring (or asking about) on the larger
 ladder. Sister docs go deep on individual tiers; this one only
 explains the relationships.
 
+## Daily-use surfaces vs admin-authoring surfaces
+
+The governance product UI splits into two functional layers. The
+distinction matters when reading the rest of this doc and the
+existing routes:
+
+| Surface | Purpose | Audience | Where it lives |
+|---------|---------|----------|----------------|
+| `/governance` (forthcoming top-level home) | Daily-use **org governance home** — spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org has activated governance (personal VKs, IngestionSources, RoutingPolicies, or gateway usage exists) | Top-level route, org-scoped. Replaces the read-mostly content currently temporarily under `/settings/governance`. |
+| `/me`, `/me/settings` | Daily-use **personal home** — your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
+| `/[project]/...` | LLMOps daily-use — traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
+| `/settings/governance/ingestion-sources`, `/settings/governance/anomaly-rules`, `/settings/routing-policies` | Admin-authoring (CRUD) — create / rotate / archive sources, write rules, publish routing policies. | Org admins with `organization:manage` | Settings sub-routes, deliberately separate from daily-use surfaces. |
+
+This split is the answer to "why is governance overview hidden under
+Settings?" — it shouldn't be. The read-mostly daily home is moving
+out to `/governance` (top-level); only the create / rotate / archive
+admin tools stay in Settings, where every other admin authoring
+tool lives.
+
 ## The split: control plane vs data plane
 
 ```
@@ -93,10 +112,10 @@ $ langwatch claude  ──exec(anthropic_url)─▶  gateway.langwatch.ai
 
 Why Tier 1 wins:
 
-- **Per-user attribution at the credential layer.** Jane's
-  `lw_vk_...` carries `principal_id=jane`. Every request, every
-  trace, every cost roll-up attributes to her without parsing
-  the model's `user` field at the provider.
+- **Per-user attribution at the credential layer.** Each user's
+  `lw_vk_...` carries `principal_id=<userId>`. Every request,
+  every trace, every cost roll-up attributes to the right person
+  without parsing the model's `user` field at the provider.
 - **Mid-flight policy.** Gateway can block before the call goes
   out (request size, model allowlist, denied tool, budget
   exceeded). Tier 3 only sees the call after it happened.

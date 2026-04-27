@@ -83,13 +83,14 @@ the most-specific `isDefault=true` policy:
 PROJECT default  >  TEAM default  >  ORG default
 ```
 
-Concretely: when a personal VK is auto-issued for Jane (member of
-the `sales-eng` team in the `miro` org), the gateway picks:
+Concretely: when a personal VK is auto-issued for a user (member of
+some team in their org), the gateway picks:
 
-1. Is there a `PROJECT`-scoped default for her personal project? No
-   (personal projects don't carry their own routing policies).
-2. Is there a `TEAM`-scoped default for `sales-eng`? Maybe.
-3. If not, fall back to the `ORG`-scoped default for `miro`.
+1. Is there a `PROJECT`-scoped default for their personal project?
+   No — personal projects don't carry their own routing policies.
+2. Is there a `TEAM`-scoped default for the user's team? Maybe.
+3. If not, fall back to the `ORG`-scoped default for their
+   organization.
 
 Override at the team level by creating a `TEAM`-scoped policy and
 marking it default. Members of that team automatically inherit it
