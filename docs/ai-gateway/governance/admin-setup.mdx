@@ -6,10 +6,19 @@ sidebarTitle: Admin setup
 
 This is the **admin** side of [Personal IDE keys](/ai-gateway/governance/personal-keys).
 Once configured, every developer in your organization can run
-`langwatch login` and immediately get a working CLI experience —
+`langwatch login --device` and immediately get a working CLI experience —
 no per-user setup, no IT tickets.
 
-Total time: ~30 minutes for a fresh organization.
+## Time budget
+
+The numbers below are hands-on time at the LangWatch admin console — not net of organisational approvals.
+
+| Path | Hands-on time | Net of approvals |
+|------|---------------|--------------------|
+| **Self-serve** (existing email signup, no SSO yet) | ~5 minutes | ~5 minutes |
+| **With Okta / Azure AD / Google Workspace SSO** | ~30 minutes | Days, depending on IT / security review of a new SAML or OIDC app |
+
+If your IT team is the bottleneck, you can start on the self-serve path today (skip §1 below) and add SSO later — the providers, routing policies, and budgets you set up keep working unchanged when SSO drops in.
 
 ## Prerequisites
 

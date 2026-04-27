@@ -6,6 +6,25 @@ sidebarTitle: Quickstart
 
 This walkthrough takes you from zero to a traced, budget-gated LLM response.
 
+## Are you a developer or an admin?
+
+The fastest path depends on which side of the rollout you're on. **Pick one before continuing**:
+
+<CardGroup cols={2}>
+  <Card title="I'm a developer" icon="laptop-code" href="/ai-gateway/governance/personal-keys">
+    Your admin already wired up the gateway and you got an SSO sign-in link or asked to install `langwatch`.
+
+    Skip ahead to **Personal IDE keys** — `langwatch login --device` provisions your virtual key automatically. You don't need to set up providers, budgets, or routing.
+  </Card>
+  <Card title="I'm an org admin" icon="shield-halved" href="/ai-gateway/governance/admin-setup">
+    Your company just bought governance and you're rolling it out for the team.
+
+    Skip ahead to **Admin setup** — connect SSO, providers, and routing policies once, every developer auto-onboards from there.
+  </Card>
+</CardGroup>
+
+The rest of this page covers the **service-virtual-key** flow used for non-personal traffic (server-to-server calls from your applications, evaluators, prompt playground, etc.). If that's what you're here for, read on.
+
 <Note>You'll need a LangWatch account, an **organisation admin** or **project admin** role, and at least one model provider (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex, or Gemini) configured at **Settings → Model Providers**. If you haven't set one up yet, start there — the AI Gateway reuses those credentials.</Note>
 
 <CardGroup cols={2}>
