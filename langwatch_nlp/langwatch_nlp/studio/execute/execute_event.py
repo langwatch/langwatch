@@ -1,3 +1,4 @@
+import os
 from typing import AsyncGenerator
 
 
@@ -46,7 +47,10 @@ async def execute_event(
             case "is_alive":
                 yield IsAliveResponse()
             case "execute_component":
-                langwatch.setup(api_key=event.payload.workflow.api_key)
+                langwatch.setup(
+                    api_key=event.payload.workflow.api_key,
+                    endpoint_url=os.environ.get("LANGWATCH_ENDPOINT"),
+                )
                 try:
                     async for event_ in execute_component(event.payload):
                         yield event_
@@ -60,7 +64,10 @@ async def execute_event(
                         error=_error_repr(e),
                     )
             case "execute_flow":
-                langwatch.setup(api_key=event.payload.workflow.api_key)
+                langwatch.setup(
+                    api_key=event.payload.workflow.api_key,
+                    endpoint_url=os.environ.get("LANGWATCH_ENDPOINT"),
+                )
                 try:
                     async for event_ in execute_flow(event.payload, queue):
                         yield event_
@@ -70,7 +77,10 @@ async def execute_event(
                     traceback.print_exc()
                     yield Error(payload=ErrorPayload(message=_error_repr(e)))
             case "execute_evaluation":
-                client = langwatch.setup(api_key=event.payload.workflow.api_key)
+                client = langwatch.setup(
+                    api_key=event.payload.workflow.api_key,
+                    endpoint_url=os.environ.get("LANGWATCH_ENDPOINT"),
+                )
                 client.disable_sending = True
                 try:
                     async for event_ in execute_evaluation(event.payload, queue):
@@ -78,7 +88,10 @@ async def execute_event(
                 except Exception as e:
                     yield Error(payload=ErrorPayload(message=_error_repr(e)))
             case "execute_optimization":
-                client = langwatch.setup(api_key=event.payload.workflow.api_key)
+                client = langwatch.setup(
+                    api_key=event.payload.workflow.api_key,
+                    endpoint_url=os.environ.get("LANGWATCH_ENDPOINT"),
+                )
                 client.disable_sending = True
                 try:
                     async for event_ in execute_optimization(event.payload, queue):

@@ -212,10 +212,21 @@ class Client(LangWatchClientProtocol):
 
         if endpoint_url is not None:
             Client._endpoint_url = endpoint_url
-        elif not Client._endpoint_url:
-            Client._endpoint_url = (
-                os.getenv("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
-            )
+        else:
+            # Always re-read LANGWATCH_ENDPOINT from env on every setup()
+            # call. The previous "pin once on first init" behavior caused
+            # Client._endpoint_url to stick at the default (https://app.langwatch.ai)
+            # whenever some code path called setup() before the host env had
+            # LANGWATCH_ENDPOINT set — most commonly dspy's ProcessPool
+            # worker init order, which made every self-host evaluator
+            # callback 401 against the cloud API. Re-reading per-call costs
+            # one os.getenv lookup; the explicit endpoint_url path above
+            # still wins.
+            env_endpoint = os.getenv("LANGWATCH_ENDPOINT")
+            if env_endpoint:
+                Client._endpoint_url = env_endpoint
+            elif not Client._endpoint_url:
+                Client._endpoint_url = "https://app.langwatch.ai"
 
         if debug is not None:
             Client._debug = debug
