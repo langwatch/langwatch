@@ -613,8 +613,9 @@ const buildSignatureNodeParameters = (
 /**
  * Builds a code node from a TypedAgent with type "code" or "workflow".
  *
- * Code agents contain Python code with DSPy modules that handle their own LLM calls.
- * Parameters are passed directly - no LLM config normalization needed.
+ * Code agents contain a Python class (with a `forward` method) that handles
+ * its own LLM calls. Parameters are passed directly - no LLM config
+ * normalization needed.
  */
 export const buildCodeNodeFromAgent = (
   nodeId: string,

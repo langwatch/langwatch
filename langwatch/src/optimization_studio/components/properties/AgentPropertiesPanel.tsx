@@ -623,7 +623,8 @@ function DbAgentPanel({
           <Field.Root>
             <Field.Label fontSize="sm">Python Code</Field.Label>
             <Text fontSize="xs" color="fg.muted" marginBottom={1}>
-              Write a DSPy module that takes inputs and returns outputs.
+              Define a Python class with a `forward` method that takes inputs
+              and returns outputs.
             </Text>
             <CodeBlockEditor
               code={code}

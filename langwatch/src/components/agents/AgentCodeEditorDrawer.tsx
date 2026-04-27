@@ -474,7 +474,8 @@ export function AgentCodeEditorDrawer(props: AgentCodeEditorDrawerProps) {
                   <Field.Root>
                     <Field.Label>Python Code</Field.Label>
                     <Text fontSize="sm" color="fg.muted" marginBottom={2}>
-                      Write a DSPy module that takes inputs and returns outputs.
+                      Define a Python class with a `forward` method that takes
+                      inputs and returns outputs.
                     </Text>
                     <CodeBlockEditor
                       code={code}
