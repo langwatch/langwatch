@@ -20,10 +20,20 @@ set -e
 PORT="${PORT:-8080}"
 KEEP_ALIVE="${NLP_UVICORN_KEEP_ALIVE_SECONDS:-4500}"
 
+# Bypass-mode invocation is env-overridable so the saas runtime images
+# (Dockerfile.langwatch_nlp.{service,lambda}.runtime in langwatch-saas)
+# can use `python -m uvicorn` instead of `uv run uvicorn` — those images
+# don't ship `uv` in the runtime stage to keep the layer lean. The
+# monorepo lambda image ships uv (it builds with `uv build` in the same
+# image), so the defaults match its shape.
+BYPASS_COMMAND="${NLPGO_BYPASS_COMMAND:-uv}"
+BYPASS_ARGS="${NLPGO_BYPASS_ARGS:---no-cache run --no-sync --no-editable uvicorn langwatch_nlp.main:app --host 0.0.0.0 --timeout-keep-alive $KEEP_ALIVE}"
+
 run_uvicorn_only() {
-  exec uv --no-cache run --no-sync --no-editable uvicorn langwatch_nlp.main:app \
-    --host 0.0.0.0 --port "$1" \
-    --timeout-keep-alive "$KEEP_ALIVE"
+  # The bypass invocation appends --port LAST so the args set above don't
+  # have to know what port to bind — the entrypoint owns that.
+  # shellcheck disable=SC2086 # word-splitting is intentional here
+  exec $BYPASS_COMMAND $BYPASS_ARGS --port "$1"
 }
 
 if [ "${NLPGO_BYPASS:-0}" = "1" ]; then
