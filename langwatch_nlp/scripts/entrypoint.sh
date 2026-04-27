@@ -63,5 +63,5 @@ export NLPGO_CHILD_ARGS="${NLPGO_CHILD_ARGS:---no-cache run --no-sync --no-edita
 export NLPGO_CHILD_HEALTH_URL="${NLPGO_CHILD_HEALTH_URL:-http://127.0.0.1:5561/health}"
 export NLPGO_CHILD_UPSTREAM_URL="${NLPGO_CHILD_UPSTREAM_URL:-http://127.0.0.1:5561}"
 
-echo "[entrypoint] nlpgo (Go) on :$PORT — uvicorn child on 127.0.0.1:5561"
+echo "[entrypoint] nlpgo (Go) on :$PORT — uvicorn child via ${NLPGO_CHILD_UPSTREAM_URL}"
 exec /usr/local/bin/nlpgo
