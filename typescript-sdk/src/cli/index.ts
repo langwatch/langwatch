@@ -7,6 +7,10 @@ config();
 import { Command } from "commander";
 import { parsePromptSpec } from "./types";
 import { formatApiErrorMessage } from "../client-sdk/services/_shared/format-api-error";
+import {
+  isGovernancePreviewEnabled,
+  GOVERNANCE_PREVIEW_DISABLED_MESSAGE,
+} from "./utils/governance/preview-flag";
 
 declare const __CLI_VERSION__: string;
 
@@ -124,22 +128,51 @@ program
   .showHelpAfterError()
   .showSuggestionAfterError();
 
-// Top-level commands
-program
-  .command("login")
-  .description("Login to LangWatch. By default, prompts for an API key (or pass --api-key for CI). Use --device to authenticate via your company SSO and provision a personal AI Gateway virtual key.")
-  .option("--api-key <key>", "Set API key non-interactively (for CI/CD and agents)")
-  .option("--device", "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI")
-  .option("--browser <name>", "browser to open for device-flow approval (chrome|chromium|firefox|safari|none|<path>)")
-  .action(async (options: { apiKey?: string; device?: boolean; browser?: string }) => {
-    try {
-      await loginCommand(options);
-    } catch (error) {
-      console.error(`Error: ${formatApiErrorMessage({ error })}`);
-      process.exit(1);
-    }
-  });
+// AI Governance preview is gated by LANGWATCH_GOVERNANCE_PREVIEW=1 — when
+// unset, the new subcommands and the `login --device` option don't get
+// registered, so they're invisible to `langwatch --help` and behave as
+// "unknown command" if invoked. This keeps the long-lived governance
+// branch merge-able into main without exposing preview features to
+// users who haven't opted in. Mirrors the web app's
+// `release_ui_ai_governance_enabled` PostHog flag.
+const governancePreview = isGovernancePreviewEnabled();
 
+// Top-level commands
+const loginCmd = program
+  .command("login")
+  .description(
+    governancePreview
+      ? "Login to LangWatch. By default, prompts for an API key (or pass --api-key for CI). Use --device to authenticate via your company SSO and provision a personal AI Gateway virtual key."
+      : "Login to LangWatch. Prompts for an API key, or pass --api-key for CI."
+  )
+  .option("--api-key <key>", "Set API key non-interactively (for CI/CD and agents)");
+
+if (governancePreview) {
+  loginCmd
+    .option(
+      "--device",
+      "RFC 8628 device-flow login via your company SSO; provisions a personal virtual key for Claude Code / Codex / Cursor / Gemini CLI",
+    )
+    .option(
+      "--browser <name>",
+      "browser to open for device-flow approval (chrome|chromium|firefox|safari|none|<path>)",
+    );
+}
+
+loginCmd.action(async (options: { apiKey?: string; device?: boolean; browser?: string }) => {
+  if (options.device && !governancePreview) {
+    console.error(GOVERNANCE_PREVIEW_DISABLED_MESSAGE);
+    process.exit(1);
+  }
+  try {
+    await loginCommand(options);
+  } catch (error) {
+    console.error(`Error: ${formatApiErrorMessage({ error })}`);
+    process.exit(1);
+  }
+});
+
+if (governancePreview) {
 // AI Gateway governance — read identity, deep-link, request budget increase.
 program
   .command("whoami")
@@ -273,6 +306,7 @@ program
       process.exit(1);
     }
   });
+} // end if (governancePreview)
 
 // Add prompt command group
 const promptCmd = program
