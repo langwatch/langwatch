@@ -79,7 +79,7 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 
 		for _, layer := range plan.Layers {
 			if err := ctx.Err(); err != nil {
-				emit(out, StreamEvent{
+				emit(ctx, out, StreamEvent{
 					Type:    "error",
 					TraceID: traceID,
 					Payload: map[string]any{"message": err.Error()},
@@ -88,11 +88,11 @@ func (e *Engine) ExecuteStream(ctx context.Context, req ExecuteRequest, opts Exe
 			}
 			e.runLayerStream(ctx, req, plan, state, layer, traceID, out)
 			if state.firstError != nil {
-				emit(out, doneEvent(traceID, state, started))
+				emit(ctx, out, doneEvent(traceID, state, started))
 				return
 			}
 		}
-		emit(out, doneEvent(traceID, state, started))
+		emit(ctx, out, doneEvent(traceID, state, started))
 	}()
 	return out, nil
 }
@@ -108,7 +108,7 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 			node := state.nodes[nodeID]
 			inputs := state.resolveInputs(plan, nodeID)
 			ns := &NodeState{ID: nodeID, Status: "running", Inputs: inputs}
-			emit(out, stateEvent(traceID, nodeID, ns))
+			emit(ctx, out, stateEvent(traceID, nodeID, ns))
 			started := time.Now()
 			outputs, derr := e.dispatch(ctx, req, node, inputs, ns)
 			ns.DurationMS = time.Since(started).Milliseconds()
@@ -123,7 +123,7 @@ func (e *Engine) runLayerStream(ctx context.Context, req ExecuteRequest, plan *p
 				state.recordOutputs(nodeID, outputs)
 			}
 			state.recordState(nodeID, ns)
-			emit(out, stateEvent(traceID, nodeID, ns))
+			emit(ctx, out, stateEvent(traceID, nodeID, ns))
 		}()
 	}
 	wg.Wait()
@@ -140,15 +140,17 @@ func heartbeat(ctx context.Context, traceID string, every time.Duration, out cha
 		case <-ctx.Done():
 			return
 		case <-t.C:
-			emit(out, StreamEvent{Type: "is_alive_response", TraceID: traceID})
+			emit(ctx, out, StreamEvent{Type: "is_alive_response", TraceID: traceID})
 		}
 	}
 }
 
 // emit is a non-blocking send for heartbeats (drop if consumer is
-// slow) and a blocking send for everything else (state changes are
-// load-bearing — never drop).
-func emit(out chan<- StreamEvent, ev StreamEvent) {
+// slow) and a blocking-but-cancelable send for everything else (state
+// changes are load-bearing — never drop, but never block forever
+// either: if ctx is canceled and the consumer has stopped draining,
+// the goroutine returns instead of leaking on the chan send).
+func emit(ctx context.Context, out chan<- StreamEvent, ev StreamEvent) {
 	if ev.Type == "is_alive_response" {
 		select {
 		case out <- ev:
@@ -156,7 +158,10 @@ func emit(out chan<- StreamEvent, ev StreamEvent) {
 		}
 		return
 	}
-	out <- ev
+	select {
+	case out <- ev:
+	case <-ctx.Done():
+	}
 }
 
 // stateEvent wraps a per-node update in the Python-aligned

@@ -56,6 +56,9 @@ async function waitForHealth(timeoutMs = 30_000): Promise<void> {
 beforeAll(async () => {
   if (!process.env.OPENAI_API_KEY) return;
 
+  // detached:true so afterAll's process.kill(-pid) reaches the
+  // compiled child of `go run`, not just the toolchain wrapper.
+  // See post-event.integration.test.ts for the full rationale.
   nlpgoProcess = spawn("go", ["run", "./cmd/service", "nlpgo"], {
     cwd: REPO_ROOT,
     env: {
@@ -64,7 +67,7 @@ beforeAll(async () => {
       SERVER_ADDR: `:${NLPGO_PORT}`,
     },
     stdio: ["ignore", "pipe", "pipe"],
-    detached: false,
+    detached: true,
   });
 
   nlpgoProcess.stderr?.on("data", (chunk: Buffer) => {
@@ -82,15 +85,26 @@ beforeAll(async () => {
 }, 90_000);
 
 afterAll(async () => {
-  if (!nlpgoProcess) return;
-  nlpgoProcess.kill("SIGTERM");
+  if (!nlpgoProcess?.pid) return;
+  const pgid = -nlpgoProcess.pid;
+  try {
+    process.kill(pgid, "SIGTERM");
+  } catch {
+    // group already gone
+  }
   const exited = await Promise.race([
     new Promise<boolean>((resolve) =>
       nlpgoProcess!.once("exit", () => resolve(true)),
     ),
     sleep(2000).then(() => false),
   ]);
-  if (!exited) nlpgoProcess.kill("SIGKILL");
+  if (!exited) {
+    try {
+      process.kill(pgid, "SIGKILL");
+    } catch {
+      // best-effort
+    }
+  }
 });
 
 const liveOpenAI = process.env.OPENAI_API_KEY ? it : it.skip;

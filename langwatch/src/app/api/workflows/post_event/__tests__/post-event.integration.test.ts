@@ -84,6 +84,12 @@ beforeAll(async () => {
   process.env.LANGWATCH_NLP_SERVICE = `http://127.0.0.1:${NLPGO_PORT}`;
   delete process.env.LANGWATCH_NLP_LAMBDA_CONFIG;
 
+  // detached:true puts `go run` into its own process group, so the
+  // SIGTERM in afterAll can target the whole group with kill(-pid, ...).
+  // Without this, SIGTERM hits only the `go` toolchain wrapper — its
+  // compiled child (the actual nlpgo binary) installs its own signal
+  // handlers and can survive long enough to keep $NLPGO_PORT bound,
+  // breaking parallel test runs with EADDRINUSE on retry.
   nlpgoProcess = spawn("go", ["run", "./cmd/service", "nlpgo"], {
     cwd: REPO_ROOT,
     env: {
@@ -94,7 +100,7 @@ beforeAll(async () => {
       SERVER_ADDR: `:${NLPGO_PORT}`,
     },
     stdio: ["ignore", "pipe", "pipe"],
-    detached: false,
+    detached: true,
   });
 
   nlpgoProcess.stderr?.on("data", (chunk: Buffer) => {
@@ -112,15 +118,29 @@ beforeAll(async () => {
 }, 90_000);
 
 afterAll(async () => {
-  if (!nlpgoProcess) return;
-  nlpgoProcess.kill("SIGTERM");
+  if (!nlpgoProcess?.pid) return;
+  // Negative pid → kill the whole process group (`go run` plus its
+  // compiled child). Falls back to single-pid SIGKILL on edge cases
+  // (e.g. process already exited so the group is gone).
+  const pgid = -nlpgoProcess.pid;
+  try {
+    process.kill(pgid, "SIGTERM");
+  } catch {
+    // group already gone — nothing to do
+  }
   const exited = await Promise.race([
     new Promise<boolean>((resolve) =>
       nlpgoProcess!.once("exit", () => resolve(true)),
     ),
     sleep(2000).then(() => false),
   ]);
-  if (!exited) nlpgoProcess.kill("SIGKILL");
+  if (!exited) {
+    try {
+      process.kill(pgid, "SIGKILL");
+    } catch {
+      // best-effort
+    }
+  }
 });
 
 const liveOpenAI = process.env.OPENAI_API_KEY ? it : it.skip;

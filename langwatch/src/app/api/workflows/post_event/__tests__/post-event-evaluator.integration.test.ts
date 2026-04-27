@@ -131,6 +131,9 @@ beforeAll(async () => {
   process.env.LANGWATCH_NLP_SERVICE = `http://127.0.0.1:${NLPGO_PORT}`;
   delete process.env.LANGWATCH_NLP_LAMBDA_CONFIG;
 
+  // detached:true so afterAll's process.kill(-pid) reaches the
+  // compiled child of `go run`, not just the toolchain wrapper.
+  // See post-event.integration.test.ts for the full rationale.
   nlpgoProcess = spawn("go", ["run", "./cmd/service", "nlpgo"], {
     cwd: REPO_ROOT,
     env: {
@@ -140,7 +143,7 @@ beforeAll(async () => {
       NLPGO_ENGINE_LANGWATCH_BASE_URL: langwatchURL,
     },
     stdio: ["ignore", "pipe", "pipe"],
-    detached: false,
+    detached: true,
   });
 
   nlpgoProcess.stderr?.on("data", (chunk: Buffer) => {
@@ -158,15 +161,26 @@ beforeAll(async () => {
 }, 90_000);
 
 afterAll(async () => {
-  if (nlpgoProcess) {
-    nlpgoProcess.kill("SIGTERM");
+  if (nlpgoProcess?.pid) {
+    const pgid = -nlpgoProcess.pid;
+    try {
+      process.kill(pgid, "SIGTERM");
+    } catch {
+      // group already gone
+    }
     const exited = await Promise.race([
       new Promise<boolean>((resolve) =>
         nlpgoProcess!.once("exit", () => resolve(true)),
       ),
       sleep(2000).then(() => false),
     ]);
-    if (!exited) nlpgoProcess.kill("SIGKILL");
+    if (!exited) {
+      try {
+        process.kill(pgid, "SIGKILL");
+      } catch {
+        // best-effort
+      }
+    }
   }
   if (langwatchSrv) {
     await new Promise<void>((resolve) => langwatchSrv!.close(() => resolve()));

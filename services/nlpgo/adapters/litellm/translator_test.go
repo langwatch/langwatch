@@ -87,9 +87,19 @@ func TestIsReasoningModel(t *testing.T) {
 		"openai/o1-mini", "openai/o3", "openai/o4-preview",
 		"openai/gpt-5-mini", "gpt-5", "o1",
 	}
+	// Pin Python parity: matching is anchored on the model BASENAME
+	// (anything after the last `/`, or the full string if no `/`),
+	// not the full provider/model string. A naive `\b(o1|o3|...)`
+	// substring scan against the full id would false-match these,
+	// causing temperature pinning + max_tokens flooring to fire on
+	// non-reasoning models.
 	no := []string{
 		"openai/gpt-4o", "anthropic/claude-3-5-sonnet", "gemini/gemini-2.0-flash",
 		"openai/gpt-3.5-turbo",
+		// CodeRabbit-flagged false-positives that the basename-anchor fixes:
+		"openai/co3-thing",     // `co3` would substring-match o3 in the full id
+		"vertex_ai/pro1-model", // `pro1` would substring-match o1 in the full id
+		"custom/super-gpt-5x",  // gpt-5 anywhere but the start would substring-match
 	}
 	for _, m := range yes {
 		if !IsReasoningModel(m) {
@@ -98,7 +108,7 @@ func TestIsReasoningModel(t *testing.T) {
 	}
 	for _, m := range no {
 		if IsReasoningModel(m) {
-			t.Errorf("IsReasoningModel(%q) = true; want false", m)
+			t.Errorf("IsReasoningModel(%q) = true; want false (basename-anchor pin)", m)
 		}
 	}
 }

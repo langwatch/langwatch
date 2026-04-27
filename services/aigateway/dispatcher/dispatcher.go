@@ -26,6 +26,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 
 	"go.uber.org/zap"
 
@@ -38,6 +39,7 @@ import (
 // concurrent use across goroutines.
 type Dispatcher struct {
 	providers *providers.BifrostRouter
+	closeOnce sync.Once
 }
 
 // Options configures a Dispatcher.
@@ -61,15 +63,20 @@ func New(ctx context.Context, opts Options) (*Dispatcher, error) {
 	return &Dispatcher{providers: router}, nil
 }
 
-// Close releases the underlying Bifrost connection pool. Call once at
-// process shutdown so the pool's goroutines and pre-allocated channels
-// don't outlive the service. Idempotent for nil receivers; subsequent
-// Dispatch calls after Close are undefined.
+// Close releases the underlying Bifrost connection pool. Idempotent —
+// safe to call zero, one, or many times. Subsequent Dispatch calls
+// after Close are undefined.
+//
+// Bifrost's BifrostRouter.Close documents itself as "Safe to call once
+// at process shutdown"; sync.Once ensures we honor that contract even
+// if our own callers wrap Close in defer chains that fire twice.
 func (d *Dispatcher) Close() {
 	if d == nil {
 		return
 	}
-	d.providers.Close()
+	d.closeOnce.Do(func() {
+		d.providers.Close()
+	})
 }
 
 // Request is the per-call shape. Body is the raw OpenAI-compat (or

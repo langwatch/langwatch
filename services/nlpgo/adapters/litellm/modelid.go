@@ -34,8 +34,12 @@ var providersNeedingDotToDash = map[string]bool{
 
 // reasoningModelPattern catches the reasoning-class models that pin
 // temperature to 1.0 and require a higher max_tokens floor. Mirrors the
-// behavior preserved from langwatch_nlp/studio/utils.py.
-var reasoningModelPattern = regexp.MustCompile(`(?i)\b(o1|o3|o4|o5|gpt-5)`)
+// Python behavior in langwatch_nlp/studio/utils.py — anchored at the
+// start of the model BASENAME (not the full provider/model string), so
+// names like `openai/co3-thing` or `vertex_ai/o1-pretender-mini` don't
+// false-match in Go where they correctly didn't in Python. Apply via
+// IsReasoningModel which extracts the basename first.
+var reasoningModelPattern = regexp.MustCompile(`(?i)^(o[1345]|gpt-5)(?:-(mini|nano))?`)
 
 // reasoningMaxTokensFloor is the minimum max_tokens we will send to the
 // gateway for a reasoning model. Lower values commonly produce truncated
@@ -89,7 +93,11 @@ func GatewayProviderForModel(provider string) string {
 }
 
 // IsReasoningModel reports whether the model id matches the reasoning class
-// (o1/o3/o4/o5/gpt-5*).
+// (o1/o3/o4/o5/gpt-5*). Matches against the model basename so a provider
+// prefix can't influence the answer — `openai/o1-mini` and bare `o1-mini`
+// give the same result, and `provider/co3-finder` doesn't false-match
+// the way a substring scan against the full id would.
 func IsReasoningModel(modelID string) bool {
-	return reasoningModelPattern.MatchString(modelID)
+	_, basename := SplitProviderModel(modelID)
+	return reasoningModelPattern.MatchString(basename)
 }

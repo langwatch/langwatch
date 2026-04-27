@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -791,6 +792,12 @@ func paramString(params []dsl.Field, name string) string {
 	return ""
 }
 
+// paramInt reads a parameter as int. Accepts both raw JSON numbers
+// (`30000`) and string-encoded numbers (`"30000"`) — Studio's DSL
+// fixtures sometimes emit `type: "str"` for what should be `type:
+// "int"` (e.g. timeout_ms in useAgentPickerFlow.ts), and a strict
+// number-only unmarshal would silently drop those. Returns 0 only when
+// the field is genuinely missing or unparseable.
 func paramInt(params []dsl.Field, name string) int {
 	for _, p := range params {
 		if p.Identifier != name {
@@ -799,6 +806,12 @@ func paramInt(params []dsl.Field, name string) int {
 		var i int
 		if err := jsonUnmarshalRaw(p.Value, &i); err == nil {
 			return i
+		}
+		var s string
+		if err := jsonUnmarshalRaw(p.Value, &s); err == nil {
+			if n, err := strconv.Atoi(strings.TrimSpace(s)); err == nil {
+				return n
+			}
 		}
 	}
 	return 0

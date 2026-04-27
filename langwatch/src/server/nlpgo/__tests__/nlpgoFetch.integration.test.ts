@@ -86,6 +86,9 @@ beforeAll(async () => {
   // Spawn `go run ./cmd/service nlpgo` from the repo root, with
   // NLPGO_CHILD_BYPASS=true so it doesn't try to spawn uvicorn (no
   // langwatch_nlp Python venv in test env).
+  // detached:true so afterAll's process.kill(-pid) reaches the
+  // compiled child of `go run`, not just the toolchain wrapper.
+  // See post-event.integration.test.ts for the full rationale.
   nlpgoProcess = spawn("go", ["run", "./cmd/service", "nlpgo"], {
     cwd: REPO_ROOT,
     env: {
@@ -93,7 +96,7 @@ beforeAll(async () => {
       NLPGO_CHILD_BYPASS: "true",
     },
     stdio: ["ignore", "pipe", "pipe"],
-    detached: false,
+    detached: true,
   });
 
   // Surface stderr to the test logs for debugging — stdout is just
@@ -113,16 +116,26 @@ beforeAll(async () => {
 }, 90_000);
 
 afterAll(async () => {
-  if (!nlpgoProcess) return;
-  // SIGTERM, then SIGKILL after 2s if still running.
-  nlpgoProcess.kill("SIGTERM");
+  if (!nlpgoProcess?.pid) return;
+  const pgid = -nlpgoProcess.pid;
+  try {
+    process.kill(pgid, "SIGTERM");
+  } catch {
+    // group already gone
+  }
   const exited = await Promise.race([
     new Promise<boolean>((resolve) =>
       nlpgoProcess!.once("exit", () => resolve(true)),
     ),
     sleep(2000).then(() => false),
   ]);
-  if (!exited) nlpgoProcess.kill("SIGKILL");
+  if (!exited) {
+    try {
+      process.kill(pgid, "SIGKILL");
+    } catch {
+      // best-effort
+    }
+  }
 });
 
 const liveOpenAI = process.env.OPENAI_API_KEY ? it : it.skip;
