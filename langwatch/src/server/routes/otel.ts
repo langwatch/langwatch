@@ -267,9 +267,12 @@ export function peekCustomerTraceIds(
   max = 10,
 ): string[] {
   if (!body || body.byteLength === 0) return [];
+  // Normalise so "application/json; charset=utf-8" is recognised. The OTLP
+  // HTTP spec lets exporters append parameters and case isn't guaranteed.
+  const mediaType = contentType?.split(";", 1)[0]?.trim().toLowerCase();
   let req: IExportTraceServiceRequest;
   try {
-    if (contentType === "application/json") {
+    if (mediaType === "application/json") {
       req = JSON.parse(Buffer.from(body).toString("utf-8"));
     } else {
       req = traceRequestType.decode(new Uint8Array(body));
@@ -466,7 +469,23 @@ app.post("/logs", async (c) => {
       }
 
       const contentType = c.req.header("content-type");
-      const body = await readBody(c.req.raw);
+
+      let body: ArrayBuffer;
+      try {
+        body = await readBody(c.req.raw);
+      } catch (error) {
+        loggerLogs.warn(
+          {
+            projectId: project.id,
+            contentEncoding: c.req.header("content-encoding") ?? null,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "OTel /logs: failed to read request body",
+        );
+        span.setStatus({ code: SpanStatusCode.ERROR, message: "Body read failed" });
+        return c.json({ error: "Unable to read body" }, 400);
+      }
+
       let logRequest: IExportLogsServiceRequest;
       try {
         if (contentType === "application/json") {
@@ -555,7 +574,23 @@ app.post("/metrics", async (c) => {
       }
 
       const contentType = c.req.header("content-type");
-      const body = await readBody(c.req.raw);
+
+      let body: ArrayBuffer;
+      try {
+        body = await readBody(c.req.raw);
+      } catch (error) {
+        loggerMetrics.warn(
+          {
+            projectId: project.id,
+            contentEncoding: c.req.header("content-encoding") ?? null,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "OTel /metrics: failed to read request body",
+        );
+        span.setStatus({ code: SpanStatusCode.ERROR, message: "Body read failed" });
+        return c.json({ error: "Unable to read body" }, 400);
+      }
+
       let metricsRequest: IExportMetricsServiceRequest;
       try {
         if (contentType === "application/json") {

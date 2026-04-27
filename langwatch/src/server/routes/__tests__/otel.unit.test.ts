@@ -108,6 +108,21 @@ describe("peekCustomerTraceIds", () => {
       ]);
     });
 
+    it.each([
+      "application/json; charset=utf-8",
+      "application/json;charset=utf-8",
+      "  Application/JSON  ",
+      "APPLICATION/JSON",
+    ])(
+      "still routes through the JSON parser when content-type is %j",
+      (contentType) => {
+        const body = jsonOtlpBody([TRACE_ID_B64_1]);
+        expect(peekCustomerTraceIds(body, contentType)).toEqual([
+          TRACE_ID_HEX_1,
+        ]);
+      },
+    );
+
     it("preserves order across distinct trace_ids", () => {
       const body = jsonOtlpBody([TRACE_ID_B64_1, TRACE_ID_B64_2]);
       expect(peekCustomerTraceIds(body, "application/json")).toEqual([
