@@ -259,21 +259,6 @@ function AnomalyRulesPage() {
           <Spacer />
         </HStack>
 
-        <Box
-          borderWidth="1px"
-          borderColor="amber.300"
-          backgroundColor="amber.50"
-          padding={3}
-          borderRadius="md"
-        >
-          <Text fontSize="sm" color="amber.900">
-            <strong>Heads up:</strong> rules persist now. Evaluation +
-            alert dispatch (Slack / SIEM / webhook / PagerDuty) arrive
-            with the detection backend. Authored rules wait dormant
-            until that ships, then start firing without further config.
-          </Text>
-        </Box>
-
         {composer && (
           <RuleComposer
             composer={composer}

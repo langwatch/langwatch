@@ -20,15 +20,18 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
     these specs disagree on field shapes, the detection feature is
     canonical because it owns the reactor's input contract.
 
-  Current ship state (as of iter 14):
+  Current ship state (as of iter 18):
     - api.anomalyRules.{list, create, update, archive} are LIVE — rule
       rows persist to the AnomalyRule table.
-    - The detection reactor (Sergey C1+C2) is being staged; alert
-      generation arrives once the activity-monitor event-sourcing
-      pipeline projects + the anomaly reactor reads fold state.
-    - The UI ships an honest "rules persist now; evaluation + alert
-      dispatch arrive with the detection backend" banner so admins
-      know what's wired vs. what's pending.
+    - C1 (activity-monitor pipeline) + C2 (anomaly detection reactor +
+      AnomalyAlert producer for spend_spike) ARE LIVE. End-to-end
+      dogfood proven on 2026-04-27: rule planted → events fired →
+      reactor evaluated → AnomalyAlert persisted → /governance
+      "Recent anomalies" section renders the alert.
+    - C3 (Slack / SIEM / webhook / PagerDuty / email dispatch) ships in
+      a follow-up — current alerts dispatch log-only.
+    - The earlier "Heads up: rules persist now…" honest-state banner
+      was removed in iter 18 — evaluation works.
 
   Background:
     Given the feature flag "release_ui_ai_governance_enabled" is enabled
@@ -60,19 +63,18 @@ Feature: AI Gateway Governance — Anomaly Rules (admin authoring)
     And no telemetry is emitted that reveals the page exists
 
   # ---------------------------------------------------------------------------
-  # Honest current-state banner
+  # No honest-state banner (C2 shipped iter 18 — evaluation is live)
   # ---------------------------------------------------------------------------
 
-  @bdd @ui @anomaly-rules @honest-state
-  Scenario: Page banner reflects "rules persist, evaluation pending" state
-    When the page renders while the detection reactor is still being staged
-    Then a banner near the heading reads:
-      "Heads up: rules persist now. Evaluation + alert dispatch arrive
-      with the detection backend."
-    And no "Preview · mocked data" badge is shown (mocks were removed
-      iter 13)
-    And once the reactor + dispatch ship, this banner is removed in a
-      follow-up so the page reads as fully-live
+  @bdd @ui @anomaly-rules @no-honest-state-banner
+  Scenario: Page no longer shows the "evaluation pending" banner
+    When the page renders post-iter-18 (C2 reactor is live)
+    Then no "Heads up: rules persist now…" banner is shown
+    And no "Preview · mocked data" badge is shown
+    And the page reads as fully-live: rules persist, the reactor
+      evaluates, AnomalyAlert rows are produced, and dispatched at
+      least to log-only (C3 will add Slack / SIEM / webhook / PagerDuty
+      / email)
 
   # ---------------------------------------------------------------------------
   # Rule list grouped by severity (real api.anomalyRules.list data)
