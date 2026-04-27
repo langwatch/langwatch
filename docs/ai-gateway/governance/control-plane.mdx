@@ -292,6 +292,36 @@ Auth matrix verified in the same dogfood pass:
 | `Bearer <valid>` | matching | 202 | 202 |
 | `Bearer <valid>` (replay) | matching | 202 + `lastEventAt` advances monotonically | 202, advanced |
 
+### Web UI full loop (Lane B dogfood)
+
+The same backend, exercised end-to-end through the admin UI:
+admin opens `/settings/governance/ingestion-sources`, fills the
+composer, hits Save, a one-time-reveal modal exposes the
+`lw_is_*` secret + OTLP URL, the admin copies, curls the
+upstream, the list page polls and flips the source from
+**Awaiting first event** → **Active** with "last event Ns ago".
+
+The hero shot is the list page after the flip:
+
+![IngestionSource list — Active after curl receipt](https://i.img402.dev/supafck5au.png)
+
+Full 6-step carousel for reviewers:
+
+| # | Step | Shot |
+|---|------|------|
+| 1 | Admin oversight `/settings/governance` (mocked v0) | [open](https://i.img402.dev/0hqnvut00t.png) |
+| 2 | `/settings/governance/ingestion-sources` — empty state | [open](https://i.img402.dev/wx4v7m7a8g.png) |
+| 3 | Composer open — `sourceType` picker + dynamic per-type form | [open](https://i.img402.dev/ycld8afavo.png) |
+| 4 | Composer filled — Generic OTel example | [open](https://i.img402.dev/yixqegurj3.png) |
+| 5 | One-time secret reveal modal — `ingestSecret` + OTLP URL + Copy | [open](https://i.img402.dev/w4fl31ukrc.png) |
+| 6 | List polled, flipped to **Active**, last event 13 s ago | [open](https://i.img402.dev/supafck5au.png) |
+
+The dogfood walks the full Tier-3 push contract: admin issues
+secret in UI → upstream curl with that secret → 202 ack →
+`lastEventAt` flips → admin sees the flip on the next poll.
+Secret is shown exactly once and never returned by the list/get
+endpoints afterwards.
+
 Tier 2 / Tier 5 are deferred; the architecture doesn't preclude them
 and the control-plane primitives already accommodate them.
 
