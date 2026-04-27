@@ -54,9 +54,19 @@ vi.mock("../../src/services/langwatch-nlp.ts", () => ({ startLangwatchNlp: nlpSt
 vi.mock("../../src/services/langevals.ts", () => ({ startLangevals: langevalsStub.fn }));
 vi.mock("../../src/services/aigateway.ts", () => ({ startAigateway: gatewayStub.fn }));
 vi.mock("../../src/services/langwatch.ts", () => ({ startLangwatch: langwatchStub.fn }));
+vi.mock("../../src/services/langwatch-workers.ts", () => ({
+  startLangwatchWorkers: () => ({
+    name: "workers",
+    pid: 0,
+    stop: async () => {},
+  }),
+}));
 vi.mock("../../src/services/migrate.ts", () => ({ runMigrations: migrateFn }));
 vi.mock("../../src/services/venvs.ts", () => ({ syncVenvs: venvsFn }));
-vi.mock("../../src/services/node-deps.ts", () => ({ ensureLangwatchDeps: nodeDepsFn }));
+vi.mock("../../src/services/node-deps.ts", () => ({
+  ensureLangwatchDeps: nodeDepsFn,
+  locateLangwatchDir: () => "/tmp/.langwatch-test/app/langwatch",
+}));
 vi.mock("../../src/services/app-dir.ts", () => ({
   ensureAppDir: ensureAppDirFn,
   appRoot: () => "/tmp/.langwatch-test/app",
@@ -144,10 +154,10 @@ describe("services/runtime", () => {
   });
 
   describe("when startAll is called", () => {
-    it("starts infra (pg+redis+clickhouse) → migrates → starts app tier (nlp+langevals+gateway+langwatch)", async () => {
+    it("starts infra (pg+redis+clickhouse) → migrates → starts app tier (nlp+langevals+gateway+langwatch+workers)", async () => {
       const ctx = fakeCtx();
       const handles = await runtime.startAll(ctx);
-      expect(handles).toHaveLength(7);
+      expect(handles).toHaveLength(8);
       const positions: Record<string, number> = {};
       callLog.forEach((entry, idx) => {
         if (!(entry in positions)) positions[entry] = idx;

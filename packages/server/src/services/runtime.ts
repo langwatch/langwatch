@@ -15,6 +15,7 @@ import { readEnvFile } from "./env-file.ts";
 import { EventBus } from "./event-bus.ts";
 import { startLangevals } from "./langevals.ts";
 import { startLangwatch } from "./langwatch.ts";
+import { startLangwatchWorkers } from "./langwatch-workers.ts";
 import { startLangwatchNlp } from "./langwatch-nlp.ts";
 import { runMigrations } from "./migrate.ts";
 import { ensureLangwatchDeps } from "./node-deps.ts";
@@ -97,6 +98,15 @@ const runtimeImpl: RuntimeApi = {
         startLangwatch(ctx, bus, childEnv),
       ]);
       handles.push(nlp, langevals, gw, lw);
+
+      // Phase 3b: workers. Spawned AFTER the app is healthy so it can
+      // share the same boot env (Redis + Prisma already migrated, app
+      // listening). Without these, the BullMQ collector/evaluations/
+      // track-event/topic-clustering queues fill up with no consumer and
+      // the UI sits forever on "Waiting for first trace…". Sync spawn —
+      // no port to health-probe; lifecycle inferred from process state.
+      const workers = startLangwatchWorkers(ctx, bus, childEnv);
+      handles.push(workers);
     } catch (err) {
       await stopHandles(handles);
       throw err;

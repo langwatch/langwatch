@@ -9,6 +9,7 @@ export type ServiceName =
   | "langevals"
   | "aigateway"
   | "langwatch"
+  | "workers"
   | "bullboard";
 
 export type ServicePaths = {
