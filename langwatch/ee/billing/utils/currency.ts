@@ -1,5 +1,5 @@
 import { Currency } from "@prisma/client";
-import type { NextApiRequest } from "next";
+import type { NextApiRequest } from "~/types/next-stubs";
 // @ts-ignore — no type definitions for geoip-country
 import geoip from "geoip-country";
 

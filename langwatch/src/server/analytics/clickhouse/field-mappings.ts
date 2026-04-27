@@ -36,6 +36,7 @@ export const TRACE_ANALYTICS_COLUMNS = [
   "ErrorMessage",
   "TopicId",
   "SubTopicId",
+  "AnnotationIds",
   "HasAnnotation",
   "Models",
   "Attributes",
@@ -398,8 +399,8 @@ export const fieldMappings: Record<string, FieldMapping> = {
   // ===== Annotation Fields =====
   annotations: {
     table: "trace_summaries",
-    column: "HasAnnotation",
-    description: "Whether trace has annotations",
+    column: "AnnotationIds",
+    description: "Annotation IDs on trace",
   },
 
   // ===== Model Fields (for grouping) =====
@@ -501,8 +502,12 @@ export function buildJoinClause(
       return `JOIN (
         SELECT ${Array.from(columns).join(", ")} FROM evaluation_runs
         WHERE TenantId = {tenantId:String}
-        ORDER BY EvaluationId, UpdatedAt DESC
-        LIMIT 1 BY TenantId, EvaluationId
+          AND (TenantId, EvaluationId, UpdatedAt) IN (
+            SELECT TenantId, EvaluationId, max(UpdatedAt)
+            FROM evaluation_runs
+            WHERE TenantId = {tenantId:String}
+            GROUP BY TenantId, EvaluationId
+          )
       ) ${alias} ON ${baseAlias}.TenantId = ${alias}.TenantId AND ${baseAlias}.TraceId = ${alias}.TraceId`;
     }
     default:

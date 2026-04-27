@@ -3,7 +3,7 @@ import type { TargetValue } from "../components/scenarios/TargetSelector";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
 
 interface PersistedTarget {
-  type: "prompt" | "http" | "code";
+  type: "prompt" | "http" | "code" | "workflow";
   id: string;
   timestamp: number;
 }

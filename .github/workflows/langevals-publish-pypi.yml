@@ -1,4 +1,4 @@
-name: Publish LangEvals to PyPI
+name: langevals-publish-pypi
 
 on:
   release:

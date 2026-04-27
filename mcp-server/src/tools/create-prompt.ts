@@ -27,6 +27,7 @@ export async function handleCreatePrompt(params: {
   handle?: string;
   messages: Array<{ role: string; content: string }>;
   model: string;
+  tags?: string[];
 }): Promise<string> {
   const handle = params.handle?.trim() || toHandle(params.name);
   if (!handle || !HANDLE_PATTERN.test(handle)) {
@@ -39,6 +40,7 @@ export async function handleCreatePrompt(params: {
     handle,
     messages: params.messages,
     model: params.model,
+    ...(params.tags ? { tags: params.tags } : {}),
   });
 
   const lines: string[] = [];
@@ -49,6 +51,8 @@ export async function handleCreatePrompt(params: {
   lines.push(`**Model**: ${params.model}`);
   if (result.latestVersionNumber != null)
     lines.push(`**Version**: v${result.latestVersionNumber}`);
+  if (params.tags && params.tags.length > 0)
+    lines.push(`**Tags**: ${params.tags.join(", ")}`);
 
   return lines.join("\n");
 }

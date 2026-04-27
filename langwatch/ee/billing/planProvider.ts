@@ -16,7 +16,6 @@ export const NUMERIC_OVERRIDE_FIELDS: NumericOverrideField[] = [
   "maxMembersLite",
   "maxProjects",
   "maxMessagesPerMonth",
-  "evaluationsCredit",
   "maxWorkflows",
   "maxTeams",
   "maxPrompts",

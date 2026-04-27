@@ -1,5 +1,6 @@
 import type { Protections } from "~/server/elasticsearch/protections";
 import type {
+  Event,
   Span,
   SpanInputOutput,
   SpanMetrics,
@@ -177,6 +178,31 @@ export function applySpanProtections(
 }
 
 /**
+ * Applies redaction protections to an event.
+ * Redacts event_details when input is not visible, preserving event_type,
+ * metrics, and timestamps.
+ */
+export function applyEventProtections(
+  event: Event,
+  protections: Protections,
+  redactions: Set<string>,
+): Event {
+  if (protections.canSeeCapturedInput !== true) {
+    return {
+      ...event,
+      event_details: Object.fromEntries(
+        Object.keys(event.event_details).map((key) => [key, "[REDACTED]"]),
+      ),
+    };
+  }
+
+  return {
+    ...event,
+    event_details: redactObject(event.event_details, redactions),
+  };
+}
+
+/**
  * Applies redaction protections to a trace and its spans.
  *
  * @param trace - The trace to apply protections to
@@ -247,11 +273,17 @@ export function applyTraceProtections(
     applySpanProtections(span, protections, redactions),
   );
 
+  // Apply protections to events
+  const transformedEvents = trace.events?.map((event) =>
+    applyEventProtections(event, protections, redactions),
+  );
+
   return {
     ...trace,
     input: transformedInput,
     output: transformedOutput,
     metrics: transformedMetrics,
     spans: transformedSpans,
+    events: transformedEvents,
   };
 }

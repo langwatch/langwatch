@@ -4,10 +4,14 @@ import type {
   UseModelProviderFormActions,
   UseModelProviderFormState,
 } from "../../hooks/useModelProviderForm";
-import { dependencies } from "../../injection/dependencies.client";
-import type { MaybeStoredModelProvider } from "../../server/modelProviders/registry";
+import {
+  modelProviders as modelProvidersRegistry,
+  type MaybeStoredModelProvider,
+} from "../../server/modelProviders/registry";
 import { KEY_CHECK } from "../../utils/constants";
 import { SmallLabel } from "../SmallLabel";
+import { ManagedModelProviderAlert } from "../../../ee/managed-providers/ManagedModelProviderAlert";
+import { api } from "../../utils/api";
 
 /**
  * Renders credential input fields (API keys, endpoints, etc.) based on the provider's schema.
@@ -42,34 +46,52 @@ export const CredentialsSection = ({
   apiKeyValidationError?: string;
   onApiKeyValidationClear?: () => void;
 }) => {
-  const ManagedModelProvider = dependencies.managedModelProviderComponent?.({
-    projectId: projectId ?? "",
-    organizationId: organizationId ?? "",
-    provider,
-  });
-  // Type assertion needed: managedModelProviderComponent is dynamically injected and may vary by deployment
-  const ManagedModelProviderAny = ManagedModelProvider as
-    | React.ComponentType<{ provider: MaybeStoredModelProvider }>
-    | undefined;
+  const { data: managedProviderData } =
+    api.modelProvider.isManagedProvider.useQuery(
+      {
+        organizationId: organizationId ?? "",
+        provider: provider.provider,
+      },
+      { enabled: !!organizationId },
+    );
+  const isManaged = managedProviderData?.managed ?? false;
+
+  const providerDefinition = modelProvidersRegistry[
+    provider.provider as keyof typeof modelProvidersRegistry
+  ] as { optionalKeys?: readonly string[] } | undefined;
+  const optionalKeySet = providerDefinition?.optionalKeys
+    ? new Set(providerDefinition.optionalKeys)
+    : undefined;
 
   useEffect(() => {
-    if (ManagedModelProviderAny) {
+    if (isManaged) {
       actions.setManaged(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(state.customKeys)]);
+  }, [isManaged]);
 
-  if (ManagedModelProviderAny) {
-    return React.createElement(ManagedModelProviderAny, { provider });
+  if (isManaged) {
+    return (
+      <ManagedModelProviderAlert
+        provider={provider}
+        error={state.errors.customKeysRoot}
+      />
+    );
   }
 
   return (
     <>
       <VStack align="stretch" gap={3} width="full">
         {Object.keys(state.displayKeys).map((key) => {
-          // Check if field is optional using Zod's public API
+          // Prefer the provider's explicit optionalKeys list (ground truth
+          // for UI affordance). Fall back to Zod introspection for
+          // providers that haven't declared it yet — `.nullable().optional()`
+          // is used on the schemas for env-var fallback, so `.isOptional()`
+          // alone over-reports "optional".
           const zodSchema = state.displayKeys[key];
-          const isOptional = zodSchema?.isOptional?.() ?? false;
+          const isOptional = optionalKeySet
+            ? optionalKeySet.has(key)
+            : (zodSchema?.isOptional?.() ?? false);
           const isPassword = KEY_CHECK.some((k) => key.includes(k));
           const isInvalid = Boolean(fieldErrors[key]);
 

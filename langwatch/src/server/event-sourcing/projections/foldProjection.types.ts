@@ -64,6 +64,22 @@ export interface FoldProjectionDefinition<
 
   /** Optional processing behavior configuration. */
   options?: FoldProjectionOptions;
+
+  /**
+   * Key name for the LastEventOccurredAt field on the state.
+   * Used by the executor to detect out-of-order events.
+   */
+  lastEventOccurredAtKey: string;
+
+  /**
+   * Loads all events for an aggregate, sorted by occurredAt ASC.
+   * Used by the executor to re-fold from scratch when out-of-order events are detected.
+   *
+   * Auto-wired by EventSourcingService at registration time — projections don't
+   * need to provide this themselves. Optional at the type level because it's set
+   * after construction, but always present at runtime.
+   */
+  eventLoader?: (context: { tenantId: string; aggregateId: string }) => Promise<Event[]>;
 }
 
 /**

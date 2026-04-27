@@ -518,13 +518,6 @@ export async function getMigrateStatus(
 }
 
 export async function runMigrations(options: GooseOptions = {}): Promise<void> {
-  if (process.env.ENABLE_CLICKHOUSE !== "true") {
-    logger.info(
-      "ENABLE_CLICKHOUSE is not set, skipping ClickHouse migrations.",
-    );
-    return;
-  }
-
   const connectionUrlStr = options.connectionUrl ?? process.env.CLICKHOUSE_URL;
   if (!connectionUrlStr) {
     logger.info(

@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useAnalytics } from "react-contextual-analytics";
 import { ObservabilityScreen } from "../components/sections/ObservabilityScreen";
 import { ProductSelectionScreen } from "../components/sections/ProductSelectionScreen";
 import { ViaClaudeCodeScreen } from "../components/sections/ViaClaudeCodeScreen";
@@ -11,6 +12,24 @@ import {
   type ProductSelection,
 } from "../types/types";
 
+interface ProductSelectionScreenWithAnalyticsProps {
+  onSelectProduct: (product: ProductSelection) => void;
+}
+
+const ProductSelectionScreenWithAnalytics: React.FC<
+  ProductSelectionScreenWithAnalyticsProps
+> = ({ onSelectProduct }) => {
+  const { emit } = useAnalytics();
+  return (
+    <ProductSelectionScreen
+      onSelectProduct={(product) => {
+        emit("selected", "product", { product });
+        onSelectProduct(product);
+      }}
+    />
+  );
+};
+
 interface UseProductScreensProps {
   flow: ProductFlowConfig;
   onSelectProduct: (product: ProductSelection) => void;
@@ -20,8 +39,16 @@ export const useCreateProductScreens = ({
   flow,
   onSelectProduct,
 }: UseProductScreensProps): OnboardingScreen[] => {
-  const ProductSelectionScreenWrapped: React.FC = () => (
-    <ProductSelectionScreen onSelectProduct={onSelectProduct} />
+  const BoundProductSelectionScreen = useMemo<React.FC>(
+    () =>
+      function BoundProductSelectionScreen() {
+        return (
+          <ProductSelectionScreenWithAnalytics
+            onSelectProduct={onSelectProduct}
+          />
+        );
+      },
+    [onSelectProduct],
   );
 
   const screensBase: Record<ProductScreenIndex, OnboardingScreen> = useMemo(
@@ -32,7 +59,7 @@ export const useCreateProductScreens = ({
         heading: "Pick your flavour",
         subHeading:
           "Choose a starting point. You can explore the rest anytime.",
-        component: ProductSelectionScreenWrapped,
+        component: BoundProductSelectionScreen,
       },
       [ProductScreenIndex.VIA_CLAUDE_CODE]: {
         id: "via-claude-code",
@@ -69,8 +96,7 @@ export const useCreateProductScreens = ({
         component: ObservabilityScreen,
       },
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onSelectProduct],
+    [BoundProductSelectionScreen],
   );
 
   return flow.visibleScreens.map((idx) => screensBase[idx]);

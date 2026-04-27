@@ -5,7 +5,7 @@ import { SUITE_RUN_EVENT_TYPES, SUITE_RUN_EVENT_VERSIONS } from "./constants";
 /**
  * SuiteRunStarted event - emitted when a suite run begins.
  */
-const suiteRunStartedEventDataSchema = z.object({
+export const suiteRunStartedEventDataSchema = z.object({
   batchRunId: z.string(),
   scenarioSetId: z.string(),
   suiteId: z.string(),
@@ -25,7 +25,7 @@ export type SuiteRunStartedEvent = z.infer<typeof SuiteRunStartedEventSchema>;
 /**
  * SuiteRunItemStarted event - emitted when an individual item in the suite starts.
  */
-const suiteRunItemStartedEventDataSchema = z.object({
+export const suiteRunItemStartedEventDataSchema = z.object({
   batchRunId: z.string(),
   scenarioRunId: z.string(),
   scenarioId: z.string(),
@@ -42,7 +42,7 @@ export type SuiteRunItemStartedEvent = z.infer<typeof SuiteRunItemStartedEventSc
 /**
  * SuiteRunItemCompleted event - emitted when an individual item finishes.
  */
-const suiteRunItemCompletedEventDataSchema = z.object({
+export const suiteRunItemCompletedEventDataSchema = z.object({
   batchRunId: z.string(),
   scenarioRunId: z.string(),
   scenarioId: z.string(),

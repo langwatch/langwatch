@@ -58,7 +58,7 @@ export const VirtualizedTableBody = React.memo(function VirtualizedTableBody({
 
   // Render all rows without virtualization when:
   // - Test mode (disableVirtualization prop)
-  // - Expanded mode with <= 100 rows
+  // - Fit mode with <= 100 rows
   if (disableVirtualization || !shouldVirtualize) {
     return (
       <>

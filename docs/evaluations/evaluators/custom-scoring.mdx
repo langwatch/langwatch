@@ -1,0 +1,328 @@
+---
+title: Custom Scoring
+sidebarTitle: Custom Scoring
+description: Send evaluation scores from your own custom logic to LangWatch for tracking and analysis.
+---
+
+Custom scoring lets you send evaluation results from your own code to LangWatch. This is useful when you have proprietary evaluation logic, domain-specific metrics, or want to integrate existing evaluation systems.
+
+<Info>
+**When to use Custom Scoring:**
+- You have your own evaluation logic (deterministic or ML-based)
+- You're integrating an existing evaluation system
+- You need domain-specific metrics that aren't covered by built-in evaluators
+- You want to track any custom metric alongside your traces
+
+**See also:**
+- [Built-in Evaluators](/evaluations/evaluators/built-in-evaluators) - Use LangWatch's ready-made evaluators
+- [Saved Evaluators](/evaluations/evaluators/saved-evaluators) - Reuse configured evaluators across your project
+</Info>
+
+## How It Works
+
+With custom scoring, you:
+1. Run your own evaluation logic
+2. Send the results (score, passed, label, details) to LangWatch
+3. View results in traces, analytics, and dashboards
+
+```
+Your Code → Your Evaluation Logic → Score/Pass/Fail → LangWatch
+                                                          ↓
+                                              Traces, Analytics, Alerts
+```
+
+## Sending Custom Scores
+
+### On a Trace/Span
+
+Attach evaluation results to the current trace or span:
+
+<Tabs>
+<Tab title="Python">
+
+```python
+import langwatch
+
+@langwatch.span()
+def my_llm_step(user_input: str):
+    output = my_llm(user_input)
+
+    # Run your custom evaluation
+    score = my_custom_evaluator(user_input, output)
+    is_valid = score > 0.7
+
+    # Send results to LangWatch
+    langwatch.get_current_span().add_evaluation(
+        name="my_custom_metric",
+        passed=is_valid,
+        score=score,
+        details="Custom evaluation based on domain rules"
+    )
+
+    return output
+```
+
+</Tab>
+<Tab title="TypeScript">
+
+```typescript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+
+async function myLLMStep(userInput: string): Promise<string> {
+  return await langwatch.trace({ name: "my-trace" }, async (span) => {
+    const output = await myLLM(userInput);
+
+    // Run your custom evaluation
+    const score = myCustomEvaluator(userInput, output);
+    const isValid = score > 0.7;
+
+    // Send results to LangWatch
+    span.addEvaluation({
+      name: "my_custom_metric",
+      passed: isValid,
+      score: score,
+      details: "Custom evaluation based on domain rules"
+    });
+
+    return output;
+  });
+}
+```
+
+</Tab>
+<Tab title="REST API">
+
+Send evaluation results directly via the collector API:
+
+```bash
+curl -X POST "https://app.langwatch.ai/api/collector" \
+     -H "X-Auth-Token: $LANGWATCH_API_KEY" \
+     -H "Content-Type: application/json" \
+     -d @- <<EOF
+{
+  "trace_id": "your-trace-id",
+  "evaluations": [{
+    "name": "my_custom_metric",
+    "passed": true,
+    "score": 0.85,
+    "details": "Custom evaluation result"
+  }]
+}
+EOF
+```
+
+</Tab>
+</Tabs>
+
+### In Experiments
+
+Log custom scores during batch evaluation:
+
+<CodeGroup>
+```python Python
+import langwatch
+
+experiment = langwatch.experiment.init("my-experiment")
+
+for index, row in experiment.loop(df.iterrows()):
+    output = my_llm(row["input"])
+
+    # Run your custom evaluation
+    score = my_custom_evaluator(row["input"], output, row["expected"])
+
+    # Log the custom score
+    experiment.log(
+        name="my_custom_metric",
+        index=index,
+        data={"input": row["input"], "output": output},
+        score=score,
+        passed=score > 0.7,
+        details="Custom domain-specific evaluation"
+    )
+```
+
+```typescript TypeScript
+import { LangWatch } from "langwatch";
+
+const langwatch = new LangWatch();
+const experiment = await langwatch.experiments.init("my-experiment");
+
+await experiment.run(
+  dataset.entries.map((e) => e.entry),
+  async ({ item, index }) => {
+    const output = await myLLM(item.input);
+
+    // Run your custom evaluation
+    const score = myCustomEvaluator(item.input, output, item.expected);
+
+    // Log the custom score
+    experiment.log({
+      name: "my_custom_metric",
+      index,
+      data: { input: item.input, output },
+      score,
+      passed: score > 0.7,
+      details: "Custom domain-specific evaluation"
+    });
+  }
+);
+```
+</CodeGroup>
+
+## Evaluation Result Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `name` | string | Yes | Identifier for this evaluation (shows in UI) |
+| `passed` | boolean | No | Whether the evaluation passed |
+| `score` | number | No | Numeric score (typically 0-1) |
+| `label` | string | No | Category label (e.g., "positive", "negative") |
+| `details` | string | No | Human-readable explanation |
+
+<Note>
+At least one of `passed`, `score`, or `label` should be provided for meaningful results.
+</Note>
+
+## Example Use Cases
+
+### Code Quality Check
+
+```python
+def check_code_quality(generated_code: str) -> dict:
+    # Your custom logic
+    has_syntax_errors = check_syntax(generated_code)
+    follows_style = check_style_guide(generated_code)
+
+    score = 0.0
+    if not has_syntax_errors:
+        score += 0.5
+    if follows_style:
+        score += 0.5
+
+    return {
+        "passed": score >= 0.5,
+        "score": score,
+        "details": f"Syntax OK: {not has_syntax_errors}, Style OK: {follows_style}"
+    }
+
+# Use in your pipeline
+result = check_code_quality(llm_output)
+langwatch.get_current_span().add_evaluation(
+    name="code_quality",
+    **result
+)
+```
+
+### Semantic Similarity
+
+```python
+from sentence_transformers import SentenceTransformer
+
+model = SentenceTransformer('all-MiniLM-L6-v2')
+
+def semantic_similarity(output: str, expected: str) -> float:
+    embeddings = model.encode([output, expected])
+    similarity = cosine_similarity([embeddings[0]], [embeddings[1]])[0][0]
+    return float(similarity)
+
+# Use in experiment
+score = semantic_similarity(output, row["expected"])
+experiment.log(
+    name="semantic_similarity",
+    index=index,
+    data={"output": output, "expected": row["expected"]},
+    score=score,
+    passed=score > 0.8
+)
+```
+
+### Business Rule Validation
+
+```python
+def validate_response(response: str, context: dict) -> dict:
+    issues = []
+
+    # Check for required elements
+    if context.get("require_disclaimer") and "disclaimer" not in response.lower():
+        issues.append("Missing required disclaimer")
+
+    # Check length constraints
+    if len(response) > context.get("max_length", 1000):
+        issues.append("Response too long")
+
+    # Check for prohibited content
+    for word in context.get("prohibited_words", []):
+        if word.lower() in response.lower():
+            issues.append(f"Contains prohibited word: {word}")
+
+    return {
+        "passed": len(issues) == 0,
+        "score": 1.0 - (len(issues) * 0.2),
+        "details": "; ".join(issues) if issues else "All checks passed"
+    }
+```
+
+## Combining with Built-in Evaluators
+
+You can use custom scoring alongside built-in evaluators:
+
+```python
+@langwatch.span()
+def my_llm_step(user_input: str):
+    output = my_llm(user_input)
+
+    # Built-in evaluator
+    langwatch.evaluation.evaluate(
+        "presidio/pii_detection",
+        name="PII Check",
+        data={"output": output},
+    )
+
+    # Custom evaluation
+    business_score = my_business_rules_check(output)
+    langwatch.get_current_span().add_evaluation(
+        name="business_rules",
+        passed=business_score > 0.8,
+        score=business_score,
+    )
+
+    return output
+```
+
+## Viewing Custom Scores
+
+Custom scores appear in:
+- **Trace Details** - Under the Evaluations section
+- **Analytics Dashboard** - Filterable by evaluation name
+- **Experiments** - In the results table alongside other evaluators
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card
+    title="Built-in Evaluators"
+    description="Use LangWatch's ready-made evaluators."
+    icon="bolt"
+    href="/evaluations/evaluators/built-in-evaluators"
+  />
+  <Card
+    title="Saved Evaluators"
+    description="Reuse configured evaluators across your project."
+    icon="bookmark"
+    href="/evaluations/evaluators/saved-evaluators"
+  />
+  <Card
+    title="Experiments"
+    description="Run batch evaluations with custom scoring."
+    icon="flask"
+    href="/evaluations/experiments/overview"
+  />
+  <Card
+    title="Evaluations Overview"
+    description="View and analyze your evaluation results."
+    icon="chart-line"
+    href="/evaluations/overview"
+  />
+</CardGroup>

@@ -51,7 +51,8 @@ export const runDataSchema = z.object({
   status: z.nativeEnum(ScenarioRunStatus),
   results: scenarioResultsSchema.optional().nullable(),
   messages: scenarioMessageSnapshotSchema.shape.messages,
-  timestamp: z.number(), // Unix timestamp when run was executed
+  timestamp: z.number(), // Unix timestamp when run started (stable sort key)
+  updatedAt: z.number().optional(), // Last update timestamp (for conditional fetch)
   durationInMs: z.number(), // Execution time in milliseconds
   totalCost: z.number().optional(), // Total cost in USD across all traces
   roleCosts: z.record(z.string(), z.array(z.number())).optional(), // Per-role cost values (one per trace)

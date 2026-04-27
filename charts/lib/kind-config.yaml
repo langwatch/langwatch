@@ -1,0 +1,12 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+# Pin the API server to a fixed port to avoid Docker Desktop port-forwarding
+# flakiness where the random port gets reassigned after heavy I/O operations.
+networking:
+  apiServerPort: 6443
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 30560
+        hostPort: 30560
+        protocol: TCP

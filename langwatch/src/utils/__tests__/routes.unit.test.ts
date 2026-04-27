@@ -12,8 +12,8 @@ describe("projectRoutes", () => {
   });
 
   describe("when the simulation runs route configuration is read", () => {
-    it("has title 'Run History'", () => {
-      expect(projectRoutes.simulation_runs.title).toBe("Run History");
+    it("has title 'Runs'", () => {
+      expect(projectRoutes.simulation_runs.title).toBe("Runs");
     });
   });
 });

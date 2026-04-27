@@ -50,6 +50,11 @@ type ConfirmedNotification = Extract<
   { type: "confirmed" }
 >;
 
+type CancelledNotification = Extract<
+  SubscriptionNotificationPayload,
+  { type: "cancelled" }
+>;
+
 type NotificationServiceOptions = {
   config: Pick<
     AppConfig,
@@ -192,6 +197,62 @@ const buildConfirmedBlocks = (
           text: { type: "plain_text", text: "Open org in admin" },
           url: adminLink,
           action_id: "subscription_confirmed_admin",
+        },
+      ],
+    },
+  ];
+};
+
+const buildCancelledBlocks = (
+  payload: CancelledNotification,
+  adminLink: string,
+): IncomingWebhookSendArguments["blocks"] => {
+  const cancelText = payload.cancellationDate
+    ? `Cancelled on ${formatDate(payload.cancellationDate)}`
+    : "Cancelled just now";
+
+  return [
+    {
+      type: "header",
+      text: { type: "plain_text", text: "Subscription cancelled" },
+    },
+    {
+      type: "section",
+      text: {
+        type: "mrkdwn",
+        text: `*${payload.organizationName}* has cancelled *${payload.plan}*.`,
+      },
+    },
+    {
+      type: "section",
+      fields: [
+        {
+          type: "mrkdwn",
+          text: `*Subscription ID:* ${payload.subscriptionId}`,
+        },
+        {
+          type: "mrkdwn",
+          text: `*Cancellation Date:* ${formatDate(payload.cancellationDate)}`,
+        },
+      ],
+    },
+    {
+      type: "context",
+      elements: [
+        {
+          type: "mrkdwn",
+          text: cancelText,
+        },
+      ],
+    },
+    {
+      type: "actions",
+      elements: [
+        {
+          type: "button",
+          text: { type: "plain_text", text: "Open org in admin" },
+          url: adminLink,
+          action_id: "subscription_cancelled_admin",
         },
       ],
     },
@@ -356,10 +417,19 @@ export class NotificationService {
     payload: SubscriptionNotificationPayload,
   ): Promise<void> {
     const adminLink = this.getAdminLink(payload.organizationId);
-    const blocks =
-      payload.type === "prospective"
-        ? buildProspectiveBlocks(payload, adminLink)
-        : buildConfirmedBlocks(payload, adminLink);
+
+    let blocks: IncomingWebhookSendArguments["blocks"];
+    switch (payload.type) {
+      case "prospective":
+        blocks = buildProspectiveBlocks(payload, adminLink);
+        break;
+      case "confirmed":
+        blocks = buildConfirmedBlocks(payload, adminLink);
+        break;
+      case "cancelled":
+        blocks = buildCancelledBlocks(payload, adminLink);
+        break;
+    }
 
     await this.sendSlackMessage({
       channelUrl: this.config.slackSubscriptionsChannel,

@@ -8,13 +8,9 @@ import { handleAddToAnnotationQueue } from "./actions/addToAnnotationQueue";
 import { handleAddToDataset } from "./actions/addToDataset";
 import { handleSendEmail } from "./actions/sendEmail";
 import { handleSendSlackMessage } from "./actions/sendSlackMessage";
+import type { Trace } from "~/server/tracer/types";
 import type { TraceGroups, TriggerData, TriggerResult } from "./types";
-import {
-  addTriggersSent,
-  getLatestUpdatedAt,
-  triggerSentForMany,
-  updateAlert,
-} from "./utils";
+import { addTriggersSent, triggerSentForMany, updateAlert } from "./utils";
 
 const logger = createLogger("langwatch:cron:triggers:trace-based");
 
@@ -65,7 +61,14 @@ export const processTraceBasedTrigger = async (
   const traceService = TraceService.create(prisma);
   const protections = await getProtectionsForProject(prisma, { projectId });
 
-  const allGroups: TraceGroups["groups"] = [];
+  // Dedup against already-sent traces page-by-page so we never hold the full
+  // result set in memory. Cap examined groups at 1_000 (was 10_000) — alerts
+  // don't need more examples than that and the heavy `Trace` payload pushes
+  // Node past V8's old-space limit for projects with many active triggers.
+  const MAX_EXAMINED_GROUPS = 1_000;
+  const tracesToSend: TraceGroups["groups"] = [];
+  let latestUpdatedAt: number | undefined;
+  let examinedGroups = 0;
   let scrollId: string | undefined;
 
   do {
@@ -74,17 +77,35 @@ export const processTraceBasedTrigger = async (
       protections,
       { scrollId },
     );
-    allGroups.push(...result.groups);
     scrollId = result.scrollId ?? undefined;
-  } while (scrollId && allGroups.length < 10_000);
 
-  const traces: TraceGroups = { groups: allGroups };
+    if (result.groups.length > 0) {
+      const pageTraceIds = result.groups.flatMap((group) =>
+        group.map((trace) => trace.trace_id),
+      );
+      const sent = await triggerSentForMany(
+        triggerId,
+        pageTraceIds,
+        input.projectId,
+      );
+      const sentIds = new Set(sent.map((s) => s.traceId));
 
-  const tracesToSend = await getTracesToSend(
-    traces,
-    triggerId,
-    input.projectId,
-  );
+      for (const group of result.groups) {
+        examinedGroups += 1;
+        const updatedAt = getLatestUpdatedAtForGroup(group);
+        if (
+          updatedAt !== undefined &&
+          (latestUpdatedAt === undefined || updatedAt > latestUpdatedAt)
+        ) {
+          latestUpdatedAt = updatedAt;
+        }
+        if (group.every((trace) => !sentIds.has(trace.trace_id))) {
+          tracesToSend.push(group);
+        }
+        if (examinedGroups >= MAX_EXAMINED_GROUPS) break;
+      }
+    }
+  } while (scrollId && examinedGroups < MAX_EXAMINED_GROUPS);
 
   if (tracesToSend.length > 0) {
     const triggerData: TriggerData[] = tracesToSend.flatMap((group) =>
@@ -131,7 +152,7 @@ export const processTraceBasedTrigger = async (
     }
 
     await addTriggersSent(triggerId, triggerData);
-    const updatedAt = getLatestUpdatedAt(traces) ?? Date.now();
+    const updatedAt = latestUpdatedAt ?? Date.now();
 
     try {
       await updateAlert(triggerId, updatedAt, project.id);
@@ -157,22 +178,13 @@ export const processTraceBasedTrigger = async (
   };
 };
 
-const getTracesToSend = async (
-  traces: TraceGroups,
-  triggerId: string,
-  projectId: string,
-) => {
-  const traceIds = traces.groups.flatMap((group) =>
-    group.map((trace) => trace.trace_id),
-  );
-
-  const triggersSent = await triggerSentForMany(triggerId, traceIds, projectId);
-
-  const tracesToSend = traces.groups.filter((group) => {
-    return group.every((trace) => {
-      return !triggersSent.some((sent) => sent.traceId === trace.trace_id);
-    });
-  });
-
-  return tracesToSend;
+const getLatestUpdatedAtForGroup = (group: Trace[]): number | undefined => {
+  let latest: number | undefined;
+  for (const trace of group) {
+    const ts = trace.timestamps?.updated_at;
+    if (ts !== undefined && (latest === undefined || ts > latest)) {
+      latest = ts;
+    }
+  }
+  return latest;
 };

@@ -52,6 +52,7 @@ interface Scenario {
 interface Agent {
   id: string;
   name: string;
+  type: string;
 }
 
 interface Prompt {
@@ -61,7 +62,7 @@ interface Prompt {
 
 interface AvailableTarget {
   name: string;
-  type: "http" | "prompt";
+  type: "http" | "prompt" | "code" | "workflow";
   referenceId: string;
 }
 
@@ -121,7 +122,21 @@ export function useSuiteForm({
     const result: AvailableTarget[] = [];
     if (agents) {
       for (const agent of agents) {
-        result.push({ name: agent.name, type: "http", referenceId: agent.id });
+        // http, code, and workflow agents are supported as suite targets.
+        // signature agents are excluded — they're used as sub-components of
+        // workflows rather than as stand-alone scenario targets.
+        if (
+          agent.type !== "http" &&
+          agent.type !== "code" &&
+          agent.type !== "workflow"
+        ) {
+          continue;
+        }
+        result.push({
+          name: agent.name,
+          type: agent.type,
+          referenceId: agent.id,
+        });
       }
     }
     if (prompts) {

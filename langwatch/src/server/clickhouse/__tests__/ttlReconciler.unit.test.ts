@@ -12,7 +12,7 @@ import {
 const sampleEntry: TableTTLEntry = {
   table: "stored_spans",
   ttlColumn: "EndTime",
-  envVar: "TIERED_STORED_SPANS_TABLE_HOT_DAYS",
+  envVar: "CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS",
   hardcodedDefault: 30,
 };
 
@@ -22,10 +22,10 @@ describe("ttlReconciler", () => {
 
     beforeEach(() => {
       savedEnv[sampleEntry.envVar] = process.env[sampleEntry.envVar];
-      savedEnv.TIERED_STORAGE_DEFAULT_HOT_DAYS =
-        process.env.TIERED_STORAGE_DEFAULT_HOT_DAYS;
+      savedEnv.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS =
+        process.env.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS;
       delete process.env[sampleEntry.envVar];
-      delete process.env.TIERED_STORAGE_DEFAULT_HOT_DAYS;
+      delete process.env.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS;
     });
 
     afterEach(() => {
@@ -46,7 +46,7 @@ describe("ttlReconciler", () => {
 
       it("takes precedence over global default", () => {
         process.env[sampleEntry.envVar] = "5";
-        process.env.TIERED_STORAGE_DEFAULT_HOT_DAYS = "14";
+        process.env.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS = "14";
         expect(resolveHotDays(sampleEntry)).toBe(5);
       });
 
@@ -79,14 +79,14 @@ describe("ttlReconciler", () => {
 
     describe("when only global default is set", () => {
       it("returns the global default", () => {
-        process.env.TIERED_STORAGE_DEFAULT_HOT_DAYS = "14";
+        process.env.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS = "14";
         expect(resolveHotDays(sampleEntry)).toBe(14);
       });
 
       it("throws on invalid global default", () => {
-        process.env.TIERED_STORAGE_DEFAULT_HOT_DAYS = "not-a-number";
+        process.env.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS = "not-a-number";
         expect(() => resolveHotDays(sampleEntry)).toThrow(
-          /TIERED_STORAGE_DEFAULT_HOT_DAYS must be a non-negative integer/,
+          /CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS must be a non-negative integer/,
         );
       });
     });
@@ -104,7 +104,7 @@ describe("ttlReconciler", () => {
       });
 
       it("treats empty global var as unset", () => {
-        process.env.TIERED_STORAGE_DEFAULT_HOT_DAYS = "";
+        process.env.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS = "";
         expect(resolveHotDays(sampleEntry)).toBe(30);
       });
     });
@@ -155,7 +155,7 @@ describe("ttlReconciler", () => {
       const entry: TableTTLEntry = {
         table: "experiment_runs",
         ttlColumn: "StartedAt",
-        envVar: "TIERED_BATCH_EVAL_RUNS_TABLE_HOT_DAYS",
+        envVar: "CLICKHOUSE_COLD_STORAGE_EXPERIMENT_RUNS_TTL_DAYS",
         hardcodedDefault: 30,
       };
       const result = buildDesiredTTLExpression({ config: entry, days: 7 });
@@ -169,7 +169,7 @@ describe("ttlReconciler", () => {
         table: "event_log",
         ttlColumn: "EventOccurredAt",
         ttlColumnExpression: "toDateTime(EventOccurredAt / 1000)",
-        envVar: "TIERED_EVENT_LOG_TABLE_HOT_DAYS",
+        envVar: "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS",
         hardcodedDefault: 30,
       };
       const result = buildDesiredTTLExpression({ config: entry, days: 7 });
@@ -183,11 +183,9 @@ describe("ttlReconciler", () => {
     const savedEnv: Record<string, string | undefined> = {};
 
     beforeEach(() => {
-      savedEnv.ENABLE_CLICKHOUSE = process.env.ENABLE_CLICKHOUSE;
-      savedEnv.ENABLE_CLICKHOUSE_TTL = process.env.ENABLE_CLICKHOUSE_TTL;
+      savedEnv.CLICKHOUSE_COLD_STORAGE_ENABLED = process.env.CLICKHOUSE_COLD_STORAGE_ENABLED;
       savedEnv.CLICKHOUSE_URL = process.env.CLICKHOUSE_URL;
-      delete process.env.ENABLE_CLICKHOUSE;
-      delete process.env.ENABLE_CLICKHOUSE_TTL;
+      delete process.env.CLICKHOUSE_COLD_STORAGE_ENABLED;
       delete process.env.CLICKHOUSE_URL;
     });
 
@@ -201,23 +199,22 @@ describe("ttlReconciler", () => {
       }
     });
 
-    describe("when ENABLE_CLICKHOUSE is not set and no connectionUrl provided", () => {
+    describe("when CLICKHOUSE_URL is not set and no connectionUrl provided", () => {
       it("skips reconciliation", async () => {
         await expect(reconcileTTL()).resolves.toBeUndefined();
       });
     });
 
-    describe("when ENABLE_CLICKHOUSE is 'true' but ENABLE_CLICKHOUSE_TTL is not set", () => {
+    describe("when CLICKHOUSE_URL is set but CLICKHOUSE_COLD_STORAGE_ENABLED is not set", () => {
       it("skips reconciliation", async () => {
-        process.env.ENABLE_CLICKHOUSE = "true";
+        process.env.CLICKHOUSE_URL = "http://localhost:8123/langwatch";
         await expect(reconcileTTL()).resolves.toBeUndefined();
       });
     });
 
-    describe("when ENABLE_CLICKHOUSE is 'true' but CLICKHOUSE_URL is missing", () => {
+    describe("when CLICKHOUSE_COLD_STORAGE_ENABLED is 'true' but CLICKHOUSE_URL is missing", () => {
       it("skips reconciliation", async () => {
-        process.env.ENABLE_CLICKHOUSE = "true";
-        process.env.ENABLE_CLICKHOUSE_TTL = "true";
+        process.env.CLICKHOUSE_COLD_STORAGE_ENABLED = "true";
         await expect(reconcileTTL()).resolves.toBeUndefined();
       });
     });
@@ -231,8 +228,8 @@ describe("ttlReconciler", () => {
     });
 
     describe("when connectionUrl is provided explicitly", () => {
-      it("bypasses the ENABLE_CLICKHOUSE gate", async () => {
-        // ENABLE_CLICKHOUSE is not set, but connectionUrl bypasses the gate.
+      it("bypasses the env var gates", async () => {
+        // CLICKHOUSE_URL is not set, but connectionUrl bypasses the gate.
         // This will fail at the ClickHouse connection level (no server running),
         // proving it got past the env-var guards.
         await expect(

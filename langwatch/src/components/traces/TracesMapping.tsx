@@ -28,6 +28,15 @@ import { api } from "../../utils/api";
 import { useEvaluationWizardStore } from "../evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { Switch } from "../ui/switch";
 
+/** Trace field options for the threads sub-field selector, excluding thread sources themselves. */
+const THREAD_SUB_FIELD_OPTIONS = Object.keys(TRACE_MAPPINGS)
+  .filter(
+    (key) =>
+      key !== "threads" &&
+      key !== "threads_until_current",
+  )
+  .map((key) => ({ label: key, value: key }));
+
 export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   string,
   keyof typeof TRACE_MAPPINGS
@@ -442,7 +451,8 @@ export const TracesMapping = ({
           const subkeys =
             traceMappingDefinition &&
             "subkeys" in traceMappingDefinition &&
-            source !== "threads"
+            source !== "threads" &&
+            source !== "threads_until_current"
               ? key === "" && source === "spans"
                 ? defaultSpanSubkeys
                 : traceMappingDefinition.subkeys(traces_, key!, {
@@ -522,7 +532,7 @@ export const TracesMapping = ({
                 <>
                   <GridItem>
                     <VStack align="start" width="full" gap={2}>
-                      <NativeSelect.Root width="full">
+                      <NativeSelect.Root width="full" minWidth="260px">
                         <NativeSelect.Field
                           onChange={(e) => {
                             setTraceMappingState((prev) => {
@@ -568,14 +578,30 @@ export const TracesMapping = ({
                           value={source}
                         >
                           <option value=""></option>
-                          {[
-                            ...SERVER_ONLY_TRACE_SOURCES,
-                            ...Object.keys(TRACE_MAPPINGS),
-                          ].map((key) => (
-                            <option key={key} value={key}>
-                              {TRACE_MAPPING_LABELS[key] ?? key}
-                            </option>
-                          ))}
+                          <optgroup label="Current Trace">
+                            {[
+                              ...SERVER_ONLY_TRACE_SOURCES,
+                              ...Object.keys(TRACE_MAPPINGS).filter(
+                                (key) =>
+                                  key !== "threads" &&
+                                  key !== "threads_until_current" &&
+                                  key !== "thread_id",
+                              ),
+                            ].map((key) => (
+                              <option key={key} value={key}>
+                                {TRACE_MAPPING_LABELS[key] ?? key}
+                              </option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="Current Thread">
+                            {["thread_id", "threads_until_current", "threads"].map(
+                              (key) => (
+                                <option key={key} value={key}>
+                                  {TRACE_MAPPING_LABELS[key] ?? key}
+                                </option>
+                              ),
+                            )}
+                          </optgroup>
                         </NativeSelect.Field>
                         <NativeSelect.Indicator />
                       </NativeSelect.Root>
@@ -690,7 +716,8 @@ export const TracesMapping = ({
                           </NativeSelect.Root>
                         </HStack>
                       )}
-                      {source === "threads" && (
+                      {(source === "threads" ||
+                        source === "threads_until_current") && (
                         <HStack align="start" width="full">
                           <Box
                             width="16px"
@@ -705,14 +732,11 @@ export const TracesMapping = ({
                           />
                           <MultiSelect
                             isMulti
-                            options={Object.keys(TRACE_MAPPINGS).map((key) => ({
-                              label: key,
-                              value: key,
-                            }))}
+                            options={THREAD_SUB_FIELD_OPTIONS}
                             value={(
                               mapping[targetField]?.selectedFields ?? []
                             ).map((field) => ({
-                              label: field,
+                              label: `thread.traces.${field}`,
                               value: field,
                             }))}
                             onChange={(newValue) => {

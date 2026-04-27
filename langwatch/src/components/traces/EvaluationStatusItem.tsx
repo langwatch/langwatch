@@ -10,7 +10,7 @@ import {
 } from "@chakra-ui/react";
 import { formatDistanceToNow } from "date-fns";
 import { MoreVertical, Pencil } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import numeral from "numeral";
 import { useMemo } from "react";
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
@@ -58,7 +58,11 @@ function EvaluatorInputsTooltip({
   inputs?: Record<string, any> | null;
   children: React.ReactNode;
 }) {
-  if (inputs === undefined || inputs === null || Object.keys(inputs).length === 0) {
+  if (
+    inputs === undefined ||
+    inputs === null ||
+    Object.keys(inputs).length === 0
+  ) {
     return <>{children}</>;
   }
 
@@ -154,6 +158,10 @@ export function EvaluationStatusItem({
   };
 
   const hasDetails = check.status === "processed" && check.details;
+  const errorMessage =
+    check.status === "error"
+      ? check.error?.message ?? check.details ?? null
+      : null;
 
   return (
     <Box width="full">
@@ -169,7 +177,14 @@ export function EvaluationStatusItem({
             )}
 
             <VStack align="start" gap={0} minWidth={0}>
-              <Text fontWeight="semibold" fontSize="sm" lineClamp={1}>
+              <Text
+                fontWeight="semibold"
+                fontSize="sm"
+                lineClamp={1}
+                borderBottom={check.inputs ? "1px solid" : undefined}
+                borderColor="border.emphasized"
+                borderStyle="dashed"
+              >
                 {check.name || evaluator?.name}
               </Text>
               {customPrompt ? (
@@ -278,8 +293,7 @@ export function EvaluationStatusItem({
           )}
 
           {/* Processing/Scheduled badge */}
-          {(check.status === "in_progress" ||
-            check.status === "scheduled") && (
+          {(check.status === "in_progress" || check.status === "scheduled") && (
             <Text fontSize="xs" color="fg.subtle">
               {check.status === "in_progress" ? "Processing..." : "Scheduled"}
             </Text>
@@ -319,7 +333,7 @@ export function EvaluationStatusItem({
                 <MoreVertical size={14} />
               </IconButton>
             </Menu.Trigger>
-            <Menu.Content minWidth="160px" zIndex="popover">
+            <Menu.Content minWidth="160px">
               <Menu.Item value="edit" onClick={handleOpenConfig}>
                 <HStack gap={2}>
                   <Pencil size={14} />
@@ -341,10 +355,7 @@ export function EvaluationStatusItem({
             paddingTop={2}
           >
             <Text fontSize="sm" color="fg.subtle">
-              <HoverableBigText
-                expandedVersion={check.details!}
-                lineClamp={3}
-              >
+              <HoverableBigText expandedVersion={check.details!} lineClamp={3}>
                 <Box as="span" whiteSpace="pre-wrap" wordBreak="break-word">
                   {check.details}
                 </Box>
@@ -355,7 +366,7 @@ export function EvaluationStatusItem({
       )}
 
       {/* Error message */}
-      {check.status === "error" && check.error?.message && (
+      {errorMessage && (
         <Box paddingLeft="22px" marginTop={2}>
           <Box
             borderTopWidth="1px"
@@ -364,12 +375,9 @@ export function EvaluationStatusItem({
             paddingTop={2}
           >
             <Text fontSize="sm" color="red.fg">
-              <HoverableBigText
-                expandedVersion={check.error.message}
-                lineClamp={3}
-              >
+              <HoverableBigText expandedVersion={errorMessage} lineClamp={3}>
                 <Box as="span" whiteSpace="pre-wrap" wordBreak="break-word">
-                  {check.error.message}
+                  {errorMessage}
                 </Box>
               </HoverableBigText>
             </Text>

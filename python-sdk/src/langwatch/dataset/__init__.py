@@ -1,84 +1,119 @@
-from typing import Any, Dict, List, Optional
-from opentelemetry import trace
-from opentelemetry.trace import NoOpTracer
-from langwatch.generated.langwatch_rest_api_client.api.default import (
-    get_api_dataset_by_slug_or_id,
-)
+"""
+LangWatch Dataset module.
 
-from langwatch.generated.langwatch_rest_api_client.models import (
-    GetApiDatasetBySlugOrIdResponse200,
-    GetApiDatasetBySlugOrIdResponse200DataItem,
-    GetApiDatasetBySlugOrIdResponse404,
-    GetApiDatasetBySlugOrIdResponse401,
-    GetApiDatasetBySlugOrIdResponse500,
-    GetApiDatasetBySlugOrIdResponse400,
-)
-from langwatch.state import get_instance
-import pandas as pd
+Exposes dataset CRUD operations via module-level attribute access that
+delegates to a cached DatasetsFacade instance, following the prompts module
+pattern.
+
+Usage::
+
+    import langwatch
+
+    # List datasets
+    result = langwatch.dataset.list_datasets()
+
+    # Create a dataset
+    info = langwatch.dataset.create_dataset("My Dataset", columns=[...])
+
+    # Get a dataset with entries
+    ds = langwatch.dataset.get_dataset("my-dataset")
+
+Backward-compatible imports::
+
+    from langwatch.dataset import get_dataset, Dataset, DatasetEntry, GetDatasetOptions
+
+"""
+
+from typing import Optional
+
 from pydantic import BaseModel
 
-from langwatch.utils.initialization import ensure_setup
+from .dataset_facade import DatasetsFacade
 
-_tracer = trace.get_tracer(__name__)
+# Re-export types that users may import directly.
+from .types import (
+    ColumnType,
+    Dataset,
+    DatasetEntry,
+    DatasetInfo,
+    DatasetRecord,
+    PaginatedResult,
+    Pagination,
+    UploadResult,
+)
+
+# Re-export custom error classes for convenient import.
+from .errors import (
+    DatasetApiError,
+    DatasetError,
+    DatasetNotFoundError,
+    DatasetPlanLimitError,
+)
+
+__all__ = [
+    "DatasetsFacade",
+    "ColumnType",
+    "Dataset",
+    "DatasetEntry",
+    "DatasetError",
+    "DatasetApiError",
+    "DatasetNotFoundError",
+    "DatasetPlanLimitError",
+    "DatasetInfo",
+    "DatasetRecord",
+    "PaginatedResult",
+    "Pagination",
+    "UploadResult",
+    "GetDatasetOptions",
+    "get_dataset",
+]
 
 
-class DatasetEntry:
-    def __init__(self, item: GetApiDatasetBySlugOrIdResponse200DataItem):
-        self.id: str = item.id
-        self.entry: Dict[str, Any] = item.entry.to_dict()
-
-
-class Dataset:
-    def __init__(self, dataset: GetApiDatasetBySlugOrIdResponse200):
-        self.entries: List[DatasetEntry] = []
-
-        for item in dataset.data:
-            self.entries.append(DatasetEntry(item))
-
-    def to_pandas(self) -> pd.DataFrame:
-        return pd.DataFrame([entry.entry for entry in self.entries])
+# ── Backward-compatibility shims ──────────────────────────────────
 
 
 class GetDatasetOptions(BaseModel):
+    """Options for get_dataset(). Kept for backward compatibility."""
+
     ignore_tracing: Optional[bool] = False
 
 
 def get_dataset(
     slug_or_id: str, options: Optional[GetDatasetOptions] = None
 ) -> Dataset:
-    ensure_setup()
+    """
+    Retrieve a dataset by slug or ID.
 
-    tracer = NoOpTracer() if options and options.ignore_tracing is True else _tracer
+    This is the legacy entry point kept for backward compatibility.
+    New code should use ``langwatch.dataset.get_dataset(slug_or_id)`` via
+    the facade delegation (which routes here).
+    """
+    facade = _get_facade()
+    ignore_tracing = bool(options and options.ignore_tracing)
+    return facade.get_dataset(slug_or_id, ignore_tracing=ignore_tracing)
 
-    with tracer.start_as_current_span(
-        "get_dataset",
-    ) as span:
-        span.set_attribute("inputs.slug_or_id", slug_or_id)
 
-        try:
-            client = get_instance()
-            ds = get_api_dataset_by_slug_or_id.sync(
-                slug_or_id=slug_or_id,
-                client=client.rest_api_client,
-            )
+# ── Module-level facade delegation ────────────────────────────────
 
-            if (
-                isinstance(ds, GetApiDatasetBySlugOrIdResponse404)
-                or isinstance(ds, GetApiDatasetBySlugOrIdResponse401)
-                or isinstance(ds, GetApiDatasetBySlugOrIdResponse500)
-                or isinstance(ds, GetApiDatasetBySlugOrIdResponse400)
-            ):
-                raise Exception(ds.message)
+_facade_instance: Optional[DatasetsFacade] = None
 
-            if isinstance(ds, GetApiDatasetBySlugOrIdResponse200):
-                dataset = Dataset(ds)
 
-                span.set_attribute("outputs.dataset_length", len(dataset.entries))
+def _get_facade() -> DatasetsFacade:
+    """Get or create the cached DatasetsFacade instance."""
+    global _facade_instance
+    if _facade_instance is None:
+        _facade_instance = DatasetsFacade.from_global()
+    return _facade_instance
 
-                return dataset
 
-            raise Exception(f"Unknown response type: {type(ds)}")
+def __getattr__(name: str):
+    """
+    Delegate attribute access to the DatasetsFacade instance.
 
-        except Exception as ex:
-            span.record_exception(ex)
-            raise
+    Allows ``langwatch.dataset.list_datasets()`` etc. to work seamlessly
+    as if ``langwatch.dataset`` were the facade itself.
+    """
+    facade = _get_facade()
+    if hasattr(facade, name):
+        return getattr(facade, name)
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

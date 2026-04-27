@@ -1,51 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { NormalizedSpan } from "../../schemas/spans";
-import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
-import {
-  applySpanToSummary,
-  createTraceSummaryFoldProjection,
-  type TraceSummaryData,
-} from "../traceSummary.foldProjection";
-
-const traceSummaryProjection = createTraceSummaryFoldProjection({
-  store: { store: async () => {}, get: async () => null },
-});
-
-function createInitState(): TraceSummaryData {
-  return traceSummaryProjection.init();
-}
-
-function createTestSpan(
-  overrides: Partial<NormalizedSpan> = {},
-): NormalizedSpan {
-  return {
-    id: "span-1",
-    traceId: "trace-1",
-    spanId: "span-1",
-    tenantId: "tenant-1",
-    parentSpanId: "parent-1",
-    parentTraceId: null,
-    parentIsRemote: null,
-    sampled: true,
-    startTimeUnixMs: 1000,
-    endTimeUnixMs: 2000,
-    durationMs: 1000,
-    name: "test-span",
-    kind: NormalizedSpanKind.INTERNAL,
-    resourceAttributes: {},
-    spanAttributes: {},
-    events: [],
-    links: [],
-    statusMessage: null,
-    statusCode: NormalizedStatusCode.UNSET,
-    instrumentationScope: { name: "test", version: null },
-    droppedAttributesCount: 0 as const,
-    droppedEventsCount: 0 as const,
-    droppedLinksCount: 0 as const,
-    ...overrides,
-  };
-}
+import { applySpanToSummary } from "../traceSummary.foldProjection";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 describe("applySpanToSummary attribute forwarding", () => {
   let extractSpy: ReturnType<typeof vi.spyOn>;
@@ -217,6 +173,57 @@ describe("applySpanToSummary attribute forwarding", () => {
       const state = applySpanToSummary({ state: createInitState(), span });
 
       expect(state.attributes["langwatch.prompt_ids"]).toBeUndefined();
+    });
+  });
+
+  // Regression for iter-110 Sergey finding: `gateway_budget_ledger_events`
+  // CH table count=0 despite the gatewayBudgetSync reactor firing. Root
+  // cause: the attribute accumulator's SPAN_ATTR_MAPPINGS allowlist didn't
+  // include the two AI Gateway markers that the reactor reads, so they
+  // never reached foldState.attributes and the reactor early-returned on
+  // `!virtualKeyId || !gatewayRequestId` for every trace.
+  describe("when span has AI Gateway markers", () => {
+    it("forwards langwatch.virtual_key_id to trace attributes", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.virtual_key_id": "vk_live_abc123",
+        },
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span });
+
+      expect(state.attributes["langwatch.virtual_key_id"]).toBe(
+        "vk_live_abc123",
+      );
+    });
+
+    it("forwards langwatch.gateway_request_id to trace attributes", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.gateway_request_id": "req_01HZX0ABCDEF",
+        },
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span });
+
+      expect(state.attributes["langwatch.gateway_request_id"]).toBe(
+        "req_01HZX0ABCDEF",
+      );
+    });
+
+    it("forwards both markers together so the gatewayBudgetSync reactor can fold", () => {
+      const span = createTestSpan({
+        spanAttributes: {
+          "langwatch.virtual_key_id": "vk_live_matrix_openai",
+          "langwatch.gateway_request_id": "req_01HZX0XYZ",
+        },
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span });
+
+      // Shape the reactor's early-return check expects.
+      expect(state.attributes["langwatch.virtual_key_id"]).toBeTruthy();
+      expect(state.attributes["langwatch.gateway_request_id"]).toBeTruthy();
     });
   });
 });

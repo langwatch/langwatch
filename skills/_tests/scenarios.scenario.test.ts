@@ -10,6 +10,9 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  assertSkillWasRead,
+  installSkillToWorkDir,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -22,17 +25,7 @@ const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
 
 function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "scenarios");
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.copyFileSync(
-    path.resolve(__dirname, "../scenarios/SKILL.md"),
-    path.join(skillDir, "SKILL.md")
-  );
-  const sharedDir = path.join(skillDir, "_shared");
-  fs.mkdirSync(sharedDir, { recursive: true });
-  execSync(
-    `cp -r ${path.resolve(__dirname, "../_shared")}/* ${sharedDir}/`
-  );
+  installSkillToWorkDir({ workingDirectory: tempFolder, skillSubpath: "scenarios" });
 }
 
 function findTestFiles(dir: string, pattern: RegExp): string[] {
@@ -64,6 +57,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python OpenAI scenario tests",
         description:
           "Adding agent simulation tests to a Python OpenAI conversational bot project using the LangWatch Scenario framework.",
@@ -86,6 +80,7 @@ describe("Scenarios Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(
@@ -129,7 +124,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -145,6 +140,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Vercel AI scenario tests",
         description:
           "Adding agent simulation tests to a TypeScript Vercel AI bot project using the LangWatch Scenario framework.",
@@ -155,17 +151,18 @@ describe("Scenarios Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent created scenario test files using the LangWatch Scenario framework",
-              "Agent should use the LangWatch MCP to check Scenario documentation",
+              "Agent used the `langwatch scenario-docs` CLI command to read Scenario documentation",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "add agent simulation tests for my agent, short and sweet, no need to run the tests"
+            "add agent simulation tests for my agent"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /\.test\.ts$/);
             expect(
@@ -193,7 +190,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -208,6 +205,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python LangGraph scenario tests",
         description:
           "Adding scenario tests to a Python LangGraph agent project.",
@@ -218,17 +216,18 @@ describe("Scenarios Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent created scenario test files using the LangWatch Scenario framework",
-              "Agent should use the LangWatch MCP to check Scenario documentation",
+              "Agent used the `langwatch scenario-docs` CLI command to read Scenario documentation",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "add agent simulation tests for my agent, short and sweet, no need to run the tests"
+            "add agent simulation tests for my agent"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(testFiles.length).toBeGreaterThan(0);
             const testContent = testFiles
@@ -241,7 +240,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -257,6 +256,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python OpenAI red team tests",
         description:
           "Adding adversarial red team tests to a Python OpenAI bot project using the LangWatch Scenario framework's RedTeamAgent.",
@@ -267,17 +267,18 @@ describe("Scenarios Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent created red team tests using Scenario's RedTeamAgent",
-              "Agent should use the LangWatch MCP to check Scenario documentation",
+              "Agent used the `langwatch scenario-docs` CLI command to read Scenario documentation",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "red team my agent for vulnerabilities, short and sweet, no need to run the tests"
+            "red team my agent for vulnerabilities"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(
@@ -303,7 +304,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -319,6 +320,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Vercel AI red team tests",
         description:
           "Adding adversarial red team tests to a TypeScript Vercel AI bot project using the LangWatch Scenario framework's RedTeamAgent.",
@@ -329,17 +331,18 @@ describe("Scenarios Skill", () => {
             model: judgeModel,
             criteria: [
               "Agent created red team tests using Scenario's RedTeamAgent",
-              "Agent should use the LangWatch MCP to check Scenario documentation",
+              "Agent used the `langwatch scenario-docs` CLI command to read Scenario documentation",
             ],
           }),
         ],
         script: [
           scenario.user(
-            "red team my agent for vulnerabilities, short and sweet, no need to run the tests"
+            "red team my agent for vulnerabilities"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
 
             const testFiles = findTestFiles(tempFolder, /\.(test|spec)\.ts$/);
             expect(
@@ -368,7 +371,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -384,6 +387,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Targeted scenario for emoji handling",
         description:
           "Adding a specific scenario test for the tweet-like bot to verify it uses emojis correctly.",
@@ -405,6 +409,7 @@ describe("Scenarios Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(testFiles.length).toBeGreaterThan(0);
             const testContent = testFiles
@@ -418,11 +423,11 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
-    "uses platform MCP tools when no codebase is present",
+    "uses the langwatch CLI to create scenarios when no codebase is present",
     async () => {
       const tempFolder = fs.mkdtempSync(
         path.join(os.tmpdir(), "langwatch-skill-scenarios-platform-")
@@ -431,17 +436,30 @@ describe("Scenarios Skill", () => {
       // No fixture copied — empty directory
       copySkillToWorkDir(tempFolder);
 
+      // Provide an .env so the CLI is authenticated
+      const apiKey = process.env.LANGWATCH_API_KEY?.trim();
+      if (!apiKey) {
+        throw new Error(
+          "LANGWATCH_API_KEY must be set to run platform-mode scenario tests"
+        );
+      }
+      fs.writeFileSync(
+        path.join(tempFolder, ".env"),
+        `LANGWATCH_API_KEY=${apiKey}\n`
+      );
+
       const result = await scenario.run({
-        name: "Platform scenario creation",
+        setId: SKILL_TESTS_SET_ID,
+        name: "Platform scenario creation via CLI",
         description:
-          "Creating scenarios on the LangWatch platform when there is no codebase.",
+          "Creating scenarios on the LangWatch platform via the `langwatch` CLI when there is no codebase.",
         agents: [
           createClaudeCodeAgent({ workingDirectory: tempFolder }),
           scenario.userSimulatorAgent({ model: judgeModel }),
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent used platform MCP tools (platform_create_scenario or similar) to create scenarios",
+              "Agent used the `langwatch scenario create` CLI command (or related `langwatch scenario` / `langwatch suite` subcommands) to create scenarios",
               "Agent did NOT try to write code files",
             ],
           }),
@@ -453,10 +471,10 @@ describe("Scenarios Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
-            // In platform mode, no test files should be created
-            // The agent should use MCP tools instead
+            assertSkillWasRead(state, "scenarios");
+            // In platform mode, no test files should be created.
+            // The agent should use the langwatch CLI instead.
 
-            // Verify the agent actually used MCP platform tools
             const allContent = state.messages
               .map((m) =>
                 typeof m.content === "string"
@@ -466,10 +484,10 @@ describe("Scenarios Skill", () => {
               .join("\n");
 
             expect(
-              allContent.includes("platform_create_scenario") ||
-                allContent.includes("platform_list_scenarios") ||
-                allContent.includes("discover_schema"),
-              "Expected agent to use platform MCP tools (platform_create_scenario, platform_list_scenarios, or discover_schema)"
+              allContent.includes("langwatch scenario create") ||
+                allContent.includes("langwatch scenario list") ||
+                allContent.includes("langwatch suite create"),
+              "Expected agent to invoke `langwatch scenario create`, `langwatch scenario list`, or `langwatch suite create` via the CLI"
             ).toBe(true);
           },
           scenario.judge(),
@@ -478,7 +496,7 @@ describe("Scenarios Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -493,6 +511,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Mastra scenario tests",
         description:
           "Adding scenario tests to a TypeScript Mastra agent project.",
@@ -508,11 +527,12 @@ describe("Scenarios Skill", () => {
         ],
         script: [
           scenario.user(
-            "add agent simulation tests for my agent, short and sweet, no need to run the tests"
+            "add agent simulation tests for my agent"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
             const testFiles = findTestFiles(tempFolder, /\.(test|spec)\.ts$/);
             expect(testFiles.length).toBeGreaterThan(0);
             const content = testFiles
@@ -525,7 +545,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -540,6 +560,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "RAG agent domain-specific scenarios",
         description:
           "Adding scenario tests to a TerraVerde farm advisory RAG agent that handles irrigation, frost protection, and pest management.",
@@ -562,6 +583,7 @@ describe("Scenarios Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);
             expect(testFiles.length).toBeGreaterThan(0);
             const content = testFiles
@@ -592,7 +614,7 @@ describe("Scenarios Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -607,6 +629,7 @@ describe("Scenarios Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Consultant mode — deeper suggestions",
         description:
           "Agent sets up scenarios for a farm advisory agent, then suggests domain-specific improvements.",
@@ -629,6 +652,7 @@ describe("Scenarios Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "scenarios");
 
             // Verify test files were created
             const testFiles = findTestFiles(tempFolder, /^test_.*\.py$/);

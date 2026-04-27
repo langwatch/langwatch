@@ -19,78 +19,78 @@ export interface TableTTLEntry {
  *
  * Each entry maps a ClickHouse table to:
  * - ttlColumn: the DateTime column used for TTL expiry
- * - envVar: per-table env var override (e.g. TIERED_STORED_SPANS_TABLE_HOT_DAYS=7)
+ * - envVar: per-table env var override (e.g. CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS=7)
  * - hardcodedDefault: fallback when no env vars are set
  *
- * Resolution order: per-table env var > TIERED_STORAGE_DEFAULT_HOT_DAYS > hardcodedDefault
+ * Resolution order: per-table env var > CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS > hardcodedDefault
  */
 export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
   {
     table: "billable_events",
     ttlColumn: "EventTimestamp",
-    envVar: "TIERED_BILLABLE_EVENTS_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
+    envVar: "CLICKHOUSE_COLD_STORAGE_BILLABLE_EVENTS_TTL_DAYS",
+    hardcodedDefault: 49,
   },
   {
     table: "dspy_steps",
     ttlColumn: "CreatedAt",
-    envVar: "TIERED_DSPY_STEPS_TABLE_HOT_DAYS",
-    hardcodedDefault: 4500,
+    envVar: "CLICKHOUSE_COLD_STORAGE_DSPY_STEPS_TTL_DAYS",
+    hardcodedDefault: 49,
   },
   {
     table: "evaluation_runs",
-    ttlColumn: "ScheduledAt",
-    envVar: "TIERED_EVALUATION_RUNS_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
+    ttlColumn: "UpdatedAt",
+    envVar: "CLICKHOUSE_COLD_STORAGE_EVALUATION_RUNS_TTL_DAYS",
+    hardcodedDefault: 49,
   },
   {
     table: "event_log",
     ttlColumn: "EventOccurredAt",
     ttlColumnExpression: "toDateTime(EventOccurredAt / 1000)",
-    envVar: "TIERED_EVENT_LOG_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
+    envVar: "CLICKHOUSE_COLD_STORAGE_EVENT_LOG_TTL_DAYS",
+    hardcodedDefault: 49,
   },
   {
     table: "experiment_run_items",
     ttlColumn: "OccurredAt",
-    envVar: "TIERED_BATCH_EVAL_RESULTS_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
+    envVar: "CLICKHOUSE_COLD_STORAGE_EXPERIMENT_RUN_ITEMS_TTL_DAYS",
+    hardcodedDefault: 49,
   },
   {
     table: "experiment_runs",
     ttlColumn: "StartedAt",
-    envVar: "TIERED_BATCH_EVAL_RUNS_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
+    envVar: "CLICKHOUSE_COLD_STORAGE_EXPERIMENT_RUNS_TTL_DAYS",
+    hardcodedDefault: 49,
   },
   {
     table: "simulation_runs",
     ttlColumn: "StartedAt",
-    envVar: "TIERED_SIMULATION_RUNS_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
+    envVar: "CLICKHOUSE_COLD_STORAGE_SIMULATION_RUNS_TTL_DAYS",
+    hardcodedDefault: 49,
   },
   {
     table: "stored_log_records",
     ttlColumn: "TimeUnixMs",
-    envVar: "TIERED_STORED_LOG_RECORDS_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
+    envVar: "CLICKHOUSE_COLD_STORAGE_LOG_RECORDS_TTL_DAYS",
+    hardcodedDefault: 49,
   },
   {
     table: "stored_metric_records",
     ttlColumn: "TimeUnixMs",
-    envVar: "TIERED_STORED_METRIC_RECORDS_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
+    envVar: "CLICKHOUSE_COLD_STORAGE_METRIC_RECORDS_TTL_DAYS",
+    hardcodedDefault: 49,
   },
   {
     table: "stored_spans",
     ttlColumn: "EndTime",
-    envVar: "TIERED_STORED_SPANS_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
+    envVar: "CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS",
+    hardcodedDefault: 49,
   },
   {
     table: "trace_summaries",
     ttlColumn: "OccurredAt",
-    envVar: "TIERED_TRACE_SUMMARIES_TABLE_HOT_DAYS",
-    hardcodedDefault: 30,
+    envVar: "CLICKHOUSE_COLD_STORAGE_TRACE_SUMMARIES_TTL_DAYS",
+    hardcodedDefault: 49,
   },
 ] as const;
 
@@ -106,8 +106,8 @@ function parseNonNegativeInt(value: string, label: string): number {
  * Resolves the desired hot-storage days for a table.
  *
  * Priority:
- * 1. Per-table env var (e.g. TIERED_STORED_SPANS_TABLE_HOT_DAYS)
- * 2. Global default env var (TIERED_STORAGE_DEFAULT_HOT_DAYS)
+ * 1. Per-table env var (e.g. CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS)
+ * 2. Global default env var (CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS)
  * 3. Hardcoded default from TABLE_TTL_CONFIG
  */
 export function resolveHotDays(config: TableTTLEntry): number {
@@ -116,11 +116,11 @@ export function resolveHotDays(config: TableTTLEntry): number {
     return parseNonNegativeInt(perTable, config.envVar);
   }
 
-  const globalDefault = process.env.TIERED_STORAGE_DEFAULT_HOT_DAYS;
+  const globalDefault = process.env.CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS;
   if (globalDefault !== undefined && globalDefault !== "") {
     return parseNonNegativeInt(
       globalDefault,
-      "TIERED_STORAGE_DEFAULT_HOT_DAYS",
+      "CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS",
     );
   }
 
@@ -188,15 +188,10 @@ export async function reconcileTTL(
   options: ReconcileOptions = {},
 ): Promise<void> {
   // When called without an explicit connectionUrl (i.e. from production startup),
-  // respect the ENABLE_CLICKHOUSE feature gate — same as runMigrations.
+  // respect the CLICKHOUSE_COLD_STORAGE_ENABLED gate.
   // Direct callers (e.g. integration tests) pass connectionUrl explicitly to bypass.
-  if (!options.connectionUrl && process.env.ENABLE_CLICKHOUSE !== "true") {
-    logger.info("ENABLE_CLICKHOUSE is not set, skipping TTL reconciliation.");
-    return;
-  }
-
-  if (!options.connectionUrl && process.env.ENABLE_CLICKHOUSE_TTL !== "true") {
-    logger.info("ENABLE_CLICKHOUSE_TTL is not set, skipping TTL reconciliation.");
+  if (!options.connectionUrl && process.env.CLICKHOUSE_COLD_STORAGE_ENABLED !== "true") {
+    logger.info("CLICKHOUSE_COLD_STORAGE_ENABLED is not set, skipping TTL reconciliation.");
     return;
   }
 

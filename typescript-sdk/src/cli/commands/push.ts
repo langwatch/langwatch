@@ -15,6 +15,7 @@ import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
 import readline from "node:readline";
+import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 
 // Handle conflict resolution - show diff and ask user to choose
 const handleConflict = async (
@@ -269,7 +270,7 @@ export const pushPrompts = async ({
         )}`;
       } catch (error) {
         const errorMessage =
-          error instanceof Error ? error.message : "Unknown error";
+          formatApiErrorMessage({ error });
         result.errors.push({ name: promptName, error: errorMessage });
       }
     }
@@ -347,7 +348,7 @@ const printPushResults = ({
 
   if (result.errors.length > 0) {
     for (const { name, error } of result.errors) {
-      console.log(chalk.red(`✗ Failed ${chalk.cyan(name)}: ${error}`));
+      console.error(chalk.red(`✗ Failed ${chalk.cyan(name)}: ${error}`));
     }
   }
 
@@ -408,7 +409,7 @@ export const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?
       console.error(
         chalk.red(
           `Unexpected error: ${
-            error instanceof Error ? error.message : "Unknown error"
+            formatApiErrorMessage({ error })
           }`
         )
       );

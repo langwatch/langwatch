@@ -7,6 +7,7 @@ import {
   gqFastqActive,
   gqFastqPending,
   gqPendingGroups,
+  gqOldestPendingAgeMilliseconds,
 } from "./metrics";
 import type { DispatchResult, GroupStagingScripts } from "./scripts";
 
@@ -67,6 +68,36 @@ export class GroupQueueMetricsCollector {
       gqActiveGroups.set(
         { queue_name: this.params.queueName },
         this.params.activeJobCountFn(),
+      );
+
+      // Oldest pending age: readyKey scores are constant (1), so we need to
+      // check per-group job sets for the actual dispatchAfterMs timestamps.
+      // Sample up to 10 groups to avoid scanning all groups every collection.
+      const sampleGroups = await this.params.redisConnection.zrange(
+        readyKey,
+        0,
+        9,
+      );
+      let minDispatchAfterMs = Infinity;
+      for (const groupId of sampleGroups) {
+        const groupJobsKey = `${keyPrefix}group:${groupId}:jobs`;
+        const oldest = await this.params.redisConnection.zrange(
+          groupJobsKey,
+          0,
+          0,
+          "WITHSCORES",
+        );
+        if (oldest.length >= 2) {
+          const score = Number(oldest[1]);
+          if (score > 0 && score < minDispatchAfterMs) {
+            minDispatchAfterMs = score;
+          }
+        }
+      }
+      const age = minDispatchAfterMs === Infinity ? 0 : Math.max(0, Date.now() - minDispatchAfterMs);
+      gqOldestPendingAgeMilliseconds.set(
+        { queue_name: this.params.queueName },
+        age,
       );
     } catch (error) {
       this.params.logger.debug(

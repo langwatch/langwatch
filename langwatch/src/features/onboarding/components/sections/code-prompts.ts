@@ -38,23 +38,14 @@ Run:
 claude mcp add langwatch -- npx -y @langwatch/mcp-server --apiKey ASK_USER_FOR_LANGWATCH_API_KEY
 \`\`\`
 
-Or add to \`~/.claude.json\` or \`.mcp.json\` in the project:
-\`\`\`json
-{
-  "mcpServers": {
-    "langwatch": {
-      "command": "npx",
-      "args": ["-y", "@langwatch/mcp-server"],
-      "env": {
-        "LANGWATCH_API_KEY": "ASK_USER_FOR_LANGWATCH_API_KEY"
-      }
-    }
-  }
-}
-\`\`\`
+Or add an entry named \`langwatch\` under the \`mcpServers\` object of \`~/.claude.json\` or \`.mcp.json\` with these fields:
+- \`command\`: npx
+- \`args\`: -y, then the package name on a separate token
+- package to launch: the npm package \`@langwatch/mcp-server\` (scoped)
+- \`env.LANGWATCH_API_KEY\`: the user's LangWatch API key
 
 ## For other editors
-Add to your editor's MCP settings file using the JSON config above.
+Add the same \`mcpServers.langwatch\` entry to your editor's MCP settings file using the fields listed above.
 
 **Tip:** If \`LANGWATCH_API_KEY\` is already in the project's \`.env\` file, use that same key for the MCP configuration.
 

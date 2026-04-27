@@ -31,6 +31,7 @@ import { ColorfulBlockIcon } from "~/optimization_studio/components/ColorfulBloc
 import { transposeColumnsFirstToRowsFirstWithId } from "~/optimization_studio/utils/datasetUtils";
 import { VersionBadge } from "~/prompts/components/ui/VersionBadge";
 import { useLatestPromptVersion } from "~/prompts/hooks/useLatestPromptVersion";
+import { TARGET_MISSING_MAPPING_TOOLTIP } from "../../constants";
 import { useEvaluationsV3Store } from "../../hooks/useEvaluationsV3Store";
 import { useTargetName } from "../../hooks/useTargetName";
 import type { TargetConfig } from "../../types";
@@ -314,7 +315,7 @@ export const TargetHeader = memo(function TargetHeader({
             )}
             {hasMissingMappings && (
               <Tooltip
-                content="Missing variable mappings - Click to configure"
+                content={TARGET_MISSING_MAPPING_TOOLTIP}
                 positioning={{ placement: "top" }}
                 openDelay={0}
                 showArrow

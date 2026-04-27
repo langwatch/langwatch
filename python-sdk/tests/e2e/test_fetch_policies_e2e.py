@@ -15,7 +15,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 import contextlib
-import logging
 import subprocess
 import tempfile
 import time
@@ -29,8 +28,6 @@ import pytest
 import langwatch
 from langwatch.prompts.local_loader import LocalPromptLoader
 from langwatch.prompts.types import FetchPolicy
-
-logger = logging.getLogger(__name__)
 
 
 @contextlib.contextmanager
@@ -161,7 +158,7 @@ class TestFetchPoliciesE2E:
             assert calls["count"] == 0
 
     def test_materialized_first_falls_back_to_api_when_local_missing(
-        self, temp_workspace
+        self, prompt_factory, temp_workspace
     ):
         """
         Test MATERIALIZED_FIRST policy falls back to API when local missing.
@@ -178,36 +175,28 @@ class TestFetchPoliciesE2E:
             langwatch.setup(debug=True)
 
             # Create prompt on server
-            created_prompt = langwatch.prompts.create(
+            prompt_factory(
                 handle=handle,
                 prompt=prompt_content,
             )
 
-            try:
-                # Run the example with HTTP request counting
-                with http_request_counter() as calls:
-                    prompt = langwatch.prompts.get(
-                        handle
-                    )  # Uses default MATERIALIZED_FIRST
+            # Run the example with HTTP request counting
+            with http_request_counter() as calls:
+                prompt = langwatch.prompts.get(
+                    handle
+                )  # Uses default MATERIALIZED_FIRST
 
-                # Verify the prompt was returned correctly
-                assert prompt is not None
-                assert prompt.handle == handle
-                assert prompt_content in (prompt.prompt or "")
+            # Verify the prompt was returned correctly
+            assert prompt is not None
+            assert prompt.handle == handle
+            assert prompt_content in (prompt.prompt or "")
 
-                # Should have made at least one API call (since no local file exists)
-                assert calls["count"] > 0
+            # Should have made at least one API call (since no local file exists)
+            assert calls["count"] > 0
 
-            finally:
-                # Clean up
-                try:
-                    langwatch.prompts.delete(created_prompt.id)
-                except Exception as e:
-                    logger.warning(
-                        "Failed to delete prompt %s: %s", created_prompt.id, e
-                    )
-
-    def test_always_fetch_returns_server_prompt_and_hits_api(self, temp_workspace):
+    def test_always_fetch_returns_server_prompt_and_hits_api(
+        self, prompt_factory, temp_workspace
+    ):
         """
         Test ALWAYS_FETCH policy returns server prompt and calls API.
 
@@ -223,37 +212,27 @@ class TestFetchPoliciesE2E:
             langwatch.setup(debug=True)
 
             # Create prompt on server
-            created_prompt = langwatch.prompts.create(
+            prompt_factory(
                 handle=handle,
                 prompt=prompt_content,
             )
 
-            try:
-                # Run the example with HTTP request counting
-                with http_request_counter() as calls:
-                    prompt = langwatch.prompts.get(
-                        handle, fetch_policy=FetchPolicy.ALWAYS_FETCH
-                    )
+            # Run the example with HTTP request counting
+            with http_request_counter() as calls:
+                prompt = langwatch.prompts.get(
+                    handle, fetch_policy=FetchPolicy.ALWAYS_FETCH
+                )
 
-                # Verify the prompt was returned correctly
-                assert prompt is not None
-                assert prompt.handle == handle
-                assert prompt_content in (prompt.prompt or "")
+            # Verify the prompt was returned correctly
+            assert prompt is not None
+            assert prompt.handle == handle
+            assert prompt_content in (prompt.prompt or "")
 
-                # Should have made at least one API call
-                assert calls["count"] > 0
-
-            finally:
-                # Clean up
-                try:
-                    langwatch.prompts.delete(created_prompt.id)
-                except Exception as e:
-                    logger.warning(
-                        "Failed to delete prompt %s: %s", created_prompt.id, e
-                    )
+            # Should have made at least one API call
+            assert calls["count"] > 0
 
     def test_materialized_only_returns_local_prompt_without_api_call(
-        self, temp_workspace
+        self, prompt_factory, temp_workspace
     ):
         """
         Test MATERIALIZED_ONLY policy uses local files without API calls.
@@ -272,7 +251,7 @@ class TestFetchPoliciesE2E:
             langwatch.setup(debug=True)
 
             # Create prompt on server
-            server_prompt = langwatch.prompts.create(
+            server_prompt = prompt_factory(
                 handle=handle, prompt="Hello from MATERIALIZED_ONLY policy test"
             )
 
@@ -301,7 +280,9 @@ class TestFetchPoliciesE2E:
             # Should NOT have made any API calls
             assert calls["count"] == 0
 
-    def test_cache_ttl_caches_then_refreshes_after_expiry(self, temp_workspace):
+    def test_cache_ttl_caches_then_refreshes_after_expiry(
+        self, prompt_factory, temp_workspace
+    ):
         """
         Test CACHE_TTL policy caches responses and refreshes after TTL expiry.
 
@@ -317,46 +298,36 @@ class TestFetchPoliciesE2E:
             langwatch.setup(debug=True)
 
             # Create prompt on server
-            created_prompt = langwatch.prompts.create(
+            prompt_factory(
                 handle=handle,
                 prompt=prompt_content,
             )
 
-            try:
-                # First call - should hit API and cache
-                with http_request_counter() as calls_first:
-                    prompt1 = langwatch.prompts.get(
-                        handle,
-                        fetch_policy=FetchPolicy.CACHE_TTL,
-                        cache_ttl_minutes=0.0005,
-                    )  # Very short TTL
+            # First call - should hit API and cache
+            with http_request_counter() as calls_first:
+                prompt1 = langwatch.prompts.get(
+                    handle,
+                    fetch_policy=FetchPolicy.CACHE_TTL,
+                    cache_ttl_minutes=0.0005,
+                )  # Very short TTL
 
-                assert prompt1 is not None
-                assert calls_first["count"] > 0
+            assert prompt1 is not None
+            assert calls_first["count"] > 0
 
-                # Wait for cache to expire
-                time.sleep(0.1)  # 0.1 seconds > 0.03 seconds TTL
+            # Wait for cache to expire
+            time.sleep(0.1)  # 0.1 seconds > 0.03 seconds TTL
 
-                # Second call - cache expired, should hit API again
-                with http_request_counter() as calls_second:
-                    prompt2 = langwatch.prompts.get(
-                        handle,
-                        fetch_policy=FetchPolicy.CACHE_TTL,
-                        cache_ttl_minutes=0.0005,
-                    )
+            # Second call - cache expired, should hit API again
+            with http_request_counter() as calls_second:
+                prompt2 = langwatch.prompts.get(
+                    handle,
+                    fetch_policy=FetchPolicy.CACHE_TTL,
+                    cache_ttl_minutes=0.0005,
+                )
 
-                assert prompt2 is not None
-                assert calls_second["count"] > 0
+            assert prompt2 is not None
+            assert calls_second["count"] > 0
 
-                # Both prompts should be the same
-                assert prompt1.handle == prompt2.handle
-                assert prompt1.id == prompt2.id
-
-            finally:
-                # Clean up
-                try:
-                    langwatch.prompts.delete(created_prompt.id)
-                except Exception as e:
-                    logger.warning(
-                        "Failed to delete prompt %s: %s", created_prompt.id, e
-                    )
+            # Both prompts should be the same
+            assert prompt1.handle == prompt2.handle
+            assert prompt1.id == prompt2.id

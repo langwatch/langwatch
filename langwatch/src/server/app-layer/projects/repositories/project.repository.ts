@@ -13,11 +13,22 @@ export interface ProjectWithOrgAdmin {
   adminUserId: string | null;
 }
 
+export interface SearchProjectsResult {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface ProjectRepository {
   getById(id: string): Promise<Project | null>;
   getWithTeam(id: string): Promise<ProjectWithTeam | null>;
   updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void>;
   getWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
+  searchByQuery(params: {
+    query: string;
+    organizationId?: string;
+    limit?: number;
+  }): Promise<SearchProjectsResult[]>;
 }
 
 export class NullProjectRepository implements ProjectRepository {
@@ -35,5 +46,13 @@ export class NullProjectRepository implements ProjectRepository {
 
   async getWithOrgAdmin(_id: string): Promise<ProjectWithOrgAdmin | null> {
     return null;
+  }
+
+  async searchByQuery(_params: {
+    query: string;
+    organizationId?: string;
+    limit?: number;
+  }): Promise<SearchProjectsResult[]> {
+    return [];
   }
 }

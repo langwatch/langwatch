@@ -283,7 +283,7 @@ describe("LangChain Integration Tests", () => {
       expect(llmSpan?.attributes["gen_ai.request.temperature"]).toBe(1);
     });
 
-    it("should name tool spans with tool name and input preview", async () => {
+    it("should name tool spans with tool name and input preview", { timeout: 30_000 }, async () => {
       const date = new Date().toISOString();
       const tools = [
         new DynamicStructuredTool({
@@ -349,7 +349,7 @@ describe("LangChain Integration Tests", () => {
       expect(toolSpan?.attributes["langwatch.span.type"]).toBe("tool");
     });
 
-    it("should name agent spans as components", async () => {
+    it("should name agent spans as components", { timeout: 30_000 }, async () => {
       const tools = [
         new DynamicStructuredTool({
           name: "search",

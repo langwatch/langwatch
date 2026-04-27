@@ -101,6 +101,27 @@ describe("useSimulationUpdateListener()", () => {
     });
   });
 
+  describe("when filter is 'default' and payload has empty scenarioSetId", () => {
+    it("accepts the update by normalizing empty string to default", () => {
+      renderHook(() =>
+        useSimulationUpdateListener({
+          projectId: "proj_1",
+          refetch: refetchSpy,
+          filter: { scenarioSetId: "default" },
+        }),
+      );
+
+      act(() => {
+        simulateSSEEvent({
+          event: "simulation_updated",
+          scenarioSetId: "",
+        });
+      });
+
+      expect(refetchSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe("when an SSE event fires for a different scenarioSetId", () => {
     it("does not trigger refetch", () => {
       renderHook(() =>

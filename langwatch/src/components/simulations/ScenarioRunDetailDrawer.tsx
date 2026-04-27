@@ -15,6 +15,7 @@ import { RunScenarioModal } from "~/components/scenarios/RunScenarioModal";
 import { ScenarioFormDrawer } from "~/components/scenarios/ScenarioFormDrawer";
 import type { TargetValue } from "~/components/scenarios/TargetSelector";
 import { buildDisplayTitle } from "~/components/suites/run-history-transforms";
+import { useDejaViewLink } from "~/hooks/useDejaViewLink";
 import { useDrawer, useDrawerParams } from "~/hooks/useDrawer";
 import { useDrawerRunCallbacks } from "~/hooks/useDrawerRunCallbacks";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -26,6 +27,7 @@ import { useTargetNameMap } from "~/hooks/useTargetNameMap";
 import { api } from "~/utils/api";
 import { formatTimeAgo } from "~/utils/formatTimeAgo";
 import { TraceDetails } from "../traces/TraceDetails";
+import { Link } from "../ui/link";
 import { hasNoResults } from "./scenario-run-status.utils";
 import { Drawer } from "../ui/drawer";
 import { ScenarioMessageRenderer } from "./ScenarioMessageRenderer";
@@ -57,6 +59,10 @@ export function ScenarioRunDetailDrawer({
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
 
   const scenarioRunId = params.scenarioRunId;
+  const dejaView = useDejaViewLink({
+    aggregateId: scenarioRunId,
+    tenantId: project?.id,
+  });
 
   const { data: scenarioState, error: runStateError, refetch } = api.scenarios.getRunState.useQuery(
     {
@@ -222,8 +228,15 @@ export function ScenarioRunDetailDrawer({
             </Drawer.Body>
           )}
           {scenarioState && (
-            <VStack gap={0} h="100%" w="100%">
-              {/* Sticky header — matches trace details pattern */}
+              <Drawer.Body
+                paddingY={0}
+                paddingX={0}
+                overflowY="auto"
+                display="flex"
+                flexDirection="column"
+                width="full"
+              >
+              {/* Sticky header — inside scroll container for correct sticky behavior */}
               <VStack
                 w="100%"
                 gap={0}
@@ -262,6 +275,13 @@ export function ScenarioRunDetailDrawer({
                         <ExternalLink size={14} />
                         Open Thread
                       </Button>
+                    )}
+                    {dejaView.href && (
+                      <Link href={dejaView.href}>
+                        <Button colorPalette="gray" size="sm">
+                          DejaView
+                        </Button>
+                      </Link>
                     )}
                     <Drawer.CloseTrigger />
                   </HStack>
@@ -356,69 +376,60 @@ export function ScenarioRunDetailDrawer({
               </VStack>
 
               {/* Body — conversation on top, results on bottom */}
-              <Drawer.Body
-                paddingY={0}
-                paddingX={0}
-                overflowY="auto"
-                display="flex"
-                flexDirection="column"
+              {/* Conversation — hidden when empty (e.g. stalled runs) */}
+              {((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) && (
+                <Box
+                  paddingX={6}
+                  paddingY={6}
+                  background="bg.muted"
+                >
+                  <Box borderRadius="md" overflow="hidden">
+                    <ScenarioMessageRenderer
+                      messages={scenarioState.messages ?? []}
+                      streamingMessages={streamingMessages}
+                      variant="drawer"
+                    />
+                  </Box>
+                </Box>
+              )}
+
+              {/* Results */}
+              <Box
+                flex={1}
                 width="full"
+                borderTop={((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) ? "1px" : undefined}
+                borderColor="border.muted"
+                position="relative"
+                className="group"
+                css={{
+                  "& > div:first-child": { borderRadius: 0, minHeight: "100%", height: "100%" },
+                }}
               >
-                {/* Conversation — hidden when empty (e.g. stalled runs) */}
-                {((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) && (
+                <SimulationConsole
+                  results={scenarioState.results}
+                  scenarioName={scenarioState.name ?? undefined}
+                  status={scenarioState.status}
+                  durationInMs={scenarioState.durationInMs}
+                />
+                {scenarioState.results && (
                   <Box
-                    paddingX={6}
-                    paddingY={6}
-                    background="bg.muted"
+                    position="absolute"
+                    top={2}
+                    right={2}
+                    opacity={0}
+                    _groupHover={{ opacity: 1 }}
+                    transition="opacity 0.2s"
                   >
-                    <Box borderRadius="md" overflow="hidden">
-                      <ScenarioMessageRenderer
-                        messages={scenarioState.messages ?? []}
-                        streamingMessages={streamingMessages}
-                        variant="drawer"
-                      />
-                    </Box>
+                    <CopyButton
+                      value={formatResultsForCopy(
+                        scenarioState.results,
+                      )}
+                      label="Results"
+                    />
                   </Box>
                 )}
-
-                {/* Results */}
-                <Box
-                  flex={1}
-                  width="full"
-                  borderTop={((scenarioState.messages ?? []).length > 0 || (streamingMessages ?? []).length > 0) ? "1px" : undefined}
-                  borderColor="border.muted"
-                  position="relative"
-                  className="group"
-                  css={{
-                    "& > div:first-child": { borderRadius: 0, minHeight: "100%", height: "100%" },
-                  }}
-                >
-                  <SimulationConsole
-                    results={scenarioState.results}
-                    scenarioName={scenarioState.name ?? undefined}
-                    status={scenarioState.status}
-                    durationInMs={scenarioState.durationInMs}
-                  />
-                  {scenarioState.results && (
-                    <Box
-                      position="absolute"
-                      top={2}
-                      right={2}
-                      opacity={0}
-                      _groupHover={{ opacity: 1 }}
-                      transition="opacity 0.2s"
-                    >
-                      <CopyButton
-                        value={formatResultsForCopy(
-                          scenarioState.results,
-                        )}
-                        label="Results"
-                      />
-                    </Box>
-                  )}
-                </Box>
+              </Box>
               </Drawer.Body>
-            </VStack>
           )}
         </Drawer.Content>
       </Drawer.Root>

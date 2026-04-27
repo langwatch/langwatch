@@ -1,4 +1,4 @@
-name: Release Please
+name: release-please-sdks
 
 on:
   push:

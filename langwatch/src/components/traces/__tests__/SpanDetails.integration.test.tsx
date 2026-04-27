@@ -6,8 +6,10 @@
  *
  * @see specs/prompts/open-existing-prompt-from-trace.feature
  */
+import React from "react";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Project } from "@prisma/client";
 import type { Span } from "../../../server/tracer/types";
@@ -31,7 +33,7 @@ vi.mock(
   }),
 );
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: { project: "test-project" },
     push: vi.fn(),
@@ -40,7 +42,7 @@ vi.mock("next/router", () => ({
   }),
 }));
 
-vi.mock("next-auth/react", () => ({
+vi.mock("~/utils/auth-client", () => ({
   useSession: () => ({ data: { user: { id: "user-1" } }, status: "authenticated" }),
 }));
 
@@ -66,6 +68,20 @@ vi.mock("~/utils/api", () => ({
 }));
 
 const project = { id: "proj_1", slug: "test-project" } as Project;
+
+// Wrapper providing Router context (Link components need it), ChakraProvider,
+// and Suspense (needed for React.lazy components used by dynamic() compat)
+function TestWrapper({ children }: { children: React.ReactNode }) {
+  return (
+    <MemoryRouter>
+      <ChakraProvider value={defaultSystem}>
+        <React.Suspense fallback={<div>Loading...</div>}>
+          {children}
+        </React.Suspense>
+      </ChakraProvider>
+    </MemoryRouter>
+  );
+}
 
 function buildLLMSpan(overrides: Partial<Span> = {}): Span {
   return {
@@ -111,9 +127,9 @@ describe("<SpanDetails/>", () => {
       });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails project={project} span={span} />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const button = screen.getByRole("button", {
@@ -128,9 +144,9 @@ describe("<SpanDetails/>", () => {
       const span = buildLLMSpan({ params: null });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails project={project} span={span} />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const link = screen.getByRole("link", {
@@ -143,9 +159,9 @@ describe("<SpanDetails/>", () => {
       const span = buildLLMSpan({ params: null });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails project={project} span={span} />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       expect(mockBuildUrl).toHaveBeenCalledWith("span-123");
@@ -172,13 +188,13 @@ describe("<SpanDetails/>", () => {
       });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails
             project={project}
             span={llmSpan}
             allSpans={[parentSpan, llmSpan]}
           />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const button = screen.getByRole("button", {
@@ -212,13 +228,13 @@ describe("<SpanDetails/>", () => {
       });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails
             project={project}
             span={llmSpan}
             allSpans={[grandparent, parent, llmSpan]}
           />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const button = screen.getByRole("button", {
@@ -240,13 +256,13 @@ describe("<SpanDetails/>", () => {
       });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails
             project={project}
             span={llmSpan}
             allSpans={[parentSpan, llmSpan]}
           />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const link = screen.getByRole("link", {
@@ -256,18 +272,125 @@ describe("<SpanDetails/>", () => {
     });
   });
 
+  describe("when prompt reference is on a sibling span (not parent)", () => {
+    it("renders a dropdown menu trigger button", () => {
+      const parentSpan = buildLLMSpan({
+        span_id: "parent-span",
+        type: "span" as Span["type"],
+        params: null,
+      });
+      const siblingSpan = buildLLMSpan({
+        span_id: "sibling-span",
+        parent_id: "parent-span",
+        type: "span" as Span["type"],
+        timestamps: {
+          started_at: Date.now() - 2000,
+          finished_at: Date.now() - 1500,
+        },
+        params: {
+          langwatch: {
+            prompt: {
+              id: "team/sibling-prompt:2",
+            },
+          },
+        },
+      });
+      const llmSpan = buildLLMSpan({
+        span_id: "span-123",
+        parent_id: "parent-span",
+        params: null,
+      });
+
+      render(
+        <TestWrapper>
+          <SpanDetails
+            project={project}
+            span={llmSpan}
+            allSpans={[parentSpan, siblingSpan, llmSpan]}
+          />
+        </TestWrapper>,
+      );
+
+      const button = screen.getByRole("button", {
+        name: /Open in Prompts/i,
+      });
+      expect(button).toBeDefined();
+    });
+  });
+
   describe("when span is not an LLM type", () => {
     it("does not render any Open in Prompts button", () => {
       const span = buildLLMSpan({ type: "span" as Span["type"] });
 
       render(
-        <ChakraProvider value={defaultSystem}>
+        <TestWrapper>
           <SpanDetails project={project} span={span} />
-        </ChakraProvider>,
+        </TestWrapper>,
       );
 
       const buttons = screen.queryAllByText(/Open in Prompts/i);
       expect(buttons).toHaveLength(0);
+    });
+  });
+
+  describe("when span has a tagged prompt reference in params", () => {
+    it("renders a dropdown menu trigger button", () => {
+      const span = buildLLMSpan({
+        params: {
+          langwatch: {
+            prompt: {
+              id: "team/sample-prompt:production",
+            },
+          },
+        },
+      });
+
+      render(
+        <TestWrapper>
+          <SpanDetails project={project} span={span} />
+        </TestWrapper>,
+      );
+
+      const button = screen.getByRole("button", {
+        name: /Open in Prompts/i,
+      });
+      expect(button).toBeDefined();
+    });
+  });
+
+  describe("when tagged prompt reference is on parent span", () => {
+    it("renders a dropdown menu trigger button for tag-based ancestor reference", () => {
+      const parentSpan = buildLLMSpan({
+        span_id: "parent-span",
+        type: "span" as Span["type"],
+        params: {
+          langwatch: {
+            prompt: {
+              id: "team/sample-prompt:production",
+            },
+          },
+        },
+      });
+      const llmSpan = buildLLMSpan({
+        span_id: "span-123",
+        parent_id: "parent-span",
+        params: null,
+      });
+
+      render(
+        <TestWrapper>
+          <SpanDetails
+            project={project}
+            span={llmSpan}
+            allSpans={[parentSpan, llmSpan]}
+          />
+        </TestWrapper>,
+      );
+
+      const button = screen.getByRole("button", {
+        name: /Open in Prompts/i,
+      });
+      expect(button).toBeDefined();
     });
   });
 });

@@ -2,6 +2,7 @@ import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseCli
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import { NormalizedSpanKind } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
+import { SecurityError } from "~/server/event-sourcing/services/errorHandling";
 import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { mapNormalizedSpansToSpans } from "~/server/traces/mappers/span.mapper";
 import type { ElasticSearchEvent, Span } from "~/server/tracer/types";
@@ -208,6 +209,53 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
     }
   }
 
+  async insertSpans(spans: SpanInsertData[]): Promise<void> {
+    if (spans.length === 0) return;
+
+    for (const span of spans) {
+      EventUtils.validateTenantId(
+        { tenantId: span.tenantId },
+        "SpanStorageClickHouseRepository.insertSpans",
+      );
+    }
+
+    // Enforce that a single bulk insert only writes spans for one tenant —
+    // the client is resolved once from the first span's tenantId, so mixed
+    // batches would silently route another tenant's data through the wrong
+    // (possibly private) ClickHouse instance.
+    const tenantId = spans[0]!.tenantId;
+    for (const span of spans) {
+      if (span.tenantId !== tenantId) {
+        throw new SecurityError(
+          "SpanStorageClickHouseRepository.insertSpans",
+          "all spans in a single batch must share the same tenantId",
+          tenantId,
+          { mismatchedTenantId: span.tenantId },
+        );
+      }
+    }
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      const records = spans.map((span) => this.toClickHouseRecord(span));
+      await client.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      logger.error(
+        {
+          count: spans.length,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to bulk insert spans into ClickHouse",
+      );
+      throw error;
+    }
+  }
+
   async getSpansByTraceId({ tenantId, traceId }: { tenantId: string; traceId: string }): Promise<Span[]> {
     EventUtils.validateTenantId(
       { tenantId },
@@ -243,14 +291,16 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             \`Links.TraceId\` AS Links_TraceId,
             \`Links.SpanId\` AS Links_SpanId,
             \`Links.Attributes\` AS Links_Attributes
-          FROM (
-            SELECT *
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-            ORDER BY SpanId ASC, StartTime DESC
-            LIMIT 1 BY TenantId, TraceId, SpanId
-          )
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+            AND (TenantId, TraceId, SpanId, StartTime) IN (
+              SELECT TenantId, TraceId, SpanId, max(StartTime)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+              GROUP BY TenantId, TraceId, SpanId
+            )
           ORDER BY StartTime ASC
         `,
         query_params: { tenantId, traceId },
@@ -354,14 +404,16 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
             toUnixTimestamp64Milli(event_timestamp) AS started_at,
             event_name AS event_type,
             event_attrs AS attributes
-          FROM (
-            SELECT *
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId = {traceId:String}
-            ORDER BY SpanId ASC, StartTime DESC
-            LIMIT 1 BY TenantId, TraceId, SpanId
-          )
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND TraceId = {traceId:String}
+            AND (TenantId, TraceId, SpanId, StartTime) IN (
+              SELECT TenantId, TraceId, SpanId, max(StartTime)
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId = {traceId:String}
+              GROUP BY TenantId, TraceId, SpanId
+            )
           ARRAY JOIN
             "Events.Timestamp" AS event_timestamp,
             "Events.Name" AS event_name,

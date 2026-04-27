@@ -208,7 +208,7 @@ export function applyRAGAttributes(span: Span, spanName: string): SpanGeneratorR
     'langwatch.span.type': 'rag',
     'langwatch.input': JSON.stringify(input),
     'langwatch.output': JSON.stringify(output),
-    'langwatch.contexts': JSON.stringify(contexts),
+    'langwatch.rag.contexts': JSON.stringify(contexts),
     'rag.retriever': 'vector_store',
     'rag.top_k': contexts.length,
   });

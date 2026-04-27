@@ -3,7 +3,7 @@ import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import { ChevronLeft, ChevronRight } from "lucide-react"; // Changed from react-feather
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { AppRouter } from "../server/api/root";
 

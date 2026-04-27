@@ -9,6 +9,7 @@ import type { MapProjectionDefinition } from "../projections/mapProjection.types
 import type { ProjectionRegistry } from "../projections/projectionRegistry";
 import type { EventSourcedQueueProcessor } from "../queues";
 import type { ReactorDefinition } from "../reactors/reactor.types";
+import type { ReplayMarkerChecker } from "../projections/replayMarkerCheck";
 import type { EventStore } from "../stores/eventStore.types";
 import type { CommandHandlerOptions } from "./commands/commandDispatcher";
 import type { JobRegistryEntry } from "./queues/queueManager";
@@ -99,4 +100,10 @@ export interface EventSourcingServiceOptions<
    * "worker" | undefined: start all consumers
    */
   processRole?: ProcessRole;
+  /**
+   * Optional replay marker checker for coordinating with projection-replay.
+   * When provided, fold projections check for active replay markers before
+   * processing events, deferring or skipping as needed.
+   */
+  replayMarkerChecker?: ReplayMarkerChecker;
 }

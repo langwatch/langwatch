@@ -1,0 +1,127 @@
+---
+title: Capturing Metadata and Attributes
+sidebarTitle: TypeScript/JS
+description: Learn how to enrich your traces and spans with custom metadata and attributes using the LangWatch TypeScript SDK.
+icon: square-js
+keywords: langwatch, typescript, javascript, metadata, attributes, tracing, spans, traces
+---
+
+Metadata and attributes are key-value pairs that allow you to add custom contextual information to your traces and spans. This enrichment is invaluable for debugging, analysis, filtering, and gaining deeper insights into your LLM application's behavior.
+
+In the TypeScript SDK, all metadata is captured through **span attributes**. You can set attributes on any span to provide context for that operation or the entire trace.
+
+<Note>
+  For a comprehensive reference of all available attributes and semantic conventions, see the [Semantic Conventions guide](/integration/typescript/tutorials/semantic-conventions).
+</Note>
+
+## Setting Attributes
+
+Use `setAttributes()` on any span to attach metadata. For trace-level context, set attributes on the root span:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch";
+
+setupObservability();
+
+const tracer = getLangWatchTracer("my-service");
+
+async function handleMessage(userId: string, message: string) {
+  return await tracer.withActiveSpan("HandleMessage", async (span) => {
+    span.setAttributes({
+      "langwatch.user.id": userId,
+      "app.version": "1.0.0",
+    });
+
+    // your application logic here...
+
+    // add more attributes as context becomes available
+    span.setAttributes({
+      "query.language": "en",
+      "processing.completed": true,
+    });
+
+    return result;
+  });
+}
+```
+
+You can also use typed attribute constants:
+
+```typescript
+import { attributes } from "langwatch";
+
+span.setAttributes({
+  [attributes.ATTR_LANGWATCH_USER_ID]: userId,
+  [attributes.ATTR_LANGWATCH_THREAD_ID]: threadId,
+});
+```
+
+### Common Attributes
+
+*   **User and session**: `langwatch.user.id`, `langwatch.thread.id` - see [Tracking Conversations](/integration/typescript/tutorials/tracking-conversations)
+*   **Application context**: `app.version`, `environment`, `region`
+*   **LLM operations**: `gen_ai.request.model`, `gen_ai.request.temperature`
+*   **Custom business logic**: `customer.tier`, `feature.flags`
+
+### Setting Attributes on Child Spans
+
+You can set attributes on any span in your trace hierarchy:
+
+```typescript
+async function processWithChildSpans() {
+  return await tracer.withActiveSpan("ParentOperation", async (parentSpan) => {
+    parentSpan.setAttributes({
+      "operation.type": "batch_processing",
+      "batch.size": 100,
+    });
+
+    await tracer.withActiveSpan("ChildOperation", async (childSpan) => {
+      childSpan.setAttributes({
+        "child.operation": "data_validation",
+        "validation.rules": 5,
+      });
+
+      // ... logic for child operation ...
+
+      childSpan.setAttributes({
+        "validation.passed": true,
+        "items.processed": 95,
+      });
+    });
+  });
+}
+```
+
+## Adding Labels to Traces
+
+Labels allow you to organize, filter, and categorize your traces in the LangWatch dashboard:
+
+```typescript
+async function handleRequest(userId: string, requestType: string) {
+  return await tracer.withActiveSpan("UserRequest", async (span) => {
+    if (requestType === "support") {
+      span.setAttributes({
+        "langwatch.labels": JSON.stringify(["customer_support", "high_priority"]),
+      });
+    } else if (requestType === "sales") {
+      span.setAttributes({
+        "langwatch.labels": JSON.stringify(["sales_inquiry"]),
+      });
+    }
+
+    // process the request...
+  });
+}
+```
+
+## Viewing in LangWatch
+
+All captured span attributes will be visible in the LangWatch UI:
+- **Root span attributes** are displayed in the trace details view, providing an overview of the entire operation
+- **Child span attributes** are shown when you inspect individual spans within a trace
+
+This rich contextual data allows you to:
+- **Filter and search** for traces and spans based on specific attribute values
+- **Analyze performance** by correlating metrics with different attributes
+- **Debug issues** by quickly understanding the context and parameters of a failed or slow operation

@@ -1,10 +1,14 @@
 import { createLogger } from "../../../../utils/logger/server";
-import { getLLMModelCosts } from "../../../modelProviders/llmModelCost";
+import {
+  getLLMModelCosts,
+  type MaybeStoredLLMModelCost,
+} from "../../../modelProviders/llmModelCost";
+import { SYNTHETIC_SPAN_NAMES } from "../../../tracer/constants";
 import type { LLMSpan, Span, Trace } from "../../../tracer/types";
 import { typedValueToText } from "./common";
 import {
   estimateCost,
-  matchingLLMModelCost,
+  matchModelCostWithFallbacks,
   tokenizeAndEstimateCost,
 } from "./cost";
 
@@ -25,6 +29,10 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
   let totalCost: number | null = null;
 
   (spans ?? []).forEach((span) => {
+    if (span.name != null && SYNTHETIC_SPAN_NAMES.has(span.name)) {
+      return;
+    }
+
     if (
       earliestStartedAt === null ||
       span.timestamps.started_at < earliestStartedAt
@@ -124,7 +132,14 @@ export const computeTraceMetrics = (spans: Span[]): Trace["metrics"] => {
   };
 };
 
-// TODO: test
+// Fallback tokenizer used when no model cost match is found.
+// gpt-4o is the most common tokenizer and a reasonable approximation for unknown models.
+const FALLBACK_TOKENIZER: MaybeStoredLLMModelCost = {
+  projectId: "",
+  model: "gpt-4o",
+  regex: "^gpt-4o$",
+};
+
 export const addLLMTokensCount = async (projectId: string, spans: Span[]) => {
   const llmModelCosts = await getLLMModelCosts({ projectId });
 
@@ -132,42 +147,43 @@ export const addLLMTokensCount = async (projectId: string, spans: Span[]) => {
     if (span.type == "llm") {
       const llmSpan = span as LLMSpan;
       const llmModelCost =
-        llmSpan.model && matchingLLMModelCost(llmSpan.model, llmModelCosts);
+        llmSpan.model && matchModelCostWithFallbacks(llmSpan.model, llmModelCosts);
 
       if (!llmSpan.metrics) {
         llmSpan.metrics = {};
       }
+
+      // Always tokenize — use matched model cost if found, otherwise fall back to gpt-4o.
+      // Cost is only set when a real model match exists (no made-up pricing for unknown models).
+      const tokenizerModel = llmModelCost || FALLBACK_TOKENIZER;
+
       if (
         llmSpan.input &&
-        llmModelCost &&
         (llmSpan.metrics.prompt_tokens === undefined ||
           llmSpan.metrics.prompt_tokens === null)
       ) {
-        llmSpan.metrics.prompt_tokens = (
-          await tokenizeAndEstimateCost({
-            llmModelCost,
-            input: typedValueToText(llmSpan.input),
-          })
-        ).inputTokens;
-        llmSpan.metrics.tokens_estimated = true;
-      }
-      if (
-        llmSpan.output &&
-        llmModelCost &&
-        (llmSpan.metrics.completion_tokens === undefined ||
-          llmSpan.metrics.completion_tokens === null)
-      ) {
-        let outputTokens = 0;
-        outputTokens += (
-          await tokenizeAndEstimateCost({
-            llmModelCost,
-            output: typedValueToText(llmSpan.output),
-          })
-        ).outputTokens;
-        llmSpan.metrics.completion_tokens = outputTokens;
+        const tokenResult = await tokenizeAndEstimateCost({
+          llmModelCost: tokenizerModel,
+          input: typedValueToText(llmSpan.input),
+        });
+        llmSpan.metrics.prompt_tokens = tokenResult.inputTokens;
         llmSpan.metrics.tokens_estimated = true;
       }
 
+      if (
+        llmSpan.output &&
+        (llmSpan.metrics.completion_tokens === undefined ||
+          llmSpan.metrics.completion_tokens === null)
+      ) {
+        const tokenResult = await tokenizeAndEstimateCost({
+          llmModelCost: tokenizerModel,
+          output: typedValueToText(llmSpan.output),
+        });
+        llmSpan.metrics.completion_tokens = tokenResult.outputTokens;
+        llmSpan.metrics.tokens_estimated = true;
+      }
+
+      // Cost only set when a real model cost was matched (no made-up pricing)
       if (llmModelCost) {
         llmSpan.metrics.cost = estimateCost({
           llmModelCost,

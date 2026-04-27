@@ -243,8 +243,8 @@ export const EvaluatorMappingAccordion = ({
                         titles={
                           dataSource !== "from_production" &&
                           datasetFields.length > 0
-                            ? ["Dataset", "Thread", "Evaluator"]
-                            : ["Thread", "Evaluator"]
+                            ? ["Dataset", "Current Thread", "Evaluator"]
+                            : ["Current Thread", "Evaluator"]
                         }
                         traces={tracesToUse}
                         threadMapping={threadMappings}
@@ -276,9 +276,9 @@ export const EvaluatorMappingAccordion = ({
                           task == "real_time" &&
                           dataSource !== "from_production" &&
                           datasetFields.length > 0
-                            ? ["Dataset", "Trace", "Evaluator"]
+                            ? ["Dataset", "Current Trace", "Evaluator"]
                             : task == "real_time"
-                              ? ["Trace", "Evaluator"]
+                              ? ["Current Trace", "Evaluator"]
                               : ["Data", "Evaluator"]
                         }
                         targetFields={targetFields}

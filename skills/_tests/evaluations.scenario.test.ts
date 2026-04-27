@@ -10,6 +10,9 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  assertSkillWasRead,
+  installSkillToWorkDir,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -22,17 +25,7 @@ const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
 
 function copySkillToWorkDir(tempFolder: string) {
-  const skillDir = path.join(tempFolder, ".skills", "evaluations");
-  fs.mkdirSync(skillDir, { recursive: true });
-  fs.copyFileSync(
-    path.resolve(__dirname, "../evaluations/SKILL.md"),
-    path.join(skillDir, "SKILL.md")
-  );
-  const sharedDir = path.join(skillDir, "_shared");
-  fs.mkdirSync(sharedDir, { recursive: true });
-  execSync(
-    `cp -r ${path.resolve(__dirname, "../_shared")}/* ${sharedDir}/`
-  );
+  installSkillToWorkDir({ workingDirectory: tempFolder, skillSubpath: "evaluations" });
 }
 
 function findNewPythonFiles(dir: string, excludeNames: string[] = ["main.py"]): string[] {
@@ -73,6 +66,7 @@ describe("Evaluations Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python OpenAI evaluation experiment",
         description:
           "Creating an evaluation experiment for a Python OpenAI chatbot that replies with tweet-like responses and emojis.",
@@ -89,11 +83,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my agent using langwatch.experiment SDK (not scenario tests), short and sweet, no need to run it. IMPORTANT: read my agent code first to understand what it does and generate a dataset that matches its actual purpose."
+            "create a batch evaluation experiment for my agent using langwatch.experiment SDK (not scenario tests). Read my agent code first to understand what it does and generate a dataset that matches its actual purpose."
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
 
             const newFiles = findNewPythonFiles(tempFolder);
             expect(
@@ -120,7 +115,7 @@ describe("Evaluations Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -136,6 +131,7 @@ describe("Evaluations Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "TypeScript Vercel AI evaluation experiment",
         description:
           "Creating an evaluation experiment for a TypeScript Vercel AI chatbot.",
@@ -152,11 +148,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my agent using langwatch experiments SDK, short and sweet, no need to run it"
+            "create a batch evaluation experiment for my agent using langwatch experiments SDK"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
             // Find new TypeScript files (not index.ts)
             const files = fs
               .readdirSync(tempFolder)
@@ -178,7 +175,7 @@ describe("Evaluations Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -193,6 +190,7 @@ describe("Evaluations Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Python LangGraph evaluation experiment",
         description:
           "Creating an evaluation experiment for a Python LangGraph agent.",
@@ -209,11 +207,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my agent using langwatch.experiment SDK, short and sweet, no need to run it"
+            "create a batch evaluation experiment for my agent using langwatch.experiment SDK"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
             const newFiles = findNewPythonFiles(tempFolder);
             expect(
               newFiles.length,
@@ -229,7 +228,7 @@ describe("Evaluations Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -244,6 +243,7 @@ describe("Evaluations Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Targeted RAG faithfulness evaluation",
         description:
           "Adding a specific evaluation for checking if the agent's responses are faithful to the context provided.",
@@ -260,11 +260,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create an evaluation that checks if my agent hallucinates or makes up information, use langwatch experiments SDK with a faithfulness evaluator, short and sweet, no need to run it"
+            "create an evaluation that checks if my agent hallucinates, use langwatch experiments SDK with a faithfulness evaluator"
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
             const newFiles = findNewPythonFiles(tempFolder);
             expect(newFiles.length).toBeGreaterThan(0);
             const content = newFiles
@@ -277,7 +278,7 @@ describe("Evaluations Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 
   it.skipIf(isCI)(
@@ -292,6 +293,7 @@ describe("Evaluations Skill", () => {
       copySkillToWorkDir(tempFolder);
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "RAG agent domain-specific evaluation",
         description:
           "Creating an evaluation experiment for a TerraVerde farm advisory RAG agent.",
@@ -308,11 +310,12 @@ describe("Evaluations Skill", () => {
         ],
         script: [
           scenario.user(
-            "create a batch evaluation experiment for my farm advisory RAG agent. Read the codebase to understand the knowledge base and domain. Generate a dataset with realistic agronomic questions. Use langwatch.experiment SDK, no need to run it."
+            "create a batch evaluation experiment for my farm advisory RAG agent. Read the codebase to understand the knowledge base and domain. Generate a dataset with realistic agronomic questions. Use langwatch.experiment SDK."
           ),
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "evaluations");
             const newFiles = findNewPythonFiles(tempFolder);
             expect(newFiles.length).toBeGreaterThan(0);
             const content = newFiles
@@ -342,6 +345,6 @@ describe("Evaluations Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 });

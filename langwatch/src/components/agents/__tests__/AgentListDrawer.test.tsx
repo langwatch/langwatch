@@ -9,7 +9,7 @@ import { api } from "~/utils/api";
 import { AgentListDrawer } from "../AgentListDrawer";
 
 // Mock dependencies
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     push: vi.fn(),
     query: {},

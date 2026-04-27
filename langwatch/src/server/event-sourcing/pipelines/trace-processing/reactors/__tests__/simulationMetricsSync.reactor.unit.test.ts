@@ -11,10 +11,10 @@ import type { SpanReceivedEvent } from "../../schemas/events";
 const TEST_TENANT_ID = createTenantId("tenant-1");
 
 function createDeps(): SimulationMetricsSyncReactorDeps & {
-  updateRunMetrics: ReturnType<typeof vi.fn>;
+  computeRunMetrics: ReturnType<typeof vi.fn>;
 } {
   return {
-    updateRunMetrics: vi.fn().mockResolvedValue(undefined),
+    computeRunMetrics: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -42,11 +42,12 @@ function createTraceSummaryState(overrides: Partial<TraceSummaryData> = {}): Tra
     blockedByGuardrail: false,
     topicId: null,
     subTopicId: null,
-    hasAnnotation: null,
+    annotationIds: [],
     attributes: {},
     scenarioRoleCosts: { Agent: 0.001 },
     scenarioRoleLatencies: { Agent: 500 },
     scenarioRoleSpans: {},
+    lastEventOccurredAt: 0,
     occurredAt: 1000,
     createdAt: 1000,
     updatedAt: 2000,
@@ -77,9 +78,21 @@ function createSpanReceivedEvent(): SpanReceivedEvent {
   };
 }
 
-describe("simulationMetricsSync reactor (trace-side)", () => {
+describe("simulationMetricsSync reactor (trace-side ECST publisher)", () => {
+  describe("when reactor is created", () => {
+    it("has dedup options with makeJobId, ttl, and delay", () => {
+      const deps = createDeps();
+      const reactor = createSimulationMetricsSyncReactor(deps);
+
+      expect(reactor.options).toBeDefined();
+      expect(reactor.options?.makeJobId).toBeTypeOf("function");
+      expect(reactor.options?.ttl).toBe(60_000);
+      expect(reactor.options?.delay).toBe(60_000);
+    });
+  });
+
   describe("when trace has scenario.run_id attribute", () => {
-    it("dispatches updateRunMetrics with role costs and latencies", async () => {
+    it("dispatches computeRunMetrics with ECST payload", async () => {
       const deps = createDeps();
       const reactor = createSimulationMetricsSyncReactor(deps);
 
@@ -96,13 +109,16 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
         foldState,
       });
 
-      expect(deps.updateRunMetrics).toHaveBeenCalledWith({
+      expect(deps.computeRunMetrics).toHaveBeenCalledWith({
         tenantId: TEST_TENANT_ID,
         scenarioRunId: "run-1",
         traceId: "trace-1",
-        totalCost: 0.001,
-        roleCosts: { Agent: 0.001 },
-        roleLatencies: { Agent: 500 },
+        metrics: {
+          totalCost: 0.001,
+          roleCosts: { Agent: 0.001 },
+          roleLatencies: { Agent: 500 },
+        },
+        retryCount: 0,
         occurredAt: expect.any(Number),
       });
     });
@@ -123,7 +139,7 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
         foldState,
       });
 
-      expect(deps.updateRunMetrics).not.toHaveBeenCalled();
+      expect(deps.computeRunMetrics).not.toHaveBeenCalled();
     });
   });
 
@@ -145,14 +161,14 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
         foldState,
       });
 
-      expect(deps.updateRunMetrics).not.toHaveBeenCalled();
+      expect(deps.computeRunMetrics).not.toHaveBeenCalled();
     });
   });
 
-  describe("when updateRunMetrics fails", () => {
+  describe("when computeRunMetrics fails", () => {
     it("logs warning and does not throw", async () => {
       const deps = createDeps();
-      deps.updateRunMetrics.mockRejectedValue(new Error("Dispatch error"));
+      deps.computeRunMetrics.mockRejectedValue(new Error("Dispatch error"));
       const reactor = createSimulationMetricsSyncReactor(deps);
 
       const foldState = createTraceSummaryState({
@@ -172,7 +188,7 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
   });
 
   describe("when totalCost is zero but scenarioRoleCosts exist", () => {
-    it("dispatches updateRunMetrics", async () => {
+    it("dispatches computeRunMetrics", async () => {
       const deps = createDeps();
       const reactor = createSimulationMetricsSyncReactor(deps);
 
@@ -190,7 +206,7 @@ describe("simulationMetricsSync reactor (trace-side)", () => {
       });
 
       // scenarioRoleCosts has an entry, even though value is 0, so dispatch happens
-      expect(deps.updateRunMetrics).toHaveBeenCalledTimes(1);
+      expect(deps.computeRunMetrics).toHaveBeenCalledTimes(1);
     });
   });
 });

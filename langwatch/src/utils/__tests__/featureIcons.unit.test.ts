@@ -12,8 +12,8 @@ describe("featureIcons", () => {
   });
 
   describe("when the simulation runs feature icon configuration is read", () => {
-    it("has label 'Run History'", () => {
-      expect(featureIcons.simulation_runs.label).toBe("Run History");
+    it("has label 'Runs'", () => {
+      expect(featureIcons.simulation_runs.label).toBe("Runs");
     });
   });
 });

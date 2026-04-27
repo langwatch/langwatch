@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.event_log
     INDEX idx_tenant_aggregate_event_id (TenantId, AggregateType, AggregateId, EventId) TYPE bloom_filter(0.001) GRANULARITY 1
 )
 ENGINE = ${CLICKHOUSE_ENGINE_REPLACING_PREFIX:-ReplacingMergeTree(}EventTimestamp)
-PARTITION BY (AggregateType, toYearWeek(toDateTime64(EventOccurredAt / 1000, 3)))
+PARTITION BY toYearWeek(toDateTime64(EventOccurredAt / 1000, 3))
 ORDER BY (TenantId, AggregateType, AggregateId, IdempotencyKey)
 SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd

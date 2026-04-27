@@ -5,6 +5,7 @@ import time
 import warnings
 import dspy
 from typing import Callable, List, Optional, Any, Type, Union
+from langwatch.utils.auth import build_auth_headers
 from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import SerializableWithStringFallback, truncate_object_recursively
 from langwatch.utils.utils import safe_get
@@ -179,7 +180,7 @@ class LangWatchDSPy:
         try:
             response = httpx.post(
                 f"{langwatch.get_endpoint()}/api/experiment/init",
-                headers={"X-Auth-Token": langwatch.get_api_key() or ""},
+                headers=build_auth_headers(langwatch.get_api_key() or ""),
                 json={
                     "experiment_slug": slug or experiment,
                     "experiment_type": "DSPY",
@@ -382,7 +383,7 @@ class LangWatchDSPy:
         response = httpx.post(
             f"{langwatch.get_endpoint()}/api/dspy/log_steps",
             headers={
-                "X-Auth-Token": langwatch.get_api_key() or "",
+                **build_auth_headers(langwatch.get_api_key() or ""),
                 "Content-Type": "application/json",
             },
             data=json.dumps(data),  # type: ignore

@@ -59,4 +59,12 @@ export class SpanAppendStore implements AppendStore<NormalizedSpan> {
   ): Promise<void> {
     await this.repo.insertSpan(toAppLayer(record));
   }
+
+  async bulkAppend(
+    records: NormalizedSpan[],
+    _context: ProjectionStoreContext,
+  ): Promise<void> {
+    if (records.length === 0) return;
+    await this.repo.insertSpans(records.map(toAppLayer));
+  }
 }

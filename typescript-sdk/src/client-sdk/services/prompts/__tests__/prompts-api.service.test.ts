@@ -1,8 +1,162 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PromptsApiService } from "../prompts-api.service";
 import { PromptsApiError } from "../errors";
 import { mock } from "vitest-mock-extended";
 import type { InternalConfig } from "@/client-sdk/types";
+import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
+import type { LangwatchApiClient } from "@/internal/api/client";
+
+describe("PromptsApiService.renameTag", () => {
+  let service: PromptsApiService;
+  let mockPut: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    mockPut = vi.fn();
+    const apiClient = {
+      PUT: mockPut,
+    } as unknown as LangwatchApiClient;
+    service = new PromptsApiService({
+      langwatchApiClient: apiClient,
+      logger: mock(),
+    } as InternalConfig);
+  });
+
+  it("calls PUT /api/prompts/tags/{tag} with new name", async () => {
+    mockPut.mockResolvedValue({ data: undefined, error: undefined });
+    await service.renameTag({ tag: "old-name", name: "new-name" });
+    expect(mockPut).toHaveBeenCalledWith(
+      "/api/prompts/tags/{tag}",
+      expect.objectContaining({
+        params: expect.objectContaining({ path: { tag: "old-name" } }),
+        body: { name: "new-name" },
+      }),
+    );
+  });
+
+  describe("when the API returns an error", () => {
+    it("throws PromptsApiError", async () => {
+      mockPut.mockResolvedValue({ data: undefined, error: "tag not found" });
+      await expect(service.renameTag({ tag: "old-name", name: "new-name" })).rejects.toThrow(PromptsApiError);
+    });
+  });
+});
+
+describe("PromptsApiService.get", () => {
+  let service: PromptsApiService;
+  let mockGet: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    mockGet = vi.fn();
+    const apiClient = {
+      GET: mockGet,
+    } as unknown as LangwatchApiClient;
+    service = new PromptsApiService({
+      langwatchApiClient: apiClient,
+      logger: mock(),
+    } as InternalConfig);
+  });
+
+  describe("when fetching with a tag", () => {
+    it("passes tag as query parameter to the API", async () => {
+      const mockPrompt = promptResponseFactory.build();
+      mockGet.mockResolvedValue({ data: mockPrompt, error: undefined });
+
+      await service.get("pizza-prompt", { tag: "production" });
+
+      expect(mockGet).toHaveBeenCalledWith(
+        "/api/prompts/{id}",
+        expect.objectContaining({
+          params: expect.objectContaining({
+            path: { id: "pizza-prompt" },
+            query: expect.objectContaining({ tag: "production" }),
+          }),
+        }),
+      );
+    });
+
+    it("passes both tag and version to the API when both provided", async () => {
+      const mockPrompt = promptResponseFactory.build();
+      mockGet.mockResolvedValue({ data: mockPrompt, error: undefined });
+
+      await service.get("pizza-prompt", { tag: "production", version: "3" });
+
+      expect(mockGet).toHaveBeenCalledWith(
+        "/api/prompts/{id}",
+        expect.objectContaining({
+          params: expect.objectContaining({
+            path: { id: "pizza-prompt" },
+            query: expect.objectContaining({ tag: "production", version: 3 }),
+          }),
+        }),
+      );
+    });
+  });
+});
+
+describe("PromptsApiService.sync", () => {
+  let service: PromptsApiService;
+  let mockPost: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    mockPost = vi.fn();
+    const apiClient = {
+      POST: mockPost,
+    } as unknown as LangwatchApiClient;
+    service = new PromptsApiService({
+      langwatchApiClient: apiClient,
+      logger: mock(),
+    } as InternalConfig);
+  });
+
+  const syncArgs = {
+    name: "x",
+    configData: { handle: "x" } as any,
+    localVersion: 1,
+    commitMessage: "test",
+  };
+
+  describe("when the server returns a valid payload", () => {
+    it("parses and returns the sync result", async () => {
+      mockPost.mockResolvedValue({
+        data: { action: "up_to_date" },
+        error: undefined,
+      });
+
+      const result = await service.sync(syncArgs);
+
+      expect(result.action).toBe("up_to_date");
+    });
+  });
+
+  describe("when the server returns a malformed 2xx payload", () => {
+    it("throws PromptsApiError instead of letting undefined fields leak downstream", async () => {
+      mockPost.mockResolvedValue({
+        data: { action: undefined },
+        error: undefined,
+      });
+
+      await expect(service.sync(syncArgs)).rejects.toThrow(PromptsApiError);
+      await expect(service.sync(syncArgs)).rejects.toThrow(
+        /invalid response body/,
+      );
+    });
+
+    it("throws PromptsApiError when data is missing entirely", async () => {
+      mockPost.mockResolvedValue({ data: undefined, error: undefined });
+
+      await expect(service.sync(syncArgs)).rejects.toThrow(PromptsApiError);
+    });
+
+    it("throws PromptsApiError when action is an unknown enum value", async () => {
+      mockPost.mockResolvedValue({
+        data: { action: "exploded" },
+        error: undefined,
+      });
+
+      await expect(service.sync(syncArgs)).rejects.toThrow(PromptsApiError);
+    });
+  });
+});
 
 describe("PromptsApiService.handleApiError", () => {
   let service: PromptsApiService;

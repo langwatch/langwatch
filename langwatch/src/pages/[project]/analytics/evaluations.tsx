@@ -9,7 +9,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { BarChart2 } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback } from "react";
 import qs from "qs";
 import {
@@ -29,6 +29,41 @@ import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluato
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
 const ONE_DAY = MINUTES_IN_DAY;
 
+const aggregateHealthSummary: CustomGraphInput = {
+  graphId: "evaluationsHealthSummary",
+  graphType: "summary",
+  series: [
+    {
+      name: "Total evaluation runs",
+      metric: "evaluations.evaluation_runs",
+      aggregation: "cardinality",
+      key: "",
+      colorSet: "tealTones",
+    },
+  ],
+  includePrevious: true,
+  timeScale: ONE_DAY,
+  height: 200,
+};
+
+const aggregatePassFailTrend: CustomGraphInput = {
+  graphId: "evaluationsPassFailTrend",
+  graphType: "stacked_bar",
+  series: [
+    {
+      name: "Evaluations",
+      metric: "evaluations.evaluation_runs",
+      aggregation: "cardinality",
+      key: "",
+      colorSet: "positiveNegativeNeutral",
+    },
+  ],
+  groupBy: "evaluations.evaluation_passed",
+  includePrevious: false,
+  timeScale: ONE_DAY,
+  height: 200,
+};
+
 const renderGridItems = (
   checks: any,
   onGraphClick: (params: {
@@ -44,6 +79,7 @@ const renderGridItems = (
   return checks.map((check: any) => {
     let checksAverage = {};
     let checksSummary = {};
+    let passRateTrend: CustomGraphInput | null = null;
     const traceCheck = getEvaluatorDefinitions(check.checkType);
 
     const isCategoryEvaluator = check.checkType === "langevals/llm_category";
@@ -52,7 +88,7 @@ const renderGridItems = (
       // Boolean/guardrail evaluators: show pass/fail distribution
       // Filter to only show processed evaluations (exclude error, scheduled, etc.)
       checksSummary = {
-        graphId: "custom",
+        graphId: `evalSummary_${check.id}`,
         graphType: "donnut",
         series: [
           {
@@ -76,7 +112,7 @@ const renderGridItems = (
       };
 
       checksAverage = {
-        graphId: "custom",
+        graphId: `evalTimeline_${check.id}`,
         graphType: "stacked_bar",
         series: [
           {
@@ -102,11 +138,33 @@ const renderGridItems = (
         timeScale: ONE_DAY,
         height: 300,
       };
+
+      passRateTrend = {
+        graphId: `evalPassRate_${check.id}`,
+        graphType: "line",
+        series: [
+          {
+            name: "Pass rate",
+            colorSet: "tealTones",
+            metric: "evaluations.evaluation_pass_rate",
+            aggregation: "avg",
+            key: check.id,
+            filters: {
+              "evaluations.state": {
+                [check.id]: ["processed"],
+              },
+            },
+          },
+        ],
+        includePrevious: false,
+        timeScale: ONE_DAY,
+        height: 200,
+      };
     } else if (isCategoryEvaluator) {
       // Category evaluators: show category distribution
       // Filter to only show processed evaluations (exclude error, scheduled, etc.)
       checksSummary = {
-        graphId: "custom",
+        graphId: `evalSummary_${check.id}`,
         graphType: "donnut",
         series: [
           {
@@ -129,7 +187,7 @@ const renderGridItems = (
       };
 
       checksAverage = {
-        graphId: "custom",
+        graphId: `evalTimeline_${check.id}`,
         graphType: "horizontal_bar",
         series: [
           {
@@ -154,7 +212,7 @@ const renderGridItems = (
       // Score-based evaluators: show average score
       // Filter to only show processed evaluations (exclude error, scheduled, etc.)
       checksSummary = {
-        graphId: "custom",
+        graphId: `evalSummary_${check.id}`,
         graphType: "summary",
         series: [
           {
@@ -176,7 +234,7 @@ const renderGridItems = (
       };
 
       checksAverage = {
-        graphId: "custom",
+        graphId: `evalTimeline_${check.id}`,
         graphType: "line",
         series: [
           {
@@ -262,6 +320,21 @@ const renderGridItems = (
             </Card.Body>
           </Card.Root>
         </GridItem>
+        {passRateTrend && (
+          <GridItem colSpan={4} display="inline-grid">
+            <Card.Root>
+              <Card.Header>
+                <HStack gap={2}>
+                  <BarChart2 color="orange" />
+                  <Heading size="sm">{check.name} - Pass Rate Trend</Heading>
+                </HStack>
+              </Card.Header>
+              <Card.Body>
+                <CustomGraph input={passRateTrend} />
+              </Card.Body>
+            </Card.Root>
+          </GridItem>
+        )}
       </>
     );
   });
@@ -371,6 +444,30 @@ function EvaluationsContent() {
       )}
       <HStack alignItems="start" gap={4}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
+          {checks.data && checks.data.length > 0 && (
+            <>
+              <GridItem colSpan={1} display="inline-grid">
+                <Card.Root>
+                  <Card.Header>
+                    <Heading size="sm">Overall Health</Heading>
+                  </Card.Header>
+                  <Card.Body>
+                    <CustomGraph input={aggregateHealthSummary} />
+                  </Card.Body>
+                </Card.Root>
+              </GridItem>
+              <GridItem colSpan={3} display="inline-grid">
+                <Card.Root>
+                  <Card.Header>
+                    <Heading size="sm">Pass / Fail Trend</Heading>
+                  </Card.Header>
+                  <Card.Body>
+                    <CustomGraph input={aggregatePassFailTrend} />
+                  </Card.Body>
+                </Card.Root>
+              </GridItem>
+            </>
+          )}
           {checks.data
             ? renderGridItems(
               [...checks.data].sort((a, b) => {

@@ -26,7 +26,7 @@ import {
   SlidersHorizontal,
   Terminal,
 } from "lucide-react";
-import NextLink from "next/link";
+import NextLink from "~/utils/compat/next-link";
 import React, { useMemo, useState } from "react";
 import { LuGauge } from "react-icons/lu";
 import { RenderCode } from "~/components/code/RenderCode";
@@ -53,14 +53,14 @@ const rowHeightOptions: ToggleOption[] = [
     icon: <ListChevronsDownUp size={18} />,
   },
   {
-    value: "expanded",
-    label: "Expanded",
+    value: "fit",
+    label: "Fit",
     icon: <ListChevronsUpDown size={18} />,
   },
 ];
 
 // Max rows for expanded mode
-const MAX_ROWS_FOR_EXPANDED_MODE = 100;
+const MAX_ROWS_FOR_FIT_MODE = 100;
 
 // =============================================================================
 // Concurrency Popover Component
@@ -198,7 +198,7 @@ export function TableSettingsMenu({
 
   // Get current row count to determine if expanded mode should be disabled
   const rowCount = getRowCount(activeDatasetId);
-  const isExpandedDisabled = rowCount > MAX_ROWS_FOR_EXPANDED_MODE;
+  const isFitDisabled = rowCount > MAX_ROWS_FOR_FIT_MODE;
 
   const { project } = useOrganizationTeamProject();
   const cicdDialog = useDisclosure();
@@ -250,7 +250,7 @@ export function TableSettingsMenu({
                 {rowHeightOptions.map((option) => {
                   const isActive = rowHeightMode === option.value;
                   const isDisabled =
-                    option.value === "expanded" && isExpandedDisabled;
+                    option.value === "fit" && isFitDisabled;
 
                   const button = (
                     <Button
@@ -279,7 +279,7 @@ export function TableSettingsMenu({
                     return (
                       <Tooltip
                         key={option.value}
-                        content={`Expanded mode is disabled for datasets with more than ${MAX_ROWS_FOR_EXPANDED_MODE} rows for performance reasons`}
+                        content={`Fit mode is disabled for datasets with more than ${MAX_ROWS_FOR_FIT_MODE} rows for performance reasons`}
                         positioning={{ placement: "top" }}
                         openDelay={100}
                       >
@@ -500,7 +500,7 @@ const LanguageMenu = React.memo(function LanguageMenu({
           <ChevronDownIcon />
         </Button>
       </Menu.Trigger>
-      <Menu.Content zIndex="popover">
+      <Menu.Content>
         {languages.map((lang) => (
           <Menu.Item
             key={lang}

@@ -13,7 +13,7 @@ vi.mock("../../../utils/encryption", () => ({
   decrypt: vi.fn((v: string) => v.replace("encrypted:", "")),
 }));
 
-vi.mock("../../../server/api/routers/modelProviders", () => ({
+vi.mock("../../../server/api/routers/modelProviders.utils", () => ({
   getProjectModelProviders: vi.fn(),
   prepareLitellmParams: vi.fn(),
 }));

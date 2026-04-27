@@ -5,38 +5,39 @@ import type {
 } from "../../../reactors/reactor.types";
 import type { TraceSummaryData } from "~/server/app-layer/traces/types";
 import type { TraceProcessingEvent } from "../schemas/events";
-import type { UpdateRunMetricsCommandData } from "../../simulation-processing/schemas/commands";
+import type { ComputeRunMetricsCommandData } from "../../simulation-processing/schemas/commands";
 
 const logger = createLogger(
-  "langwatch:trace-processing:simulation-metrics-sync",
+  "langwatch:trace-processing:simulation-metrics-publisher",
 );
 
 export interface SimulationMetricsSyncReactorDeps {
-  updateRunMetrics: (data: UpdateRunMetricsCommandData) => Promise<void>;
+  computeRunMetrics: (data: ComputeRunMetricsCommandData) => Promise<void>;
 }
 
 /**
- * Trace-side reactor: when a trace with scenario.run_id arrives,
- * propagates per-role cost/latency metrics to the simulation run.
+ * Trace-side ECST publisher: when a simulation trace stabilises,
+ * publishes its metrics to the simulation pipeline.
  *
- * Zero queries — reads scenario_run_id directly from the trace's hoisted
- * span attributes.
+ * Uses delay+dedup (60s) for terminal detection — fires once per trace
+ * after 60s of quiet (no new spans). Carries the metrics data in the
+ * command payload (Event-Carried State Transfer) so the simulation
+ * pipeline doesn't need to query back.
  *
- * Complements the simulation-side traceMetricsSync reactor:
- * - Simulation-side handles "events arrive first, trace later" by reading
- *   the trace summary when simulation events arrive.
- * - This trace-side reactor handles "trace arrives after events" by
- *   dispatching metrics directly using the scenario_run_id from the span.
- *
- * Both are idempotent: the simulation fold's TraceMetrics map replaces
- * (not accumulates) per-trace entries, so duplicate dispatches converge
- * to the same final state.
+ * Scenario filtering: only fires for traces with scenario.run_id
+ * in their hoisted span attributes.
  */
 export function createSimulationMetricsSyncReactor(
   deps: SimulationMetricsSyncReactorDeps,
 ): ReactorDefinition<TraceProcessingEvent, TraceSummaryData> {
   return {
     name: "simulationMetricsSync",
+    options: {
+      makeJobId: (payload) =>
+        `sim-metrics:${payload.event.tenantId}:${payload.event.aggregateId}`,
+      ttl: 60_000,
+      delay: 60_000,
+    },
 
     async handle(
       _event: TraceProcessingEvent,
@@ -59,23 +60,26 @@ export function createSimulationMetricsSyncReactor(
 
       logger.debug(
         { traceId, tenantId, scenarioRunId },
-        "Propagating trace metrics to simulation run",
+        "Publishing trace metrics to simulation run (ECST)",
       );
 
       try {
-        await deps.updateRunMetrics({
+        await deps.computeRunMetrics({
           tenantId,
           scenarioRunId,
           traceId,
-          totalCost: foldState.totalCost ?? 0,
-          roleCosts,
-          roleLatencies,
+          metrics: {
+            totalCost: foldState.totalCost ?? 0,
+            roleCosts,
+            roleLatencies,
+          },
+          retryCount: 0,
           occurredAt: Date.now(),
         });
       } catch (error) {
         logger.warn(
           { traceId, tenantId, scenarioRunId, error },
-          "Failed to dispatch updateRunMetrics from trace-side reactor",
+          "Failed to dispatch computeRunMetrics from trace-side reactor",
         );
       }
     },

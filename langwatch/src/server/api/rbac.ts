@@ -1,12 +1,14 @@
 import {
   OrganizationUserRole,
+  RoleBindingScopeType,
   type PrismaClient,
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import type { Session } from "next-auth";
+import type { Session } from "~/server/auth";
 import { env } from "~/env.mjs";
 import { LiteMemberRestrictedError } from "~/server/app-layer/permissions/errors";
+import { isAdmin } from "../../../ee/admin/isAdmin";
 
 // ============================================================================
 // PERMISSION DEFINITIONS
@@ -22,6 +24,13 @@ export const Actions = {
   DELETE: "delete",
   MANAGE: "manage", // Full CRUD + settings
   SHARE: "share",
+  // Gateway-specific actions: `rotate` is a sub-action of `update` for virtual
+  // keys but callers may want to grant it independently. `attach`/`detach`
+  // apply to guardrails — these are also treated as sub-actions of `update`
+  // by the hierarchy helper below.
+  ROTATE: "rotate",
+  ATTACH: "attach",
+  DETACH: "detach",
 } as const;
 
 export type Action = (typeof Actions)[keyof typeof Actions];
@@ -45,6 +54,23 @@ export const Resources = {
   PROMPTS: "prompts",
   SECRETS: "secrets",
   PLAYGROUND: "playground",
+  OPS: "ops",
+  // Platform audit log — covers both the legacy AuditLog stream AND the
+  // gateway-resource rows folded into it by the audit consolidation.
+  // Lives outside the gateway permission family because it gates a
+  // platform settings page (/settings/audit-log), not a gateway sub-page.
+  AUDIT_LOG: "auditLog",
+  // AI Gateway resources — see specs/ai-gateway/_shared/contract.md §10
+  VIRTUAL_KEYS: "virtualKeys",
+  GATEWAY_BUDGETS: "gatewayBudgets",
+  GATEWAY_PROVIDERS: "gatewayProviders",
+  GATEWAY_GUARDRAILS: "gatewayGuardrails",
+  // Deprecated (kept for backwards-compat): pre-consolidation perm that
+  // gated /[project]/gateway/audit. The page is gone; auditLog:view is
+  // the live permission. Safe to drop in a future breaking-change pass.
+  GATEWAY_LOGS: "gatewayLogs",
+  GATEWAY_USAGE: "gatewayUsage",
+  GATEWAY_CACHE_RULES: "gatewayCacheRules",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -78,6 +104,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "cost:view",
     // Traces
     "traces:view",
+    "traces:create",
     "traces:share",
     // Annotations
     "annotations:view",
@@ -106,6 +133,33 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Team
     "team:view",
     "team:manage",
+    // AI Gateway (admin has full gateway CRUD + rotation)
+    "virtualKeys:view",
+    "virtualKeys:create",
+    "virtualKeys:update",
+    "virtualKeys:delete",
+    "virtualKeys:rotate",
+    "virtualKeys:manage",
+    "gatewayBudgets:view",
+    "gatewayBudgets:create",
+    "gatewayBudgets:update",
+    "gatewayBudgets:delete",
+    "gatewayBudgets:manage",
+    "gatewayProviders:view",
+    "gatewayProviders:update",
+    "gatewayProviders:manage",
+    "gatewayGuardrails:view",
+    "gatewayGuardrails:attach",
+    "gatewayGuardrails:detach",
+    "gatewayGuardrails:manage",
+    "gatewayLogs:view",
+    "auditLog:view",
+    "gatewayUsage:view",
+    "gatewayCacheRules:view",
+    "gatewayCacheRules:create",
+    "gatewayCacheRules:update",
+    "gatewayCacheRules:delete",
+    "gatewayCacheRules:manage",
   ],
   [TeamUserRole.MEMBER]: [
     // Projects
@@ -118,6 +172,7 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "cost:view",
     // Traces
     "traces:view",
+    "traces:create",
     "traces:share",
     // Annotations
     "annotations:view",
@@ -145,6 +200,18 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "secrets:manage",
     // Team
     "team:view",
+    // AI Gateway (member: can manage own VKs + see budgets, cannot delete budgets)
+    "virtualKeys:view",
+    "virtualKeys:create",
+    "virtualKeys:update",
+    "virtualKeys:rotate",
+    "gatewayBudgets:view",
+    "gatewayProviders:view",
+    "gatewayGuardrails:view",
+    "gatewayLogs:view",
+    "auditLog:view",
+    "gatewayUsage:view",
+    "gatewayCacheRules:view",
   ],
   [TeamUserRole.VIEWER]: [
     // Projects
@@ -169,6 +236,15 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "secrets:view",
     // Team
     "team:view",
+    // AI Gateway (viewer: read-only)
+    "virtualKeys:view",
+    "gatewayBudgets:view",
+    "gatewayProviders:view",
+    "gatewayGuardrails:view",
+    "gatewayLogs:view",
+    "auditLog:view",
+    "gatewayUsage:view",
+    "gatewayCacheRules:view",
   ],
   [TeamUserRole.CUSTOM]: [
     // CUSTOM role permissions fall back to VIEWER if no assignedRoleId or custom role has no permissions
@@ -194,6 +270,15 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "secrets:view",
     // Team
     "team:view",
+    // AI Gateway (custom role default: same baseline as VIEWER, overridable via CustomRole.permissions)
+    "virtualKeys:view",
+    "gatewayBudgets:view",
+    "gatewayProviders:view",
+    "gatewayGuardrails:view",
+    "gatewayLogs:view",
+    "auditLog:view",
+    "gatewayUsage:view",
+    "gatewayCacheRules:view",
   ],
 };
 
@@ -227,6 +312,8 @@ export const EXTERNAL_MEMBER_PERMISSIONS: Permission[] = [
   "analytics:view",
   "traces:view",
   "annotations:view",
+  "annotations:create",
+  "annotations:update",
   "evaluations:view",
   "datasets:view",
   "workflows:view",
@@ -253,8 +340,17 @@ export function hasPermissionWithHierarchy(
     return true;
   }
 
-  // Hierarchy rule: manage permissions include view, create, update, and delete permissions
-  const actionSuffixes = [":view", ":create", ":update", ":delete"];
+  // Hierarchy rule: manage permissions include view, create, update, delete,
+  // and gateway-specific sub-actions (rotate, attach, detach).
+  const actionSuffixes = [
+    ":view",
+    ":create",
+    ":update",
+    ":delete",
+    ":rotate",
+    ":attach",
+    ":detach",
+  ];
   for (const suffix of actionSuffixes) {
     if (requestedPermission.endsWith(suffix)) {
       const managePermission = requestedPermission.replace(suffix, ":manage");
@@ -367,6 +463,7 @@ type PermissionMiddlewareParams<InputType> = {
     permissionChecked: boolean;
     publiclyShared: boolean;
     organizationRole?: OrganizationUserRole | null;
+    opsScope?: OpsScope;
   };
   input: InputType;
   next: () => any;
@@ -474,6 +571,136 @@ export const checkOrganizationPermission =
 // BACKEND PERMISSION CHECKS
 // ============================================================================
 
+// ============================================================================
+// ROLE BINDING RESOLUTION
+// ============================================================================
+
+/**
+ * Checks whether any of the user's RoleBindings at the given scopes grants the
+ * requested permission. All matching bindings are evaluated and their permission
+ * sets are unioned — a user is permitted if ANY binding grants the permission.
+ *
+ * Falls back to the legacy TeamUser table when no RoleBindings exist.
+ */
+async function checkPermissionFromBindings({
+  prisma,
+  userId,
+  organizationId,
+  scopes,
+  organizationRole,
+  permission,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  organizationId: string;
+  scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+  organizationRole: OrganizationUserRole | null;
+  permission: Permission;
+}): Promise<boolean> {
+  const scopeIds = scopes.map((s) => s.scopeId);
+
+  // Fetch groups the user belongs to in this org
+  const groupMemberships = await prisma.groupMembership.findMany({
+    where: { userId, group: { organizationId } },
+    select: { groupId: true },
+  });
+  const groupIds = groupMemberships.map((m) => m.groupId);
+
+  // Fetch all matching RoleBindings for this user (direct + via groups) across all scopes
+  const bindings = await prisma.roleBinding.findMany({
+    where: {
+      organizationId,
+      scopeId: { in: scopeIds },
+      OR: [
+        { userId },
+        ...(groupIds.length > 0 ? [{ groupId: { in: groupIds } }] : []),
+      ],
+    },
+    select: { role: true, customRoleId: true, scopeType: true },
+  });
+
+  if (bindings.length === 0) {
+    // Fall back to legacy TeamUser for users not yet migrated to RoleBindings
+    const teamScope = scopes.find(
+      (s) => s.scopeType === RoleBindingScopeType.TEAM,
+    );
+    if (!teamScope) return false;
+
+    const teamUser = await prisma.teamUser.findFirst({
+      where: { userId, teamId: teamScope.scopeId },
+      select: { role: true, assignedRoleId: true },
+    });
+
+    if (!teamUser) return false;
+    return resolveBindingPermission(
+      { role: teamUser.role, customRoleId: teamUser.assignedRoleId ?? null },
+      organizationRole,
+      permission,
+      prisma,
+    );
+  }
+
+  // Union permissions across ALL matching bindings — permitted if any grants it
+  for (const binding of bindings) {
+    // Org-scoped bindings: ADMIN grants everything; MEMBER grants org-level permissions only.
+    // ORG-scoped MEMBER bindings do NOT imply any team- or project-level access — team/project
+    // access requires a TEAM- or PROJECT-scoped binding. Only org:* permissions are checked here.
+    if (
+      binding.scopeType === RoleBindingScopeType.ORGANIZATION &&
+      binding.role !== TeamUserRole.CUSTOM
+    ) {
+      // Defense-in-depth: EXTERNAL (Lite Member) users must never be promoted
+      // by this fast path even if an ORG-scoped MEMBER binding exists — the
+      // OrganizationUser role is authoritative for EXTERNAL restrictions.
+      if (organizationRole === OrganizationUserRole.EXTERNAL) continue;
+      if (binding.role === TeamUserRole.ADMIN) return true;
+      if (organizationRoleHasPermission(OrganizationUserRole.MEMBER, permission)) return true;
+      continue;
+    }
+
+    const permitted = await resolveBindingPermission(
+      binding,
+      organizationRole,
+      permission,
+      prisma,
+    );
+    if (permitted) return true;
+  }
+
+  return false;
+}
+
+/**
+ * Checks whether a single binding grants the requested permission,
+ * respecting EXTERNAL user restrictions and custom role permission lists.
+ */
+async function resolveBindingPermission(
+  binding: { role: TeamUserRole; customRoleId: string | null },
+  organizationRole: OrganizationUserRole | null,
+  permission: Permission,
+  prisma: PrismaClient,
+): Promise<boolean> {
+  if (binding.customRoleId) {
+    const customRole = await prisma.customRole.findUnique({
+      where: { id: binding.customRoleId },
+    });
+    if (customRole) {
+      const perms = Array.isArray(customRole.permissions)
+        ? (customRole.permissions as string[])
+        : [];
+      if (perms.length > 0) {
+        return hasPermissionWithHierarchy(perms, permission);
+      }
+    }
+  }
+
+  if (organizationRole === OrganizationUserRole.EXTERNAL) {
+    return hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission);
+  }
+
+  return teamRoleHasPermission(binding.role, permission);
+}
+
 /**
  * Resolve a project permission check, returning the permission decision
  * along with the user's organization role.
@@ -499,15 +726,6 @@ export async function resolveProjectPermission(
         select: {
           id: true,
           organizationId: true,
-          members: {
-            where: { userId: ctx.session.user.id },
-            select: {
-              userId: true,
-              teamId: true,
-              role: true,
-              assignedRoleId: true,
-            },
-          },
           organization: {
             select: {
               members: {
@@ -521,63 +739,29 @@ export async function resolveProjectPermission(
     },
   });
 
+  const teamId = projectTeam?.team.id;
+  const organizationId = projectTeam?.team.organizationId;
   const organizationRole =
     projectTeam?.team.organization?.members[0]?.role ?? null;
-  const teamMember = projectTeam?.team.members[0];
 
-  if (!teamMember) {
+  if (!teamId || !organizationId) {
     return { permitted: false, organizationRole };
   }
 
-  // Check user's individual permissions (custom role or built-in role)
-  if (teamMember.assignedRoleId) {
-    const customRole = await ctx.prisma.customRole.findUnique({
-      where: { id: teamMember.assignedRoleId },
-    });
-
-    if (customRole) {
-      const rawPermissions = customRole.permissions as
-        | string[]
-        | null
-        | undefined;
-      const userPermissions = Array.isArray(rawPermissions)
-        ? rawPermissions
-        : [];
-
-      // If custom role has permissions, use them; otherwise fall back to built-in role
-      if (userPermissions.length > 0) {
-        return {
-          permitted: hasPermissionWithHierarchy(userPermissions, permission),
-          organizationRole,
-        };
-      }
-      // Fall back to built-in role if custom role has no permissions
-      // EXTERNAL users get restricted defaults instead of full team role
-      if (organizationRole === OrganizationUserRole.EXTERNAL) {
-        return {
-          permitted: hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission),
-          organizationRole,
-        };
-      }
-      return {
-        permitted: teamRoleHasPermission(teamMember.role, permission),
-        organizationRole,
-      };
-    }
-  }
-
-  // Only fall back to built-in team role if NO custom role exists
-  // EXTERNAL users get restricted defaults instead of full VIEWER permissions
-  if (organizationRole === OrganizationUserRole.EXTERNAL) {
-    return {
-      permitted: hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission),
-      organizationRole,
-    };
-  }
-  return {
-    permitted: teamRoleHasPermission(teamMember.role, permission),
+  const permitted = await checkPermissionFromBindings({
+    prisma: ctx.prisma,
+    userId: ctx.session.user.id,
+    organizationId,
+    scopes: [
+      { scopeType: RoleBindingScopeType.PROJECT, scopeId: projectId },
+      { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+      { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId },
+    ],
     organizationRole,
-  };
+    permission,
+  });
+
+  return { permitted, organizationRole };
 }
 
 /**
@@ -614,71 +798,26 @@ export async function resolveTeamPermission(
     return { permitted: false, organizationRole: null };
   }
 
-  // Check organization admin override
   const organizationUser = await ctx.prisma.organizationUser?.findFirst({
-    where: {
-      userId: ctx.session.user.id,
-      organizationId: team.organizationId,
-    },
+    where: { userId: ctx.session.user.id, organizationId: team.organizationId },
+    select: { role: true },
   });
 
   const organizationRole = organizationUser?.role ?? null;
 
-  // Organization ADMINs can do anything on all teams
-  if (organizationUser?.role === OrganizationUserRole.ADMIN) {
-    return { permitted: true, organizationRole };
-  }
-
-  // Check team membership
-  const teamUser = await ctx.prisma.teamUser?.findFirst({
-    where: {
-      userId: ctx.session.user.id,
-      teamId: teamId,
-    },
-    select: {
-      userId: true,
-      teamId: true,
-      role: true,
-      assignedRoleId: true,
-    },
+  const permitted = await checkPermissionFromBindings({
+    prisma: ctx.prisma,
+    userId: ctx.session.user.id,
+    organizationId: team.organizationId,
+    scopes: [
+      { scopeType: RoleBindingScopeType.TEAM, scopeId: teamId },
+      { scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: team.organizationId },
+    ],
+    organizationRole,
+    permission,
   });
 
-  if (!teamUser) {
-    return { permitted: false, organizationRole };
-  }
-
-  // Check user's individual permissions (custom role or built-in role)
-  if (teamUser.assignedRoleId) {
-    const customRole = await ctx.prisma.customRole.findUnique({
-      where: { id: teamUser.assignedRoleId },
-    });
-
-    if (customRole) {
-      const rawPermissions = customRole.permissions as
-        | string[]
-        | null
-        | undefined;
-      const userPermissions = Array.isArray(rawPermissions)
-        ? rawPermissions
-        : [];
-      if (hasPermissionWithHierarchy(userPermissions, permission)) {
-        return { permitted: true, organizationRole };
-      }
-    }
-  }
-
-  // Fall back to user's built-in team role only
-  // EXTERNAL users get restricted defaults instead of full team role permissions
-  if (organizationRole === OrganizationUserRole.EXTERNAL) {
-    return {
-      permitted: hasPermissionWithHierarchy(EXTERNAL_MEMBER_PERMISSIONS, permission),
-      organizationRole,
-    };
-  }
-  return {
-    permitted: teamRoleHasPermission(teamUser.role, permission),
-    organizationRole,
-  };
+  return { permitted, organizationRole };
 }
 
 /**
@@ -705,22 +844,51 @@ export async function hasOrganizationPermission(
     return false;
   }
 
-  const organizationUser = await ctx.prisma.organizationUser?.findFirst({
-    where: {
-      userId: ctx.session.user.id,
-      organizationId: organizationId,
-    },
+  const userId = ctx.session.user.id;
+
+  const orgMember = await ctx.prisma.organizationUser?.findFirst({
+    where: { userId, organizationId },
+    select: { role: true },
   });
 
-  // Only check organization role - team admins do NOT get automatic organization permissions
-  if (organizationUser) {
-    const orgResult = organizationRoleHasPermission(
-      organizationUser.role,
-      permission,
-    );
-    if (orgResult) return true;
+  if (!orgMember) return false;
+
+  // EXTERNAL (Lite Member) users get organization:view only — no org-scoped binding exists for them
+  if (orgMember.role === OrganizationUserRole.EXTERNAL) {
+    return permission === "organization:view";
   }
 
+  // Primary path: resolve via ORGANIZATION-scoped RoleBindings.
+  const permittedByBindings = await checkPermissionFromBindings({
+    prisma: ctx.prisma,
+    userId,
+    organizationId,
+    scopes: [{ scopeType: RoleBindingScopeType.ORGANIZATION, scopeId: organizationId }],
+    organizationRole: orgMember.role,
+    permission,
+  });
+  if (permittedByBindings) return true;
+
+  // Legacy fallback: users migrated before RoleBindings existed keep their
+  // TeamUser row (with ADMIN/MEMBER/VIEWER role) but may have zero
+  // RoleBindings. For org-scoped permission checks we union across every
+  // TeamUser the user has in the organization — this matches the intent
+  // that org ADMINs / team ADMINs have broad access to org-scoped gateway
+  // resources (audit, org-level budgets, cache rules) without requiring a
+  // RoleBinding backfill first.
+  const teamMemberships = await ctx.prisma.teamUser.findMany({
+    where: { userId, team: { organizationId } },
+    select: { role: true, assignedRoleId: true },
+  });
+  for (const tu of teamMemberships) {
+    const permitted = await resolveBindingPermission(
+      { role: tu.role, customRoleId: tu.assignedRoleId ?? null },
+      orgMember.role,
+      permission,
+      ctx.prisma,
+    );
+    if (permitted) return true;
+  }
   return false;
 }
 
@@ -893,6 +1061,64 @@ export const checkPermissionOrPubliclyShared =
       ctx.publiclyShared = true;
     }
 
+    ctx.permissionChecked = true;
+    return next();
+  };
+
+// ============================================================================
+// OPS PERMISSION
+// ============================================================================
+
+export type OpsScope = { kind: "platform" };
+
+/**
+ * Resolve the ops scope for a user. Returns null if the user has no ops access.
+ * Shared between tRPC middleware and SSE endpoint.
+ *
+ * Only users listed in ADMIN_EMAILS have ops access. All ops data is
+ * platform-wide so no org-scoped tier exists.
+ */
+export function resolveOpsScope({
+  userEmail,
+}: {
+  userId: string;
+  userEmail: string | null | undefined;
+  permission: Permission;
+  prisma: unknown;
+}): OpsScope | null {
+  if (isAdmin({ email: userEmail })) {
+    return { kind: "platform" };
+  }
+
+  return null;
+}
+
+export const checkOpsPermission =
+  (permission: Permission) =>
+  async ({
+    ctx,
+    next,
+  }: PermissionMiddlewareParams<unknown>) => {
+    const user = ctx.session?.user;
+    if (!user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    const opsScope = await resolveOpsScope({
+      userId: user.id,
+      userEmail: user.email,
+      permission,
+      prisma: ctx.prisma,
+    });
+
+    if (!opsScope) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "You do not have permission to access ops resources",
+      });
+    }
+
+    ctx.opsScope = opsScope;
     ctx.permissionChecked = true;
     return next();
   };

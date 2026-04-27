@@ -46,22 +46,6 @@ export class EvaluatorConfigError extends DomainError {
   }
 }
 
-export class CostLimitExceededError extends DomainError {
-  declare readonly kind: "cost_limit_exceeded";
-
-  constructor(
-    organizationId: string,
-    options: { reasons?: readonly Error[] } = {},
-  ) {
-    super("cost_limit_exceeded", "Monthly usage limit exceeded", {
-      meta: { organizationId },
-      httpStatus: 429,
-      ...options,
-    });
-    this.name = "CostLimitExceededError";
-  }
-}
-
 export class EvaluatorExecutionError extends DomainError {
   declare readonly kind: "evaluator_execution_error";
 

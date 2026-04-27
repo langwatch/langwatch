@@ -16,6 +16,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { toaster } from "~/components/ui/toaster";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { createEvaluatorEditorCallbacks } from "~/evaluations-v3/utils/evaluatorEditorCallbacks";
 import { setFlowCallbacks, useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
@@ -141,12 +142,15 @@ function Page() {
   const handleCreateNewEvaluator = () => {
     // Set up callback to close drawer after creating new evaluator
     // (instead of going back through category → type → editor stack)
-    setFlowCallbacks("evaluatorEditor", {
-      onSave: () => {
-        closeDrawer();
-        return true; // Signal that we handled navigation
-      },
-    });
+    setFlowCallbacks(
+      "evaluatorEditor",
+      createEvaluatorEditorCallbacks({
+        onSave: () => {
+          closeDrawer();
+          return true; // Signal that we handled navigation
+        },
+      }),
+    );
     openDrawer("evaluatorCategorySelector");
   };
 

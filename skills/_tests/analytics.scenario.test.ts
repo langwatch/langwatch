@@ -9,6 +9,9 @@ import { openai } from "@ai-sdk/openai";
 import {
   createClaudeCodeAgent,
   toolCallFix,
+  assertSkillWasRead,
+  installSkillToWorkDir,
+  SKILL_TESTS_SET_ID,
 } from "./helpers/claude-code-adapter";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -27,18 +30,10 @@ describe("Analytics Skill", () => {
         path.join(os.tmpdir(), "langwatch-skill-analytics-")
       );
 
-      const skillDir = path.join(tempFolder, ".skills", "analytics");
-      fs.mkdirSync(skillDir, { recursive: true });
-      fs.copyFileSync(
-        path.resolve(__dirname, "../analytics/SKILL.md"),
-        path.join(skillDir, "SKILL.md")
-      );
-      const sharedDir = path.join(skillDir, "_shared");
-      fs.mkdirSync(sharedDir, { recursive: true });
-      const sharedSrc = path.resolve(__dirname, "../_shared");
-      fs.cpSync(sharedSrc, sharedDir, { recursive: true });
+      installSkillToWorkDir({ workingDirectory: tempFolder, skillSubpath: "analytics" });
 
       const result = await scenario.run({
+        setId: SKILL_TESTS_SET_ID,
         name: "Agent performance analytics",
         description:
           "User wants to understand how their agent has been performing.",
@@ -48,7 +43,7 @@ describe("Analytics Skill", () => {
           scenario.judgeAgent({
             model: judgeModel,
             criteria: [
-              "Agent used LangWatch MCP tools to query analytics or search traces",
+              "Agent used the `langwatch` CLI (e.g. `langwatch analytics query` or `langwatch trace search`) to query analytics or search traces",
               "Agent provided a summary of performance data",
             ],
           }),
@@ -60,6 +55,7 @@ describe("Analytics Skill", () => {
           scenario.agent(),
           (state) => {
             toolCallFix(state);
+            assertSkillWasRead(state, "analytics");
           },
           scenario.judge(),
         ],
@@ -67,6 +63,6 @@ describe("Analytics Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    600_000
+    900_000
   );
 });

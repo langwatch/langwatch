@@ -1,0 +1,87 @@
+---
+title: LLM Nodes
+description: Use LLM Nodes in Optimization Studio to invoke LLMs from workflows and run controlled evaluations for agent testing.
+---
+
+<iframe
+  width="720"
+  height="405"
+  src="https://www.youtube.com/embed/fbNmm6qoZFw"
+  title="YouTube video player"
+  frameborder="0"
+  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+  allowFullScreen
+></iframe>
+
+## Getting Started
+
+To begin working with LLM nodes, first create a new workflow by navigating to the workflows page and clicking "Create New Workflow." You can choose from available templates, but for learning purposes, the blank template is a good starting point. After naming your workflow, the system automatically creates three basic blocks: an entry node, an LLM call node, and an end node.
+
+## Understanding the LLM Node [(0:34)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=34s)
+
+The LLM node is where the actual language model interaction happens. Each node has configurable properties accessible through the right sidebar, including:
+- LLM provider selection
+- LLM Instructions
+- Input and output fields
+- Few-shot demonstrations
+
+You can quickly test an LLM node by using the "Run with manual input" option, which allows you to input test queries and see immediate results. The system will show you both the cost and duration of each execution.
+
+## Configuring Input and Output Fields [(1:31)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=91s)
+
+One of the most important aspects of the LLM node is how you configure its inputs and outputs. The field names are meaningful as they're passed directly to the LLM. You can:
+- Add multiple input fields (such as 'purchase' and 'amount')
+- Create custom output fields for different types of responses
+- Rename fields to better represent their purpose
+
+## Working with Datasets [(2:10)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=130s)
+
+LLM nodes become particularly powerful when connected to datasets. Through the entry node, you can:
+- Select and load your datasets
+- Map dataset fields to LLM input fields
+- Test your workflow using random samples from your dataset
+- Connect multiple dataset fields to provide richer context to your LLM
+
+## Improving Results with Instructions [(2:58)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=178s)
+
+To get better responses from your LLM, you can add specific instructions in the node properties. These instructions help guide the LLM's behavior and can include:
+- Expected output categories
+- Format specifications
+- Processing guidelines
+- Context information
+
+## Creating Complex Workflows [(4:25)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=265s)
+
+You're not limited to single LLM nodes. You can create sophisticated workflows by:
+- Connecting multiple LLM nodes in sequence
+- Passing outputs from one node as inputs to another
+- Using different LLM models for different tasks
+- Adjusting temperature and other parameters independently for each node
+
+## Monitoring and Tracking [(5:54)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=354s)
+
+Every LLM node execution is tracked in detail. You can:
+- View the full execution trace in LangWatch trace monitoring
+- Examine system prompts and user requests
+- Track costs and performance metrics
+- Analyze the complete message flow
+
+## Using Demonstrations [(6:58)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=418s)
+
+To improve your LLM's performance, you can provide example cases through demonstrations. In the node properties, you can:
+- Add input-output pairs as examples
+- Save demonstrations for reuse
+- Test how different examples affect results
+
+## Custom LLM Providers [(7:27)](https://www.youtube.com/watch?v=fbNmm6qoZFw&t=447s)
+
+You're not limited to default LLM providers. You can set up custom providers by:
+1. Accessing the "Configure available model" settings
+2. Enabling custom settings
+3. Adding your API keys
+4. Configuring custom or fine-tuned models
+
+Appart from the main providers (OpenAI, Anthropic, Google, Groq, etc) the system also supports any OpenAI-compatible APIs, for example on your own self-hosted Llama.
+
+
+This is just the beginning of the Optimization Studio. The LLM Node serves as the foundation for more advanced features like image processing, evaluation, and automatic optimization, which are covered in the next tutorials.

@@ -7,6 +7,15 @@
         "scripts/playwright-mcp.sh"
       ],
       "env": {}
+    },
+    "playwright-headed": {
+      "type": "stdio",
+      "command": "bash",
+      "args": [
+        "scripts/playwright-mcp.sh",
+        "--headed"
+      ],
+      "env": {}
     }
   }
 }

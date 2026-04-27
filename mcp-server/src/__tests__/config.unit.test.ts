@@ -86,6 +86,9 @@ describe("config", () => {
 
   describe("getConfig", () => {
     it("throws when config has not been initialized", async () => {
+      // globalThis survives vi.resetModules(), so clear it explicitly
+      delete (globalThis as Record<string, unknown>).__langwatch_mcp_config;
+      delete (globalThis as Record<string, unknown>).__langwatch_mcp_config_storage;
       vi.resetModules();
       const freshConfig = await import("../config.js");
       expect(() => freshConfig.getConfig()).toThrow("Config not initialized");

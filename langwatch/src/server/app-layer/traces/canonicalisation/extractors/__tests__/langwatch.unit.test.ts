@@ -191,4 +191,64 @@ describe("LangWatchExtractor", () => {
       });
     });
   });
+
+  describe("RAG contexts promotion", () => {
+    describe("when span has langwatch.rag.contexts (canonical key)", () => {
+      it("promotes to canonical output", () => {
+        const contexts = [
+          { document_id: "doc-1", chunk_id: "chunk-1", content: "hello world" },
+        ];
+        const ctx = createExtractorContext({
+          [ATTR_KEYS.LANGWATCH_RAG_CONTEXTS]: contexts,
+        });
+
+        extractor.apply(ctx);
+
+        expect(ctx.setAttr).toHaveBeenCalledWith(
+          ATTR_KEYS.LANGWATCH_RAG_CONTEXTS,
+          contexts,
+        );
+        expect(ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS]).toEqual(contexts);
+      });
+    });
+
+    describe("when span has langwatch.rag_contexts (legacy key)", () => {
+      it("promotes to canonical output", () => {
+        const contexts = [
+          { document_id: "doc-2", chunk_id: "chunk-2", content: "legacy data" },
+        ];
+        const ctx = createExtractorContext({
+          [ATTR_KEYS.LANGWATCH_RAG_CONTEXTS_LEGACY]: contexts,
+        });
+
+        extractor.apply(ctx);
+
+        expect(ctx.setAttr).toHaveBeenCalledWith(
+          ATTR_KEYS.LANGWATCH_RAG_CONTEXTS,
+          contexts,
+        );
+        expect(ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS]).toEqual(contexts);
+      });
+    });
+
+    describe("when span has langwatch.contexts (old TS SDK key, pre-fix)", () => {
+      it("does NOT promote — legacy/unrecognized key, SDK now emits langwatch.rag.contexts", () => {
+        const contexts = [
+          { document_id: "doc-3", chunk_id: "chunk-3", content: "ts sdk data" },
+        ];
+        // Old TS SDK (<=0.26.0) sent "langwatch.contexts" which is not recognized
+        const ctx = createExtractorContext({
+          "langwatch.contexts": JSON.stringify({
+            type: "json",
+            value: contexts,
+          }),
+        });
+
+        extractor.apply(ctx);
+
+        // Intentionally not promoted — SDK now emits the canonical key
+        expect(ctx.out[ATTR_KEYS.LANGWATCH_RAG_CONTEXTS]).toBeUndefined();
+      });
+    });
+  });
 });

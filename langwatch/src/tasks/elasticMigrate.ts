@@ -40,8 +40,12 @@ export default async function execute() {
     console.log("Checking for org:", org.name);
     await elasticsearchMigrate(org.id);
   }
-  console.log("Checking for default elasticsearch");
-  await elasticsearchMigrate();
+  if (env.ELASTICSEARCH_NODE_URL) {
+    console.log("Checking for default elasticsearch");
+    await elasticsearchMigrate();
+  } else {
+    console.log("ELASTICSEARCH_NODE_URL not configured, skipping default ES migration");
+  }
 }
 
 export const elasticsearchMigrate = async (organizationId?: string) => {

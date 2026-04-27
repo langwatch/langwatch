@@ -1,0 +1,60 @@
+name: docs-release
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_reason:
+        description: "Reason for docs release"
+        required: true
+        default: "General"
+  push:
+    branches:
+      - main
+    paths:
+      - "docs/**"
+      - ".github/workflows/docs-release.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RELEASE_DOCS_TOKEN }}
+          fetch-depth: 0
+
+      - name: Update cache buster redirect
+        run: |
+          CURRENT_TIME=$(date +%s)
+          jq --arg current_time_val "$CURRENT_TIME" \
+            'if (.redirects[0].source | startswith("/ci/cache/busted/")) then
+              .redirects[0].source = ("/ci/cache/busted/" + $current_time_val)
+            else
+              error("Error: .redirects[0].source does not start with /ci/cache/busted/")
+            end' \
+            docs.json > docs.json.tmp && \
+          mv docs.json.tmp docs.json
+
+      - name: Configure Git
+        run: |
+          git config --global user.name "LangWatch Docs Bot"
+          git config --global user.email "y.budnyk789@gmail.com"
+
+      - name: Trigger Release
+        run: |
+          git add docs.json
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            git commit -m "Release docs (${{ github.event.inputs.release_reason }}) [skip ci]"
+          else
+            git commit -m "Release docs (auto-release on merge to main) [skip ci]"
+          fi
+          git push origin HEAD:main

@@ -24,11 +24,37 @@ if TYPE_CHECKING:
     import langwatch.langchain as langchain
     from .prompts.prompt_facade import PromptsFacade
     from .evaluators.evaluator_api_service import EvaluatorApiService
+    from .agents import AgentsFacade
+    from .scenarios import ScenariosFacade
+    from .suites import SuitesFacade
+    from .triggers import TriggersFacade
+    from .workflows import WorkflowsFacade
+    from .dashboards import DashboardsFacade
+    from .annotations import AnnotationsFacade
+    from .graphs import GraphsFacade
+    from .model_providers import ModelProvidersFacade
+    from .analytics import AnalyticsFacade
+    from .traces import TracesFacade
+    from .monitors import MonitorsFacade
+    from .secrets import SecretsFacade
 
     # Type hint for the prompts service specifically
     # required to get the instance typing correct
     prompts: PromptsFacade
     evaluators: EvaluatorApiService
+    agents: AgentsFacade
+    scenarios: ScenariosFacade
+    suites: SuitesFacade
+    triggers: TriggersFacade
+    workflows: WorkflowsFacade
+    dashboards: DashboardsFacade
+    annotations: AnnotationsFacade
+    graphs: GraphsFacade
+    model_providers: ModelProvidersFacade
+    analytics: AnalyticsFacade
+    traces: TracesFacade
+    monitors: MonitorsFacade
+    secrets: SecretsFacade
 
 
 @module_property
@@ -52,6 +78,26 @@ _LAZY_MODULES = {
 }
 
 
+# Mapping of facade attribute names to their (module_path, class_name) for lazy instantiation
+_LAZY_FACADES = {
+    "prompts": (".prompts.prompt_facade", "PromptsFacade"),
+    "evaluators": (".evaluators.evaluator_api_service", "EvaluatorApiService"),
+    "agents": (".agents", "AgentsFacade"),
+    "scenarios": (".scenarios", "ScenariosFacade"),
+    "suites": (".suites", "SuitesFacade"),
+    "triggers": (".triggers", "TriggersFacade"),
+    "workflows": (".workflows", "WorkflowsFacade"),
+    "dashboards": (".dashboards", "DashboardsFacade"),
+    "annotations": (".annotations", "AnnotationsFacade"),
+    "graphs": (".graphs", "GraphsFacade"),
+    "model_providers": (".model_providers", "ModelProvidersFacade"),
+    "analytics": (".analytics", "AnalyticsFacade"),
+    "traces": (".traces", "TracesFacade"),
+    "monitors": (".monitors", "MonitorsFacade"),
+    "secrets": (".secrets", "SecretsFacade"),
+}
+
+
 def __getattr__(name: str):
     if name in _LAZY_MODULES:
         if name == "dspy":
@@ -66,17 +112,13 @@ def __getattr__(name: str):
             # Cache it in the module globals for subsequent access
             globals()[name] = module
             return module
-    elif name == "prompts":
-        # Special-case: expose a PromptsFacade instance at langwatch.prompts
-        from .prompts.prompt_facade import PromptsFacade
+    elif name in _LAZY_FACADES:
+        import importlib
 
-        svc = PromptsFacade.from_global()
-        globals()[name] = svc  # Cache for subsequent access
-        return svc
-    elif name == "evaluators":
-        from .evaluators.evaluator_api_service import EvaluatorApiService
-
-        svc = EvaluatorApiService.from_global()
+        module_path, class_name = _LAZY_FACADES[name]
+        module = importlib.import_module(module_path, package=__name__)
+        facade_cls = getattr(module, class_name)
+        svc = facade_cls.from_global()
         globals()[name] = svc  # Cache for subsequent access
         return svc
 
@@ -167,4 +209,15 @@ __all__ = [
     "langchain",
     "dspy",
     "FetchPolicy",
+    "agents",
+    "scenarios",
+    "suites",
+    "triggers",
+    "workflows",
+    "dashboards",
+    "annotations",
+    "graphs",
+    "model_providers",
+    "analytics",
+    "traces",
 ]

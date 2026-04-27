@@ -1,24 +1,24 @@
 import {
-  Center,
-  EmptyState,
   Grid,
-  Heading,
   Skeleton,
   Spacer,
+  useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { Workflow } from "lucide-react";
+import { Plus, Workflow } from "lucide-react";
 import { DashboardLayout } from "../../components/DashboardLayout";
+import { NoDataInfoBlock } from "../../components/NoDataInfoBlock";
 import { PageLayout } from "../../components/ui/layouts/PageLayout";
 import { Link } from "../../components/ui/link";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
-import { CreateWorkflowButton } from "../../components/workflows/CreateWorkflowButton";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { WorkflowCard } from "../../optimization_studio/components/workflow/WorkflowCard";
+import { NewWorkflowModal } from "../../optimization_studio/components/workflow/NewWorkflowModal";
 import { api } from "../../utils/api";
 
 function Workflows() {
   const { project } = useOrganizationTeamProject();
+  const { open, onClose, onOpen } = useDisclosure();
 
   const workflows = api.workflow.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -33,26 +33,26 @@ function Workflows() {
       <PageLayout.Header>
         <PageLayout.Heading>Workflows</PageLayout.Heading>
         <Spacer />
-        <CreateWorkflowButton />
+        <PageLayout.HeaderButton onClick={onOpen}>
+          <Plus size={16} /> New Workflow
+        </PageLayout.HeaderButton>
       </PageLayout.Header>
 
       {showEmptyState ? (
-        <Center flex={1} padding={6}>
-          <EmptyState.Root>
-            <EmptyState.Content>
-              <EmptyState.Indicator>
-                <Workflow size={32} />
-              </EmptyState.Indicator>
-              <EmptyState.Title>No workflows yet</EmptyState.Title>
-              <EmptyState.Description>
-                Create your first workflow with the Optimization Studio.
-              </EmptyState.Description>
-              <CreateWorkflowButton
-                props={{ colorPalette: "orange", variant: "solid" }}
-              />
-            </EmptyState.Content>
-          </EmptyState.Root>
-        </Center>
+        <PageLayout.Container>
+          <PageLayout.Content>
+            <NoDataInfoBlock
+              title="No workflows yet"
+              description="Create reusable workflows with the Optimization Studio."
+              icon={<Workflow size={24} />}
+              color="blue.500"
+            >
+              <PageLayout.HeaderButton onClick={onOpen} marginTop={4}>
+                <Plus size={16} /> Create your first workflow
+              </PageLayout.HeaderButton>
+            </NoDataInfoBlock>
+          </PageLayout.Content>
+        </PageLayout.Container>
       ) : (
         <VStack gap={6} width="full" align="start" padding={6}>
           <Grid
@@ -93,6 +93,8 @@ function Workflows() {
           </Grid>
         </VStack>
       )}
+
+      <NewWorkflowModal open={open} onClose={onClose} />
     </DashboardLayout>
   );
 }

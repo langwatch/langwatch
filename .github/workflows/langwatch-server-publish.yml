@@ -1,4 +1,4 @@
-name: Publish LangWatch Server to PyPI
+name: langwatch-server-publish
 
 on:
   release:
@@ -29,6 +29,10 @@ jobs:
         uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2
         with:
           version: 10.24.0
+
+      - name: Build mcp-server
+        working-directory: mcp-server
+        run: pnpm install --frozen-lockfile && pnpm run build
 
       - name: Install dependencies
         run: |

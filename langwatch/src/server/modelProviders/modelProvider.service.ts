@@ -1,9 +1,19 @@
 import type { PrismaClient, Project } from "@prisma/client";
+import type { Session } from "~/server/auth";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { KEY_CHECK, MASKED_KEY_PLACEHOLDER } from "../../utils/constants";
 import type { CustomModelsInput } from "./customModel.schema";
 import { toLegacyCompatibleCustomModels } from "./customModel.schema";
-import { ModelProviderRepository } from "./modelProvider.repository";
+import {
+  assertCanManageAllScopes,
+  canReadAnyScope,
+} from "./modelProvider.authz";
+import {
+  ModelProviderRepository,
+  type ModelProviderWithScopes,
+  type ScopeInput,
+} from "./modelProvider.repository";
 import {
   getProviderModelOptions,
   type MaybeStoredModelProvider,
@@ -11,11 +21,19 @@ import {
 } from "./registry";
 
 /**
+ * Minimal ctx slice this service uses to authorize scope-level writes.
+ * Kept narrow so the service can be constructed from any caller (tRPC,
+ * Hono routes, workers) without dragging the full tRPC Context in.
+ */
+export type AuthzContext = { prisma: PrismaClient; session: Session | null };
+
+/**
  * Input types for service operations
  */
 export type UpdateModelProviderInput = {
   id?: string;
   projectId: string;
+  name?: string;
   provider: string;
   enabled: boolean;
   customKeys?: Record<string, unknown> | null;
@@ -23,6 +41,22 @@ export type UpdateModelProviderInput = {
   customEmbeddingsModels?: CustomModelsInput | null;
   extraHeaders?: { key: string; value: string }[] | null;
   defaultModel?: string;
+  /**
+   * Full scope set for this credential. When omitted on create, defaults
+   * to `[{ scopeType: "PROJECT", scopeId: projectId }]` for backward
+   * compatibility; when omitted on update, the existing scope set is
+   * preserved. Replace-all semantics: passing `[]` is rejected at the
+   * router boundary.
+   */
+  scopes?: ScopeInput[];
+  /**
+   * Legacy single-scope inputs kept so existing form callers still
+   * compile during the transition. When both `scopes` and these legacy
+   * fields arrive, `scopes` wins; otherwise the pair is promoted to a
+   * single-entry scope array.
+   */
+  scopeType?: "ORGANIZATION" | "TEAM" | "PROJECT";
+  scopeId?: string;
 };
 
 export type DeleteModelProviderInput = {
@@ -116,7 +150,20 @@ export class ModelProviderService {
    * - Smart merging: preserves original keys when masked placeholder is sent
    * - Can optionally update project default model
    */
-  async updateModelProvider(input: UpdateModelProviderInput) {
+  /**
+   * Authorizes a write that lands the given set of scope entries on a
+   * ModelProvider. Every entry must pass the per-scope manage check; a
+   * single failure rejects the entire operation (no partial apply).
+   *
+   * When `ctx` is omitted the check is skipped — that path is reserved
+   * for migrations, workers, and other server-internal callers that
+   * already have a trusted root context. tRPC routers and any other
+   * user-driven entrypoint MUST pass ctx.
+   */
+  async updateModelProvider(
+    input: UpdateModelProviderInput,
+    ctx?: AuthzContext,
+  ) {
     const {
       id,
       projectId,
@@ -127,6 +174,7 @@ export class ModelProviderService {
       customEmbeddingsModels,
       extraHeaders,
       defaultModel,
+      name,
     } = input;
 
     // Validate provider exists
@@ -147,6 +195,23 @@ export class ModelProviderService {
       projectId,
     );
 
+    // Resolve input scope set. Callers may pass `scopes: [...]` directly,
+    // or a single-scope pair via the legacy `scopeType`/`scopeId` fields.
+    // When neither is given, defer to the create/update defaults.
+    const scopes: ScopeInput[] | undefined =
+      input.scopes ??
+      (input.scopeType && input.scopeId
+        ? [{ scopeType: input.scopeType, scopeId: input.scopeId }]
+        : undefined);
+
+    // Fail-closed scope authz. Every (scopeType, scopeId) entry in the
+    // target set must pass the caller's manage-permission check; a
+    // single failure aborts the whole operation so partial-success
+    // cannot silently rebind a credential the caller can't see.
+    if (ctx && scopes) {
+      await assertCanManageAllScopes(ctx, scopes);
+    }
+
     return await this.prisma.$transaction(async (tx) => {
       let result;
 
@@ -157,6 +222,8 @@ export class ModelProviderService {
             projectId,
             provider,
             enabled,
+            name,
+            scopes,
             customModels: customModels ?? [],
             customEmbeddingsModels: customEmbeddingsModels ?? [],
             extraHeaders: extraHeaders ?? [],
@@ -171,6 +238,8 @@ export class ModelProviderService {
             projectId,
             provider,
             enabled,
+            name: name ?? this.deriveDefaultName(provider),
+            scopes,
             customModels: customModels ?? undefined,
             customEmbeddingsModels: customEmbeddingsModels ?? undefined,
             extraHeaders: extraHeaders ?? [],
@@ -194,16 +263,110 @@ export class ModelProviderService {
   }
 
   /**
-   * Deletes a model provider.
+   * Humanized default name for a brand-new ModelProvider when the caller
+   * didn't supply one. Mirrors the backfill in migration
+   * 20260419230000. For collisions within an org the service auto-
+   * suffixes at write time — that suffix logic is handled by the router
+   * because it needs access to the organization id.
    */
-  async deleteModelProvider(input: DeleteModelProviderInput) {
+  private deriveDefaultName(provider: string): string {
+    const humanized: Record<string, string> = {
+      openai: "OpenAI",
+      anthropic: "Anthropic",
+      gemini: "Gemini",
+      azure: "Azure OpenAI",
+      bedrock: "Bedrock",
+      vertex_ai: "Vertex AI",
+      deepseek: "DeepSeek",
+      xai: "xAI",
+      cerebras: "Cerebras",
+      groq: "Groq",
+      azure_safety: "Azure Safety",
+      custom: "Custom (OpenAI-compatible)",
+      cloudflare: "Cloudflare",
+      mistral: "Mistral",
+      cohere: "Cohere",
+      fireworks_ai: "Fireworks AI",
+    };
+    return (
+      humanized[provider] ??
+      provider
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+    );
+  }
+
+  /**
+   * Deletes a model provider.
+   *
+   * Scope authz: the caller must hold the manage-permission on EVERY
+   * current scope entry. A team-level admin cannot silently blow up an
+   * org-shared credential from under an organization they don't
+   * manage.
+   */
+  async deleteModelProvider(
+    input: DeleteModelProviderInput,
+    ctx?: AuthzContext,
+  ) {
     const { id, projectId, provider } = input;
+
+    if (ctx) {
+      const existing = id
+        ? await this.repository.findById(id, projectId)
+        : await this.repository.findByProvider(provider, projectId);
+      if (!existing) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Model provider not found for this project",
+        });
+      }
+      await assertCanManageAllScopes(
+        ctx,
+        existing.scopes.map((s) => ({
+          scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+          scopeId: s.scopeId,
+        })),
+      );
+    }
 
     if (id) {
       return await this.repository.delete(id, projectId);
     } else {
       return await this.repository.deleteByProvider(provider, projectId);
     }
+  }
+
+  /**
+   * Scope-aware read gate for getById. Returns the row when the caller
+   * can see any of its scope entries, otherwise surfaces NOT_FOUND so
+   * clients can't probe ids across tenants.
+   */
+  async getById(
+    id: string,
+    projectId: string,
+    ctx: AuthzContext,
+  ): Promise<ModelProviderWithScopes> {
+    const existing = await this.repository.findById(id, projectId);
+    if (!existing) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Model provider not found",
+      });
+    }
+    const readable = await canReadAnyScope(
+      ctx,
+      existing.scopes.map((s) => ({
+        scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+        scopeId: s.scopeId,
+      })),
+    );
+    if (!readable) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Model provider not found",
+      });
+    }
+    return existing;
   }
 
   // ─────────────────────────────────────────────────────────────────
@@ -247,7 +410,15 @@ export class ModelProviderService {
     defaultProviders: Record<string, MaybeStoredModelProvider>,
     includeKeys: boolean,
   ): Promise<Record<string, MaybeStoredModelProvider>> {
-    const savedProviders = await this.repository.findAll(projectId);
+    // Walk the multi-scope access relation: every MP whose scope set
+    // intersects the project's (projectId, teamId, organizationId) is
+    // returned. When the same provider string appears multiple times
+    // (e.g. an ORG row and a PROJECT override), narrower-scope wins for
+    // the legacy `Record<provider, …>` shape we still return here —
+    // new consumers that need the full list should call
+    // `listAccessibleForProject` directly on the service.
+    const savedProviders =
+      await this.repository.findAllAccessibleForProject(projectId);
 
     return savedProviders
       .filter((mp) => this.shouldKeepModelProvider(mp, defaultProviders))
@@ -266,8 +437,11 @@ export class ModelProviderService {
             "embedding",
           );
 
+          const narrowestScope = this.pickNarrowestScope(mp.scopes);
+
           const provider_: MaybeStoredModelProvider = {
             id: mp.id,
+            name: mp.name,
             provider: mp.provider,
             enabled: mp.enabled,
             customKeys: includeKeys ? mp.customKeys : null,
@@ -284,12 +458,62 @@ export class ModelProviderService {
             extraHeaders: mp.extraHeaders as
               | { key: string; value: string }[]
               | null,
+            scopes: mp.scopes.map((s) => ({
+              scopeType: s.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+              scopeId: s.scopeId,
+            })),
+            scopeType: narrowestScope.scopeType,
+            scopeId: narrowestScope.scopeId,
           };
 
-          return { ...acc, [mp.provider]: provider_ };
+          // Narrower-scope wins when the same provider string has
+          // multiple accessible rows (preserves iter 107/108 semantics
+          // for the Record<provider, …> consumers).
+          const existing = acc[mp.provider];
+          if (!existing || this.isNarrower(provider_, existing)) {
+            return { ...acc, [mp.provider]: provider_ };
+          }
+          return acc;
         },
         {} as Record<string, MaybeStoredModelProvider>,
       );
+  }
+
+  private scopePriority(
+    scopeType: "ORGANIZATION" | "TEAM" | "PROJECT" | undefined,
+  ): number {
+    if (scopeType === "PROJECT") return 3;
+    if (scopeType === "TEAM") return 2;
+    if (scopeType === "ORGANIZATION") return 1;
+    return 0;
+  }
+
+  private pickNarrowestScope(
+    scopes: { scopeType: string; scopeId: string }[],
+  ): { scopeType: "ORGANIZATION" | "TEAM" | "PROJECT"; scopeId: string } {
+    if (scopes.length === 0) {
+      return { scopeType: "PROJECT", scopeId: "" };
+    }
+    const sorted = [...scopes].sort(
+      (a, b) =>
+        this.scopePriority(
+          b.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+        ) -
+        this.scopePriority(
+          a.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+        ),
+    );
+    return {
+      scopeType: sorted[0]!.scopeType as "ORGANIZATION" | "TEAM" | "PROJECT",
+      scopeId: sorted[0]!.scopeId,
+    };
+  }
+
+  private isNarrower(
+    a: MaybeStoredModelProvider,
+    b: MaybeStoredModelProvider,
+  ): boolean {
+    return this.scopePriority(a.scopeType) > this.scopePriority(b.scopeType);
   }
 
   /**
@@ -406,6 +630,8 @@ export class ModelProviderService {
       projectId: string;
       provider: string;
       enabled: boolean;
+      name?: string;
+      scopes?: ScopeInput[];
       customModels: CustomModelsInput;
       customEmbeddingsModels: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
@@ -431,6 +657,8 @@ export class ModelProviderService {
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
         extraHeaders: data.extraHeaders,
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.scopes !== undefined && { scopes: data.scopes }),
         ...(customKeysToSave !== undefined && {
           customKeys: customKeysToSave,
         }),
@@ -442,11 +670,13 @@ export class ModelProviderService {
   private async createNew(
     data: {
       projectId: string;
+      name: string;
       provider: string;
       enabled: boolean;
       customModels?: CustomModelsInput;
       customEmbeddingsModels?: CustomModelsInput;
       extraHeaders: { key: string; value: string }[];
+      scopes?: ScopeInput[];
     },
     validatedKeys: Record<string, unknown> | null,
     customKeysProvided: boolean,
@@ -455,11 +685,13 @@ export class ModelProviderService {
     return await this.repository.create(
       {
         projectId: data.projectId,
+        name: data.name,
         provider: data.provider,
         enabled: data.enabled,
         customModels: data.customModels,
         customEmbeddingsModels: data.customEmbeddingsModels,
         extraHeaders: data.extraHeaders,
+        scopes: data.scopes,
         ...(customKeysProvided &&
           validatedKeys && { customKeys: validatedKeys }),
       },

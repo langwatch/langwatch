@@ -10,10 +10,14 @@
  * - Tests can inject mocks without vi.mock
  */
 
+import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 import { env } from "~/env.mjs";
+import { normalizeToSnakeCase } from "~/optimization_studio/components/properties/llm-configs/normalizeToSnakeCase";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { createLogger } from "~/utils/logger/server";
+import { getInputsOutputs } from "../../../optimization_studio/utils/nodeUtils";
+import { validateWorkflowAgentMappings } from "./validate-workflow-mappings";
 
 const logger = createLogger("langwatch:scenarios:data-prefetcher");
 import {
@@ -24,17 +28,20 @@ import { AgentRepository, type TypedAgent } from "../../agents/agent.repository"
 import { prisma } from "../../db";
 import { PromptService, type VersionedPrompt } from "../../prompt-config/prompt.service";
 import { ScenarioService } from "../scenario.service";
+import { decrypt } from "~/utils/encryption";
 import {
   AuthConfigSchema,
   type ChildProcessJobData,
   type CodeAgentData,
   type ExecutionContext,
+  FieldMappingSchema,
   type HttpAgentData,
   type LiteLLMParams,
   type PromptConfigData,
   type ScenarioConfig,
   type TargetAdapterData,
   type TargetConfig,
+  type WorkflowAgentData,
 } from "./types";
 
 // ============================================================================
@@ -65,12 +72,33 @@ export interface AgentFetcher {
   findById(params: { projectId: string; id: string }): Promise<TypedAgent | null>;
 }
 
+/**
+ * Minimal interface for workflow version lookup - loads the latest DSL
+ * for a workflow so the worker-thread adapter can execute it without DB access.
+ */
+export interface WorkflowVersionFetcher {
+  getLatestDsl(params: {
+    projectId: string;
+    workflowId: string;
+  }): Promise<{ workflowId: string; dsl: Record<string, unknown> } | null>;
+}
+
 /** Minimal interface for project lookup */
 export interface ProjectFetcher {
   findUnique(projectId: string): Promise<{
     apiKey: string | null;
     defaultModel: string | null;
   } | null>;
+}
+
+/**
+ * Loads decrypted project secrets (name → plaintext value) for injection into
+ * code and workflow agent DSL payloads. Mirrors the studio's addEnvs behavior
+ * so `secrets.NAME` resolves the same way whether the workflow runs from the
+ * UI or from a scenario worker.
+ */
+export interface ProjectSecretsFetcher {
+  getSecrets(projectId: string): Promise<Record<string, string>>;
 }
 
 /** Reason codes for model params preparation failures */
@@ -96,8 +124,10 @@ export interface DataPrefetcherDependencies {
   scenarioFetcher: ScenarioFetcher;
   promptFetcher: PromptFetcher;
   agentFetcher: AgentFetcher;
+  workflowVersionFetcher: WorkflowVersionFetcher;
   projectFetcher: ProjectFetcher;
   modelParamsProvider: ModelParamsProvider;
+  projectSecretsFetcher: ProjectSecretsFetcher;
 }
 
 // ============================================================================
@@ -154,13 +184,33 @@ export async function prefetchScenarioData(
   }
   const project = projectResult.data;
 
-  const adapterData = await fetchAgentData(context.projectId, target, deps);
+  const adapterResult = await fetchAgentData(context.projectId, target, deps);
+  if (adapterResult !== null && "success" in adapterResult && !adapterResult.success) {
+    // Hydration failure from workflow DSL — surface structured error
+    logger.warn(
+      { projectId: context.projectId, targetType: target.type, reason: adapterResult.reason },
+      `Workflow LLM hydration failed: ${adapterResult.message}`,
+    );
+    return {
+      success: false,
+      error: adapterResult.message,
+      reason: adapterResult.reason,
+    };
+  }
+  const adapterData = adapterResult as TargetAdapterData | null;
   if (!adapterData) {
     logger.warn(
       { projectId: context.projectId, targetType: target.type, targetReferenceId: target.referenceId },
       "Target adapter not found",
     );
-    const targetLabel = target.type === "prompt" ? "Prompt" : target.type === "code" ? "Code agent" : "HTTP agent";
+    const targetLabel =
+      target.type === "prompt"
+        ? "Prompt"
+        : target.type === "code"
+          ? "Code agent"
+          : target.type === "workflow"
+            ? "Workflow agent"
+            : "HTTP agent";
     return {
       success: false,
       error: `${targetLabel} ${target.referenceId} not found`,
@@ -201,7 +251,7 @@ export async function prefetchScenarioData(
       target,
     },
     telemetry: {
-      endpoint: env.BASE_HOST ?? "https://app.langwatch.ai",
+      endpoint: process.env.LANGWATCH_ENDPOINT!,
       apiKey: project.apiKey,
     },
   };
@@ -252,16 +302,34 @@ async function fetchProject(
   };
 }
 
+/** Failure result propagated from hydrateLlmParameters through the fetch chain */
+type HydrationFailure = { success: false; reason: ModelParamsFailureReason; message: string };
+
 async function fetchAgentData(
   projectId: string,
   target: TargetConfig,
   deps: DataPrefetcherDependencies,
-): Promise<TargetAdapterData | null> {
+): Promise<TargetAdapterData | HydrationFailure | null> {
   if (target.type === "prompt") {
     return fetchPromptConfigData(projectId, target.referenceId, deps.promptFetcher);
   }
   if (target.type === "code") {
-    return fetchCodeAgentData(projectId, target.referenceId, deps.agentFetcher);
+    return fetchCodeAgentData(
+      projectId,
+      target.referenceId,
+      deps.agentFetcher,
+      deps.projectSecretsFetcher,
+    );
+  }
+  if (target.type === "workflow") {
+    return fetchWorkflowAgentData({
+      projectId,
+      agentId: target.referenceId,
+      agentFetcher: deps.agentFetcher,
+      workflowVersionFetcher: deps.workflowVersionFetcher,
+      modelParamsProvider: deps.modelParamsProvider,
+      projectSecretsFetcher: deps.projectSecretsFetcher,
+    });
   }
   return fetchHttpAgentData(projectId, target.referenceId, deps.agentFetcher);
 }
@@ -302,6 +370,7 @@ const HttpAgentConfigSchema = z.object({
   auth: AuthConfigSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
 
 async function fetchHttpAgentData(
@@ -327,6 +396,7 @@ async function fetchHttpAgentData(
     auth: config.auth,
     bodyTemplate: config.bodyTemplate,
     outputPath: config.outputPath,
+    scenarioMappings: config.scenarioMappings,
   };
 }
 
@@ -348,12 +418,15 @@ const RawCodeAgentConfigSchema = z.object({
     identifier: z.string(),
     type: z.string(),
   })).optional(),
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  scenarioOutputField: z.string().optional(),
 });
 
 async function fetchCodeAgentData(
   projectId: string,
   agentId: string,
   fetcher: AgentFetcher,
+  projectSecretsFetcher: ProjectSecretsFetcher,
 ): Promise<CodeAgentData | null> {
   const agent = await fetcher.findById({ projectId, id: agentId });
   if (!agent || agent.type !== "code") return null;
@@ -371,13 +444,290 @@ async function fetchCodeAgentData(
     return null;
   }
 
+  const secrets = await projectSecretsFetcher.getSecrets(projectId);
+
   return {
     type: "code",
     agentId: agent.id,
     code: codeParam.value,
     inputs: config.inputs ?? [],
     outputs: config.outputs ?? [],
+    scenarioMappings: config.scenarioMappings,
+    scenarioOutputField: config.scenarioOutputField,
+    secrets,
   };
+}
+
+/**
+ * Zod schema for workflow agent config validation.
+ * Workflow agents reference a workflow by id; scenarioMappings/scenarioOutputField
+ * are the same shape used by code and HTTP agents.
+ */
+const RawWorkflowAgentConfigSchema = z.object({
+  workflow_id: z.string().optional(),
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  scenarioOutputField: z.string().optional(),
+});
+
+/** Shape of entry/end node fields extracted from a workflow DSL. */
+interface WorkflowField {
+  identifier: string;
+  type: string;
+}
+
+async function fetchWorkflowAgentData({
+  projectId,
+  agentId,
+  agentFetcher,
+  workflowVersionFetcher,
+  modelParamsProvider,
+  projectSecretsFetcher,
+}: {
+  projectId: string;
+  agentId: string;
+  agentFetcher: AgentFetcher;
+  workflowVersionFetcher: WorkflowVersionFetcher;
+  modelParamsProvider: ModelParamsProvider;
+  projectSecretsFetcher: ProjectSecretsFetcher;
+}): Promise<WorkflowAgentData | HydrationFailure | null> {
+  const agent = await agentFetcher.findById({ projectId, id: agentId });
+  if (!agent || agent.type !== "workflow") return null;
+
+  const parseResult = RawWorkflowAgentConfigSchema.safeParse(agent.config);
+  if (!parseResult.success) return null;
+  const config = parseResult.data;
+
+  // workflowId can live on the Agent row or inside the DSL config. Prefer the
+  // agent row (set when the agent was created by WorkflowSelectorDrawer).
+  const workflowId =
+    (agent as TypedAgent & { workflowId?: string | null }).workflowId ??
+    config.workflow_id ??
+    null;
+  if (!workflowId) return null;
+
+  const latest = await workflowVersionFetcher.getLatestDsl({
+    projectId,
+    workflowId,
+  });
+  if (!latest) return null;
+
+  const hydrateResult = await hydrateLlmParameters({
+    dsl: latest.dsl,
+    projectId,
+    modelParamsProvider,
+  });
+
+  if (!hydrateResult.success) {
+    return { success: false, reason: hydrateResult.reason, message: hydrateResult.message };
+  }
+
+  const { inputs, outputs } = extractWorkflowIO(hydrateResult.dsl);
+
+  const secrets = await projectSecretsFetcher.getSecrets(projectId);
+
+  const data: WorkflowAgentData = {
+    type: "workflow",
+    agentId: agent.id,
+    workflowId: latest.workflowId,
+    workflow: hydrateResult.dsl,
+    inputs,
+    outputs,
+    scenarioMappings: config.scenarioMappings,
+    scenarioOutputField: config.scenarioOutputField,
+    secrets,
+  };
+
+  validateWorkflowAgentMappings(data);
+
+  return data;
+}
+
+/** Discriminated result type returned by hydrateLlmParameters */
+type HydrateLlmResult =
+  | { success: true; dsl: Record<string, unknown> }
+  | { success: false; reason: ModelParamsFailureReason; message: string };
+
+/**
+ * Injects litellm_params into every llm-type parameter across all DSL nodes.
+ *
+ * Mirrors addEnvs.ts node-parameter hydration but uses the prefetcher's
+ * ModelParamsProvider abstraction so the child process never needs DB access.
+ * We dedupe by model string to avoid N provider lookups for N identical nodes.
+ *
+ * Provider-lookup failures are surfaced as structured failures rather than
+ * silently skipped — a partial hydration still reaches the NLP service with
+ * "dummy" api_key and causes the same AuthenticationError this PR fixes.
+ */
+async function hydrateLlmParameters({
+  dsl,
+  projectId,
+  modelParamsProvider,
+}: {
+  dsl: Record<string, unknown>;
+  projectId: string;
+  modelParamsProvider: ModelParamsProvider;
+}): Promise<HydrateLlmResult> {
+  const nodes = Array.isArray(dsl.nodes) ? (dsl.nodes as unknown[]) : [];
+  if (nodes.length === 0) return { success: true, dsl };
+
+  // Resolve the fallback model: workflow.default_llm.model or DEFAULT_MODEL
+  const defaultLlm =
+    typeof dsl.default_llm === "object" && dsl.default_llm !== null
+      ? (dsl.default_llm as Record<string, unknown>)
+      : null;
+  const defaultModel =
+    typeof defaultLlm?.model === "string" && defaultLlm.model.length > 0
+      ? defaultLlm.model
+      : DEFAULT_MODEL;
+
+  // Collect unique models needed before hitting the provider
+  const modelsNeeded = new Set<string>();
+  for (const node of nodes) {
+    if (typeof node !== "object" || node === null) continue;
+    const n = node as Record<string, unknown>;
+    const nodeData =
+      typeof n.data === "object" && n.data !== null
+        ? (n.data as Record<string, unknown>)
+        : null;
+    const rawParameters = nodeData?.parameters;
+    const parameters = Array.isArray(rawParameters) ? (rawParameters as unknown[]) : [];
+    for (const param of parameters) {
+      if (typeof param !== "object" || param === null) continue;
+      const p = param as Record<string, unknown>;
+      if (p.type !== "llm") continue;
+      const value = typeof p.value === "object" && p.value !== null
+        ? (p.value as Record<string, unknown>)
+        : null;
+      const model =
+        typeof value?.model === "string" && value.model.length > 0
+          ? value.model
+          : defaultModel;
+      modelsNeeded.add(model);
+    }
+  }
+
+  if (modelsNeeded.size === 0) return { success: true, dsl };
+
+  // Fetch litellm_params for each unique model — fail fast on first failure.
+  // Partial hydration is not safe: a partially-hydrated DSL still reaches the
+  // NLP service with "dummy" api_key for the un-hydrated nodes.
+  const litellmParamsByModel = new Map<string, Record<string, unknown>>();
+  const prepareResults = await Promise.all(
+    Array.from(modelsNeeded).map(async (model) => {
+      const result = await modelParamsProvider.prepare(projectId, model);
+      return { model, result };
+    }),
+  );
+
+  for (const { model, result } of prepareResults) {
+    if (!result.success) {
+      logger.warn(
+        { projectId, model, reason: result.reason },
+        `Failed to hydrate llm parameter: ${result.message}`,
+      );
+      return { success: false, reason: result.reason, message: result.message };
+    }
+    litellmParamsByModel.set(model, result.params as Record<string, unknown>);
+  }
+
+  const hydratedNodes = nodes.map((node) => {
+    if (typeof node !== "object" || node === null) return node;
+    const n = node as Record<string, unknown>;
+    const data =
+      typeof n.data === "object" && n.data !== null
+        ? (n.data as Record<string, unknown>)
+        : null;
+    if (!data) return node;
+
+    const parameters = Array.isArray(data.parameters)
+      ? (data.parameters as unknown[])
+      : null;
+    if (!parameters) return node;
+
+    const hydratedParams = parameters.map((param) => {
+      if (typeof param !== "object" || param === null) return param;
+      const p = param as Record<string, unknown>;
+      if (p.type !== "llm") return param;
+
+      const existingValue =
+        typeof p.value === "object" && p.value !== null
+          ? (p.value as Record<string, unknown>)
+          : null;
+      const model =
+        typeof existingValue?.model === "string" && existingValue.model.length > 0
+          ? existingValue.model
+          : defaultModel;
+
+      const litellmParams = litellmParamsByModel.get(model);
+      if (!litellmParams) return param;
+
+      // Use existing value if present, otherwise fall back to default_llm or { model }.
+      // Normalize to snake_case to match addEnvs.ts behaviour (e.g. maxTokens → max_tokens).
+      const rawBaseValue =
+        existingValue ??
+        defaultLlm ??
+        { model };
+      // Cast through unknown then to the expected intersection type — rawBaseValue is opaque
+      // Record<string, unknown> from the DSL and normalizeToSnakeCase is safe on any object.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const normalizedBase = normalizeToSnakeCase(rawBaseValue as any);
+
+      // Guarantee top-level `model` — partial existingValue (e.g. only `temperature`) would
+      // otherwise pass through without one, diverging from addEnvs.ts which derives model via
+      // LLMConfig contract. Downstream NLP reads value.model directly.
+      return {
+        ...p,
+        value: { ...normalizedBase, model, litellm_params: litellmParams },
+      };
+    });
+
+    return { ...n, data: { ...data, parameters: hydratedParams } };
+  });
+
+  return { success: true, dsl: { ...dsl, nodes: hydratedNodes } };
+}
+
+/**
+ * Extract declared entry inputs and end outputs from an opaque workflow DSL.
+ *
+ * The DSL is stored as `Record<string, unknown>` (JSON column), so we narrow
+ * into the `Edge[]`/`Node[]` shape `getInputsOutputs` expects and then flatten
+ * its loose return value into typed `WorkflowField`s. Workflows without an
+ * entry/end node yield empty arrays; the adapter synthesises a single
+ * `input`/`output` identifier as a fallback.
+ */
+function extractWorkflowIO(dsl: Record<string, unknown>): {
+  inputs: WorkflowField[];
+  outputs: WorkflowField[];
+} {
+  const nodes = (Array.isArray(dsl.nodes) ? dsl.nodes : []) as Node[];
+  const edges = (Array.isArray(dsl.edges) ? dsl.edges : []) as Edge[];
+
+  const { inputs: rawInputs, outputs: rawOutputs } = getInputsOutputs(
+    edges,
+    nodes,
+  );
+
+  const inputs: WorkflowField[] = (rawInputs ?? []).flatMap((i) =>
+    typeof i.identifier === "string"
+      ? [{ identifier: i.identifier, type: "str" }]
+      : [],
+  );
+
+  const outputs: WorkflowField[] = (Array.isArray(rawOutputs) ? rawOutputs : [])
+    .flatMap((o: unknown): WorkflowField[] => {
+      if (typeof o !== "object" || o === null) return [];
+      const field = o as { identifier?: unknown; type?: unknown };
+      if (typeof field.identifier !== "string") return [];
+      return [
+        {
+          identifier: field.identifier,
+          type: typeof field.type === "string" ? field.type : "str",
+        },
+      ];
+    });
+
+  return { inputs, outputs };
 }
 
 // ============================================================================
@@ -410,12 +760,53 @@ export function createDataPrefetcherDependencies(): DataPrefetcherDependencies {
     agentFetcher: {
       findById: (params) => agentRepository.findById(params),
     },
+    workflowVersionFetcher: {
+      getLatestDsl: async ({ projectId, workflowId }) => {
+        const workflow = await prisma.workflow.findFirst({
+          where: { id: workflowId, projectId, archivedAt: null },
+          select: { id: true, latestVersionId: true },
+        });
+        if (!workflow?.latestVersionId) return null;
+        const version = await prisma.workflowVersion.findFirst({
+          where: { id: workflow.latestVersionId, projectId },
+          select: { dsl: true },
+        });
+        if (!version) return null;
+        return {
+          workflowId: workflow.id,
+          dsl: version.dsl as unknown as Record<string, unknown>,
+        };
+      },
+    },
     projectFetcher: {
       findUnique: async (projectId) =>
         prisma.project.findUnique({
           where: { id: projectId },
           select: { apiKey: true, defaultModel: true },
         }),
+    },
+    projectSecretsFetcher: {
+      getSecrets: async (projectId) => {
+        const rows = await prisma.projectSecret.findMany({
+          where: { projectId },
+          select: { name: true, encryptedValue: true },
+        });
+        const secrets: Record<string, string> = {};
+        for (const row of rows) {
+          try {
+            secrets[row.name] = decrypt(row.encryptedValue);
+          } catch (err) {
+            // Wrap per-secret so a single corrupt row yields a readable error
+            // instead of a raw crypto stack trace surfacing at the caller.
+            throw new Error(
+              `Failed to decrypt project secret "${row.name}": ${
+                err instanceof Error ? err.message : String(err)
+              }`,
+            );
+          }
+        }
+        return secrets;
+      },
     },
     modelParamsProvider: {
       prepare: async (projectId, model): Promise<ModelParamsResult> => {

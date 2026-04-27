@@ -600,4 +600,91 @@ describe("SignaturePromptEditorBridge", () => {
       expect(capturedProps.inputMappings).toEqual({});
     });
   });
+
+  describe("when output type changes but identifier stays the same", () => {
+    it("updates node outputs with the new type", () => {
+      const node = createSignatureNode({
+        outputs: [{ identifier: "answer", type: "str" }],
+      });
+      render(<SignaturePromptEditorBridge node={node} />);
+
+      capturedProps.onLocalConfigChange({
+        llm: { model: "gpt-4" },
+        messages: [],
+        inputs: [{ identifier: "question", type: "str" }],
+        outputs: [{ identifier: "answer", type: "float" }],
+      });
+
+      expect(mockSetNode).toHaveBeenCalledWith({
+        id: "llm-1",
+        data: expect.objectContaining({
+          outputs: [{ identifier: "answer", type: "float" }],
+        }),
+      });
+    });
+  });
+
+  describe("when input type changes but identifier stays the same", () => {
+    it("updates node inputs with the new type", () => {
+      const node = createSignatureNode({
+        inputs: [{ identifier: "question", type: "str" }],
+      });
+      render(<SignaturePromptEditorBridge node={node} />);
+
+      capturedProps.onLocalConfigChange({
+        llm: { model: "gpt-4" },
+        messages: [],
+        inputs: [{ identifier: "question", type: "float" }],
+        outputs: [{ identifier: "answer", type: "str" }],
+      });
+
+      expect(mockSetNode).toHaveBeenCalledWith({
+        id: "llm-1",
+        data: expect.objectContaining({
+          inputs: [{ identifier: "question", type: "float" }],
+        }),
+      });
+    });
+  });
+
+  describe("when output type changes to json_schema", () => {
+    it("includes json_schema data in the updated outputs", () => {
+      const node = createSignatureNode({
+        outputs: [{ identifier: "answer", type: "str" }],
+      });
+      render(<SignaturePromptEditorBridge node={node} />);
+
+      capturedProps.onLocalConfigChange({
+        llm: { model: "gpt-4" },
+        messages: [],
+        inputs: [{ identifier: "question", type: "str" }],
+        outputs: [
+          {
+            identifier: "answer",
+            type: "json_schema",
+            json_schema: {
+              type: "object",
+              properties: { result: { type: "string" } },
+            },
+          },
+        ],
+      });
+
+      expect(mockSetNode).toHaveBeenCalledWith({
+        id: "llm-1",
+        data: expect.objectContaining({
+          outputs: [
+            expect.objectContaining({
+              identifier: "answer",
+              type: "json_schema",
+              json_schema: {
+                type: "object",
+                properties: { result: { type: "string" } },
+              },
+            }),
+          ],
+        }),
+      });
+    });
+  });
 });

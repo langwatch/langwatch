@@ -48,13 +48,13 @@ export type EvaluatorResultChipProps = {
  */
 const DataTooltipContent = ({ inputs }: { inputs: Record<string, unknown> }) => (
   <VStack align="stretch" gap={1} padding={2} maxWidth="300px">
-    <Text fontSize="12px" fontWeight="semibold" color="white" marginBottom={1}>
+    <Text fontSize="12px" fontWeight="semibold" color="fg" marginBottom={1}>
       Evaluator Inputs
     </Text>
     <Box
       fontSize="11px"
       fontFamily="mono"
-      color="gray.300"
+      color="fg.muted"
       whiteSpace="pre-wrap"
       wordBreak="break-word"
       maxHeight="250px"
@@ -126,26 +126,26 @@ export function EvaluatorResultChip({
       <VStack align="stretch" gap={1} padding={2}>
         {score !== undefined && (
           <HStack justify="space-between" gap={4}>
-            <Text fontSize="12px" color="gray.300">
+            <Text fontSize="12px" color="fg.muted">
               Score:
             </Text>
-            <Text fontSize="12px" fontWeight="semibold" color="white">
+            <Text fontSize="12px" fontWeight="semibold" color="fg">
               {score.toFixed(2)}
             </Text>
           </HStack>
         )}
         {label && (
           <HStack justify="space-between" gap={4}>
-            <Text fontSize="12px" color="gray.300">
+            <Text fontSize="12px" color="fg.muted">
               Label:
             </Text>
-            <Text fontSize="12px" fontWeight="semibold" color="white">
+            <Text fontSize="12px" fontWeight="semibold" color="fg">
               {label}
             </Text>
           </HStack>
         )}
         <HStack justify="space-between" gap={4}>
-          <Text fontSize="12px" color="gray.300">
+          <Text fontSize="12px" color="fg.muted">
             Status:
           </Text>
           <Text fontSize="12px" fontWeight="semibold" color={statusColor}>
@@ -159,7 +159,7 @@ export function EvaluatorResultChip({
             </Text>
             <Text
               fontSize="12px"
-              color="gray.300"
+              color="fg.muted"
               whiteSpace="pre-wrap"
               maxHeight="200px"
               overflow="auto"
@@ -179,17 +179,17 @@ export function EvaluatorResultChip({
             <HStack
               justify="space-between"
               cursor="pointer"
-              _hover={{ bg: "white/10" }}
+              _hover={{ bg: "bg.muted" }}
               marginX={-2}
               paddingX={2}
               paddingY={1}
               borderRadius="md"
               marginTop={1}
             >
-              <Text fontSize="12px" color="gray.300">
+              <Text fontSize="12px" color="fg.muted">
                 Data
               </Text>
-              <Icon as={LuChevronRight} boxSize={3} color="white/50" />
+              <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" />
             </HStack>
           </Tooltip>
         )}

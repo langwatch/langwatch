@@ -24,6 +24,7 @@ from langwatch_nlp.studio.types.events import (
 from langwatch_nlp.studio.utils import (
     disable_dsp_caching,
     get_input_keys,
+    optional_langwatch_trace,
     transpose_inline_dataset_to_object_list,
 )
 
@@ -67,6 +68,8 @@ async def execute_evaluation(
             module.prevent_crashes()
 
             langwatch.setup(workflow.api_key)
+
+            origin = event.origin or "evaluation"
 
             entry_node = cast(
                 EntryNode,
@@ -158,7 +161,12 @@ async def execute_evaluation(
             )
             # Send initial empty batch to create the experiment in LangWatch
             reporting.send_batch()
-            await asyncify(evaluator)(module, metric=reporting.evaluate_and_report)  # type: ignore
+            with optional_langwatch_trace(
+                name="execute_evaluation",
+                type="evaluation",
+                origin=origin,
+            ):
+                await asyncify(evaluator)(module, metric=reporting.evaluate_and_report)  # type: ignore
             eval_logger.info(
                 "Evaluation execution complete, waiting for batch sends: run_id=%s",
                 run_id,

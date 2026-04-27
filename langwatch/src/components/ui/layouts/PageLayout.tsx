@@ -62,6 +62,10 @@ function Header({
       borderBottom={withBorder ? "1px solid" : undefined}
       borderBottomColor={withBorder ? "border" : undefined}
       gap={2}
+      position="sticky"
+      top={0}
+      zIndex={10}
+      background="bg.surface"
       {...props}
     >
       {children}

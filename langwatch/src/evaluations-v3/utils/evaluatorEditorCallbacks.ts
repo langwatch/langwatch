@@ -8,54 +8,120 @@
  * Mirrors the pattern in promptEditorCallbacks.ts for prompt targets.
  */
 
+import type { FieldMapping as UIFieldMapping } from "~/components/variables";
 import type { LocalEvaluatorConfig } from "../types";
 
 /**
- * Parameters required to create evaluator editor callbacks.
- * All fields are required to ensure we don't forget anything.
+ * Parameters to create evaluator editor callbacks.
+ *
+ * Two ways to wire `onLocalConfigChange`:
+ *
+ * 1. **Direct** — pass `onLocalConfigChange` (recommended for sites that
+ *    don't need the evaluations-v3 target-bound convenience, e.g. an
+ *    evaluator chip whose local config updates an evaluator, not a target).
+ *
+ * 2. **Target-bound convenience** — pass `targetId + updateTarget`. The
+ *    helper synthesizes `onLocalConfigChange` as
+ *    `(lc) => updateTarget(targetId, { localEvaluatorConfig: lc })`. Used by
+ *    `useOpenTargetEditor` for the prompt-target / agent-target / evaluator-
+ *    target editor flows where a real target id exists.
+ *
+ * If both are provided, the direct `onLocalConfigChange` wins and the
+ * target-bound convenience is ignored. Contexts without any local-config
+ * persistence (e.g. `OnlineEvaluationDrawer`) omit all three.
  */
 export type CreateEvaluatorEditorCallbacksParams = {
-  targetId: string;
-  updateTarget: (
+  /** Direct local-config sink (use this when no target id is available). */
+  onLocalConfigChange?: (
+    localConfig: LocalEvaluatorConfig | undefined,
+  ) => void;
+  /** Target-bound convenience: requires `updateTarget` to also be provided. */
+  targetId?: string;
+  /** Target-bound convenience: requires `targetId` to also be provided. */
+  updateTarget?: (
     id: string,
     updates: {
       localEvaluatorConfig?: LocalEvaluatorConfig;
     },
   ) => void;
+  onMappingChange?: (
+    identifier: string,
+    mapping: UIFieldMapping | undefined,
+  ) => void;
+  onSave?: (evaluator: {
+    id: string;
+    name: string;
+    evaluatorType?: string;
+  }) => boolean | void | Promise<void> | Promise<boolean>;
 };
 
 /**
  * The callbacks object returned by createEvaluatorEditorCallbacks.
- * All callbacks are required - this is what gets passed to setFlowCallbacks.
+ * All fields are optional so callers only pay for what they use.
  */
 export type EvaluatorEditorCallbacksForTarget = {
-  onLocalConfigChange: (
+  onLocalConfigChange?: (
     localConfig: LocalEvaluatorConfig | undefined,
   ) => void;
+  onMappingChange?: (
+    identifier: string,
+    mapping: UIFieldMapping | undefined,
+  ) => void;
+  onSave?: (evaluator: {
+    id: string;
+    name: string;
+    evaluatorType?: string;
+  }) => boolean | void | Promise<void> | Promise<boolean>;
 };
 
 /**
- * Creates the standard set of evaluator editor callbacks for a target in evaluations-v3.
+ * Creates a canonical set of evaluator editor flow callbacks.
  *
- * This helper ensures we always set up all required callbacks consistently.
- * If you need to add a new callback that all evaluations-v3 flows need,
- * add it here and TypeScript will enforce it everywhere.
+ * This centralizes the "open the evaluator editor" callback registration so
+ * every site routes non-serializable callbacks through `setFlowCallbacks`
+ * (durable) rather than embedding them in `mappingsConfig` (ephemeral,
+ * cleared on ErrorBoundary remount — see issue #3087).
  *
- * @example
+ * @example Direct (TargetCell evaluator chip — local config updates the evaluator, not a target):
  * ```ts
- * const callbacks = createEvaluatorEditorCallbacks({
- *   targetId,
- *   updateTarget,
- * });
- * setFlowCallbacks("evaluatorEditor", callbacks);
+ * setFlowCallbacks("evaluatorEditor",
+ *   createEvaluatorEditorCallbacks({
+ *     onLocalConfigChange: (lc) => updateEvaluator(evaluator.id, { localEvaluatorConfig: lc }),
+ *     onMappingChange,
+ *   }),
+ * );
+ * ```
+ *
+ * @example Target-bound convenience (useOpenTargetEditor — prompt/agent/evaluator-target editors):
+ * ```ts
+ * setFlowCallbacks("evaluatorEditor",
+ *   createEvaluatorEditorCallbacks({ targetId, updateTarget, onMappingChange }),
+ * );
+ * ```
+ *
+ * @example OnlineEvaluationDrawer (no target, only mapping persistence):
+ * ```ts
+ * setFlowCallbacks("evaluatorEditor",
+ *   createEvaluatorEditorCallbacks({ onMappingChange }),
+ * );
  * ```
  */
 export const createEvaluatorEditorCallbacks = ({
+  onLocalConfigChange,
   targetId,
   updateTarget,
-}: CreateEvaluatorEditorCallbacksParams): EvaluatorEditorCallbacksForTarget => ({
-  onLocalConfigChange: (localConfig) => {
-    // Only update localEvaluatorConfig for tracking unsaved changes
-    updateTarget(targetId, { localEvaluatorConfig: localConfig });
-  },
-});
+  onMappingChange,
+  onSave,
+}: CreateEvaluatorEditorCallbacksParams): EvaluatorEditorCallbacksForTarget => {
+  const callbacks: EvaluatorEditorCallbacksForTarget = {};
+  if (onLocalConfigChange) {
+    callbacks.onLocalConfigChange = onLocalConfigChange;
+  } else if (targetId !== undefined && updateTarget) {
+    callbacks.onLocalConfigChange = (localConfig) => {
+      updateTarget(targetId, { localEvaluatorConfig: localConfig });
+    };
+  }
+  if (onMappingChange) callbacks.onMappingChange = onMappingChange;
+  if (onSave) callbacks.onSave = onSave;
+  return callbacks;
+};

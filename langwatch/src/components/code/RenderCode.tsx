@@ -5,9 +5,12 @@ import { toaster } from "../ui/toaster";
 import { monokaiTheme } from "./monokaiTheme";
 
 (typeof global !== "undefined" ? global : window).Prism = Prism;
-require("prismjs/components/prism-bash");
-require("prismjs/components/prism-python");
-require("prismjs/components/prism-diff");
+// @ts-ignore — prismjs component modules lack type declarations
+void import("prismjs/components/prism-bash");
+// @ts-ignore — prismjs component modules lack type declarations
+void import("prismjs/components/prism-python");
+// @ts-ignore — prismjs component modules lack type declarations
+void import("prismjs/components/prism-diff");
 
 export const RenderCode = ({
   code,

@@ -1,0 +1,170 @@
+---
+title: Azure OpenAI Instrumentation
+sidebarTitle: Azure OpenAI
+description: Instrument Azure OpenAI API calls with the LangWatch Python SDK to capture traces, measure costs, and run agent evaluations.
+keywords: azure openai, openai, instrumentation, autotrack, openinference, openllmetry, LangWatch, Python
+---
+
+LangWatch offers robust integration with Azure OpenAI, allowing you to capture detailed information about your LLM calls automatically. There are two primary approaches to instrumenting your Azure OpenAI interactions:
+
+1.  **Using `autotrack_openai_calls()`**: This method, part of the LangWatch SDK, dynamically patches your `AzureOpenAI` client instance to capture calls made through it within a specific trace.
+2.  **Using Community OpenTelemetry Instrumentors**: Leverage existing OpenTelemetry instrumentation libraries like those from OpenInference or OpenLLMetry. These can be integrated with LangWatch by either passing them to the `langwatch.setup()` function or by using their native `instrument()` methods if you're managing your OpenTelemetry setup more directly.
+
+This guide will walk you through both methods.
+
+## Using `autotrack_openai_calls()`
+
+The `autotrack_openai_calls()` function provides a straightforward way to capture all Azure OpenAI calls made with a specific client instance for the duration of the current trace.
+
+You typically call this method on the trace object obtained via `langwatch.get_current_trace()` inside a function decorated with `@langwatch.trace()`.
+
+```python
+import langwatch
+from openai import AzureOpenAI
+import os
+
+# Ensure LANGWATCH_API_KEY is set in your environment, or set it in `setup`
+langwatch.setup()
+
+# Initialize your AzureOpenAI client
+# Ensure your Azure environment variables are set:
+# AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT_NAME
+client = AzureOpenAI(
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    api_version="2023-05-15"  # Or your preferred API version
+)
+
+
+@langwatch.trace(name="Azure OpenAI Chat Completion")
+async def get_azure_openai_chat_response(user_prompt: str):
+    # Get the current trace and enable autotracking for the 'client' instance
+    langwatch.get_current_trace().autotrack_openai_calls(client)
+
+    # All calls made with 'client' will now be automatically captured as spans
+    response = client.chat.completions.create(
+        model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"), # Use your Azure deployment name
+        messages=[{"role": "user", "content": user_prompt}],
+    )
+    completion = response.choices[0].message.content
+    return completion
+
+async def main():
+    user_query = "Tell me a fact about the Azure cloud."
+    response = await get_azure_openai_chat_response(user_query)
+    print(f"User: {user_query}")
+    print(f"AI: {response}")
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
+```
+
+Key points for `autotrack_openai_calls()` with Azure OpenAI:
+-   It must be called on an active trace object (e.g., obtained via `langwatch.get_current_trace()`).
+-   It instruments a *specific instance* of the `AzureOpenAI` client. If you have multiple clients, you'll need to call it for each one you want to track.
+-   Ensure your `AzureOpenAI` client is correctly configured with `azure_endpoint`, `api_key`, `api_version`, and you use the deployment name for the `model` parameter.
+
+## Using Community OpenTelemetry Instrumentors
+
+If you prefer to use broader OpenTelemetry-based instrumentation, or are already using libraries like `OpenInference` or `OpenLLMetry`, LangWatch can seamlessly integrate with them. These libraries provide instrumentors that automatically capture data from the `openai` library, which `AzureOpenAI` is part of.
+
+There are two main ways to integrate these:
+
+### 1. Via `langwatch.setup()`
+
+You can pass an instance of the instrumentor (e.g., `OpenAIInstrumentor` from OpenInference) to the `instrumentors` list in the `langwatch.setup()` call. LangWatch will then manage the lifecycle of this instrumentor.
+
+```python
+import langwatch
+from openai import AzureOpenAI
+import os
+
+from openinference.instrumentation.openai import OpenAIInstrumentor
+
+# Initialize LangWatch with the OpenAIInstrumentor
+langwatch.setup(
+    instrumentors=[OpenAIInstrumentor()]
+)
+
+# Initialize your AzureOpenAI client
+client = AzureOpenAI(
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    api_version="2023-05-15"
+)
+
+@langwatch.trace(name="Azure OpenAI Call with Community Instrumentor")
+def generate_text_with_community_instrumentor(prompt: str):
+    # No need to call autotrack explicitly, the community instrumentor handles OpenAI calls globally.
+    response = client.chat.completions.create(
+        model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "your-deployment-name"), # Use your Azure deployment name
+        messages=[{"role": "user", "content": prompt}]
+    )
+    return response.choices[0].message.content
+
+if __name__ == "__main__":
+    user_query = "Explain Azure Machine Learning in simple terms."
+    response = generate_text_with_community_instrumentor(user_query)
+    print(f"User: {user_query}")
+    print(f"AI: {response}")
+```
+<Note>
+  Ensure you have the respective community instrumentation library installed (e.g., `pip install openllmetry-instrumentation-openai` or `pip install openinference-instrumentation-openai`). The instrumentor works with `AzureOpenAI` as it's part of the same `openai` Python package.
+</Note>
+
+### 2. Direct Instrumentation
+
+If you have an existing OpenTelemetry `TracerProvider` configured in your application (or if LangWatch is configured to use the global provider), you can use the community instrumentor's `instrument()` method directly. LangWatch will automatically pick up the spans generated by these instrumentors as long as its exporter is part of the active `TracerProvider`.
+
+```python
+import langwatch
+from openai import AzureOpenAI
+import os
+
+from openinference.instrumentation.openai import OpenAIInstrumentor
+
+langwatch.setup() # LangWatch sets up or uses the global OpenTelemetry provider
+
+# Initialize your AzureOpenAI client
+client = AzureOpenAI(
+    azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+    api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+    api_version="2023-05-15"
+)
+
+# Instrument OpenAI directly using the community library
+# This will patch the openai library, affecting AzureOpenAI instances too.
+OpenAIInstrumentor().instrument()
+
+@langwatch.trace(name="Azure OpenAI Call with Direct Community Instrumentation")
+def get_creative_idea(topic: str):
+    response = client.chat.completions.create(
+        model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME", "your-deployment-name"), # Use your Azure deployment name
+        messages=[
+            {"role": "system", "content": "You are an idea generation bot."},
+            {"role": "user", "content": f"Generate a creative idea about {topic}."}
+        ]
+    )
+    return response.choices[0].message.content
+
+if __name__ == "__main__":
+    subject = "sustainable energy"
+    idea = get_creative_idea(subject)
+    print(f"Topic: {subject}")
+    print(f"AI's Idea: {idea}")
+```
+
+### Key points for community instrumentors with Azure OpenAI:
+-   These instrumentors often patch the `openai` library at a global level, meaning all calls from any `OpenAI` or `AzureOpenAI` client instance will be captured once instrumented.
+-   If using `langwatch.setup(instrumentors=[...])`, LangWatch handles the instrumentor's setup.
+-   If instrumenting directly (e.g., `OpenAIInstrumentor().instrument()`), ensure that the `TracerProvider` used by the instrumentor is the same one LangWatch is exporting from. This typically happens automatically if LangWatch initializes the global provider or if you configure them to use the same explicit provider.
+
+<Note>
+### Which Approach to Choose?
+
+-   **`autotrack_openai_calls()`** is ideal for targeted instrumentation within specific traces or when you want fine-grained control over which `AzureOpenAI` client instances are tracked. It's simpler if you're not deeply invested in a separate OpenTelemetry setup.
+-   **Community Instrumentors** are powerful if you're already using OpenTelemetry, want to capture Azure OpenAI calls globally across your application, or need to instrument other libraries alongside Azure OpenAI with a consistent OpenTelemetry approach. They provide a more holistic observability solution if you have multiple OpenTelemetry-instrumented components.
+
+Choose the method that best fits your existing setup and instrumentation needs. Both approaches effectively send Azure OpenAI call data to LangWatch for monitoring and analysis.
+</Note>

@@ -10,6 +10,18 @@ import { z } from "zod";
 import type { Span } from "../../tracer/types";
 
 // ============================================================================
+// Field Mapping Types
+// (defined first so adapter schemas can reference them)
+// ============================================================================
+
+/** Field mapping for agent inputs — maps to a scenario source or a static value */
+export const FieldMappingSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("source"), sourceId: z.string(), path: z.array(z.string()) }),
+  z.object({ type: z.literal("value"), value: z.string() }),
+]);
+export type FieldMapping = z.infer<typeof FieldMappingSchema>;
+
+// ============================================================================
 // Adapter Data Types (Zod schemas for data contracts)
 // ============================================================================
 
@@ -84,6 +96,8 @@ export const HttpAgentDataSchema = z.object({
   auth: AuthConfigSchema.optional(),
   bodyTemplate: z.string().optional(),
   outputPath: z.string().optional(),
+  /** Maps agent input field identifiers to scenario data sources or static values. */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
 });
 export type HttpAgentData = z.infer<typeof HttpAgentDataSchema>;
 
@@ -110,14 +124,66 @@ export const CodeAgentDataSchema = z.object({
       type: z.string(),
     })
   ),
+  /** Maps agent input field identifiers to scenario data sources or static values. */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  /** Which output field to use as the scenario result. When unset, uses the first output. */
+  scenarioOutputField: z.string().optional(),
+  /**
+   * Project secrets exposed to the Python code as the `secrets.NAME` namespace.
+   * Pre-fetched so the worker-thread adapter runs without DB access. Mirrors
+   * the studio's addEnvs behavior for in-app workflow execution.
+   */
+  secrets: z.record(z.string(), z.string()).default({}),
 });
 export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
+
+/**
+ * Pre-fetched workflow agent configuration for serialized execution.
+ *
+ * Contains the fully published workflow DSL plus scenario-mapping metadata.
+ * Workflow execution is delegated to the langwatch_nlp service's /studio/execute_sync
+ * endpoint using an execute_flow event, identical to code agents but with the
+ * user's own workflow DSL (rather than a synthesized entry→code→end workflow).
+ */
+export const WorkflowAgentDataSchema = z.object({
+  type: z.literal("workflow"),
+  agentId: z.string(),
+  workflowId: z.string(),
+  /** The published workflow DSL (from WorkflowVersion.dsl). Opaque to the adapter. */
+  workflow: z.record(z.string(), z.unknown()),
+  /** Ordered declared entry-node inputs used for mapping resolution + fallback. */
+  inputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+    })
+  ),
+  /** Ordered end-node outputs used for default/fallback output extraction. */
+  outputs: z.array(
+    z.object({
+      identifier: z.string(),
+      type: z.string(),
+    })
+  ),
+  /** Maps agent input field identifiers to scenario data sources or static values. */
+  scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
+  /** Which output field to use as the scenario result. When unset, uses the first output. */
+  scenarioOutputField: z.string().optional(),
+  /**
+   * Project secrets merged into the workflow DSL before execution. Mirrors the
+   * studio's addEnvs behavior so `secrets.NAME` works inside code nodes of the
+   * published workflow.
+   */
+  secrets: z.record(z.string(), z.string()).default({}),
+});
+export type WorkflowAgentData = z.infer<typeof WorkflowAgentDataSchema>;
 
 /** Union type for all supported target adapter data */
 export const TargetAdapterDataSchema = z.discriminatedUnion("type", [
   PromptConfigDataSchema,
   HttpAgentDataSchema,
   CodeAgentDataSchema,
+  WorkflowAgentDataSchema,
 ]);
 export type TargetAdapterData = z.infer<typeof TargetAdapterDataSchema>;
 
@@ -177,7 +243,7 @@ export type TelemetryConfig = z.infer<typeof TelemetryConfigSchema>;
 
 /** Target configuration - what to test against */
 export const TargetConfigSchema = z.object({
-  type: z.enum(["prompt", "http", "code"]),
+  type: z.enum(["prompt", "http", "code", "workflow"]),
   referenceId: z.string(),
 });
 export type TargetConfig = z.infer<typeof TargetConfigSchema>;

@@ -68,15 +68,14 @@ Feature: Model Provider List Management
     And the "openai" provider row does not show a "Default Model" badge
 
   @integration
-  Scenario: Filter "Add Model Provider" menu to show only non-enabled providers
-    Given I have "openai" provider enabled
-    And I have "anthropic" provider not enabled
-    And I have "azure" provider not enabled
+  Scenario: "Add Model Provider" menu lists every provider regardless of existing rows
+    Given I have "openai" provider with one row configured
+    And I have "anthropic" provider not configured
     When I click "Add Model Provider"
-    Then I see a menu with provider options
-    And the menu includes "anthropic"
-    And the menu includes "azure"
-    And the menu does not include "openai"
+    Then I see a menu with all provider types
+    And the menu still includes "openai" so a second row can be created
+    # See scope-and-multi-instance.feature — multiple rows per provider type
+    # are a first-class concept now.
 
   @integration
   Scenario: Disable "Add Model Provider" button without manage permission
@@ -84,9 +83,3 @@ Feature: Model Provider List Management
     When I navigate to the Model Providers settings page
     Then the "Add Model Provider" button is disabled
     And a tooltip explains I need model provider manage permissions
-
-  @integration
-  Scenario: Disable "Add Model Provider" button when all providers enabled
-    Given I have all available providers enabled
-    When I navigate to the Model Providers settings page
-    Then the "Add Model Provider" button is disabled

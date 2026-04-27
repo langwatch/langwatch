@@ -26,6 +26,7 @@ import { useForm } from "react-hook-form";
 import { LuListTree } from "react-icons/lu";
 import { Drawer } from "~/components/ui/drawer";
 import type { FieldMapping as UIFieldMapping } from "~/components/variables";
+import { createEvaluatorEditorCallbacks } from "~/evaluations-v3/utils/evaluatorEditorCallbacks";
 import { validateEvaluatorMappingsWithFields } from "~/evaluations-v3/utils/mappingValidation";
 import {
   getComplexProps,
@@ -55,9 +56,10 @@ import {
 } from "~/components/preconditions/preconditionFieldUtils";
 import {
   type MappingState,
-  THREAD_MAPPINGS,
   TRACE_MAPPINGS,
 } from "~/server/tracer/tracesMapping";
+import { deserializeMappingStateToUI } from "./utils/deserializeMappingStateToUI";
+import { serializeMappingsToMappingState } from "./utils/serializeMappingsToMappingState";
 import { api } from "~/utils/api";
 import type { EvaluatorMappingsConfig } from "../evaluators/EvaluatorEditorDrawer";
 import { HorizontalFormControl } from "../HorizontalFormControl";
@@ -507,33 +509,11 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       // Load existing mappings
       const existingMappings = monitorQuery.data
         .mappings as MappingState | null;
-      const uiMappings: Record<string, UIFieldMapping> = {};
       if (existingMappings?.mapping) {
-        for (const [field, mapping] of Object.entries(
-          existingMappings.mapping,
-        )) {
-          if (mapping.source) {
-            const pathParts: string[] = [mapping.source as string];
-            if ("type" in mapping && mapping.type === "thread") {
-              // Thread mappings use selectedFields instead of key/subkey
-              if (
-                "selectedFields" in mapping &&
-                mapping.selectedFields?.length
-              ) {
-                pathParts.push(...mapping.selectedFields);
-              }
-            } else {
-              if ("key" in mapping && mapping.key) pathParts.push(mapping.key);
-              if ("subkey" in mapping && mapping.subkey)
-                pathParts.push(mapping.subkey);
-            }
-            uiMappings[field] = {
-              type: "source",
-              sourceId: monitorLevel === "trace" ? "trace" : "thread",
-              path: pathParts,
-            };
-          }
-        }
+        const uiMappings = deserializeMappingStateToUI(
+          existingMappings,
+          monitorLevel as "trace" | "thread",
+        );
         setMappings(uiMappings);
       }
 
@@ -653,10 +633,14 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
   const openEvaluatorEditorForMappings = useCallback(() => {
     if (!selectedEvaluator) return;
 
+    setFlowCallbacks(
+      "evaluatorEditor",
+      createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+    );
+
     const mappingsConfig: EvaluatorMappingsConfig = {
       level: level ?? undefined,
       initialMappings: mappings,
-      onMappingChange: handleMappingChange,
     };
 
     openDrawer("evaluatorEditor", {
@@ -703,11 +687,17 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
           threadIdleTimeout,
         };
 
-        // Build mappings config and navigate to evaluator editor
+        // Build mappings config and navigate to evaluator editor.
+        // onMappingChange goes through flowCallbacks (durable) — never inside
+        // mappingsConfig (ephemeral complexProps, lost on ErrorBoundary remount).
+        setFlowCallbacks(
+          "evaluatorEditor",
+          createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+        );
+
         const newMappingsConfig: EvaluatorMappingsConfig = {
           level: level ?? undefined,
           initialMappings: autoMappings,
-          onMappingChange: handleMappingChange,
         };
 
         // Use "Select Evaluator" button text since we're selecting a different evaluator
@@ -723,10 +713,14 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       },
     });
 
+    setFlowCallbacks(
+      "evaluatorEditor",
+      createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+    );
+
     const mappingsConfig: EvaluatorMappingsConfig = {
       level: level ?? undefined,
       initialMappings: mappings,
-      onMappingChange: handleMappingChange,
     };
 
     // Open the evaluator editor directly - use default "Save Changes" text
@@ -775,11 +769,17 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
         threadIdleTimeout,
       };
 
+      // onMappingChange goes through flowCallbacks (durable) — never inside
+      // mappingsConfig (ephemeral complexProps, lost on ErrorBoundary remount).
+      setFlowCallbacks(
+        "evaluatorEditor",
+        createEvaluatorEditorCallbacks({ onMappingChange: handleMappingChange }),
+      );
+
       // Build mappings config for the evaluator editor
       const mappingsConfig: EvaluatorMappingsConfig = {
         level: level ?? undefined,
         initialMappings: autoMappings,
-        onMappingChange: handleMappingChange,
       };
 
       // Open evaluator editor immediately (replaceCurrentInStack replaces evaluatorList with evaluatorEditor)
@@ -805,33 +805,36 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
       const capturedPreconditions = preconditions;
       const capturedThreadIdleTimeout = threadIdleTimeout;
 
-      setFlowCallbacks("evaluatorEditor", {
-        onSave: (savedEvaluator: { id: string; name: string }) => {
-          // Store the new evaluator info in module-level state
-          // The evaluator will be loaded when the online evaluation drawer reopens
-          const newName = capturedName || savedEvaluator.name;
+      setFlowCallbacks(
+        "evaluatorEditor",
+        createEvaluatorEditorCallbacks({
+          onSave: (savedEvaluator) => {
+            // Store the new evaluator info in module-level state.
+            // The evaluator will be loaded when the online evaluation drawer reopens.
+            const newName = capturedName || savedEvaluator.name;
 
-          // Persist state with the new evaluator ID (the full evaluator will be loaded via query)
-          onlineEvaluationDrawerState = {
-            level: capturedLevel,
-            name: newName,
-            selectedEvaluator: null, // Will be loaded via query
-            sample: capturedSample,
-            mappings: {},
-            preconditions: capturedPreconditions,
-            threadIdleTimeout: capturedThreadIdleTimeout,
-            // Store the new evaluator ID to load it when the drawer reopens
-            pendingEvaluatorId: savedEvaluator.id,
-          };
+            // Persist state with the new evaluator ID (the full evaluator will be loaded via query)
+            onlineEvaluationDrawerState = {
+              level: capturedLevel,
+              name: newName,
+              selectedEvaluator: null, // Will be loaded via query
+              sample: capturedSample,
+              mappings: {},
+              preconditions: capturedPreconditions,
+              threadIdleTimeout: capturedThreadIdleTimeout,
+              // Store the new evaluator ID to load it when the drawer reopens
+              pendingEvaluatorId: savedEvaluator.id,
+            };
 
-          // Navigate directly to online evaluation drawer (resetting the stack)
-          // Use module-level navigation since the component may not be mounted
-          navigateToDrawer("onlineEvaluation", { resetStack: true });
+            // Navigate directly to online evaluation drawer (resetting the stack).
+            // Use module-level navigation since the component may not be mounted.
+            navigateToDrawer("onlineEvaluation", { resetStack: true });
 
-          // Return true to indicate we handled navigation (prevents default goBack())
-          return true;
-        },
-      });
+            // Return true to indicate we handled navigation (prevents default goBack())
+            return true;
+          },
+        }),
+      );
     };
 
     // Set flow callback for evaluator selection (when user selects an existing evaluator)
@@ -979,35 +982,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
     const settings = evaluatorConfig?.settings ?? {};
 
     // Convert UIFieldMapping to MappingState format
-    const mappingState: MappingState = {
-      mapping: {},
-      expansions: [],
-    };
-    for (const [field, mapping] of Object.entries(mappings)) {
-      if (mapping.type === "source" && mapping.path.length > 0) {
-        const parts = mapping.path;
-        const source = parts[0]!;
-
-        // Check if this is a thread-level mapping source (e.g., "traces", "thread_id")
-        if (source in THREAD_MAPPINGS) {
-          // For "traces" with sub-paths like "traces.input", "traces.output",
-          // convert to selectedFields format
-          const selectedFields =
-            parts.length > 1 ? parts.slice(1) : undefined;
-          mappingState.mapping[field] = {
-            type: "thread" as const,
-            source: source as keyof typeof THREAD_MAPPINGS,
-            selectedFields,
-          };
-        } else {
-          mappingState.mapping[field] = {
-            source: source as keyof typeof TRACE_MAPPINGS,
-            key: parts[1],
-            subkey: parts[2],
-          };
-        }
-      }
-    }
+    const mappingState = serializeMappingsToMappingState(mappings);
 
     if (monitorId) {
       // Update existing monitor
@@ -1124,7 +1099,7 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
                   <StepRadio
                     value="thread"
                     title="Thread Level"
-                    description="Evaluate all traces in a conversation thread together"
+                    description="Evaluate all traces in a thread together"
                     icon={<Spool />}
                     width="full"
                   />
@@ -1441,8 +1416,8 @@ export function OnlineEvaluationDrawer(props: OnlineEvaluationDrawerProps) {
               <HorizontalFormControl
                 label={
                   <HStack>
-                    Conversation Idle Time
-                    <Tooltip content="Wait for the conversation to be idle (no new messages) before running the evaluation. This prevents re-evaluating on every single message in a conversation.">
+                    Thread Idle Time
+                    <Tooltip content="Wait for the thread to be idle (no new messages) before running the evaluation. This prevents re-evaluating on every single message in a thread.">
                       <HelpCircle size={14} />
                     </Tooltip>
                   </HStack>

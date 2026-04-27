@@ -261,6 +261,100 @@ describe.skipIf(!hasTestcontainers)(
       });
     });
 
+    describe("deduplication with TOCTOU race", () => {
+      describe("when dispatched job exists and new dedup job arrives", () => {
+        it("processes both jobs (new job not silently dropped)", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          const processingStarted = new Promise<void>((resolve) => {
+            let firstCall = true;
+            processed.mockImplementation(async () => {
+              if (firstCall) {
+                firstCall = false;
+                resolve();
+                // Hold first job for 200ms to allow second send
+                await new Promise((r) => setTimeout(r, 200));
+              }
+            });
+          });
+
+          const queue = createQueue(processed, {
+            deduplication: {
+              makeId: (p) => `${p.groupId}:${p.id}`,
+              ttlMs: 10000,
+            },
+          });
+          await queue.waitUntilReady();
+
+          // Send payload A
+          await queue.send({
+            id: "race-job",
+            groupId: "group-a",
+            value: "first",
+          });
+
+          // Wait for A to start processing (dispatched)
+          await processingStarted;
+
+          // Send payload B with same dedupId while A is processing
+          await queue.send({
+            id: "race-job",
+            groupId: "group-a",
+            value: "second",
+          });
+
+          // Wait for both to complete
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(2);
+            },
+            { timeout: 10000, interval: 50 },
+          );
+        });
+      });
+
+      describe("when dedup squash happens before dispatch", () => {
+        it("processes only once with squashed data", async () => {
+          const processed = vi.fn<(payload: TestPayload) => Promise<void>>();
+          processed.mockResolvedValue(undefined);
+
+          const queue = createQueue(processed, {
+            delay: 200, // Long enough to squash before dispatch
+            deduplication: {
+              makeId: (p) => `${p.groupId}:${p.id}`,
+              ttlMs: 10000,
+            },
+          });
+          await queue.waitUntilReady();
+
+          // Send A then B quickly (before dispatch happens)
+          await queue.send({
+            id: "squash-job",
+            groupId: "group-a",
+            value: "first",
+          });
+          await queue.send({
+            id: "squash-job",
+            groupId: "group-a",
+            value: "second",
+          });
+
+          await vi.waitFor(
+            () => {
+              expect(processed).toHaveBeenCalledTimes(1);
+            },
+            { timeout: 10000, interval: 50 },
+          );
+
+          const receivedPayload = processed.mock.calls[0]![0];
+          expect(receivedPayload.value).toBe("second");
+
+          // Wait to confirm no second call
+          await new Promise((r) => setTimeout(r, 500));
+          expect(processed).toHaveBeenCalledTimes(1);
+        });
+      });
+    });
+
     describe("cross-group parallel processing", () => {
       describe("when jobs have different group keys", () => {
         it("processes them concurrently", async () => {

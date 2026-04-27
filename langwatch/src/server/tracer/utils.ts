@@ -49,7 +49,7 @@ export const getRAGInfo = (
   }
 
   const contexts = extractRAGTextualContext(lastRagSpan.contexts ?? []);
-  if (!lastRagSpan) {
+  if (!contexts.length) {
     throw new Error("RAG span does not have contexts");
   }
   if (!lastRagSpan.input) {

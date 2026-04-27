@@ -33,6 +33,7 @@ const mockPrisma = {
   },
   teamUser: {
     findFirst: vi.fn(),
+    findMany: vi.fn(),
   },
   teamUserCustomRole: {
     findFirst: vi.fn(),
@@ -42,6 +43,12 @@ const mockPrisma = {
   },
   publicShare: {
     findFirst: vi.fn(),
+  },
+  groupMembership: {
+    findMany: vi.fn(),
+  },
+  roleBinding: {
+    findMany: vi.fn(),
   },
 } as any;
 
@@ -56,6 +63,11 @@ const mockSession = {
 describe("RBAC Integration Tests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: no group memberships, no role bindings, no team user (falls through to denied)
+    mockPrisma.groupMembership.findMany.mockResolvedValue([]);
+    mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+    mockPrisma.teamUser.findFirst.mockResolvedValue(null);
+    mockPrisma.teamUser.findMany.mockResolvedValue([]);
   });
 
   describe("hasProjectPermission", () => {
@@ -104,14 +116,43 @@ describe("RBAC Integration Tests", () => {
       expect(result).toBe(false);
     });
 
+    it("grants access via group membership when user has no direct teamUser row", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          organizationId: "org-123",
+          organization: { members: [] },
+        },
+      });
+      // User belongs to a group (no direct teamUser)
+      mockPrisma.groupMembership.findMany.mockResolvedValue([
+        { groupId: "group-abc" },
+      ]);
+      // Group has a MEMBER binding on the team scope
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { role: TeamUserRole.MEMBER, customRoleId: null },
+      ]);
+      mockPrisma.teamUser.findFirst.mockResolvedValue(null);
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "workflows:view" as Permission,
+      );
+      expect(result).toBe(true);
+    });
+
     it("should return true when user has built-in role permission", async () => {
       mockPrisma.project.findUnique.mockResolvedValue({
         team: {
           id: "team-123",
-          members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
+          organizationId: "org-123",
           organization: { members: [] },
         },
       });
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { role: TeamUserRole.ADMIN, customRoleId: null },
+      ]);
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -125,15 +166,15 @@ describe("RBAC Integration Tests", () => {
       mockPrisma.project.findUnique.mockResolvedValue({
         team: {
           id: "team-123",
-          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+          organizationId: "org-123",
           organization: { members: [] },
         },
       });
-
-      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
-        customRole: {
-          permissions: ["workflows:manage"],
-        },
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-123" },
+      ]);
+      mockPrisma.customRole.findUnique.mockResolvedValue({
+        permissions: ["workflows:manage"],
       });
 
       const result = await hasProjectPermission(
@@ -155,7 +196,7 @@ describe("RBAC Integration Tests", () => {
       expect(result).toBe(false);
     });
 
-    it("should return true for organization admin", async () => {
+    it("returns true for organization admin with org-scoped binding", async () => {
       mockPrisma.team.findUnique.mockResolvedValue({
         id: "team-123",
         organizationId: "org-123",
@@ -164,6 +205,10 @@ describe("RBAC Integration Tests", () => {
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
         role: OrganizationUserRole.ADMIN,
       });
+
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
+      ]);
 
       const result = await hasTeamPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -240,10 +285,14 @@ describe("RBAC Integration Tests", () => {
       expect(result).toBe(false);
     });
 
-    it("should return true for organization admin", async () => {
+    it("returns true for organization admin with org-scoped binding", async () => {
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
         role: OrganizationUserRole.ADMIN,
       });
+
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
+      ]);
 
       const result = await hasOrganizationPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -253,10 +302,14 @@ describe("RBAC Integration Tests", () => {
       expect(result).toBe(true);
     });
 
-    it("should return true for organization member with view permission", async () => {
+    it("should return true for organization member with org-scoped binding and view permission", async () => {
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
         role: OrganizationUserRole.MEMBER,
       });
+
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { role: "MEMBER", customRoleId: null, scopeType: "ORGANIZATION" },
+      ]);
 
       const result = await hasOrganizationPermission(
         { prisma: mockPrisma, session: mockSession },
@@ -307,6 +360,10 @@ describe("RBAC Integration Tests", () => {
         role: OrganizationUserRole.ADMIN,
       });
 
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
+      ]);
+
       const result = await hasOrganizationPermission(
         { prisma: mockPrisma, session: mockSession },
         "org-123",
@@ -314,6 +371,140 @@ describe("RBAC Integration Tests", () => {
       );
 
       expect(result).toBe(true);
+    });
+
+    describe("when user is OrgUser+TeamUser ADMIN but has no RoleBindings (legacy migration)", () => {
+      // Finding #28: /gateway/audit + /gateway/budgets.list + cache-rules.list
+      // all 401 for legacy ADMINs because hasOrganizationPermission had no
+      // TeamUser fallback for org-scoped permission checks.
+      beforeEach(() => {
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.ADMIN,
+        });
+        mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+        mockPrisma.teamUser.findMany.mockResolvedValue([
+          { role: TeamUserRole.ADMIN, assignedRoleId: null },
+        ]);
+      });
+
+      it("grants gatewayLogs:view (was 401 before the fallback)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "gatewayLogs:view" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      it("grants gatewayBudgets:view", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "gatewayBudgets:view" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      it("grants gatewayCacheRules:create", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "gatewayCacheRules:create" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      // Regression coverage for the audit consolidation: the unified
+      // /settings/audit-log page is gated on auditLog:view (was
+      // gatewayLogs:view + organization:manage pre-consolidation). Legacy
+      // admins must keep their access via the same TeamUser fallback path
+      // that grants gatewayBudgets:view / gatewayCacheRules:create above.
+      it("grants auditLog:view (post-consolidation /settings/audit-log)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "auditLog:view" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      it("does NOT grant organization:manage (org-admin-only perm)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "organization:manage" as Permission,
+        );
+        expect(result).toBe(false);
+      });
+    });
+
+    describe("when user has only TeamUser MEMBER role (no RoleBindings, no admin)", () => {
+      beforeEach(() => {
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.MEMBER,
+        });
+        mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+        mockPrisma.teamUser.findMany.mockResolvedValue([
+          { role: TeamUserRole.MEMBER, assignedRoleId: null },
+        ]);
+      });
+
+      it("grants gatewayLogs:view (MEMBER team role includes it)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "gatewayLogs:view" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      it("grants auditLog:view (MEMBER team role includes it)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "auditLog:view" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      it("does NOT grant gatewayBudgets:delete (MEMBER cannot delete)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "gatewayBudgets:delete" as Permission,
+        );
+        expect(result).toBe(false);
+      });
+    });
+
+    describe("when user has only TeamUser VIEWER role (no RoleBindings, no admin)", () => {
+      beforeEach(() => {
+        mockPrisma.organizationUser.findFirst.mockResolvedValue({
+          role: OrganizationUserRole.MEMBER,
+        });
+        mockPrisma.roleBinding.findMany.mockResolvedValue([]);
+        mockPrisma.teamUser.findMany.mockResolvedValue([
+          { role: TeamUserRole.VIEWER, assignedRoleId: null },
+        ]);
+      });
+
+      it("grants auditLog:view (VIEWER team role includes it)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "auditLog:view" as Permission,
+        );
+        expect(result).toBe(true);
+      });
+
+      it("does NOT grant gatewayBudgets:delete (VIEWER cannot delete)", async () => {
+        const result = await hasOrganizationPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "org-123",
+          "gatewayBudgets:delete" as Permission,
+        );
+        expect(result).toBe(false);
+      });
     });
   });
 
@@ -354,10 +545,13 @@ describe("RBAC Integration Tests", () => {
         mockPrisma.project.findUnique.mockResolvedValue({
           team: {
             id: "team-123",
-            members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
+            organizationId: "org-123",
             organization: { members: [] },
           },
         });
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: TeamUserRole.ADMIN, customRoleId: null },
+        ]);
 
         const middleware = checkProjectPermission(
           "workflows:view" as Permission,
@@ -410,6 +604,10 @@ describe("RBAC Integration Tests", () => {
           role: OrganizationUserRole.ADMIN,
         });
 
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
+        ]);
+
         const middleware = checkTeamPermission("workflows:view" as Permission);
 
         const result = await middleware({
@@ -446,6 +644,10 @@ describe("RBAC Integration Tests", () => {
         mockPrisma.organizationUser.findFirst.mockResolvedValue({
           role: OrganizationUserRole.ADMIN,
         });
+
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
+        ]);
 
         const middleware = checkOrganizationPermission(
           "organization:view" as Permission,
@@ -506,12 +708,14 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-123",
             organizationId: "org-1",
-            members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
             organization: {
               members: [{ role: OrganizationUserRole.MEMBER }],
             },
           },
         });
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: TeamUserRole.ADMIN, customRoleId: null },
+        ]);
 
         const middleware = checkPermissionOrPubliclyShared(
           checkProjectPermission("workflows:view" as Permission),
@@ -605,14 +809,16 @@ describe("RBAC Integration Tests", () => {
         team: {
           id: "team-1",
           organizationId: "org-1",
-          members: hasTeamMember
-            ? [{ userId: "user-123", role: teamRole ?? TeamUserRole.MEMBER }]
-            : [],
           organization: {
             members: orgRole ? [{ role: orgRole }] : [],
           },
         },
       });
+      if (hasTeamMember && teamRole) {
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: teamRole, customRoleId: null },
+        ]);
+      }
     }
 
     describe("when user is an org ADMIN and team MEMBER", () => {
@@ -721,18 +927,15 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-1",
             organizationId: "org-1",
-            members: [
-              {
-                userId: "user-123",
-                role: TeamUserRole.CUSTOM,
-                assignedRoleId: "custom-role-1",
-              },
-            ],
             organization: {
               members: [{ role: OrganizationUserRole.MEMBER }],
             },
           },
         });
+        mockPrisma.groupMembership.findMany.mockResolvedValue([]);
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-1" },
+        ]);
 
         mockPrisma.customRole.findUnique.mockResolvedValue({
           permissions: ["analytics:view", "datasets:view"],
@@ -755,18 +958,15 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-1",
             organizationId: "org-1",
-            members: [
-              {
-                userId: "user-123",
-                role: TeamUserRole.CUSTOM,
-                assignedRoleId: "custom-role-1",
-              },
-            ],
             organization: {
               members: [{ role: OrganizationUserRole.MEMBER }],
             },
           },
         });
+        mockPrisma.groupMembership.findMany.mockResolvedValue([]);
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: TeamUserRole.CUSTOM, customRoleId: "custom-role-1" },
+        ]);
 
         mockPrisma.customRole.findUnique.mockResolvedValue({
           permissions: ["analytics:view"],
@@ -866,12 +1066,16 @@ describe("RBAC Integration Tests", () => {
       );
     }
 
-    describe("when user is an org ADMIN (admin bypass, not a team member)", () => {
+    describe("when user is an org ADMIN with an org-scoped binding", () => {
       it("grants permission and returns ADMIN org role", async () => {
         setupTeamMocks({
           orgRole: OrganizationUserRole.ADMIN,
           hasTeamUser: false,
         });
+
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
+        ]);
 
         const result = await resolveTeamPermission(
           { prisma: mockPrisma, session: mockSession },
@@ -963,12 +1167,14 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-1",
             organizationId: "org-1",
-            members: [{ userId: "user-123", role: TeamUserRole.MEMBER }],
             organization: {
               members: [{ role: OrganizationUserRole.MEMBER }],
             },
           },
         });
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: TeamUserRole.MEMBER, customRoleId: null },
+        ]);
 
         const result = await hasProjectPermission(
           { prisma: mockPrisma, session: mockSession },
@@ -985,12 +1191,14 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-1",
             organizationId: "org-1",
-            members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
             organization: {
               members: [{ role: OrganizationUserRole.MEMBER }],
             },
           },
         });
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: TeamUserRole.VIEWER, customRoleId: null },
+        ]);
 
         const result = await hasProjectPermission(
           { prisma: mockPrisma, session: mockSession },
@@ -1077,12 +1285,14 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-1",
             organizationId: "org-1",
-            members: [{ userId: "user-123", role: TeamUserRole.MEMBER }],
             organization: {
               members: [{ role: OrganizationUserRole.MEMBER }],
             },
           },
         });
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: TeamUserRole.MEMBER, customRoleId: null },
+        ]);
 
         const mockNext = vi.fn().mockResolvedValue("success");
         const middleware = checkProjectPermission(
@@ -1118,6 +1328,10 @@ describe("RBAC Integration Tests", () => {
         mockPrisma.organizationUser.findFirst.mockResolvedValue({
           role: OrganizationUserRole.ADMIN,
         });
+
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: "ADMIN", customRoleId: null, scopeType: "ORGANIZATION" },
+        ]);
 
         const mockNext = vi.fn().mockResolvedValue("success");
         const middleware = checkTeamPermission("team:view" as Permission);
@@ -1212,12 +1426,14 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-1",
             organizationId: "org-1",
-            members: [{ userId: "user-123", role: TeamUserRole.MEMBER }],
             organization: {
               members: [{ role: OrganizationUserRole.MEMBER }],
             },
           },
         });
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: TeamUserRole.MEMBER, customRoleId: null },
+        ]);
 
         const mockNext = vi.fn().mockResolvedValue("success");
         const middleware = checkPermissionOrPubliclyShared(
@@ -1253,18 +1469,14 @@ describe("RBAC Integration Tests", () => {
         team: {
           id: "team-1",
           organizationId: "org-1",
-          members: [
-            {
-              userId: "user-123",
-              role: teamRole,
-              assignedRoleId: assignedRoleId ?? null,
-            },
-          ],
           organization: {
             members: [{ role: OrganizationUserRole.EXTERNAL }],
           },
         },
       });
+      mockPrisma.roleBinding.findMany.mockResolvedValue([
+        { role: teamRole, customRoleId: assignedRoleId ?? null },
+      ]);
     }
 
     function setupTeamWithExternalUser({
@@ -1323,12 +1535,14 @@ describe("RBAC Integration Tests", () => {
       );
     });
 
-    describe("when EXTERNAL user requests an allowed view permission via project", () => {
+    describe("when EXTERNAL user requests an allowed permission via project", () => {
       it.each([
         "project:view",
         "analytics:view",
         "traces:view",
         "annotations:view",
+        "annotations:create",
+        "annotations:update",
         "evaluations:view",
         "datasets:view",
         "workflows:view",
@@ -1380,12 +1594,14 @@ describe("RBAC Integration Tests", () => {
       );
     });
 
-    describe("when EXTERNAL user requests an allowed view permission via team", () => {
+    describe("when EXTERNAL user requests an allowed permission via team", () => {
       it.each([
         "project:view",
         "analytics:view",
         "traces:view",
         "annotations:view",
+        "annotations:create",
+        "annotations:update",
         "evaluations:view",
         "datasets:view",
         "workflows:view",
@@ -1464,14 +1680,15 @@ describe("RBAC Integration Tests", () => {
             team: {
               id: "team-1",
               organizationId: "org-1",
-              members: [
-                { userId: "user-123", role: TeamUserRole.VIEWER, assignedRoleId: null },
-              ],
               organization: {
                 members: [{ role: OrganizationUserRole.MEMBER }],
               },
             },
           });
+          mockPrisma.groupMembership.findMany.mockResolvedValue([]);
+          mockPrisma.roleBinding.findMany.mockResolvedValue([
+            { role: TeamUserRole.VIEWER, customRoleId: null },
+          ]);
 
           const result = await resolveProjectPermission(
             { prisma: mockPrisma, session: mockSession },
@@ -1490,14 +1707,15 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-1",
             organizationId: "org-1",
-            members: [
-              { userId: "user-123", role: TeamUserRole.ADMIN, assignedRoleId: null },
-            ],
             organization: {
               members: [{ role: OrganizationUserRole.ADMIN }],
             },
           },
         });
+        mockPrisma.groupMembership.findMany.mockResolvedValue([]);
+        mockPrisma.roleBinding.findMany.mockResolvedValue([
+          { role: TeamUserRole.ADMIN, customRoleId: null },
+        ]);
 
         const result = await resolveProjectPermission(
           { prisma: mockPrisma, session: mockSession },
@@ -1618,12 +1836,14 @@ describe("RBAC Integration Tests", () => {
     });
 
     describe("when EXTERNAL_MEMBER_PERMISSIONS constant is defined", () => {
-      it("matches the VIEWER role permission set exactly", () => {
+      it("includes view permissions plus annotation create and update", () => {
         expect(EXTERNAL_MEMBER_PERMISSIONS).toEqual([
           "project:view",
           "analytics:view",
           "traces:view",
           "annotations:view",
+          "annotations:create",
+          "annotations:update",
           "evaluations:view",
           "datasets:view",
           "workflows:view",

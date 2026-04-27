@@ -41,7 +41,7 @@ describe("<SuiteRunConfirmationDialog/>", () => {
       });
 
       expect(
-        screen.getByText(/Start 6 new runs\?/),
+        screen.getByText(/Run 6 simulations\?/),
       ).toBeInTheDocument();
     });
 
@@ -185,7 +185,7 @@ describe("<SuiteRunConfirmationDialog/>", () => {
 
       // 3 scenarios * 2 targets * 3 repeats = 18
       expect(
-        screen.getByText(/Start 18 new runs\?/),
+        screen.getByText(/Run 18 simulations\?/),
       ).toBeInTheDocument();
       expect(screen.getByText("Run 18 Jobs")).toBeInTheDocument();
     });
@@ -215,7 +215,7 @@ describe("<SuiteRunConfirmationDialog/>", () => {
       expect(screen.getByText("scenario")).toBeInTheDocument();
       expect(screen.getByText("target")).toBeInTheDocument();
       expect(
-        screen.getByText(/Start 1 new run\?/),
+        screen.getByText(/Run 1 simulation\?/),
       ).toBeInTheDocument();
       expect(screen.getByText("Run 1 Job")).toBeInTheDocument();
     });

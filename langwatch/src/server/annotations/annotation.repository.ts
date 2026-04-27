@@ -12,6 +12,16 @@ export type CreateAnnotationInput = {
   expectedOutput: string | null;
 };
 
+export type UpdateAnnotationInput = {
+  id: string;
+  projectId: string;
+  traceId: string;
+  comment: string;
+  isThumbsUp: boolean | null | undefined;
+  scoreOptions: JsonValue;
+  expectedOutput: string | null;
+};
+
 export type DeleteAnnotationInput = {
   id: string;
   projectId: string;
@@ -34,6 +44,25 @@ export class AnnotationRepository {
         projectId: input.projectId,
         traceId: input.traceId,
         userId: input.userId,
+        comment: input.comment,
+        isThumbsUp: input.isThumbsUp,
+        scoreOptions: input.scoreOptions ?? {},
+        expectedOutput: input.expectedOutput,
+      },
+    });
+  }
+
+  /**
+   * Updates an existing annotation.
+   */
+  async update(input: UpdateAnnotationInput): Promise<Annotation> {
+    return await this.prisma.annotation.update({
+      where: {
+        id: input.id,
+        projectId: input.projectId,
+        traceId: input.traceId,
+      },
+      data: {
         comment: input.comment,
         isThumbsUp: input.isThumbsUp,
         scoreOptions: input.scoreOptions ?? {},

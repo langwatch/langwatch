@@ -1,8 +1,8 @@
 import {
   Badge,
   Box,
+  Button,
   Card,
-  Flex,
   Heading,
   HStack,
   Spacer,
@@ -12,15 +12,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useMemo, useState } from "react";
 import { RandomColorAvatar } from "~/components/RandomColorAvatar";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { captureException } from "~/utils/posthogErrorCapture";
 import { AddMembersForm } from "../../components/AddMembersForm";
+import { MemberDetailDialog } from "../../components/settings/MemberDetailDialog";
 import { CopyInput } from "../../components/CopyInput";
-import { orgRoleOptions } from "../../components/settings/OrganizationUserRoleField";
-import { getOrgRoleOptionsForUser } from "../../components/members/getOrgRoleOptionsForUser";
 import { InvitesTable } from "../../components/members/InvitesTable";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
@@ -35,14 +34,13 @@ import { useRequiredSession } from "../../hooks/useRequiredSession";
 import type {
   OrganizationWithMembersAndTheirTeams,
   TeamWithProjects,
-} from "../../server/api/routers/organization";
+} from "../../server/app-layer/organizations/repositories/organization.repository";
 import type { PlanInfo } from "../../../ee/licensing/planInfo";
 import { api } from "../../utils/api";
+import type { RouterOutputs } from "../../utils/api";
+import { OrganizationUserRole, RoleBindingScopeType } from "@prisma/client";
 
-// Create a Map for fast O(1) lookups instead of O(n) .find() in render
-const roleLabelMap = new Map(
-  orgRoleOptions.map((option) => [option.value, option.label]),
-);
+type Binding = RouterOutputs["roleBinding"]["listForOrg"][number];
 
 function Members() {
   const { organization } = useOrganizationTeamProject();
@@ -91,7 +89,6 @@ function MembersList({
 }) {
   const { data: session } = useRequiredSession();
   const { hasPermission } = useOrganizationTeamProject();
-  const router = useRouter();
   const hasOrganizationManagePermission = hasPermission("organization:manage");
   const user = session?.user;
 
@@ -100,6 +97,12 @@ function MembersList({
     value: team.id,
   }));
   const queryClient = api.useContext();
+
+  const [selectedMember, setSelectedMember] = useState<{
+    userId: string;
+    role: OrganizationUserRole;
+    user: { name: string | null; email: string | null };
+  } | null>(null);
 
   const {
     open: isAddMembersOpen,
@@ -209,10 +212,36 @@ function MembersList({
     onInviteLinkClose();
   };
 
+  const {
+    data: allBindings,
+    isLoading: isBindingsLoading,
+    isError: isBindingsError,
+  } = api.roleBinding.listForOrg.useQuery(
+    { organizationId: organization.id },
+    { enabled: !!organization.id && hasOrganizationManagePermission },
+  );
+
+  const bindingsByUser = useMemo(() => {
+    const map = new Map<string, Binding[]>();
+    for (const b of allBindings ?? []) {
+      if (b.userId) {
+        if (!map.has(b.userId)) map.set(b.userId, []);
+        map.get(b.userId)!.push(b);
+      }
+      for (const uid of b.memberUserIds) {
+        if (!map.has(uid)) map.set(uid, []);
+        map.get(uid)!.push(b);
+      }
+    }
+    return map;
+  }, [allBindings]);
+
   const sortedMembers = useMemo(
     () =>
       [...organization.members].sort((a, b) =>
-        b.user.id.localeCompare(a.user.id),
+        (a.user.name ?? a.user.email ?? "").localeCompare(
+          b.user.name ?? b.user.email ?? "",
+        ),
       ),
     [organization.members],
   );
@@ -221,11 +250,6 @@ function MembersList({
     hasOrganizationManagePermission &&
     organization.members.length > 1 &&
     memberId !== user?.id;
-
-  const filteredOrgRoleOptions = useMemo(
-    () => getOrgRoleOptionsForUser({ isAdmin: hasOrganizationManagePermission }),
-    [hasOrganizationManagePermission],
-  );
 
   const sentInvites = useMemo(
     () =>
@@ -264,15 +288,14 @@ function MembersList({
                   <Table.ColumnHeader width="56px" />
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Email</Table.ColumnHeader>
-                  <Table.ColumnHeader>Role</Table.ColumnHeader>
-                  <Table.ColumnHeader>Teams</Table.ColumnHeader>
+                  {hasOrganizationManagePermission && (
+                    <Table.ColumnHeader textAlign="right">Access</Table.ColumnHeader>
+                  )}
                   <Table.ColumnHeader width="60px"></Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
                 {sortedMembers.map((member) => {
-                  const roleLabel = roleLabelMap.get(member.role) ?? member.role;
-
                   return (
                     <Table.Row key={member.userId}>
                       <Table.Cell>
@@ -283,9 +306,29 @@ function MembersList({
                       </Table.Cell>
                       <Table.Cell>
                         <HStack>
-                          <Link href={`/settings/members/${member.userId}`}>
+                          <Button
+                            variant="plain"
+                            size="sm"
+                            padding={0}
+                            height="auto"
+                            fontWeight="normal"
+                            color="colorPalette.fg"
+                            colorPalette="blue"
+                            onClick={() => {
+                              setSelectedMember({
+                                userId: member.userId,
+                                role: member.role,
+                                user: { name: member.user.name ?? null, email: member.user.email ?? null },
+                              });
+                            }}
+                          >
                             {member.user.name}
-                          </Link>
+                          </Button>
+                          {member.role === "EXTERNAL" && (
+                            <Badge colorPalette="gray" size="sm">
+                              Lite Member
+                            </Badge>
+                          )}
                           {member.user.deactivatedAt && (
                             <Badge colorPalette="red" size="sm">
                               Deactivated
@@ -294,13 +337,14 @@ function MembersList({
                         </HStack>
                       </Table.Cell>
                       <Table.Cell>{member.user.email}</Table.Cell>
-                      <Table.Cell>{roleLabel}</Table.Cell>
-                      <Table.Cell>
-                        <TeamMembershipsDisplay
-                          teamMemberships={member.user.teamMemberships}
-                          organizationId={organization.id}
-                        />
-                      </Table.Cell>
+                      {hasOrganizationManagePermission && (
+                        <Table.Cell>
+                          <MemberAccessDisplay
+                            bindings={bindingsByUser.get(member.userId) ?? []}
+                            isLoading={isBindingsLoading || isBindingsError}
+                          />
+                        </Table.Cell>
+                      )}
                       <Table.Cell>
                         <Box
                           width="full"
@@ -316,7 +360,11 @@ function MembersList({
                               <Menu.Item
                                 value="edit"
                                 onClick={() => {
-                                  void router.push(`/settings/members/${member.userId}`);
+                                  setSelectedMember({
+                                    userId: member.userId,
+                                    role: member.role,
+                                    user: { name: member.user.name ?? null, email: member.user.email ?? null },
+                                  });
                                 }}
                               >
                                 <Pencil size={16} />
@@ -356,6 +404,17 @@ function MembersList({
           onDeleteInvite={deleteInvite}
         />
       </VStack>
+
+      {selectedMember && (
+        <MemberDetailDialog
+          member={selectedMember}
+          organizationId={organization.id}
+          canManage={hasOrganizationManagePermission}
+          isCurrentUser={selectedMember.userId === user?.id}
+          open={!!selectedMember}
+          onClose={() => setSelectedMember(null)}
+        />
+      )}
 
       <Dialog.Root
         open={isInviteLinkOpen}
@@ -413,7 +472,6 @@ function MembersList({
           <Dialog.Body>
             <AddMembersForm
               teamOptions={teamOptions}
-              orgRoleOptions={filteredOrgRoleOptions}
               organizationId={organization.id}
               onSubmit={onSubmit}
               isLoading={isSubmitting}
@@ -428,33 +486,43 @@ function MembersList({
   );
 }
 
-interface TeamMembershipsDisplayProps {
-  teamMemberships: Array<{
-    team: { id: string; name: string; slug: string; organizationId: string };
-  }>;
-  organizationId: string;
+function scopeTypeLabel(type: RoleBindingScopeType) {
+  if (type === RoleBindingScopeType.ORGANIZATION) return "🏢";
+  if (type === RoleBindingScopeType.TEAM) return "👥";
+  return "📁";
 }
 
-/**
- * Reusable component to display team memberships as clickable badges
- * Single Responsibility: Renders team memberships as a list of clickable badges
- */
-const TeamMembershipsDisplay = ({
-  teamMemberships,
-  organizationId,
-}: TeamMembershipsDisplayProps) => {
+function roleBadgeColor(role: string) {
+  if (role === "ADMIN") return "red";
+  if (role === "MEMBER") return "blue";
+  return "gray";
+}
+
+function MemberAccessDisplay({ bindings, isLoading }: { bindings: Binding[]; isLoading?: boolean }) {
+  if (isLoading) {
+    return <Text fontSize="xs" color="fg.subtle" textAlign="right">—</Text>;
+  }
+  if (bindings.length === 0) {
+    return <Text fontSize="xs" color="fg.subtle" textAlign="right">No access configured</Text>;
+  }
   return (
-    <Flex gap={2} flexWrap="wrap">
-      {teamMemberships
-        .flatMap((m) => m.team)
-        .filter((m) => m.organizationId === organizationId)
-        .map((m) => (
-          <Link href={`/settings/teams/${m.slug}`} key={m.id}>
-            <Badge size="sm" variant="surface">
-              {m.name}
-            </Badge>
-          </Link>
-        ))}
-    </Flex>
+    <VStack gap={1} align="end">
+      {bindings.map((b) => (
+        <HStack key={b.id} gap={1} fontSize="xs">
+          <Badge colorPalette={roleBadgeColor(b.role)} size="sm">
+            {b.customRoleName ?? b.role}
+          </Badge>
+          <Text color="fg.muted">on</Text>
+          <Badge colorPalette="purple" size="sm">
+            {scopeTypeLabel(b.scopeType)} {b.scopeName ?? b.scopeId.slice(0, 8) + "…"}
+          </Badge>
+          {b.groupId && (
+            <Text color="fg.subtle" fontSize="xs" title={`via group: ${b.groupName ?? b.groupId}`}>
+              via {b.groupName ?? "group"}
+            </Text>
+          )}
+        </HStack>
+      ))}
+    </VStack>
   );
-};
+}

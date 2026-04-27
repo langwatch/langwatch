@@ -10,6 +10,7 @@ import type {
 } from "../tracer/types";
 import {
   PRECONDITION_FIELD_MATCHERS,
+  normalizePreconditionTraceData,
   type PreconditionTraceData,
 } from "../filters/precondition-matchers";
 import { getEvaluatorDefinitions } from "./getEvaluator";
@@ -244,10 +245,11 @@ export function evaluatePreconditions({
   traceData: PreconditionTraceData;
   preconditions: CheckPreconditions;
 }): boolean {
+  const normalizedData = normalizePreconditionTraceData(traceData);
   for (const precondition of preconditions) {
     const fieldValue = resolveFieldValue({
       field: precondition.field,
-      data: traceData,
+      data: normalizedData,
       key: precondition.key,
       subkey: precondition.subkey,
       value: precondition.value,
@@ -324,7 +326,7 @@ export function buildPreconditionTraceDataFromTrace({
       .map((span) => (span as LLMSpan).model)
       .filter((model): model is string => typeof model === "string" && model !== ""),
     customMetadata: Object.keys(customMetadata).length > 0 ? customMetadata : null,
-    hasAnnotation: null, // Not available in legacy collector path
+    annotationIds: [], // Not available in legacy collector path
     events: events?.map((e) => ({
       event_type: e.event_type,
       metrics: e.metrics ?? [],
@@ -367,7 +369,7 @@ export function buildPreconditionTraceDataFromCommand({
             typeof model === "string" && model !== "",
         ),
     customMetadata: data.customMetadata ?? null,
-    hasAnnotation: null, // Not available at command time
+    annotationIds: [], // Not available at command time
     events: events ?? null,
   };
 }

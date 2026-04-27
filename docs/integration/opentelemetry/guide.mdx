@@ -1,0 +1,258 @@
+---
+title: OpenTelemetry Integration Guide
+sidebarTitle: OpenTelemetry
+description: Integrate OpenTelemetry with LangWatch to collect LLM spans from any language for unified AI agent evaluation data.
+icon: telescope
+keywords: langwatch, opentelemetry, integration, guide, java, c#, .net, python, typescript, javascript, go, sdk, open telemetry, open telemetry integration, open telemetry guide, open telemetry integration guide, open telemetry integration guide java, open telemetry integration guide c#, open telemetry integration guide .net, open telemetry integration guide python, open telemetry integration guide typescript, open telemetry integration guide javascript, open telemetry integration guide go
+---
+
+import OpenInferenceMetadata from "/snippets/openinference-metadata.mdx";
+
+OpenTelemetry is a vendor-neutral standard for observability that provides a unified way to capture traces, metrics, and logs. LangWatch is fully compatible with OpenTelemetry, allowing you to use any OpenTelemetry-compatible library in any programming language to capture your LLM traces and send them to LangWatch.
+
+This guide shows you how to set up OpenTelemetry instrumentation in any language and configure it to export traces to LangWatch's OTEL API endpoint.
+
+import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
+
+<LLMsTxtProtip />
+
+## Prerequisites
+
+- Obtain your `LANGWATCH_API_KEY` from the [LangWatch dashboard](https://app.langwatch.ai/)
+- Install the OpenTelemetry SDK for your programming language
+
+## LangWatch OTEL API Endpoint
+
+LangWatch provides a standard OpenTelemetry Protocol (OTLP) endpoint for receiving traces:
+
+```
+https://app.langwatch.ai/api/otel/v1/traces
+```
+
+This endpoint accepts OTLP over HTTP and gRPC protocols, making it compatible with all OpenTelemetry SDKs.
+
+## General Setup Pattern
+
+The setup follows this general pattern across all languages:
+
+1. **Install OpenTelemetry SDK** for your language
+2. **Configure the OTLP exporter** to point to LangWatch's endpoint
+3. **Set up authentication** using your API key
+4. **Initialize the trace provider** with the exporter
+5. **Instrument your LLM calls** using available instrumentation libraries
+
+## Language-Specific Examples
+
+<Tabs>
+  <Tab title="Java">
+    <Steps>
+      <Step title="Install OpenTelemetry">
+        Add to your `pom.xml`:
+        ```xml
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-sdk</artifactId>
+            <version>1.32.0</version>
+        </dependency>
+        <dependency>
+            <groupId>io.opentelemetry</groupId>
+            <artifactId>opentelemetry-exporter-otlp</artifactId>
+            <version>1.32.0</version>
+        </dependency>
+        ```
+      </Step>
+
+      <Step title="Configure the exporter">
+        ```java
+        import io.opentelemetry.api.OpenTelemetry;
+        import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
+        import io.opentelemetry.context.propagation.ContextPropagators;
+        import io.opentelemetry.sdk.OpenTelemetrySdk;
+        import io.opentelemetry.sdk.trace.SdkTracerProvider;
+        import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+        import io.opentelemetry.sdk.trace.export.OtlpHttpSpanExporter;
+        import io.opentelemetry.semconv.resource.attributes.ResourceAttributes;
+
+        public class OpenTelemetryConfig {
+            public static OpenTelemetry initOpenTelemetry() {
+                OtlpHttpSpanExporter spanExporter = OtlpHttpSpanExporter.builder()
+                    .setEndpoint("https://app.langwatch.ai/api/otel/v1/traces")
+                    .addHeader("Authorization", "Bearer " + System.getenv("LANGWATCH_API_KEY"))
+                    .build();
+
+                SdkTracerProvider sdkTracerProvider = SdkTracerProvider.builder()
+                    .addSpanProcessor(BatchSpanProcessor.builder(spanExporter).build())
+                    .setResource(Resource.getDefault().toBuilder()
+                        .put(ResourceAttributes.SERVICE_NAME, "my-service")
+                        .build())
+                    .build();
+
+                return OpenTelemetrySdk.builder()
+                    .setTracerProvider(sdkTracerProvider)
+                    .setPropagators(ContextPropagators.create(W3CTraceContextPropagator.getInstance()))
+                    .buildAndRegisterGlobal();
+            }
+        }
+        ```
+      </Step>
+
+      <Step title="Instrument your LLM calls">
+        ```java
+        import io.opentelemetry.api.trace.Tracer;
+
+        public class LLMService {
+            private final Tracer tracer = OpenTelemetry.getGlobalTracer("my-service");
+
+            public void callLLM() {
+                var span = tracer.spanBuilder("llm-call").startSpan();
+                try (var scope = span.makeCurrent()) {
+                    // Your LLM call here
+                } finally {
+                    span.end();
+                }
+            }
+        }
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+
+  <Tab title="C#/.NET">
+    <Steps>
+      <Step title="Install OpenTelemetry">
+        ```bash
+        dotnet add package OpenTelemetry
+        dotnet add package OpenTelemetry.Exporter.OpenTelemetryProtocol
+        ```
+      </Step>
+
+      <Step title="Configure the exporter">
+        ```csharp
+        using OpenTelemetry;
+        using OpenTelemetry.Resources;
+        using OpenTelemetry.Trace;
+
+        public class Program
+        {
+            public static void Main(string[] args)
+            {
+                var builder = Sdk.CreateTracerProviderBuilder()
+                    .SetResourceBuilder(ResourceBuilder.CreateDefault()
+                        .AddService(serviceName: "my-service"))
+                    .AddOtlpExporter(opts => opts
+                        .Endpoint = new Uri("https://app.langwatch.ai/api/otel/v1/traces")
+                        .Headers = "Authorization=Bearer " + Environment.GetEnvironmentVariable("LANGWATCH_API_KEY"))
+                    .Build();
+            }
+        }
+        ```
+      </Step>
+
+      <Step title="Instrument your LLM calls">
+        ```csharp
+        using OpenTelemetry.Trace;
+
+        public class LLMService
+        {
+            private readonly Tracer _tracer = TracerProvider.Default.GetTracer("my-service");
+
+            public async Task<string> CallLLMAsync()
+            {
+                using var span = _tracer.StartActiveSpan("llm-call");
+                // Your LLM call here
+                return "response";
+            }
+        }
+        ```
+      </Step>
+    </Steps>
+  </Tab>
+</Tabs>
+
+## Available Instrumentation Libraries
+
+LangWatch works with any OpenTelemetry-compatible instrumentation library. Here are some popular options:
+
+### Java Libraries
+- **[Spring AI](https://docs.spring.io/spring-ai/reference/index.html)**: Spring AI provides built-in observability support for AI applications, including OpenTelemetry integration for tracing LLM calls and AI operations
+- **OpenTelemetry Java SDK**: Use OpenTelemetry Java SDK with custom spans
+
+### .NET Libraries
+- **[Azure Monitor OpenTelemetry](https://learn.microsoft.com/en-us/azure/azure-monitor/app/opentelemetry-enable?tabs=aspnetcore)**: Azure Monitor OpenTelemetry provides comprehensive OpenTelemetry support for .NET applications, including automatic instrumentation and Azure-specific features
+- **OpenTelemetry .NET SDK**: Use OpenTelemetry .NET SDK with custom instrumentation
+
+## Manual Instrumentation
+
+If no automatic instrumentation is available for your LLM provider, you can manually create spans:
+
+```java
+import io.opentelemetry.api.trace.Tracer;
+import io.opentelemetry.api.trace.Span;
+import io.opentelemetry.context.Context;
+
+public class LLMService {
+    private final Tracer tracer = OpenTelemetry.getGlobalTracer("my-service");
+
+    public String callLLM(String prompt) {
+        Span span = tracer.spanBuilder("llm-call").startSpan();
+        
+        try (var scope = span.makeCurrent()) {
+            // Add relevant attributes
+            span.setAttribute("llm.provider", "custom-provider");
+            span.setAttribute("llm.model", "gpt-5-mini");
+            span.setAttribute("llm.prompt", prompt);
+            
+            // Your LLM call here
+            String response = yourLLMClient.generate(prompt);
+            
+            return response;
+        } finally {
+            span.end();
+        }
+    }
+}
+```
+
+## Environment Variables
+
+Set these environment variables for authentication:
+
+```bash
+export LANGWATCH_API_KEY="your-api-key-here"
+```
+
+## Verification
+
+After setting up your instrumentation, you can verify that traces are being sent to LangWatch by:
+
+1. Making a few LLM calls in your application
+2. Checking the [LangWatch dashboard](https://app.langwatch.ai/) for incoming traces
+3. Looking for spans with your service name and LLM call details
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Traces not appearing in LangWatch">
+    - Verify your API key is correct and has proper permissions
+    - Check that the endpoint URL is correct: `https://app.langwatch.ai/api/otel/v1/traces`
+    - Ensure your application is making LLM calls after instrumentation is set up
+    - Check network connectivity to the LangWatch endpoint
+  </Accordion>
+
+  <Accordion title="Authentication errors">
+    - Verify the Authorization header format: `Bearer YOUR_API_KEY`
+    - Ensure the API key is valid and not expired
+    - Check that the API key has the necessary permissions for trace ingestion
+  </Accordion>
+
+  <Accordion title="Performance issues">
+    - Consider using batch span processors for high-volume applications
+    - Implement sampling to reduce the number of traces sent
+    - Use async span processors to avoid blocking your application
+  </Accordion>
+</AccordionGroup>
+
+## Next Steps
+
+- Explore the [LangWatch dashboard](https://app.langwatch.ai/) to view your traces
+- Set up [custom evaluations](/evaluations) for your LLM calls

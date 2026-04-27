@@ -1,0 +1,20 @@
+---
+title: "Overview"
+description: "Manage saved evaluator configurations for your project"
+---
+
+## Intro
+
+The Saved Evaluators API lets you manage reusable evaluator configurations for your project. You can list, retrieve, and create saved evaluators that can then be used for online evaluations, guardrails, and experiments.
+
+Each saved evaluator stores a name, an evaluator type (e.g. `langevals/exact_match`), and its settings configuration.
+
+## Authentication
+
+To make a call to the Saved Evaluators API, you will need to pass through your LangWatch API key in the header as `X-Auth-Token`. Your API key can be found on the setup page under settings.
+
+#### Allowed Methods
+
+- `GET /api/evaluators` - List all saved evaluators for a project
+- `GET /api/evaluators/:idOrSlug` - Get a specific evaluator by ID or slug
+- `POST /api/evaluators` - Create a new saved evaluator

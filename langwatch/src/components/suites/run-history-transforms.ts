@@ -6,17 +6,11 @@
  */
 
 import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import type { ScenarioRunData, SuiteRunSummary } from "~/server/scenarios/scenario-event.types";
 import { isOnPlatformSet, ON_PLATFORM_DISPLAY_NAME } from "~/server/scenarios/internal-set-id";
 import { computeMetricStats, type MetricStats } from "~/components/shared/MetricStatsTooltip";
 import { extractSuiteId, isSuiteSetId } from "~/server/suites/suite-set-id";
 
-export type SuiteRunSummary = {
-  passedCount: number;
-  failedCount: number;
-  totalCount: number;
-  lastRunTimestamp: number | null;
-};
 
 /** Valid values for the grouping dimension. */
 export const RUN_GROUP_TYPES = ["none", "scenario", "target"] as const;
@@ -128,9 +122,19 @@ const UNKNOWN_GROUP_KEY = "__unknown__";
 
 /**
  * Computes the maximum timestamp from a list of scenario runs.
+ * Used for scenario/target groups where "most recently active" ordering makes sense.
  */
 function maxTimestamp(runs: ScenarioRunData[]): number {
   return runs.reduce((max, r) => Math.max(max, r.timestamp), 0);
+}
+
+/**
+ * Computes the minimum timestamp from a list of scenario runs.
+ * Used as the batch "creation time" so batches maintain stable ordering
+ * even when individual runs within them get updated.
+ */
+function minTimestamp(runs: ScenarioRunData[]): number {
+  return runs.reduce((min, r) => Math.min(min, r.timestamp), Infinity);
 }
 
 /**
@@ -145,7 +149,8 @@ function sortByTimestampDesc<T extends RunGroup>(groups: T[]): T[] {
  * Groups a flat list of scenario runs by their batchRunId.
  *
  * Returns batch runs sorted by timestamp descending (most recent first).
- * Each batch uses the maximum timestamp from its scenario runs.
+ * Each batch uses the minimum timestamp (creation time) from its scenario runs
+ * so batches maintain stable ordering even when individual runs update.
  * When scenarioSetIds is provided, each batch run includes its scenarioSetId.
  */
 export function groupRunsByBatchId({
@@ -168,7 +173,7 @@ export function groupRunsByBatchId({
 
   const batchRuns: BatchRun[] = [];
   for (const [batchRunId, scenarioRuns] of batchMap) {
-    const timestamp = maxTimestamp(scenarioRuns);
+    const timestamp = minTimestamp(scenarioRuns);
     const scenarioSetId = scenarioSetIds?.[batchRunId];
     batchRuns.push({
       groupKey: batchRunId,
@@ -287,9 +292,15 @@ export function computeBatchRunSummary({
 /**
  * Computes pass/fail summary for any RunGroup (batch, scenario, or target).
  *
- * Pass rate = passed / total (all runs count in denominator).
- * When no runs have an actual verdict (completedCount == 0), passRate is null
- * to distinguish "nothing evaluated yet" from "everything failed" (0%).
+ * Pass rate = passed / settled. "Settled" = passed + failed + stalled + cancelled
+ * (all terminal states). Only in-progress and queued runs are excluded from the
+ * denominator since we don't know their outcome yet.
+ * When no runs have settled yet (settledCount == 0), passRate is null.
+ *
+ * ⚠️  KEEP IN SYNC: The sidebar uses a separate ClickHouse aggregation query
+ * with its own pass rate formula. If you change the formula here, also update:
+ *   - simulation.clickhouse.repository.ts → getSetSummaries() (sidebar query)
+ *   - SuiteSidebar.tsx → RunSummaryLine() (sidebar display)
  */
 export function computeGroupSummary({
   group,
@@ -327,9 +338,10 @@ export function computeGroupSummary({
   }
 
   const completedCount = passedCount + failedCount;
+  const settledCount = passedCount + failedCount + stalledCount + cancelledCount;
   const totalCount = group.scenarioRuns.length;
-  const passRate = completedCount > 0
-    ? (passedCount / totalCount) * 100
+  const passRate = settledCount > 0
+    ? (passedCount / settledCount) * 100
     : (totalCount > 0 ? null : 0);
 
   let totalCost = 0;

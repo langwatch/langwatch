@@ -1,7 +1,6 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { getClickHouseClientForOrganization } from "~/server/clickhouse/clickhouseClient";
 import { prisma } from "~/server/db";
-import { esClient, SCENARIO_EVENTS_INDEX, TRACE_INDEX } from "./elasticsearch";
 
 export async function collectUsageStats(instanceId: string) {
   const organizationId = instanceId.split("__")[1];
@@ -16,8 +15,6 @@ export async function collectUsageStats(instanceId: string) {
     },
     select: {
       id: true,
-      featureClickHouseDataSourceTraces: true,
-      featureClickHouseDataSourceSimulations: true,
     },
   });
   const projectIds = projects.map((p) => p.id);
@@ -95,29 +92,11 @@ export async function collectUsageStats(instanceId: string) {
 }
 
 async function getTraceCount(
-  projects: Array<{
-    id: string;
-    featureClickHouseDataSourceTraces: boolean;
-  }>,
+  projects: Array<{ id: string }>,
   clickhouse: ClickHouseClient | null,
 ): Promise<number> {
-  const chProjectIds = clickhouse
-    ? projects.filter((p) => p.featureClickHouseDataSourceTraces).map((p) => p.id)
-    : [];
-  const esProjectIds = projects
-    .filter((p) => !clickhouse || !p.featureClickHouseDataSourceTraces)
-    .map((p) => p.id);
-
-  const [chCount, esCount] = await Promise.all([
-    chProjectIds.length > 0
-      ? getChTraceCount(clickhouse!, chProjectIds)
-      : 0,
-    esProjectIds.length > 0
-      ? getEsTraceCount(esProjectIds)
-      : 0,
-  ]);
-
-  return chCount + esCount;
+  if (!clickhouse || projects.length === 0) return 0;
+  return getChTraceCount(clickhouse, projects.map((p) => p.id));
 }
 
 async function getChTraceCount(
@@ -138,49 +117,12 @@ async function getChTraceCount(
   return parseInt(rows[0]?.Total ?? "0", 10);
 }
 
-async function getEsTraceCount(projectIds: string[]): Promise<number> {
-  const client = await esClient();
-
-  const result = await client.count({
-    index: TRACE_INDEX.all,
-    body: {
-      query: {
-        terms: { project_id: projectIds },
-      },
-    },
-  });
-
-  return (
-    (result as { body?: { count?: number } }).body?.count ??
-    result.count ??
-    0
-  );
-}
-
 async function getScenariosCount(
-  projects: Array<{
-    id: string;
-    featureClickHouseDataSourceSimulations: boolean;
-  }>,
+  projects: Array<{ id: string }>,
   clickhouse: ClickHouseClient | null,
 ): Promise<number> {
-  const chProjectIds = clickhouse
-    ? projects.filter((p) => p.featureClickHouseDataSourceSimulations).map((p) => p.id)
-    : [];
-  const esProjectIds = projects
-    .filter((p) => !clickhouse || !p.featureClickHouseDataSourceSimulations)
-    .map((p) => p.id);
-
-  const [chCount, esCount] = await Promise.all([
-    chProjectIds.length > 0
-      ? getChScenariosCount(clickhouse!, chProjectIds)
-      : 0,
-    esProjectIds.length > 0
-      ? getEsScenariosCount(esProjectIds)
-      : 0,
-  ]);
-
-  return chCount + esCount;
+  if (!clickhouse || projects.length === 0) return 0;
+  return getChScenariosCount(clickhouse, projects.map((p) => p.id));
 }
 
 async function getChScenariosCount(
@@ -190,14 +132,15 @@ async function getChScenariosCount(
   const result = await clickhouse.query({
     query: `
       SELECT toString(count()) AS Total
-      FROM (
-        SELECT *
-        FROM simulation_runs
-        WHERE TenantId IN ({projectIds:Array(String)})
-        ORDER BY ScenarioRunId, UpdatedAt DESC
-        LIMIT 1 BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
-      )
-      WHERE ArchivedAt IS NULL
+      FROM simulation_runs AS t
+      WHERE t.TenantId IN ({projectIds:Array(String)})
+        AND t.ArchivedAt IS NULL
+        AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
+          SELECT TenantId, ScenarioSetId, BatchRunId, ScenarioRunId, max(UpdatedAt)
+          FROM simulation_runs
+          WHERE TenantId IN ({projectIds:Array(String)})
+          GROUP BY TenantId, ScenarioSetId, BatchRunId, ScenarioRunId
+        )
     `,
     query_params: { projectIds },
     format: "JSONEachRow",
@@ -207,21 +150,3 @@ async function getChScenariosCount(
   return parseInt(rows[0]?.Total ?? "0", 10);
 }
 
-async function getEsScenariosCount(projectIds: string[]): Promise<number> {
-  const client = await esClient();
-
-  const result = await client.count({
-    index: SCENARIO_EVENTS_INDEX.alias,
-    body: {
-      query: {
-        terms: { project_id: projectIds },
-      },
-    },
-  });
-
-  return (
-    (result as { body?: { count?: number } }).body?.count ??
-    result.count ??
-    0
-  );
-}

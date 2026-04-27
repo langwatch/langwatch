@@ -394,7 +394,7 @@ describe("column-pruning", () => {
         "ErrorMessage",
         "TopicId",
         "SubTopicId",
-        "HasAnnotation",
+        "AnnotationIds",
         "Models",
         // Map column (used via Attributes['key'])
         "Attributes",

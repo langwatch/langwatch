@@ -10,6 +10,10 @@ vi.mock("../../../auditLog", () => ({
   auditLog: vi.fn(() => Promise.resolve()),
 }));
 
+// Mock the redis connection so the revoke helper called by
+// UserService.deactivate doesn't try to talk to a real Redis from a unit test.
+vi.mock("~/server/redis", () => ({ connection: undefined }));
+
 vi.mock("../../rbac", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../rbac")>();
   return {
@@ -36,7 +40,15 @@ describe("userRouter", () => {
         expires: "2099-01-01",
       },
     });
-    (ctx as any).prisma = { user: { update: prismaUpdateMock } };
+    (ctx as any).prisma = {
+      user: { update: prismaUpdateMock },
+      // UserService.deactivate also revokes all sessions for the user;
+      // mock the session model so the revocation completes cleanly.
+      session: {
+        findMany: vi.fn().mockResolvedValue([]),
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
     return userRouter.createCaller(ctx);
   };
 

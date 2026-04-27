@@ -1,5 +1,5 @@
 import { Box, Button, HStack, Input, Text } from "@chakra-ui/react";
-import { BookText, ChevronDown, Code, Globe, Plus } from "lucide-react";
+import { BookText, ChevronDown, Code, Globe, Plus, Workflow } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "../../prompts/hooks/useAllPromptsForProject";
@@ -10,7 +10,7 @@ import {
 } from "./useFilteredScenarioTargets";
 
 export type TargetValue = {
-  type: "prompt" | "http" | "code";
+  type: "prompt" | "http" | "code" | "workflow";
   id: string;
 } | null;
 
@@ -44,6 +44,7 @@ export function TargetSelector({
   const [searchValue, setSearchValue] = useState("");
   const [open, setOpen] = useState(false);
   const [maxDropdownHeight, setMaxDropdownHeight] = useState(400);
+  const [dropUp, setDropUp] = useState(false);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -111,11 +112,16 @@ export function TargetSelector({
     const next = !open;
     setOpen(next);
     if (next) {
-      // Cap dropdown height to available space above the trigger
+      // Pick the larger of space below/above the trigger and drop up when needed,
+      // so the dropdown stays usable at the bottom of the viewport (dialogs, drawers).
       const triggerRect = triggerRef.current?.getBoundingClientRect();
       if (triggerRect) {
-        const spaceAbove = triggerRect.top - 8; // 8px padding from viewport edge
-        setMaxDropdownHeight(Math.min(400, Math.max(150, spaceAbove)));
+        const spaceBelow = window.innerHeight - triggerRect.bottom - 8; // 8px padding from viewport edge
+        const spaceAbove = triggerRect.top - 8;
+        const openUp = spaceAbove > spaceBelow;
+        const available = openUp ? spaceAbove : spaceBelow;
+        setDropUp(openUp);
+        setMaxDropdownHeight(Math.min(400, Math.max(40, available)));
       }
       setTimeout(() => {
         inputRef.current?.focus();
@@ -141,6 +147,7 @@ export function TargetSelector({
           {value?.type === "prompt" && <BookText size={14} />}
           {value?.type === "http" && <Globe size={14} />}
           {value?.type === "code" && <Code size={14} />}
+          {value?.type === "workflow" && <Workflow size={14} />}
           <Text>{selectedLabel ?? placeholder}</Text>
         </HStack>
         <ChevronDown size={14} />
@@ -149,11 +156,12 @@ export function TargetSelector({
       {open && (
         <Box
           position="absolute"
-          bottom="100%"
+          {...(dropUp
+            ? { bottom: "100%", marginBottom: 1 }
+            : { top: "100%", marginTop: 1 })}
           left={0}
           width="300px"
           maxHeight={`${maxDropdownHeight}px`}
-          marginBottom={1}
           borderRadius="lg"
           borderWidth="1px"
           borderColor="border"

@@ -1,4 +1,5 @@
 import type { createLogger } from "~/utils/logger/server";
+import { KILL_SWITCH_CACHE_TTL_MS } from "../../featureFlag/constants";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 import type { AggregateType } from "../domain/aggregateType";
 
@@ -47,6 +48,7 @@ export async function isComponentDisabled({
       flagKey,
       tenantId,
       false,
+      { cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS },
     );
     if (isDisabled && logger) {
       logger.debug(

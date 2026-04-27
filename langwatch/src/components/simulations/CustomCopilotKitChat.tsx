@@ -113,7 +113,7 @@ function CustomCopilotKitChatInner({
             css={fadeInCss}
           >
             {message_.role === "assistant" && (
-              <Markdown className="markdown">{message_.content}</Markdown>
+              <Markdown>{message_.content}</Markdown>
             )}
             {UserMessage && message_.role === "user" && (
               <UserMessage message={message_.content} rawData={message} />

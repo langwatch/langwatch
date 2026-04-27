@@ -33,6 +33,8 @@ export const evaluationExecutionResultSchema = z.object({
   passed: z.boolean().optional(),
   label: z.string().optional(),
   details: z.string().optional(),
+  error: z.string().optional(),
+  errorDetails: z.string().optional(),
   cost: evaluationCostSchema.optional(),
   evaluationThreadId: z.string().optional(),
   inputs: z.record(z.any()).optional(),

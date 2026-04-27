@@ -10,6 +10,7 @@ import {
   ProjectionError,
   handleError,
   categorizeError,
+  classifyClickHouseError,
 } from "../errorHandling";
 
 const createMockLogger = () => ({
@@ -341,5 +342,49 @@ describe("categorizeError", () => {
 
   it("returns RECOVERABLE for non-Error value", () => {
     expect(categorizeError("not an error")).toBe(ErrorCategory.RECOVERABLE);
+  });
+});
+
+describe("classifyClickHouseError", () => {
+  describe("when error has a transient ClickHouse error code", () => {
+    it("returns RECOVERABLE for code 202 (TOO_MANY_SIMULTANEOUS_QUERIES)", () => {
+      const err = Object.assign(new Error("Too many simultaneous queries"), { code: "202" });
+      expect(classifyClickHouseError(err)).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for code 159 (TIMEOUT_EXCEEDED)", () => {
+      const err = Object.assign(new Error("timeout"), { code: "159" });
+      expect(classifyClickHouseError(err)).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for code 241 (MEMORY_LIMIT_EXCEEDED)", () => {
+      const err = Object.assign(new Error("memory"), { code: "241" });
+      expect(classifyClickHouseError(err)).toBe(ErrorCategory.RECOVERABLE);
+    });
+  });
+
+  describe("when error message matches transient patterns", () => {
+    it("returns RECOVERABLE for 'Too many simultaneous queries' message", () => {
+      expect(classifyClickHouseError(new Error("Too many simultaneous queries. Maximum: 100. "))).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for connection refused", () => {
+      expect(classifyClickHouseError(new Error("connect ECONNREFUSED 127.0.0.1:8123"))).toBe(ErrorCategory.RECOVERABLE);
+    });
+
+    it("returns RECOVERABLE for connection timeout", () => {
+      expect(classifyClickHouseError(new Error("connect ETIMEDOUT"))).toBe(ErrorCategory.RECOVERABLE);
+    });
+  });
+
+  describe("when error is not transient", () => {
+    it("returns CRITICAL for unknown ClickHouse errors", () => {
+      expect(classifyClickHouseError(new Error("Syntax error in SQL"))).toBe(ErrorCategory.CRITICAL);
+    });
+
+    it("returns CRITICAL for null/undefined", () => {
+      expect(classifyClickHouseError(null)).toBe(ErrorCategory.CRITICAL);
+      expect(classifyClickHouseError(undefined)).toBe(ErrorCategory.CRITICAL);
+    });
   });
 });

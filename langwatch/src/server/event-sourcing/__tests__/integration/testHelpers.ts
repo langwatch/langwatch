@@ -25,10 +25,14 @@ import {
  */
 export async function closePipelineGracefully(pipeline: {
   service: { close: () => Promise<void> };
+  eventSourcing?: { close: () => Promise<void> };
 }): Promise<void> {
-  await pipeline.service.close();
-  // Wait for BullMQ workers to fully shut down and release Redis connections
-  // Using 2000ms to ensure all async operations complete before next test
+  if (pipeline.eventSourcing) {
+    await pipeline.eventSourcing.close();
+  } else {
+    await pipeline.service.close();
+  }
+  // Wait for queue workers to fully shut down and release Redis connections
   await new Promise((resolve) => setTimeout(resolve, 2000));
 }
 
@@ -83,6 +87,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     eventStore,
     clickhouse: async () => clickHouseClient,
     redis: redisConnection,
+    processRole: "worker",
   });
 
   // Build pipeline using static definition
@@ -100,6 +105,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
   return {
     ...pipeline,
     eventStore,
+    eventSourcing,
     pipelineName,
     // Wait for BullMQ workers to be ready before sending commands
     ready: () => pipeline.service.waitUntilReady(),
@@ -108,6 +114,7 @@ export function createTestPipeline(): PipelineWithCommandHandlers<
     { testCommand: any }
   > & {
     eventStore: EventStoreClickHouse;
+    eventSourcing: EventSourcing;
     pipelineName: string;
     ready: () => Promise<void>;
   };

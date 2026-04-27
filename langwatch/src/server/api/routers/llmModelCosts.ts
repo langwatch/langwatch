@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import safe from "safe-regex2";
 import { z } from "zod";
 import { prisma } from "~/server/db";
 import { getModelLimits } from "../../../utils/modelLimits";
@@ -26,8 +27,9 @@ export const llmModelCostsRouter = createTRPCRouter({
         model: z.string(),
         inputCostPerToken: z.number().optional(),
         outputCostPerToken: z.number().optional(),
-        regex: z.string().refine((value) => isValidRegex(value), {
-          message: "Invalid regular expression",
+        regex: z.string().refine((value) => isSafeRegex(value), {
+          message:
+            "Invalid or unsafe regular expression (avoid nested quantifiers like (a+)+)",
         }),
       }),
     )
@@ -90,10 +92,10 @@ export const llmModelCostsRouter = createTRPCRouter({
     .query(async ({ input }) => getModelLimits(input.model)),
 });
 
-const isValidRegex = (pattern: string): boolean => {
+const isSafeRegex = (pattern: string): boolean => {
   try {
-    new RegExp(pattern);
-    return true;
+    const re = new RegExp(pattern);
+    return safe(re);
   } catch {
     return false;
   }

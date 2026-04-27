@@ -1,0 +1,38 @@
+{{- include "clickhouse-serverless.validate" . }}
+ClickHouse Serverless has been deployed!
+
+Configuration:
+  CPU:      {{ .Values.cpu }}
+  Memory:   {{ .Values.memory }}
+  Replicas: {{ .Values.replicas }}
+  Storage:  {{ .Values.storage.size }}
+{{- if .Values.cold.enabled }}
+  Cold storage: {{ .Values.objectStorage.bucket }}
+{{- end }}
+{{- if .Values.backup.enabled }}
+  Backups: {{ .Values.objectStorage.bucket }} ({{ .Values.backup.database }})
+{{- end }}
+
+The image auto-tunes all ClickHouse parameters (memory limits, thread pools,
+merge settings, etc.) from the CPU and memory values above. No manual tuning
+is required.
+
+To connect to ClickHouse:
+
+  # HTTP interface (port 8123)
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "clickhouse-serverless.fullname" . }} 8123:8123
+
+  # Native protocol (port 9000)
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "clickhouse-serverless.fullname" . }} 9000:9000
+
+  # Retrieve the password
+  kubectl -n {{ .Release.Namespace }} get secret {{ include "clickhouse-serverless.secretName" . }} -o jsonpath='{.data.{{ include "clickhouse-serverless.secretKey" . }}}' | base64 -d
+
+  # Test connectivity
+  curl http://localhost:8123/ping
+
+To override any auto-tuned parameter, use the env map in values.yaml:
+
+  env:
+    MAX_CONCURRENT_QUERIES: "200"
+    BACKGROUND_POOL_SIZE: "32"

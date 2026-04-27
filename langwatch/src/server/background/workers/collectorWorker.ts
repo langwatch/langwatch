@@ -8,7 +8,6 @@ import type {
 } from "~/server/background/types";
 import {
   getTraceById,
-  searchTraces,
   searchTracesWithInternals,
 } from "~/server/elasticsearch/traces";
 import { env } from "../../../env.mjs";
@@ -26,9 +25,7 @@ import {
 } from "../../api/utils";
 import { prisma } from "../../db";
 import { esClient, TRACE_INDEX, traceIndexId } from "../../elasticsearch";
-import { isElasticSearchWriteDisabled } from "../../elasticsearch/isElasticSearchWriteDisabled";
 import {
-  collectorIndexDelayHistogram,
   recordJobWaitDuration,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
@@ -464,60 +461,9 @@ const processCollectorJob_ = async (
     );
   }
 
-  const esWriteDisabled = project.disableElasticSearchTraceWriting;
-
-  if (!esWriteDisabled) {
-    await withSpan("updateTrace", () =>
-      updateTrace(trace, esSpans, evaluations),
-    );
-  } else {
-    logger.debug(
-      { projectId: project.id, traceId },
-      "Skipping ES trace write — disableElasticSearchTraceWriting is enabled",
-    );
-  }
-
-  if (!existingTrace?.inserted_at) {
-    const delay = Date.now() - data.collectedAt;
-    collectorIndexDelayHistogram.observe(delay);
-  }
+  // ES writes are disabled — ClickHouse handles all trace persistence via event sourcing.
 
   void markProjectFirstMessage(project, trace.metadata);
-
-  if (env.IS_QUICKWIT || esWriteDisabled) {
-    // Skip check and adjust for quickwit or when ES writes are disabled
-    return;
-  }
-
-  const checkAndAdjust = async (postfix = "") => {
-    return collectorQueue.add(
-      "collector",
-      {
-        action: "check_and_adjust",
-        traceId,
-        projectId,
-      },
-      {
-        jobId: `collector_${traceId}_check_and_adjust${postfix}`,
-        delay: 3000,
-      },
-    );
-  };
-
-  const job = await checkAndAdjust();
-  try {
-    // Push it forward if two traces are processed at the same time
-    await job?.changeDelay(3000);
-  } catch {
-    try {
-      // Remove the existing job and start a new one to rerun adjust
-      await job?.remove();
-      await checkAndAdjust();
-    } catch {
-      // If that fails too because adjust is running, start a new job with different id for later
-      await checkAndAdjust("_2");
-    }
-  }
 };
 
 const updateTrace = async (
@@ -799,137 +745,11 @@ const updateTrace = async (
 };
 
 export const processCollectorCheckAndAdjustJob = async (
-  id: string | undefined,
-  data: CollectorCheckAndAdjustJob,
+  _id: string | undefined,
+  _data: CollectorCheckAndAdjustJob,
 ) => {
-  logger.debug({ jobId: id }, "post-processing job");
-  const { traceId, projectId } = data;
-
-  // Skip entirely when ES trace writes are disabled — this job only reads/writes ES
-  if (await isElasticSearchWriteDisabled(prisma, projectId, "traces")) {
-    logger.debug(
-      { projectId, traceId },
-      "Skipping check-and-adjust — disableElasticSearchTraceWriting is enabled",
-    );
-    return;
-  }
-
-  const client = await esClient({ projectId });
-  const protections = await getInternalProtectionsForProject(prisma, {
-    projectId,
-  });
-  const existingTraceResponse = await searchTraces({
-    connConfig: { projectId },
-    search: {
-      size: 1,
-      query: {
-        bool: {
-          must: [
-            { term: { trace_id: traceId } },
-            { term: { project_id: projectId } },
-          ],
-          should: void 0,
-          must_not: void 0,
-        },
-      },
-      _source: [
-        "spans",
-        "timestamps.inserted_at",
-        "metadata",
-        "expected_output",
-      ],
-    },
-    protections,
-  });
-  const existingTrace = existingTraceResponse[0];
-  if (!existingTrace) {
-    return;
-  }
-
-  const spans = existingTrace.spans;
-  const [input, output] = await Promise.all([
-    { value: getFirstInputAsText(spans) },
-    { value: getLastOutputAsText(spans) },
-  ]);
-  const error = getLastOutputError(spans);
-
-  const trace: Pick<
-    ElasticSearchTrace,
-    | "trace_id"
-    | "project_id"
-    | "input"
-    | "output"
-    | "error"
-    | "metadata"
-    | "expected_output"
-  > = {
-    trace_id: traceId,
-    project_id: projectId,
-    input,
-    output,
-    error,
-    metadata: existingTrace.metadata,
-    expected_output: existingTrace.expected_output,
-  };
-
-  await client.update({
-    index: TRACE_INDEX.alias,
-    id: traceIndexId({ traceId, projectId }),
-    retry_on_conflict: 10,
-    body: {
-      script: {
-        source: `
-          if (params.input != null && params.input.value != null && params.input.value != "") {
-            ctx._source.input = params.input;
-          }
-          if (params.output != null && params.output.value != null && params.output.value != "") {
-            ctx._source.output = params.output;
-          }
-          if (params.error != null) {
-            ctx._source.error = params.error;
-          }
-        `,
-        lang: "painless",
-        params: {
-          input: input ?? null,
-          output: output ?? null,
-          error: error ?? null,
-        },
-      },
-    },
-    refresh: true,
-  });
-
-  const customMetadata = existingTrace.metadata.custom;
-  const isCustomMetadataObject =
-    typeof customMetadata === "object" &&
-    customMetadata !== null &&
-    !Array.isArray(customMetadata);
-
-  // Skip collector-based evaluation scheduling when event-sourcing handles it
-  // or when ES evaluation writes are disabled (no destination for results)
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: {
-      featureEventSourcingEvaluationIngestion: true,
-      disableElasticSearchEvaluationWriting: true,
-    },
-  });
-
-  if (
-    !project?.featureEventSourcingEvaluationIngestion &&
-    !project?.disableElasticSearchEvaluationWriting &&
-    // Does not re-schedule trace checks for too old traces being resynced
-    (!existingTrace?.timestamps?.inserted_at ||
-      existingTrace.timestamps.inserted_at > Date.now() - 60 * 60 * 1000) &&
-    // Does not schedule evaluations for traces that are not from the studio in development
-    (!isCustomMetadataObject || // If it's not an object, proceed with evaluations
-      customMetadata?.platform !== "optimization_studio" ||
-      customMetadata?.environment !== "development")
-  ) {
-    await scheduleEvaluations(trace, spans);
-  }
-
+  // ES trace writes are globally disabled — this job only reads/writes ES, so it's a no-op.
+  return;
 };
 
 export const startCollectorWorker = () => {
@@ -1063,6 +883,9 @@ export const fetchExistingMD5s = async (
     }
   | undefined
 > => {
+  // Dedup check only works when ES is configured — without it, treat every trace as new
+  if (!env.ELASTICSEARCH_NODE_URL) return undefined;
+
   const existingTracesWithInternals = await searchTracesWithInternals({
     connConfig: { projectId },
     protections: {

@@ -11,11 +11,9 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { GetServerSidePropsContext } from "next";
-import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import type { Session } from "next-auth";
-import { getSession, signIn } from "next-auth/react";
+import Link from "~/utils/compat/next-link";
+import { useSearchParams } from "~/utils/compat/next-navigation";
+import { signIn, useSession } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -23,26 +21,38 @@ import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LogoIcon } from "../../components/icons/LogoIcon";
 import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
-import { SignInError } from "./error";
+import { normalizeErrorCode, SignInError } from "./error";
 
-export default function SignIn({ session }: { session: Session | null }) {
+export default function SignIn() {
+  const { data: session } = useSession();
   const query = useSearchParams();
-  const error = query?.get("error");
+  const rawError = query?.get("error");
+  // Normalize BetterAuth error codes so the auto-redirect gate works.
+  // e.g. "account_already_linked_to_different_user" → "OAuthAccountNotLinked"
+  const error = normalizeErrorCode(rawError);
 
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const callbackUrl = query?.get("callbackUrl") ?? undefined;
 
+  const isSocialProvider =
+    isAuthProvider && isAuthProvider !== "email";
+
   useEffect(() => {
-    if (!publicEnv.data) {
+    if (!publicEnv.data) return;
+
+    // Already-signed-in users hitting /auth/signin should bounce to their
+    // callback (or dashboard) instead of staring at a 'Redirecting to Sign
+    // in...' splash forever (ariana dogfood finding #2).
+    if (session) {
+      const dest = callbackUrl && callbackUrl.startsWith("/") ? callbackUrl : "/";
+      window.location.replace(dest);
       return;
     }
 
     if (
       error !== "OAuthAccountNotLinked" &&
-      !session &&
-      isAuthProvider &&
-      isAuthProvider !== "email"
+      isSocialProvider
     ) {
       setTimeout(
         () => {
@@ -51,7 +61,7 @@ export default function SignIn({ session }: { session: Session | null }) {
         error ? 2000 : 0,
       );
     }
-  }, [publicEnv.data, session, callbackUrl, isAuthProvider, error]);
+  }, [publicEnv.data, session, callbackUrl, isAuthProvider, isSocialProvider, error]);
 
   if (error) {
     return <SignInError error={error} />;
@@ -61,31 +71,22 @@ export default function SignIn({ session }: { session: Session | null }) {
     return null;
   }
 
-  return isAuthProvider && isAuthProvider !== "email" ? (
-    <Box padding="12px">Redirecting to Sign in...</Box>
-  ) : (
-    <SignInForm />
-  );
-}
-
-export const getServerSideProps = async (
-  context: GetServerSidePropsContext,
-) => {
-  const session = await getSession(context);
-
+  // Show a friendlier message if the user is already signed in (the
+  // useEffect above triggers the redirect — this is the transient splash
+  // for ~1 paint frame). Distinguishes the two very different states that
+  // used to render the same "Redirecting to Sign in..." string.
   if (session) {
-    return {
-      redirect: {
-        destination: "/",
-        permanent: false,
-      },
-    };
+    return <Box padding="12px">Already signed in — redirecting…</Box>;
   }
 
-  return {
-    props: { session },
-  };
-};
+  if (isSocialProvider) {
+    return <Box padding="12px">Redirecting to Sign in...</Box>;
+  }
+
+  return <SignInForm />;
+}
+
+// Auth redirect is now handled client-side via useSession() + useEffect in the component
 
 function SignInForm() {
   const query = useSearchParams();

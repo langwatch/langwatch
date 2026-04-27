@@ -1,7 +1,7 @@
 import { OrganizationUserRole } from "@prisma/client";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
-import { useEffect, useMemo } from "react";
+import { Suspense, useEffect, useMemo } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import {
   type DrawerType,
@@ -18,7 +18,6 @@ export { useDrawer } from "../hooks/useDrawer";
 
 /** Drawers that EXTERNAL users cannot open, mapped to their restriction resource. */
 const restrictedDrawers: Partial<Record<DrawerType, string>> = {
-  traceDetails: "traces",
   addDatasetRecord: "datasets",
 };
 
@@ -111,6 +110,7 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
   return (
     <DrawerOffsetProvider value={offsetValue}>
       <ErrorBoundary
+        resetKeys={[drawerType]}
         fallback={null}
         onError={() => {
           void router.push(
@@ -127,11 +127,13 @@ export function CurrentDrawer({ marginTop }: { marginTop?: number }) {
           );
         }}
       >
-        <CurrentDrawerComponent
-          {...queryDrawer}
-          {...complexProps}
-          {...flowCallbacksForDrawer}
-        />
+        <Suspense>
+          <CurrentDrawerComponent
+            {...queryDrawer}
+            {...complexProps}
+            {...flowCallbacksForDrawer}
+          />
+        </Suspense>
       </ErrorBoundary>
     </DrawerOffsetProvider>
   );

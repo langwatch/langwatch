@@ -5,11 +5,7 @@ import type {
 import { NormalizedStatusCode } from "~/server/event-sourcing/pipelines/trace-processing/schemas/spans";
 import { coerceToNumber } from "~/utils/coerceToNumber";
 import { safeUnflatten } from "~/utils/safeUnflatten";
-import {
-  estimateCost,
-  matchingLLMModelCost,
-} from "~/server/background/workers/collector/cost";
-import { getStaticModelCosts } from "~/server/modelProviders/llmModelCost";
+import { computeSpanCost } from "~/server/app-layer/traces/model-cost-matching";
 import type {
   BaseSpan,
   ChatMessage,
@@ -259,44 +255,6 @@ function extractOutput(
   return null;
 }
 
-/**
- * Computes per-span cost using the same priority as the fold projection:
- * 1. Custom cost rates from attributes
- * 2. Static model registry lookup
- * 3. SDK-provided cost fallback
- */
-function computeSpanCost({
-  spanAttributes,
-  promptTokens,
-  completionTokens,
-}: {
-  spanAttributes: NormalizedAttributes;
-  promptTokens: number | null;
-  completionTokens: number | null;
-}): number | null {
-  // Priority 1: Custom cost rates
-  const inputRate = coerceToNumber(spanAttributes["langwatch.model.inputCostPerToken"]);
-  const outputRate = coerceToNumber(spanAttributes["langwatch.model.outputCostPerToken"]);
-  if (inputRate !== null || outputRate !== null) {
-    return (promptTokens ?? 0) * (inputRate ?? 0) + (completionTokens ?? 0) * (outputRate ?? 0);
-  }
-
-  // Priority 2: Static model registry
-  const model = spanAttributes["gen_ai.response.model"] ?? spanAttributes["gen_ai.request.model"];
-  if (typeof model === "string" && ((promptTokens ?? 0) > 0 || (completionTokens ?? 0) > 0)) {
-    const matched = matchingLLMModelCost(model, getStaticModelCosts());
-    if (matched) {
-      const computed = estimateCost({ llmModelCost: matched, inputTokens: promptTokens ?? 0, outputTokens: completionTokens ?? 0 });
-      if (computed !== undefined && computed > 0) return computed;
-    }
-  }
-
-  // Priority 3: SDK-provided cost fallback
-  const sdkCost = coerceToNumber(spanAttributes["langwatch.span.cost"]);
-  if (sdkCost !== null && sdkCost > 0) return sdkCost;
-
-  return null;
-}
 
 /**
  * Extracts metrics from canonical span attributes only.
@@ -330,7 +288,8 @@ function extractMetrics(
     spanAttributes["gen_ai.usage.cache_creation.input_tokens"],
   );
 
-  const cost = computeSpanCost({ spanAttributes, promptTokens, completionTokens });
+  const rawCost = computeSpanCost({ attrs: spanAttributes, promptTokens, completionTokens });
+  const cost = rawCost > 0 ? rawCost : null;
 
   if (
     promptTokens === null &&
@@ -411,24 +370,54 @@ function extractContexts(
 }
 
 /**
- * Extracts error information from span status.
+ * Extracts error information from span status, preferring the OTel
+ * exception event's structured attributes over the span-level statusMessage.
+ *
+ * Priority (first hit wins):
+ *   1. Newest exception event's attributes["exception.message"]
+ *   2. Span-level attributes["exception.message"]
+ *   3. statusMessage
+ *   4. "Unknown error"
+ *
+ * Rationale: upstream instrumentors (incl. our Go gateway — see iter 68
+ * 86aad630d) attach rich actionable text on the exception event itself;
+ * statusMessage is often a short HTTP-status summary ("Bad Request") that
+ * loses the actionable detail.
  */
 function extractError(
   statusCode: NormalizedStatusCode | null,
   statusMessage: string | null,
   spanAttributes: NormalizedAttributes,
+  events: readonly { name: string; attributes: NormalizedAttributes }[],
 ): ErrorCapture | null {
   if (statusCode !== NormalizedStatusCode.ERROR) {
     return null;
   }
 
-  const errorMessage =
-    statusMessage ??
-    (typeof spanAttributes["exception.message"] === "string"
-      ? spanAttributes["exception.message"]
-      : "Unknown error");
+  const exceptionEvents = events.filter((e) => e.name === "exception");
+  const latestExceptionEvent =
+    exceptionEvents.length > 0
+      ? exceptionEvents[exceptionEvents.length - 1]
+      : undefined;
 
-  const stacktrace = spanAttributes["exception.stacktrace"];
+  const eventMessage = latestExceptionEvent?.attributes["exception.message"];
+  const attrMessage = spanAttributes["exception.message"];
+
+  const errorMessage =
+    (typeof eventMessage === "string" && eventMessage.length > 0
+      ? eventMessage
+      : undefined) ??
+    (typeof attrMessage === "string" && attrMessage.length > 0
+      ? attrMessage
+      : undefined) ??
+    statusMessage ??
+    "Unknown error";
+
+  const eventStacktrace = latestExceptionEvent?.attributes["exception.stacktrace"];
+  const attrStacktrace = spanAttributes["exception.stacktrace"];
+  const stacktrace =
+    (typeof eventStacktrace === "string" ? eventStacktrace : undefined) ??
+    (typeof attrStacktrace === "string" ? attrStacktrace : undefined);
   const stacktraceArray =
     typeof stacktrace === "string" ? stacktrace.split("\n") : [];
 
@@ -490,6 +479,7 @@ export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
       normalizedSpan.statusCode,
       normalizedSpan.statusMessage,
       normalizedSpan.spanAttributes,
+      normalizedSpan.events,
     ),
     timestamps,
     metrics: extractMetrics(normalizedSpan.spanAttributes),

@@ -13,6 +13,7 @@
  */
 import { vi } from "vitest";
 import type { PlanInfo } from "../../../../ee/licensing/planInfo";
+import type { DisplayInvoice } from "../../../server/app-layer/subscription/subscription.service";
 
 // ---------------------------------------------------------------------------
 // Mutable mock organisation (reset per-test via resetMocks)
@@ -45,7 +46,6 @@ export const createMockPlan = (overrides: Partial<PlanInfo> = {}): PlanInfo => (
   maxTeams: 1,
   maxProjects: 3,
   maxMessagesPerMonth: 50000,
-  evaluationsCredit: 3,
   maxWorkflows: 3,
   maxPrompts: 3,
   maxEvaluators: 3,
@@ -160,7 +160,7 @@ export const mockCreateInvites = vi.fn(() => ({
 }));
 
 export const mockListInvoices = vi.fn(() => ({
-  data: [],
+  data: [] as DisplayInvoice[],
   isLoading: false,
   isError: false,
 }));
@@ -201,7 +201,7 @@ export function resetMocks() {
     isLoading: false,
   });
   mockListInvoices.mockReturnValue({
-    data: [],
+    data: [] as DisplayInvoice[],
     isLoading: false,
     isError: false,
   });

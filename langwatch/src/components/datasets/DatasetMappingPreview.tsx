@@ -243,7 +243,7 @@ export function DatasetMappingPreview({
               boxShadow={!isThreadMapping ? "xs" : "none"}
               transition="all 0.15s"
             >
-              Traces
+              Current Trace
             </Box>
             <Box
               as="button"
@@ -263,7 +263,7 @@ export function DatasetMappingPreview({
               transition="all 0.15s"
             >
               <HStack gap={1}>
-                <Text>Threads</Text>
+                <Text>Thread</Text>
                 {isThreadMapping && (
                   <>
                     {threadIds.length === 0 ? (
@@ -288,7 +288,7 @@ export function DatasetMappingPreview({
           </HStack>
           <Field.HelperText margin={0} fontSize="13px" marginBottom={2}>
             {isThreadMapping
-              ? "Groups traces by thread_id and maps to dataset columns"
+              ? "Groups traces by thread and maps to dataset columns"
               : "Maps each trace individually to dataset columns"}
           </Field.HelperText>
 

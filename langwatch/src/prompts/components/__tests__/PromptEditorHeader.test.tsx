@@ -46,6 +46,12 @@ vi.mock("~/prompts/components/SavePromptButton", () => ({
   ),
 }));
 
+vi.mock("~/prompts/components/DeployPromptDialog", () => ({
+  DeployPromptDialog: () => (
+    <div data-testid="deploy-prompt-dialog">DeployPromptDialog</div>
+  ),
+}));
+
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", apiKey: "test-api-key" },
@@ -134,6 +140,18 @@ describe("<PromptEditorHeader/>", () => {
 
       expect(screen.getByTestId("save-prompt-button")).toBeInTheDocument();
     });
+
+    it("renders the deploy button", () => {
+      render(
+        <TestWrapper>
+          <PromptEditorHeader {...defaultProps} />
+        </TestWrapper>,
+      );
+
+      expect(
+        screen.getByRole("button", { name: /deploy/i }),
+      ).toBeInTheDocument();
+    });
   });
 
   describe("when variant is 'model-only'", () => {
@@ -180,6 +198,18 @@ describe("<PromptEditorHeader/>", () => {
 
       expect(
         screen.queryByTestId("save-prompt-button"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("does not render the deploy button", () => {
+      render(
+        <TestWrapper>
+          <PromptEditorHeader {...defaultProps} variant="model-only" />
+        </TestWrapper>,
+      );
+
+      expect(
+        screen.queryByRole("button", { name: /deploy/i }),
       ).not.toBeInTheDocument();
     });
   });

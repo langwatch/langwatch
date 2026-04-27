@@ -16,3 +16,43 @@ export class DatasetConflictError extends Error {
     this.name = "DatasetConflictError";
   }
 }
+
+/**
+ * Thrown when a dataset's persisted columnTypes is not a valid array of {name, type} objects.
+ * This indicates a data integrity issue — the schema stored in the database is corrupt.
+ */
+export class MalformedColumnTypesError extends Error {
+  constructor(datasetName: string) {
+    super(
+      `Dataset "${datasetName}" has malformed columnTypes — expected an array of objects with string "name" properties`,
+    );
+    this.name = "MalformedColumnTypesError";
+  }
+}
+
+/**
+ * Thrown when a record entry contains a column name not defined in the dataset schema.
+ */
+export class InvalidColumnError extends Error {
+  readonly columnName: string;
+  readonly validColumns: string[];
+
+  constructor({
+    columnName,
+    datasetName,
+    validColumns,
+  }: {
+    columnName: string;
+    datasetName: string;
+    validColumns: string[];
+  }) {
+    const validColumnsList =
+      validColumns.length > 0 ? validColumns.join(", ") : "(none)";
+    super(
+      `Column "${columnName}" is not defined in the "${datasetName}" dataset schema. Valid columns: ${validColumnsList}`,
+    );
+    this.name = "InvalidColumnError";
+    this.columnName = columnName;
+    this.validColumns = validColumns;
+  }
+}

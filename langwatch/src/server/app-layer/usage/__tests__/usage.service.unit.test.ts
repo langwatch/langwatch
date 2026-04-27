@@ -25,6 +25,22 @@ const PAID_TIERED_PLAN: PlanInfo = {
   maxMessagesPerMonth: 10_000,
 };
 
+const { mockRedisStore } = vi.hoisted(() => {
+  const mockRedisStore = new Map<string, string>();
+  return { mockRedisStore };
+});
+
+vi.mock("~/server/redis", () => {
+  const fakeRedis = {
+    get: vi.fn(async (key: string) => mockRedisStore.get(key) ?? null),
+    setex: vi.fn(async (_key: string, _ttl: number, value: string) => {
+      mockRedisStore.set(_key, value);
+    }),
+    del: vi.fn(async (key: string) => { mockRedisStore.delete(key); }),
+  };
+  return { isBuildOrNoRedis: false, connection: fakeRedis };
+});
+
 vi.mock("../../tracing", () => ({
   traced: <T>(instance: T) => instance,
 }));
@@ -70,6 +86,7 @@ describe("UsageService", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockRedisStore.clear();
     for (const key of Object.keys(mockEnv)) {
       delete mockEnv[key];
     }
@@ -85,8 +102,8 @@ describe("UsageService", () => {
       eventUsageService: mockEventUsageService,
       planResolver: mockPlanResolver,
       organizationRepository: mockOrgRepo,
-      cache: new TtlCache<number>(30_000),
-      decisionCache: new TtlCache<unknown>(30_000),
+      countCache: new TtlCache<number>(30_000, "test:"),
+      decisionCache: new TtlCache<unknown>(30_000, "test:"),
     });
   });
 
@@ -393,8 +410,10 @@ describe("UsageService", () => {
         // First call with events unit (free plan)
         await service.getCurrentMonthCount({ organizationId: "org-123" });
 
-        // Clear decision cache, switch to paid plan (traces unit)
-        ((service as any).decisionCache as TtlCache<unknown>).clear();
+        // Clear Redis and replace caches to force re-resolution, switch to paid plan (traces unit)
+        mockRedisStore.clear();
+        (service as any).decisionCache = new TtlCache(30_000, "test:");
+        (service as any).countCache = new TtlCache(30_000, "test:");
         (mockPlanResolver as ReturnType<typeof vi.fn>).mockResolvedValue({
           ...PAID_TIERED_PLAN,
         });

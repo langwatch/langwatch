@@ -1,5 +1,6 @@
 import type { OtlpSpan } from "../../event-sourcing/pipelines/trace-processing/schemas/otlp";
 import type { TokenizerClient } from "../clients/tokenizer/tokenizer.client";
+import { KILL_SWITCH_CACHE_TTL_MS } from "../../featureFlag/constants";
 import type { FeatureFlagServiceInterface } from "../../featureFlag/types";
 
 /**
@@ -149,11 +150,15 @@ export class OtlpSpanTokenEstimationService {
   }): Promise<boolean> {
     if (!this.deps.featureFlagService) return false;
 
-    // Global kill switch — disables for all projects
+    // Global kill switch — disables for all projects.
+    // Both checks pass cacheTtlMs to widen the cache window beyond the
+    // 5s frontend-flag default, since this method runs on the per-span
+    // hot path and a cache miss = one billable PostHog /flags request.
     const globalDisabled = await this.deps.featureFlagService.isEnabled(
       GLOBAL_KILL_SWITCH_KEY,
       "global",
       false,
+      { cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS },
     );
     if (globalDisabled) return true;
 
@@ -163,7 +168,7 @@ export class OtlpSpanTokenEstimationService {
         PROJECT_KILL_SWITCH_KEY,
         tenantId,
         false,
-        { projectId: tenantId },
+        { projectId: tenantId, cacheTtlMs: KILL_SWITCH_CACHE_TTL_MS },
       );
       if (projectDisabled) return true;
     }

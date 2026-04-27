@@ -6,7 +6,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";

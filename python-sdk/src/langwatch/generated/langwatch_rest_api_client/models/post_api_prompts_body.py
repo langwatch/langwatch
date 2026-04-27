@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
 
@@ -34,6 +34,7 @@ class PostApiPromptsBody:
         inputs (list[PostApiPromptsBodyInputsItem] | Unset):
         outputs (list[PostApiPromptsBodyOutputsItem] | Unset):
         schema_version (PostApiPromptsBodySchemaVersion | Unset):
+        tags (list[str] | Unset):
     """
 
     handle: str
@@ -48,6 +49,7 @@ class PostApiPromptsBody:
     inputs: list[PostApiPromptsBodyInputsItem] | Unset = UNSET
     outputs: list[PostApiPromptsBodyOutputsItem] | Unset = UNSET
     schema_version: PostApiPromptsBodySchemaVersion | Unset = UNSET
+    tags: list[str] | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         handle = self.handle
@@ -93,6 +95,10 @@ class PostApiPromptsBody:
         if not isinstance(self.schema_version, Unset):
             schema_version = self.schema_version.value
 
+        tags: list[str] | Unset = UNSET
+        if not isinstance(self.tags, Unset):
+            tags = self.tags
+
         field_dict: dict[str, Any] = {}
 
         field_dict.update(
@@ -122,6 +128,8 @@ class PostApiPromptsBody:
             field_dict["outputs"] = outputs
         if schema_version is not UNSET:
             field_dict["schemaVersion"] = schema_version
+        if tags is not UNSET:
+            field_dict["tags"] = tags
 
         return field_dict
 
@@ -187,6 +195,8 @@ class PostApiPromptsBody:
         else:
             schema_version = PostApiPromptsBodySchemaVersion(_schema_version)
 
+        tags = cast(list[str], d.pop("tags", UNSET))
+
         post_api_prompts_body = cls(
             handle=handle,
             scope=scope,
@@ -200,6 +210,7 @@ class PostApiPromptsBody:
             inputs=inputs,
             outputs=outputs,
             schema_version=schema_version,
+            tags=tags,
         )
 
         return post_api_prompts_body

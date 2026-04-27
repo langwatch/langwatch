@@ -35,6 +35,8 @@ class PostApiTracesSearchBody:
         scroll_id (None | str | Unset):
         format_ (PostApiTracesSearchBodyFormat | Unset): Output format: 'digest' (AI-readable trace digest) or 'json'
             (full raw data)
+        include_spans (bool | Unset): When true, fetches full span data for each trace. Useful for bulk export. Default
+            false.
         llm_mode (bool | Unset):
     """
 
@@ -52,6 +54,7 @@ class PostApiTracesSearchBody:
     updated_at: float | Unset = UNSET
     scroll_id: None | str | Unset = UNSET
     format_: PostApiTracesSearchBodyFormat | Unset = UNSET
+    include_spans: bool | Unset = UNSET
     llm_mode: bool | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -96,6 +99,8 @@ class PostApiTracesSearchBody:
         if not isinstance(self.format_, Unset):
             format_ = self.format_.value
 
+        include_spans = self.include_spans
+
         llm_mode = self.llm_mode
 
         field_dict: dict[str, Any] = {}
@@ -130,6 +135,8 @@ class PostApiTracesSearchBody:
             field_dict["scrollId"] = scroll_id
         if format_ is not UNSET:
             field_dict["format"] = format_
+        if include_spans is not UNSET:
+            field_dict["includeSpans"] = include_spans
         if llm_mode is not UNSET:
             field_dict["llmMode"] = llm_mode
 
@@ -192,6 +199,8 @@ class PostApiTracesSearchBody:
         else:
             format_ = PostApiTracesSearchBodyFormat(_format_)
 
+        include_spans = d.pop("includeSpans", UNSET)
+
         llm_mode = d.pop("llmMode", UNSET)
 
         post_api_traces_search_body = cls(
@@ -209,6 +218,7 @@ class PostApiTracesSearchBody:
             updated_at=updated_at,
             scroll_id=scroll_id,
             format_=format_,
+            include_spans=include_spans,
             llm_mode=llm_mode,
         )
 

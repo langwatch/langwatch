@@ -6,6 +6,34 @@ import type {
   GenerateFilterConditionsResult,
 } from "./types";
 
+/** Label values that represent pass/fail status rather than classification labels. */
+const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
+
+/**
+ * Factory for evaluator_id EXISTS condition builders.
+ * All 5 variants share the same EXISTS subquery template, differing only in the additional WHERE clause.
+ *
+ * NOTE: evaluation_runs.TraceId is Nullable(String) while trace_summaries.TraceId is String.
+ * ClickHouse correlated EXISTS silently fails to filter on Nullable = NonNullable comparisons,
+ * returning TRUE for every outer row. We use assumeNotNull() + IS NOT NULL to work around this.
+ * See: https://github.com/langwatch/langwatch/issues/3000
+ */
+function buildEvaluatorExistsCondition(
+  additionalWhere: string,
+): FilterConditionBuilder {
+  return (values, paramId) => ({
+    sql: `EXISTS (
+      SELECT 1 FROM evaluation_runs es
+      WHERE es.TenantId = ts.TenantId
+        AND es.TraceId IS NOT NULL
+        AND assumeNotNull(es.TraceId) = ts.TraceId
+        AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
+        ${additionalWhere}
+    )`,
+    params: { [`${paramId}_values`]: values },
+  });
+}
+
 /**
  * ClickHouse WHERE clause builders for filtering traces.
  * Returns null if the filter is not supported in ClickHouse.
@@ -86,15 +114,15 @@ export const clickHouseFilterConditions: Record<
   }),
 
   // Traces
+  // The dropdown maps empty/NULL origin to "application" via ifNull().
+  // Apply the same mapping here so the condition matches what the dropdown counted.
   "traces.origin": (values, paramId) => {
     if (values.length === 0) {
       return { sql: "1=0", params: {} };
     }
 
-    // All origin values (including "application") are matched by exact value.
-    // Empty/NULL no longer implies "application".
     return {
-      sql: `ts.Attributes['langwatch.origin'] IN ({${paramId}_values:Array(String)})`,
+      sql: `if(ifNull(ts.Attributes['langwatch.origin'], '') = '', 'application', ts.Attributes['langwatch.origin']) IN ({${paramId}_values:Array(String)})`,
       params: { [`${paramId}_values`]: values },
     };
   },
@@ -129,35 +157,28 @@ export const clickHouseFilterConditions: Record<
     const hasFalse = values.includes("false");
     if (hasTrue && hasFalse) return { sql: "1=1", params: {} };
     if (hasTrue) return { sql: "ts.HasAnnotation = true", params: {} };
-    if (hasFalse)
-      return {
-        sql: "(ts.HasAnnotation = false OR ts.HasAnnotation IS NULL)",
-        params: {},
-      };
+    if (hasFalse) return { sql: "(ts.HasAnnotation = false OR ts.HasAnnotation IS NULL)", params: {} };
     return { sql: "1=0", params: {} };
   },
 
   // Evaluations - using evaluation_runs table with EXISTS subquery
-  "evaluations.evaluator_id": (values, paramId) => ({
-    sql: `EXISTS (
-      SELECT 1 FROM evaluation_runs es
-      WHERE es.TenantId = ts.TenantId
-        AND es.TraceId = ts.TraceId
-        AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
-    )`,
-    params: { [`${paramId}_values`]: values },
-  }),
+  "evaluations.evaluator_id": buildEvaluatorExistsCondition(""),
 
-  "evaluations.evaluator_id.guardrails_only": (values, paramId) => ({
-    sql: `EXISTS (
-      SELECT 1 FROM evaluation_runs es
-      WHERE es.TenantId = ts.TenantId
-        AND es.TraceId = ts.TraceId
-        AND es.EvaluatorId IN ({${paramId}_values:Array(String)})
-        AND es.IsGuardrail = 1
-    )`,
-    params: { [`${paramId}_values`]: values },
-  }),
+  "evaluations.evaluator_id.guardrails_only": buildEvaluatorExistsCondition(
+    "AND es.IsGuardrail = 1",
+  ),
+
+  "evaluations.evaluator_id.has_passed": buildEvaluatorExistsCondition(
+    "AND es.Passed IS NOT NULL",
+  ),
+
+  "evaluations.evaluator_id.has_score": buildEvaluatorExistsCondition(
+    "AND es.Score IS NOT NULL",
+  ),
+
+  "evaluations.evaluator_id.has_label": buildEvaluatorExistsCondition(
+    `AND es.Label IS NOT NULL AND es.Label != '' AND es.Label NOT IN ('${STATUS_LABEL_VALUES.join("', '")}')`,
+  ),
 
   "evaluations.passed": (values, paramId, key) => {
     if (!key) return { sql: "1=0", params: {} };
@@ -166,7 +187,8 @@ export const clickHouseFilterConditions: Record<
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
         WHERE es.TenantId = ts.TenantId
-          AND es.TraceId = ts.TraceId
+          AND es.TraceId IS NOT NULL
+          AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
           AND es.Passed IN ({${paramId}_values:Array(UInt8)})
       )`,
@@ -192,7 +214,8 @@ export const clickHouseFilterConditions: Record<
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
         WHERE es.TenantId = ts.TenantId
-          AND es.TraceId = ts.TraceId
+          AND es.TraceId IS NOT NULL
+          AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
           AND es.Score >= {${paramId}_min:Float64}
           AND es.Score <= {${paramId}_max:Float64}
@@ -211,7 +234,8 @@ export const clickHouseFilterConditions: Record<
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
         WHERE es.TenantId = ts.TenantId
-          AND es.TraceId = ts.TraceId
+          AND es.TraceId IS NOT NULL
+          AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
           AND es.Status IN ({${paramId}_values:Array(String)})
       )`,
@@ -228,7 +252,8 @@ export const clickHouseFilterConditions: Record<
       sql: `EXISTS (
         SELECT 1 FROM evaluation_runs es
         WHERE es.TenantId = ts.TenantId
-          AND es.TraceId = ts.TraceId
+          AND es.TraceId IS NOT NULL
+          AND assumeNotNull(es.TraceId) = ts.TraceId
           AND es.EvaluatorId = {${paramId}_key:String}
           AND es.Label IN ({${paramId}_values:Array(String)})
       )`,

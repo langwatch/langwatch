@@ -1,4 +1,4 @@
-import { Text, VStack } from "@chakra-ui/react";
+import { VStack } from "@chakra-ui/react";
 import type React from "react";
 import { GenerateApiSnippetDialog } from "~/components/GenerateApiSnippetDialog";
 import { Link } from "~/components/ui/link";
@@ -7,6 +7,7 @@ import { getGetPromptSnippets } from "../utils/snippets/getGetPromptSnippets";
 interface GeneratePromptApiSnippetButtonProps {
   promptHandle?: string | null;
   apiKey?: string;
+  label?: string;
   children?: React.ReactNode;
 }
 
@@ -22,11 +23,13 @@ interface GeneratePromptApiSnippetButtonProps {
 export function GeneratePromptApiSnippetDialog({
   promptHandle,
   apiKey,
+  label,
   children,
 }: GeneratePromptApiSnippetButtonProps) {
   const snippets = getGetPromptSnippets({
     promptHandle: promptHandle ?? undefined,
     apiKey,
+    label,
   });
 
   const targets = snippets.map((snippet) => snippet.target);
@@ -53,7 +56,7 @@ export function GeneratePromptApiSnippetDialog({
     <GenerateApiSnippetDialog
       snippets={snippets}
       targets={targets}
-      title="Get Prompt by ID"
+      title={label ? "Get Prompt by Tag" : "Get Prompt by ID"}
       description={description}
     >
       {children}

@@ -54,6 +54,7 @@ describe("PromptService", () => {
         authorId: null,
         updatedAt: new Date(),
         createdAt: new Date(),
+        tags: [],
         ...overrides,
       };
     }

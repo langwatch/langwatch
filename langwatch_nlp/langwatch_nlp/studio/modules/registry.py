@@ -88,4 +88,9 @@ FIELD_TYPE_TO_DSPY_TYPE = {
     FieldType.dict: "dict",
     FieldType.signature: "dspy.Signature",
     FieldType.llm: "LLMConfig",
+    # chat_messages surfaces in the Studio UI as an input/output type option; map it to
+    # DSPy's native History so multi-turn conversation history renders as distinct chat turns
+    # (instead of being collapsed into a single user message containing escaped JSON).
+    # See langwatch/langwatch#3415.
+    FieldType.chat_messages: "dspy.History",
 }

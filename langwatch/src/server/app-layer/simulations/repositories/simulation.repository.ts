@@ -71,6 +71,12 @@ export interface SimulationRepository {
     endDate?: number;
   }): Promise<ExternalSetSummary[]>;
 
+  getInternalSuiteSummaries(params: {
+    projectId: string;
+    startDate?: number;
+    endDate?: number;
+  }): Promise<ExternalSetSummary[]>;
+
   getRunDataForAllSuites(params: {
     projectId: string;
     limit?: number;
@@ -127,6 +133,10 @@ export class NullSimulationRepository implements SimulationRepository {
   }
 
   async getExternalSetSummaries(): Promise<ExternalSetSummary[]> {
+    return [];
+  }
+
+  async getInternalSuiteSummaries(): Promise<ExternalSetSummary[]> {
     return [];
   }
 

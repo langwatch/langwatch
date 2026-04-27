@@ -1,51 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { TraceIOExtractionService } from "~/server/app-layer/traces/trace-io-extraction.service";
-import type { NormalizedSpan } from "../../schemas/spans";
-import { NormalizedSpanKind, NormalizedStatusCode } from "../../schemas/spans";
-import {
-  applySpanToSummary,
-  createTraceSummaryFoldProjection,
-  type TraceSummaryData,
-} from "../traceSummary.foldProjection";
-
-const traceSummaryProjection = createTraceSummaryFoldProjection({
-  store: { store: async () => {}, get: async () => null },
-});
-
-function createInitState(): TraceSummaryData {
-  return traceSummaryProjection.init();
-}
-
-function createTestSpan(
-  overrides: Partial<NormalizedSpan> = {},
-): NormalizedSpan {
-  return {
-    id: "span-1",
-    traceId: "trace-1",
-    spanId: "span-1",
-    tenantId: "tenant-1",
-    parentSpanId: "parent-1",
-    parentTraceId: null,
-    parentIsRemote: null,
-    sampled: true,
-    startTimeUnixMs: 1000,
-    endTimeUnixMs: 2000,
-    durationMs: 1000,
-    name: "test-span",
-    kind: NormalizedSpanKind.INTERNAL,
-    resourceAttributes: {},
-    spanAttributes: {},
-    events: [],
-    links: [],
-    statusMessage: null,
-    statusCode: NormalizedStatusCode.UNSET,
-    instrumentationScope: { name: "test", version: null },
-    droppedAttributesCount: 0 as const,
-    droppedEventsCount: 0 as const,
-    droppedLinksCount: 0 as const,
-    ...overrides,
-  };
-}
+import { applySpanToSummary } from "../traceSummary.foldProjection";
+import { createInitState, createTestSpan } from "./fixtures/trace-summary-test.fixtures";
 
 describe("applySpanToSummary() langwatch.origin hoisting", () => {
   beforeEach(() => {
@@ -366,8 +322,9 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
   });
 
   describe("when sdk.name is present but no explicit origin or legacy markers (old SDK heuristic)", () => {
-    it("infers langwatch.origin = 'application'", () => {
+    it("infers langwatch.origin = 'application' on root span", () => {
       const span = createTestSpan({
+        parentSpanId: null, // root span — heuristic only fires here
         resourceAttributes: {
           "telemetry.sdk.name": "langwatch",
         },
@@ -379,8 +336,23 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
       expect(state.attributes["langwatch.origin"]).toBe("application");
     });
 
+    it("does not infer origin on child span (prevents race with explicit platform origin)", () => {
+      const span = createTestSpan({
+        parentSpanId: "root-1", // child span — heuristic must not fire
+        resourceAttributes: {
+          "telemetry.sdk.name": "langwatch",
+        },
+        spanAttributes: {},
+      });
+
+      const state = applySpanToSummary({ state: createInitState(), span: span });
+
+      expect(state.attributes["langwatch.origin"]).toBeUndefined();
+    });
+
     it("does not override legacy-inferred origin with SDK heuristic", () => {
       const span = createTestSpan({
+        parentSpanId: null, // root span
         resourceAttributes: {
           "telemetry.sdk.name": "langwatch",
         },
@@ -410,6 +382,7 @@ describe("applySpanToSummary() langwatch.origin hoisting", () => {
 
     it("does not infer origin when sdk.name is absent (pure OTEL)", () => {
       const span = createTestSpan({
+        parentSpanId: null,
         resourceAttributes: {},
         spanAttributes: {},
       });
@@ -529,6 +502,101 @@ describe("applySpanToSummary() langwatch.source hoisting", () => {
       state = applySpanToSummary({ state, span: rootSpan });
 
       expect(state.attributes["langwatch.origin.source"]).toBe("platform");
+    });
+  });
+
+  describe("when child with sdk.name arrives before root with legacy marker", () => {
+    it("overrides provisional 'application' origin with root's inferred origin", () => {
+      // Child arrives first — sdk.name heuristic does NOT fire (child span)
+      const childSpan = createTestSpan({
+        id: "child-1",
+        spanId: "child-1",
+        parentSpanId: "root-1",
+        resourceAttributes: {
+          "telemetry.sdk.name": "@langwatch/scenario",
+        },
+        spanAttributes: {},
+      });
+
+      // Root arrives later — has legacy marker for simulation
+      const rootSpan = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        instrumentationScope: { name: "@langwatch/scenario", version: null },
+        spanAttributes: {},
+      });
+
+      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      // SDK heuristic no longer fires on child spans — origin stays unset
+      expect(state.attributes["langwatch.origin"]).toBeUndefined();
+
+      state = applySpanToSummary({ state, span: rootSpan });
+      expect(state.attributes["langwatch.origin"]).toBe("simulation");
+    });
+  });
+
+  describe("when child span arrives before non-root span with explicit platform origin (distributed trace)", () => {
+    it("explicit origin wins over heuristic-inferred origin", () => {
+      // Child span arrives first — no explicit origin, sdk.name present
+      // but SDK heuristic does not fire on child spans
+      const childSpan = createTestSpan({
+        id: "child-1",
+        spanId: "child-1",
+        parentSpanId: "platform-root",
+        resourceAttributes: {
+          "telemetry.sdk.name": "opentelemetry",
+        },
+        spanAttributes: {},
+      });
+
+      // Platform span arrives — has explicit origin but is NOT a root span
+      // (parent comes from distributed trace context / HTTP propagation)
+      const platformSpan = createTestSpan({
+        id: "platform-root",
+        spanId: "platform-root",
+        parentSpanId: "external-parent", // NOT null — distributed trace
+        spanAttributes: {
+          "langwatch.origin": "playground",
+          "langwatch.origin.source": "platform",
+        },
+      });
+
+      let state = applySpanToSummary({ state: createInitState(), span: childSpan });
+      expect(state.attributes["langwatch.origin"]).toBeUndefined();
+
+      state = applySpanToSummary({ state, span: platformSpan });
+      expect(state.attributes["langwatch.origin"]).toBe("playground");
+    });
+
+    it("explicit origin overrides previously heuristic-inferred 'application'", () => {
+      // Root span arrives first with sdk.name — heuristic fires
+      const rootSpan = createTestSpan({
+        id: "root-1",
+        spanId: "root-1",
+        parentSpanId: null,
+        resourceAttributes: {
+          "telemetry.sdk.name": "langwatch",
+        },
+        spanAttributes: {},
+      });
+
+      // Platform child span arrives with explicit origin
+      const platformSpan = createTestSpan({
+        id: "platform-1",
+        spanId: "platform-1",
+        parentSpanId: "root-1",
+        spanAttributes: {
+          "langwatch.origin": "playground",
+          "langwatch.origin.source": "platform",
+        },
+      });
+
+      let state = applySpanToSummary({ state: createInitState(), span: rootSpan });
+      expect(state.attributes["langwatch.origin"]).toBe("application");
+
+      state = applySpanToSummary({ state, span: platformSpan });
+      expect(state.attributes["langwatch.origin"]).toBe("playground");
     });
   });
 });

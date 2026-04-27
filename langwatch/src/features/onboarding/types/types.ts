@@ -1,3 +1,5 @@
+import type { Attribution } from "~/utils/attribution";
+
 export enum OnboardingScreenIndex {
   ORGANIZATION = 0,
   BASIC_INFO = 1,
@@ -69,7 +71,7 @@ export interface OnboardingFormData {
   solutionType?: SolutionType;
   selectedDesires: DesireType[];
   role?: RoleType;
-  utmCampaign?: string | null;
+  attribution?: Attribution;
 }
 
 export interface OnboardingScreen {

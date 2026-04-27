@@ -1,22 +1,27 @@
 /**
- * Unit tests for the scenario cancellation pub/sub channel.
+ * Unit tests for cancellation channel (Redis pub/sub).
  *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
- * (Distributed cancellation scenarios)
  */
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
-  CANCELLATION_CHANNEL,
   publishCancellation,
   subscribeToCancellations,
-  type CancellationMessage,
+  CANCELLATION_CHANNEL,
+} from "../cancellation-channel";
+import type {
+  CancellationPublisher,
+  CancellationSubscriber,
+  CancellationMessage,
 } from "../cancellation-channel";
 
-function createMockPublisher() {
-  return { publish: vi.fn().mockResolvedValue(1) };
+function createMockPublisher(): CancellationPublisher {
+  return {
+    publish: vi.fn().mockResolvedValue(1),
+  };
 }
 
-function createMockSubscriber() {
+function createMockSubscriber(): CancellationSubscriber {
   return {
     subscribe: vi.fn().mockResolvedValue(undefined),
     on: vi.fn(),
@@ -24,134 +29,85 @@ function createMockSubscriber() {
   };
 }
 
-function createMockWorker() {
-  return { cancelJob: vi.fn().mockReturnValue(false) };
-}
-
-describe("CANCELLATION_CHANNEL", () => {
-  it("is a non-empty string", () => {
-    expect(typeof CANCELLATION_CHANNEL).toBe("string");
-    expect(CANCELLATION_CHANNEL.length).toBeGreaterThan(0);
-  });
-});
-
-describe("publishCancellation()", () => {
-  describe("when publishing a cancellation message", () => {
-    let publisher: ReturnType<typeof createMockPublisher>;
+describe("publishCancellation", () => {
+  it("publishes the message to the cancel channel", async () => {
+    const publisher = createMockPublisher();
     const message: CancellationMessage = {
-      jobId: "job-1",
-      projectId: "proj-1",
-      scenarioRunId: "run-1",
-      batchRunId: "batch-1",
+      projectId: "proj1",
+      scenarioRunId: "run1",
+      batchRunId: "batch1",
     };
 
-    beforeEach(async () => {
-      publisher = createMockPublisher();
-      await publishCancellation({ publisher, message });
-    });
+    await publishCancellation({ publisher, message });
 
-    it("publishes to the cancellation channel", () => {
-      expect(publisher.publish).toHaveBeenCalledWith(
-        CANCELLATION_CHANNEL,
-        expect.any(String),
-      );
-    });
-
-    it("serializes the message as JSON", () => {
-      const [, payload] = publisher.publish.mock.calls[0] as [string, string];
-      expect(JSON.parse(payload)).toEqual(message);
-    });
+    expect(publisher.publish).toHaveBeenCalledWith(
+      CANCELLATION_CHANNEL,
+      JSON.stringify(message),
+    );
   });
 });
 
-describe("subscribeToCancellations()", () => {
-  describe("when setting up a subscription", () => {
-    let subscriber: ReturnType<typeof createMockSubscriber>;
-    let worker: ReturnType<typeof createMockWorker>;
+describe("subscribeToCancellations", () => {
+  it("subscribes to the cancel channel", async () => {
+    const subscriber = createMockSubscriber();
+    const onCancel = vi.fn();
 
-    beforeEach(async () => {
-      subscriber = createMockSubscriber();
-      worker = createMockWorker();
-      await subscribeToCancellations({ worker, subscriber });
-    });
+    await subscribeToCancellations({ subscriber, onCancel });
 
-    it("subscribes to the cancellation channel", () => {
-      expect(subscriber.subscribe).toHaveBeenCalledWith(CANCELLATION_CHANNEL);
-    });
-
-    it("registers a message handler", () => {
-      expect(subscriber.on).toHaveBeenCalledWith("message", expect.any(Function));
-    });
+    expect(subscriber.subscribe).toHaveBeenCalledWith(CANCELLATION_CHANNEL);
   });
 
-  describe("when the cleanup function is called", () => {
-    it("calls subscriber.quit()", async () => {
-      const subscriber = createMockSubscriber();
-      const worker = createMockWorker();
+  it("invokes onCancel when a valid message arrives", async () => {
+    const subscriber = createMockSubscriber();
+    const onCancel = vi.fn();
 
-      const cleanup = await subscribeToCancellations({ worker, subscriber });
-      await cleanup();
+    await subscribeToCancellations({ subscriber, onCancel });
 
-      expect(subscriber.quit).toHaveBeenCalled();
-    });
+    const onCall = (subscriber.on as ReturnType<typeof vi.fn>).mock.calls[0]!;
+    expect(onCall[0]).toBe("message");
+    const handler = onCall[1] as (channel: string, raw: string) => void;
+
+    const msg: CancellationMessage = {
+      projectId: "proj1",
+      scenarioRunId: "run1",
+      batchRunId: "batch1",
+    };
+    handler(CANCELLATION_CHANNEL, JSON.stringify(msg));
+
+    expect(onCancel).toHaveBeenCalledWith(msg);
   });
 
-  describe("when a cancellation message arrives", () => {
-    let worker: ReturnType<typeof createMockWorker>;
-    let capturedHandler: (channel: string, raw: string) => void;
+  it("ignores messages from other channels", async () => {
+    const subscriber = createMockSubscriber();
+    const onCancel = vi.fn();
 
-    beforeEach(async () => {
-      const subscriber = createMockSubscriber();
-      worker = createMockWorker();
+    await subscribeToCancellations({ subscriber, onCancel });
 
-      subscriber.on.mockImplementation((event: string, handler: (channel: string, raw: string) => void) => {
-        if (event === "message") capturedHandler = handler;
-      });
+    const handler = (subscriber.on as ReturnType<typeof vi.fn>).mock.calls[0]![1] as (channel: string, raw: string) => void;
+    handler("other:channel", JSON.stringify({ scenarioRunId: "run1" }));
 
-      await subscribeToCancellations({ worker, subscriber });
-    });
+    expect(onCancel).not.toHaveBeenCalled();
+  });
 
-    describe("when the worker owns the job", () => {
-      beforeEach(() => {
-        worker.cancelJob.mockReturnValue(true);
-        capturedHandler(CANCELLATION_CHANNEL, JSON.stringify({ jobId: "job-1", projectId: "p1", scenarioRunId: "r1", batchRunId: "b1" }));
-      });
+  it("ignores malformed messages", async () => {
+    const subscriber = createMockSubscriber();
+    const onCancel = vi.fn();
 
-      it("calls cancelJob with the job id", () => {
-        expect(worker.cancelJob).toHaveBeenCalledWith("job-1");
-      });
-    });
+    await subscribeToCancellations({ subscriber, onCancel });
 
-    describe("when the worker does not own the job", () => {
-      beforeEach(() => {
-        worker.cancelJob.mockReturnValue(false);
-        capturedHandler(CANCELLATION_CHANNEL, JSON.stringify({ jobId: "job-2", projectId: "p1", scenarioRunId: "r1", batchRunId: "b1" }));
-      });
+    const handler = (subscriber.on as ReturnType<typeof vi.fn>).mock.calls[0]![1] as (channel: string, raw: string) => void;
+    handler(CANCELLATION_CHANNEL, "not-json");
 
-      it("calls cancelJob (which is a no-op on non-owning workers)", () => {
-        expect(worker.cancelJob).toHaveBeenCalledWith("job-2");
-      });
-    });
+    expect(onCancel).not.toHaveBeenCalled();
+  });
 
-    describe("when the message arrives on a different channel", () => {
-      beforeEach(() => {
-        capturedHandler("other:channel", JSON.stringify({ jobId: "job-3", projectId: "p1", scenarioRunId: "r1", batchRunId: "b1" }));
-      });
+  it("returns a cleanup function that quits the subscriber", async () => {
+    const subscriber = createMockSubscriber();
+    const onCancel = vi.fn();
 
-      it("does not call cancelJob", () => {
-        expect(worker.cancelJob).not.toHaveBeenCalled();
-      });
-    });
+    const unsubscribe = await subscribeToCancellations({ subscriber, onCancel });
+    await unsubscribe();
 
-    describe("when the message is malformed JSON", () => {
-      it("does not throw", () => {
-        expect(() => capturedHandler(CANCELLATION_CHANNEL, "not-json")).not.toThrow();
-      });
-
-      it("does not call cancelJob", () => {
-        capturedHandler(CANCELLATION_CHANNEL, "not-json");
-        expect(worker.cancelJob).not.toHaveBeenCalled();
-      });
-    });
+    expect(subscriber.quit).toHaveBeenCalled();
   });
 });

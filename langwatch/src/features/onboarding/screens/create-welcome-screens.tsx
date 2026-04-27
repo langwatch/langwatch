@@ -50,6 +50,8 @@ const OrganizationScreen: React.FC = () => {
           placeholder="Company or your name"
           borderRadius="10px"
           h="44px"
+          transition="padding 0.2s ease"
+          _focus={{ px: 5 }}
           value={organizationName}
           onChange={(e) => setOrganizationName(e.target.value)}
         />

@@ -5,8 +5,15 @@ import {
   buildDataForFilterQuery,
   buildTopDocumentsQuery,
   buildFeedbacksQuery,
+  __testOnly__,
 } from "../aggregation-builder";
 import type { FlattenAnalyticsMetricsEnum } from "../../registry";
+
+const {
+  mapEvalAggregationToOuter,
+  extractTraceAggregationColumn,
+  hasEvalMixedWithTraceMetrics,
+} = __testOnly__;
 
 describe("aggregation-builder", () => {
   beforeEach(() => {
@@ -30,7 +37,8 @@ describe("aggregation-builder", () => {
 
       expect(result.sql).toContain("SELECT");
       expect(result.sql).toContain("FROM trace_summaries");
-      expect(result.sql).toContain("LIMIT 1 BY TenantId, TraceId");
+      expect(result.sql).not.toContain("LIMIT 1 BY");
+      expect(result.sql).toContain("max(UpdatedAt)");
       expect(result.sql).toContain("WHERE");
       expect(result.sql).toContain("GROUP BY");
       expect(result.sql).toContain("period");
@@ -81,6 +89,364 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("TotalCost");
     });
 
+    // @regression: LLM Metrics card mixed metadata.span_type (cardinality) with
+    // performance.total_cost (sum) and performance.total_tokens (sum). The span_type
+    // metric forced a stored_spans JOIN even though cardinality only uses uniq(TraceId)
+    // from trace_summaries. The JOIN created one row per span per trace, inflating
+    // the trace-level SUM aggregations (cost ~4x, tokens ~6x).
+    // @regression issue #3088: When trace-level metrics (sum of TotalCost) are combined
+    // with evaluation metrics (avg of evaluation_pass_rate) in buildSimpleTimeseriesQuery,
+    // the evaluation_runs JOIN produces N rows per trace, inflating sum(TotalCost) by N.
+    // The fix must ensure trace-level aggregations are not fanned out by eval join cardinality.
+    it("does not inflate trace-level aggregations when mixed with evaluation metrics in simple path", () => {
+      const input = {
+        ...baseInput,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Assert the fix's specific SQL shape: a per-trace CTE exists with trace_id
+      // in its GROUP BY, and the outer query aggregates over that CTE — not over
+      // the raw evaluation_runs join.
+      expect(result.sql).toMatch(/WITH\s+per_trace_metrics\s+AS\s*\(/);
+      expect(result.sql).toMatch(/GROUP BY[^)]*\btrace_id\b/);
+      expect(result.sql).not.toMatch(/\bsum\s*\(\s*ts\.TotalCost\s*\)/);
+
+      // Both metrics must still be emitted by any valid fix.
+      expect(result.sql).toContain("Passed");
+      expect(result.sql).toContain("0__performance_total_cost__sum");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+    });
+
+    // @regression issue #3088: When timeScale is "full" (summary widgets) with mixed eval and
+    // trace metrics, the previous routing fell through to buildSubqueryTimeseriesQuery which
+    // still joined evaluation_runs directly and inflated sum(ts.TotalCost) by the number of
+    // evaluation runs per trace.
+    it("does not inflate trace metrics with mixed eval metrics when timeScale is full", () => {
+      const input = {
+        ...baseInput,
+        timeScale: "full" as const,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must use per-trace CTE approach, not plain sum(ts.TotalCost) over fanned-out eval rows
+      const hasRawTotalCostSum = /\bsum\s*\(\s*ts\.TotalCost\s*\)/.test(result.sql);
+      expect(hasRawTotalCostSum).toBe(false);
+
+      // Must contain the per-trace CTE (the fix uses a WITH clause that groups by trace_id)
+      expect(result.sql).toMatch(/\bWITH\b/);
+      expect(result.sql).toMatch(/GROUP BY\s+trace_id\b/);
+
+      // Both aliases still present
+      expect(result.sql).toContain("0__performance_total_cost__sum");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+    });
+
+    // @regression issue #3088: When metadata.user_id (cardinality, which uses
+    // Attributes['langwatch.user_id']) was mixed with evaluation metrics,
+    // extractTraceAggregationColumn returned null because its regex didn't handle
+    // Attributes-indexed columns, and the defensive fallback produced invalid nested
+    // any(uniqIf(...)) SQL.
+    it("handles metadata.user_id mixed with evaluation metrics correctly", () => {
+      const input = {
+        ...baseInput,
+        series: [
+          { metric: "metadata.user_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must not produce nested aggregations like any(uniqIf(...)) or any(avg(...))
+      expect(result.sql).not.toMatch(/\bany\s*\(\s*\w+If\s*\(/);
+      expect(result.sql).not.toMatch(/\bany\s*\(\s*(sum|avg|min|max|count|uniq)\s*\(/);
+
+      // Both metric aliases still emitted
+      expect(result.sql).toContain("0__metadata_user_id__cardinality");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+    });
+
+    // @regression issue #3088: When trace-level metrics (sum TotalCost) are combined with
+    // evaluation metrics (avg evaluation_pass_rate) while using a groupBy that activates
+    // the CTE/arrayJoin path (metadata.labels), the outer SELECT previously referenced
+    // `es.Passed` outside the CTE where the `es` alias no longer exists. Trace-level
+    // metrics would also be double-counted via the eval JOIN fanout.
+    it("produces valid SQL when mixing trace and evaluation metrics with arrayJoin groupBy", () => {
+      const input = {
+        ...baseInput,
+        groupBy: "metadata.labels",
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // The query must still group by the label arrayJoin
+      expect(result.sql).toContain("arrayJoin");
+
+      // The trace-level metric must be transformed to use the CTE column
+      expect(result.sql).toContain("trace_total_cost");
+
+      // The outer query must reference a pre-aggregated eval value, not es.Passed directly.
+      // With the fix, the per-trace alias pattern is present (the eval metric is
+      // pre-aggregated inside the CTE) and the outer aggregation is a plain avg over that
+      // per-trace column, not an avgIf conditional aggregation.
+      expect(result.sql).toMatch(/_per_trace/);
+      expect(result.sql).toMatch(
+        /\bavg\s*\(\s*`?1__evaluations_evaluation_pass_rate__avg__my_evaluator__per_trace`?\s*\)/,
+      );
+
+      // The eval metric alias must still be emitted
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+    });
+
+    // @regression: Trace-level metrics emitted `avg(ts.<Column>)` in the outer
+    // SELECT when routed through the arrayJoin groupBy path, but `ts` is only
+    // in scope inside the `deduped_traces` CTE. Columns not registered in
+    // `DEDUP_FIELD_MAPPINGS` and not projected into the CTE caused ClickHouse
+    // to reject the query with:
+    //   "Unknown expression or function identifier `ts.<Column>` in scope"
+    //
+    // Audit of `metric-translator.ts` revealed two trace-level columns with
+    // this bug: `TokensPerSecond` and `TimeToFirstTokenMs`. Both have been
+    // projected into the CTE and wired into DEDUP_FIELD_MAPPINGS so
+    // `transformMetricForDedup` rewrites the outer reference to the CTE alias.
+    it.each([
+      {
+        metric: "performance.tokens_per_second",
+        aggregation: "avg",
+        alias: "trace_tokens_per_second",
+        rawColumn: "TokensPerSecond",
+        outerAggregation: /\bavg\s*\(\s*trace_tokens_per_second\s*\)/,
+      },
+      {
+        metric: "performance.first_token",
+        aggregation: "p90",
+        alias: "trace_time_to_first_token_ms",
+        rawColumn: "TimeToFirstTokenMs",
+        outerAggregation: /\bquantileExact\(0\.9\)\s*\(\s*trace_time_to_first_token_ms\s*\)/,
+      },
+    ])(
+      "routes $metric through the CTE alias in arrayJoin groupBy path",
+      ({ metric, aggregation, alias, rawColumn, outerAggregation }) => {
+        const input = {
+          ...baseInput,
+          groupBy: "metadata.model" as const,
+          series: [
+            {
+              metric: metric as FlattenAnalyticsMetricsEnum,
+              aggregation: aggregation as "avg" | "p90",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // Must route through the arrayJoin CTE path (Models array)
+        expect(result.sql).toContain("arrayJoin");
+        expect(result.sql).toContain("deduped_traces");
+
+        // The CTE must project the column under the expected alias. A single
+        // `ts.<Column> AS <alias>` reference inside the CTE is expected and
+        // correct — the bug was only that the outer SELECT also used
+        // `ts.<Column>`, where `ts` is out of scope.
+        expect(result.sql).toContain(`ts.${rawColumn} AS ${alias}`);
+
+        // The outer SELECT must reference the CTE alias, not the raw column.
+        const outerPortion = result.sql.slice(
+          result.sql.indexOf("FROM (") + "FROM (".length,
+        ).split("FROM deduped_traces")[1] ?? "";
+        expect(result.sql).toMatch(outerAggregation);
+        expect(outerPortion).not.toContain(`ts.${rawColumn}`);
+      },
+    );
+
+    // @regression: Dashboard widgets `avgCostPerModel` and `avgTokensPerModel`
+    // emit `pipeline: { field: "trace_id", aggregation: "avg" }` on a
+    // trace-level metric (`performance.total_cost`, `performance.completion_tokens`)
+    // with `groupBy: metadata.model`. The arrayJoin CTE path previously only
+    // rewrote pipelines with `aggregation: "sum"`; `"avg"` (and min/max) fell
+    // through and the metric was silently dropped from the outer SELECT — the
+    // query returned 200 OK with no values, and the UI showed "No data".
+    //
+    // For trace-level columns the CTE already deduplicates by (trace_id,
+    // group_key), so the per-trace inner aggregation is identity — sum/avg/min/max
+    // all collapse to the per-trace scalar, and the outer aggregation equals
+    // the direct aggregation over deduped traces.
+    it.each([
+      {
+        metric: "performance.total_cost",
+        pipelineAgg: "avg",
+        outerAggregation: /\bavg\s*\(\s*trace_total_cost\s*\)/,
+      },
+      {
+        metric: "performance.completion_tokens",
+        pipelineAgg: "avg",
+        outerAggregation: /\bavg\s*\(\s*trace_completion_tokens\s*\)/,
+      },
+    ])(
+      "rewrites trace_id pipeline with $pipelineAgg aggregation on $metric in arrayJoin groupBy",
+      ({ metric, pipelineAgg, outerAggregation }) => {
+        const input = {
+          ...baseInput,
+          groupBy: "metadata.model" as const,
+          series: [
+            {
+              metric: metric as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              pipeline: {
+                field: "trace_id" as const,
+                aggregation: pipelineAgg as "avg",
+              },
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("deduped_traces");
+        // Metric must survive to the outer SELECT (not silently dropped)
+        expect(result.sql).toMatch(outerAggregation);
+      },
+    );
+
+    // @guard: prevent this class of bug from recurring silently. Any
+    // trace-level column referenced via `${ts}.<Column>` in metric-translator
+    // MUST be registered in DEDUP_FIELD_MAPPINGS (which is consumed by
+    // transformMetricForDedup to rewrite outer references to the CTE alias)
+    // AND projected in the CTE (see aggregation-builder.ts:~1168). Columns
+    // not in this list are handled specially (see allowlist below). If a new
+    // trace-level metric is added and this test fails, either add the column
+    // to DEDUP_FIELD_MAPPINGS + CTE, or extend the allowlist with a reason.
+    it("every ${ts}.<Column> reference in metric-translator is handled", async () => {
+      const fs = await import("node:fs/promises");
+      const path = await import("node:path");
+      const source = await fs.readFile(
+        path.resolve(__dirname, "../metric-translator.ts"),
+        "utf8",
+      );
+      const referenced = new Set(
+        Array.from(source.matchAll(/\$\{ts\}\.([A-Z][a-zA-Z]+)/g)).map(
+          (m) => m[1]!,
+        ),
+      );
+      // Columns handled by special cases in transformMetricForDedup, not by
+      // DEDUP_FIELD_MAPPINGS lookup. Keep this list minimal and documented.
+      const SPECIAL_CASE_ALLOWLIST = new Set([
+        "TraceId", // -> uniqExact(trace_id)
+        "Attributes", // routed through extractReferencedEvaluationColumns / metadata path
+        "OccurredAt", // used only in period/date boundaries, not in outer aggregations
+      ]);
+      const {
+        __testOnly_DEDUP_FIELD_MAPPINGS,
+      } = __testOnly__ as unknown as {
+        __testOnly_DEDUP_FIELD_MAPPINGS?: Record<string, string>;
+      };
+      const registered = new Set(
+        Object.keys(__testOnly_DEDUP_FIELD_MAPPINGS ?? {}),
+      );
+
+      const unhandled = [...referenced].filter(
+        (col) => !registered.has(col) && !SPECIAL_CASE_ALLOWLIST.has(col),
+      );
+      expect(unhandled).toEqual([]);
+    });
+
+    // @regression: Pie charts with arrayJoin groupBy (e.g. metadata.labels) add a
+    // pipeline { field: "trace_id", aggregation: "sum" } which sets requiresSubquery.
+    // buildArrayJoinTimeseriesQuery previously dropped all subquery metrics, returning
+    // empty data. The fix re-translates trace_id pipeline metrics as simple metrics
+    // since the CTE already deduplicates by (trace_id, group_key).
+    it("includes pipeline metrics with trace_id field in arrayJoin groupBy path", () => {
+      const input = {
+        ...baseInput,
+        groupBy: "metadata.labels" as const,
+        series: [
+          {
+            metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "trace_id" as const, aggregation: "sum" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must route through the arrayJoin CTE path
+      expect(result.sql).toContain("arrayJoin");
+      expect(result.sql).toContain("deduped_traces");
+
+      // The metric alias must be present in the outer SELECT (not silently dropped)
+      expect(result.sql).toContain("0__metadata_trace_id__cardinality");
+
+      // The metric should be converted to uniqExact(trace_id) via transformMetricForDedup
+      expect(result.sql).toContain("uniqExact(trace_id)");
+    });
+
+    // Verify that page-level filters are applied inside the arrayJoin CTE
+    // when combined with pipeline metrics and groupBy labels.
+    it("applies label filters in arrayJoin groupBy path with pipeline metrics", () => {
+      const input = {
+        ...baseInput,
+        groupBy: "metadata.labels" as const,
+        filters: {
+          "metadata.labels": ["populator", "conversation"],
+        },
+        series: [
+          {
+            metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "trace_id" as const, aggregation: "sum" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must route through arrayJoin CTE path
+      expect(result.sql).toContain("deduped_traces");
+
+      // Filter must be in the CTE WHERE clause
+      expect(result.sql).toContain("hasAny");
+      expect(result.sql).toContain("langwatch.labels");
+
+      // Filter params must be present
+      const paramKeys = Object.keys(result.params);
+      const labelsParam = paramKeys.find((k) => k.startsWith("labels"));
+      expect(labelsParam).toBeDefined();
+      expect(result.params[labelsParam!]).toEqual(["populator", "conversation"]);
+
+      // Outer query must restrict group_key to only the filtered labels
+      // (arrayJoin expands ALL labels from matching traces — without this,
+      // unfiltered labels leak into pie/bar chart results)
+      expect(result.sql).toContain("group_key IN");
+      expect(result.params.groupByFilterValues).toEqual(["populator", "conversation"]);
+    });
+
+    it("does not JOIN stored_spans when metadata.span_type uses cardinality alongside trace-level metrics", () => {
+      const input = {
+        ...baseInput,
+        series: [
+          { metric: "metadata.span_type" as FlattenAnalyticsMetricsEnum, key: "llm", aggregation: "cardinality" as const },
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "performance.total_tokens" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // The query must NOT join stored_spans — all three metrics work from trace_summaries alone
+      expect(result.sql).not.toContain("JOIN stored_spans");
+      expect(result.sql).not.toContain("FROM stored_spans");
+      // But the metrics themselves should still be present
+      expect(result.sql).toContain("uniq(");
+      expect(result.sql).toContain("TotalCost");
+      expect(result.sql).toContain("TotalPromptTokenCount");
+    });
+
     it("adds JOINs when metrics require them", () => {
       const input = {
         ...baseInput,
@@ -94,7 +460,7 @@ describe("aggregation-builder", () => {
       const result = buildTimeseriesQuery(input);
 
       expect(result.sql).toContain("FROM evaluation_runs");
-      expect(result.sql).toContain("LIMIT 1 BY TenantId, EvaluationId");
+      expect(result.sql).toContain("GROUP BY TenantId, EvaluationId");
     });
 
     it("adds filters to WHERE clause with parameterized values", () => {
@@ -217,6 +583,134 @@ describe("aggregation-builder", () => {
       expect(result.sql).toContain("`1__performance_total_cost__sum`");
     });
 
+    describe("when timeScale is full with groupBy", () => {
+      // @regression issue #2644: Summary charts with groupBy render blank because
+      // buildSubqueryTimeseriesQuery never includes group_key in SELECT, GROUP BY,
+      // or UNION ALL — causing the frontend to receive no group dimension to render.
+
+      it("includes group_key in the UNION ALL SELECT for simple metrics", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_label" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+      });
+
+      it("includes group_key in the CTE query for pipeline metrics", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_label" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+              pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+      });
+
+      it("includes group_key in standard query for simple metrics with groupBy", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_label" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // timeScale "full" + groupBy uses the standard query path (not CTE/UNION ALL),
+        // which produces a single SELECT with GROUP BY period, group_key
+        expect(result.sql).toContain("group_key");
+        expect(result.sql).toContain("GROUP BY");
+        expect(result.sql).toContain("period");
+      });
+
+      it("does not include group_key when groupBy is absent", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).not.toContain("group_key");
+      });
+
+      it("includes group_key when mixing simple and pipeline metrics with groupBy", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_label" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+            {
+              metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+              pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // timeScale "full" + groupBy falls through to the standard query path,
+        // which includes group_key in a single SELECT with GROUP BY
+        expect(result.sql).toContain("group_key");
+        expect(result.sql).toContain("GROUP BY");
+      });
+
+      it("uses direct group_key alias without null-check wrapper when groupBy handlesUnknown", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "evaluations.evaluation_passed" as const,
+          groupByKey: "my-evaluator",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+        // When handlesUnknown=true the column expression itself handles unknown values,
+        // so no outer if(... IS NULL, 'unknown', toString(...)) wrapper is added.
+        expect(result.sql).not.toContain("IS NULL, 'unknown'");
+      });
+    });
+
     it("uses date-bucketed pipeline query for pipeline metrics with numeric timeScale", () => {
       const input = {
         ...baseInput,
@@ -310,6 +804,241 @@ describe("aggregation-builder", () => {
       // Tenant isolation in SQL (dedupedTraceSummaries + baseWhere)
       expect(result.sql).toContain("TenantId = {tenantId:String}");
     });
+
+    describe("when groupBy is evaluation field with cross-evaluator metrics", () => {
+      // @regression issue #2668: groupByAdditionalWhere was appended to the global WHERE
+      // clause, pre-filtering the entire dataset to one evaluator. This caused metrics
+      // that use conditional aggregation (avgIf/sumIf with their OWN evaluator filter)
+      // to find no matching rows because the global WHERE already excluded all rows for
+      // the OTHER evaluator.
+
+      it("excludes global EvaluatorId WHERE filter for evaluation_label groupBy", () => {
+        // GroupBy evaluatorA, but metric targets evaluatorB via its own conditional aggregation.
+        // The global WHERE must NOT filter by evaluatorA — that would make evaluatorB rows invisible.
+        const input = {
+          ...baseInput,
+          groupBy: "evaluations.evaluation_label",
+          groupByKey: "evaluatorA",
+          series: [
+            {
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "evaluatorB",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // The group_key expression should incorporate the evaluatorA filter (not the global WHERE)
+        expect(result.sql).toContain("group_key");
+        // The metric's conditional aggregation should reference evaluatorB
+        expect(result.sql).toContain("evaluatorB");
+        // The global WHERE clause must NOT contain a standalone EvaluatorId equality filter
+        // (it would appear as "AND es.EvaluatorId = {groupByKey:String}" or similar)
+        const whereSection = result.sql.split("GROUP BY")[0] ?? result.sql;
+        expect(whereSection).not.toMatch(
+          /AND\s+es\.EvaluatorId\s*=\s*\{groupByKey:String\}/,
+        );
+      });
+
+      it("excludes global EvaluatorId WHERE filter for evaluation_passed groupBy", () => {
+        const input = {
+          ...baseInput,
+          groupBy: "evaluations.evaluation_passed",
+          groupByKey: "evaluatorA",
+          series: [
+            {
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "evaluatorB",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        expect(result.sql).toContain("group_key");
+        expect(result.sql).toContain("evaluatorB");
+        const whereSection = result.sql.split("GROUP BY")[0] ?? result.sql;
+        expect(whereSection).not.toMatch(
+          /AND\s+es\.EvaluatorId\s*=\s*\{groupByKey:String\}/,
+        );
+      });
+
+      it("keeps EvaluatorId condition inside group_key expression for evaluation_label", () => {
+        const input = {
+          ...baseInput,
+          groupBy: "evaluations.evaluation_label",
+          groupByKey: "evaluatorA",
+          series: [
+            {
+              metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum,
+              aggregation: "cardinality" as const,
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // The evaluator filter must live inside the group_key column expression, not in WHERE
+        expect(result.sql).toContain("{groupByKey:String}");
+        // The group_key expression should be conditional (if/CASE) so non-matching rows
+        // return NULL and get filtered by HAVING rather than excluded from the whole dataset
+        expect(result.sql).toMatch(/if\(.*EvaluatorId.*group_key|CASE.*EvaluatorId/s);
+        const whereSection = result.sql.split("GROUP BY")[0] ?? result.sql;
+        expect(whereSection).not.toMatch(
+          /AND\s+es\.EvaluatorId\s*=\s*\{groupByKey:String\}/,
+        );
+      });
+
+      it("produces no evaluator filter when groupByKey is absent", () => {
+        const input = {
+          ...baseInput,
+          groupBy: "evaluations.evaluation_label",
+          // no groupByKey
+          series: [
+            {
+              metric: "evaluations.evaluation_score" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "evaluatorB",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // Without a groupByKey there is no evaluator groupBy filter at all
+        expect(result.sql).not.toContain("{groupByKey:String}");
+        expect(result.params).not.toHaveProperty("groupByKey");
+      });
+    });
+
+    describe("when evaluation pass rate metric is combined with labels groupBy", () => {
+      // @regression issue #3067: evaluation metrics reference `es.Passed` which is
+      // out of scope in the CTE outer SELECT. The fix includes eval columns in the
+      // CTE and rewrites `es.X` → `eval_snake_case` in the outer query.
+      it("rewrites es.Passed and es.Status to CTE column aliases", () => {
+        const input = {
+          ...baseInput,
+          timeScale: "full" as const,
+          groupBy: "metadata.labels" as const,
+          series: [
+            {
+              metric:
+                "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum,
+              aggregation: "avg" as const,
+              key: "some-evaluator",
+            },
+          ],
+        };
+        const result = buildTimeseriesQuery(input);
+
+        // CTE must include evaluation columns with eval_ prefix
+        expect(result.sql).toContain("AS eval_passed");
+        expect(result.sql).toContain("AS eval_status");
+        expect(result.sql).toContain("AS eval_evaluator_id");
+
+        // Outer SELECT (after the CTE) must use eval_ aliases, not es.X
+        const outerSelect = result.sql.split("FROM deduped_traces")[0]!
+          .split(")\n    SELECT")[1]!;
+        expect(outerSelect).toContain("eval_passed");
+        expect(outerSelect).toContain("eval_status");
+        expect(outerSelect).toContain("eval_evaluator_id");
+        expect(outerSelect).not.toContain("es.");
+      });
+    });
+
+    // @regression: Pipeline metrics must not be dropped when hasEvalMixedWithTraceMetrics fires.
+    // Before the guard, buildMixedEvalTimeseriesQuery only received simpleMetrics,
+    // so pipeline series (requiresSubquery=true) vanished from the output.
+    it("preserves pipeline metrics when mixed with trace and eval simple metrics", () => {
+      const input = {
+        ...baseInput,
+        timeScale: "full" as const,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+          {
+            metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // All three metric aliases must be present
+      expect(result.sql).toContain("0__performance_total_cost__sum");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+      expect(result.sql).toContain("2__metadata_thread_id__cardinality");
+    });
+
+    // @regression: buildDateBucketedPipelineQuery previously only received pipeline
+    // metrics, silently dropping simple metrics when mixed with pipeline metrics
+    // on numeric timeScale.
+    it("preserves simple metrics alongside pipeline metrics with numeric timeScale", () => {
+      const input = {
+        ...baseInput,
+        timeScale: 60,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          {
+            metric: "metadata.thread_id" as FlattenAnalyticsMetricsEnum,
+            aggregation: "cardinality" as const,
+            pipeline: { field: "user_id" as const, aggregation: "avg" as const },
+          },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Both metric aliases must be present
+      expect(result.sql).toContain("0__performance_total_cost__sum");
+      expect(result.sql).toContain("1__metadata_thread_id__cardinality");
+
+      // Simple metrics should be in a simple_metrics CTE
+      expect(result.sql).toContain("simple_metrics");
+    });
+
+    // @regression: count-like trace metrics (count(), uniq(TraceId)) mixed with eval
+    // metrics previously threw because extractTraceAggregationColumn returned null for
+    // expressions without a table.column reference.
+    it("handles count() trace metric mixed with evaluation metrics", () => {
+      const input = {
+        ...baseInput,
+        series: [
+          { metric: "metadata.trace_id" as FlattenAnalyticsMetricsEnum, aggregation: "cardinality" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      // Should NOT throw — count-like metrics must be handled explicitly
+      const result = buildTimeseriesQuery(input);
+
+      expect(result.sql).toContain("0__metadata_trace_id__cardinality");
+      expect(result.sql).toContain("1__evaluations_evaluation_pass_rate__avg");
+      // The per-trace CTE should exist
+      expect(result.sql).toMatch(/WITH\s+per_trace_metrics/);
+    });
+
+    // @regression: timeScale "full" without groupBy must guarantee both 'current' and
+    // 'previous' period rows even when one period has no data. The UNION ALL approach
+    // with per-period CTEs ensures this.
+    it("guarantees both period rows for timeScale full with mixed eval and trace metrics", () => {
+      const input = {
+        ...baseInput,
+        timeScale: "full" as const,
+        series: [
+          { metric: "performance.total_cost" as FlattenAnalyticsMetricsEnum, aggregation: "sum" as const },
+          { metric: "evaluations.evaluation_pass_rate" as FlattenAnalyticsMetricsEnum, aggregation: "avg" as const, key: "my-evaluator" },
+        ],
+      };
+      const result = buildTimeseriesQuery(input);
+
+      // Must use UNION ALL to guarantee both periods
+      expect(result.sql).toContain("UNION ALL");
+      expect(result.sql).toContain("'current' AS period");
+      expect(result.sql).toContain("'previous' AS period");
+
+      // Must use per-period CTEs
+      expect(result.sql).toContain("per_trace_metrics_current");
+      expect(result.sql).toContain("per_trace_metrics_previous");
+    });
   });
 
   describe("buildDataForFilterQuery", () => {
@@ -398,7 +1127,7 @@ describe("aggregation-builder", () => {
       );
 
       expect(result.sql).toContain("FROM evaluation_runs");
-      expect(result.sql).toContain("LIMIT 1 BY TenantId, EvaluationId");
+      expect(result.sql).toContain("GROUP BY TenantId, EvaluationId");
       expect(result.sql).toContain("es.EvaluatorId AS field");
     });
 
@@ -569,6 +1298,90 @@ describe("aggregation-builder", () => {
       const result = buildFeedbacksQuery(projectId, startDate, endDate);
 
       expect(result.sql).toContain("ORDER BY event_timestamp DESC");
+    });
+  });
+
+  describe("mapEvalAggregationToOuter", () => {
+    const cases: Array<{ expression: string; expected: string }> = [
+      { expression: "avgIf(toFloat64(es.Passed), cond)", expected: "avg" },
+      { expression: "sumIf(es.Score, cond)", expected: "sum" },
+      { expression: "minIf(es.Score, cond)", expected: "min" },
+      { expression: "maxIf(es.Score, cond)", expected: "max" },
+      // uniqIf -> sum: per-trace count of unique evaluation runs, safe to
+      // sum across traces because EvaluationId is unique per trace.
+      { expression: "uniqIf(es.EvaluationId, cond)", expected: "sum" },
+      { expression: "countIf(es.Score, cond)", expected: "sum" },
+      // quantileExactIf collapses to avg — an approximation that preserves
+      // monotonic ordering of the metric across periods.
+      { expression: "quantileExactIf(0.5)(es.Score, cond)", expected: "avg" },
+    ];
+
+    for (const { expression, expected } of cases) {
+      const name = expression.split("(")[0];
+      it(`maps ${name} to ${expected}`, () => {
+        expect(mapEvalAggregationToOuter(expression)).toBe(expected);
+      });
+    }
+
+    it("returns null for unknown aggregation patterns", () => {
+      expect(mapEvalAggregationToOuter("stddevIf(es.Score, cond)")).toBeNull();
+    });
+  });
+
+  describe("extractTraceAggregationColumn", () => {
+    it("returns null for expressions that do not contain a column reference", () => {
+      // No `<alias>.<column>` shape at all — should not match anything.
+      expect(extractTraceAggregationColumn("some_udf(42)")).toBeNull();
+    });
+
+    it("handles bracketed Attributes columns", () => {
+      expect(
+        extractTraceAggregationColumn(
+          "uniqIf(ts.Attributes['langwatch.user_id'], ts.Attributes['langwatch.user_id'] != '')",
+        ),
+      ).toBe("ts.Attributes['langwatch.user_id']");
+    });
+
+    it("handles dot-access columns wrapped in coalesce+sum", () => {
+      expect(
+        extractTraceAggregationColumn("coalesce(sum(ts.TotalCost), 0)"),
+      ).toBe("ts.TotalCost");
+    });
+  });
+
+  describe("hasEvalMixedWithTraceMetrics", () => {
+    // Minimal MetricTranslation-shaped fixtures — the helper only inspects
+    // `requiredJoins`, so other fields are intentionally stub values.
+    type MetricStub = Parameters<typeof hasEvalMixedWithTraceMetrics>[0][number];
+    const evalMetric = {
+      selectExpression: "avgIf(es.Passed, 1)",
+      alias: "e",
+      requiredJoins: ["evaluation_runs"],
+      params: {},
+    } as unknown as MetricStub;
+    const traceMetric = {
+      selectExpression: "sum(ts.TotalCost)",
+      alias: "t",
+      requiredJoins: [],
+      params: {},
+    } as unknown as MetricStub;
+
+    it("returns true when both eval and trace metrics are present", () => {
+      expect(hasEvalMixedWithTraceMetrics([evalMetric, traceMetric])).toBe(
+        true,
+      );
+    });
+
+    it("returns false when only eval metrics are present", () => {
+      expect(hasEvalMixedWithTraceMetrics([evalMetric])).toBe(false);
+    });
+
+    it("returns false when only trace metrics are present", () => {
+      expect(hasEvalMixedWithTraceMetrics([traceMetric])).toBe(false);
+    });
+
+    it("returns false for an empty list", () => {
+      expect(hasEvalMixedWithTraceMetrics([])).toBe(false);
     });
   });
 });

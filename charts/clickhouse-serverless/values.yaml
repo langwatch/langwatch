@@ -1,0 +1,84 @@
+image:
+  repository: langwatch/clickhouse-serverless
+  tag: "0.2.0"  # x-release-please-version
+  pullPolicy: IfNotPresent
+
+# Primary inputs — the image auto-tunes all ClickHouse parameters from these
+cpu: 2
+memory: "4Gi"
+replicas: 1  # 1 = standalone MergeTree, 3+ = ReplicatedMergeTree + Keeper (must be odd)
+clusterName: langwatch  # ClickHouse cluster name used in macros and remote_servers
+
+storage:
+  size: 50Gi
+  storageClass: ""
+
+# S3-compatible object storage — shared by cold storage and backups
+objectStorage:
+  bucket: ""
+  region: ""
+  endpoint: ""                     # e.g. https://s3.us-east-1.amazonaws.com/bucket/
+  useEnvironmentCredentials: true   # IRSA / workload identity / pod SA
+  credentials:
+    secretKeyRef:
+      name: ""                     # K8s secret with S3 access key + secret key
+      accessKeyId: "accessKey"
+      secretAccessKey: "secretKey"
+
+# Cold storage: tiered hot→cold data movement (requires objectStorage)
+cold:
+  enabled: false
+  defaultTtlDays: 49  # App-side TTL before data moves to cold (must be divisible by 7)
+
+# Backups: native ClickHouse BACKUP/RESTORE to S3 (requires objectStorage)
+backup:
+  enabled: false
+  database: "langwatch"
+  user: "default"  # ClickHouse user for backup/restore operations
+  full:
+    schedule: "0 */12 * * *"       # every 12 hours
+  incremental:
+    schedule: "0 * * * *"          # every hour
+
+# Authentication
+auth:
+  password: ""         # Auto-generated when empty
+  clusterSecret: ""    # Inter-node cluster secret; auto-generated when empty
+  existingSecret: ""
+  secretKeys:
+    passwordKey: "password"
+    clusterSecretKey: "clusterSecret"
+
+
+# Advanced: override any computed value (applied last)
+env: {}
+
+# Keeper resources (only used when replicas > 1)
+keeper:
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  storage:
+    size: 10Gi
+    storageClass: ""  # defaults to parent storage.storageClass
+
+# ServiceAccount
+serviceAccount:
+  create: true
+  name: ""  # defaults to <fullname>
+  automountServiceAccountToken: false
+  annotations: {}  # e.g. eks.amazonaws.com/role-arn: arn:aws:iam::role/my-role (for IRSA)
+
+# Pod-level settings
+imagePullSecrets: []
+podAnnotations: {}
+
+# Scheduling
+scheduling:
+  nodeSelector: {}
+  affinity: {}
+  tolerations: []

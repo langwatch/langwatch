@@ -30,6 +30,7 @@ import { isJson } from "../../utils/isJson";
 import { isPythonRepr } from "../../utils/parsePythonInsideJson";
 import { getExtractedInput } from "../../utils/traceExtraction";
 import { SmallLabel } from "../SmallLabel";
+import { PIIRedactionNotice } from "../ui/PIIRedactionNotice";
 import { RedactedField } from "../ui/RedactedField";
 import { Tooltip } from "../ui/tooltip";
 import {
@@ -149,6 +150,9 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                 Thread ID: {trace.metadata.thread_id}
               </Text>
             )}
+            <PIIRedactionNotice
+              content={`${getExtractedInput(trace) ?? ""}\n${stringifyIfObject(trace.output?.value) ?? ""}`}
+            />
             <Message
               author="Input"
               avatar={
@@ -161,7 +165,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
             >
               <Box paddingY="6px" marginBottom="38px">
                 <RedactedField field="input">
-                  <Markdown className="markdown">
+                  <Markdown>
                     {translationState.translatedTextInput &&
                     translationState.translationActive
                       ? translationState.translatedTextInput
@@ -221,7 +225,7 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
                     }}
                   >
                     <RedactedField field="output">
-                      <Markdown className="markdown">
+                      <Markdown>
                         {translationState.translatedTextOutput &&
                         translationState.translationActive
                           ? translationState.translatedTextOutput

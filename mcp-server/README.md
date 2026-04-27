@@ -1,6 +1,6 @@
 # LangWatch MCP Server
 
-MCP server that gives AI coding agents access to LangWatch observability data, prompts, and documentation via the [Model Context Protocol](https://modelcontextprotocol.io/introduction).
+MCP server that gives AI coding agents access to LangWatch observability data, prompts, datasets, scenarios, evaluators, and documentation via the [Model Context Protocol](https://modelcontextprotocol.io/introduction).
 
 ## Quick Setup
 
@@ -57,17 +57,58 @@ The API key is required for observability and prompt tools. Documentation tools 
 
 | Tool | Description |
 |------|-------------|
-| `list_prompts` | List all prompts |
-| `get_prompt` | Get prompt with messages and version history |
-| `create_prompt` | Create a new prompt |
-| `update_prompt` | Update prompt or create new version |
+| `platform_list_prompts` | List all prompts |
+| `platform_get_prompt` | Get prompt with messages and version history |
+| `platform_create_prompt` | Create a new prompt |
+| `platform_update_prompt` | Update prompt or create new version |
+
+### Datasets (requires API key)
+
+| Tool | Description |
+|------|-------------|
+| `platform_list_datasets` | List all datasets with record counts |
+| `platform_get_dataset` | Get dataset metadata, columns, and record preview |
+| `platform_create_dataset` | Create a new dataset with optional column definitions |
+| `platform_update_dataset` | Update dataset name or column types |
+| `platform_delete_dataset` | Archive a dataset |
+| `platform_create_dataset_records` | Add records to a dataset (max 1000 per call) |
+| `platform_update_dataset_record` | Update a single record |
+| `platform_delete_dataset_records` | Delete records by IDs (max 1000 per call) |
+
+### Scenarios (requires API key)
+
+| Tool | Description |
+|------|-------------|
+| `platform_list_scenarios` | List all scenarios |
+| `platform_get_scenario` | Get scenario details |
+| `platform_create_scenario` | Create a new scenario |
+| `platform_update_scenario` | Update a scenario |
+| `platform_archive_scenario` | Archive a scenario |
+
+### Evaluators (requires API key)
+
+| Tool | Description |
+|------|-------------|
+| `platform_list_evaluators` | List all evaluators |
+| `platform_get_evaluator` | Get evaluator details |
+| `platform_create_evaluator` | Create a new evaluator |
+| `platform_update_evaluator` | Update an evaluator |
+
+### Model Providers (requires API key)
+
+| Tool | Description |
+|------|-------------|
+| `platform_list_model_providers` | List configured model providers |
+| `platform_set_model_provider` | Configure a model provider |
 
 ## Output Formats
 
-The `search_traces` and `get_trace` tools support a `format` parameter:
+Several tools support a `format` parameter:
 
-- **`digest`** (default) — AI-readable trace digest with hierarchical span tree, timing, inputs/outputs, and errors. Optimized for LLM consumption — compact and information-dense.
-- **`json`** — Full raw trace data with all fields. Useful for programmatic access or when you need the complete schema.
+- **`digest`** (default) — AI-readable markdown output. Optimized for LLM consumption — compact and information-dense.
+- **`json`** — Full raw data. Useful for programmatic access or when you need the complete schema.
+
+Supported on: `search_traces`, `get_trace`, `platform_list_datasets`, `platform_get_dataset`, `platform_list_scenarios`, `platform_get_scenario`.
 
 ## Usage Tips
 
@@ -76,6 +117,8 @@ The `search_traces` and `get_trace` tools support a `format` parameter:
 - Search returns 25 traces per page by default. Use `scrollId` from the response to paginate.
 - Analytics uses `category.name` format for metrics (e.g., `performance.completion_time`).
 - Use `create_prompt` / `update_prompt` with `createVersion: true` for safe prompt iteration.
+- Use `platform_list_datasets` then `platform_get_dataset` to browse dataset contents.
+- Dataset tools support full CRUD: create datasets, add/update/delete records, and archive datasets.
 
 ## Development
 

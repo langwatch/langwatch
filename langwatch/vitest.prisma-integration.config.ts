@@ -17,7 +17,6 @@ export default defineConfig({
       ...configDefaults.exclude,
       ".next/**/*",
       ".next-saas/**/*",
-      "saas-src/**/*",
     ],
     testTimeout: 60_000,
     hookTimeout: 60_000,
@@ -31,14 +30,6 @@ export default defineConfig({
     alias: {
       "~/": join(__dirname, "./src/"),
       "@app/": join(__dirname, "./src/server/app-layer/"),
-      "@injected-dependencies.client": join(
-        __dirname,
-        "./src/injection/injection.client.ts",
-      ),
-      "@injected-dependencies.server": join(
-        __dirname,
-        "./src/injection/injection.server.ts",
-      ),
     },
   },
 });

@@ -68,6 +68,7 @@ describe("createAdapter", () => {
         code: 'def execute(input):\n    return f"processed: {input}"',
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
+        secrets: {},
       };
 
       const adapter = createAdapter({

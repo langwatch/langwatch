@@ -120,14 +120,18 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
   const handleEditAgent = (agent: TypedAgent) => {
     if (onEdit) {
       onEdit(agent);
-    } else {
-      // Default: open appropriate editor drawer based on agent type
-      if (agent.type === "http") {
-        openDrawer("agentHttpEditor", { agentId: agent.id });
-      } else {
-        openDrawer("agentCodeEditor", { agentId: agent.id });
-      }
+      return;
     }
+    // Default: open appropriate editor drawer based on agent type
+    if (agent.type === "http") {
+      openDrawer("agentHttpEditor", { agentId: agent.id });
+      return;
+    }
+    if (agent.type === "workflow") {
+      openDrawer("agentWorkflowEditor", { agentId: agent.id });
+      return;
+    }
+    openDrawer("agentCodeEditor", { agentId: agent.id });
   };
 
   const handleDeleteAgent = (agent: TypedAgent) => {

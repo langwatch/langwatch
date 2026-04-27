@@ -7,6 +7,9 @@ class PostApiScenarioEventsBodyType1Status(str, Enum):
     FAILED = "FAILED"
     IN_PROGRESS = "IN_PROGRESS"
     PENDING = "PENDING"
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    STALLED = "STALLED"
     SUCCESS = "SUCCESS"
 
     def __str__(self) -> str:

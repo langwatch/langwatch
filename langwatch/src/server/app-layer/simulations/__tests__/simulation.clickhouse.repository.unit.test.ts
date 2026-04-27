@@ -100,7 +100,7 @@ describe("SimulationClickHouseRepository", () => {
 
       expect(clickhouse.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          query_params: { tenantId: "proj-1", scenarioSetId: "set-1" },
+          query_params: { tenantId: "proj-1", scenarioSetIds: ["set-1"] },
         }),
       );
     });
@@ -381,12 +381,12 @@ describe("SimulationClickHouseRepository", () => {
             {
               BatchRunId: "batch-1",
               MaxCreatedAt: "3000",
-              ScenarioSetId: "__internal__foo__suite",
+              NormalizedSetId: "__internal__foo__suite",
             },
             {
               BatchRunId: "batch-2",
               MaxCreatedAt: "2000",
-              ScenarioSetId: "__internal__bar__suite",
+              NormalizedSetId: "__internal__bar__suite",
             },
           ],
           [
@@ -445,12 +445,12 @@ describe("SimulationClickHouseRepository", () => {
             {
               BatchRunId: "batch-1",
               MaxCreatedAt: "3000",
-              ScenarioSetId: "__internal__a__suite",
+              NormalizedSetId: "__internal__a__suite",
             },
             {
               BatchRunId: "batch-2",
               MaxCreatedAt: "2000",
-              ScenarioSetId: "__internal__b__suite",
+              NormalizedSetId: "__internal__b__suite",
             },
           ],
           [
@@ -470,14 +470,16 @@ describe("SimulationClickHouseRepository", () => {
       });
     });
 
-    it("uses LIKE pattern for internal suites", async () => {
+    it("queries without suite-specific filtering", async () => {
       setQueryResult(clickhouse, []);
 
       await repo.getRunDataForAllSuites({ projectId: "proj-1" });
 
       const call = (clickhouse.query as ReturnType<typeof vi.fn>).mock
         .calls[0]![0] as { query: string };
-      expect(call.query).toContain("__internal__%__suite");
+      // getRunDataForAllSuites fetches all runs (suite filtering is done by getSetSummaries)
+      expect(call.query).toContain("TenantId");
+      expect(call.query).not.toContain("__internal__");
     });
   });
 

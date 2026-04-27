@@ -9,8 +9,9 @@ import { getPrompt as apiGetPrompt } from "../langwatch-api.js";
 export async function handleGetPrompt(params: {
   idOrHandle: string;
   version?: number;
+  tag?: string;
 }): Promise<string> {
-  const prompt = await apiGetPrompt(params.idOrHandle, params.version);
+  const prompt = await apiGetPrompt(params.idOrHandle, { version: params.version, tag: params.tag });
 
   const lines: string[] = [];
   lines.push(

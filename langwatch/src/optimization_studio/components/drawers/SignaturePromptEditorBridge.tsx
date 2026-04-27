@@ -16,11 +16,11 @@ import {
   buildInputMappings,
 } from "../../utils/edgeMappingUtils";
 
-/** Check whether two sets of fields have identical identifiers (order-independent). */
-function identifiersMatch(a: Field[], b: { identifier: string }[]): boolean {
+/** Check whether two sets of fields have identical identifiers and types (order-independent). */
+function fieldsMatch(a: Field[], b: { identifier: string; type: string }[]): boolean {
   if (a.length !== b.length) return false;
-  const ids = new Set(a.map((f) => f.identifier));
-  return b.every((f) => ids.has(f.identifier));
+  const fieldMap = new Map(a.map((f) => [f.identifier, f.type]));
+  return b.every((f) => fieldMap.get(f.identifier) === f.type);
 }
 
 /**
@@ -35,7 +35,7 @@ function mergeFields({
   handlePrefix,
 }: {
   oldFields: Field[];
-  newFields: { identifier: string; type: string }[];
+  newFields: { identifier: string; type: string; json_schema?: unknown }[];
   connectedEdges: Edge[];
   handlePrefix: string;
 }): Field[] {
@@ -47,6 +47,9 @@ function mergeFields({
       identifier: f.identifier,
       type: f.type as Field["type"],
       ...(existing?.value != null ? { value: existing.value } : {}),
+      ...("json_schema" in f && f.json_schema != null
+        ? { json_schema: f.json_schema }
+        : {}),
     };
   });
 
@@ -211,12 +214,22 @@ export function SignaturePromptEditorBridge({
         localPromptConfig: config,
       };
 
+      // Mirror LLM config into parameters so the canvas node display stays in sync.
+      // The canvas reads model from parameters[identifier="llm"].value (Nodes.tsx:384).
+      const oldParameters = signatureNode.data.parameters ?? [];
+      const updatedParameters = oldParameters.map((p) =>
+        p.identifier === "llm" ? { ...p, value: config.llm } : p,
+      );
+      if (updatedParameters.some((p) => p.identifier === "llm")) {
+        data.parameters = updatedParameters;
+      }
+
       const oldInputs = signatureNode.data.inputs ?? [];
       const oldOutputs = signatureNode.data.outputs ?? [];
 
       // Only update inputs when the set of identifiers actually changed.
       // Skipping avoids triggering removeInvalidEdges on drawer open.
-      if (config.inputs && !identifiersMatch(oldInputs, config.inputs)) {
+      if (config.inputs && !fieldsMatch(oldInputs, config.inputs)) {
         const currentEdges = getWorkflow().edges;
         const incomingEdges = currentEdges.filter(
           (e) => e.target === node.id && e.targetHandle?.startsWith("inputs."),
@@ -239,7 +252,7 @@ export function SignaturePromptEditorBridge({
         if (remapped) setEdges(remapped);
       }
 
-      if (config.outputs && !identifiersMatch(oldOutputs, config.outputs)) {
+      if (config.outputs && !fieldsMatch(oldOutputs, config.outputs)) {
         const currentEdges = getWorkflow().edges;
         const outgoingEdges = currentEdges.filter(
           (e) => e.source === node.id && e.sourceHandle?.startsWith("outputs."),
@@ -260,6 +273,7 @@ export function SignaturePromptEditorBridge({
       node.id,
       signatureNode.data.inputs,
       signatureNode.data.outputs,
+      signatureNode.data.parameters,
       setNode,
       updateNodeInternals,
       getWorkflow,

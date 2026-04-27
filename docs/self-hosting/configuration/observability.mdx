@@ -1,0 +1,196 @@
+---
+title: Observability & Monitoring
+description: "Monitor LangWatch infrastructure with Prometheus, Grafana, and health checks"
+---
+
+LangWatch exposes Prometheus metrics and health check endpoints for monitoring your self-hosted deployment.
+
+## Prometheus
+
+The Helm chart includes an optional Prometheus instance that scrapes metrics from LangWatch components.
+
+### Enable Prometheus
+
+```yaml
+# In your values.yaml
+app:
+  telemetry:
+    metrics:
+      enabled: true
+      apiKey:
+        value: "your-metrics-api-key"  # Authenticates scrape requests
+
+prometheus:
+  chartManaged: true
+  server:
+    retention: 30d
+    persistentVolume:
+      size: 20Gi
+```
+
+### What Gets Scraped
+
+| Component | Port | Endpoint | Metrics |
+|-----------|------|----------|---------|
+| App | 5560 | `/metrics` | HTTP request latency, error rates, active connections |
+| Workers | 2999 | `/metrics` | Queue depth, job processing time, job success/failure rates |
+
+### Access Prometheus
+
+Port-forward to the Prometheus UI:
+
+```bash
+kubectl -n langwatch port-forward svc/langwatch-prometheus-server 9090:9090
+# Open http://localhost:9090
+```
+
+### External Prometheus
+
+To use an existing Prometheus instance instead of the chart-managed one:
+
+```yaml
+prometheus:
+  chartManaged: false
+  external:
+    existingSecret: prometheus-credentials
+    secretKeys:
+      host: "host"
+      port: "port"
+      username: "username"
+      password: "password"
+```
+
+You'll need to configure your external Prometheus to scrape the LangWatch pods. Pods are annotated with:
+
+```yaml
+prometheus.io/scrape: "true"
+prometheus.io/port: "5560"    # or 2999 for workers
+prometheus.io/path: "/metrics"
+```
+
+## Grafana
+
+Connect Grafana to your Prometheus instance to visualize LangWatch metrics.
+
+### Key Dashboards
+
+Set up dashboards for:
+- **Trace throughput** — traces ingested per minute
+- **Worker queue depth** — BullMQ queue backlog (indicates processing bottleneck)
+- **ClickHouse query latency** — p50/p95/p99 query times
+- **Error rates** — HTTP 5xx responses from App and Workers
+- **Resource utilization** — CPU and memory per component
+
+### Example Queries
+
+```promql
+# Trace ingestion rate (per minute)
+rate(langwatch_traces_ingested_total[5m]) * 60
+
+# Worker queue depth
+langwatch_worker_queue_depth
+
+# HTTP error rate
+rate(http_requests_total{status=~"5.."}[5m])
+  / rate(http_requests_total[5m])
+
+# ClickHouse query p95 latency
+histogram_quantile(0.95, rate(clickhouse_query_duration_seconds_bucket[5m]))
+```
+
+## Health & Readiness Checks
+
+### Endpoints
+
+| Component | Endpoint | Method | Healthy Response |
+|-----------|----------|--------|-----------------|
+| App | `/api/health` | GET | 200 OK |
+| Workers | `/healthz` | GET | 200 OK |
+
+### Kubernetes Probes
+
+The Helm chart configures probes automatically. Default configuration:
+
+```yaml
+# Startup probe (allows time for migrations)
+startupProbe:
+  httpGet:
+    path: /api/health
+    port: 5560
+  periodSeconds: 5
+  failureThreshold: 30    # Up to 150s for startup
+
+# Liveness probe (restarts unhealthy pods)
+livenessProbe:
+  httpGet:
+    path: /api/health
+    port: 5560
+  periodSeconds: 10
+  failureThreshold: 5
+
+# Readiness probe (removes from service if unhealthy)
+readinessProbe:
+  httpGet:
+    path: /api/health
+    port: 5560
+  periodSeconds: 5
+  failureThreshold: 3
+```
+
+### Manual Health Check
+
+```bash
+# Check app health
+kubectl -n langwatch exec deploy/langwatch-app -- \
+  curl -s http://localhost:5560/api/health
+
+# Check worker health
+kubectl -n langwatch exec deploy/langwatch-workers -- \
+  curl -s http://localhost:2999/healthz
+```
+
+## Alerting Recommendations
+
+Set up alerts for these critical conditions:
+
+| Alert | Condition | Severity |
+|-------|-----------|----------|
+| Worker queue backlog | Queue depth > 10,000 for 5 min | Warning |
+| Worker queue backlog (critical) | Queue depth > 100,000 for 5 min | Critical |
+| ClickHouse memory | Memory usage > 80% of limit | Warning |
+| ClickHouse disk | Hot storage > 85% full | Critical |
+| PostgreSQL connections | Active connections > 80% of max | Warning |
+| App error rate | HTTP 5xx rate > 5% for 5 min | Critical |
+| Pod restarts | Pod restart count > 3 in 15 min | Warning |
+
+### Example Alertmanager Rule
+
+```yaml
+groups:
+  - name: langwatch
+    rules:
+      - alert: WorkerQueueBacklog
+        expr: langwatch_worker_queue_depth > 10000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Worker queue backlog is high"
+          description: "Queue depth is {{ $value }} — workers may need scaling."
+```
+
+## Prometheus Configuration Reference
+
+Full Prometheus configuration in the Helm chart:
+
+| Value | Description | Default |
+|-------|-------------|---------|
+| `prometheus.chartManaged` | Manage Prometheus via this chart | `true` |
+| `prometheus.server.retention` | Data retention period | `60d` |
+| `prometheus.server.persistentVolume.size` | Storage size | `6Gi` |
+| `prometheus.server.persistentVolume.storageClass` | Storage class | `""` (default) |
+| `prometheus.server.resources.requests.cpu` | CPU request | `200m` |
+| `prometheus.server.resources.requests.memory` | Memory request | `512Mi` |
+| `prometheus.server.resources.limits.cpu` | CPU limit | `500m` |
+| `prometheus.server.resources.limits.memory` | Memory limit | `2Gi` |
+| `prometheus.server.global.scrape_interval` | Scrape interval | `15s` |

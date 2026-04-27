@@ -1,0 +1,33 @@
+<div className="not-prose" style={{display: "flex", gap: "8px", padding: "0"}}>
+  <div>
+  <a href="https://github.com/langwatch/langwatch/tree/main/typescript-sdk" target="_blank">
+    <img src="https://img.shields.io/badge/repo-langwatch-blue?style=flat&logo=Github" noZoom alt="LangWatch TypeScript Repo" />
+  </a>
+  </div>
+
+  <div>
+  <a href="https://www.npmjs.com/package/langwatch" target="_blank">
+    <img src="https://img.shields.io/npm/v/langwatch?color=007EC6" noZoom alt="LangWatch TypeScript SDK version" />
+  </a>
+  </div>
+</div>
+
+LangWatch library is the easiest way to integrate your TypeScript application with LangWatch, the messages are synced on the background so it doesn't intercept or block your LLM calls.
+
+import LLMsTxtProtip from "/snippets/llms-txt-protip.mdx";
+
+<LLMsTxtProtip />
+
+import Prerequisites from "/snippets/prerequests-ts.mdx";
+
+<Prerequisites />
+
+## Basic Concepts
+
+- Each message triggering your LLM pipeline as a whole is captured with a [Trace](/concepts#traces).
+- A [Trace](/concepts#traces) contains multiple [Spans](/concepts#spans), which are the steps inside your pipeline.
+  - A span can be an LLM call, a database query for a RAG retrieval, or a simple function transformation.
+  - Different types of [Spans](/concepts#spans) capture different parameters.
+  - [Spans](/concepts#spans) can be nested to capture the pipeline structure.
+- [Traces](/concepts#traces) can be grouped together on LangWatch Dashboard by having the same [`thread_id`](/concepts#threads) in their metadata, making the individual messages become part of a conversation.
+  - It is also recommended to provide the [`user_id`](/concepts#user-id) metadata to track user analytics.

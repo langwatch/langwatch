@@ -1,0 +1,122 @@
+---
+title: The Foundry
+description: "Interactive trace playground for building and sending synthetic traces"
+---
+
+**The Foundry** (`/ops/foundry`) is an interactive trace builder and sender. It lets you construct complete trace hierarchies — LLM calls, tool invocations, RAG retrievals, agent steps — and send them to any LangWatch project. Use it to test ingestion pipelines, reproduce issues, or generate sample data.
+
+<Frame>
+<img src="/images/ops/foundry.png" alt="The Foundry trace builder" />
+</Frame>
+
+## Layout
+
+The Foundry is split into two panels:
+
+**Left sidebar:**
+- [Target project](#target-project) selector
+- Trace settings (service name, user ID, metadata)
+- [Span tree](#span-tree) — hierarchical view of all spans
+- [Execution controls](#sending-traces) — send button, batch settings, execution log
+
+**Main area** with four tabs:
+- [Editor](#span-editor) — form-based span attribute editing
+- [Waterfall](#waterfall-view) — timeline visualization
+- [Graph](#graph-view) — DAG of span relationships
+- [JSON](#json-view) — raw trace configuration
+
+## Target Project
+
+The project selector at the top of the sidebar determines where traces are sent. It lists all projects you have access to, grouped by organization. Selecting a project automatically uses its API key for execution.
+
+## Span Tree
+
+The span tree shows all spans in the trace as a nested hierarchy. Each span displays its type icon, name, and type badge.
+
+**Supported span types:**
+- **LLM** — language model calls with messages, model, temperature
+- **Agent** — autonomous agent steps
+- **Tool** — tool/function invocations
+- **RAG** — retrieval-augmented generation with document contexts
+- **Chain** — multi-step processing chains
+- **Prompt** — prompt template rendering
+- **Guardrail** — safety/validation checks
+- **Generic** — any other operation
+
+**Actions:**
+- Click a span to select it for editing
+- Hover to reveal quick actions: reorder (up/down), duplicate, delete
+- Use the **"Add Span"** button to add child spans under any parent
+
+## Span Editor
+
+When a span is selected, the Editor tab shows a form with:
+
+- **Name** and **Type** — identity of the span
+- **Duration** and **Offset** (ms) — timing relative to the parent span
+- **Status** — OK, Error, or Unset
+- **Exception** — error message and stack trace (appears when status is Error)
+- **Input / Output** — data flowing through the span (text or JSON)
+- **Type-specific fields** — e.g., model and temperature for LLM spans, documents for RAG spans
+- **Custom Attributes** — arbitrary key-value pairs
+
+<Frame>
+<img src="/images/ops/foundry-editor.png" alt="Span editor form" />
+</Frame>
+
+## Waterfall View
+
+A horizontal timeline showing when each span executed relative to the trace start. Bar width represents duration, position represents offset, and indentation shows parent-child hierarchy. Color coding matches span type.
+
+<Frame>
+<img src="/images/ops/foundry-waterfall.png" alt="Waterfall timeline visualization" />
+</Frame>
+
+## Graph View
+
+A directed acyclic graph (DAG) showing span relationships as nodes and edges. Nodes display the span name, type, and duration. The graph auto-layouts to minimize overlap, with pan and zoom controls.
+
+## JSON View
+
+A Monaco code editor showing the full trace configuration as JSON. You can edit the JSON directly — changes are validated in real-time and reflected in the other views.
+
+Buttons for **Format**, **Copy**, and **Reset** are available in the header.
+
+## Sending Traces
+
+The execution controls at the bottom of the sidebar let you send the configured trace:
+
+- **Run N times** — batch count (1–100)
+- **Stagger (ms)** — delay between batch items to avoid overwhelming the system
+- **Send Traces** — executes the batch
+
+The **execution log** below the button shows the status of each send:
+- Pending, success (with copyable trace ID), or error
+- Click a successful entry to copy its trace ID for lookup in the main LangWatch UI
+
+## Presets
+
+Use the **preset picker** in the header to save and load trace templates. Presets store the full span tree and trace settings, letting you quickly switch between common test scenarios.
+
+## Common Workflows
+
+### Testing trace ingestion after a config change
+
+1. Select the target project
+2. Load a preset or build a simple trace (one LLM span)
+3. Click **Send Traces**
+4. Check the execution log for success
+5. Verify the trace appears in the LangWatch Messages view
+
+### Reproducing a customer issue
+
+1. Build a trace that matches the customer's span structure
+2. Set appropriate input/output values and error states
+3. Send to a test project
+4. Use [Deja View](/self-hosting/ops/dejaview) to verify the event stream matches
+
+### Load testing ingestion
+
+1. Build a representative trace
+2. Set **Run N times** to 100 with a stagger of 50ms
+3. Send and monitor the [Ops Dashboard](/self-hosting/ops/dashboard) for throughput and error rates

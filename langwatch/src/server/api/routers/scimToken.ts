@@ -60,4 +60,5 @@ export const scimTokenRouter = createTRPCRouter({
       });
       return { success: true };
     }),
+
 });

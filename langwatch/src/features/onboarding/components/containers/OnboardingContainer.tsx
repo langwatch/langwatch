@@ -10,7 +10,7 @@ import {
 import { ArrowLeft, ArrowRight, LogOut } from "lucide-react";
 import { Link } from "~/components/ui/link";
 import { AnimatePresence, motion } from "motion/react";
-import { signOut } from "next-auth/react";
+import { signOut } from "~/utils/auth-client";
 import { useAnalytics } from "react-contextual-analytics";
 import { FullLogo } from "~/components/icons/FullLogo";
 import { Tooltip } from "~/components/ui/tooltip";

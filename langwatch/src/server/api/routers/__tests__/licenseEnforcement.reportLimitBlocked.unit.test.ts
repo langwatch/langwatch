@@ -10,8 +10,45 @@
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { z } from "zod";
+import { createInnerTRPCContext } from "../../trpc";
 
-const mockCheckLimit = vi.fn();
+vi.mock("~/env.mjs", () => ({
+  env: {
+    NEXTAUTH_PROVIDER: "email",
+    DEMO_PROJECT_ID: undefined,
+  },
+}));
+
+vi.mock("~/server/auditLog", () => ({
+  auditLog: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("~/utils/logger/server", () => ({
+  createLogger: vi.fn(() => ({
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    child: vi.fn(),
+  })),
+}));
+
+const {
+  mockCheckLimit,
+  mockNotifyResourceLimitReached,
+  mockUsageLimits,
+  mockCaptureException,
+} = vi.hoisted(() => {
+  const mockNotifyResourceLimitReached = vi.fn();
+  return {
+    mockCheckLimit: vi.fn(),
+    mockNotifyResourceLimitReached,
+    mockUsageLimits: {
+      notifyResourceLimitReached: mockNotifyResourceLimitReached,
+    },
+    mockCaptureException: vi.fn(),
+  };
+});
 
 vi.mock("~/server/license-enforcement", () => {
   const limitTypes = [
@@ -41,18 +78,12 @@ vi.mock("~/server/license-enforcement", () => {
   };
 });
 
-const mockNotifyResourceLimitReached = vi.fn();
-const mockUsageLimits = {
-  notifyResourceLimitReached: mockNotifyResourceLimitReached,
-};
-
 vi.mock("~/server/app-layer/app", () => ({
   getApp: () => ({
     usageLimits: mockUsageLimits,
   }),
 }));
 
-const mockCaptureException = vi.fn();
 vi.mock("~/utils/posthogErrorCapture", () => ({
   captureException: mockCaptureException,
 }));
@@ -82,13 +113,13 @@ async function callReportLimitBlocked({
   organizationId: string;
   limitType: string;
 }) {
-  const caller = licenseEnforcementRouter.createCaller({
-    prisma: {} as any,
+  const ctx = createInnerTRPCContext({
     session: {
       user: { id: "user-1", email: "test@example.com", name: "Test User" },
       expires: "",
     },
-  } as any);
+  });
+  const caller = licenseEnforcementRouter.createCaller(ctx);
   return caller.reportLimitBlocked({
     organizationId,
     limitType: limitType as any,

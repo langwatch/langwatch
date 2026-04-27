@@ -46,6 +46,8 @@ export type State = Workflow & {
     | "closed"
     | undefined;
   playgroundOpen: boolean;
+  /** True while the user is dragging a node. Used to suppress drawer opening during drag. */
+  isDraggingNode: boolean;
 };
 
 export type WorkflowStore = State & {
@@ -121,6 +123,7 @@ export type WorkflowStore = State & {
     request: "evaluations" | "optimizations" | "closed" | undefined,
   ) => void;
   setPlaygroundOpen: (open: boolean) => void;
+  setIsDraggingNode: (dragging: boolean) => void;
   stopWorkflowIfRunning: (message: string | undefined) => void;
   checkIfUnreachableErrorMessage: (message: string | undefined) => void;
 };
@@ -161,6 +164,7 @@ export const initialState: State = {
   currentVersionId: undefined,
   openResultsPanelRequest: undefined,
   playgroundOpen: false,
+  isDraggingNode: false,
 };
 
 export const getWorkflow = (state: State) => {
@@ -946,6 +950,9 @@ export const store = (
   },
   setPlaygroundOpen: (open: boolean) => {
     set({ playgroundOpen: open });
+  },
+  setIsDraggingNode: (dragging: boolean) => {
+    set({ isDraggingNode: dragging });
   },
   stopWorkflowIfRunning: (message: string | undefined) => {
     get().setWorkflowExecutionState({

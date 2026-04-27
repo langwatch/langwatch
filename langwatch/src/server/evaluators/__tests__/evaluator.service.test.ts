@@ -7,7 +7,11 @@
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { Evaluator, PrismaClient } from "@prisma/client";
-import { EvaluatorService, type EvaluatorField } from "../evaluator.service";
+import {
+  EvaluatorService,
+  STANDARD_EVALUATOR_OUTPUT_FIELDS,
+  type EvaluatorField,
+} from "../evaluator.service";
 import type { EvaluatorRepository } from "../evaluator.repository";
 
 // Mock AVAILABLE_EVALUATORS
@@ -49,6 +53,23 @@ vi.mock("~/server/evaluations/evaluators.generated", () => ({
     },
   },
 }));
+
+describe("STANDARD_EVALUATOR_OUTPUT_FIELDS", () => {
+  it("does not include details (regression: sticky details bug #2514)", () => {
+    const identifiers = STANDARD_EVALUATOR_OUTPUT_FIELDS.map(
+      (f) => f.identifier,
+    );
+    expect(identifiers).not.toContain("details");
+  });
+
+  it("includes passed, score, and label only", () => {
+    expect(STANDARD_EVALUATOR_OUTPUT_FIELDS).toEqual([
+      { identifier: "passed", type: "bool" },
+      { identifier: "score", type: "float" },
+      { identifier: "label", type: "str" },
+    ]);
+  });
+});
 
 describe("EvaluatorService", () => {
   describe("field computation for built-in evaluators", () => {
@@ -253,7 +274,6 @@ describe("EvaluatorService", () => {
         { identifier: "passed", type: "bool" },
         { identifier: "score", type: "float" },
         { identifier: "label", type: "str" },
-        { identifier: "details", type: "str" },
       ]);
     });
 

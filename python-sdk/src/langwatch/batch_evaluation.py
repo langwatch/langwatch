@@ -24,6 +24,7 @@ from tqdm import tqdm
 import pandas as pd
 
 from langwatch.types import Money
+from langwatch.utils.auth import build_auth_headers
 from langwatch.utils.exceptions import better_raise_for_status
 
 
@@ -139,7 +140,7 @@ class BatchEvaluation:
         with httpx.Client(timeout=60) as client:
             response = client.post(
                 f"{langwatch.get_endpoint()}/api/experiment/init",
-                headers={"X-Auth-Token": langwatch.get_api_key() or ""},
+                headers=build_auth_headers(langwatch.get_api_key() or ""),
                 json={
                     "experiment_name": self.experiment,
                     "experiment_slug": self.experiment,
@@ -365,7 +366,7 @@ class BatchEvaluation:
     def post_results(cls, api_key: str, body: dict):
         response = httpx.post(
             f"{langwatch.get_endpoint()}/api/evaluations/batch/log_results",
-            headers={"Authorization": f"Bearer {api_key}"},
+            headers=build_auth_headers(api_key),
             json=body,
             timeout=60,
         )
@@ -407,7 +408,7 @@ async def run_evaluation(
 
         request_params = {
             "url": langwatch.get_endpoint() + f"/api/evaluations/{evaluation}/evaluate",
-            "headers": {"X-Auth-Token": langwatch.get_api_key()},
+            "headers": build_auth_headers(langwatch.get_api_key() or ""),
             "json": json_data,
         }
 
@@ -458,7 +459,7 @@ def get_dataset(
 ) -> list[DatasetRecord]:
     request_params = {
         "url": langwatch.get_endpoint() + f"/api/dataset/{slug}",
-        "headers": {"X-Auth-Token": str(langwatch.get_api_key())},
+        "headers": build_auth_headers(str(langwatch.get_api_key() or "")),
     }
 
     with httpx.Client(timeout=300) as client:

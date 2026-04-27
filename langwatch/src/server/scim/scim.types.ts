@@ -72,3 +72,56 @@ export const scimCreateUserRequestSchema = z.object({
 });
 
 export type ScimCreateUserRequest = z.infer<typeof scimCreateUserRequestSchema>;
+
+// SCIM Group types
+
+export interface ScimGroup {
+  schemas: ["urn:ietf:params:scim:schemas:core:2.0:Group"];
+  id: string;
+  displayName: string;
+  members?: Array<{
+    value: string;
+    display?: string;
+  }>;
+  meta: {
+    resourceType: "Group";
+    created: string;
+    lastModified: string;
+  };
+}
+
+export const scimGroupMemberSchema = z.object({
+  value: z.string(),
+  display: z.string().optional(),
+});
+
+export const scimCreateGroupRequestSchema = z.object({
+  schemas: z.array(z.string()),
+  displayName: z.string(),
+  members: z.array(scimGroupMemberSchema).optional(),
+});
+
+export type ScimCreateGroupRequest = z.infer<typeof scimCreateGroupRequestSchema>;
+
+export const scimReplaceGroupRequestSchema = z.object({
+  schemas: z.array(z.string()),
+  displayName: z.string(),
+  members: z.array(scimGroupMemberSchema).optional(),
+});
+
+export type ScimReplaceGroupRequest = z.infer<typeof scimReplaceGroupRequestSchema>;
+
+/**
+ * Type guard that checks whether a value is a SCIM 2.0 Error response.
+ * Shared across all SCIM route handlers.
+ */
+export function isScimError(value: unknown): value is ScimError {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "schemas" in value &&
+    Array.isArray((value as ScimError).schemas) &&
+    (value as ScimError).schemas[0] ===
+      "urn:ietf:params:scim:api:messages:2.0:Error"
+  );
+}

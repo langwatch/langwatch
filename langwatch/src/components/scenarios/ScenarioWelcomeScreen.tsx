@@ -1,9 +1,6 @@
 import { Box, Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { FlaskConical, RefreshCw, ArrowRight } from "lucide-react";
-
-type ScenarioWelcomeScreenProps = {
-  onProceed: () => void;
-};
+import { Dialog } from "../ui/dialog";
 
 const CAPABILITIES = [
   {
@@ -21,15 +18,11 @@ const CAPABILITIES = [
 ] as const;
 
 /**
- * Welcome onboarding screen shown when a user creates their first scenario.
- * Explains what scenarios do and highlights key capabilities before proceeding
- * to the creation flow.
+ * Shared welcome content used by both the inline page view and the modal.
  */
-export function ScenarioWelcomeScreen({
-  onProceed,
-}: ScenarioWelcomeScreenProps) {
+function ScenarioWelcomeContent({ onProceed }: { onProceed: () => void }) {
   return (
-    <VStack gap={8} align="center" py={16} px={8} maxW="640px" mx="auto">
+    <VStack gap={8} align="center">
       <VStack gap={3} textAlign="center">
         <Heading as="h2" size="xl">
           Welcome to Scenarios
@@ -77,5 +70,46 @@ export function ScenarioWelcomeScreen({
         Create Your First Scenario <ArrowRight size={16} />
       </Button>
     </VStack>
+  );
+}
+
+/**
+ * Inline welcome screen rendered directly in the page layout
+ * when a user has zero scenarios and hasn't seen the welcome before.
+ */
+export function ScenarioWelcomeScreen({
+  onProceed,
+}: {
+  onProceed: () => void;
+}) {
+  return (
+    <VStack py={16} px={8} maxW="640px" mx="auto">
+      <ScenarioWelcomeContent onProceed={onProceed} />
+    </VStack>
+  );
+}
+
+/**
+ * Modal version of the welcome screen, shown when "New Scenario" is clicked
+ * from any entry point and the user hasn't completed onboarding yet.
+ */
+export function ScenarioWelcomeModal({
+  open,
+  onOpenChange,
+  onProceed,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onProceed: () => void;
+}) {
+  return (
+    <Dialog.Root open={open} onOpenChange={(e) => onOpenChange(e.open)} placement="center" size="lg">
+      <Dialog.Content maxWidth="640px">
+        <Dialog.CloseTrigger />
+        <Dialog.Body py={8} px={8}>
+          <ScenarioWelcomeContent onProceed={onProceed} />
+        </Dialog.Body>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }

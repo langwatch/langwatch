@@ -78,7 +78,7 @@ export function buildMessageLimitInfo(
  * Follows Interface Segregation Principle - only what we need.
  */
 export interface ITraceUsageService {
-  getCurrentMonthCount(params: { organizationId: string }): Promise<number>;
+  getCurrentMonthCount(params: { organizationId: string }): Promise<number | "unlimited">;
 }
 
 /**
@@ -96,7 +96,7 @@ export interface IUsageUnitResolver {
  */
 export interface UsageStats {
   projectsCount: number;
-  currentMonthMessagesCount: number;
+  currentMonthMessagesCount: number | null;
   currentMonthCost: number;
   activePlan: PlanInfo;
   maxMonthlyUsageLimit: number;
@@ -109,7 +109,6 @@ export interface UsageStats {
   evaluatorsCount: number;
   agentsCount: number;
   experimentsCount: number;
-  evaluationsCreditUsed: number;
   messageLimitInfo: MessageLimitInfo;
   usageUnit: UsageUnit;
 }
@@ -170,7 +169,6 @@ export class UsageStatsService {
       evaluatorsCount,
       agentsCount,
       experimentsCount,
-      evaluationsCreditUsed,
       usageUnit,
     ] = await Promise.all([
       this.repository.getProjectCount(organizationId),
@@ -187,18 +185,19 @@ export class UsageStatsService {
       this.repository.getEvaluatorCount(organizationId),
       this.repository.getAgentCount(organizationId),
       this.repository.getExperimentCount(organizationId),
-      this.repository.getEvaluationsCreditUsed(organizationId),
       this.usageUnitResolver.getResolvedUsageUnit({ organizationId }),
     ]);
 
+    const resolvedCount = currentMonthMessagesCount === "unlimited" ? null : currentMonthMessagesCount;
+
     const messageLimitInfo = buildMessageLimitInfo(
-      currentMonthMessagesCount,
+      resolvedCount ?? 0,
       activePlan.maxMessagesPerMonth,
     );
 
     return {
       projectsCount,
-      currentMonthMessagesCount,
+      currentMonthMessagesCount: resolvedCount,
       currentMonthCost,
       activePlan,
       maxMonthlyUsageLimit,
@@ -211,7 +210,6 @@ export class UsageStatsService {
       evaluatorsCount,
       agentsCount,
       experimentsCount,
-      evaluationsCreditUsed,
       messageLimitInfo,
       usageUnit,
     };

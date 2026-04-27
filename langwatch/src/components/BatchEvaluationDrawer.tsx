@@ -14,7 +14,7 @@ import {
 } from "@chakra-ui/react";
 import { EvaluationExecutionMode, type Monitor } from "@prisma/client";
 import type { JsonObject } from "@prisma/client/runtime/library";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useEffect, useState } from "react";
 import { RenderCode } from "~/components/code/RenderCode";
 import { Drawer } from "~/components/ui/drawer";

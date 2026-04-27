@@ -154,19 +154,23 @@ describe("filter-translator", () => {
     });
 
     describe("span filters", () => {
-      it("translates spans.type filter with parameterized EXISTS subquery", () => {
+      it("translates spans.type filter with parameterized IN subquery", () => {
         const result = translateFilter("spans.type", ["llm", "agent"]);
-        expect(result.whereClause).toContain("EXISTS");
+        // Regression guard: issue #2660
+        expect(result.whereClause).not.toContain("EXISTS");
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
         expect(result.whereClause).toContain("stored_spans");
         expect(result.whereClause).toContain("langwatch.span.type");
         expect(result.whereClause).toContain("{spanTypes_0:Array(String)}");
         expect(result.params).toEqual({ spanTypes_0: ["llm", "agent"] });
-        expect(result.usesExistsSubquery).toBe(true);
       });
 
-      it("translates spans.model filter with parameterized EXISTS subquery", () => {
+      it("translates spans.model filter with parameterized IN subquery", () => {
         const result = translateFilter("spans.model", ["gpt-4", "claude-3"]);
-        expect(result.whereClause).toContain("EXISTS");
+        expect(result.whereClause).not.toContain("EXISTS");
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
         expect(result.whereClause).toContain("gen_ai.request.model");
         expect(result.whereClause).toContain("{models_0:Array(String)}");
         expect(result.params).toEqual({ models_0: ["gpt-4", "claude-3"] });
@@ -174,21 +178,68 @@ describe("filter-translator", () => {
     });
 
     describe("evaluation filters", () => {
-      it("translates evaluations.evaluator_id filter with parameterized EXISTS", () => {
+      it("translates evaluations.evaluator_id filter with parameterized IN subquery", () => {
         const result = translateFilter("evaluations.evaluator_id", [
           "eval-1",
           "eval-2",
         ]);
-        expect(result.whereClause).toContain("EXISTS");
+        expect(result.whereClause).not.toContain("EXISTS");
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
         expect(result.whereClause).toContain("evaluation_runs");
-        expect(result.whereClause).toContain("es.EvaluatorId IN ({evaluatorIds_0:Array(String)})");
+        expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
         expect(result.params).toEqual({ evaluatorIds_0: ["eval-1", "eval-2"] });
       });
 
-      it("translates evaluations.passed filter with parameterized query", () => {
+      it("translates evaluations.evaluator_id.has_passed filter with Passed IS NOT NULL predicate", () => {
+        const result = translateFilter("evaluations.evaluator_id.has_passed", [
+          "eval-1",
+        ]);
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
+        expect(result.whereClause).toContain("AND Passed IS NOT NULL");
+        expect(result.params).toEqual({ evaluatorIds_0: ["eval-1"] });
+      });
+
+      it("translates evaluations.evaluator_id.has_score filter with Score IS NOT NULL predicate", () => {
+        const result = translateFilter("evaluations.evaluator_id.has_score", [
+          "eval-1",
+        ]);
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
+        expect(result.whereClause).toContain("AND Score IS NOT NULL");
+        expect(result.params).toEqual({ evaluatorIds_0: ["eval-1"] });
+      });
+
+      it("translates evaluations.evaluator_id.has_label filter with Label exclusion predicate", () => {
+        const result = translateFilter("evaluations.evaluator_id.has_label", [
+          "eval-1",
+        ]);
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
+        expect(result.whereClause).toContain("AND Label IS NOT NULL");
+        expect(result.whereClause).toContain("AND Label != ''");
+        expect(result.whereClause).toContain("AND Label NOT IN ('succeeded', 'failed')");
+        expect(result.params).toEqual({ evaluatorIds_0: ["eval-1"] });
+      });
+
+      it("translates base evaluations.evaluator_id without additional predicates", () => {
+        const result = translateFilter("evaluations.evaluator_id", [
+          "eval-1",
+        ]);
+        expect(result.whereClause).toContain("EvaluatorId IN ({evaluatorIds_0:Array(String)})");
+        expect(result.whereClause).not.toContain("Passed IS NOT NULL");
+        expect(result.whereClause).not.toContain("Score IS NOT NULL");
+        expect(result.whereClause).not.toContain("Label IS NOT NULL");
+      });
+
+      it("translates evaluations.passed filter with parameterized IN subquery", () => {
         const result = translateFilter("evaluations.passed", ["true"]);
-        expect(result.whereClause).toContain("EXISTS");
-        expect(result.whereClause).toContain("es.Passed IN ({evalPassed_0:Array(UInt8)})");
+        // Regression guard: issue #2660
+        expect(result.whereClause).not.toContain("EXISTS");
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("Passed IN ({evalPassed_0:Array(UInt8)})");
         expect(result.params).toEqual({ evalPassed_0: [1] });
       });
 
@@ -198,8 +249,9 @@ describe("filter-translator", () => {
           ["true"],
           "eval-123"
         );
-        expect(result.whereClause).toContain("es.EvaluatorId = {evaluatorId_1:String}");
-        expect(result.whereClause).toContain("es.Passed IN ({evalPassed_0:Array(UInt8)})");
+        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("EvaluatorId = {evaluatorId_1:String}");
+        expect(result.whereClause).toContain("Passed IN ({evalPassed_0:Array(UInt8)})");
         expect(result.params).toEqual({
           evalPassed_0: [1],
           evaluatorId_1: "eval-123",
@@ -212,49 +264,62 @@ describe("filter-translator", () => {
           ["0.5", "1.0"],
           "eval-123"
         );
-        expect(result.whereClause).toContain("es.Score >= {scoreMin_0:Float64}");
-        expect(result.whereClause).toContain("es.Score <= {scoreMax_1:Float64}");
+        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("Score >= {scoreMin_0:Float64}");
+        expect(result.whereClause).toContain("Score <= {scoreMax_1:Float64}");
         expect(result.params).toHaveProperty("scoreMin_0", 0.5);
         expect(result.params).toHaveProperty("scoreMax_1", 1);
         expect(result.params).toHaveProperty("evaluatorId_2", "eval-123");
       });
 
-      it("translates evaluations.label filter with parameterized query", () => {
+      it("translates evaluations.label filter with parameterized IN subquery", () => {
         const result = translateFilter(
           "evaluations.label",
           ["good", "bad"],
           "eval-123"
         );
-        expect(result.whereClause).toContain("es.Label IN ({evalLabels_0:Array(String)})");
+        // Regression guard: issue #2660
+        expect(result.whereClause).not.toContain("EXISTS");
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("Label IN ({evalLabels_0:Array(String)})");
         expect(result.params).toHaveProperty("evalLabels_0", ["good", "bad"]);
         expect(result.params).toHaveProperty("evaluatorId_1", "eval-123");
       });
 
-      it("translates evaluations.state filter with parameterized query", () => {
+      it("translates evaluations.state filter with parameterized IN subquery", () => {
         const result = translateFilter("evaluations.state", ["processed"]);
-        expect(result.whereClause).toContain("es.Status IN ({evalStates_0:Array(String)})");
+        expect(result.whereClause).not.toContain("EXISTS");
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("Status IN ({evalStates_0:Array(String)})");
         expect(result.params).toEqual({ evalStates_0: ["processed"] });
       });
     });
 
     describe("event filters", () => {
-      it("translates events.event_type filter with parameterized query", () => {
+      it("translates events.event_type filter with parameterized IN subquery", () => {
         const result = translateFilter("events.event_type", [
           "thumbs_up_down",
           "feedback",
         ]);
-        expect(result.whereClause).toContain("EXISTS");
-        expect(result.whereClause).toContain("hasAny(ss.\"Events.Name\", {eventTypes_0:Array(String)})");
+        // Regression guard: issue #2660
+        expect(result.whereClause).not.toContain("EXISTS");
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
+        expect(result.whereClause).toContain("hasAny(\"Events.Name\", {eventTypes_0:Array(String)})");
         expect(result.params).toEqual({ eventTypes_0: ["thumbs_up_down", "feedback"] });
       });
 
-      it("translates events.metrics.key filter with parameterized query", () => {
+      it("translates events.metrics.key filter with parameterized IN subquery", () => {
         const result = translateFilter(
           "events.metrics.key",
           ["vote"],
           "thumbs_up_down"
         );
-        expect(result.whereClause).toContain("EXISTS");
+        expect(result.whereClause).not.toContain("EXISTS");
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
         expect(result.whereClause).toContain("arrayExists");
         expect(result.whereClause).toContain("mapContains");
         expect(result.whereClause).toContain("{metricKeys_0:Array(String)}");
@@ -269,7 +334,9 @@ describe("filter-translator", () => {
           "thumbs_up_down",
           "vote"
         );
-        expect(result.whereClause).toContain("EXISTS");
+        expect(result.whereClause).not.toContain("EXISTS");
+        expect(result.whereClause).toContain("ts.TraceId IN");
+        expect(result.whereClause).toContain("TenantId = {tenantId:String}");
         expect(result.whereClause).toContain("toFloat64OrNull");
         expect(result.whereClause).toContain(">= {metricMin_1:Float64}");
         expect(result.whereClause).toContain("<= {metricMax_2:Float64}");
@@ -283,14 +350,13 @@ describe("filter-translator", () => {
     describe("annotation filters", () => {
       it("translates annotations.hasAnnotation filter for true", () => {
         const result = translateFilter("annotations.hasAnnotation", ["true"]);
-        expect(result.whereClause).toContain("ts.HasAnnotation = 1");
+        expect(result.whereClause).toContain("ts.HasAnnotation = true");
         expect(result.params).toEqual({});
       });
 
       it("translates annotations.hasAnnotation filter for false", () => {
         const result = translateFilter("annotations.hasAnnotation", ["false"]);
-        expect(result.whereClause).toContain("ts.HasAnnotation = 0");
-        expect(result.whereClause).toContain("IS NULL");
+        expect(result.whereClause).toContain("ts.HasAnnotation = false");
         expect(result.params).toEqual({});
       });
     });
@@ -390,8 +456,8 @@ describe("filter-translator", () => {
         },
       };
       const result = translateAllFilters(filters);
-      expect(result.whereClause).toContain("es.EvaluatorId = {evaluatorId_1:String}");
-      expect(result.whereClause).toContain("es.Passed IN ({evalPassed_0:Array(UInt8)})");
+      expect(result.whereClause).toContain("EvaluatorId = {evaluatorId_1:String}");
+      expect(result.whereClause).toContain("Passed IN ({evalPassed_0:Array(UInt8)})");
       expect(result.params).toHaveProperty("evaluatorId_1", "eval-123");
       expect(result.params).toHaveProperty("evalPassed_0", [1]);
     });

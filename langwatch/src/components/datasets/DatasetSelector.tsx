@@ -62,7 +62,7 @@ export function DatasetSelector<T extends { datasetId: string }>({
         </Select.Trigger>
         <Select.Content portalled={false}>
           {datasetCollection.items.map((dataset) => (
-            <Select.Item key={dataset.value} item={dataset} marginY={3}>
+            <Select.Item key={dataset.value} item={dataset}>
               {dataset.label}
             </Select.Item>
           ))}

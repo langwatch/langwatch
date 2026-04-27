@@ -495,4 +495,33 @@ describe("workflowStoreCore", () => {
       });
     });
   });
+
+  describe("isDraggingNode", () => {
+    let testStore: StoreApi<WorkflowStore>;
+
+    beforeEach(() => {
+      testStore = createStore<WorkflowStore>(storeCreator as any);
+    });
+
+    describe("when initialized", () => {
+      it("defaults to false", () => {
+        expect(testStore.getState().isDraggingNode).toBe(false);
+      });
+    });
+
+    describe("when setIsDraggingNode is called with true", () => {
+      it("sets isDraggingNode to true", () => {
+        testStore.getState().setIsDraggingNode(true);
+        expect(testStore.getState().isDraggingNode).toBe(true);
+      });
+    });
+
+    describe("when setIsDraggingNode is called with false after dragging", () => {
+      it("resets isDraggingNode to false", () => {
+        testStore.getState().setIsDraggingNode(true);
+        testStore.getState().setIsDraggingNode(false);
+        expect(testStore.getState().isDraggingNode).toBe(false);
+      });
+    });
+  });
 });

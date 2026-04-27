@@ -1,4 +1,5 @@
 import {
+  EmptyState,
   Heading,
   HStack,
   Separator,
@@ -6,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import React, { useEffect, useRef, useState } from "react";
 import { HelpCircle } from "react-feather";
 import { useFilterParams } from "../../hooks/useFilterParams";
@@ -227,15 +228,23 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
                 </React.Fragment>
               ))
           ) : (
-            <HStack>
-              <Text>No topics found</Text>
-              <Tooltip content="Topics are assigned automatically to a group of messages. If you already have enough messages, it may take a day topics to be generated">
-                <HelpCircle width="14px" />
-              </Tooltip>
-            </HStack>
+            <EmptyState.Root size="sm">
+              <EmptyState.Content>
+                <VStack textAlign="center">
+                  <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
+                  <EmptyState.Description textStyle="xs">
+                    Topics are assigned automatically after enough messages are collected.{" "}
+                  </EmptyState.Description>
+                </VStack>
+              </EmptyState.Content>
+            </EmptyState.Root>
           )
         ) : (
-          <Text>No topics found</Text>
+          <EmptyState.Root size="sm">
+            <EmptyState.Content>
+              <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
+            </EmptyState.Content>
+          </EmptyState.Root>
         )}
       </VStack>
     </VStack>

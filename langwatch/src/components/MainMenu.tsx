@@ -1,9 +1,23 @@
-import { Box, Text, VStack } from "@chakra-ui/react";
+import { Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
-import { useRouter } from "next/router";
+import {
+  Activity,
+  Anvil,
+  Film,
+  Gauge,
+  History,
+  KeyRound,
+  LineChart,
+  Plug,
+  Shield,
+  Zap,
+} from "lucide-react";
+import { useRouter } from "~/utils/compat/next-router";
 import React, { useState } from "react";
 import { useFeatureFlag } from "../hooks/useFeatureFlag";
+import { useOpsPermission } from "../hooks/useOpsPermission";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
+import { usePublicEnv } from "../hooks/usePublicEnv";
 import { api } from "../utils/api";
 import { featureIcons } from "../utils/featureIcons";
 import { projectRoutes } from "../utils/routes";
@@ -26,7 +40,7 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const { project, hasPermission, isPublicRoute, organization } =
+  const { project, hasPermission, isPublicRoute } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
 
@@ -35,9 +49,13 @@ export const MainMenu = React.memo(function MainMenu({
     { enabled: !!project?.id },
   );
 
-  const { enabled: showSuites } = useFeatureFlag(
-    "release_ui_suites_enabled",
-    { projectId: project?.id, organizationId: organization?.id },
+  // AI Gateway menu is feature-flagged pre-GA. Flip it on for internal
+  // dogfooding by setting FEATURE_FLAG_FORCE_ENABLE=release_ui_ai_gateway_menu_enabled
+  // on the server (see featureFlagService.posthog.ts). Otherwise targeting
+  // is driven by PostHog release conditions.
+  const { enabled: gatewayMenuEnabled } = useFeatureFlag(
+    "release_ui_ai_gateway_menu_enabled",
+    { projectId: project?.id, enabled: !!project },
   );
 
   // In compact mode, show expanded view on hover
@@ -144,9 +162,7 @@ export const MainMenu = React.memo(function MainMenu({
                         project.slug,
                       )
                     : "/auth/signin",
-                  isActive: router.pathname.includes(
-                    "/simulations/scenarios",
-                  ),
+                  isActive: router.pathname.includes("/simulations/scenarios"),
                 },
                 {
                   icon: featureIcons.simulation_runs.icon,
@@ -159,25 +175,8 @@ export const MainMenu = React.memo(function MainMenu({
                     : "/auth/signin",
                   isActive:
                     router.pathname.includes("/simulations") &&
-                    !router.pathname.includes("/simulations/scenarios") &&
-                    !router.pathname.includes("/simulations/suites"),
+                    !router.pathname.includes("/simulations/scenarios"),
                 },
-                ...(showSuites
-                  ? [
-                      {
-                        icon: featureIcons.suites.icon,
-                        label: projectRoutes.suites.title,
-                        href: project
-                          ? projectRoutes.suites.path.replace(
-                              "[project]",
-                              project.slug,
-                            )
-                          : "/auth/signin",
-                        isActive: router.pathname.includes("/simulations/suites"),
-                        beta: "This feature is provided in beta and is still under development. By using it, you acknowledge it may contain errors, change without notice, or be discontinued at any time.",
-                      },
-                    ]
-                  : []),
               ]}
             />
 
@@ -259,6 +258,121 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/datasets")}
               showLabel={showExpanded}
             />
+
+            {gatewayMenuEnabled && hasPermission("virtualKeys:view") && project && (
+              <>
+                {" "}
+                <HStack
+                  paddingX={2}
+                  paddingTop={3}
+                  paddingBottom={1}
+                  gap={1}
+                  align="center"
+                >
+                  <Text
+                    fontSize="11px"
+                    fontWeight="medium"
+                    textTransform="uppercase"
+                    color="gray.500"
+                  >
+                    {showExpanded ? "Gateway" : <div>&nbsp;</div>}
+                  </Text>
+                  {showExpanded && (
+                    <Badge
+                      colorPalette="blue"
+                      variant="subtle"
+                      fontSize="2xs"
+                      paddingX={1.5}
+                      lineHeight={1.2}
+                    >
+                      Beta
+                    </Badge>
+                  )}
+                </HStack>
+                <CollapsibleMenuGroup
+                  icon={featureIcons.gateway.icon}
+                  label={projectRoutes.gateway.title}
+                  project={project}
+                  showLabel={showExpanded}
+                  children={[
+                    {
+                      icon: KeyRound,
+                      label: projectRoutes.gateway_virtual_keys.title,
+                      href: projectRoutes.gateway_virtual_keys.path.replace(
+                        "[project]",
+                        project.slug,
+                      ),
+                      isActive: router.pathname.includes(
+                        "/gateway/virtual-keys",
+                      ),
+                    },
+                    ...(hasPermission("gatewayBudgets:view")
+                      ? [
+                          {
+                            icon: Gauge,
+                            label: projectRoutes.gateway_budgets.title,
+                            href: projectRoutes.gateway_budgets.path.replace(
+                              "[project]",
+                              project.slug,
+                            ),
+                            isActive:
+                              router.pathname.includes("/gateway/budgets"),
+                          },
+                        ]
+                      : []),
+                    ...(hasPermission("gatewayProviders:view")
+                      ? [
+                          {
+                            icon: Plug,
+                            label: projectRoutes.gateway_providers.title,
+                            href: projectRoutes.gateway_providers.path.replace(
+                              "[project]",
+                              project.slug,
+                            ),
+                            isActive:
+                              router.pathname.includes("/gateway/providers"),
+                          },
+                        ]
+                      : []),
+                    ...(hasPermission("gatewayCacheRules:view")
+                      ? [
+                          {
+                            icon: Zap,
+                            label: projectRoutes.gateway_cache_rules.title,
+                            href: projectRoutes.gateway_cache_rules.path.replace(
+                              "[project]",
+                              project.slug,
+                            ),
+                            isActive: router.pathname.includes(
+                              "/gateway/cache-rules",
+                            ),
+                          },
+                        ]
+                      : []),
+                    ...(hasPermission("gatewayUsage:view")
+                      ? [
+                          {
+                            icon: LineChart,
+                            label: projectRoutes.gateway_usage.title,
+                            href: projectRoutes.gateway_usage.path.replace(
+                              "[project]",
+                              project.slug,
+                            ),
+                            isActive:
+                              router.pathname.endsWith("/gateway/usage"),
+                          },
+                        ]
+                      : []),
+                    // Audit log entry removed — gateway audit rows are now
+                    // surfaced under /settings/audit-log alongside platform
+                    // governance events. Deep-links from VK / Budget detail
+                    // pages target /settings/audit-log directly.
+                  ]}
+                />
+              </>
+            )}
+
+            <OpsSection showExpanded={showExpanded} />
           </VStack>
 
           <VStack width="full" gap={0.5} align="start">
@@ -281,6 +395,95 @@ export const MainMenu = React.memo(function MainMenu({
     </Box>
   );
 });
+
+const OpsSection = ({ showExpanded }: { showExpanded: boolean }) => {
+  const router = useRouter();
+  const { hasAccess } = useOpsPermission();
+  const publicEnv = usePublicEnv();
+  const alwaysShow = publicEnv.data?.SHOW_OPS_IN_MAIN_SIDEBAR ?? false;
+  const isOnOpsRoute = router.pathname.startsWith("/ops");
+  const shouldShow = hasAccess && (alwaysShow || isOnOpsRoute);
+
+  const opsData = api.ops.getDashboardSnapshot.useQuery(undefined, {
+    enabled: shouldShow,
+    refetchInterval: 10000,
+  });
+
+  // Backoffice is admin-only. `useOpsPermission` already gates the whole
+  // OPS section on admin today, but we keep the isAdmin query decoupled so
+  // that if ops:view ever broadens beyond admin, the Backoffice link still
+  // stays strictly admin-only. Gated on `shouldShow` so the request is
+  // skipped entirely when the section isn't rendered.
+  const adminStatus = api.user.isAdmin.useQuery(
+    {},
+    { enabled: shouldShow, retry: false, refetchOnWindowFocus: false },
+  );
+  const isAdminUser = adminStatus.data?.isAdmin ?? false;
+
+  if (!shouldShow) return null;
+
+  const blockedCount =
+    opsData.data?.queues.reduce((sum, q) => sum + q.blockedGroupCount, 0) ?? 0;
+  const dlqCount =
+    opsData.data?.queues.reduce((sum, q) => sum + q.dlqCount, 0) ?? 0;
+
+  return (
+    <>
+      <Text
+        fontSize="11px"
+        fontWeight="medium"
+        textTransform="uppercase"
+        color="gray.500"
+        paddingX={2}
+        paddingTop={3}
+        paddingBottom={1}
+      >
+        {showExpanded ? "Ops" : <div>&nbsp;</div>}
+      </Text>
+      <SideMenuLink
+        icon={Activity}
+        label="Dashboard"
+        href="/ops"
+        isActive={
+          router.pathname === "/ops" ||
+          router.pathname.startsWith("/ops/queues")
+        }
+        badgeNumber={blockedCount + dlqCount}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={Film}
+        label="Projection Replay"
+        href="/ops/projections"
+        isActive={router.pathname.startsWith("/ops/projections")}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={Anvil}
+        label="The Foundry"
+        href="/ops/foundry"
+        isActive={router.pathname.startsWith("/ops/foundry")}
+        showLabel={showExpanded}
+      />
+      <SideMenuLink
+        icon={History}
+        label="Deja View"
+        href="/ops/dejaview"
+        isActive={router.pathname.startsWith("/ops/dejaview")}
+        showLabel={showExpanded}
+      />
+      {isAdminUser && (
+        <SideMenuLink
+          icon={Shield}
+          label="Backoffice"
+          href="/ops/backoffice/users"
+          isActive={router.pathname.startsWith("/ops/backoffice")}
+          showLabel={showExpanded}
+        />
+      )}
+    </>
+  );
+};
 
 type PageMenuLinkProps = {
   icon: React.ComponentType<{ size?: string | number; color?: string }>;

@@ -1,8 +1,8 @@
-import { Card, Heading, HStack, Skeleton, VStack } from "@chakra-ui/react";
+import { Button, Card, Heading, HStack, Separator, Skeleton, Text, VStack } from "@chakra-ui/react";
 import type { TeamUserRole } from "@prisma/client";
 import { TRPCClientError } from "@trpc/client";
 import isEqual from "lodash-es/isEqual";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import { useCallback, useEffect, useState } from "react";
 import { type SubmitHandler, useForm, useWatch } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
@@ -19,7 +19,7 @@ import {
 } from "../../../components/settings/TeamUserRoleField";
 import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/api/routers/organization";
+import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/app-layer/organizations/repositories/organization.repository";
 import { api } from "../../../utils/api";
 import { isHandledByGlobalHandler } from "../../../utils/trpcError";
 
@@ -180,7 +180,9 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
   const { handleSubmit, control } = form;
   const formWatch = useWatch({ control });
   const updateTeam = api.team.update.useMutation();
+  const archiveTeam = api.team.archiveById.useMutation();
   const apiContext = api.useContext();
+  const router = useRouter();
 
   const onSubmit: SubmitHandler<TeamFormData> = useDebouncedCallback(
     (data: TeamFormData) => {
@@ -237,15 +239,62 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
     void handleSubmit(onSubmit)();
   }, [formWatch, handleSubmit, onSubmit]);
 
+  const handleArchive = () => {
+    if (!confirm(`Archive "${team.name}"? This will hide the team and all its projects. Contact LangWatch support to restore it.`)) return;
+    archiveTeam.mutate(
+      { teamId: team.id },
+      {
+        onSuccess: () => {
+          void router.push("/settings/teams");
+        },
+        onError: () => {
+          toaster.create({
+            title: "Failed to archive team",
+            type: "error",
+            duration: 5000,
+            meta: { closable: true },
+          });
+        },
+      },
+    );
+  };
+
   return (
     <SettingsLayout>
-      <TeamForm
-        organizationId={team.organizationId}
-        team={team}
-        form={form}
-        onSubmit={onSubmit}
-        isLoading={updateTeam.isLoading}
-      />
+      <VStack gap={8} align="start" width="full">
+        <TeamForm
+          organizationId={team.organizationId}
+          team={team}
+          form={form}
+          onSubmit={onSubmit}
+          isLoading={updateTeam.isLoading}
+        />
+        <Separator />
+        <VStack align="start" gap={3} width="full">
+          <Heading size="sm" color="red.500">Danger Zone</Heading>
+          <Card.Root width="full" borderColor="red.200">
+            <Card.Body>
+              <HStack justify="space-between">
+                <VStack align="start" gap={0}>
+                  <Text fontWeight="medium">Archive this team</Text>
+                  <Text fontSize="sm" color="fg.muted">
+                    Hides the team and all its projects. Contact LangWatch support to restore it.
+                  </Text>
+                </VStack>
+                <Button
+                  colorPalette="red"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleArchive}
+                  disabled={archiveTeam.isLoading}
+                >
+                  Archive team
+                </Button>
+              </HStack>
+            </Card.Body>
+          </Card.Root>
+        </VStack>
+      </VStack>
     </SettingsLayout>
   );
 }

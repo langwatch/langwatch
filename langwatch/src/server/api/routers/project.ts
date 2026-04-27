@@ -3,11 +3,14 @@ import {
   type PrismaClient,
   type Project,
   ProjectSensitiveDataVisibilityLevel,
+  RoleBindingScopeType,
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
-import type { Session } from "next-auth";
+import type { Session } from "~/server/auth";
+import { KSUID_RESOURCES } from "~/utils/constants";
 import { z } from "zod";
 import { env } from "~/env.mjs";
 import {
@@ -34,6 +37,7 @@ import {
   skipPermissionCheckProjectCreation,
 } from "../rbac";
 import { revokeAllTraceShares } from "./share";
+import { getUserProtectionsForProject } from "../utils";
 
 export const projectRouter = createTRPCRouter({
   publicGetById: publicProcedure
@@ -115,20 +119,6 @@ export const projectRouter = createTRPCRouter({
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
 
-      const teamUser = await prisma.teamUser.findFirst({
-        where: {
-          userId: userId,
-          teamId: input.teamId,
-          role: "ADMIN",
-        },
-      });
-
-      if (!teamUser) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You don't have the necessary permissions",
-        });
-      }
 
       const enforcement = createLicenseEnforcementService(prisma);
       try {
@@ -200,11 +190,14 @@ export const projectRouter = createTRPCRouter({
             organizationId: input.organizationId,
           },
         });
-        await prisma.teamUser.create({
+        await prisma.roleBinding.create({
           data: {
+            id: generate(KSUID_RESOURCES.ROLE_BINDING).toString(),
+            organizationId: input.organizationId,
             userId: userId,
-            teamId: team.id,
-            role: "ADMIN",
+            role: TeamUserRole.ADMIN,
+            scopeType: RoleBindingScopeType.TEAM,
+            scopeId: team.id,
           },
         });
 
@@ -228,15 +221,6 @@ export const projectRouter = createTRPCRouter({
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
           capturedOutputVisibility:
             ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
-          featureClickHouseDataSourceSimulations: Boolean(env.IS_SAAS),
-          featureClickHouseDataSourceEvaluations: Boolean(env.IS_SAAS),
-          featureClickHouseDataSourceTraces: Boolean(env.IS_SAAS),
-          featureEventSourcingSimulationIngestion: Boolean(env.IS_SAAS),
-          featureEventSourcingEvaluationIngestion: Boolean(env.IS_SAAS),
-          featureEventSourcingTraceIngestion: Boolean(env.IS_SAAS),
-          disableElasticSearchTraceWriting: Boolean(env.IS_SAAS),
-          disableElasticSearchEvaluationWriting: Boolean(env.IS_SAAS),
-          disableElasticSearchSimulationWriting: Boolean(env.IS_SAAS),
         },
       });
 
@@ -565,66 +549,18 @@ export const projectRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("project:view"))
-    .query(
-      async ({
-        input,
-        ctx,
-      }: {
-        input: { projectId: string };
-        ctx: { session: Session; prisma: PrismaClient };
-      }) => {
-        const { projectId } = input;
-        const prisma = ctx.prisma;
+    .query(async ({ input, ctx }) => {
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
 
-        const project = await prisma.project.findUnique({
-          where: { id: projectId },
-          select: {
-            capturedInputVisibility: true,
-            capturedOutputVisibility: true,
-          },
-        });
-        if (!project) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Project not found",
-          });
-        }
-
-        const teamsWithAccess = await prisma.teamUser.findMany({
-          where: {
-            userId: ctx.session.user.id,
-            team: {
-              projects: {
-                some: {
-                  id: projectId,
-                },
-              },
-            },
-          },
-          select: {
-            role: true,
-          },
-        });
-
-        const isUserPrivileged = teamsWithAccess.some(
-          (teamUser: { role: TeamUserRole }) =>
-            teamUser.role === TeamUserRole.ADMIN,
-        );
-
-        return {
-          isRedacted: {
-            input: !canAccessSensitiveData(
-              project.capturedInputVisibility,
-              isUserPrivileged,
-            ),
-            output: !canAccessSensitiveData(
-              project.capturedOutputVisibility,
-              isUserPrivileged,
-            ),
-          },
-        };
-      },
-    ),
+      return {
+        isRedacted: {
+          input: !protections.canSeeCapturedInput,
+          output: !protections.canSeeCapturedOutput,
+        },
+      };
+    }),
   archiveById: protectedProcedure
     .input(z.object({ projectId: z.string(), projectToArchiveId: z.string() }))
     .use(checkProjectPermission("project:delete"))
@@ -708,19 +644,4 @@ async function checkCapturedDataVisibilityPermission({
   return next();
 }
 
-const canAccessSensitiveData = (
-  visibility: ProjectSensitiveDataVisibilityLevel,
-  userIsPrivileged: boolean,
-): boolean => {
-  switch (visibility) {
-    case ProjectSensitiveDataVisibilityLevel.REDACTED_TO_ALL:
-      return false;
-    case ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL:
-      return true;
-    case ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ADMIN:
-      return userIsPrivileged;
-    default:
-      console.error("Unexpected visibility level:", visibility);
-      return false; // Default to not showing
-  }
-};
+

@@ -14,6 +14,7 @@ import httpx
 
 import langwatch
 from langwatch.state import get_api_key, get_endpoint
+from langwatch.utils.auth import build_auth_headers
 
 
 def _replace_url_domain(url: str, new_base: str) -> str:
@@ -114,7 +115,7 @@ class ExperimentRunSummary:
     total_cost: float = 0.0
 
 
-@dataclass
+@dataclass(repr=False)
 class ExperimentRunResult:
     """Result of running a platform evaluation."""
 
@@ -143,6 +144,53 @@ class ExperimentRunResult:
 
         if should_exit and self.failed > 0:
             sys.exit(1)
+
+    def __repr__(self) -> str:
+        status_icon = {"completed": "OK", "failed": "FAIL", "stopped": "STOPPED"}.get(
+            self.status, self.status
+        )
+        return (
+            f"ExperimentRunResult("
+            f"status={status_icon}, "
+            f"passed={self.passed}, failed={self.failed}, "
+            f"pass_rate={self.pass_rate:.1f}%, "
+            f"duration={self.duration / 1000:.1f}s)"
+        )
+
+    def to_dataframe(self) -> "pd.DataFrame":
+        """
+        Convert the experiment run summary to a pandas DataFrame.
+
+        Returns a DataFrame with one row per evaluator, showing pass rate,
+        passed/failed counts, and average score.
+
+        Example::
+
+            result = langwatch.experiment.run("my-experiment")
+            result.to_dataframe()          # renders as table in Jupyter
+        """
+        import pandas as pd
+
+        rows = []
+        for e in self.summary.evaluators:
+            rows.append({
+                "evaluator": e.name,
+                "pass_rate": e.pass_rate,
+                "passed": e.passed,
+                "failed": e.failed,
+                "avg_score": e.avg_score,
+            })
+
+        if not rows:
+            # Fallback: single summary row
+            rows.append({
+                "evaluator": "(all)",
+                "pass_rate": self.pass_rate,
+                "passed": self.passed,
+                "failed": self.failed,
+            })
+
+        return pd.DataFrame(rows)
 
 
 def _is_notebook() -> bool:
@@ -282,7 +330,7 @@ def _start_run(slug: str, endpoint: str, api_key: str) -> dict:
     with httpx.Client(timeout=60) as client:
         response = client.post(
             f"{endpoint}/api/evaluations/v3/{slug}/run",
-            headers={"X-Auth-Token": api_key},
+            headers=build_auth_headers(api_key),
         )
 
     if response.status_code == 404:
@@ -304,7 +352,7 @@ def _get_run_status(run_id: str, endpoint: str, api_key: str) -> dict:
     with httpx.Client(timeout=60) as client:
         response = client.get(
             f"{endpoint}/api/evaluations/v3/runs/{run_id}",
-            headers={"X-Auth-Token": api_key},
+            headers=build_auth_headers(api_key),
         )
 
     if response.status_code == 404:
@@ -409,6 +457,8 @@ def _print_summary(result: ExperimentRunResult) -> None:
     print(f"  Passed:     {result.passed}")
     print(f"  Failed:     {result.failed}")
     print(f"  Pass Rate:  {result.pass_rate:.1f}%")
+    if summary.total_cost:
+        print(f"  Total Cost: ${summary.total_cost:.4f}")
 
     if summary.targets:
         print("─" * 60)

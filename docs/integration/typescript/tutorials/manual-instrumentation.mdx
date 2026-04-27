@@ -1,0 +1,538 @@
+---
+title: "Manual Instrumentation"
+sidebarTitle: "Manual Control"
+description: "Use LangWatch TypeScript manual instrumentation for fine-grained tracing control during AI agent testing."
+---
+
+# Manual Instrumentation
+
+This guide covers advanced manual span management techniques for TypeScript/JavaScript applications when you need fine-grained control over observability beyond the automatic `withActiveSpan` method.
+
+<CardGroup cols={2}>
+<Card title="withActiveSpan Method" icon="auto" href="#withactivespan-method">
+  The recommended approach for most use cases with automatic context management and error handling.
+</Card>
+
+<Card title="Manual Span Control" icon="settings" href="#basic-manual-span-management">
+  Complete manual control over span lifecycle, attributes, and context propagation.
+</Card>
+</CardGroup>
+
+## withActiveSpan Method
+
+The `withActiveSpan` method is the recommended approach for most manual instrumentation needs. It automatically handles context propagation, error handling, and span cleanup, making it both safer and easier to use than manual span management. For consistent attribute naming, combine this with [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions).
+
+### Basic Usage
+
+```typescript
+import { getLangWatchTracer, SpanStatusCode } from "langwatch";
+
+const tracer = getLangWatchTracer("my-service");
+
+// Simple usage with automatic cleanup
+await tracer.withActiveSpan("my-operation", async (span) => {
+  span.setType("llm");
+  span.setInput("Hello, world!");
+
+  // Your business logic here
+  const result = await processRequest("Hello, world!");
+
+  span.setOutput(result);
+  span.setStatus({ code: SpanStatusCode.OK });
+
+  return result;
+});
+```
+
+### Error Handling
+
+`withActiveSpan` automatically handles errors and ensures proper span cleanup:
+
+```typescript
+await tracer.withActiveSpan("risky-operation", async (span) => {
+  span.setType("external_api");
+  span.setInput({ userId: "123", action: "update_profile" });
+
+  try {
+    // This might throw an error
+    const result = await externalApiCall();
+    span.setOutput(result);
+    span.setStatus({ code: SpanStatusCode.OK });
+    return result;
+  } catch (error) {
+    // Error is automatically recorded and span status is set to ERROR
+    span.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: error.message
+    });
+    span.recordException(error);
+    throw error; // Re-throw to maintain error flow
+  }
+  // Span is automatically ended in finally block
+});
+```
+
+### Context Propagation
+
+`withActiveSpan` automatically propagates span context to child operations:
+
+```typescript
+async function processUserRequest(userId: string) {
+  return await tracer.withActiveSpan("process-user-request", async (span) => {
+    span.setType("user_operation");
+    span.setInput({ userId });
+
+    // Child operations automatically inherit the span context
+    const userData = await fetchUserData(userId);
+    const userProfile = await updateUserProfile(userId);
+
+    const result = { userData, userProfile };
+    span.setOutput(result);
+    span.setStatus({ code: SpanStatusCode.OK });
+
+    return result;
+  });
+}
+
+// Child operations automatically create child spans
+async function fetchUserData(userId: string) {
+  return await tracer.withActiveSpan("fetch-user-data", async (span) => {
+    span.setType("database_query");
+    // This span is automatically a child of the parent span
+    // ... database logic ...
+  });
+}
+```
+
+### Custom Attributes and Events
+
+Add rich metadata to your spans:
+
+```typescript
+await tracer.withActiveSpan("custom-operation", async (span) => {
+  // Set span type
+  span.setType("llm");
+
+  // Add custom attributes for filtering and analysis
+  span.setAttributes({
+    "custom.business_unit": "marketing",
+    "custom.campaign_id": "summer-2024",
+    "custom.user_tier": "premium",
+    "custom.operation_type": "batch_processing",
+    "llm.model": "gpt-5-mini",
+    "llm.temperature": 0.7
+  });
+
+  // Add events to track important milestones
+  span.addEvent("processing_started", {
+    timestamp: Date.now(),
+    batch_size: 1000
+  });
+
+  // Your business logic
+  const result = await processBatch();
+
+  span.addEvent("processing_completed", {
+    timestamp: Date.now(),
+    processed_count: result.length
+  });
+
+  span.setOutput(result);
+  span.setStatus({ code: SpanStatusCode.OK });
+
+  return result;
+});
+```
+
+<Tip>
+For consistent attribute naming and TypeScript autocomplete support, use semantic conventions. See our [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) guide for best practices.
+</Tip>
+
+### Conditional Span Creation
+
+Create spans conditionally based on your application logic:
+
+```typescript
+async function conditionalOperation(shouldTrace: boolean, data: any) {
+  if (shouldTrace) {
+    return await tracer.withActiveSpan("conditional-operation", async (span) => {
+      span.setType("conditional");
+      span.setInput(data);
+
+      const result = await processData(data);
+
+      span.setOutput(result);
+      span.setStatus({ code: SpanStatusCode.OK });
+
+      return result;
+    });
+  } else {
+    // No tracing overhead when not needed
+    return await processData(data);
+  }
+}
+```
+
+## Basic Manual Span Management
+
+When you need fine-grained control over spans beyond what `withActiveSpan` provides, you can manually manage span lifecycle, attributes, and context propagation.
+
+### Using startActiveSpan
+
+`startActiveSpan` provides automatic context management but requires manual error handling:
+
+```typescript
+// Using startActiveSpan (automatic context management)
+tracer.startActiveSpan("my-operation", (span) => {
+  try {
+    span.setType("llm");
+    span.setInput("Hello, world!");
+    // ... your business logic ...
+    span.setOutput("Hello! How can I help you?");
+    span.setStatus({ code: SpanStatusCode.OK });
+  } catch (error) {
+    span.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: error.message
+    });
+    span.recordException(error);
+    throw error;
+  } finally {
+    span.end();
+  }
+});
+```
+
+### Using startSpan (Complete Manual Control)
+
+`startSpan` gives you complete control but requires manual context management:
+
+```typescript
+// Using startSpan (complete manual control)
+const span = tracer.startSpan("my-operation");
+try {
+  span.setType("llm");
+  span.setInput("Hello, world!");
+  // ... your business logic ...
+  span.setOutput("Hello! How can I help you?");
+  span.setStatus({ code: SpanStatusCode.OK });
+} catch (error) {
+  span.setStatus({
+    code: SpanStatusCode.ERROR,
+    message: error.message
+  });
+  span.recordException(error);
+  throw error;
+} finally {
+  span.end();
+}
+```
+
+## Span Context Propagation
+
+Manually propagate span context across async boundaries and service boundaries when `withActiveSpan` isn't sufficient:
+
+```typescript
+import { context, trace } from "@opentelemetry/api";
+
+async function processWithContext(userId: string) {
+  const span = tracer.startSpan("process-user");
+  const ctx = trace.setSpan(context.active(), span);
+
+  try {
+    // Propagate context to async operations
+    await context.with(ctx, async () => {
+      await processUserData(userId);
+      await updateUserProfile(userId);
+    });
+
+    span.setStatus({ code: SpanStatusCode.OK });
+  } catch (error) {
+    span.setStatus({
+      code: SpanStatusCode.ERROR,
+      message: error.message
+    });
+    span.recordException(error);
+    throw error;
+  } finally {
+    span.end();
+  }
+}
+```
+
+## Error Handling Patterns
+
+Implement robust error handling for manual span management:
+
+```typescript
+class SpanManager {
+  private tracer = getLangWatchTracer("my-service");
+
+  async executeWithSpan<T>(
+    operationName: string,
+    operation: (span: Span) => Promise<T>
+  ): Promise<T> {
+    const span = this.tracer.startSpan(operationName);
+
+    try {
+      const result = await operation(span);
+      span.setStatus({ code: SpanStatusCode.OK });
+      return result;
+    } catch (error) {
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: error.message
+      });
+      span.recordException(error);
+      throw error;
+    } finally {
+      span.end();
+    }
+  }
+}
+
+// Usage example
+const spanManager = new SpanManager();
+const result = await spanManager.executeWithSpan("my-operation", async (span) => {
+  span.setType("llm");
+  span.setInput("Hello");
+  // ... your business logic ...
+  return "World";
+});
+```
+
+## Custom Span Processors
+
+Create custom span processors for specialized processing needs, filtering, and multiple export destinations.
+
+### Custom Exporters
+
+Configure custom exporters alongside LangWatch:
+
+```typescript
+import { setupObservability } from "langwatch/observability/node";
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+
+const handle = setupObservability({
+  // Use custom span processors
+  spanProcessors: [
+    new BatchSpanProcessor(new OTLPTraceExporter({
+      url: 'https://custom-collector.com/v1/traces'
+    }))
+  ],
+
+  // Or use a single trace exporter
+  traceExporter: new OTLPTraceExporter({
+    url: 'https://custom-collector.com/v1/traces'
+  })
+});
+```
+
+### Span Filtering
+
+Implement span filtering to control which spans are processed:
+
+```typescript
+import { FilterableBatchSpanProcessor, LangWatchExporter } from "langwatch";
+
+const processor = new FilterableBatchSpanProcessor(
+  new LangWatchExporter({
+    apiKey: "your-api-key",
+  }),
+  [
+    { attribute: "http.url", value: "/health" },
+    { attribute: "span.type", value: "health" },
+    { attribute: "custom.ignore", value: "true" }
+  ]
+);
+
+const handle = setupObservability({
+  langwatch: 'disabled',
+  spanProcessors: [processor]
+});
+```
+
+### Multiple Exporters
+
+Configure multiple exporters for different destinations:
+
+```typescript
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { JaegerExporter } from "@opentelemetry/exporter-jaeger";
+import { LangWatchExporter } from "langwatch";
+
+const handle = setupObservability({
+  serviceName: "my-service",
+  spanProcessors: [
+    // Send to Jaeger for debugging
+    new BatchSpanProcessor(new JaegerExporter({
+      endpoint: "http://localhost:14268/api/traces"
+    })),
+    // Send to LangWatch for production monitoring
+    new BatchSpanProcessor(new LangWatchExporter({
+      apiKey: process.env.LANGWATCH_API_KEY
+    }))
+  ]
+});
+```
+
+### Batch Processing Configuration
+
+Optimize batch processing for high-volume applications:
+
+```typescript
+import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { LangWatchExporter } from "langwatch";
+
+const batchProcessor = new BatchSpanProcessor(
+  new LangWatchExporter({
+    apiKey: process.env.LANGWATCH_API_KEY
+  }),
+  {
+    maxQueueSize: 2048, // Maximum number of spans in queue
+    maxExportBatchSize: 512, // Maximum spans per batch
+    scheduledDelayMillis: 5000, // Export interval
+    exportTimeoutMillis: 30000, // Export timeout
+  }
+);
+
+const handle = setupObservability({
+  langwatch: 'disabled', // Disabled we report to LangWatch via the `batchProcessor`
+  spanProcessors: [batchProcessor]
+});
+```
+
+## Performance Considerations
+
+When using manual span management, consider these performance implications:
+
+<Warning>
+Manual span management requires careful attention to memory usage and proper cleanup to avoid memory leaks.
+</Warning>
+
+1. **Memory Usage**: Manually created spans consume memory until explicitly ended
+2. **Context Propagation**: Manual context management can be error-prone and impact performance
+3. **Error Handling**: Ensure spans are always ended, even when exceptions occur
+4. **Batch Processing**: Use batch processors for high-volume applications to reduce overhead
+5. **Sampling**: Implement sampling to reduce overhead in production environments
+
+## Best Practices
+
+<CardGroup cols={2}>
+<Card title="Use withActiveSpan" icon="auto">
+  - Prefer `withActiveSpan` for most use cases
+  - Automatic context propagation and error handling
+  - Guaranteed span cleanup
+</Card>
+
+<Card title="Manual Control" icon="settings">
+  - Use manual span management only when needed
+  - Always end spans in finally blocks
+  - Use try-catch-finally patterns consistently
+</Card>
+
+<Card title="Context Management" icon="context">
+  - Propagate span context across async boundaries
+  - Use context.with() for async operations
+  - Maintain span hierarchy properly
+</Card>
+
+<Card title="Attributes and Events" icon="attributes">
+  - Add meaningful custom attributes for filtering
+  - Use consistent attribute naming conventions
+  - Include relevant business context
+</Card>
+
+<Card title="Performance" icon="performance">
+  - Implement appropriate sampling strategies
+  - Use batch processors for high volume
+  - Monitor observability overhead
+</Card>
+
+<Card title="Error Handling" icon="error">
+  - Set appropriate status codes and error messages
+  - Record exceptions with context
+  - Maintain error flow in your application
+</Card>
+</CardGroup>
+
+## When to Use Each Approach
+
+<Tabs>
+<Tab title="withActiveSpan (Recommended)">
+Use `withActiveSpan` for:
+- Most application logic
+- Operations that need automatic context propagation
+- When you want automatic error handling and cleanup
+- Simple to moderate complexity operations
+
+```typescript
+await tracer.withActiveSpan("my-operation", async (span) => {
+  // Automatic context propagation, error handling, and cleanup
+  return await processData();
+});
+```
+</Tab>
+
+<Tab title="startActiveSpan">
+Use `startActiveSpan` for:
+- When you need manual error handling logic
+- Operations with complex conditional logic
+- When you need to control exactly when the span ends
+
+```typescript
+tracer.startActiveSpan("my-operation", (span) => {
+  try {
+    // Manual error handling
+    return processData();
+  } catch (error) {
+    // Custom error handling logic
+    handleError(error);
+    throw error;
+  } finally {
+    span.end();
+  }
+});
+```
+</Tab>
+
+<Tab title="startSpan (Manual)">
+Use `startSpan` for:
+- Maximum control over span lifecycle
+- Complex context propagation scenarios
+- When you need to manage multiple spans simultaneously
+- Advanced use cases requiring manual context management
+
+```typescript
+const span = tracer.startSpan("my-operation");
+try {
+  // Complete manual control
+  const ctx = trace.setSpan(context.active(), span);
+  await context.with(ctx, async () => {
+    // Manual context propagation
+  });
+} finally {
+  span.end();
+}
+```
+</Tab>
+</Tabs>
+
+<Info>
+For most use cases, the `withActiveSpan` method provides the best balance of ease of use, safety, and functionality. Only use manual span management when you need specific control over span lifecycle or context propagation that `withActiveSpan` cannot provide.
+</Info>
+
+## Related Documentation
+
+For more advanced observability patterns and best practices:
+
+- **[Integration Guide](/integration/typescript/guide)** - Basic setup and core concepts
+- **[API Reference](/integration/typescript/reference)** - Complete API documentation
+- **[Semantic Conventions](/integration/typescript/tutorials/semantic-conventions)** - Standardized attribute naming guidelines
+- **[Debugging and Troubleshooting](/integration/typescript/tutorials/debugging-typescript)** - Debug manual instrumentation issues
+- **[Framework Integrations](/integration/typescript/integrations)** - Framework-specific instrumentation approaches
+
+<Tip>
+Combine manual instrumentation with [Semantic Conventions](/integration/typescript/tutorials/semantic-conventions) for consistent, maintainable observability across your application.
+</Tip>

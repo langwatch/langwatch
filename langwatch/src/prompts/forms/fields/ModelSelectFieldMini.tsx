@@ -79,7 +79,6 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
         return (
           <Popover.Root
             positioning={{ placement: "bottom-start" }}
-            closeOnInteractOutside={false}
             open={popoverOpen}
             onOpenChange={({ open }) => setPopoverOpen(open)}
           >

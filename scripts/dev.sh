@@ -3,7 +3,23 @@
 set -e
 
 COMPOSE="docker compose -f compose.dev.yml"
-LAST_CHOICE_FILE="/tmp/.langwatch-dev-last-choice"
+
+# Auto-detect worktree for container/volume isolation
+if git rev-parse --is-inside-work-tree &>/dev/null; then
+  WORKTREE_NAME=$(basename "$(git rev-parse --show-toplevel)")
+  # "langwatch" is the expected main checkout directory name (repo name)
+  if [ "$WORKTREE_NAME" != "langwatch" ]; then
+    # Sanitize for Docker Compose project/volume naming (only [a-z0-9_-], must start with letter/digit)
+    WORKTREE_NAME=$(echo "$WORKTREE_NAME" \
+      | tr '[:upper:]' '[:lower:]' \
+      | sed -E 's/[^a-z0-9_-]+/-/g; s/^-+//; s/-+$//')
+    [ -z "$WORKTREE_NAME" ] && WORKTREE_NAME="langwatch"
+    export COMPOSE_PROJECT_NAME="${WORKTREE_NAME}"
+    export VOLUME_PREFIX="${WORKTREE_NAME}"
+  fi
+fi
+
+LAST_CHOICE_FILE="/tmp/.langwatch-dev-last-choice-v2-${COMPOSE_PROJECT_NAME:-langwatch}"
 
 # Check for required .env files
 check_env_files() {
@@ -55,7 +71,7 @@ find_free_port() {
 
 # Auto-detect free ports
 export APP_PORT=$(find_free_port 5560)
-export BULLBOARD_PORT=$(find_free_port 3000)
+export BULLBOARD_PORT=$(find_free_port 6380)
 export AI_SERVER_PORT=$(find_free_port 3456)
 
 # Load last choice if exists
@@ -69,18 +85,20 @@ echo "╔═══════════════════════�
 echo "║              LangWatch Development Environment             ║"
 echo "╠════════════════════════════════════════════════════════════╣"
 echo "║  Ports: app=$APP_PORT  bullboard=$BULLBOARD_PORT  ai-server=$AI_SERVER_PORT"
+echo "╠════════════════════════════════════════════════════════════╣"
+echo "║  AI Gateway runs separately: make service svc=aigateway"
+echo "║  (not bundled into compose; binds host :5563)"
 echo "╚════════════════════════════════════════════════════════════╝"
 echo ""
-PROFILE_NAMES=("" "dev" "dev-search" "dev-nlp" "dev-scenarios" "dev-test" "dev-full")
+PROFILE_NAMES=("" "dev" "dev-nlp" "dev-scenarios" "dev-test" "dev-full")
 
 echo "Select a profile:"
 echo ""
-echo "  1) dev           - Minimal (postgres, redis, app)"
-echo "  2) dev-search    - + opensearch (for traces/search)"
-echo "  3) dev-nlp       - + NLP + langevals (for evaluations)"
-echo "  4) dev-scenarios - + scenario worker + bullboard + NLP"
-echo "  5) dev-test      - + AI test server"
-echo "  6) dev-full      - Everything"
+echo "  1) dev           - Minimal (postgres, redis, clickhouse, app)"
+echo "  2) dev-nlp       - + NLP + langevals (for evaluations)"
+echo "  3) dev-scenarios - + scenario worker + bullboard + NLP"
+echo "  4) dev-test      - + AI test server"
+echo "  5) dev-full      - Everything"
 echo ""
 echo "  r) rebuild       - Rebuild (removes node_modules, restarts)"
 echo "  d) down          - Stop all services"
@@ -101,34 +119,28 @@ case $choice in
   1)
     echo "$choice" > "$LAST_CHOICE_FILE"
     ensure_prepared
-    echo "Starting: postgres + redis + app..."
+    echo "Starting: postgres + redis + clickhouse + app..."
     $COMPOSE up
     ;;
   2)
     echo "$choice" > "$LAST_CHOICE_FILE"
     ensure_prepared
-    echo "Starting: + opensearch..."
-    $COMPOSE --profile search up
-    ;;
-  3)
-    echo "$choice" > "$LAST_CHOICE_FILE"
-    ensure_prepared
     echo "Starting: + nlp + langevals..."
     $COMPOSE --profile nlp up
     ;;
-  4)
+  3)
     echo "$choice" > "$LAST_CHOICE_FILE"
     ensure_prepared
     echo "Starting: scenarios (+ workers + bullboard + nlp)..."
     $COMPOSE --profile scenarios up
     ;;
-  5)
+  4)
     echo "$choice" > "$LAST_CHOICE_FILE"
     ensure_prepared
     echo "Starting: + ai-server..."
     $COMPOSE --profile test up
     ;;
-  6)
+  5)
     echo "$choice" > "$LAST_CHOICE_FILE"
     ensure_prepared
     echo "Starting: full stack..."
@@ -137,7 +149,8 @@ case $choice in
   r|R)
     echo "Rebuilding (removes container node_modules)..."
     $COMPOSE --profile full down
-    docker volume rm "${PWD##*/}_app_modules" 2>/dev/null || true
+    docker volume rm "${VOLUME_PREFIX:-langwatch}-app-modules" 2>/dev/null || true
+    docker volume rm "${VOLUME_PREFIX:-langwatch}-bullboard-modules" 2>/dev/null || true
     # Re-run with last profile
     if [ -n "$LAST" ]; then
       echo "Restarting with last profile..."

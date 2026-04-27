@@ -44,7 +44,7 @@ const {
   };
 });
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: {},
     push: vi.fn(),

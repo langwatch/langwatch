@@ -8,12 +8,14 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import type { PublicShare } from "@prisma/client";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import qs from "qs";
 import { useCallback, useEffect, useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
 import { useDrawer } from "~/hooks/useDrawer";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
+import { useLiteMemberGuard } from "../../hooks/useLiteMemberGuard";
+import { useDejaViewLink } from "../../hooks/useDejaViewLink";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { api } from "../../utils/api";
@@ -45,6 +47,11 @@ export function TraceDetails(props: {
   onToggleView?: () => void;
 }) {
   const { project, hasPermission } = useOrganizationTeamProject();
+  const dejaView = useDejaViewLink({
+    aggregateId: props.traceId,
+    tenantId: project?.id,
+  });
+  const { isLiteMember } = useLiteMemberGuard();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
   const queryClient = api.useContext();
@@ -104,8 +111,8 @@ export function TraceDetails(props: {
 
   const availableTabs = [
     ...(canViewMessages ? ["messages"] : []),
-    "traceDetails",
-    "sequenceDiagram",
+    ...(!isLiteMember ? ["traceDetails"] : []),
+    ...(!isLiteMember ? ["sequenceDiagram"] : []),
     ...(anyGuardrails ? ["guardrails"] : []),
     "evaluations",
     "events",
@@ -305,6 +312,13 @@ export function TraceDetails(props: {
               {project && (
                 <ShareButton project={project} traceId={props.traceId} />
               )}
+              {dejaView.href && (
+                <Link href={dejaView.href}>
+                  <Button data-scope="header" colorPalette="gray" size="sm">
+                    DejaView
+                  </Button>
+                </Link>
+              )}
               {props.onToggleView && (
                 <>
                   <Button data-scope="header" colorPalette="gray">
@@ -332,8 +346,12 @@ export function TraceDetails(props: {
             {canViewMessages && (
               <Tabs.Trigger value="messages">Thread</Tabs.Trigger>
             )}
-            <Tabs.Trigger value="traceDetails">Trace Details</Tabs.Trigger>
-            <Tabs.Trigger value="sequenceDiagram">Sequence</Tabs.Trigger>
+            {!isLiteMember && (
+              <Tabs.Trigger value="traceDetails">Trace Details</Tabs.Trigger>
+            )}
+            {!isLiteMember && (
+              <Tabs.Trigger value="sequenceDiagram">Sequence</Tabs.Trigger>
+            )}
             {anyGuardrails && (
               <Tabs.Trigger value="guardrails">
                 Guardrails
@@ -359,7 +377,7 @@ export function TraceDetails(props: {
               />
             </Tabs.Trigger>
             <Tabs.Trigger value="events">
-              Events
+              User Events
               {trace.data?.events && trace.data.events.length > 0 && (
                 <Text
                   borderRadius={"md"}

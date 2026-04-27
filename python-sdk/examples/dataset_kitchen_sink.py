@@ -140,9 +140,7 @@ def main(messages=None):
     # 9. Handle empty dataset
     print("\n9. Handle empty dataset:")
     print("-" * 60)
-    empty_dataset = Dataset(
-        type("GetApiDatasetBySlugOrIdResponse200", (), {"data": []})()
-    )
+    empty_dataset = Dataset(entries=[])
     print(f"Empty dataset entries: {len(empty_dataset.entries)}")
     if pd is not None:
         empty_df = empty_dataset.to_pandas()

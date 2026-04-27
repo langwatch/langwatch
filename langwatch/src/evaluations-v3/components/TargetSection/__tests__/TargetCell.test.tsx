@@ -6,26 +6,91 @@ import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { TargetConfig } from "../../../types";
+import type { EvaluatorConfig, TargetConfig } from "../../../types";
 import { TargetCellContent } from "../TargetCell";
 
-// Mock hooks
-const mockOpenDrawer = vi.fn();
+// Drawer + flow-callback mocks must be vi.hoisted so the vi.mock factory can
+// reference them (vi.mock is hoisted above imports).
+const { mockOpenDrawer, mockSetFlowCallbacks } = vi.hoisted(() => ({
+  mockOpenDrawer: vi.fn(),
+  mockSetFlowCallbacks: vi.fn(),
+}));
+
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({
     openDrawer: mockOpenDrawer,
   }),
+  setFlowCallbacks: mockSetFlowCallbacks,
 }));
 
+// Mutable state for the store mock — each test seeds what the component will
+// read. `useEvaluationsV3Store` accepts a selector, so the mock must too.
+type StoreMockState = {
+  evaluators: EvaluatorConfig[];
+  activeDatasetId: string;
+  datasets: Array<{
+    id: string;
+    name: string;
+    columns: Array<{ id: string; name: string; type: string }>;
+  }>;
+  removeEvaluator: ReturnType<typeof vi.fn>;
+  updateEvaluator: ReturnType<typeof vi.fn>;
+  setEvaluatorMapping: ReturnType<typeof vi.fn>;
+  removeEvaluatorMapping: ReturnType<typeof vi.fn>;
+};
+
+const storeMockState: StoreMockState = {
+  evaluators: [],
+  activeDatasetId: "dataset-1",
+  datasets: [],
+  removeEvaluator: vi.fn(),
+  updateEvaluator: vi.fn(),
+  setEvaluatorMapping: vi.fn(),
+  removeEvaluatorMapping: vi.fn(),
+};
+
+const resetStoreMock = () => {
+  storeMockState.evaluators = [];
+  storeMockState.activeDatasetId = "dataset-1";
+  storeMockState.datasets = [];
+  storeMockState.removeEvaluator = vi.fn();
+  storeMockState.updateEvaluator = vi.fn();
+  storeMockState.setEvaluatorMapping = vi.fn();
+  storeMockState.removeEvaluatorMapping = vi.fn();
+};
+
 vi.mock("../../../hooks/useEvaluationsV3Store", () => ({
-  useEvaluationsV3Store: () => ({
-    evaluators: [],
-    activeDatasetId: "dataset-1",
-    datasets: [],
-    removeEvaluator: vi.fn(),
-    setEvaluatorMapping: vi.fn(),
-    removeEvaluatorMapping: vi.fn(),
-  }),
+  useEvaluationsV3Store: (selector?: (state: StoreMockState) => unknown) =>
+    selector ? selector(storeMockState) : storeMockState,
+}));
+
+// Mock mappingValidation so we control which evaluators flag as
+// hasMissingMappings without touching the real DSL logic.
+vi.mock("../../../utils/mappingValidation", () => ({
+  evaluatorHasMissingMappings: vi.fn(() => false),
+}));
+
+// Replace the chip with a minimal stub that exposes onEdit as a plain button.
+// The real chip wraps onEdit behind a Chakra Menu, which needs user-event
+// gymnastics to open — and the chip has its own test file covering that.
+// Here we only care that TargetCell wires the chip's onEdit to the correct
+// drawer + flowCallbacks payload.
+vi.mock("../EvaluatorChip", () => ({
+  EvaluatorChip: ({
+    evaluator,
+    onEdit,
+  }: {
+    evaluator: { id: string };
+    onEdit: () => void;
+  }) => (
+    <button
+      type="button"
+      data-testid={`evaluator-chip-stub-${evaluator.id}`}
+      onClick={onEdit}
+    >
+      chip:{evaluator.id}
+    </button>
+  ),
 }));
 
 // Mock name hooks to avoid tRPC queries
@@ -34,6 +99,7 @@ vi.mock("../../../hooks/useTargetName", () => ({
 }));
 vi.mock("../../../hooks/useEvaluatorName", () => ({
   useEvaluatorName: () => "Exact Match",
+  useEvaluatorNames: () => new Map(),
 }));
 
 const Wrapper = ({ children }: { children: ReactNode }) => (
@@ -57,6 +123,7 @@ const generateLongText = (length: number): string => {
 describe("TargetCellContent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetStoreMock();
   });
 
   afterEach(() => {
@@ -676,6 +743,128 @@ describe("TargetCellContent", () => {
 
       // Should show the output
       expect(screen.getByText("Completed output")).toBeInTheDocument();
+    });
+  });
+
+  // Regression for issue #3441 fix 1: clicking the evaluator chip's edit
+  // path must open the editor drawer with both a mappingsConfig AND an
+  // onMappingChange callback registered via setFlowCallbacks. The drawer's
+  // render gate is `mappingsConfig && onMappingChange` — if either is
+  // missing, the mappings section silently hides and users can't configure
+  // variables. Prior regression lived in TargetCell.tsx bypassing the shared
+  // createEvaluatorEditorCallbacks helper and omitting onMappingChange.
+  describe("when the user clicks an evaluator chip's edit", () => {
+    const evaluator: EvaluatorConfig = {
+      id: "eval-1",
+      evaluatorType: "langevals/exact_match",
+      dbEvaluatorId: "db-eval-1",
+      mappings: {},
+      inputs: [
+        { identifier: "output", type: "str" },
+        { identifier: "expected_output", type: "str" },
+      ],
+    };
+
+    const targetWithEvaluator = (): TargetConfig => ({
+      id: "target-1",
+      type: "prompt",
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+      mappings: {},
+    });
+
+    const seedStoreWithEvaluatorAndDataset = () => {
+      storeMockState.evaluators = [evaluator];
+      storeMockState.datasets = [
+        {
+          id: "dataset-1",
+          name: "Test Dataset",
+          columns: [
+            { id: "input", name: "input", type: "string" },
+            { id: "expected_output", name: "expected_output", type: "string" },
+          ],
+        },
+      ];
+    };
+
+    it("registers onMappingChange on the evaluatorEditor flow callbacks", async () => {
+      seedStoreWithEvaluatorAndDataset();
+      const user = userEvent.setup();
+
+      render(
+        <TargetCellContent
+          target={targetWithEvaluator()}
+          output="some output"
+          evaluatorResults={{}}
+          row={0}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await user.click(screen.getByTestId("evaluator-chip-stub-eval-1"));
+
+      expect(mockSetFlowCallbacks).toHaveBeenCalledWith(
+        "evaluatorEditor",
+        expect.objectContaining({
+          onMappingChange: expect.any(Function),
+        }),
+      );
+    });
+
+    it("opens the evaluatorEditor drawer with a mappingsConfig containing availableSources and initialMappings", async () => {
+      seedStoreWithEvaluatorAndDataset();
+      const user = userEvent.setup();
+
+      render(
+        <TargetCellContent
+          target={targetWithEvaluator()}
+          output="some output"
+          evaluatorResults={{}}
+          row={0}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await user.click(screen.getByTestId("evaluator-chip-stub-eval-1"));
+
+      await waitFor(() => {
+        expect(mockOpenDrawer).toHaveBeenCalledWith(
+          "evaluatorEditor",
+          expect.objectContaining({
+            evaluatorType: "langevals/exact_match",
+            mappingsConfig: expect.objectContaining({
+              availableSources: expect.any(Array),
+              initialMappings: expect.any(Object),
+            }),
+          }),
+        );
+      });
+    });
+
+    it("keeps onMappingChange OUT of mappingsConfig (serializable complexProps constraint, see #3087)", async () => {
+      seedStoreWithEvaluatorAndDataset();
+      const user = userEvent.setup();
+
+      render(
+        <TargetCellContent
+          target={targetWithEvaluator()}
+          output="some output"
+          evaluatorResults={{}}
+          row={0}
+        />,
+        { wrapper: Wrapper },
+      );
+
+      await user.click(screen.getByTestId("evaluator-chip-stub-eval-1"));
+
+      expect(mockOpenDrawer).toHaveBeenCalledWith(
+        "evaluatorEditor",
+        expect.objectContaining({
+          mappingsConfig: expect.not.objectContaining({
+            onMappingChange: expect.any(Function),
+          }),
+        }),
+      );
     });
   });
 });

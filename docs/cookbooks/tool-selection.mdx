@@ -1,0 +1,374 @@
+---
+title: Evaluating Tool Selection
+description: Understand how to evaluate tools and components in your RAG pipeline—covering retrievers, embedding models, chunking strategies, and vector stores.
+keywords:
+  [
+    RAG tools,
+    RAG stack,
+    tool selection,
+    retriever evaluation,
+    embedding models,
+    chunking,
+    vector stores,
+    LLM architecture,
+  ]
+---
+
+In this cookbook, we demonstrate how to evaluate tool calling capabilities in LLM applications using objective metrics. Like always, we'll focus on data-driven approaches to measure and improve tool selection performance.
+
+When building AI assistants, we often need them to use external tools - searching databases, calling APIs, or processing data. But how do we know if our model is selecting the right tools at the right time? Traditional evaluation methods don't capture this well.
+
+Imagine you're building a customer service bot. A user asks "What's my account balance?" Your assistant needs to decide: should it query the account database, ask for authentication, or simply respond with general information? Selecting the wrong tool leads to either frustrated users (if important tools are missed) or wasted resources (if unnecessary tools are called).
+
+The key insight is that tool selection quality is distinct from text generation quality. You can have a model that writes beautiful responses but consistently fails to take appropriate actions. By measuring precision and recall of tool selection decisions, we can systematically improve how our models interact with the world around them.
+
+## Requirements
+
+Before starting, ensure you have the following packages installed:
+
+```bash
+%pip install langwatch pydantic openai pandas
+```
+
+## Setup
+
+Start by setting up LangWatch to monitor your RAG application:
+
+```python
+import langwatch
+import openai
+import getpass
+import pandas as pd
+
+# Initialize OpenAI and LangWatch
+openai.api_key = getpass.getpass('Enter your OpenAI API key: ')
+langwatch.login()
+```
+
+## Metrics
+
+To start evaluating, you need to do 3 things:
+
+1. Define the tools that your model can call
+2. Define an evaluation dataset of queries and corresponding expected tool calls
+3. Define a function to calculate precision and recall.
+
+Before defining our tools, let's take a look at the metrics we will be working with. In contrast to RAG, we will be using a different set of metrics for evaluating tool calling, namely precision and recall.
+
+```python
+def calculate_precision(model_tool_call, expected_tool_call):
+    if not model_tool_call:
+        return 0.0
+
+    correct_calls = sum(1 for tool in model_tool_call if tool in expected_tool_call)
+    return round(correct_calls / len(model_tool_call), 2)
+
+def calculate_recall(model_tool_call, expected_tool_call):
+    if not expected_tool_call:
+        return 1.0
+
+    if not model_tool_call:
+        return 0.0
+
+    correct_calls = sum(1 for tool in expected_tool_call if tool in model_tool_call)
+    return round(correct_calls / len(expected_tool_call), 2)
+
+def calculate_precision_recall_for_queries(df):
+    df = df.copy()
+    df["precision"] = df.apply(lambda x: calculate_precision(x["actual"], x["expected"]), axis=1)
+    df["recall"] = df.apply(lambda x: calculate_recall(x["actual"], x["expected"]), axis=1)
+    return df
+```
+
+Remember:
+
+- **Precision**: The ratio of correct tool calls to total tool calls
+- **Recall**: The ratio of correct tool calls to total possible tool calls
+
+In RAG, precision was less important since we relied on the model's ability to filter out relevant documents. In tool calling, precision is very important. For example, let's say the model calls the following tools: get calendar events, create reminder, and send email about the event. If all we really cared about is that the model tells us what time an event is, we don't care about the reminder nor the email. As oppposed to RAG, the model won't filter these tools out for us (technically you could chain it with another LLM to do this for you, but this is not a standard practice). It will call them, leading to increased latency and cost. Recall is, just like standard RAG, important. If we're not calling the right tools, we might miss out on potential tools that the user needs.
+
+## Defining Tools
+
+Let's start by defining our tools. When starting out, you can define a small set of 3-4 tools to evaluate. Once the evaluation framework is set in place, you can scale the number of tools to evaluate. For this application, I'll be looking at 3 tools: get calendar events, create reminder, and send email about the event.
+
+```python
+from typing import List
+from datetime import datetime, timedelta
+
+def send_email(email: str, subject: str, body: str) -> str:
+    """Send an email to the specified address.
+
+    Args:
+        email: The recipient's email address
+        subject: The email subject line
+        body: The content of the email
+
+    Returns:
+        A confirmation message
+    """
+    print(f"Sending email to {email} with subject: {subject}")
+    return f"Email sent to {email}"
+
+def get_calendar_events(start_date: str, end_date: str) -> List[dict]:
+    """Retrieve calendar events from specified calendars.
+
+    Args:
+        start_date: Start date for events (defaults to now)
+        end_date: End date for events (defaults to 7 days from now)
+
+    Returns:
+        List of calendar events
+    """
+
+    print(f"Getting events between {start_date} and {end_date}")
+    return [{"title": "Sample Event", "date": start_date.isoformat()}]
+
+def create_reminder(title: str, description: str, due_date: str) -> str:
+    """Create a new reminder.
+
+    Args:
+        title: Title of the reminder
+        description: Detailed description of the reminder
+        due_date: When the reminder is due
+
+    Returns:
+        Confirmation of reminder creation
+    """
+    print(f"Creating reminder: {title} due on {due_date}")
+    return f"Reminder '{title}' created for {due_date.isoformat()}"
+```
+
+We'll use OpenAI's API to call tools. Note that OpenAI's tools parameters expects the functions to be defined in a specific way. In the utils folder, we define a function that takes a function as input and returns a schema in the format that OpenAI expects.
+
+```python
+import asyncio
+from datetime import datetime
+from openai import AsyncOpenAI
+from helpers import func_to_schema
+
+available_tools = [func_to_schema(func) for func in [send_email, get_calendar_events, create_reminder]]
+
+# Main function to generate and execute tool calls
+async def process_user_query(query: str):
+    client = AsyncOpenAI(api_key=openai.api_key)
+
+    messages = [
+        {
+            "role": "system",
+            "content": f"You are a helpful assistant that can call tools in response to user requests. Today's date is {datetime.now().strftime('%Y-%m-%d')}"
+        },
+        {"role": "user", "content": query}
+    ]
+
+    start_time = asyncio.get_event_loop().time()
+
+    response = await client.responses.create(
+        model="gpt-5",
+        input=messages,
+        tools=available_tools,
+    )
+
+    end_time = asyncio.get_event_loop().time()
+
+    return {
+        "response": response,
+        "time": end_time - start_time
+    }
+```
+
+## Define an Eval Set
+
+Now that we have our tools defined, we can define an eval set. I'll test the model for its ability to call a single and a combination of two tools.
+
+```python
+tests = [
+    ["Send an email to john@example.com about the project update", [send_email]],
+    ["What meetings do I have scheduled for tomorrow?", [get_calendar_events]],
+    ["Set a reminder for my dentist appointment next week", [create_reminder]],
+    ["Check my calendar for next week's meetings and set reminders for each one", [get_calendar_events, create_reminder]],
+    ["Look up my team meeting schedule and send the agenda to all participants", [get_calendar_events, send_email]],
+    ["Set a reminder for the client call and send a confirmation email to the team", [create_reminder, send_email]],
+]
+```
+
+Note that you don't need a lot of examples to begin with. The first few tests are used to set up an evaluation framework that can scale with you.
+
+## Run the Tests
+
+```python
+def extract_tool_calls(response):
+    """Extract tool calls from the new response format"""
+    tool_calls = []
+
+    if hasattr(response, 'output') and response.output:
+        for output_item in response.output:
+            if output_item.type == 'function_call':
+                tool_calls.append(output_item.name)
+
+    return tool_calls
+
+# Initialize a new experiment
+evaluation = langwatch.experiment.init("tool-calling-evaluation")
+
+# Create a DataFrame from the test data for easier processing
+test_df = pd.DataFrame([
+    {
+        "query": test_item[0],
+        "expected": [tool.__name__ for tool in test_item[1]]
+    }
+    for test_item in tests
+])
+
+# Wrap your loop with evaluation.loop(), and iterate as usual
+results = []
+for idx, row in evaluation.loop(test_df.iterrows()):
+    # Run your model
+    result = await process_user_query(row["query"])
+
+    # Extract tool calls
+    actual_tools = extract_tool_calls(result["response"])
+
+    # Calculate metrics
+    precision = calculate_precision(actual_tools, row["expected"])
+    recall = calculate_recall(actual_tools, row["expected"])
+
+    # Log metrics for this sample
+    evaluation.log("precision", index=idx, score=precision)
+    evaluation.log("recall", index=idx, score=recall)
+
+    # Include additional data for debugging
+    evaluation.log("tool_selection",
+                  index=idx,
+                  score=recall,  # Using recall as the primary score
+                  data={
+                      "query": row["query"],
+                      "expected_tools": row["expected"],
+                      "actual_tools": actual_tools,
+                      "response_time": round(result["time"], 2)
+                  })
+
+    # Store results for local analysis
+    results.append({
+        "query": row["query"],
+        "expected": row["expected"],
+        "actual": actual_tools,
+        "time": round(result["time"], 2),
+        "precision": precision,
+        "recall": recall
+    })
+
+# Create DataFrame for local analysis
+df = pd.DataFrame(results)
+df
+```
+
+| query                                                                        | expected                               | actual                        | time | precision | recall |
+| ---------------------------------------------------------------------------- | -------------------------------------- | ----------------------------- | ---- | --------- | ------ |
+| Send an email to john@example.com about the project update                   | [send_email]                           | []                            | 0.90 | 0.0       | 0.0    |
+| What meetings do I have scheduled for tomorrow?                              | [get_calendar_events]                  | [get_calendar_events]         | 0.88 | 1.0       | 1.0    |
+| Set a reminder for my dentist appointment next week                          | [create_reminder]                      | [create_reminder]             | 1.37 | 1.0       | 1.0    |
+| Check my calendar for next week's meetings and set reminders for each one    | [get_calendar_events, create_reminder] | [get_calendar_events]         | 1.06 | 1.0       | 0.5    |
+| Look up my team meeting schedule and send the agenda to all participants     | [get_calendar_events, send_email]      | [get_calendar_events]         | 1.19 | 1.0       | 0.5    |
+| Set a reminder for the client call and send a confirmation email to the team | [create_reminder, send_email]          | [create_reminder, send_email] | 1.97 | 1.0       | 1.0    |
+
+Our evaluation reveals interesting patterns in the model's tool selection behavior: The model demonstrates good precision in tool selection - when it chooses to invoke a tool, it's typically the right one for the task. This suggests the model has a strong understanding of each tool's use cases. However, we observe lower recall scores in scenarios requiring multiple tool coordination. The model sometimes fails to recognize when a complex query necessitates multiple tools working together.
+
+Consider the query: "Look at my team meeting schedule and send the agenda to all participants." This requires:
+
+1. Retrieving calendar information (`get_calendar_events`)
+2. Composing and sending an email (`send_email`)
+
+We should also break down recall by tool category to identify which types of tools the model handles well and where it struggles. This can guide improvements like refining tool descriptions, renaming functions for clarity, or even removing tools that aren’t adding value.
+
+```python
+def calculate_per_tool_recall(df):
+    """Calculate recall metrics for each individual tool."""
+    # Collect all unique tools
+    all_tools = set()
+    for tools in df["expected"] + df["actual"]:
+        all_tools.update(tools)
+
+    # Initialize counters
+    correct_calls = {tool: 0 for tool in all_tools}
+    expected_calls = {tool: 0 for tool in all_tools}
+
+    # Use evaluation.loop() to wrap the iteration
+    for idx, row in evaluation.loop(df.iterrows()):
+        expected = set(row["expected"])
+        actual = set(row["actual"])
+
+        for tool in expected:
+            expected_calls[tool] += 1
+            if tool in actual:
+                correct_calls[tool] += 1
+
+            # Log each tool's performance for this specific query
+            evaluation.log(
+                f"tool_{tool}_query_{idx}",
+                index=idx,
+                score=1.0 if tool in actual else 0.0,
+                data={
+                    "query": row["query"],
+                    "tool": tool,
+                    "was_called": tool in actual
+                }
+            )
+
+    # Build results dataframe
+    results = []
+    for tool_idx, tool in enumerate(all_tools):
+        recall = correct_calls[tool] / expected_calls[tool] if expected_calls[tool] > 0 else 0
+        results.append({
+            "tool": tool,
+            "correct_calls": correct_calls[tool],
+            "expected_calls": expected_calls[tool],
+            "recall": recall
+        })
+
+        # Log the overall recall for each tool
+        evaluation.log(
+            f"tool_recall_{tool}",
+            index=tool_idx,
+            score=recall,
+            data={
+                "tool": tool,
+                "correct_calls": int(correct_calls[tool]),
+                "expected_calls": int(expected_calls[tool])
+            }
+        )
+
+    return pd.DataFrame(results).sort_values("recall", ascending=False).round(2)
+
+# Calculate per-tool recall metrics and log to LangWatch
+tool_recall_df = calculate_per_tool_recall(df)
+tool_recall_df
+```
+
+| tool                | correct_calls | expected_calls | recall |
+| ------------------- | ------------- | -------------- | ------ |
+| get_calendar_events | 3             | 3              | 1.00   |
+| create_reminder     | 2             | 3              | 0.67   |
+| send_email          | 1             | 3              | 0.33   |
+
+The model shows a clear preference hierarchy, with calendar queries being handled most reliably, followed by reminders, and then emails. This suggests that:
+
+1. The `send_email` tool may need improved descriptions or examples to better match user query patterns
+2. Multi-tool coordination needs enhancement, particularly for action-oriented tools
+
+This tool-specific analysis helps us target improvements where they'll have the most impact, rather than making general changes to the entire system.
+
+## Conclusion
+
+In this cookbook, we've demonstrated how to evaluate tool calling capabilities using objective metrics like precision and recall. By systematically analyzing tool selection performance, we've gained valuable insights into where our model excels and where it needs improvement.
+
+Our evaluation revealed that the model achieves high precision (consistently selecting appropriate tools when it does make a selection) but struggles with recall for certain tools, particularly when multiple tools need to be coordinated. The `send_email` tool showed the lowest recall (0.33), indicating it's frequently overlooked even when needed.
+
+This data-driven approach to tool evaluation offers several advantages over traditional methods:
+
+1. It provides objective metrics that can be tracked over time
+2. It identifies specific tools that need improvement rather than general system issues
+3. It highlights patterns in the model's decision-making process that might not be obvious from manual testing
+
+When building your own tool-enabled AI systems, remember that tool selection is as critical as the quality of the generated text. A model that writes beautifully but fails to take appropriate actions will ultimately disappoint users. By measuring precision and recall at both the query and tool level, you can systematically improve your system's ability to take the right actions at the right time.
+
+For the full notebook, check it out on: [GitHub](https://github.com/langwatch/cookbooks/blob/main/notebooks/tool-calling.ipynb).

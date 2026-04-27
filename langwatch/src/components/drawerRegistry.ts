@@ -7,7 +7,7 @@
  * - `DrawerProps<T>`: Props type for a specific drawer
  * - `DrawerCallbacks<T>`: Callback props (functions) for a specific drawer
  */
-import type { ComponentProps } from "react";
+import { lazy, type ComponentProps } from "react";
 
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
@@ -19,6 +19,7 @@ import { AgentHistoryDrawer } from "./agents/AgentHistoryDrawer";
 import { AgentHttpEditorDrawer } from "./agents/AgentHttpEditorDrawer";
 import { AgentListDrawer } from "./agents/AgentListDrawer";
 import { AgentTypeSelectorDrawer } from "./agents/AgentTypeSelectorDrawer";
+import { AgentWorkflowEditorDrawer } from "./agents/AgentWorkflowEditorDrawer";
 import { WorkflowSelectorDrawer } from "./agents/WorkflowSelectorDrawer";
 import { AlertDrawer } from "./analytics/AlertDrawer";
 import { DashboardNameDrawer } from "./analytics/DashboardNameDrawer";
@@ -37,11 +38,17 @@ import { EvaluatorListDrawer } from "./evaluators/EvaluatorListDrawer";
 import { EvaluatorTypeSelectorDrawer } from "./evaluators/EvaluatorTypeSelectorDrawer";
 import { WorkflowSelectorForEvaluatorDrawer } from "./evaluators/WorkflowSelectorForEvaluatorDrawer";
 import { SdkRadarDrawer } from "./drawers/SdkRadarDrawer";
+// Lazy-loaded: FoundryDrawer transitively imports the OTel SDK which has
+// side effects that break React if evaluated eagerly at app startup.
+const FoundryDrawer = lazy(
+  () => import("./ops/foundry/FoundryDrawer").then((m) => ({ default: m.FoundryDrawer })),
+);
 import { CreateProjectDrawer } from "./projects/CreateProjectDrawer";
 import { PromptEditorDrawer } from "./prompts/PromptEditorDrawer";
 import { PromptListDrawer } from "./prompts/PromptListDrawer";
 import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 import { ScenarioFormDrawerFromUrl } from "./scenarios/ScenarioFormDrawer";
+import { CreateTeamDrawer } from "./settings/CreateTeamDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { ScenarioRunDetailDrawer } from "./simulations/ScenarioRunDetailDrawer";
 import { SuiteFormDrawer } from "./suites/SuiteFormDrawer";
@@ -78,6 +85,7 @@ export const drawers = {
   agentTypeSelector: AgentTypeSelectorDrawer,
   agentCodeEditor: AgentCodeEditorDrawer,
   agentHttpEditor: AgentHttpEditorDrawer,
+  agentWorkflowEditor: AgentWorkflowEditorDrawer,
   workflowSelector: WorkflowSelectorDrawer,
   evaluatorHistory: EvaluatorHistoryDrawer,
   evaluatorList: EvaluatorListDrawer,
@@ -93,11 +101,14 @@ export const drawers = {
   suiteEditor: SuiteFormDrawer,
   // Project management
   createProject: CreateProjectDrawer,
+  createTeam: CreateTeamDrawer,
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,
   // SDK Radar
   sdkRadar: SdkRadarDrawer,
+  // Ops
+  foundry: FoundryDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 /**

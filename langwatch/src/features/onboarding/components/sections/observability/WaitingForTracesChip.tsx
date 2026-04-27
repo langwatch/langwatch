@@ -1,5 +1,5 @@
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { CheckCircle } from "react-feather";

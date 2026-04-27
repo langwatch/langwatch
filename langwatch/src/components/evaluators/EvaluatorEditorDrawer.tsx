@@ -77,7 +77,7 @@ export type EvaluatorMappingsConfig = {
   /** Initial mappings in UI format - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback when a mapping changes - used to persist to store */
-  onMappingChange: (
+  onMappingChange?: (
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
@@ -116,6 +116,19 @@ export type EvaluatorEditorDrawerProps = {
    */
   onLocalConfigChange?: (config: LocalEvaluatorConfig | undefined) => void;
   /**
+   * Callback for when a variable mapping changes.
+   *
+   * This prop exists so `setFlowCallbacks("evaluatorEditor", { onMappingChange })`
+   * is type-safe (the flow callbacks registry derives from drawer props).
+   * Callers must NOT pass it directly — it must go through setFlowCallbacks so
+   * the non-serializable function survives ErrorBoundary remounts and drawer
+   * navigation (it cannot be persisted through the ephemeral complexProps path).
+   */
+  onMappingChange?: (
+    identifier: string,
+    mapping: UIFieldMapping | undefined,
+  ) => void;
+  /**
    * Initial local config to load (for resuming unpublished changes).
    * When provided, overrides DB data for form initialization.
    */
@@ -147,10 +160,14 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
     drawerParams.evaluatorId ??
     (complexProps.evaluatorId as string | undefined);
 
-  // Get mappingsConfig from props or complexProps
+  // onMappingChange is registered via setFlowCallbacks because it is a
+  // non-serializable function that must survive drawer lifecycle events
+  // (in-app navigation, ErrorBoundary remount) rather than being embedded
+  // in the ephemeral mappingsConfig/complexProps path.
   const mappingsConfig =
     props.mappingsConfig ??
     (complexProps.mappingsConfig as EvaluatorMappingsConfig | undefined);
+  const onMappingChange = flowCallbacks?.onMappingChange;
 
   // Get custom save button text from props or complexProps
   const saveButtonText =
@@ -263,6 +280,7 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   } | null>(null);
   const onLocalConfigChangeRef = useRef(onLocalConfigChange);
   onLocalConfigChangeRef.current = onLocalConfigChange;
+  const initializedForEvaluatorRef = useRef<string | null>(null);
 
   // Initialize form with evaluator data (merging local config if present)
   useEffect(() => {
@@ -276,16 +294,19 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
       };
       savedFormValuesRef.current = savedValues;
 
-      // Merge local config over DB data if present
-      const formValues = initialLocalConfig
-        ? {
-            name: initialLocalConfig.name,
-            settings: initialLocalConfig.settings ?? savedValues.settings,
-          }
-        : savedValues;
+      // Only reset form on first data load for this evaluator, not on refetches
+      if (initializedForEvaluatorRef.current !== evaluatorQuery.data.id) {
+        initializedForEvaluatorRef.current = evaluatorQuery.data.id;
+        const formValues = initialLocalConfig
+          ? {
+              name: initialLocalConfig.name,
+              settings: initialLocalConfig.settings ?? savedValues.settings,
+            }
+          : savedValues;
 
-      form.reset(formValues);
-      setHasUnsavedChanges(!!initialLocalConfig);
+        form.reset(formValues);
+        setHasUnsavedChanges(!!initialLocalConfig);
+      }
     }
   }, [evaluatorQuery.data, form, initialLocalConfig]);
 
@@ -426,20 +447,31 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
   const handleSave = useCallback(() => {
     if (!project?.id || !isValid) return;
 
-    // For existing workflow evaluators, we're just "selecting" them, not saving
-    // Call onSave directly without requiring evaluatorType
+    // For existing workflow evaluators, persist name changes via mutation
     if (evaluatorId && isWorkflowEvaluator) {
-      const freshOnSave = getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
-      const handledNavigation = freshOnSave?.({
-        id: evaluatorId,
-        name: evaluatorQuery.data?.name ?? "",
-      });
-      if (handledNavigation) return;
-      // Default: go back if there's a stack, otherwise close
-      if (getDrawerStack().length > 1) {
-        goBack();
+      const formValues = form.getValues();
+      const newName = formValues.name.trim();
+      const nameChanged = newName !== (evaluatorQuery.data?.name?.trim() ?? "");
+
+      if (nameChanged) {
+        updateMutation.mutate({
+          id: evaluatorId,
+          projectId: project.id,
+          name: newName,
+        });
       } else {
-        onClose();
+        const freshOnSave =
+          getFlowCallbacks("evaluatorEditor")?.onSave ?? onSave;
+        const handledNavigation = freshOnSave?.({
+          id: evaluatorId,
+          name: evaluatorQuery.data?.name ?? "",
+        });
+        if (handledNavigation) return;
+        if (getDrawerStack().length > 1) {
+          goBack();
+        } else {
+          onClose();
+        }
       }
       return;
     }
@@ -640,22 +672,24 @@ export function EvaluatorEditorDrawer(props: EvaluatorEditorDrawerProps) {
                   </VStack>
                 )}
 
-                {/* No settings message - only for non-workflow evaluators with no settings and no mappings */}
-                {!hasSettings && !mappingsConfig && !isWorkflowEvaluator && (
+                {/* No settings message - only for non-workflow evaluators with no settings and no active mappings */}
+                {!hasSettings &&
+                  (!mappingsConfig || !onMappingChange) &&
+                  !isWorkflowEvaluator && (
                   <Text fontSize="sm" color="fg.muted">
                     This evaluator does not have any settings to configure.
                   </Text>
                 )}
 
-                {/* Mappings section - shown when caller provides mappingsConfig */}
-                {mappingsConfig && (
+                {/* Mappings section - shown when caller provides mappingsConfig and onMappingChange */}
+                {mappingsConfig && onMappingChange && (
                   <Box paddingTop={4}>
                     <EvaluatorMappingsSection
                       evaluatorDef={effectiveEvaluatorDef}
                       level={mappingsConfig.level}
                       providedSources={mappingsConfig.availableSources}
                       initialMappings={mappingsConfig.initialMappings}
-                      onMappingChange={mappingsConfig.onMappingChange}
+                      onMappingChange={onMappingChange}
                       scrollToMissingOnMount={true}
                     />
                   </Box>
@@ -743,7 +777,7 @@ type EvaluatorMappingsSectionProps = {
   /** Initial mappings - used to seed local state */
   initialMappings: Record<string, UIFieldMapping>;
   /** Callback to persist changes to store */
-  onMappingChange: (
+  onMappingChange?: (
     identifier: string,
     mapping: UIFieldMapping | undefined,
   ) => void;
@@ -875,7 +909,7 @@ function EvaluatorMappingsSection({
       });
 
       // Persist to store
-      onMappingChange(identifier, mapping);
+      onMappingChange?.(identifier, mapping);
     },
     [onMappingChange],
   );

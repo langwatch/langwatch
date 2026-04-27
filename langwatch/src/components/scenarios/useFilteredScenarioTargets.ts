@@ -2,7 +2,11 @@ import { useMemo } from "react";
 import type { TargetValue } from "./TargetSelector";
 
 /** Agent types that can be used as scenario targets */
-const SCENARIO_AGENT_TYPES: ReadonlySet<string> = new Set(["http", "code"]);
+const SCENARIO_AGENT_TYPES: ReadonlySet<string> = new Set([
+  "http",
+  "code",
+  "workflow",
+]);
 
 type AgentLike = {
   id: string;
@@ -11,9 +15,9 @@ type AgentLike = {
   updatedAt: Date | string;
 };
 
-type ScenarioAgent = AgentLike & { type: "http" | "code" };
+type ScenarioAgent = AgentLike & { type: "http" | "code" | "workflow" };
 
-/** Filter and sort agents to only valid scenario target types (HTTP + code). */
+/** Filter and sort agents to only valid scenario target types. */
 export function useFilteredAgents(
   agents: AgentLike[] | undefined,
   searchValue: string,
@@ -33,9 +37,11 @@ export function useFilteredAgents(
   }, [agents, searchValue]);
 }
 
-/** Type guard: is this target value an agent (HTTP or code)? */
+/** Type guard: is this target value an agent (HTTP, code, or workflow)? */
 export function isAgentTarget(
   target: TargetValue,
-): target is NonNullable<TargetValue> & { type: "http" | "code" } {
+): target is NonNullable<TargetValue> & {
+  type: "http" | "code" | "workflow";
+} {
   return target !== null && SCENARIO_AGENT_TYPES.has(target.type);
 }

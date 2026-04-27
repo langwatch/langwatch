@@ -1,7 +1,7 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 import type { WithDateWrites } from "~/server/clickhouse/types";
 import {
-  ErrorCategory,
+  classifyClickHouseError,
   SecurityError,
   StoreError,
   ValidationError,
@@ -46,11 +46,12 @@ interface ClickHouseSuiteRunRecord {
   UpdatedAt: number;
   StartedAt: number | null;
   FinishedAt: number | null;
+  LastEventOccurredAt: number;
 }
 
 type ClickHouseSuiteRunWriteRecord = WithDateWrites<
   ClickHouseSuiteRunRecord,
-  "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt"
+  "CreatedAt" | "UpdatedAt" | "StartedAt" | "FinishedAt" | "LastEventOccurredAt"
 >;
 
 export class SuiteRunStateRepositoryClickHouse<
@@ -80,6 +81,7 @@ export class SuiteRunStateRepositoryClickHouse<
       UpdatedAt: Number(record.UpdatedAt),
       StartedAt: record.StartedAt === null ? null : Number(record.StartedAt),
       FinishedAt: record.FinishedAt === null ? null : Number(record.FinishedAt),
+      LastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
     };
   }
 
@@ -110,6 +112,7 @@ export class SuiteRunStateRepositoryClickHouse<
       UpdatedAt: new Date(data.UpdatedAt),
       StartedAt: new Date(data.StartedAt ?? data.CreatedAt),
       FinishedAt: data.FinishedAt != null ? new Date(data.FinishedAt) : null,
+      LastEventOccurredAt: data.LastEventOccurredAt ? new Date(data.LastEventOccurredAt) : new Date(0),
     };
   }
 
@@ -135,7 +138,8 @@ export class SuiteRunStateRepositoryClickHouse<
             toUnixTimestamp64Milli(CreatedAt) AS CreatedAt,
             toUnixTimestamp64Milli(UpdatedAt) AS UpdatedAt,
             toUnixTimestamp64Milli(StartedAt) AS StartedAt,
-            toUnixTimestamp64Milli(FinishedAt) AS FinishedAt
+            toUnixTimestamp64Milli(FinishedAt) AS FinishedAt,
+            toUnixTimestamp64Milli(LastEventOccurredAt) AS LastEventOccurredAt
           FROM ${TABLE_NAME}
           WHERE TenantId = {tenantId:String}
             AND BatchRunId = {batchRunId:String}
@@ -168,7 +172,7 @@ export class SuiteRunStateRepositoryClickHouse<
         "getProjection",
         "SuiteRunStateRepositoryClickHouse",
         `Failed to get projection for batch run ${batchRunId}: ${errorMessage}`,
-        ErrorCategory.CRITICAL,
+        classifyClickHouseError(error),
         { batchRunId },
         error,
       );
@@ -214,7 +218,7 @@ export class SuiteRunStateRepositoryClickHouse<
         table: TABLE_NAME,
         values: [projectionRecord],
         format: "JSONEachRow",
-        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 0 },
       });
 
     } catch (error) {
@@ -230,8 +234,66 @@ export class SuiteRunStateRepositoryClickHouse<
         "storeProjection",
         "SuiteRunStateRepositoryClickHouse",
         `Failed to store projection ${projection.id} for batch run ${projection.aggregateId}: ${errorMessage}`,
-        ErrorCategory.CRITICAL,
+        classifyClickHouseError(error),
         { projectionId: projection.id, batchRunId: String(projection.aggregateId) },
+        error,
+      );
+    }
+  }
+
+  async storeProjectionBatch(
+    projections: ProjectionType[],
+    context: ProjectionStoreWriteContext,
+  ): Promise<void> {
+    if (projections.length === 0) return;
+
+    EventUtils.validateTenantId(
+      context,
+      "SuiteRunStateRepositoryClickHouse.storeProjectionBatch",
+    );
+
+    for (const projection of projections) {
+      if (projection.tenantId !== context.tenantId) {
+        throw new SecurityError(
+          "storeProjectionBatch",
+          `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+          projection.tenantId,
+          { contextTenantId: context.tenantId },
+        );
+      }
+    }
+
+    try {
+      const records = projections.map((projection) =>
+        this.mapProjectionDataToClickHouseRecord(
+          projection.data as SuiteRunStateData,
+          String(context.tenantId),
+          projection.id,
+          projection.version,
+        ),
+      );
+
+      const client = await this.resolveClient(context.tenantId);
+      await client.insert({
+        table: TABLE_NAME,
+        values: records,
+        format: "JSONEachRow",
+        clickhouse_settings: { async_insert: 1, wait_for_async_insert: 1 },
+      });
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error({
+        tenantId: context.tenantId,
+        count: projections.length,
+        error: errorMessage,
+      }, "Failed to batch store suite projections in ClickHouse");
+      throw new StoreError(
+        "storeProjectionBatch",
+        "SuiteRunStateRepositoryClickHouse",
+        `Failed to batch store ${projections.length} projections: ${errorMessage}`,
+        classifyClickHouseError(error),
+        { count: projections.length },
         error,
       );
     }

@@ -1,9 +1,9 @@
+import type { Projection } from "../domain/types";
 import type {
-	Projection,
 	ProjectionStore,
 	ProjectionStoreReadContext,
 	ProjectionStoreWriteContext,
-} from "../";
+} from "./projectionStore.types";
 
 /**
  * Base class for in-memory projection stores.

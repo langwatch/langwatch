@@ -16,6 +16,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SimulationSuite } from "@prisma/client";
 import { SuiteSidebar, SUITE_SIDEBAR_COLLAPSED_KEY } from "../SuiteSidebar";
+import { NowProvider } from "../NowProvider";
 import { ALL_RUNS_ID } from "../useSuiteRouting";
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
@@ -43,6 +44,7 @@ function makeSuite(
 }
 
 const defaultProps = {
+  projectSlug: "my-project",
   suites: [] as SimulationSuite[],
   selectedSuiteSlug: null,
   onSelectSuite: vi.fn(),
@@ -245,6 +247,7 @@ describe("<SuiteSidebar/>", () => {
     ];
 
     describe("when a suite has all passing results", () => {
+      const FIXED_NOW = new Date("2026-01-15T12:00:00Z").getTime();
       const runSummaries = new Map([
         [
           "suite_1",
@@ -252,7 +255,7 @@ describe("<SuiteSidebar/>", () => {
             passedCount: 8,
             failedCount: 0,
             totalCount: 8,
-            lastRunTimestamp: Date.now() - 2 * 60 * 60 * 1000,
+            lastRunTimestamp: FIXED_NOW - 2 * 60 * 60 * 1000,
           },
         ],
       ]);
@@ -284,16 +287,30 @@ describe("<SuiteSidebar/>", () => {
       });
 
       it("displays compact recency text", () => {
-        render(
-          <SuiteSidebar
-            {...defaultProps}
-            suites={suites}
-            runSummaries={runSummaries}
-          />,
-          { wrapper: Wrapper },
+        const NowWrapper = ({ children }: { children: React.ReactNode }) => (
+          <ChakraProvider value={defaultSystem}>
+            <NowProvider intervalMs={999999}>{children}</NowProvider>
+          </ChakraProvider>
         );
+        // Override the NowProvider with FIXED_NOW so time is deterministic
+        vi.useFakeTimers();
+        vi.setSystemTime(FIXED_NOW);
+        try {
+          render(
+            <SuiteSidebar
+              {...defaultProps}
+              suites={suites}
+              runSummaries={runSummaries}
+            />,
+            { wrapper: NowWrapper },
+          );
 
-        expect(screen.getByText(/2h ago/)).toBeInTheDocument();
+          const suiteItems = screen.getAllByTestId("suite-list-item");
+          const texts = suiteItems.map((el) => el.textContent).join(" ");
+          expect(texts).toMatch(/2h ago/);
+        } finally {
+          vi.useRealTimers();
+        }
       });
     });
 

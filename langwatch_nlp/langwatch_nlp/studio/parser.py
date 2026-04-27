@@ -113,7 +113,9 @@ def parse_workflow(
         node.data.name = normalize_name_to_class_name(node.data.name or "")
 
     node_templates = {
-        node.id: parse_component(node, workflow, format) for node in nodes
+        node.id: parse_component(node, workflow, format)
+        for node in nodes
+        if node.type not in ("entry", "end")
     }
 
     inputs = workflow_inputs(workflow)
@@ -165,11 +167,39 @@ def parsed_and_materialized_workflow_class(
         yield cast(Type[LangWatchWorkflowModule], Module), inputs
 
 
+_SIGNATURE_FIELD_TYPE_SPECIAL_CASES = {"json_schema"}
+
+
+def _assert_signature_field_types_are_mapped(node: Node) -> None:
+    """
+    Surface unmapped signature input/output types as a structured error so the user sees
+    which field broke instead of a bare Jinja `UndefinedError('dict object' has no attribute
+    'X')`. See langwatch/langwatch#3415 AC 5.
+    """
+    for collection, kind in (
+        (node.data.inputs or [], "input"),
+        (node.data.outputs or [], "output"),
+    ):
+        for field in collection:
+            raw_type = getattr(field.type, "value", field.type)
+            if raw_type in _SIGNATURE_FIELD_TYPE_SPECIAL_CASES:
+                continue
+            if field.type in FIELD_TYPE_TO_DSPY_TYPE:
+                continue
+            raise ValueError(
+                f"Signature node '{node.id}' {kind} field '{field.identifier}' has type "
+                f"'{raw_type}' which is not present in FIELD_TYPE_TO_DSPY_TYPE. Add a mapping "
+                f"in langwatch_nlp/studio/modules/registry.py or extend llm.py.jinja with a "
+                f"special case."
+            )
+
+
 def parse_component(
     node: Node, workflow: Workflow, standalone=False, format=False, debug_level=0
 ) -> Tuple[str, str, Dict[str, Any]]:
     match node.type:
         case "signature":
+            _assert_signature_field_types_are_mapped(node)
             parameters = parse_fields(node.data.parameters or [], autoparse=True)
 
             prompting_technique = parameters.get("prompting_technique")
@@ -363,9 +393,9 @@ def parse_component(
                         f"Unknown agent_type '{agent_type}' for agent {node.data.name}"
                     )
         case "entry":
-            return "", "None", {}
+            raise ValueError("Entry nodes cannot be executed as standalone components")
         case "end":
-            return "", "None", {}
+            raise ValueError("End nodes cannot be executed as standalone components")
         case _:
             raise ValueError(f"Unknown node type: {node.type}")
 

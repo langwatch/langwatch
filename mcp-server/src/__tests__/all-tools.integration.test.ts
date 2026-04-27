@@ -278,6 +278,50 @@ const CANNED_MODEL_PROVIDERS_LIST = {
   },
 };
 
+const CANNED_AGENTS_LIST = {
+  data: [
+    { id: "agent_abc", name: "Test Agent", type: "http", config: { url: "http://example.com" }, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
+  ],
+  pagination: { page: 1, limit: 50, total: 1, totalPages: 1 },
+};
+
+const CANNED_AGENT_DETAIL = {
+  id: "agent_abc", name: "Test Agent", type: "http", config: { url: "http://example.com" }, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z",
+};
+
+const CANNED_SUITES_LIST = [
+  { id: "suite_abc", name: "Regression Suite", slug: "regression-suite", description: null, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 1, labels: [], createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
+];
+
+const CANNED_SUITE_DETAIL = {
+  id: "suite_abc", name: "Regression Suite", slug: "regression-suite", description: "A test suite", scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 1, labels: [], createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z",
+};
+
+const CANNED_SUITE_CREATED = {
+  id: "suite_new", name: "New Suite", slug: "new-suite", description: null, scenarioIds: ["scen_abc123"], targets: [{ type: "http", referenceId: "agent_abc" }], repeatCount: 1, labels: [], createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z",
+};
+
+const CANNED_SUITE_RUN = {
+  scheduled: true, batchRunId: "batch_123", setId: "set_456", jobCount: 1, skippedArchived: { scenarios: [], targets: [] }, items: [{ scenarioRunId: "run_1", scenarioId: "scen_abc123", target: { type: "http", referenceId: "agent_abc" }, name: "Test" }],
+};
+
+const CANNED_SIMULATION_RUNS = {
+  runs: [{ scenarioRunId: "run_abc", scenarioId: "scen_abc123", batchRunId: "batch_xyz", name: "Login Flow", status: "SUCCESS", durationInMs: 5200, totalCost: 0.0042, timestamp: 1700000000000, updatedAt: 1700000001000 }],
+  hasMore: false,
+};
+
+const CANNED_SIMULATION_RUN_DETAIL = {
+  scenarioRunId: "run_abc", scenarioId: "scen_abc123", batchRunId: "batch_xyz", name: "Login Flow", status: "SUCCESS", durationInMs: 5200, totalCost: 0.0042, results: { verdict: "passed", reasoning: "All criteria met", metCriteria: ["Greets user"], unmetCriteria: [], error: null }, messages: [{ role: "user", content: "Hello" }, { role: "assistant", content: "Hi there!" }], timestamp: 1700000000000, updatedAt: 1700000001000,
+};
+
+const CANNED_DASHBOARDS_LIST = {
+  data: [{ id: "dash_abc", name: "Main Dashboard", order: 0, graphCount: 3, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" }],
+};
+
+const CANNED_WORKFLOWS_LIST = [
+  { id: "wf_abc", name: "Test Workflow", icon: null, description: "A workflow", isEvaluator: false, isComponent: false, createdAt: "2024-01-01T00:00:00Z", updatedAt: "2024-01-01T00:00:00Z" },
+];
+
 const CANNED_MODEL_PROVIDER_SET = {
   openai: {
     provider: "openai",
@@ -435,6 +479,124 @@ function createMockServer(): Server {
       ) {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_MODEL_PROVIDER_SET));
+      }
+      // --- Agent endpoints ---
+      else if (url === "/api/agents" && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_AGENTS_LIST));
+      } else if (url === "/api/agents" && method === "POST") {
+        res.writeHead(201);
+        res.end(JSON.stringify(CANNED_AGENT_DETAIL));
+      } else if (url?.match(/^\/api\/agents\/[^/]+$/) && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_AGENT_DETAIL));
+      } else if (url?.match(/^\/api\/agents\/[^/]+$/) && method === "PATCH") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_AGENT_DETAIL));
+      } else if (url?.match(/^\/api\/agents\/[^/]+$/) && method === "DELETE") {
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: "agent_abc", name: "Test Agent" }));
+      }
+      // --- Suite endpoints ---
+      else if (url === "/api/suites" && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_SUITES_LIST));
+      } else if (url === "/api/suites" && method === "POST") {
+        res.writeHead(201);
+        res.end(JSON.stringify(CANNED_SUITE_CREATED));
+      } else if (url?.match(/^\/api\/suites\/[^/]+\/run$/) && method === "POST") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_SUITE_RUN));
+      } else if (url?.match(/^\/api\/suites\/[^/]+\/duplicate$/) && method === "POST") {
+        res.writeHead(201);
+        res.end(JSON.stringify(CANNED_SUITE_CREATED));
+      } else if (url?.match(/^\/api\/suites\/[^/]+$/) && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_SUITE_DETAIL));
+      } else if (url?.match(/^\/api\/suites\/[^/]+$/) && method === "PATCH") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_SUITE_DETAIL));
+      } else if (url?.match(/^\/api\/suites\/[^/]+$/) && method === "DELETE") {
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: "suite_abc", archived: true }));
+      }
+      // --- Simulation Run endpoints ---
+      else if (url?.match(/^\/api\/simulation-runs\/[^/]+$/) && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_SIMULATION_RUN_DETAIL));
+      } else if (url?.match(/^\/api\/simulation-runs/) && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_SIMULATION_RUNS));
+      }
+      // --- Dashboard endpoints ---
+      else if (url === "/api/dashboards" && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_DASHBOARDS_LIST));
+      } else if (url === "/api/dashboards" && method === "POST") {
+        res.writeHead(201);
+        res.end(JSON.stringify({ id: "dash_new", name: "New Dashboard" }));
+      } else if (url?.match(/^\/api\/dashboards\/[^/]+$/) && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_DASHBOARDS_LIST.data[0]));
+      } else if (url?.match(/^\/api\/dashboards\/[^/]+$/) && method === "DELETE") {
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: "dash_abc", name: "Main Dashboard" }));
+      }
+      // --- Workflow endpoints ---
+      else if (url === "/api/workflows" && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_WORKFLOWS_LIST));
+      } else if (url?.match(/^\/api\/workflows\/[^/]+\/run$/) && method === "POST") {
+        res.writeHead(200);
+        res.end(JSON.stringify({ output: "workflow result" }));
+      } else if (url?.match(/^\/api\/workflows\/[^/]+$/) && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify(CANNED_WORKFLOWS_LIST[0]));
+      } else if (url?.match(/^\/api\/workflows\/[^/]+$/) && method === "DELETE") {
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: "wf_abc", archived: true }));
+      }
+      // --- Monitor endpoints ---
+      else if (url === "/api/monitors" && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify([
+          { id: "mon_abc", name: "Toxicity Check", slug: "toxicity-check-x1y2z", checkType: "ragas/toxicity", enabled: true, executionMode: "ON_MESSAGE", sample: 1.0, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
+        ]));
+      } else if (url === "/api/monitors" && method === "POST") {
+        res.writeHead(201);
+        res.end(JSON.stringify({ id: "mon_new", name: "New Monitor", slug: "new-monitor-abc12", checkType: "ragas/toxicity", enabled: true, executionMode: "ON_MESSAGE", sample: 1.0, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }));
+      } else if (url?.match(/^\/api\/monitors\/[^/]+\/toggle$/) && method === "POST") {
+        const monitorId = url?.split("/")[3];
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: monitorId, enabled: true }));
+      } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: "mon_abc", name: "Toxicity Check", slug: "toxicity-check-x1y2z", checkType: "ragas/toxicity", enabled: true, executionMode: "ON_MESSAGE", sample: 1.0, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" }));
+      } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "PATCH") {
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: "mon_abc", name: "Updated Monitor", slug: "toxicity-check-x1y2z", checkType: "ragas/toxicity", enabled: false, executionMode: "ON_MESSAGE", sample: 0.5, level: "trace", evaluatorId: null, preconditions: [], parameters: {}, mappings: {}, threadIdleTimeout: null, createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z" }));
+      } else if (url?.match(/^\/api\/monitors\/[^/]+$/) && method === "DELETE") {
+        const monitorId = url?.split("/").pop();
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: monitorId, deleted: true }));
+      }
+      // --- Secret endpoints ---
+      else if (url === "/api/secrets" && method === "GET") {
+        res.writeHead(200);
+        res.end(JSON.stringify([
+          { id: "secret_abc", projectId: "proj_123", name: "MY_API_KEY", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-01T00:00:00Z" },
+          { id: "secret_def", projectId: "proj_123", name: "DB_PASSWORD", createdAt: "2026-01-02T00:00:00Z", updatedAt: "2026-01-02T00:00:00Z" },
+        ]));
+      } else if (url === "/api/secrets" && method === "POST") {
+        res.writeHead(201);
+        res.end(JSON.stringify({ id: "secret_new", projectId: "proj_123", name: "NEW_SECRET", createdAt: "2026-01-03T00:00:00Z", updatedAt: "2026-01-03T00:00:00Z" }));
+      } else if (url?.match(/^\/api\/secrets\/[^/]+$/) && method === "PUT") {
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: "secret_abc", projectId: "proj_123", name: "MY_API_KEY", createdAt: "2026-01-01T00:00:00Z", updatedAt: "2026-01-03T00:00:00Z" }));
+      } else if (url?.match(/^\/api\/secrets\/[^/]+$/) && method === "DELETE") {
+        const secretId = url?.split("/").pop();
+        res.writeHead(200);
+        res.end(JSON.stringify({ id: secretId, deleted: true }));
       }
       // --- Fallback ---
       else {
@@ -1332,6 +1494,188 @@ describe("All MCP tools integration", () => {
         "../tools/list-model-providers.js"
       );
       await expect(handleListModelProviders()).rejects.toThrow("401");
+    });
+  });
+
+  // =====================
+  // Suite Tools
+  // =====================
+  describe("platform_list_suites", () => {
+    it("returns formatted suite list", async () => {
+      const { handleListSuites } = await import("../tools/list-suites.js");
+      const result = await handleListSuites({});
+
+      expect(result).toContain("Suites / Run Plans (1 total)");
+      expect(result).toContain("Regression Suite");
+    });
+  });
+
+  describe("platform_get_suite", () => {
+    it("returns suite details", async () => {
+      const { handleGetSuite } = await import("../tools/get-suite.js");
+      const result = await handleGetSuite({ id: "suite_abc" });
+
+      expect(result).toContain("Regression Suite");
+      expect(result).toContain("suite_abc");
+    });
+  });
+
+  describe("platform_create_suite", () => {
+    it("creates a suite and returns confirmation", async () => {
+      const { handleCreateSuite } = await import("../tools/create-suite.js");
+      const result = await handleCreateSuite({
+        name: "New Suite",
+        scenarioIds: ["scen_abc123"],
+        targets: JSON.stringify([{ type: "http", referenceId: "agent_abc" }]),
+      });
+
+      expect(result).toContain("created successfully");
+      expect(result).toContain("New Suite");
+    });
+  });
+
+  describe("platform_run_suite", () => {
+    it("triggers a suite run and returns batch info", async () => {
+      const { handleRunSuite } = await import("../tools/run-suite.js");
+      const result = await handleRunSuite({ id: "suite_abc" });
+
+      expect(result).toContain("scheduled successfully");
+      expect(result).toContain("batch_123");
+    });
+  });
+
+  describe("platform_archive_suite", () => {
+    it("archives the suite", async () => {
+      const { handleArchiveSuite } = await import("../tools/archive-suite.js");
+      const result = await handleArchiveSuite({ id: "suite_abc" });
+
+      expect(result).toContain("archived");
+    });
+  });
+
+  // =====================
+  // Simulation Run Tools
+  // =====================
+  describe("platform_list_simulation_runs", () => {
+    it("returns formatted run list", async () => {
+      const { handleListSimulationRuns } = await import("../tools/list-simulation-runs.js");
+      const result = await handleListSimulationRuns({});
+
+      expect(result).toContain("Simulation Runs");
+      expect(result).toContain("Login Flow");
+    });
+  });
+
+  describe("platform_get_simulation_run", () => {
+    it("returns run details with conversation", async () => {
+      const { handleGetSimulationRun } = await import("../tools/get-simulation-run.js");
+      const result = await handleGetSimulationRun({ scenarioRunId: "run_abc" });
+
+      expect(result).toContain("Login Flow");
+      expect(result).toContain("passed");
+      expect(result).toContain("Hello");
+    });
+  });
+
+  // =====================
+  // Monitor Tools
+  // =====================
+  describe("platform_list_monitors", () => {
+    it("returns formatted monitor list", async () => {
+      const { listMonitors } = await import("../langwatch-api-monitors.js");
+      const monitors = await listMonitors();
+      expect(monitors).toHaveLength(1);
+      expect(monitors[0]!.name).toBe("Toxicity Check");
+      expect(monitors[0]!.checkType).toBe("ragas/toxicity");
+    });
+  });
+
+  describe("platform_get_monitor", () => {
+    it("returns monitor details", async () => {
+      const { getMonitor } = await import("../langwatch-api-monitors.js");
+      const monitor = await getMonitor("mon_abc");
+      expect(monitor.id).toBe("mon_abc");
+      expect(monitor.name).toBe("Toxicity Check");
+      expect(monitor.enabled).toBe(true);
+    });
+  });
+
+  describe("platform_create_monitor", () => {
+    it("creates a monitor and returns metadata", async () => {
+      const { createMonitor } = await import("../langwatch-api-monitors.js");
+      const monitor = await createMonitor({ name: "New Monitor", checkType: "ragas/toxicity" });
+      expect(monitor.id).toBe("mon_new");
+      expect(monitor.name).toBe("New Monitor");
+    });
+  });
+
+  describe("platform_update_monitor", () => {
+    it("updates a monitor", async () => {
+      const { updateMonitor } = await import("../langwatch-api-monitors.js");
+      const monitor = await updateMonitor({ id: "mon_abc", enabled: false });
+      expect(monitor.id).toBe("mon_abc");
+      expect(monitor.enabled).toBe(false);
+    });
+  });
+
+  describe("platform_delete_monitor", () => {
+    it("deletes a monitor", async () => {
+      const { deleteMonitor } = await import("../langwatch-api-monitors.js");
+      const result = await deleteMonitor("mon_abc");
+      expect(result.id).toBe("mon_abc");
+      expect(result.deleted).toBe(true);
+    });
+  });
+
+  // =====================
+  // Secret Tools
+  // =====================
+  describe("platform_list_secrets", () => {
+    it("returns formatted secret list", async () => {
+      const { listSecrets } = await import("../langwatch-api-secrets.js");
+      const secrets = await listSecrets();
+      expect(secrets).toHaveLength(2);
+      expect(secrets[0]!.name).toBe("MY_API_KEY");
+    });
+  });
+
+  describe("platform_create_secret", () => {
+    it("creates a secret and returns metadata", async () => {
+      const { createSecret } = await import("../langwatch-api-secrets.js");
+      const secret = await createSecret({ name: "NEW_SECRET", value: "sk-123" });
+      expect(secret.id).toBe("secret_new");
+      expect(secret.name).toBe("NEW_SECRET");
+    });
+  });
+
+  describe("platform_update_secret", () => {
+    it("updates a secret value", async () => {
+      const { updateSecret } = await import("../langwatch-api-secrets.js");
+      const secret = await updateSecret({ id: "secret_abc", value: "new-val" });
+      expect(secret.id).toBe("secret_abc");
+      expect(secret.name).toBe("MY_API_KEY");
+    });
+  });
+
+  describe("platform_delete_secret", () => {
+    it("deletes a secret", async () => {
+      const { deleteSecret } = await import("../langwatch-api-secrets.js");
+      const result = await deleteSecret("secret_abc");
+      expect(result.id).toBe("secret_abc");
+      expect(result.deleted).toBe(true);
+    });
+  });
+
+  // =====================
+  // Agent Run Tool
+  // =====================
+  describe("platform_run_workflow", () => {
+    it("executes a workflow and returns result", async () => {
+      const { handleRunWorkflow } = await import("../tools/run-workflow.js");
+      const result = await handleRunWorkflow({ id: "wf_abc" });
+
+      expect(result).toContain("executed successfully");
+      expect(result).toContain("workflow result");
     });
   });
 });

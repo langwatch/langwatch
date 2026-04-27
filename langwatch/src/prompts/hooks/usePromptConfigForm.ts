@@ -182,6 +182,12 @@ export const usePromptConfigForm = ({
       return;
     }
 
+    // Don't overwrite user edits while the form is dirty. The debounced
+    // reverse sync will eventually write the user's changes to the store;
+    // once the store catches up, parsedInitialValues will reflect the
+    // user's values and the field-level sync becomes a no-op.
+    if (methods.formState.isDirty) return;
+
     disableOnChangeRef.current = true;
     // Use parsed values to ensure defaults are applied
     for (const [key, value] of Object.entries(

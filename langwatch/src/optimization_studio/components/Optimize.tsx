@@ -552,7 +552,7 @@ const OptimizerSelect = ({
       <Select.Trigger>
         <Select.ValueText placeholder="Select optimizer" />
       </Select.Trigger>
-      <Select.Content zIndex={1501}>
+      <Select.Content>
         {optimizerOptions.map((option) => (
           <Select.Item item={option} key={option.value}>
             <VStack align="start" width="full">

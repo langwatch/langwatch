@@ -121,6 +121,7 @@ export const projectDailySdkUsageProjection: FoldProjectionDefinition<
 > = {
   name: "projectDailySdkUsage",
   version: PROJECT_DAILY_SDK_USAGE_PROJECTION_VERSION,
+  lastEventOccurredAtKey: "LastEventOccurredAt",
   eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
 
   key: (event) => {

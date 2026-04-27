@@ -10,10 +10,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import type { GetServerSidePropsContext } from "next";
-import { useSearchParams } from "next/navigation";
-import type { Session } from "next-auth";
-import { getSession, signIn } from "next-auth/react";
+import { useSearchParams } from "~/utils/compat/next-navigation";
+import { signIn, useSession } from "~/utils/auth-client";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -24,7 +22,8 @@ import { toaster } from "../../components/ui/toaster";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { api } from "../../utils/api";
 
-export default function SignUp({ session }: { session: Session | null }) {
+export default function SignUp() {
+  const { data: session } = useSession();
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
@@ -50,24 +49,7 @@ export default function SignUp({ session }: { session: Session | null }) {
   );
 }
 
-export const getServerSideProps = async (
-  context: GetServerSidePropsContext,
-) => {
-  const session = await getSession(context);
-
-  if (session) {
-    return {
-      redirect: {
-        destination: "/",
-        permanent: false,
-      },
-    };
-  }
-
-  return {
-    props: { session },
-  };
-};
+// Auth redirect is now handled client-side via useSession() + useEffect in the component
 
 function SignUpForm() {
   const query = useSearchParams();
@@ -79,10 +61,10 @@ function SignUpForm() {
       email: z.string().min(1).email(),
       password: z
         .string()
-        .min(6, { message: "Password must be at least 6 characters" }),
+        .min(8, { message: "Password must be at least 8 characters" }),
       confirmPassword: z
         .string()
-        .min(6, { message: "Password must be at least 6 characters" }),
+        .min(8, { message: "Password must be at least 8 characters" }),
     })
     .refine((data) => data.password === data.confirmPassword, {
       message: "Passwords don't match",

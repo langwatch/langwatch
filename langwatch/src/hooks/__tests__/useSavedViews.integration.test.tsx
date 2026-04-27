@@ -27,7 +27,7 @@ let mockRouterQuery: Record<string, string | string[] | undefined> = {};
 let mockRouterAsPath = "/[project]/messages";
 const MOCK_PATHNAME = "/[project]/messages";
 
-vi.mock("next/router", () => ({
+vi.mock("~/utils/compat/next-router", () => ({
   useRouter: () => ({
     query: mockRouterQuery,
     push: mockRouterPush,

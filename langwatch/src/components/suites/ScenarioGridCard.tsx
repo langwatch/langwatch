@@ -59,13 +59,13 @@ export function ScenarioGridCard({
           paddingY={0.5}
           borderRadius="md"
           border="1px solid"
-          borderColor="red.200"
+          borderColor="gray.300"
           fontSize="xs"
-          color="red.600"
+          color="fg.default"
           bg="white"
           cursor={isCancelling ? "default" : "pointer"}
           opacity={isCancelling ? 0.6 : 1}
-          _hover={isCancelling ? undefined : { bg: "red.50", borderColor: "red.300" }}
+          _hover={isCancelling ? undefined : { bg: "gray.100", borderColor: "gray.400" }}
           position="absolute"
           top={2}
           right={2}
@@ -85,7 +85,7 @@ export function ScenarioGridCard({
           aria-disabled={isCancelling}
           data-testid="cancel-run-button"
         >
-          {isCancelling ? <Spinner size="xs" /> : <Square size={10} fill="currentColor" />}
+          {isCancelling ? <Spinner size="xs" /> : <Square size={10} />}
           <Text fontSize="xs">Stop</Text>
         </HStack>
       )}

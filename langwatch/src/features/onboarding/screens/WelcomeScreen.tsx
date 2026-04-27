@@ -1,6 +1,6 @@
 import { Box, HStack, VStack } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
-import { useRouter } from "next/router";
+import { useRouter } from "~/utils/compat/next-router";
 import type React from "react";
 import { useEffect, useState } from "react";
 import { AnalyticsBoundary } from "react-contextual-analytics";
@@ -84,7 +84,7 @@ export const WelcomeScreen: React.FC = () => {
           companySize: form.companySize,
           yourRole: form.role,
           featureUsage: form.selectedDesires.join("\n"),
-          utmCampaign: form.utmCampaign,
+          ...form.attribution,
         },
       },
       {
@@ -143,7 +143,7 @@ export const WelcomeScreen: React.FC = () => {
         showBackButton={false}
       >
         <VStack gap={5} align="stretch" w="full" minW="0">
-          <Box position="relative" overflow="hidden" py="1" my="-1">
+          <Box position="relative" overflow="hidden" py="1" px="2" my="-1" mx="-2">
             <AnimatePresence
               mode="popLayout"
               custom={direction}

@@ -232,7 +232,7 @@ export class SuiteRepository {
         }
         const archivedSlug = suite.slug.endsWith(ARCHIVED_SLUG_SUFFIX)
           ? suite.slug
-          : `${suite.slug}${ARCHIVED_SLUG_SUFFIX}`;
+          : `${suite.slug}${ARCHIVED_SLUG_SUFFIX}-${suite.id.slice(-6)}`;
         const result = await this.prisma.simulationSuite.update({
           where: { id: params.id, projectId: params.projectId },
           data: {

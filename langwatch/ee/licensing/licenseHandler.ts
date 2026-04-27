@@ -12,7 +12,7 @@ import type { ILicenseEnforcementRepository } from "~/server/license-enforcement
  * Follows Interface Segregation Principle - only what we need.
  */
 export interface ITraceUsageService {
-  getCurrentMonthCount(params: { organizationId: string }): Promise<number>;
+  getCurrentMonthCount(params: { organizationId: string }): Promise<number | "unlimited">;
 }
 
 interface LicenseHandlerConfig {
@@ -195,9 +195,11 @@ export class LicenseHandler {
     const resolved = resolvePlanDefaults(plan);
 
     // Get message count via TraceUsageService (direct ES/CH query).
-    // Returns 0 if service not provided (e.g., in tests)
+    // Returns 0 if service not provided (e.g., in tests).
+    // "unlimited" is resolved to 0 since license display needs a numeric value.
     const messagesCountPromise = this.traceUsageService
       ? this.traceUsageService.getCurrentMonthCount({ organizationId })
+          .then((count) => (count === "unlimited" ? 0 : count))
       : Promise.resolve(0);
 
     const [
@@ -217,7 +219,6 @@ export class LicenseHandler {
       currentCustomGraphs,
       currentAutomations,
       currentMessagesPerMonth,
-      currentEvaluationsCredit,
     ] = await Promise.all([
       this.repository.getMemberCount(organizationId),
       this.repository.getMembersLiteCount(organizationId),
@@ -235,7 +236,6 @@ export class LicenseHandler {
       this.repository.getCustomGraphCount(organizationId),
       this.repository.getAutomationCount(organizationId),
       messagesCountPromise,
-      this.repository.getEvaluationsCreditUsed(organizationId),
     ]);
 
     return {
@@ -271,8 +271,6 @@ export class LicenseHandler {
       maxAutomations: resolved.maxAutomations,
       currentMessagesPerMonth,
       maxMessagesPerMonth: resolved.maxMessagesPerMonth,
-      currentEvaluationsCredit,
-      maxEvaluationsCredit: resolved.evaluationsCredit,
     };
   }
 

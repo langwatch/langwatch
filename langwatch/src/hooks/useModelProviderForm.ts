@@ -1,11 +1,32 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { CustomModelEntry } from "../server/modelProviders/customModel.schema";
-import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
+import {
+  modelProviders as modelProvidersRegistry,
+  type MaybeStoredModelProvider,
+} from "../server/modelProviders/registry";
+
+// Mirrors the server's deriveDefaultName. Kept here so the drawer can
+// pre-fill the input on open without an extra tRPC round trip.
+function humanizeProviderName(providerKey: string): string {
+  const def =
+    modelProvidersRegistry[providerKey as keyof typeof modelProvidersRegistry];
+  if (def?.name) return def.name;
+  return providerKey
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
 import { useCredentialKeys } from "./useCredentialKeys";
 import { useCustomModels } from "./useCustomModels";
 import { useDefaultProviderSelection } from "./useDefaultProviderSelection";
 import { type ExtraHeader, useExtraHeaders } from "./useExtraHeaders";
 import { type FormSnapshot, useProviderFormSubmit } from "./useProviderFormSubmit";
+
+export type ModelProviderScopeType = "ORGANIZATION" | "TEAM" | "PROJECT";
+
+export type ScopeSelection = {
+  scopeType: ModelProviderScopeType;
+  scopeId: string;
+};
 
 export type UseModelProviderFormParams = {
   provider: MaybeStoredModelProvider;
@@ -20,11 +41,33 @@ export type UseModelProviderFormParams = {
     | undefined;
   enabledProvidersCount: number;
   isUsingEnvVars?: boolean;
+  // Principal-style scope context (iter 108). The team+org IDs come from
+  // useOrganizationTeamProject so the form can render the picker and derive
+  // the scopeId for ORGANIZATION/TEAM selections. Legacy PROJECT scope
+  // keeps working when these are undefined.
+  teamId?: string;
+  organizationId?: string;
+  /**
+   * Permission predicates used to decide the default scope selection for
+   * a brand-new provider (iter 109). The form opens at the widest scope
+   * the user can manage: ORGANIZATION if they have organization:manage,
+   * else TEAM if they have team:manage, else PROJECT. Callers wire these
+   * from useOrganizationTeamProject's hasPermission helper.
+   */
+  canManageOrganization?: boolean;
+  canManageTeam?: boolean;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 };
 
 export type UseModelProviderFormState = {
+  /**
+   * User-facing name. Defaults to the humanized provider string
+   * ("openai" → "OpenAI"); operators override it when they run
+   * multiple instances of the same provider at different scopes
+   * so the list and model-selector groups stay distinguishable.
+   */
+  name: string;
   useApiGateway: boolean;
   customKeys: Record<string, string>;
   displayKeys: Record<string, any>;
@@ -36,6 +79,15 @@ export type UseModelProviderFormState = {
   projectDefaultModel: string | null;
   projectTopicClusteringModel: string | null;
   projectEmbeddingsModel: string | null;
+  /**
+   * Multi-scope selection (iter 109). Every write sends this array to
+   * the tRPC layer and the service fail-closes the whole write if any
+   * single scope is unmanageable by the caller. For backwards-compat
+   * reads, `scopeType` still exposes the narrowest entry's tier.
+   */
+  scopes: ScopeSelection[];
+  /** Narrowest scope tier from `scopes` — kept for the legacy picker. */
+  scopeType: ModelProviderScopeType;
   isSaving: boolean;
   errors: {
     customKeysRoot?: string;
@@ -44,6 +96,9 @@ export type UseModelProviderFormState = {
 
 export type UseModelProviderFormActions = {
   setEnabled: (enabled: boolean) => Promise<void>;
+  setName: (name: string) => void;
+  setScopes: (scopes: ScopeSelection[]) => void;
+  setScopeType: (scope: ModelProviderScopeType) => void;
   setUseApiGateway: (use: boolean) => void;
   setCustomKey: (key: string, value: string) => void;
   addExtraHeader: () => void;
@@ -73,9 +128,80 @@ export function useModelProviderForm(
     project,
     enabledProvidersCount,
     isUsingEnvVars,
+    teamId,
+    organizationId,
+    canManageOrganization,
+    canManageTeam,
     onSuccess,
     onError,
   } = params;
+
+  // Name state — editing an existing row shows the stored name, new
+  // rows pre-fill with the humanized provider default so the input
+  // never looks empty.
+  const initialName =
+    (provider as { name?: string }).name ??
+    humanizeProviderName(provider.provider);
+  const [name, setName] = useState<string>(initialName);
+
+  // Scope state — defaults to the stored provider's scope set when
+  // editing. For brand-new providers we open at the widest scope the
+  // user can manage (org > team > project) so an admin lands on the
+  // most useful default instead of having to flip from PROJECT every
+  // time. Iter 109 made this an array; existing callers that only
+  // expect a single tier still work via the derived `scopeType`.
+  const defaultNewScope: ModelProviderScopeType =
+    canManageOrganization && organizationId
+      ? "ORGANIZATION"
+      : canManageTeam && teamId
+        ? "TEAM"
+        : "PROJECT";
+  const defaultScopeId =
+    defaultNewScope === "ORGANIZATION"
+      ? organizationId
+      : defaultNewScope === "TEAM"
+        ? teamId
+        : projectId;
+
+  const initialScopes: ScopeSelection[] =
+    provider.scopes && provider.scopes.length > 0
+      ? provider.scopes.map((s) => ({
+          scopeType: s.scopeType,
+          scopeId: s.scopeId,
+        }))
+      : provider.scopeType && provider.scopeId
+        ? [{ scopeType: provider.scopeType, scopeId: provider.scopeId }]
+        : defaultScopeId
+          ? [{ scopeType: defaultNewScope, scopeId: defaultScopeId }]
+          : [];
+  const [scopes, setScopes] = useState<ScopeSelection[]>(initialScopes);
+
+  // Narrowest tier (PROJECT > TEAM > ORGANIZATION) — legacy consumers
+  // that expected a single `scopeType` pick the most specific one.
+  const scopeType: ModelProviderScopeType = scopes.some(
+    (s) => s.scopeType === "PROJECT",
+  )
+    ? "PROJECT"
+    : scopes.some((s) => s.scopeType === "TEAM")
+      ? "TEAM"
+      : scopes[0]?.scopeType ?? defaultNewScope;
+
+  const scopeId =
+    scopes.find((s) => s.scopeType === scopeType)?.scopeId ?? undefined;
+
+  const setScopeType = useCallback(
+    (next: ModelProviderScopeType) => {
+      const nextId =
+        next === "ORGANIZATION"
+          ? organizationId
+          : next === "TEAM"
+            ? teamId
+            : projectId;
+      if (!nextId) return;
+      setScopes([{ scopeType: next, scopeId: nextId }]);
+    },
+    [organizationId, teamId, projectId],
+  );
 
   // --- Sub-hooks ---
   const credentialKeysHook = useCredentialKeys({ provider });
@@ -104,6 +230,10 @@ export function useModelProviderForm(
       projectTopicClusteringModel:
         defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
+      name,
+      scopes,
+      scopeType,
+      scopeId,
     }),
     [
       provider,
@@ -119,6 +249,10 @@ export function useModelProviderForm(
       defaultProviderHook.projectDefaultModel,
       defaultProviderHook.projectTopicClusteringModel,
       defaultProviderHook.projectEmbeddingsModel,
+      name,
+      scopes,
+      scopeType,
+      scopeId,
     ],
   );
 
@@ -152,6 +286,10 @@ export function useModelProviderForm(
     customModelsHook.reset(provider);
     defaultProviderHook.reset(provider, project, enabledProvidersCount);
     formSubmitHook.reset();
+    setName(
+      (provider as { name?: string }).name ??
+        humanizeProviderName(provider.provider),
+    );
   }, [
     provider.provider,
     provider.id,
@@ -181,11 +319,17 @@ export function useModelProviderForm(
       projectTopicClusteringModel:
         defaultProviderHook.projectTopicClusteringModel,
       projectEmbeddingsModel: defaultProviderHook.projectEmbeddingsModel,
+      name,
+      scopes,
+      scopeType,
       isSaving: formSubmitHook.isSaving,
       errors: formSubmitHook.errors,
     },
     {
       setEnabled: formSubmitHook.setEnabled,
+      setName,
+      setScopes,
+      setScopeType,
       setUseApiGateway,
       setCustomKey: credentialKeysHook.setCustomKey,
       addExtraHeader: extraHeadersHook.addExtraHeader,

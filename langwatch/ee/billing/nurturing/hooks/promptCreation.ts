@@ -9,12 +9,7 @@ const logger = createLogger("ee:nurturing:prompt-creation");
  * Fires nurturing calls when a prompt is created.
  *
  * Always sends has_prompts: true + prompt_count on every call (idempotent).
- * This ensures recovery if a previous CIO call failed during an outage.
- *
- * Also always sends first_prompt_created event — Customer.io Journey
- * entry conditions fire once per person, so duplicates are harmless.
- * This avoids race conditions when prompts are created concurrently
- * (e.g., via CLI push scripts).
+ * Only sends first_prompt_created event when orgPromptCount === 1.
  *
  * All calls are fire-and-forget.
  *
@@ -34,7 +29,6 @@ export function firePromptCreatedNurturing({
   const nurturing = getApp().nurturing;
   if (!nurturing) return;
 
-  // Always send has_prompts: true — idempotent, recovers from prior failures
   void nurturing
     .identifyUser({
       userId,
@@ -42,14 +36,15 @@ export function firePromptCreatedNurturing({
     })
     .catch(captureException);
 
-  // Always send event — CIO Journey entry deduplicates per person
-  void nurturing
-    .trackEvent({
-      userId,
-      event: "first_prompt_created",
-      properties: { project_id: projectId },
-    })
-    .catch(captureException);
+  if (orgPromptCount === 1) {
+    void nurturing
+      .trackEvent({
+        userId,
+        event: "first_prompt_created",
+        properties: { project_id: projectId },
+      })
+      .catch(captureException);
+  }
 }
 
 /**

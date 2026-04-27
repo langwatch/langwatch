@@ -579,4 +579,158 @@ describe("InviteService", () => {
       });
     });
   });
+
+  describe("subscription invite flow: create → approve → apply", () => {
+    describe("when a PAYMENT_PENDING invite is approved and then applied", () => {
+      const mockOrganization = { id: "org-1", name: "Test Org" };
+      let roleBindingsCreated: Array<Record<string, unknown>>;
+
+      beforeEach(() => {
+        roleBindingsCreated = [];
+
+        // Step 1: createPaymentPendingInvite creates a PAYMENT_PENDING record
+        mockPrisma.organizationInvite.create.mockResolvedValue({
+          id: "inv-flow-1",
+          email: "sub-user@example.com",
+          inviteCode: "flow-code-1",
+          status: "PAYMENT_PENDING",
+          subscriptionId: "sub-flow-1",
+          organizationId: "org-1",
+          teamIds: "team-1",
+          teamAssignments: null,
+          role: "MEMBER",
+          expiration: null,
+        });
+
+        // Step 2: approvePaymentPendingInvites finds the invite and transitions it
+        mockPrisma.organizationInvite.findMany.mockResolvedValue([
+          {
+            id: "inv-flow-1",
+            email: "sub-user@example.com",
+            inviteCode: "flow-code-1",
+            status: "PAYMENT_PENDING",
+            subscriptionId: "sub-flow-1",
+            organizationId: "org-1",
+            organization: mockOrganization,
+          },
+        ]);
+        mockPrisma.organizationInvite.update.mockResolvedValue({
+          id: "inv-flow-1",
+          email: "sub-user@example.com",
+          inviteCode: "flow-code-1",
+          status: "PENDING",
+          subscriptionId: "sub-flow-1",
+          organizationId: "org-1",
+          teamIds: "team-1",
+          teamAssignments: null,
+          role: "MEMBER",
+          expiration: new Date(Date.now() + 48 * 60 * 60 * 1000),
+        });
+        mockSendInviteEmail.mockResolvedValue(undefined);
+
+        // Step 3: applyInvite — track RoleBinding creation
+        (mockPrisma as any).organizationUser = {
+          createMany: vi.fn(),
+        };
+        (mockPrisma as any).roleBinding = {
+          deleteMany: vi.fn(),
+          create: vi.fn().mockImplementation(({ data }) => {
+            roleBindingsCreated.push(data);
+            return Promise.resolve(data);
+          }),
+        };
+      });
+
+      it("transitions through PAYMENT_PENDING → PENDING → ACCEPTED and creates RoleBindings", async () => {
+        // Step 1: Create PAYMENT_PENDING invite
+        const invite = await service.createPaymentPendingInvite({
+          email: "sub-user@example.com",
+          role: "MEMBER" as any,
+          organizationId: "org-1",
+          teamIds: "team-1",
+          subscriptionId: "sub-flow-1",
+        });
+
+        expect(invite.status).toBe("PAYMENT_PENDING");
+
+        // Step 2: Simulate webhook approval
+        const approved = await service.approvePaymentPendingInvites({
+          subscriptionId: "sub-flow-1",
+          organizationId: "org-1",
+        });
+
+        expect(approved).toHaveLength(1);
+        expect(approved[0]!.status).toBe("PENDING");
+
+        // Step 3: Apply the now-PENDING invite (simulating acceptInvite)
+        await service.applyInvite({
+          userId: "user-flow-1",
+          invite: approved[0]! as any,
+        });
+
+        // Verify: org-scoped RoleBinding was created (MEMBER gets org binding)
+        const orgBinding = roleBindingsCreated.find(
+          (rb) => rb.scopeType === "ORGANIZATION"
+        );
+        expect(orgBinding).toBeDefined();
+        expect(orgBinding!.userId).toBe("user-flow-1");
+        expect(orgBinding!.organizationId).toBe("org-1");
+
+        // Verify: team-scoped RoleBinding was created
+        const teamBinding = roleBindingsCreated.find(
+          (rb) => rb.scopeType === "TEAM"
+        );
+        expect(teamBinding).toBeDefined();
+        expect(teamBinding!.userId).toBe("user-flow-1");
+        expect(teamBinding!.scopeId).toBe("team-1");
+
+        // Verify: invite was marked ACCEPTED
+        expect(mockPrisma.organizationInvite.update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            data: { status: "ACCEPTED" },
+          })
+        );
+      });
+    });
+  });
+
+  describe("applyInvite", () => {
+    describe("when invite status is not PENDING", () => {
+      it("throws for PAYMENT_PENDING invites", async () => {
+        await expect(
+          service.applyInvite({
+            userId: "user-1",
+            invite: {
+              id: "inv-guard-1",
+              status: "PAYMENT_PENDING",
+              organizationId: "org-1",
+              teamIds: "team-1",
+              teamAssignments: null,
+              role: "MEMBER",
+            } as any,
+          })
+        ).rejects.toThrow(
+          "Cannot apply invite inv-guard-1: status is PAYMENT_PENDING, expected PENDING"
+        );
+      });
+
+      it("throws for ACCEPTED invites", async () => {
+        await expect(
+          service.applyInvite({
+            userId: "user-1",
+            invite: {
+              id: "inv-guard-2",
+              status: "ACCEPTED",
+              organizationId: "org-1",
+              teamIds: "team-1",
+              teamAssignments: null,
+              role: "MEMBER",
+            } as any,
+          })
+        ).rejects.toThrow(
+          "Cannot apply invite inv-guard-2: status is ACCEPTED, expected PENDING"
+        );
+      });
+    });
+  });
 });

@@ -45,7 +45,7 @@ const baseScenarioEventSchema = baseEventSchema.extend({
   batchRunId: batchRunIdSchema,
   scenarioId: scenarioIdSchema,
   scenarioRunId: scenarioRunIdSchema,
-  scenarioSetId: z.string().optional().default("default"),
+  scenarioSetId: z.string().optional().default("default").transform((v) => v || "default"),
 });
 
 /**
@@ -55,7 +55,7 @@ const baseScenarioEventSchema = baseEventSchema.extend({
  */
 export const langwatchMetadataSchema = z.object({
   targetReferenceId: z.string(),
-  targetType: z.enum(["prompt", "http", "code"]),
+  targetType: z.enum(["prompt", "http", "code", "workflow"]),
   simulationSuiteId: z.string().optional(),
 });
 

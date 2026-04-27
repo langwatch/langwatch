@@ -10,7 +10,7 @@ import {
   handleFailedJobResult,
   type ProcessorDependencies,
 } from "../scenario.processor";
-import type { ScenarioJob } from "../scenario.queue";
+import type { ExecutionJobData } from "../execution/execution-pool";
 
 describe("buildOtelResourceAttributes", () => {
   it("always includes langwatch.origin.source=platform", () => {
@@ -46,7 +46,7 @@ describe("buildOtelResourceAttributes", () => {
 
 describe("handleCancelledJobResult", () => {
   let mockDeps: ProcessorDependencies;
-  const baseJobData: ScenarioJob = {
+  const baseJobData: ExecutionJobData = {
     projectId: "proj_123",
     scenarioId: "scen_456",
     setId: "set_789",
@@ -96,7 +96,7 @@ describe("handleCancelledJobResult", () => {
 
 describe("handleFailedJobResult", () => {
   let mockDeps: ProcessorDependencies;
-  const baseJobData: ScenarioJob = {
+  const baseJobData: ExecutionJobData = {
     projectId: "proj_123",
     scenarioId: "scen_456",
     setId: "set_789",

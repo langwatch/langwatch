@@ -69,7 +69,7 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
 
   if (!user || !orgUser) return;
 
-  const [org, projects] = await Promise.all([
+  const [org, projects, activeSubscription] = await Promise.all([
     prisma.organization.findUnique({
       where: { id: orgUser.organizationId },
       select: { id: true, name: true, signupData: true },
@@ -81,6 +81,13 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
         },
       },
       select: { firstMessage: true, integrated: true },
+    }),
+    prisma.subscription.findFirst({
+      where: {
+        organizationId: orgUser.organizationId,
+        status: "ACTIVE",
+      },
+      select: { id: true },
     }),
   ]);
 
@@ -97,6 +104,7 @@ async function performFullSync({ userId }: { userId: string }): Promise<void> {
       ? { company_size: signupData.companySize as string }
       : {}),
     has_traces: hasTraces,
+    has_subscription: !!activeSubscription,
     createdAt: user.createdAt.toISOString(),
     last_active_at: new Date().toISOString(),
   };

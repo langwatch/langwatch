@@ -1,4 +1,3 @@
-import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { DrawerType } from "~/components/drawerRegistry";
 import type { Command, RecentItem, SearchResult } from "./types";
 
@@ -95,6 +94,10 @@ export function handleCommandSelect(
     case "action-sdk-radar":
       ctx.close();
       openDrawer("sdkRadar");
+      break;
+    case "action-send-trace":
+      ctx.close();
+      openDrawer("foundry");
       break;
   }
 }

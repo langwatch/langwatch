@@ -20,8 +20,8 @@ describe("isCancellableStatus()", () => {
   });
 
   describe("when status is STALLED", () => {
-    it("returns true", () => {
-      expect(isCancellableStatus(ScenarioRunStatus.STALLED)).toBe(true);
+    it("returns false (stalled is a terminal state)", () => {
+      expect(isCancellableStatus(ScenarioRunStatus.STALLED)).toBe(false);
     });
   });
 

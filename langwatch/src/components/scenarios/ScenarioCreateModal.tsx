@@ -5,10 +5,9 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useModelProvidersSettings } from "~/hooks/useModelProvidersSettings";
 import { useLicenseEnforcement } from "~/hooks/useLicenseEnforcement";
 import { isHandledByGlobalHandler } from "~/utils/trpcError";
-import { DEFAULT_MODEL } from "~/utils/constants";
-import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { generateScenarioWithAI } from "./services/scenarioGeneration";
 import type { ScenarioFormData, ScenarioInitialData } from "./ScenarioForm";
+import { getDefaultModelState } from "./utils/defaultModelState";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -61,18 +60,15 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
   const { checkAndProceed } = useLicenseEnforcement("scenarios");
 
   // Check if any model providers are configured
-  const { hasEnabledProviders } = useModelProvidersSettings({
+  const { hasEnabledProviders, providers } = useModelProvidersSettings({
     projectId: project?.id,
   });
 
-  // Check if the default model has API keys configured
-  const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
-  const { modelOption } = useModelSelectionOptions(
-    allModelOptions,
-    defaultModel,
-    "chat"
-  );
-  const isModelDisabled = modelOption?.isDisabled ?? false;
+  const defaultModelState = getDefaultModelState({
+    hasEnabledProviders,
+    providers,
+    defaultModel: project?.defaultModel,
+  });
 
   const openEditorWithData = useCallback(
     (formData: Partial<ScenarioFormData>) => {
@@ -95,10 +91,21 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
         throw new Error("No project selected");
       }
 
-      if (isModelDisabled) {
-        throw new Error(
-          "API keys not configured. Please go to Settings → Model Providers to add your API keys."
-        );
+      if (!defaultModelState.ok) {
+        if (defaultModelState.reason === "no-default") {
+          throw new Error(
+            "No default model set. Configure one in Settings → Model Providers."
+          );
+        }
+        if (defaultModelState.reason === "stale-default") {
+          throw new Error(
+            "Your default model's provider is disabled. Configure a new default in Settings → Model Providers."
+          );
+        }
+        // no-providers: AICreateModal hides the Generate button, so this is unreachable in practice
+        const _exhaustiveCheck: "no-providers" = defaultModelState.reason;
+        void _exhaustiveCheck;
+        return;
       }
 
       try {
@@ -109,7 +116,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
         throw error;
       }
     },
-    [project?.id, isModelDisabled, openEditorWithData]
+    [project?.id, defaultModelState, openEditorWithData]
   );
 
   const handleSkip = useCallback(() => {
@@ -119,6 +126,8 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
       criteria: [],
     });
   }, [openEditorWithData]);
+
+  const hasModelProviders = defaultModelState.ok || defaultModelState.reason !== "no-providers";
 
   return (
     <AICreateModal
@@ -130,7 +139,7 @@ export function ScenarioCreateModal({ open, onClose }: ScenarioCreateModalProps)
       onGenerate={(desc) => checkAndProceed(() => handleGenerate(desc))}
       onSkip={() => checkAndProceed(handleSkip)}
       generatingText={GENERATING_TEXT}
-      hasModelProviders={hasEnabledProviders}
+      hasModelProviders={hasModelProviders}
     />
   );
 }

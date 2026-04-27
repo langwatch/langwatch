@@ -12,7 +12,7 @@ import { skipPermissionCheck } from "../../rbac";
 import { organizationRouter } from "../organization";
 import { projectRouter } from "../project";
 
-import { signUpDataSchema } from "./schemas/sign-up-data.schema";
+import { signUpDataSchema } from "~/server/schemas/sign-up-data.schema";
 
 /**
  * Router for handling onboarding-related operations.
