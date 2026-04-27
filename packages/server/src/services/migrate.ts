@@ -1,6 +1,6 @@
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import type { EventBus } from "./event-bus.ts";
-import { locateLangwatchDir } from "./node-deps.ts";
+import { locateLangwatchDir, resolvePnpm } from "./node-deps.ts";
 import { execAndPipe } from "./_pipe-to-bus.ts";
 
 /**
@@ -48,8 +48,13 @@ export async function runMigrations(
     SKIP_CLICKHOUSE_MIGRATE: "false",
   };
 
-  await execAndPipe(bus, "migrate:prisma", "pnpm", ["run", "prisma:migrate"], { cwd: langwatchDir, env });
-  await execAndPipe(bus, "migrate:clickhouse", "pnpm", ["run", "clickhouse:migrate"], { cwd: langwatchDir, env });
+  // Resolve pnpm via the same fallback chain node-deps.ts uses (direct →
+  // corepack pnpm). Bare-Linux boxes — node installed via nvm without
+  // pnpm-on-PATH and without `corepack enable` — would otherwise hit
+  // `spawn pnpm ENOENT` here. Mirrors ensureLangwatchDeps.
+  const pnpm = await resolvePnpm();
+  await execAndPipe(bus, "migrate:prisma", pnpm.command, [...pnpm.args, "run", "prisma:migrate"], { cwd: langwatchDir, env });
+  await execAndPipe(bus, "migrate:clickhouse", pnpm.command, [...pnpm.args, "run", "clickhouse:migrate"], { cwd: langwatchDir, env });
 
   bus.emit({ type: "healthy", service: "postgres", durationMs: Date.now() - start });
 }

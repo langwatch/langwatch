@@ -136,7 +136,7 @@ function computeInstallKey(...files: string[]): string {
   return h.digest("hex");
 }
 
-async function resolvePnpm(): Promise<{ command: string; args: string[] }> {
+export async function resolvePnpm(): Promise<{ command: string; args: string[] }> {
   // Prefer pnpm directly on PATH (pnpm/action-setup puts it there on CI;
   // corepack shims put it there for end users running `npx ...`). Fall back
   // to `corepack pnpm` only if pnpm isn't reachable. We avoid corepack-as-
