@@ -321,7 +321,12 @@ export const useBatchEvaluationDownloadCSV = ({
 
     const link = document.createElement("a");
     link.href = url;
-    const formattedDate = new Date(run.data.timestamps.createdAt)
+    // Non-null per the `isDownloadCSVEnabled` guard above (the early
+    // throw on line 208 ensures `run.data` is populated by the time we
+    // get here). `getRun` returns `ExperimentRunWithItems | null` since
+    // PR #3483 to handle the cold-start window where the row hasn't
+    // been folded into ClickHouse yet — see service comment.
+    const formattedDate = new Date(run.data!.timestamps.createdAt)
       .toISOString()
       .split("T")[0];
     const fileName = `${formattedDate}_${experiment.name}_${runId}.csv`;
