@@ -19,6 +19,11 @@ export const getVercelAIModel = async (projectId: string, model?: string) => {
 
   const modelProviders = await getProjectModelProviders(projectId);
 
+  // Callers that need env-fallback default-model resolution should call
+  // ProjectService.resolveDefaultModel(projectId) and pass the result as
+  // `model` rather than relying on project.defaultModel directly. This keeps
+  // resolveModel() pure (no DB round-trip) and lets callers skip the hit when
+  // they already have an explicit model.
   const model_ = resolveModel({
     explicit: model,
     projectDefault: project.defaultModel,

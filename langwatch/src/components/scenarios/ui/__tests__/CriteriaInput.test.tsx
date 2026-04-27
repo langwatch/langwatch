@@ -59,6 +59,33 @@ describe("CriteriaInput", () => {
         expect(onChange).toHaveBeenCalledWith(["New criterion"]);
       });
     });
+
+    it("saves criterion on blur (regression: typing and tabbing away must persist)", async () => {
+      const onChange = vi.fn();
+      renderWithChakra(
+        <CriteriaInput value={[]} onChange={onChange} />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("Add the first criteria")).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByText("Add the first criteria"));
+
+      await waitFor(() => {
+        expect(screen.getByPlaceholderText("Add a criterion...")).toBeInTheDocument();
+      });
+
+      const input = screen.getByPlaceholderText("Add a criterion...");
+      fireEvent.change(input, { target: { value: "Criterion typed then blurred" } });
+
+      // Blur without clicking Save — simulates the user tabbing/clicking away
+      fireEvent.blur(input);
+
+      await waitFor(() => {
+        expect(onChange).toHaveBeenCalledWith(["Criterion typed then blurred"]);
+      });
+    });
   });
 
   describe("when criteria exist", () => {
@@ -143,6 +170,37 @@ describe("CriteriaInput", () => {
 
       await waitFor(() => {
         expect(onChange).toHaveBeenCalledWith(["first", "third"]);
+      });
+    });
+
+    it("saves edited criterion on blur (regression: editing and clicking away must persist)", async () => {
+      const onChange = vi.fn();
+      renderWithChakra(
+        <CriteriaInput
+          value={["first", "second", "third"]}
+          onChange={onChange}
+        />,
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("second")).toBeInTheDocument();
+      });
+
+      // Click to enter edit mode
+      fireEvent.click(screen.getByText("second"));
+
+      await waitFor(() => {
+        expect(screen.getByDisplayValue("second")).toBeInTheDocument();
+      });
+
+      const textarea = screen.getByDisplayValue("second");
+      fireEvent.change(textarea, { target: { value: "second edited" } });
+
+      // Blur without clicking Save — simulates the user tabbing/clicking away
+      fireEvent.blur(textarea);
+
+      await waitFor(() => {
+        expect(onChange).toHaveBeenCalledWith(["first", "second edited", "third"]);
       });
     });
   });

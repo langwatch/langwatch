@@ -56,7 +56,12 @@ export const useOrganizationTeamProject = (
     { isDemo: isDemo },
     {
       enabled: !!session.data || !isPublicRoute,
-      staleTime: keepFetching ? undefined : Infinity,
+      // Small reference query that drives load-bearing client state (current
+      // project incl. defaultModel). Cheap to refetch — prefer freshness over
+      // a "cache forever" default. Background refetch on focus picks up edits
+      // made via SDK, API, or another tab.
+      staleTime: keepFetching ? 0 : 30_000,
+      refetchOnWindowFocus: true,
       refetchInterval: keepFetching ? 5_000 : undefined,
     },
   );

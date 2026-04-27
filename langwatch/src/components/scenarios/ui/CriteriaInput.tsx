@@ -99,6 +99,7 @@ export function CriteriaInput({
                 value={editingValue}
                 onChange={(e) => setEditingValue(e.target.value)}
                 onKeyDown={handleEditKeyDown}
+                onBlur={handleSaveEdit}
                 size="sm"
                 autoresize
                 rows={2}
@@ -120,6 +121,7 @@ export function CriteriaInput({
                   type="button"
                   size="xs"
                   variant="outline"
+                  onMouseDown={(e) => e.preventDefault()}
                   onClick={() => setEditingIndex(null)}
                 >
                   Cancel
@@ -178,6 +180,7 @@ export function CriteriaInput({
               placeholder={placeholder}
               flex={1}
               onKeyDown={handleAddKeyDown}
+              onBlur={handleSaveNew}
               _placeholder={{ color: "gray.400", fontStyle: "italic" }}
               autoresize
               rows={2}
@@ -188,6 +191,7 @@ export function CriteriaInput({
               type="button"
               size="xs"
               variant="outline"
+              onMouseDown={(e) => e.preventDefault()}
               onClick={() => {
                 setInputValue("");
                 setIsAddingNew(false);

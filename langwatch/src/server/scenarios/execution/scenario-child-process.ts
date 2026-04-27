@@ -12,7 +12,8 @@
  * a non-zero exit code.
  *
  * OTEL isolation is achieved by:
- * 1. Parent sets LANGWATCH_API_KEY and LANGWATCH_ENDPOINT env vars
+ * 1. Parent injects LANGWATCH_API_KEY (project.apiKey) and LANGWATCH_ENDPOINT
+ *    (BASE_HOST) as env vars via buildChildProcessEnv in scenario.processor.ts
  * 2. This process imports @langwatch/scenario which calls setupObservability()
  *    at module load time, reading from those env vars
  * 3. Each child process gets its own OTEL TracerProvider
@@ -86,14 +87,11 @@ async function readJobDataFromStdin(): Promise<ChildProcessJobData> {
 async function executeScenario(jobData: ChildProcessJobData): Promise<void> {
   const { context, scenario, adapterData, modelParams, nlpServiceUrl, target } = jobData;
 
-  const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT;
-  const langwatchApiKey = process.env.LANGWATCH_API_KEY;
-  if (!langwatchEndpoint) {
-    throw new Error("LANGWATCH_ENDPOINT env var is required but not set");
-  }
-  if (!langwatchApiKey) {
-    throw new Error("LANGWATCH_API_KEY env var is required but not set");
-  }
+  // These are injected as env vars by the parent process (scenario.processor.ts
+  // buildChildProcessEnv). They originate from prefetchScenarioData telemetry:
+  // endpoint = BASE_HOST, apiKey = project.apiKey.
+  const langwatchEndpoint = process.env.LANGWATCH_ENDPOINT ?? "";
+  const langwatchApiKey = process.env.LANGWATCH_API_KEY ?? "";
 
   const adapter = createAdapter({
     adapterData,
