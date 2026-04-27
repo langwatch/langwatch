@@ -103,7 +103,9 @@ export function createEnvConfig() {
       AZURE_OPENAI_KEY: z.string().optional(),
       OPENAI_API_KEY: z.string().optional(),
       SENDGRID_API_KEY: z.string().optional(),
-      LANGWATCH_NLP_SERVICE: z.string().optional(),
+      LANGWATCH_NLP_SERVICE: optionalIfBuildTime(z.string().url()),
+      LANGWATCH_ENDPOINT: optionalIfBuildTime(z.string().url()),
+      TOPIC_CLUSTERING_SERVICE: z.string().optional(),
       LANGEVALS_ENDPOINT: z.string().optional(),
       // S3 staging for outbound langevals POSTs is opt-in: only relevant
       // when langevals is fronted by AWS Lambda (6 MB sync-invoke cap).
@@ -293,6 +295,11 @@ export function createEnvConfig() {
       OPENAI_API_KEY: process.env.OPENAI_API_KEY,
       SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
       LANGWATCH_NLP_SERVICE: process.env.LANGWATCH_NLP_SERVICE,
+      LANGWATCH_ENDPOINT: process.env.LANGWATCH_ENDPOINT,
+      // Temporary, ideally we want to move this to lambda too
+      TOPIC_CLUSTERING_SERVICE: process.env.TOPIC_CLUSTERING_SERVICE
+        ? process.env.TOPIC_CLUSTERING_SERVICE
+        : process.env.LANGWATCH_NLP_SERVICE,
       LANGEVALS_ENDPOINT: process.env.LANGEVALS_ENDPOINT,
       LANGEVALS_STAGING_THRESHOLD_BYTES: process.env.LANGEVALS_STAGING_THRESHOLD_BYTES,
       LANGEVALS_STAGING_TTL_SECONDS: process.env.LANGEVALS_STAGING_TTL_SECONDS,
