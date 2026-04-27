@@ -1,0 +1,1 @@
+Co-authored-by: ai_gateway_sergey_2 (C1 activity-monitor-processing reactor scaffold + project-id-as-tenantId bridge fix in ingestionRoutes.ts — bundled into this commit when shared-worktree index swept Sergey's pre-staged files into Andre's git-add. Sergey accepted as-is per kanban thread to avoid revert churn; C1 work is GREEN end-to-end on :5660.)
