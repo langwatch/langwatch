@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { Project } from "@prisma/client";
 import type { ModelProviderService } from "~/server/modelProviders/modelProvider.service";
 import type { MaybeStoredModelProvider } from "~/server/modelProviders/registry";
