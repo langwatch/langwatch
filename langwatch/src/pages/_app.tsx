@@ -83,7 +83,7 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.gray.100}", _dark: "{colors.gray.700}" },
           },
           emphasized: {
-            value: { _light: "{colors.gray.375}", _dark: "{colors.gray.600}" },
+            value: { _light: "{colors.gray.400}", _dark: "{colors.gray.600}" },
           },
           fg: {
             value: { _light: "{colors.gray.700}", _dark: "{colors.gray.200}" },
@@ -438,7 +438,7 @@ export const system = createSystem(defaultConfig, {
             value: { _light: "{colors.gray.600}", _dark: "{colors.gray.400}" },
           },
           subtle: {
-            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.400}" },
+            value: { _light: "{colors.gray.500}", _dark: "{colors.gray.450}" },
           },
           inverted: { value: { _light: "white", _dark: "{colors.gray.950}" } },
         },
@@ -800,7 +800,12 @@ export const system = createSystem(defaultConfig, {
         slots: ["item", "content"],
         base: {
           content: {
-            background: "bg.panel",
+            background: "bg.panel/75",
+            backdropFilter: "blur(8px)",
+            border: "1px solid",
+            borderColor: "border",
+            borderRadius: "lg",
+            boxShadow: "lg",
           },
           item: {
             cursor: "pointer",
@@ -976,6 +981,10 @@ export const system = createSystem(defaultConfig, {
           content: {
             background: "bg.surface/60",
             backdropFilter: "blur(12px)",
+            border: "1px solid",
+            borderColor: "border",
+            borderRadius: "lg",
+            boxShadow: "lg",
             "& button:not([data-variant=ghost]):not([data-part])": {
               boxShadow: "md",
             },
@@ -1004,8 +1013,12 @@ export const system = createSystem(defaultConfig, {
             background: "bg.surface/65",
           },
           content: {
-            background: "bg.panel",
+            background: "bg.panel/75",
+            backdropFilter: "blur(8px)",
+            border: "1px solid",
+            borderColor: "border",
             borderRadius: "lg",
+            boxShadow: "lg",
           },
           item: {
             borderRadius: "lg",
@@ -1052,7 +1065,12 @@ export const system = createSystem(defaultConfig, {
         slots: ["content"],
         base: {
           content: {
-            background: "bg.panel",
+            background: "bg.panel/75",
+            backdropFilter: "blur(8px)",
+            border: "1px solid",
+            borderColor: "border",
+            borderRadius: "lg",
+            boxShadow: "lg",
           },
         },
       }),
@@ -1074,7 +1092,11 @@ export const system = createSystem(defaultConfig, {
         base: {
           content: {
             maxWidth: "70%",
-            background: "bg.surface",
+            background: "bg.surface/80",
+            backdropFilter: "blur(25px)",
+            border: "1px solid",
+            borderColor: "border",
+            borderRadius: "lg",
           },
           header: {
             paddingY: 4,

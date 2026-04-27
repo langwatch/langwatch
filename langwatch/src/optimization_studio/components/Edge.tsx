@@ -25,7 +25,7 @@ export default function DefaultEdge(props: EdgeProps) {
   const [edgePath] = getBezierPath(props);
 
   const edgeColor = useColorModeValue(
-    useColorRawValue("gray.350"),
+    useColorRawValue("gray.400"),
     useColorRawValue("gray.600"),
   );
 
