@@ -417,16 +417,19 @@ server post-`33a8cf6d0` (full receiver rewire shipped):
    the new one rolls out upstream).
    ![Ingestion sources list](https://i.img402.dev/sfmg6nsxbd.png)
 
-3. **Add ingestion source composer** — the headline UI artifact of
-   Sergey's 2b-i: source-type dropdown, display name, description, and
-   the **retention class dropdown** with three options gated by org
-   plan ceiling — Operational (30 days, SOC 2 / ISO 27001 baseline) /
-   Compliance (1 year, EU AI Act / GDPR / HIPAA-most-uses) /
-   Long-form audit (7 years, regulated industry).
-   **Crucially, NO Project field** — the hidden Governance Project is
-   internal routing only, never user-configurable. Per
-   `master_orchestrator` + `rchaves` directive 2026-04-27.
-   ![Ingestion source composer](https://i.img402.dev/9220teidwj.png)
+3. **Add ingestion source composer** — opens as a right-edge Drawer
+   per the platform's universal create/edit pattern (commit
+   `746951769` — refactored from inline panel to Drawer per
+   rchaves's directive 2026-04-27). Source-type dropdown, display
+   name, description, and the **retention class dropdown** with three
+   options gated by org plan ceiling — Operational (30 days,
+   SOC 2 / ISO 27001 baseline) / Compliance (1 year, EU AI Act /
+   GDPR / HIPAA-most-uses) / Long-form audit (7 years, regulated
+   industry). **Crucially, NO Project field** — the hidden
+   Governance Project is internal routing only, never
+   user-configurable. Per `master_orchestrator` + `rchaves` directive
+   2026-04-27.
+   ![Ingestion source composer drawer](https://i.img402.dev/o7cplffzne.png)
 
 4. **WorkspaceSwitcher BEFORE the helper fires** — only the
    user-visible "tes" application project appears under the "test"
@@ -463,14 +466,16 @@ server post-`33a8cf6d0` (full receiver rewire shipped):
    Cross-link from the governance overview when the rule fires.
    ![Anomaly rules list](https://i.img402.dev/x7qg8aqgfq.png)
 
-8. **AnomalyRule composer** — Name + Severity + Description + Rule
-   type + Scope + Threshold JSON. v1 ships `spend_spike` rule type +
+8. **AnomalyRule composer** — opens as a larger right-edge Drawer
+   (size=lg, fits the JSON threshold editor + Alert destinations
+   callout cleanly). Name + Severity + Description + Rule type +
+   Scope + Threshold JSON. v1 ships `spend_spike` rule type +
    log-only dispatch; `rate_limit` / `after_hours` / Slack / PagerDuty
    / webhook / email destinations are explicitly **preview** in the
    composer copy (config persists, evaluation/dispatch in follow-up).
    Honest framing — no mocked-v0 surfaces per @rchaves "no mocks in
    UI" directive.
-   ![Anomaly composer](https://i.img402.dev/yx701f85e8.png)
+   ![Anomaly composer drawer](https://i.img402.dev/3sionqxgev.png)
 
 ### Screenshot cross-references — what each shot proves
 
