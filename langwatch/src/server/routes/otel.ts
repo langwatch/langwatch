@@ -28,6 +28,7 @@ import {
   extractCredentials,
   patCeilingDenialResponse,
 } from "~/server/pat/auth-middleware";
+import { decodeBase64OpenTelemetryId } from "~/server/tracer/utils";
 import { createLogger } from "~/utils/logger/server";
 import { captureException } from "~/utils/posthogErrorCapture";
 
@@ -99,7 +100,7 @@ type RouteContext = {
  * `tokenType` field emitted by the unified auth middleware so on-call can
  * filter CloudWatch by SDK shape.
  */
-function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
+export function classifyTokenType(token: string): "pat" | "legacy" | "unknown" {
   if (token.startsWith("pat-lw-")) return "pat";
   if (token.startsWith("sk-lw-")) return "legacy";
   return "unknown";
@@ -255,8 +256,12 @@ async function enforcePlanLimit(
  * body is empty, malformed, or unparsable, returns an empty array. Used to
  * tag error logs (plan-limit, parse failure) so a customer who reports
  * "I sent trace_id X but it didn't appear" can be matched to the rejection.
+ *
+ * JSON-OTLP serialises trace_id as base64 strings; protobuf-OTLP decodes
+ * them as Uint8Array. `decodeBase64OpenTelemetryId` handles both — output
+ * is always lowercase hex, the same shape the rest of the platform uses.
  */
-function peekCustomerTraceIds(
+export function peekCustomerTraceIds(
   body: ArrayBuffer,
   contentType: string | undefined,
   max = 10,
@@ -276,14 +281,9 @@ function peekCustomerTraceIds(
   for (const rs of req.resourceSpans ?? []) {
     for (const ss of rs.scopeSpans ?? []) {
       for (const sp of ss.spans ?? []) {
-        const t = sp.traceId;
-        if (!t) continue;
-        const idStr =
-          typeof t === "string"
-            ? t
-            : Buffer.from(t as Uint8Array).toString("hex");
-        if (idStr) {
-          ids.add(idStr);
+        const decoded = decodeBase64OpenTelemetryId(sp.traceId);
+        if (decoded) {
+          ids.add(decoded);
           if (ids.size >= max) return Array.from(ids);
         }
       }
