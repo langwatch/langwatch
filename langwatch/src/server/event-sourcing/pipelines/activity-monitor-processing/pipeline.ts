@@ -1,5 +1,6 @@
 import { definePipeline } from "../../";
 import type { AppendStore } from "../../projections/mapProjection.types";
+import type { ReactorDefinition } from "../../reactors/reactor.types";
 
 import { RecordActivityEventCommand } from "./commands";
 import {
@@ -15,6 +16,12 @@ export interface ActivityMonitorProcessingPipelineDeps {
    * in `pipelineRegistry.ts` (alongside the other CH-backed AppendStores).
    */
   activityEventAppendStore: AppendStore<ClickHouseActivityEventRecord>;
+  /**
+   * Optional anomaly-detection reactor. Wired in registerActivityMonitorPipeline
+   * once the AnomalyAlert table + anomaly reactor are available (Option C2).
+   * Skipped entirely when undefined so the pipeline still ships during C1.
+   */
+  anomalyDetectionReactor?: ReactorDefinition<ActivityMonitorProcessingEvent>;
 }
 
 /**
@@ -41,7 +48,7 @@ export interface ActivityMonitorProcessingPipelineDeps {
 export function createActivityMonitorProcessingPipeline(
   deps: ActivityMonitorProcessingPipelineDeps,
 ) {
-  return definePipeline<ActivityMonitorProcessingEvent>()
+  let builder = definePipeline<ActivityMonitorProcessingEvent>()
     .withName("activity_monitor_processing")
     .withAggregateType("activity_event")
     .withMapProjection(
@@ -49,7 +56,17 @@ export function createActivityMonitorProcessingPipeline(
       new ActivityEventStorageMapProjection({
         store: deps.activityEventAppendStore,
       }),
-    )
+    );
+
+  if (deps.anomalyDetectionReactor) {
+    builder = builder.withReactor(
+      "activityEventStorage",
+      "anomalyDetection",
+      deps.anomalyDetectionReactor,
+    );
+  }
+
+  return builder
     .withCommand("recordActivityEvent", RecordActivityEventCommand)
     .build();
 }

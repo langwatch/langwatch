@@ -23,6 +23,8 @@ import { createEvaluationProcessingPipeline } from "./pipelines/evaluation-proce
 import { createExperimentRunProcessingPipeline } from "./pipelines/experiment-run-processing/pipeline";
 import {
   createActivityMonitorProcessingPipeline,
+  createAnomalyDetectionReactor,
+  type AnomalyDetectionReactorDeps,
   type ClickHouseActivityEventRecord,
 } from "./pipelines/activity-monitor-processing";
 import { createExperimentRunEsSyncReactor } from "./pipelines/experiment-run-processing/reactors/experimentRunEsSync.reactor";
@@ -175,6 +177,13 @@ export interface PipelineRegistryDeps {
   billingCheckpoints: BillingCheckpointService;
   usageReportingService?: UsageReportingService;
   gatewayBudgetSync?: GatewayBudgetSyncReactorDeps;
+  /**
+   * Optional deps for the anomaly-detection reactor on the
+   * activity-monitor-processing pipeline. Skipped when undefined
+   * (e.g. ClickHouse disabled in smaller self-hosters); the receiver
+   * + map projection still ship without anomaly evaluation.
+   */
+  anomalyDetection?: AnomalyDetectionReactorDeps;
 }
 
 /**
@@ -228,9 +237,13 @@ export class PipelineRegistry {
   }
 
   private registerActivityMonitorPipeline() {
+    const anomalyDetectionReactor = this.deps.anomalyDetection
+      ? createAnomalyDetectionReactor(this.deps.anomalyDetection)
+      : undefined;
     return this.deps.eventSourcing.register(
       createActivityMonitorProcessingPipeline({
         activityEventAppendStore: this.deps.repositories.activityEventStorage,
+        anomalyDetectionReactor,
       }),
     );
   }

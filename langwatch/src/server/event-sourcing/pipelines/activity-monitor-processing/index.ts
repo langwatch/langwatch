@@ -2,6 +2,10 @@ export { createActivityMonitorProcessingPipeline } from "./pipeline";
 export type { ActivityMonitorProcessingPipelineDeps } from "./pipeline";
 export { RecordActivityEventCommand } from "./commands";
 export {
+  createAnomalyDetectionReactor,
+  type AnomalyDetectionReactorDeps,
+} from "./reactors/anomalyDetection.reactor";
+export {
   ActivityEventStorageMapProjection,
   type ClickHouseActivityEventRecord,
 } from "./projections/activityEventStorage.mapProjection";

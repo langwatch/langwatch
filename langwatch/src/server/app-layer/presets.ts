@@ -347,6 +347,13 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       }
     : undefined;
 
+  const anomalyDetection = clickhouseEnabled
+    ? {
+        prisma,
+        resolveClickHouseClient,
+      }
+    : undefined;
+
   const registry = new PipelineRegistry({
     eventSourcing: es,
     repositories,
@@ -362,6 +369,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     billingCheckpoints: new PrismaBillingCheckpointService(prisma),
     usageReportingService,
     gatewayBudgetSync,
+    anomalyDetection,
   });
   const commands = registry.registerAll();
   (globalForApp as any).__scenarioExecutionHandle = commands.scenarioExecutionHandle;

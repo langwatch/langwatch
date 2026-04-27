@@ -13,6 +13,13 @@ import { ActivityMonitorService } from "~/server/governance/activity-monitor/act
 import { checkOrganizationPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
+function extractSourceLabel(detail: unknown): string {
+  const d = (detail as Record<string, unknown>) ?? {};
+  if (typeof d.sourceLabel === "string") return d.sourceLabel;
+  if (typeof d.source === "string") return d.source;
+  return "";
+}
+
 export const activityMonitorRouter = createTRPCRouter({
   /**
    * Summary cards: total spend in window, delta vs previous window,
@@ -69,22 +76,46 @@ export const activityMonitorRouter = createTRPCRouter({
     }),
 
   /**
-   * Open anomalies. Returns [] until Option C (anomaly rule eval +
-   * dispatch backend) lands. Stub here so the dashboard can wire to
-   * the final shape without a follow-up frontend change.
+   * Recent anomaly alerts produced by the anomaly-detection reactor
+   * (C2). Reads AnomalyAlert rows from PG, sorted by detectedAt DESC.
+   * Returns [] when no rules have fired or when ClickHouse is
+   * disabled (the reactor short-circuits without CH access).
    */
   recentAnomalies: protectedProcedure
-    .input(z.object({ organizationId: z.string() }))
+    .input(
+      z.object({
+        organizationId: z.string(),
+        limit: z.number().int().min(1).max(200).default(50),
+      }),
+    )
     .use(checkOrganizationPermission("organization:view"))
-    .query(async () => {
-      return [] as Array<{
-        id: string;
-        severity: "critical" | "warning" | "info";
-        rule: string;
-        sourceLabel: string;
-        detectedAtIso: string;
-        currentState: "open" | "acknowledged" | "resolved";
-      }>;
+    .query(async ({ ctx, input }) => {
+      const rows = await ctx.prisma.anomalyAlert.findMany({
+        where: { organizationId: input.organizationId },
+        orderBy: { detectedAt: "desc" },
+        take: input.limit,
+      });
+      return rows.map((row) => ({
+        id: row.id,
+        ruleId: row.ruleId,
+        ruleName: row.ruleName,
+        ruleType: row.ruleType,
+        severity: row.severity as "critical" | "warning" | "info",
+        triggerWindowStartIso: row.triggerWindowStart.toISOString(),
+        triggerWindowEndIso: row.triggerWindowEnd.toISOString(),
+        triggerSpendUsd: row.triggerSpendUsd
+          ? Number(row.triggerSpendUsd.toString())
+          : null,
+        triggerEventCount: row.triggerEventCount,
+        detectedAtIso: row.detectedAt.toISOString(),
+        state: row.state,
+        currentState: row.state as "open" | "acknowledged" | "resolved",
+        detail: row.detail as Record<string, unknown>,
+        // Back-compat aliases for the existing /governance dashboard
+        // (renderer was sketched against the iter-10 mock shape).
+        rule: row.ruleName,
+        sourceLabel: extractSourceLabel(row.detail),
+      }));
     }),
 
   /**
