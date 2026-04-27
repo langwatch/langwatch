@@ -72,6 +72,10 @@ browser-tests/
 # README.md is the exception — it documents the .claude/ layout itself.
 .claude/*.md
 !.claude/README.md
+# PR description documents are the canonical reviewer artifact for the
+# branch they describe — graduated from local notes to tracked content
+# per @rchaves directive 2026-04-27.
+!.claude/PR-*.md
 
 # Playwright E2E tests
 agentic-e2e-tests/test-results/
