@@ -17,23 +17,51 @@ const stubSpan: Pick<
 
 describe("CanonicalizeSpanAttributesService — structured IO", () => {
   describe("when input type is chat_messages", () => {
-    it("sets gen_ai.input.messages from value array", () => {
-      const messages = [
-        { role: "user", content: "Hello" },
-        { role: "assistant", content: "Hi there" },
-      ];
+    it("sets gen_ai.input.messages from value array (stripping trailing assistant — post-call capture leak)", () => {
       const result = service.canonicalize(
         {
           "langwatch.input": JSON.stringify({
             type: "chat_messages",
-            value: messages,
+            value: [
+              { role: "user", content: "Hello" },
+              { role: "assistant", content: "Hi there" },
+            ],
           }),
         },
         [],
         stubSpan as any,
       );
 
-      expect(result.attributes["gen_ai.input.messages"]).toEqual(messages);
+      // Trailing assistant messages are stripped — they are the model's
+      // response leaking back into input from post-call attribute capture,
+      // not part of what was actually sent to the model.
+      expect(result.attributes["gen_ai.input.messages"]).toEqual([
+        { role: "user", content: "Hello" },
+      ]);
+    });
+
+    it("preserves prior assistant messages in multi-turn conversations", () => {
+      const result = service.canonicalize(
+        {
+          "langwatch.input": JSON.stringify({
+            type: "chat_messages",
+            value: [
+              { role: "user", content: "Hi" },
+              { role: "assistant", content: "Hello!" },
+              { role: "user", content: "How are you?" },
+            ],
+          }),
+        },
+        [],
+        stubSpan as any,
+      );
+
+      // Last message is `user` — full multi-turn history kept intact.
+      expect(result.attributes["gen_ai.input.messages"]).toEqual([
+        { role: "user", content: "Hi" },
+        { role: "assistant", content: "Hello!" },
+        { role: "user", content: "How are you?" },
+      ]);
     });
 
     it("does not override span type to llm", () => {

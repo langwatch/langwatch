@@ -65,6 +65,33 @@ const isLangWatchStructuredValue = (
   typeof v.type === "string" &&
   v.value !== void 0;
 
+/**
+ * Strips trailing `assistant` messages from a chat_messages array.
+ *
+ * Per OTel GenAI spec, `gen_ai.input.messages` is the prompt array sent to
+ * the model — the final message is always `user`, `system`, or `tool`,
+ * never `assistant`. Some SDKs capture span attributes after the model has
+ * returned, and at that point the response message has been appended to
+ * the conversation state, so it leaks into `input` (where it then
+ * duplicates `output`).
+ *
+ * Drop any tail of `assistant` messages so input reflects what was actually
+ * sent to the model. Multi-turn history with prior `assistant` messages
+ * earlier in the array is preserved.
+ */
+function stripTrailingAssistantMessages(messages: unknown[]): unknown[] {
+  let end = messages.length;
+  while (end > 0) {
+    const last = messages[end - 1];
+    if (isRecord(last) && (last as { role?: unknown }).role === "assistant") {
+      end--;
+    } else {
+      break;
+    }
+  }
+  return end === messages.length ? messages : messages.slice(0, end);
+}
+
 export class LangWatchExtractor implements CanonicalAttributesExtractor {
   readonly id = "langwatch";
 
@@ -277,7 +304,11 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
           rawInput.type === "chat_messages" &&
           Array.isArray(rawInput.value)
         ) {
-          const messages = normalizeToMessages(rawInput.value, "user");
+          // Strip trailing assistant messages — these are the model's
+          // response leaking back into input from post-call attribute
+          // capture, not part of what was actually sent.
+          const cleanedValue = stripTrailingAssistantMessages(rawInput.value);
+          const messages = normalizeToMessages(cleanedValue, "user");
 
           if (messages) {
             const systemInstruction =
@@ -301,8 +332,11 @@ export class LangWatchExtractor implements CanonicalAttributesExtractor {
             );
           }
 
-          // Always preserve the raw input — even when normalization fails
-          ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, rawInput);
+          // Preserve the (cleaned) raw input
+          ctx.setAttr(ATTR_KEYS.LANGWATCH_INPUT, {
+            ...rawInput,
+            value: cleanedValue,
+          });
           ctx.recordRule(`${this.id}:input`);
         } else {
           // text, json, raw, list — unwrap value, don't coerce to gen_ai
