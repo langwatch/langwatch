@@ -75,9 +75,18 @@ describe("PersonalWorkspaceService — auto-create personal team + project", () 
   afterAll(async () => {
     // Cleanup in dependency order. Personal Team's id may have been
     // assigned dynamically inside ensure() so we wipe by org/owner.
-    await prisma.virtualKey.deleteMany({
-      where: { project: { team: { organizationId: ORG_ID } } },
+    // dbMultiTenancyProtection requires projectId in the WHERE for
+    // VirtualKey — resolve project ids explicitly first.
+    const projects = await prisma.project.findMany({
+      where: { team: { organizationId: ORG_ID } },
+      select: { id: true },
     });
+    const projectIds = projects.map((p) => p.id);
+    if (projectIds.length > 0) {
+      await prisma.virtualKey.deleteMany({
+        where: { projectId: { in: projectIds } },
+      });
+    }
     await prisma.roleBinding.deleteMany({ where: { organizationId: ORG_ID } });
     await prisma.teamUser.deleteMany({
       where: { team: { organizationId: ORG_ID } },
@@ -187,15 +196,27 @@ describe("PersonalWorkspaceService — auto-create personal team + project", () 
       // First user from previous test + this second user = 2.
       expect(allPersonalInOrg).toBe(2);
 
-      const otherTeam = await prisma.team.findFirst({
+      const firstUserTeam = await prisma.team.findFirst({
+        where: {
+          organizationId: ORG_ID,
+          isPersonal: true,
+          ownerUserId: USER_ID,
+        },
+      });
+      const secondUserTeam = await prisma.team.findFirst({
         where: {
           organizationId: ORG_ID,
           isPersonal: true,
           ownerUserId: SECOND_USER_ID,
         },
       });
-      expect(otherTeam).not.toBeNull();
-      expect(otherTeam?.id).not.toBe(second.team.id === otherTeam?.id ? second.team.id : otherTeam?.id);
+      expect(firstUserTeam).not.toBeNull();
+      expect(secondUserTeam).not.toBeNull();
+      // Distinct personal teams per (org, user). The previous spelling
+      // had a self-comparison via a ternary that always evaluated true,
+      // masking the real assertion. Fixed to compare across users.
+      expect(secondUserTeam?.id).not.toBe(firstUserTeam?.id);
+      expect(secondUserTeam?.id).toBe(second.team.id);
     });
   });
 
