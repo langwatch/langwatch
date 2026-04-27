@@ -184,13 +184,19 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     async (data: ScenarioFormData, { skipTransition = false } = {}): Promise<Scenario | null> => {
       if (!project?.id) return null;
 
-      // Edit mode: scenarioId is in URL and scenario data is loaded
+      // Edit mode: scenarioId is in URL and scenario data is loaded.
+      // Catch mutation errors here so save failures never surface as "Failed to run scenario"
+      // in the save-and-run path — the mutation's own onError toast handles user feedback.
       if (scenario) {
-        return updateMutation.mutateAsync({
-          projectId: project.id,
-          id: scenario.id,
-          ...data,
-        });
+        try {
+          return await updateMutation.mutateAsync({
+            projectId: project.id,
+            id: scenario.id,
+            ...data,
+          });
+        } catch {
+          return null;
+        }
       }
 
       // Create mode: no scenarioId in URL yet
