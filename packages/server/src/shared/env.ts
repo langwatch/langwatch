@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import type { PortAllocation } from "./ports.ts";
 
 export type EnvOverrides = Partial<Record<string, string>>;
@@ -10,6 +10,26 @@ export type EnvScaffoldInput = {
   baseHost?: string;
   overrides?: EnvOverrides;
 };
+
+// Keys whose generated value MUST be stable across .env regenerations —
+// they encrypt rows in postgres (CREDENTIALS_SECRET), sign session/JWT
+// cookies (NEXTAUTH_SECRET, API_TOKEN_JWT_SECRET), and re-keying them
+// orphans every encrypted ModelProvider key + invalidates every active
+// session. We persist these to a sidecar `secrets.json` next to the .env
+// on first scaffold, and re-use them on subsequent scaffolds (e.g. user
+// `rm`s the .env to start clean but kept `data/postgres/`).
+//
+// We also persist gateway secrets (LW_VIRTUAL_KEY_PEPPER, LW_GATEWAY_*)
+// because rotating the gateway pepper invalidates every issued virtual
+// key.
+const PERSISTENT_SECRET_KEYS = [
+  "NEXTAUTH_SECRET",
+  "CREDENTIALS_SECRET",
+  "API_TOKEN_JWT_SECRET",
+  "LW_VIRTUAL_KEY_PEPPER",
+  "LW_GATEWAY_INTERNAL_SECRET",
+  "LW_GATEWAY_JWT_SECRET",
+] as const;
 
 const hex = (bytes: number) => randomBytes(bytes).toString("hex");
 const b64 = (bytes: number) => randomBytes(bytes).toString("base64");
@@ -107,8 +127,49 @@ export function scaffoldEnvFile(input: EnvScaffoldInput & { path: string }): { w
     return { written: false, path: input.path };
   }
   mkdirSync(dirname(input.path), { recursive: true });
-  writeFileSync(input.path, buildEnv(input), { mode: 0o600 });
+
+  // Read previously persisted secrets (from a prior scaffold) and overlay
+  // them so a `rm ~/.langwatch/.env; npx ...` doesn't rotate
+  // CREDENTIALS_SECRET out from under encrypted postgres rows. The first
+  // scaffold writes the sidecar; every later scaffold reuses it.
+  const secretsPath = join(dirname(input.path), "secrets.json");
+  const persistedSecrets = readPersistedSecrets(secretsPath);
+  const overlay = { ...input.overrides, ...persistedSecrets };
+
+  const body = buildEnv({ ...input, overrides: overlay });
+  writeFileSync(input.path, body, { mode: 0o600 });
+  writePersistedSecrets(secretsPath, body);
   return { written: true, path: input.path };
+}
+
+function readPersistedSecrets(path: string): Record<string, string> {
+  if (!existsSync(path)) return {};
+  try {
+    const raw = readFileSync(path, "utf8");
+    const parsed = JSON.parse(raw) as Record<string, string>;
+    const out: Record<string, string> = {};
+    for (const key of PERSISTENT_SECRET_KEYS) {
+      const v = parsed[key];
+      if (typeof v === "string" && v.length > 0) out[key] = v;
+    }
+    return out;
+  } catch {
+    return {};
+  }
+}
+
+function writePersistedSecrets(path: string, envBody: string): void {
+  const found: Record<string, string> = {};
+  for (const line of envBody.split("\n")) {
+    const m = line.match(/^([^=]+)=(.*)$/);
+    if (!m) continue;
+    const [, key, value] = m as unknown as [string, string, string];
+    if ((PERSISTENT_SECRET_KEYS as readonly string[]).includes(key)) {
+      found[key] = value;
+    }
+  }
+  if (Object.keys(found).length === 0) return;
+  writeFileSync(path, JSON.stringify(found, null, 2), { mode: 0o600 });
 }
 
 const PASSTHROUGH_ENV_KEYS = [
