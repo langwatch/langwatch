@@ -222,16 +222,28 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   validation).
 - ✅ **`/me` + `/me/settings`** dashboards (web app, gated behind the
   `release_ui_ai_governance_enabled` flag).
+- ✅ **`/settings/governance`** admin oversight dashboard
+  (org-admin-only via `organization:manage` permission, plus the
+  governance flag — populated with mocked data until the D2
+  backend lands; layout is the contract the tRPC queries will
+  fulfill).
 - ✅ **Budget enforcement** (cross-surface — gateway 402 ↔ CLI
   Screen-8 box ↔ web `BudgetExceededBanner` all derive from
   `GatewayBudgetService.check()`).
 - ✅ **Helm `NOTES.txt` + post-install checklist** for self-hosted
   bootstrap.
+- ✅ **`IngestionSource` schema** (Postgres) + `trace_summaries.SourceType`
+  + `SourceId` columns (ClickHouse) — the data model for Tier 3
+  + Tier 4. Seven `sourceType` values supported on the schema
+  side (see Tier 3 above).
 
 In flight on the same branch:
 
-- 🚧 IngestionSource backend foundation (Tier 3 + 4 entry point).
-- 🚧 Admin oversight dashboard (cross-tier rollup, mocked data first).
+- 🚧 OTel passthrough + generic-webhook receivers (Tier 3 + 4
+  ingest endpoints).
+- 🚧 IngestionSource setup forms (per-source-type, in lane B).
+- 🚧 IngestionSourceService + repository scaffold so the admin
+  oversight dashboard's mocked queries can swap to real data.
 - 🚧 Architecture deep-dive doc (the diagram + per-tier internals).
 
 Tier 2 / Tier 5 are deferred; the architecture doesn't preclude them
