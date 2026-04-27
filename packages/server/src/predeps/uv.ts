@@ -14,7 +14,7 @@ async function resolveVersion(bin: string): Promise<string | null> {
 
 export const uvPredep: Predep = {
   id: "uv",
-  label: "uv (Python package manager)",
+  label: "uv",
   required: true,
 
   async detect(paths): Promise<DetectionResult> {

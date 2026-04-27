@@ -40,7 +40,7 @@ async function sha256OfFile(path: string): Promise<string> {
 
 export const redisPredep: Predep = {
   id: "redis",
-  label: "redis-server (queue + fold cache backend)",
+  label: "redis-server",
   required: true,
 
   // Always use the embedded redis. NOT checking `which redis-server` —

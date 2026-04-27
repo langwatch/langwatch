@@ -31,7 +31,7 @@ async function resolveVersion(bin: string): Promise<string | null> {
 
 export const clickhousePredep: Predep = {
   id: "clickhouse",
-  label: "clickhouse (analytics)",
+  label: "clickhouse",
   required: true,
 
   // Always use the embedded clickhouse. NOT checking `which clickhouse` —

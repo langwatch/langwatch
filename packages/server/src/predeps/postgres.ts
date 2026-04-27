@@ -37,7 +37,7 @@ async function sha256OfFile(path: string): Promise<string> {
 
 export const postgresPredep: Predep = {
   id: "postgres",
-  label: `postgresql ${PG_MAJOR} (primary store)`,
+  label: `postgresql ${PG_MAJOR}`,
   required: true,
 
   async detect(paths) {

@@ -37,7 +37,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # for creating/updating GH release with aigateway monobinaries
   id-token: write # for npm provenance + Trusted Publishers OIDC exchange
 
 jobs:
@@ -105,6 +105,60 @@ jobs:
 
       - name: Install pnpm dependencies (workspace)
         run: pnpm install --frozen-lockfile
+
+      - uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5
+        with:
+          go-version-file: "go.mod"
+          cache: true
+
+      # Build the aigateway monobinary for all 4 platforms and create a
+      # GitHub release with them attached at tag v$VERSION. The aigateway
+      # predep at runtime fetches:
+      #   https://github.com/langwatch/langwatch/releases/download/v$VERSION/aigateway-$PLATFORM
+      # Without this step npx installs hit HTTP 404 and either fail or fall
+      # through to the dev-only LANGWATCH_AIGATEWAY_DEV_BUILD=1 path.
+      #
+      # We always create a `v$VERSION` tag for the npx flow even when
+      # release-please cuts a separate `langwatch@v$VERSION` release —
+      # release-please's component-prefixed tag format is awkward to URL-
+      # encode and tying the gateway artifact tag to a single, stable
+      # `v$VERSION` is simpler.
+      - name: Build aigateway monobinaries (4 platforms)
+        run: |
+          set -e
+          mkdir -p _pack
+          for tp in linux-amd64 linux-arm64 darwin-amd64 darwin-arm64; do
+            os="${tp%-*}"; arch="${tp#*-}"
+            echo "→ building aigateway-$tp"
+            GOOS="$os" GOARCH="$arch" CGO_ENABLED=0 go build \
+              -ldflags="-s -w -X main.Version=$VERSION" \
+              -o "_pack/aigateway-$tp" \
+              ./cmd/service
+          done
+          ls -lh _pack/aigateway-*
+        env:
+          VERSION: ${{ steps.versions.outputs.version }}
+
+      - name: Create GH release v$VERSION with aigateway binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.versions.outputs.version }}
+        run: |
+          set -e
+          tag="v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "→ release $tag exists, uploading binaries (clobber)"
+            gh release upload "$tag" _pack/aigateway-* --clobber
+          else
+            echo "→ creating release $tag"
+            prerelease_flag=""
+            if [[ "$VERSION" == *"-"* ]]; then prerelease_flag="--prerelease"; fi
+            gh release create "$tag" \
+              --title "v$VERSION" \
+              --notes "@langwatch/server@$VERSION — aigateway monobinaries" \
+              $prerelease_flag \
+              _pack/aigateway-*
+          fi
 
       - name: Build @langwatch/server CLI
         run: pnpm --filter @langwatch/server-cli build

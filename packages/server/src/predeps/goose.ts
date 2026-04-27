@@ -38,7 +38,7 @@ async function resolveVersion(bin: string): Promise<string | null> {
 
 export const goosePredep: Predep = {
   id: "goose",
-  label: "goose (clickhouse migrations runner)",
+  label: "goose",
   required: true,
 
   async detect(paths) {

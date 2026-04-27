@@ -29,10 +29,11 @@ async function resolveVersion(bin: string): Promise<string | null> {
   }
 }
 
-// When running from a langwatch checkout (dev mode), `cmd/service` exists
-// alongside packages/server. We can `go build` it ourselves instead of
-// relying on a GH release artifact that may not exist for the current dev
-// tree (chicken-and-egg before v3.1.0 publishes the gateway monobinary).
+// Dev-only fallback: when running from a langwatch checkout (e.g. `pnpm dev`
+// before a GH release of the gateway monobinary exists), opt in via
+// LANGWATCH_AIGATEWAY_DEV_BUILD=1 to `go build ./cmd/service` locally instead
+// of fetching the prebuilt artifact. Never auto-triggers — npx-installed
+// users always get the prebuilt download path.
 function findRepoRoot(): string | null {
   let here: string;
   try {
@@ -91,27 +92,23 @@ export function makeAigatewayPredep(version: string): Predep {
         const v = (await resolveVersion(out)) ?? version;
         return { version: v, resolvedPath: out };
       } catch (err) {
-        // GH release HTTP miss falls through to the local-build path below.
-        // Other errors (disk full, etc.) we'd want to surface, but in
-        // practice the only HTTP error we care about is 404 on a not-yet-
-        // published release artifact — local-build is the right fallback.
-        if (!(err instanceof Error) || !/HTTP 404/.test(err.message)) throw err;
-      }
+        const is404 = err instanceof Error && /HTTP 404/.test(err.message);
+        if (!is404) throw err;
 
-      // GH release artifact is missing — fall back to a local Go build if we
-      // can find a checkout (this is the chicken-and-egg path: pre-v3.1.0
-      // npx publish doesn't have the artifact yet, but every CI run + every
-      // dogfood run happens from a checkout that has cmd/service).
-      const repoRoot = findRepoRoot();
-      if (repoRoot) {
-        await buildFromCheckout(repoRoot, paths.bin, task);
-        const v = (await resolveVersion(out)) ?? `${version}+local-build`;
-        return { version: v, resolvedPath: out };
-      }
+        if (process.env.LANGWATCH_AIGATEWAY_DEV_BUILD === "1") {
+          const repoRoot = findRepoRoot();
+          if (repoRoot) {
+            await buildFromCheckout(repoRoot, paths.bin, task);
+            const v = (await resolveVersion(out)) ?? `${version}+local-build`;
+            return { version: v, resolvedPath: out };
+          }
+        }
 
-      throw new Error(
-        `aigateway download failed for v${version} (${url}). No local checkout found to build from. The v${version} release must publish aigateway-${platform.replace("x64", "amd64")} for npx-only installs to work.`,
-      );
+        throw new Error(
+          `ai-gateway prebuilt monobinary for v${version} not found at ${url} (HTTP 404). The v${version} release must publish aigateway-${platform.replace("x64", "amd64")} for npx installs to work. ` +
+            `Devs working from a checkout can opt into a local Go build via LANGWATCH_AIGATEWAY_DEV_BUILD=1.`,
+        );
+      }
     },
   };
 }

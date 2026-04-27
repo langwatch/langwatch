@@ -47,6 +47,11 @@ func run(args []string) int {
 	cmd := args[0]
 	args = args[1:]
 
+	if cmd == "--version" || cmd == "-v" || cmd == "version" {
+		fmt.Println(Version)
+		return 0
+	}
+
 	fn, ok := services[cmd]
 	if !ok {
 		logger.Error("unknown service", zap.String("command", cmd))
