@@ -62,7 +62,7 @@ function createTRPCLinks() {
       false: splitLink({
         condition(op) {
           // check for context property `skipBatch`
-          return op.context.skipBatch === true;
+          return op.context.skipBatch === true || process.env.NODE_ENV === 'development';
         },
         // when condition is true, use normal request
         true: httpLink({
