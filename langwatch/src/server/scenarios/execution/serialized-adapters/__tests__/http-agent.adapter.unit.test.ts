@@ -4,6 +4,7 @@
 
 import { AgentRole, type AgentInput } from "@langwatch/scenario";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { TemplateRenderError } from "../../http-template-engine";
 import type { HttpAgentData } from "../../types";
 import { SerializedHttpAgentAdapter } from "../http-agent.adapter";
 
@@ -360,6 +361,185 @@ describe("SerializedHttpAgentAdapter", () => {
             "Content-Type": "application/json",
             "X-Custom": "custom-value",
           }),
+        });
+      });
+    });
+  });
+
+  describe("URL template interpolation", () => {
+    it("renders {{threadId}} placeholder in url", async () => {
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        url: "https://api.example.com/conversations/{{threadId}}/messages",
+      };
+      const adapter = new SerializedHttpAgentAdapter(config);
+
+      await adapter.call(defaultInput);
+
+      expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+        "https://api.example.com/conversations/thread_123/messages",
+        expect.any(Object),
+      );
+    });
+
+    it("URL-encodes interpolated values by default", async () => {
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        url: "https://api.example.com/search/{{input}}",
+      };
+      const input: AgentInput = {
+        ...defaultInput,
+        messages: [{ role: "user", content: "hello world & friends?" }],
+        newMessages: [{ role: "user", content: "hello world & friends?" }],
+      };
+
+      const adapter = new SerializedHttpAgentAdapter(config);
+      await adapter.call(input);
+
+      expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+        "https://api.example.com/search/hello%20world%20%26%20friends%3F",
+        expect.any(Object),
+      );
+    });
+
+    it("does NOT URL-encode the body template (BC preserved)", async () => {
+      const config: HttpAgentData = {
+        ...defaultConfig,
+        bodyTemplate: '{"query": "{{input}}"}',
+      };
+      const input: AgentInput = {
+        ...defaultInput,
+        messages: [{ role: "user", content: "hello world & friends" }],
+        newMessages: [{ role: "user", content: "hello world & friends" }],
+      };
+
+      const adapter = new SerializedHttpAgentAdapter(config);
+      await adapter.call(input);
+
+      const callArgs = mockSsrfSafeFetch.mock.calls[0]![1];
+      const body = JSON.parse(callArgs?.body as string);
+      expect(body.query).toBe("hello world & friends");
+    });
+
+    describe("when using `| raw` filter", () => {
+      it("skips URL-encoding for raw-filtered values only", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          url: "https://api.example.com/{{threadId | raw}}/q/{{input}}",
+        };
+        const input: AgentInput = {
+          ...defaultInput,
+          threadId: "path/with/slash",
+          messages: [{ role: "user", content: "needs encoding" }],
+          newMessages: [{ role: "user", content: "needs encoding" }],
+        };
+
+        const adapter = new SerializedHttpAgentAdapter(config);
+        await adapter.call(input);
+
+        expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+          "https://api.example.com/path/with/slash/q/needs%20encoding",
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe("when url has no placeholders", () => {
+      it("passes url through unchanged", async () => {
+        const adapter = new SerializedHttpAgentAdapter(defaultConfig);
+        await adapter.call(defaultInput);
+
+        expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+          "https://api.example.com/chat",
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe("when url contains Liquid conditional", () => {
+      it("renders if-branch when condition is truthy via scenarioMappings", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          url: "https://api.example.com{% if conversationId %}/chat/{{conversationId}}/message{% else %}/chat/start{% endif %}",
+          scenarioMappings: {
+            conversationId: { type: "value", value: "conv-42" },
+          },
+        };
+        const adapter = new SerializedHttpAgentAdapter(config);
+
+        await adapter.call(defaultInput);
+
+        expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+          "https://api.example.com/chat/conv-42/message",
+          expect.any(Object),
+        );
+      });
+
+      it("renders else-branch when condition is falsy", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          url: "https://api.example.com{% if conversationId %}/chat/{{conversationId}}/message{% else %}/chat/start{% endif %}",
+        };
+        const adapter = new SerializedHttpAgentAdapter(config);
+
+        await adapter.call(defaultInput);
+
+        expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+          "https://api.example.com/chat/start",
+          expect.any(Object),
+        );
+      });
+    });
+
+    describe("SSRF regression", () => {
+      beforeEach(() => {
+        mockSsrfSafeFetch.mockRejectedValue(
+          new Error("Access to private IP denied"),
+        );
+      });
+
+      it.each([
+        ["localhost"],
+        ["127.0.0.1"],
+        ["169.254.169.254"],
+      ])(
+        "passes the %s-resolved url (post-render) to ssrfSafeFetch",
+        async (host) => {
+          const config: HttpAgentData = {
+            ...defaultConfig,
+            url: "https://{{input | raw}}/path",
+          };
+          const input: AgentInput = {
+            ...defaultInput,
+            messages: [{ role: "user", content: host }],
+            newMessages: [{ role: "user", content: host }],
+          };
+          const adapter = new SerializedHttpAgentAdapter(config);
+
+          await expect(adapter.call(input)).rejects.toThrow();
+
+          expect(mockSsrfSafeFetch).toHaveBeenCalledWith(
+            `https://${host}/path`,
+            expect.any(Object),
+          );
+        },
+      );
+    });
+
+    describe("when url template is malformed", () => {
+      it("throws TemplateRenderError with field=url", async () => {
+        const config: HttpAgentData = {
+          ...defaultConfig,
+          url: "https://api.example.com/{% if %}/broken",
+        };
+        const adapter = new SerializedHttpAgentAdapter(config);
+
+        await expect(adapter.call(defaultInput)).rejects.toThrow(
+          TemplateRenderError,
+        );
+
+        await expect(adapter.call(defaultInput)).rejects.toMatchObject({
+          field: "url",
         });
       });
     });
