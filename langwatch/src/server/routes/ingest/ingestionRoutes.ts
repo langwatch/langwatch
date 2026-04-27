@@ -33,13 +33,57 @@
 import type { Context } from "hono";
 import { Hono } from "hono";
 
+import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
+import type { IngestionSource } from "@prisma/client";
+
+import { getApp } from "~/server/app-layer/app";
 import { prisma } from "~/server/db";
 import { IngestionSourceService } from "~/server/governance/activity-monitor/ingestionSource.service";
+import { ensureHiddenGovernanceProject } from "~/server/governance/governanceProject.service";
 import {
   parseOtlpTraces,
   readOtlpBody,
 } from "~/server/otel/parseOtlpBody";
 import { createLogger } from "~/utils/logger/server";
+
+/**
+ * Stamp `langwatch.origin.*` + `langwatch.governance.*` attributes on
+ * every span of the parsed OTLP request, in-place. The trace pipeline
+ * persists these alongside any caller-supplied attributes; downstream
+ * consumers (governance fold projection, OCSF read projection) filter
+ * on `langwatch.origin.kind = "ingestion_source"`.
+ *
+ * Spec: receiver-shapes.feature, retention.feature.
+ */
+function stampOriginAttrs(
+  request: IExportTraceServiceRequest,
+  source: IngestionSource,
+): void {
+  const originAttrs = [
+    { key: "langwatch.origin.kind", value: { stringValue: "ingestion_source" } },
+    { key: "langwatch.ingestion_source.id", value: { stringValue: source.id } },
+    {
+      key: "langwatch.ingestion_source.organization_id",
+      value: { stringValue: source.organizationId },
+    },
+    {
+      key: "langwatch.ingestion_source.source_type",
+      value: { stringValue: source.sourceType },
+    },
+    {
+      key: "langwatch.governance.retention_class",
+      value: { stringValue: source.retentionClass },
+    },
+  ];
+  for (const rs of request.resourceSpans ?? []) {
+    for (const ss of rs.scopeSpans ?? []) {
+      for (const span of ss.spans ?? []) {
+        const existing = span.attributes ?? [];
+        span.attributes = [...existing, ...originAttrs];
+      }
+    }
+  }
+}
 
 const logger = createLogger("langwatch:ingest");
 
@@ -61,13 +105,25 @@ async function authIngestionSource(c: Context) {
 // ---------------------------------------------------------------------------
 // POST /api/ingest/otel/:sourceId
 // ---------------------------------------------------------------------------
-// OTLP/HTTP passthrough receiver. Body decompression + JSON/protobuf
-// parse via the shared src/server/otel helper (same primitive used by
-// /api/otel/v1/traces). In this branch-correction commit the receiver
-// is a placeholder — it parses the OTLP body but does NOT yet hand off
-// to the trace pipeline. The next commit wires the handoff with origin
-// metadata stamped on each span and routing through the hidden
-// Governance Project.
+// OTLP/HTTP passthrough receiver for span-shaped sources (otel_generic +
+// claude_cowork). Body decompression + JSON/protobuf parse via the
+// shared src/server/otel helper (same primitive used by /api/otel/v1/traces).
+//
+// After parse:
+//   1. Resolve / lazy-create the org's hidden Governance Project (single
+//      central helper, idempotent under concurrent first-mint races).
+//   2. Stamp origin metadata onto every span — langwatch.origin.kind +
+//      langwatch.ingestion_source.{id,organization_id,source_type} +
+//      langwatch.governance.retention_class. The governance fold
+//      projection + OCSF read projection downstream filter on these.
+//   3. Hand off to the existing trace pipeline via
+//      getApp().traces.collection.handleOtlpTraceRequest with the Gov
+//      Project as the tenant. The receiver does NOT write CH directly.
+//
+// Spec contracts:
+//   - receiver-shapes.feature (Lane-S)
+//   - architecture-invariants.feature (Lane-B)
+//   - retention.feature (Lane-S)
 // ---------------------------------------------------------------------------
 app.post("/otel/:sourceId", async (c: Context) => {
   const source = await authIngestionSource(c);
@@ -87,6 +143,7 @@ app.post("/otel/:sourceId", async (c: Context) => {
 
   let bodyBytes = 0;
   let eventCount = 0;
+  let rejectedSpans = 0;
   let parseHint: string | undefined;
   try {
     const body = await readOtlpBody(c.req.raw);
@@ -99,12 +156,31 @@ app.post("/otel/:sourceId", async (c: Context) => {
         (rs.scopeSpans ?? []).flatMap((ss) => ss.spans ?? []),
       );
       eventCount = spans.length;
+
+      if (eventCount > 0) {
+        // Resolve the hidden Governance Project for this org. Lazy-
+        // ensured via the single central helper — first mint of any
+        // governance entity created it (per master directive); receiver
+        // pulls it back here for trace-pipeline tenancy. Helper is
+        // idempotent so a race-created Project resolves cleanly.
+        const govProject = await ensureHiddenGovernanceProject(
+          prisma,
+          source.organizationId,
+        );
+        stampOriginAttrs(parsed.request, source);
+        const result = await getApp().traces.collection.handleOtlpTraceRequest(
+          govProject.id,
+          parsed.request,
+          govProject.piiRedactionLevel,
+        );
+        rejectedSpans = result?.rejectedSpans ?? 0;
+      }
     }
   } catch (err) {
     parseHint = String(err);
     logger.warn(
       { sourceId: source.id, err: String(err) },
-      "otel ingest body read failed (still ack'ing)",
+      "otel ingest receive failed (still ack'ing)",
     );
   }
 
@@ -116,8 +192,9 @@ app.post("/otel/:sourceId", async (c: Context) => {
       sourceType: source.sourceType,
       bytes: bodyBytes,
       events: eventCount,
+      rejectedSpans,
     },
-    "otel ingest received (parser-only placeholder; handoff lands in next commit)",
+    "otel ingest landed in unified trace pipeline",
   );
 
   const responseBody: Record<string, unknown> = {
@@ -125,6 +202,7 @@ app.post("/otel/:sourceId", async (c: Context) => {
     bytes: bodyBytes,
     events: eventCount,
   };
+  if (rejectedSpans > 0) responseBody.rejectedSpans = rejectedSpans;
   if (eventCount === 0 && (parseHint || bodyBytes > 0)) {
     responseBody.hint = parseHint
       ? `Body did not parse as OTLP/HTTP: ${parseHint}. See https://docs.langwatch.ai/observability/trace-vs-activity-ingestion for the canonical shape.`
