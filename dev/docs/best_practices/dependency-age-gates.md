@@ -59,10 +59,12 @@ pnpm install --lockfile-only --frozen-lockfile --ignore-scripts
 ### uv
 
 For uv projects, use `exclude-newer-package` in the relevant `pyproject.toml`.
-Set the package to `false` to exempt it from the global 7-day cutoff:
+Package-specific exceptions require uv 0.9.25 or newer. Set the package to
+`false` to exempt it from the global 7-day cutoff:
 
 ```toml
 [tool.uv]
+required-version = ">=0.9.25"
 exclude-newer = "7 days"
 exclude-newer-package = { litellm = false }
 ```
@@ -72,6 +74,7 @@ point in time, use an RFC 3339 timestamp instead:
 
 ```toml
 [tool.uv]
+required-version = ">=0.9.25"
 exclude-newer = "7 days"
 exclude-newer-package = { litellm = "2026-04-27T12:00:00Z" }
 ```
