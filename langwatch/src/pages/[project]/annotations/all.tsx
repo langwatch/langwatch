@@ -40,7 +40,9 @@ export default function Annotations() {
 
   const {
     period: { startDate, endDate },
+    mode,
     setPeriod,
+    setRelativePeriod,
   } = usePeriodSelector();
 
   type RouterOutput = inferRouterOutputs<AppRouter>;
@@ -190,7 +192,12 @@ export default function Annotations() {
       >
         Export all <Download style={{ marginLeft: "8px" }} />
       </Button>
-      <PeriodSelector period={{ startDate, endDate }} setPeriod={setPeriod} />
+      <PeriodSelector
+        period={{ startDate, endDate }}
+        mode={mode}
+        setPeriod={setPeriod}
+        setRelativePeriod={setRelativePeriod}
+      />
     </HStack>
   );
 
