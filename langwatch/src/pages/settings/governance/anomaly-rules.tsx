@@ -95,7 +95,11 @@ function AnomalyRulesPage() {
   const orgId = organization?.id ?? "";
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
-    { projectId: project?.id, enabled: !!project },
+    {
+      projectId: project?.id,
+      organizationId: orgId,
+      enabled: !!orgId,
+    },
   );
 
   const rulesQuery = api.anomalyRules.list.useQuery(
@@ -614,6 +618,6 @@ const selectStyle = {
   fontSize: "14px",
 };
 
-export default withPermissionGuard("organization:manage", {})(
+export default withPermissionGuard("organization:manage", { bypassOnboardingRedirect: true })(
   AnomalyRulesPage,
 );

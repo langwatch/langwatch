@@ -25,6 +25,17 @@ export const noOrgBouncerRoutes = [
   "/onboarding/welcome",
   "/onboarding/[team]/project",
   "/onboarding/product",
+  // Org-scoped governance pages — admin in an empty org (no project yet)
+  // must still reach /governance + /settings/governance/* to set up
+  // sources, rules, routing policies. Bouncing them to /onboarding/welcome
+  // is wrong: they ALREADY have an org, they just haven't created a
+  // project yet (and may never need to — governance is org-scoped).
+  "/governance",
+  "/settings/governance",
+  "/settings/governance/ingestion-sources",
+  "/settings/governance/ingestion-sources/[id]",
+  "/settings/governance/anomaly-rules",
+  "/settings/routing-policies",
 ];
 
 export const useRequiredSession = (

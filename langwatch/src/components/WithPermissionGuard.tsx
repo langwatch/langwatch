@@ -11,6 +11,15 @@ interface WithPermissionGuardOptions {
   }>;
   layoutComponent?: React.ComponentType<{ children: React.ReactNode }>;
   customMessage?: string;
+  /**
+   * When true, the underlying `useOrganizationTeamProject` call inside
+   * the guard does NOT trigger the no-org/no-project bouncer to
+   * `/onboarding/welcome`. Used by org-scope pages (governance) where
+   * an admin may exist in an org without any project yet — they must
+   * still reach `/governance` to set up sources / rules. The default
+   * (false) preserves the legacy behavior for project-scope pages.
+   */
+  bypassOnboardingRedirect?: boolean;
 }
 
 /**
@@ -30,10 +39,18 @@ export function withPermissionGuard(
       fallbackComponent: FallbackComponent = PermissionAlert,
       layoutComponent: LayoutComponent,
       customMessage,
+      bypassOnboardingRedirect = false,
     } = options ?? {};
 
     const GuardedComponent = (props: P) => {
-      const { hasAnyPermission, isLoading } = useOrganizationTeamProject();
+      const { hasAnyPermission, isLoading } = useOrganizationTeamProject(
+        bypassOnboardingRedirect
+          ? {
+              redirectToOnboarding: false,
+              redirectToProjectOnboarding: false,
+            }
+          : undefined,
+      );
 
       // Don't check permissions while still loading - let the wrapped component handle loading state
       if (isLoading) {

@@ -93,7 +93,11 @@ function IngestionSourceDetailPage() {
   const orgId = organization?.id ?? "";
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
-    { projectId: project?.id, enabled: !!project },
+    {
+      projectId: project?.id,
+      organizationId: orgId,
+      enabled: !!orgId,
+    },
   );
 
   const sourceQuery = api.ingestionSources.get.useQuery(
@@ -565,6 +569,6 @@ function SecretRevealModal({
   );
 }
 
-export default withPermissionGuard("organization:manage", {})(
+export default withPermissionGuard("organization:manage", { bypassOnboardingRedirect: true })(
   IngestionSourceDetailPage,
 );

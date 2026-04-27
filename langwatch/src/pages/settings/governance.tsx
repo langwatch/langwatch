@@ -66,7 +66,11 @@ function GovernanceOverviewPage() {
   const orgId = organization?.id ?? "";
   const { enabled: governancePreviewEnabled } = useFeatureFlag(
     "release_ui_ai_governance_enabled",
-    { projectId: project?.id, enabled: !!project },
+    {
+      projectId: project?.id,
+      organizationId: orgId,
+      enabled: !!orgId,
+    },
   );
 
   const sourcesQuery = api.ingestionSources.list.useQuery(
@@ -591,6 +595,6 @@ function UserRow({ user }: { user: SpendByUser }) {
   );
 }
 
-export default withPermissionGuard("organization:manage", {})(
-  GovernanceOverviewPage,
-);
+export default withPermissionGuard("organization:manage", {
+  bypassOnboardingRedirect: true,
+})(GovernanceOverviewPage);
