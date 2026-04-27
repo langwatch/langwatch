@@ -973,7 +973,7 @@ function SecretModal({
             {usesPushUrl && (
               <VStack align="stretch" gap={1}>
                 <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  OTLP audit-event endpoint (paste into upstream exporter)
+                  OTLP ingestion endpoint (paste into upstream exporter)
                 </Text>
                 <HStack gap={2}>
                   <Code flex={1} padding={2} fontSize="xs">
@@ -988,12 +988,13 @@ function SecretModal({
                   </Button>
                 </HStack>
                 <Text fontSize="xs" color="fg.muted">
-                  This endpoint is for cross-platform audit events
-                  (Workato / Cowork / Copilot Studio / etc.). If you
-                  are sending agent traces from your own LangWatch
-                  SDK, use{" "}
+                  Spans push into the LangWatch trace store with this
+                  source&apos;s origin tag and become viewable in the
+                  trace viewer. If you are sending agent traces from
+                  your own LangWatch SDK, use{" "}
                   <Code fontSize="xs">/api/otel/v1/traces</Code> with
-                  your project API key instead — see{" "}
+                  your project API key — different auth, same trace
+                  store. See{" "}
                   <Link
                     href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
                     color="orange.600"

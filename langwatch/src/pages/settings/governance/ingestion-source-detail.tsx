@@ -370,16 +370,16 @@ function EmptyEventsHint({ source }: { source: Source }) {
   return (
     <VStack align="stretch" gap={3}>
       <Text fontSize="sm" color="fg.muted">
-        No audit events yet. Push an event to{" "}
+        No traces from this source yet. Push an OTLP body to{" "}
         <Code fontSize="xs">{endpoint}</Code> with the source&apos;s
         bearer secret to start populating.
       </Text>
       <Text fontSize="xs" color="fg.muted">
-        This endpoint is for cross-platform <strong>audit events</strong>{" "}
-        (governance roll-up). If you are sending agent traces from your
-        own LangWatch SDK, use{" "}
-        <Code fontSize="xs">/api/otel/v1/traces</Code> with your project
-        API key instead — see{" "}
+        Spans land in the LangWatch trace store with this
+        source&apos;s origin tag, viewable in the trace viewer. If
+        you are sending agent traces from your own LangWatch SDK,
+        use <Code fontSize="xs">/api/otel/v1/traces</Code> with your
+        project API key — different auth, same trace store. See{" "}
         <Link
           href="https://docs.langwatch.ai/observability/trace-vs-activity-ingestion"
           color="orange.600"
