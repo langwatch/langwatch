@@ -397,6 +397,55 @@ secret in UI → upstream curl with that secret → 202 ack →
 Secret is shown exactly once and never returned by the list/get
 endpoints afterwards.
 
+### CLI ingest debug (Lane A dogfood)
+
+The same backend, exercised through the CLI without ever opening
+a browser. After `langwatch login --device`, four read-only
+governance debug helpers go live (gated behind
+`LANGWATCH_GOVERNANCE_PREVIEW=1`):
+
+```text
+$ langwatch governance status
+Governance setup state
+  · Personal VKs
+  · Routing policies
+  ✓ Ingestion sources
+  ✓ Anomaly rules
+  ✓ Recent activity (30d)
+
+Governance active: yes
+
+$ langwatch ingest list
+NAME                        TYPE          STATUS  LAST EVENT
+Dogfood OTel · alexis lane  otel_generic  active  46m ago
+
+$ langwatch ingest health JxQztBgN90QeX12-afJ0C
+Dogfood OTel · alexis lane  (JxQztBgN90QeX12-afJ0C)
+Status:        active
+Events (24h):  1
+Events (7d):   1
+Events (30d):  1
+Last event:    47m ago
+
+$ langwatch ingest tail JxQztBgN90QeX12-afJ0C --limit 5
+2026-04-27T07:11:18.963Z  api.call  chat_completion → claude-3-5-sonnet
+```
+
+Every command also accepts `--json` for machine output (exact
+contract match with the equivalent tRPC procedure / web UI render).
+`langwatch ingest tail --follow` polls every 3 s and dedupes by
+`eventId`, so the CLI and the per-source detail page show the
+same event stream byte-for-byte.
+
+Auth for these REST adapters reuses the same Bearer
+`access_token` the device flow persists in
+`~/.langwatch/config.json` — no separate token. Unauthenticated
+calls bounce with `Not logged in — run \`langwatch login --device\` first`;
+unknown source IDs surface the underlying tRPC `NOT_FOUND` as
+`Error: IngestionSource not found`. Both error paths are
+asserted in `specs/ai-gateway/governance/cli-ingest-debug.feature`
+(12 scenarios).
+
 ### Admin oversight wired to real data (no mocks)
 
 Once a source is `active` and events are flowing, the admin
