@@ -243,9 +243,13 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   `release_ui_ai_governance_enabled` flag).
 - ✅ **`/settings/governance`** admin oversight dashboard
   (org-admin-only via `organization:manage` permission, plus the
-  governance flag — populated with mocked data until the D2
-  backend lands; layout is the contract the tRPC queries will
-  fulfill).
+  governance flag). Wired to real `api.activityMonitor.{summary,
+  spendByUser, ingestionSourcesHealth, recentAnomalies}` tRPC
+  procedures; **no mocked fixtures** — empty data renders a setup
+  checklist (publish a RoutingPolicy, connect an IngestionSource),
+  data renders live cards + per-user table + source-health strip.
+  Read-mostly daily-use surface; admin authoring lives at the
+  `/settings/governance/*` sub-routes.
 - ✅ **Budget enforcement** (cross-surface — gateway 402 ↔ CLI
   Screen-8 box ↔ web `BudgetExceededBanner` all derive from
   `GatewayBudgetService.check()`).
@@ -328,18 +332,31 @@ Full 6-step carousel for reviewers:
 
 | # | Step | Shot |
 |---|------|------|
-| 1 | Admin oversight `/settings/governance` (mocked v0) | [open](https://i.img402.dev/0hqnvut00t.png) |
-| 2 | `/settings/governance/ingestion-sources` — empty state | [open](https://i.img402.dev/wx4v7m7a8g.png) |
-| 3 | Composer open — `sourceType` picker + dynamic per-type form | [open](https://i.img402.dev/ycld8afavo.png) |
-| 4 | Composer filled — Generic OTel example | [open](https://i.img402.dev/yixqegurj3.png) |
-| 5 | One-time secret reveal modal — `ingestSecret` + OTLP URL + Copy | [open](https://i.img402.dev/w4fl31ukrc.png) |
-| 6 | List polled, flipped to **Active**, last event 13 s ago | [open](https://i.img402.dev/supafck5au.png) |
+| 1 | `/settings/governance/ingestion-sources` — empty state | [open](https://i.img402.dev/wx4v7m7a8g.png) |
+| 2 | Composer open — `sourceType` picker + dynamic per-type form | [open](https://i.img402.dev/ycld8afavo.png) |
+| 3 | Composer filled — Generic OTel example | [open](https://i.img402.dev/yixqegurj3.png) |
+| 4 | One-time secret reveal modal — `ingestSecret` + OTLP URL + Copy | [open](https://i.img402.dev/w4fl31ukrc.png) |
+| 5 | List polled, flipped to **Active**, last event 13 s ago | [open](https://i.img402.dev/supafck5au.png) |
 
 The dogfood walks the full Tier-3 push contract: admin issues
 secret in UI → upstream curl with that secret → 202 ack →
 `lastEventAt` flips → admin sees the flip on the next poll.
 Secret is shown exactly once and never returned by the list/get
 endpoints afterwards.
+
+### Admin oversight wired to real data (no mocks)
+
+Once a source is `active` and events are flowing, the admin
+oversight dashboard at `/settings/governance` queries
+`gateway_activity_events` via the `api.activityMonitor.*` tRPC
+procedures. Empty data renders a setup checklist; data present
+renders live cards + per-user table + source-health strip.
+
+| Surface | Real-data state | Shot |
+|---------|------------------|------|
+| `/settings/governance` — setup checklist + first real source visible in the health strip | live (`api.activityMonitor.{summary, spendByUser, ingestionSourcesHealth, recentAnomalies}`) | [open](https://i.img402.dev/hhghiq7gbb.png) |
+| `/settings/governance/ingestion-sources` — list page after the iter-13 customer-name scrub | live (`api.ingestionSources.list`) | [open](https://i.img402.dev/kfvazcuczp.png) |
+| `/settings/governance/anomaly-rules` — placeholder until the detection backend ships | placeholder (real backend stub persists rules; eval engine is the next slice) | [open](https://i.img402.dev/rcgdx6lio6.png) |
 
 Tier 2 / Tier 5 are deferred; the architecture doesn't preclude them
 and the control-plane primitives already accommodate them.
