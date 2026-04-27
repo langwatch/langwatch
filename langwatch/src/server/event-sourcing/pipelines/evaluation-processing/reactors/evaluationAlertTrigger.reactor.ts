@@ -118,7 +118,7 @@ export function createEvaluationAlertTriggerReactor(
       }
 
       // Load all evaluations for this trace
-      const allEvaluations = await deps.evaluationRuns.getByTraceId(
+      const allEvaluations = await deps.evaluationRuns.findByTraceId(
         tenantId,
         traceId,
       );

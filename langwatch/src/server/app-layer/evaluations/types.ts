@@ -30,3 +30,18 @@ export const evaluationRunDataSchema = z.object({
 });
 
 export type EvaluationRunData = z.infer<typeof evaluationRunDataSchema>;
+
+export const evalSummarySchema = z.object({
+  evaluationId: z.string(),
+  evaluatorId: z.string(),
+  evaluatorType: z.string(),
+  evaluatorName: z.string().nullable(),
+  traceId: z.string().nullable(),
+  isGuardrail: z.boolean(),
+  status: z.enum(["scheduled", "in_progress", "processed", "error", "skipped"]),
+  score: z.number().nullable(),
+  passed: z.boolean().nullable(),
+  label: z.string().nullable(),
+});
+
+export type EvalSummary = z.infer<typeof evalSummarySchema>;

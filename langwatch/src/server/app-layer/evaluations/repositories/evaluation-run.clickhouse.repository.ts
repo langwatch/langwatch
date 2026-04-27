@@ -4,7 +4,7 @@ import { EventUtils } from "~/server/event-sourcing/utils/event.utils";
 import { EVALUATION_PROJECTION_VERSIONS } from "~/server/event-sourcing/pipelines/evaluation-processing/schemas/constants";
 import { IdUtils } from "~/server/event-sourcing/pipelines/evaluation-processing/utils/id.utils";
 import { createLogger } from "~/utils/logger/server";
-import type { EvaluationRunData } from "../types";
+import type { EvalSummary, EvaluationRunData } from "../types";
 import type { EvaluationRunRepository } from "./evaluation-run.repository";
 
 const TABLE_NAME = "evaluation_runs" as const;
@@ -39,12 +39,12 @@ interface ClickHouseEvaluationRunRecord {
   CompletedAt: number | null;
   CostId: string | null;
   LastProcessedEventId: string;
-  LastEventOccurredAt: number;
+  lastEventOccurredAt: number;
 }
 
 type ClickHouseEvaluationRunWriteRecord = WithDateWrites<
   ClickHouseEvaluationRunRecord,
-  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt" | "LastEventOccurredAt"
+  "CreatedAt" | "UpdatedAt" | "ArchivedAt" | "ScheduledAt" | "StartedAt" | "CompletedAt" | "lastEventOccurredAt"
 >;
 
 export class EvaluationRunClickHouseRepository
@@ -308,6 +308,100 @@ export class EvaluationRunClickHouseRepository
     }
   }
 
+  async findSummariesByTraceIds(
+    tenantId: string,
+    traceIds: string[],
+  ): Promise<Record<string, EvalSummary[]>> {
+    if (traceIds.length === 0) return {};
+
+    EventUtils.validateTenantId(
+      { tenantId },
+      "EvaluationRunClickHouseRepository.findSummariesByTraceIds",
+    );
+
+    try {
+      const client = await this.resolveClient(tenantId);
+      const result = await client.query({
+        query: `
+          SELECT
+            EvaluationId,
+            EvaluatorId,
+            EvaluatorType,
+            EvaluatorName,
+            TraceId,
+            IsGuardrail,
+            Status,
+            Score,
+            Passed,
+            Label
+          FROM ${TABLE_NAME}
+          WHERE TenantId = {tenantId:String}
+            AND ScheduledAt >= now() - INTERVAL 7 DAY
+            AND TraceId IN ({traceIds:Array(String)})
+          ORDER BY UpdatedAt DESC
+        `,
+        query_params: { tenantId, traceIds },
+        format: "JSONEachRow",
+      });
+
+      interface SlimRow {
+        EvaluationId: string;
+        EvaluatorId: string;
+        EvaluatorType: string;
+        EvaluatorName: string | null;
+        TraceId: string | null;
+        IsGuardrail: number;
+        Status: string;
+        Score: number | null;
+        Passed: number | null;
+        Label: string | null;
+      }
+
+      const rows = await result.json<SlimRow>();
+
+      const byTrace: Record<string, EvalSummary[]> = {};
+      const seen = new Set<string>();
+
+      for (const row of rows) {
+        if (seen.has(row.EvaluationId)) continue;
+        seen.add(row.EvaluationId);
+
+        const traceId = row.TraceId;
+        if (!traceId) continue;
+
+        const summary: EvalSummary = {
+          evaluationId: row.EvaluationId,
+          evaluatorId: row.EvaluatorId,
+          evaluatorType: row.EvaluatorType,
+          evaluatorName: row.EvaluatorName,
+          traceId,
+          isGuardrail: !!row.IsGuardrail,
+          status: row.Status as EvalSummary["status"],
+          score: row.Score,
+          passed: row.Passed === null ? null : !!row.Passed,
+          label: row.Label,
+        };
+
+        const arr = byTrace[traceId];
+        if (arr) {
+          arr.push(summary);
+        } else {
+          byTrace[traceId] = [summary];
+        }
+      }
+
+      return byTrace;
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(
+        { tenantId, traceIdCount: traceIds.length, error: errorMessage },
+        "Failed to find evaluation summaries by trace IDs in ClickHouse",
+      );
+      throw error;
+    }
+  }
+
   private fromClickHouseRecord(
     record: ClickHouseEvaluationRunRecord,
   ): EvaluationRunData {
@@ -330,7 +424,7 @@ export class EvaluationRunClickHouseRepository
       errorDetails: record.ErrorDetails,
       createdAt: Number(record.CreatedAt),
       updatedAt: Number(record.UpdatedAt),
-      lastEventOccurredAt: Number(record.LastEventOccurredAt ?? 0),
+      lastEventOccurredAt: Number(record.lastEventOccurredAt ?? 0),
       archivedAt: record.ArchivedAt === null ? null : Number(record.ArchivedAt),
       scheduledAt:
         record.ScheduledAt === null ? null : Number(record.ScheduledAt),
@@ -367,7 +461,7 @@ export class EvaluationRunClickHouseRepository
       ErrorDetails: data.errorDetails,
       CreatedAt: new Date(data.createdAt),
       UpdatedAt: new Date(data.updatedAt),
-      LastEventOccurredAt: data.lastEventOccurredAt ? new Date(data.lastEventOccurredAt) : new Date(0),
+      lastEventOccurredAt: data.lastEventOccurredAt ? new Date(data.lastEventOccurredAt) : new Date(0),
       ArchivedAt: data.archivedAt != null ? new Date(data.archivedAt) : null,
       ScheduledAt: new Date(data.scheduledAt ?? data.createdAt),
       StartedAt: data.startedAt != null ? new Date(data.startedAt) : null,

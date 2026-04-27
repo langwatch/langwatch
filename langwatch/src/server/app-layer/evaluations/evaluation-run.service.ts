@@ -1,6 +1,6 @@
 import { EvaluationNotFoundError } from "./errors";
 import type { EvaluationRunRepository } from "./repositories/evaluation-run.repository";
-import type { EvaluationRunData } from "./types";
+import type { EvalSummary, EvaluationRunData } from "./types";
 
 export class EvaluationRunService {
   constructor(readonly repository: EvaluationRunRepository) {}
@@ -18,10 +18,17 @@ export class EvaluationRunService {
     return result;
   }
 
-  async getByTraceId(
+  async findByTraceId(
     tenantId: string,
     traceId: string,
   ): Promise<EvaluationRunData[]> {
     return this.repository.findByTraceId(tenantId, traceId);
+  }
+
+  async findSummariesByTraceIds(
+    tenantId: string,
+    traceIds: string[],
+  ): Promise<Record<string, EvalSummary[]>> {
+    return this.repository.findSummariesByTraceIds(tenantId, traceIds);
   }
 }
