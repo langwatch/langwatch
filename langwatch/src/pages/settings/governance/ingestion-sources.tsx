@@ -36,6 +36,7 @@ import {
   DialogRoot,
   DialogTitle,
 } from "~/components/ui/dialog";
+import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
@@ -330,32 +331,29 @@ function IngestionSourcesPage() {
             </Text>
           </VStack>
           <Spacer />
-          {!composing && (
-            <Button
-              size="sm"
-              colorPalette="blue"
-              onClick={() => {
-                setComposer(blankComposer());
-                setComposing(true);
-              }}
-            >
-              <Plus size={14} /> Add source
-            </Button>
-          )}
+          <Button
+            size="sm"
+            colorPalette="blue"
+            onClick={() => {
+              setComposer(blankComposer());
+              setComposing(true);
+            }}
+          >
+            <Plus size={14} /> Add source
+          </Button>
         </HStack>
 
-        {composing && (
-          <SourceComposer
-            composer={composer}
-            setComposer={setComposer}
-            isPending={createMutation.isPending}
-            onSubmit={onSubmit}
-            onCancel={() => {
-              setComposing(false);
-              setComposer(blankComposer());
-            }}
-          />
-        )}
+        <SourceComposerDrawer
+          isOpen={composing}
+          composer={composer}
+          setComposer={setComposer}
+          isPending={createMutation.isPending}
+          onSubmit={onSubmit}
+          onClose={() => {
+            setComposing(false);
+            setComposer(blankComposer());
+          }}
+        />
 
         {sourcesQuery.isLoading && <Spinner size="sm" />}
 
@@ -513,33 +511,41 @@ function SourceRow({
   );
 }
 
-function SourceComposer({
+function SourceComposerDrawer({
+  isOpen,
   composer,
   setComposer,
   isPending,
   onSubmit,
-  onCancel,
+  onClose,
 }: {
+  isOpen: boolean;
   composer: ComposerState;
   setComposer: (next: ComposerState) => void;
   isPending: boolean;
   onSubmit: () => void;
-  onCancel: () => void;
+  onClose: () => void;
 }) {
   const meta = SOURCE_TYPE_OPTIONS.find((o) => o.value === composer.sourceType);
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="blue.300"
-      borderRadius="md"
-      padding={4}
-      backgroundColor="blue.50"
+    <Drawer.Root
+      open={isOpen}
+      placement="end"
+      size="md"
+      onOpenChange={({ open }) => {
+        if (!open) onClose();
+      }}
     >
-      <VStack align="stretch" gap={3}>
-        <Text fontSize="sm" fontWeight="semibold">
-          Add ingestion source
-        </Text>
-        <HStack gap={3}>
+      <Drawer.Content>
+        <Drawer.Header>
+          <Drawer.CloseTrigger />
+          <Heading as="h2" size="md">
+            Add ingestion source
+          </Heading>
+        </Drawer.Header>
+        <Drawer.Body>
+          <VStack align="stretch" gap={3}>
+            <HStack gap={3}>
           <VStack align="stretch" gap={1} flex={1}>
             <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
               Source type
@@ -643,23 +649,27 @@ function SourceComposer({
           </Text>
         </VStack>
 
-        <HStack gap={3}>
-          <Spacer />
-          <Button size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            colorPalette="blue"
-            onClick={onSubmit}
-            loading={isPending}
-            disabled={!composer.name.trim()}
-          >
-            Create source
-          </Button>
-        </HStack>
-      </VStack>
-    </Box>
+          </VStack>
+        </Drawer.Body>
+        <Drawer.Footer>
+          <HStack gap={3} width="full">
+            <Spacer />
+            <Button size="sm" variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              colorPalette="blue"
+              onClick={onSubmit}
+              loading={isPending}
+              disabled={!composer.name.trim()}
+            >
+              Create source
+            </Button>
+          </HStack>
+        </Drawer.Footer>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 }
 

@@ -17,6 +17,7 @@ import { useMemo, useState } from "react";
 import { NotFoundScene } from "~/components/NotFoundScene";
 import SettingsLayout from "~/components/SettingsLayout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { Drawer } from "~/components/ui/drawer";
 import { Link } from "~/components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { useFeatureFlag } from "~/hooks/useFeatureFlag";
@@ -456,17 +457,23 @@ function RuleComposer({
   );
   const isEdit = !!composer.id;
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="blue.300"
-      borderRadius="md"
-      padding={4}
-      backgroundColor="blue.50"
+    <Drawer.Root
+      open={true}
+      placement="end"
+      size="lg"
+      onOpenChange={({ open }) => {
+        if (!open) onCancel();
+      }}
     >
-      <VStack align="stretch" gap={3}>
-        <Text fontSize="sm" fontWeight="semibold">
-          {isEdit ? "Edit anomaly rule" : "New anomaly rule"}
-        </Text>
+      <Drawer.Content>
+        <Drawer.Header>
+          <Drawer.CloseTrigger />
+          <Heading as="h2" size="md">
+            {isEdit ? "Edit anomaly rule" : "New anomaly rule"}
+          </Heading>
+        </Drawer.Header>
+        <Drawer.Body>
+          <VStack align="stretch" gap={3}>
         <HStack gap={3}>
           <VStack align="stretch" gap={1} flex={2}>
             <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
@@ -709,26 +716,30 @@ function RuleComposer({
           </Text>
         </Box>
 
-        <HStack gap={3}>
-          <Spacer />
-          <Button size="sm" variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button
-            size="sm"
-            colorPalette="blue"
-            onClick={onSubmit}
-            loading={isPending}
-            disabled={
-              !composer.name.trim() ||
-              (composer.scope !== "organization" && !composer.scopeId.trim())
-            }
-          >
-            {isEdit ? "Save changes" : "Create rule"}
-          </Button>
-        </HStack>
-      </VStack>
-    </Box>
+          </VStack>
+        </Drawer.Body>
+        <Drawer.Footer>
+          <HStack gap={3} width="full">
+            <Spacer />
+            <Button size="sm" variant="ghost" onClick={onCancel}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              colorPalette="blue"
+              onClick={onSubmit}
+              loading={isPending}
+              disabled={
+                !composer.name.trim() ||
+                (composer.scope !== "organization" && !composer.scopeId.trim())
+              }
+            >
+              {isEdit ? "Save changes" : "Create rule"}
+            </Button>
+          </HStack>
+        </Drawer.Footer>
+      </Drawer.Content>
+    </Drawer.Root>
   );
 }
 
