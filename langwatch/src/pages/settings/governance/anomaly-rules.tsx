@@ -281,6 +281,7 @@ function AnomalyRulesPage() {
             onSubmit={onSubmit}
             onCancel={() => setComposer(null)}
             isPending={isPending}
+            orgId={orgId}
           />
         )}
 
@@ -418,19 +419,41 @@ function RuleRow({
   );
 }
 
+const SOURCE_TYPE_PICKER_OPTIONS = [
+  { value: "otel_generic", label: "Generic OTel (otel_generic)" },
+  { value: "claude_cowork", label: "Claude Cowork (claude_cowork)" },
+  { value: "workato", label: "Workato (workato)" },
+  { value: "copilot_studio", label: "Copilot Studio (copilot_studio)" },
+  { value: "openai_compliance", label: "OpenAI Compliance (openai_compliance)" },
+  { value: "claude_compliance", label: "Claude Compliance (claude_compliance)" },
+  { value: "s3_custom", label: "S3 Custom (s3_custom)" },
+];
+
 function RuleComposer({
   composer,
   setComposer,
   onSubmit,
   onCancel,
   isPending,
+  orgId,
 }: {
   composer: ComposerState;
   setComposer: (next: ComposerState | null) => void;
   onSubmit: () => void;
   onCancel: () => void;
   isPending: boolean;
+  orgId: string;
 }) {
+  const [scopeIdMode, setScopeIdMode] = useState<"picker" | "custom">(
+    "picker",
+  );
+  const sourcesQuery = api.ingestionSources.list.useQuery(
+    { organizationId: orgId },
+    {
+      enabled: composer.scope === "source" && !!orgId,
+      refetchOnWindowFocus: false,
+    },
+  );
   const isEdit = !!composer.id;
   return (
     <Box
@@ -565,24 +588,81 @@ function RuleComposer({
           </VStack>
           {composer.scope !== "organization" && (
             <VStack align="stretch" gap={1} flex={1}>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                Scope ID
-              </Text>
-              <Input
-                size="sm"
-                backgroundColor="white"
-                value={composer.scopeId}
-                onChange={(e) =>
-                  setComposer({ ...composer, scopeId: e.target.value })
-                }
-                placeholder={
-                  composer.scope === "source_type"
-                    ? "otel_generic, workato, ..."
-                    : composer.scope === "source"
-                      ? "ingestion source ID"
-                      : `${composer.scope} ID`
-                }
-              />
+              <HStack gap={2} alignItems="center">
+                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+                  {composer.scope === "source"
+                    ? "Ingestion source"
+                    : composer.scope === "source_type"
+                      ? "Source type"
+                      : "Scope ID"}
+                </Text>
+                <Spacer />
+                <Button
+                  size="xs"
+                  variant="ghost"
+                  fontSize="xs"
+                  color="orange.600"
+                  onClick={() =>
+                    setScopeIdMode((m) =>
+                      m === "picker" ? "custom" : "picker",
+                    )
+                  }
+                >
+                  {scopeIdMode === "picker" ? "type a custom ID" : "use picker"}
+                </Button>
+              </HStack>
+              {scopeIdMode === "picker" && composer.scope === "source" ? (
+                <select
+                  value={composer.scopeId}
+                  onChange={(e) =>
+                    setComposer({ ...composer, scopeId: e.target.value })
+                  }
+                  style={selectStyle}
+                  disabled={sourcesQuery.isLoading}
+                >
+                  <option value="">
+                    {sourcesQuery.isLoading
+                      ? "Loading sources…"
+                      : "— select an ingestion source —"}
+                  </option>
+                  {(sourcesQuery.data ?? []).map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.sourceType})
+                    </option>
+                  ))}
+                </select>
+              ) : scopeIdMode === "picker" && composer.scope === "source_type" ? (
+                <select
+                  value={composer.scopeId}
+                  onChange={(e) =>
+                    setComposer({ ...composer, scopeId: e.target.value })
+                  }
+                  style={selectStyle}
+                >
+                  <option value="">— select a source type —</option>
+                  {SOURCE_TYPE_PICKER_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Input
+                  size="sm"
+                  backgroundColor="white"
+                  value={composer.scopeId}
+                  onChange={(e) =>
+                    setComposer({ ...composer, scopeId: e.target.value })
+                  }
+                  placeholder={
+                    composer.scope === "source_type"
+                      ? "otel_generic, workato, ..."
+                      : composer.scope === "source"
+                        ? "ingestion source ID"
+                        : `${composer.scope} ID`
+                  }
+                />
+              )}
             </VStack>
           )}
         </HStack>
