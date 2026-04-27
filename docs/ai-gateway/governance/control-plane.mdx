@@ -22,7 +22,7 @@ existing routes:
 
 | Surface | Purpose | Audience | Where it lives |
 |---------|---------|----------|----------------|
-| `/governance` (forthcoming top-level home) | Daily-use **org governance home** — spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org has activated governance (personal VKs, IngestionSources, RoutingPolicies, or gateway usage exists) | Top-level route, org-scoped. Replaces the read-mostly content currently temporarily under `/settings/governance`. |
+| `/governance` (forthcoming top-level home) | Daily-use **org governance home** — spend, ingestion-source health, anomalies, per-user breakdown. Read-mostly. | Org admins whose org's `setupState.governanceActive` is `true` (see [Persona-based home routing](#persona-based-home-routing--the-setup-state-signal) below) | Top-level route, org-scoped. Replaces the read-mostly content currently temporarily under `/settings/governance`. |
 | `/me`, `/me/settings` | Daily-use **personal home** — your usage, your budget, your personal VK, your IDE setup snippet. | Any user with a personal VK | Top-level route, principal-scoped. |
 | `/[project]/...` | LLMOps daily-use — traces, evals, datasets, scenarios, workflows. | Project members | Per-project routes. **Unchanged** from current LangWatch. |
 | `/settings/governance/ingestion-sources`, `/settings/governance/anomaly-rules`, `/settings/routing-policies` | Admin-authoring (CRUD) — create / rotate / archive sources, write rules, publish routing policies. | Org admins with `organization:manage` | Settings sub-routes, deliberately separate from daily-use surfaces. |
@@ -32,6 +32,43 @@ Settings?" — it shouldn't be. The read-mostly daily home is moving
 out to `/governance` (top-level); only the create / rotate / archive
 admin tools stay in Settings, where every other admin authoring
 tool lives.
+
+### Persona-based home routing — the setup-state signal
+
+The `/governance` entry only appears for users whose org has
+**activated** governance. The signal is the
+`api.governance.setupState({ organizationId })` tRPC procedure
+(read-only, cheap, server-side):
+
+```ts
+{
+  hasPersonalVKs:       boolean,
+  hasRoutingPolicies:   boolean,
+  hasIngestionSources:  boolean,
+  hasAnomalyRules:      boolean,
+  hasRecentActivity:    boolean,  // any event in last 30d
+  governanceActive:     boolean,  // OR of the above
+}
+```
+
+The UI calls it once on session resolve. The promotion rule is
+deliberately conservative — **don't auto-redirect existing
+LLMOps users**, just promote a `/governance` nav entry when
+the signal fires:
+
+```tsx
+const { data } = api.governance.setupState.useQuery({ organizationId });
+if (data?.governanceActive && hasOrgManagePermission) {
+  // Promote /governance entry in MainMenu.
+  // Otherwise: hide it. Current LLMOps customers see nothing
+  // until their org actually activates governance.
+}
+```
+
+This satisfies the "don't lose LLMOps" constraint: the vast
+majority of current admins (no personal VKs, no IngestionSources,
+no recent gateway activity) get `governanceActive=false` and see
+no nav change at all.
 
 ## The split: control plane vs data plane
 
@@ -268,6 +305,12 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   rotateSecret,archive}` exposes the management surface to the
   admin UI; raw secret is returned exactly once on create /
   rotate, never echoed back afterwards.
+- ✅ **`api.governance.setupState`** — the persona-routing
+  signal. Read-only summary of whether the org has personal VKs,
+  routing policies, ingestion sources, anomaly rules, or recent
+  activity. The boolean OR (`governanceActive`) drives whether
+  the `/governance` nav entry appears for org admins. Wires the
+  conservative no-auto-redirect promotion rule.
 
 In flight on the same branch:
 
