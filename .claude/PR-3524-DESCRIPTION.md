@@ -330,16 +330,34 @@ trail. The mechanical delete commit (`f3de1ae07`) is the boundary between
 
 ## UI flows + screenshots
 
-> **Alexis to fold governance dashboard walkthrough + screenshots here from
-> her .monitor-logs/lane-b-governance-dashboard-walkthrough-draft.md +
-> live img402.dev URLs as she captures them during dogfood.**
+> Captured by Alexis during the iter22 governance dogfood pass against the
+> running dev server. All post-`33a8cf6d0` (full receiver rewire shipped).
 
-Placeholder shots (older iterations, kept for the audit trail until refreshed):
+### The unified-substrate dogfood path
 
-- Composer pre-receiver-rewire: TBD
-- SecretModal post-create with retention class visible: TBD
-- WorkspaceSwitcher Layer-1 non-leak proof: TBD
-- /governance dashboard with real data (post step 3/3): TBD
+1. **Anomaly rules list** — `/settings/governance/anomaly-rules`. Critical /
+   Warning / Info severity sections; one active rule each. Cross-link from
+   the governance overview when the rule fires.
+   ![Anomaly rules list](https://i.img402.dev/x7qg8aqgfq.png)
+
+2. **AnomalyRule composer** — Name + Severity + Description + Rule type +
+   Scope + Threshold JSON. v1 ships `spend_spike` rule type + log-only
+   dispatch; `rate_limit` / `after_hours` / Slack / PagerDuty / webhook /
+   email destinations are explicitly **preview** in the composer copy
+   (config persists, evaluation/dispatch in follow-up). Honest framing — no
+   mocked-v0 surfaces per @rchaves "no mocks in UI" directive.
+   ![Anomaly composer](https://i.img402.dev/yx701f85e8.png)
+
+> Lane-B's full 8-shot iter22 set is queued for fold-in. Remaining flows
+> (governance dashboard / IngestionSource composer / SecretModal / WorkspaceSwitcher
+> Layer-1 non-leak proof) ship alongside Lane-A's narrative fold.
+
+### Screenshot cross-references — what each shot proves
+
+| Shot | Proves | Spec scenario |
+|---|---|---|
+| Anomaly rules list | AnomalyRule + AnomalyAlert read paths render against real PG state | `architecture-invariants.feature` AnomalyRule lifecycle |
+| Anomaly composer | Composer offers retention-class + scope + threshold; Preview-rule-type framing matches spec contract | `ui-contract.feature` composer scenarios |
 
 ---
 
