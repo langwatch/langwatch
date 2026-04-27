@@ -39,6 +39,9 @@ import { PersonalVirtualKeyService } from "~/server/governance/personalVirtualKe
 import { PersonalWorkspaceService } from "~/server/governance/personalWorkspace.service";
 import { GatewayBudgetService } from "~/server/gateway/budget.service";
 import { GatewayBudgetClickHouseRepository } from "~/server/gateway/budget.clickhouse.repository";
+import { IngestionSourceService } from "~/server/governance/activity-monitor/ingestionSource.service";
+import { ActivityMonitorService } from "~/server/governance/activity-monitor/activityMonitor.service";
+import { GovernanceSetupStateService } from "~/server/governance/setupState.service";
 import {
   getClickHouseClientForProject,
   isClickHouseEnabled,
@@ -697,6 +700,156 @@ app.get("/budget/status", async (c: Context) => {
     },
     402,
   );
+});
+
+// ---------------------------------------------------------------------------
+// CLI debug helpers (read-only) — `langwatch ingest *`, `langwatch
+// governance status`. Each endpoint validates the device-flow Bearer
+// access_token and delegates to the same service classes the web
+// admin tRPC procedures call, so the CLI and the UI are guaranteed
+// to see the same data — only the wire transport differs (REST here,
+// tRPC for the browser; identical service layer underneath).
+//
+// Authoring (create / rotate / archive) intentionally stays
+// browser-only until the setup flow is stable; CLI only reads.
+// ---------------------------------------------------------------------------
+
+app.get("/governance/ingest/sources", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  const includeArchived = c.req.query("include_archived") === "1";
+  const service = new IngestionSourceService(prisma);
+  const sources = await service.list(tokenRecord.organization_id);
+  const filtered = includeArchived
+    ? sources
+    : sources.filter((s: { archivedAt: Date | null }) => s.archivedAt === null);
+  return c.json({
+    sources: filtered.map((s: any) => ({
+      id: s.id,
+      name: s.name,
+      sourceType: s.sourceType,
+      description: s.description,
+      status: s.status,
+      lastEventAt: s.lastEventAt?.toISOString() ?? null,
+      createdAt: s.createdAt.toISOString(),
+      archivedAt: s.archivedAt?.toISOString() ?? null,
+    })),
+  });
+});
+
+app.get("/governance/ingest/sources/:id/events", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  const sourceId = c.req.param("id");
+  if (!sourceId) {
+    return c.json(
+      { error: "invalid_request", error_description: "source id is required" },
+      400,
+    );
+  }
+  const limitRaw = c.req.query("limit");
+  const beforeIso = c.req.query("before_iso") ?? undefined;
+  const limit = limitRaw ? Math.min(Math.max(1, parseInt(limitRaw, 10)), 200) : 50;
+
+  // Defensive ownership check before hitting CH — prevents the
+  // "querying any source-id with a valid bearer" footgun even
+  // though ActivityMonitorService also filters by OrganizationId.
+  const sourceService = new IngestionSourceService(prisma);
+  const source = await sourceService.findById(
+    sourceId,
+    tokenRecord.organization_id,
+  );
+  if (!source) {
+    return c.json(
+      { error: "not_found", error_description: "IngestionSource not found" },
+      404,
+    );
+  }
+
+  const monitor = new ActivityMonitorService(prisma);
+  const events = await monitor.eventsForSource({
+    organizationId: tokenRecord.organization_id,
+    sourceId,
+    limit,
+    beforeIso,
+  });
+  return c.json({ events });
+});
+
+app.get("/governance/ingest/sources/:id/health", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  const sourceId = c.req.param("id");
+  if (!sourceId) {
+    return c.json(
+      { error: "invalid_request", error_description: "source id is required" },
+      400,
+    );
+  }
+  const sourceService = new IngestionSourceService(prisma);
+  const source = await sourceService.findById(
+    sourceId,
+    tokenRecord.organization_id,
+  );
+  if (!source) {
+    return c.json(
+      { error: "not_found", error_description: "IngestionSource not found" },
+      404,
+    );
+  }
+  const monitor = new ActivityMonitorService(prisma);
+  const health = await monitor.sourceHealthMetrics({
+    organizationId: tokenRecord.organization_id,
+    sourceId,
+  });
+  return c.json({
+    source: { id: source.id, name: source.name, status: source.status },
+    health,
+  });
+});
+
+app.get("/governance/status", async (c: Context) => {
+  const tokenRecord = await validateAccessToken(c.req.header("Authorization"));
+  if (!tokenRecord) {
+    return c.json(
+      {
+        error: "unauthorized",
+        error_description:
+          "Bearer access token is missing, malformed, or expired",
+      },
+      401,
+    );
+  }
+  const setupService = GovernanceSetupStateService.create(prisma);
+  const setup = await setupService.resolve(tokenRecord.organization_id);
+  return c.json({ setup });
 });
 
 // ---------------------------------------------------------------------------
