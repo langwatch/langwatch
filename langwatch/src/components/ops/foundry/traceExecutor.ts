@@ -144,6 +144,17 @@ function buildSpan(
     }
   }
 
+  if (config.events) {
+    for (const event of config.events) {
+      const eventTimeMs = startTimeMs + (event.offsetMs ?? 0);
+      const attrs: Record<string, string> = {};
+      for (const [k, v] of Object.entries(event.attributes)) {
+        attrs[k] = typeof v === "string" ? v : JSON.stringify(v);
+      }
+      span.addEvent(event.name, attrs, new Date(eventTimeMs));
+    }
+  }
+
   for (const [key, value] of Object.entries(config.attributes)) {
     span.setAttribute(key, value);
   }

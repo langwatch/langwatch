@@ -63,6 +63,12 @@ export interface SpanException {
   stackTrace?: string;
 }
 
+export interface SpanEvent {
+  name: string;
+  attributes: Record<string, unknown>;
+  offsetMs?: number;
+}
+
 export interface LLMConfig {
   requestModel?: string;
   responseModel?: string;
@@ -95,6 +101,8 @@ export interface SpanConfig {
   output?: SpanInputOutput;
   attributes: Record<string, string | number | boolean>;
   exception?: SpanException;
+
+  events?: SpanEvent[];
 
   llm?: LLMConfig;
   rag?: RAGConfig;

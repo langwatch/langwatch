@@ -55,6 +55,11 @@ import { TokenizerService } from "./traces/tokenizer.service";
 import { LogRequestCollectionService } from "./traces/log-request-collection.service";
 import { MetricRequestCollectionService } from "./traces/metric-request-collection.service";
 import { TraceRequestCollectionService } from "./traces/trace-request-collection.service";
+import { TraceListService } from "./traces/trace-list.service";
+import { TraceListClickHouseRepository } from "./traces/repositories/trace-list.clickhouse.repository";
+import { NullTraceListRepository } from "./traces/repositories/trace-list.repository";
+import { PrismaTopicRepository } from "./topics/topic.prisma.repository";
+import { NullTopicRepository } from "./topics/null-topic.repository";
 import { TraceSummaryService } from "./traces/trace-summary.service";
 import { TraceSummaryClickHouseRepository } from "./traces/repositories/trace-summary.clickhouse.repository";
 import { NullTraceSummaryRepository } from "./traces/repositories/trace-summary.repository";
@@ -152,6 +157,20 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
     ),
     "TraceSummaryService",
   );
+  const evaluationRuns = traced(
+    new EvaluationRunService(
+      clickhouseEnabled ? new EvaluationRunClickHouseRepository(resolveClickHouseClient) : new NullEvaluationRunRepository(),
+    ),
+    "EvaluationRunService",
+  );
+  const traceList = traced(
+    new TraceListService(
+      clickhouseEnabled ? new TraceListClickHouseRepository(resolveClickHouseClient) : new NullTraceListRepository(),
+      evaluationRuns,
+      new PrismaTopicRepository(prisma),
+    ),
+    "TraceListService",
+  );
   const spanStorage = traced(
     new SpanStorageService(
       clickhouseEnabled ? new SpanStorageClickHouseRepository(resolveClickHouseClient) : new NullSpanStorageRepository(),
@@ -169,13 +188,6 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
       clickhouseEnabled ? new MetricRecordStorageClickHouseRepository(resolveClickHouseClient) : new NullMetricRecordStorageRepository(),
     ),
     "MetricRecordStorageService",
-  );
-
-  const evaluationRuns = traced(
-    new EvaluationRunService(
-      clickhouseEnabled ? new EvaluationRunClickHouseRepository(resolveClickHouseClient) : new NullEvaluationRunRepository(),
-    ),
-    "EvaluationRunService",
   );
 
   const experiments = traced(
@@ -398,6 +410,7 @@ export function initializeDefaultApp(options?: { processRole?: ProcessRole }): A
 
   const traces = {
     summary: traceSummary,
+    list: traceList,
     spans: spanStorage,
     logRecords: logRecordStorage,
     metricRecords: metricRecordStorage,
@@ -531,31 +544,35 @@ export function createTestApp(overrides?: Partial<AppDependencies>): App {
   return new App({
     config,
     broadcast: new BroadcastService(null),
-    traces: {
-      summary: traced(new TraceSummaryService(new NullTraceSummaryRepository()), "TraceSummaryService"),
-      spans: traced(new SpanStorageService(new NullSpanStorageRepository()), "SpanStorageService"),
-      logRecords: traced(new LogRecordStorageService(new NullLogRecordStorageRepository()), "LogRecordStorageService"),
-      metricRecords: traced(new MetricRecordStorageService(new NullMetricRecordStorageRepository()), "MetricRecordStorageService"),
-      collection: traced(
-        new TraceRequestCollectionService({
-          dedup: createSpanDedupeService(null),
-          recordSpan: noop,
-        }),
-        "TraceRequestCollectionService",
-      ),
-      logCollection: traced(
-        new LogRequestCollectionService({
-          recordLog: noop,
-        }),
-        "LogRequestCollectionService",
-      ),
-      metricCollection: traced(
-        new MetricRequestCollectionService({
-          recordMetric: noop,
-        }),
-        "MetricRequestCollectionService",
-      ),
-    },
+    traces: (() => {
+      const nullEvalRuns = new EvaluationRunService(new NullEvaluationRunRepository());
+      return {
+        summary: traced(new TraceSummaryService(new NullTraceSummaryRepository()), "TraceSummaryService"),
+        list: traced(new TraceListService(new NullTraceListRepository(), nullEvalRuns, new NullTopicRepository()), "TraceListService"),
+        spans: traced(new SpanStorageService(new NullSpanStorageRepository()), "SpanStorageService"),
+        logRecords: traced(new LogRecordStorageService(new NullLogRecordStorageRepository()), "LogRecordStorageService"),
+        metricRecords: traced(new MetricRecordStorageService(new NullMetricRecordStorageRepository()), "MetricRecordStorageService"),
+        collection: traced(
+          new TraceRequestCollectionService({
+            dedup: createSpanDedupeService(null),
+            recordSpan: noop,
+          }),
+          "TraceRequestCollectionService",
+        ),
+        logCollection: traced(
+          new LogRequestCollectionService({
+            recordLog: noop,
+          }),
+          "LogRequestCollectionService",
+        ),
+        metricCollection: traced(
+          new MetricRequestCollectionService({
+            recordMetric: noop,
+          }),
+          "MetricRequestCollectionService",
+        ),
+      };
+    })(),
     evaluations: {
       runs: traced(new EvaluationRunService(new NullEvaluationRunRepository()), "EvaluationRunService"),
       execution: void 0 as unknown as AppDependencies["evaluations"]["execution"],
