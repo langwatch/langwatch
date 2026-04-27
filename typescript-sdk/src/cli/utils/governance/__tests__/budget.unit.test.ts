@@ -109,6 +109,33 @@ describe("renderBudgetExceeded", () => {
     expect(out).not.toContain("Admin:");
   });
 
+  describe("period rendering — gateway emits lowercased GatewayBudgetWindow root form", () => {
+    it.each([
+      ["month", "monthly budget"],
+      ["week", "weekly budget"],
+      ["day", "daily budget"],
+      ["hour", "hourly budget"],
+      ["minute", "per-minute budget"],
+      ["total", "total budget"],
+    ])("maps period=%j -> %j", (period, label) => {
+      const out = renderBudgetExceeded({ ...baseEvent, period });
+      expect(out).toContain(label);
+    });
+
+    it.each(["day", "minute", "total"])(
+      "regression: period=%j must not produce naive ${period}ly gibberish",
+      (period) => {
+        const out = renderBudgetExceeded({ ...baseEvent, period });
+        expect(out).not.toContain(`${period}ly budget`);
+      },
+    );
+
+    it("falls back to raw period for unknown values (graceful)", () => {
+      const out = renderBudgetExceeded({ ...baseEvent, period: "rolling_24h" });
+      expect(out).toContain("rolling_24h budget");
+    });
+  });
+
   it("contains no ANSI escape sequences (pipe-safe)", () => {
     const out = renderBudgetExceeded(baseEvent);
     // eslint-disable-next-line no-control-regex

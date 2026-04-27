@@ -125,6 +125,26 @@ describe("BudgetExceededBanner", () => {
     });
   });
 
+  describe("when period is the gateway's root-form (lowercased GatewayBudgetWindow)", () => {
+    it.each([
+      ["month", /monthly\s+\w+\s+budget/i],
+      ["week", /weekly\s+\w+\s+budget/i],
+      ["day", /daily\s+\w+\s+budget/i],
+      ["hour", /hourly\s+\w+\s+budget/i],
+    ])("normalizes %j to adjective form in the copy", (period, pattern) => {
+      renderBanner({ period });
+
+      expect(screen.getByText(pattern)).toBeInTheDocument();
+    });
+
+    it("never renders the raw 'month X budget' shape (regression guard)", () => {
+      renderBanner({ period: "month" });
+
+      const monthlyMatches = screen.queryAllByText(/\bmonthly\s/i);
+      expect(monthlyMatches.length).toBeGreaterThan(0);
+    });
+  });
+
   describe("when given an unknown period value", () => {
     it("falls back to the raw period string (graceful degradation)", () => {
       renderBanner({ period: "rolling_24h" });

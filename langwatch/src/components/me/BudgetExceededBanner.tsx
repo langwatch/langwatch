@@ -34,10 +34,22 @@ export type BudgetExceededBannerProps = {
   adminEmail?: string | null;
 };
 
+// `api.user.personalBudget` and the gateway 402 payload both pass
+// `period` as the lowercased root form of the `GatewayBudgetWindow`
+// Prisma enum ("month" / "week" / "day" / "hour" / "minute" / "total").
+// Map to adjective form for display; also accept the adjective forms
+// directly so older callers / hand-written fixtures still render.
 const PERIOD_LABEL: Record<string, string> = {
+  minute: "per-minute",
+  hour: "hourly",
+  day: "daily",
+  week: "weekly",
+  month: "monthly",
+  total: "total",
   monthly: "monthly",
   weekly: "weekly",
   daily: "daily",
+  hourly: "hourly",
   session: "session",
 };
 

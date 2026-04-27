@@ -104,7 +104,16 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   }
 
   const env = { ...process.env, ...envForTool(cfg, tool).vars };
-  const child = spawn(tool, args, { stdio: "inherit", env });
+  // npm installs claude/codex/cursor/gemini as `.cmd` shims on Windows;
+  // bare spawn() can't resolve them without a shell. shell:true is safe
+  // here because `tool` is whitelisted (claude/codex/cursor/gemini) and
+  // `args` is forwarded from the user's own terminal invocation — same
+  // trust boundary as if they'd typed `claude …` directly.
+  const child = spawn(tool, args, {
+    stdio: "inherit",
+    env,
+    shell: process.platform === "win32",
+  });
   child.on("error", (err) => {
     if ((err as NodeJS.ErrnoException).code === "ENOENT") {
       process.stderr.write(

@@ -72,12 +72,27 @@ export async function checkBudget(
  * escape sequences. Lines match the budget-exceeded.feature
  * scenario character-for-character.
  */
+// Gateway emits root-form periods from the `GatewayBudgetWindow` Prisma
+// enum lowercased ("month", "week", "day", "hour", "minute", "total").
+// Naive `${period}ly` produces "dayly" / "totally" / "minutely" — map
+// explicitly. Unknown periods (e.g. older server adds "rolling_24h")
+// fall through to the raw value rather than render gibberish.
+const PERIOD_LABEL: Record<string, string> = {
+  minute: "per-minute",
+  hour: "hourly",
+  day: "daily",
+  week: "weekly",
+  month: "monthly",
+  total: "total",
+};
+
 export function renderBudgetExceeded(e: BudgetExceededPayload): string {
-  const period = e.period || "month";
+  const period = (e.period || "month").toLowerCase();
+  const periodLabel = PERIOD_LABEL[period] ?? period;
   const lines: string[] = [];
   lines.push("⚠  Budget limit reached");
   lines.push("");
-  lines.push(`   You've used $${e.spent_usd} of your $${e.limit_usd} ${period}ly budget.`);
+  lines.push(`   You've used $${e.spent_usd} of your $${e.limit_usd} ${periodLabel} budget.`);
   lines.push("   To continue, ask your team admin to raise your limit.");
   lines.push("");
   if (e.admin_email) {
