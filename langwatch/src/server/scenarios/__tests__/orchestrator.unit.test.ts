@@ -49,6 +49,7 @@ function createTestDeps(overrides?: Partial<OrchestratorDependencies>): Orchestr
     projectRepository: {
       getProject: async () => defaultProject,
     },
+    defaultModelResolver: async () => defaultProject.defaultModel,
     modelParamsProvider: {
       prepare: async () => ({ success: true as const, params: defaultParams }),
     },
@@ -144,6 +145,7 @@ describe("ScenarioExecutionOrchestrator", () => {
             projectRepository: {
               getProject: async () => ({ apiKey: "test-api-key", defaultModel: null }),
             },
+            defaultModelResolver: async () => null,
           });
           const orchestrator = new ScenarioExecutionOrchestrator(deps);
 

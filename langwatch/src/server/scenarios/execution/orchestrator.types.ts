@@ -72,6 +72,11 @@ export interface ScenarioExecutor {
 export interface OrchestratorDependencies {
   scenarioRepository: ScenarioRepository;
   projectRepository: ProjectRepository;
+  /**
+   * Resolves the effective default model for a project, including env-fallback
+   * providers. Injected so callers can wire in ProjectService.resolveDefaultModel.
+   */
+  defaultModelResolver: (projectId: string) => Promise<string | null>;
   modelParamsProvider: ModelParamsProvider;
   adapterFactory: AdapterFactory;
   tracerFactory: TracerFactory;
