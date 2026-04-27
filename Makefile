@@ -89,12 +89,6 @@ install:
 start:
 	cd langwatch && pnpm concurrently --kill-others 'pnpm dev' 'cd ../langwatch_nlp && make start'
 
-python-build:
-	uv pip install build && uv run python -m build
-
-python-install:
-	pip install --no-cache-dir --force-reinstall dist/langwatch_server-*-py3-none-any.whl
-
 start/postgres:
 	@echo "Starting Postgres..."
 	@docker compose up -d postgres

@@ -1,0 +1,60 @@
+# What goes in the @langwatch/server tarball — anything not in `files` from
+# package.json gets dropped by default; this file trims further inside the
+# directories that ARE included (langwatch/, langwatch_nlp/, langevals/).
+#
+# The CLI bundle (packages/server/dist/cli.cjs) ships unmodified, and the
+# langwatch app's dist/ (vite client + scenario-child-process + mcp-server
+# bundles) is intentionally NOT excluded here — it's pre-built in
+# .github/workflows/npx-server-publish.yml so end users skip the runtime
+# `vite build` step.
+
+# Internal dev tooling — used only during langwatch development, never at
+# runtime by `npx @langwatch/server`. Keeping these out cuts the tarball
+# in half (deja-view alone is ~1MB).
+langwatch/packages/
+
+# Jupyter notebooks — exploration artifacts, not runtime code.
+langwatch_nlp/notebooks/
+langevals/notebooks/
+
+# Tests, fixtures, and dev-only configs.
+**/tests/
+**/__tests__/
+**/test/
+**/__pycache__/
+**/.pytest_cache/
+**/.venv/
+**/node_modules/
+
+# CI + container files that don't apply when running locally via npx.
+**/Dockerfile*
+**/.dockerignore
+**/.github/
+
+# Source maps + tsbuildinfo
+**/*.map
+**/*.tsbuildinfo
+
+# langwatch/ee/ used to be excluded as "saas-only" — it isn't, the langwatch
+# app's source has unconditional imports into it. langwatch/saas-src/ never
+# existed in the OSS tree, so no exclusion needed for either.
+
+# Editor + OS detritus.
+**/.DS_Store
+**/.vscode/
+**/.idea/
+**/.cursorignore
+**/.cursorrules
+
+# Loose dotfiles already covered by .gitignore but worth being explicit.
+**/.env
+**/.env.local
+**/.env.*.local
+
+# License-swap source. /LICENSE-NPM.txt holds the Apache-2.0 text that
+# scripts/pack-npm.sh swaps into /LICENSE.md (the file npm auto-includes)
+# at pack time — the source itself doesn't belong in the tarball. The
+# backup of the original BSL /LICENSE.md is staged in /tmp by mktemp,
+# never at repo root, because npm has a hardcoded auto-include rule for
+# any LICENSE-shaped filename that ignores .npmignore.
+LICENSE-NPM.txt

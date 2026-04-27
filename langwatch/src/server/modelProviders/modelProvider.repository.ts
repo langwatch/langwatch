@@ -257,7 +257,13 @@ export class ModelProviderRepository {
    * Decrypts customKeys after reading from the database.
    * Handles the migration transition where some rows may still have plaintext JSON objects.
    *
-   * @returns Decrypted object, or null if input is null/undefined.
+   * @returns Decrypted object, or null if input is null/undefined or undecryptable.
+   *
+   * Undecryptable rows (typically: CREDENTIALS_SECRET rotated since the row
+   * was written) used to throw and crash the whole `getAllForProject` query —
+   * blocking the entire UI behind a 500 response. We now log a warning and
+   * return null so the provider is treated as keyless, the user can re-enter
+   * keys, and the rest of the providers list still loads.
    */
   private decryptCustomKeys(
     customKeys: unknown,
@@ -271,8 +277,16 @@ export class ModelProviderRepository {
 
     // Encrypted string: decrypt and parse
     if (typeof customKeys === "string") {
-      const decrypted = decrypt(customKeys);
-      return JSON.parse(decrypted) as Record<string, unknown>;
+      try {
+        const decrypted = decrypt(customKeys);
+        return JSON.parse(decrypted) as Record<string, unknown>;
+      } catch (err) {
+        console.warn(
+          "[ModelProviderRepository] dropping unreadable customKeys (likely CREDENTIALS_SECRET rotated since row was written):",
+          err instanceof Error ? err.message : String(err),
+        );
+        return null;
+      }
     }
 
     return null;

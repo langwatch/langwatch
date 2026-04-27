@@ -1,0 +1,55 @@
+{
+  "name": "@langwatch/server",
+  "version": "3.1.0-beta.19",
+  "description": "Run LangWatch locally with one command — `npx @langwatch/server`. Bundles the Next.js control plane, Python NLP service, evaluators, and the Go AI gateway with embedded postgres, redis, and clickhouse.",
+  "license": "Apache-2.0",
+  "homepage": "https://langwatch.ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/langwatch/langwatch.git"
+  },
+  "bugs": {
+    "url": "https://github.com/langwatch/langwatch/issues"
+  },
+  "keywords": [
+    "langwatch",
+    "llm",
+    "observability",
+    "evaluations",
+    "ai",
+    "tracing",
+    "playground",
+    "self-hosted"
+  ],
+  "engines": {
+    "node": ">=20",
+    "pnpm": ">=10"
+  },
+  "packageManager": "pnpm@10.24.0",
+  "type": "module",
+  "bin": {
+    "langwatch-server": "packages/server/dist/cli.cjs"
+  },
+  "files": [
+    "packages/server/dist/",
+    "packages/server/templates/",
+    "langwatch/",
+    "langwatch_nlp/",
+    "langevals/",
+    "python-sdk/",
+    "mcp-server/",
+    "scripts/",
+    "README.md",
+    "LICENSE.md"
+  ],
+  "scripts": {
+    "build:cli": "pnpm --filter @langwatch/server-cli build",
+    "dev:cli": "pnpm --filter @langwatch/server-cli dev",
+    "test:cli": "pnpm --filter @langwatch/server-cli test",
+    "pack:npm": "bash scripts/pack-npm.sh",
+    "release:dry-run": "bash scripts/pack-npm.sh && tar -tzf langwatch-server-*.tgz | head -50"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}

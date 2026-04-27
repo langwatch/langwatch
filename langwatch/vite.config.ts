@@ -1,12 +1,39 @@
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import path from "path";
 
 const FRONTEND_PORT = parseInt(process.env.PORT ?? "5560");
 const API_PORT = FRONTEND_PORT + 1000;
 
+// object-inspect's index.js does `var inspectCustom = require('./util.inspect')`
+// and the package.json sets `"browser": { "./util.inspect.js": false }`. Vite
+// turns `false` into a Proxy stub that throws on ANY property access — which
+// breaks object-inspect's `typeof inspectCustom.custom === 'symbol'` defensive
+// check (it expected `false` → empty `{}`, but vite gives a throwing stub).
+// Result before this plugin: the SPA failed to mount and threw `Cannot access
+// ".custom" in client code` in the command-bar chunk.
+//
+// Fix: intercept the relative `./util.inspect` import from inside object-inspect
+// and route it to our noop module. Vite's `resolve.alias` can't catch this
+// because the alias key would have to match the relative specifier, but only
+// from one specific importer. A `resolveId` plugin with an importer check is
+// the right tool.
+function patchObjectInspectBrowserStub(): Plugin {
+  const noopPath = path.resolve(__dirname, "./src/noop-css.cjs");
+  return {
+    name: "patch-object-inspect-browser-stub",
+    enforce: "pre",
+    resolveId(id, importer) {
+      if (id === "./util.inspect" && importer && importer.includes("/object-inspect/")) {
+        return noopPath;
+      }
+      return undefined;
+    },
+  };
+}
+
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), patchObjectInspectBrowserStub()],
   resolve: {
     alias: {
       // Path aliases (matching tsconfig paths)

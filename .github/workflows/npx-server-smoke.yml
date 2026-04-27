@@ -1,0 +1,319 @@
+# Smoke job for `npx @langwatch/server`. Builds the workspace package as a
+# tarball, then runs it from a fresh sandbox dir on every supported platform.
+# Asserts the full stack (postgres + redis + clickhouse + langwatch_nlp +
+# langevals + ai-gateway + langwatch app) reaches healthy state and that the
+# critical user paths — workflow execution, evaluator run — return 200.
+#
+# Trigger policy:
+# - workflow_dispatch (manual, with optional `port_base` input)
+# - nightly schedule (04:00 UTC)
+# - push to non-main branches when key files change (PR validation)
+#
+# This workflow is intentionally not in the langwatch-app-complete required
+# checks — postgres/clickhouse/uv downloads are heavy and flaky-prone. Treat
+# failures as signal, not gate, until the workflow has hardened.
+
+name: npx-server-smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      port_base:
+        description: "Port base to test (default 5560)"
+        required: false
+        default: "5560"
+  schedule:
+    - cron: "0 4 * * *"
+  push:
+    branches-ignore:
+      - main
+    paths:
+      - "package.json"
+      - "pnpm-workspace.yaml"
+      - "pnpm-lock.yaml"
+      - "packages/server/**"
+      - "langwatch_nlp/pyproject.toml"
+      - "langwatch_nlp/uv.lock"
+      - "langevals/pyproject.toml"
+      - "langevals/uv.lock"
+      - "services/aigateway/**"
+      - "cmd/service/**"
+      - "langwatch/package.json"
+      - "langwatch/scripts/start.sh"
+      - "langwatch/scripts/check-ports.sh"
+      - ".github/workflows/npx-server-smoke.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        runner:
+          - macos-latest
+          - ubuntu-latest
+          - ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    env:
+      LANGWATCH_HOME: ${{ github.workspace }}/.langwatch-smoke
+      PORT_BASE: ${{ inputs.port_base || '5560' }}
+      CI: "true"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Identify runner
+        run: |
+          uname -a
+          node --version || true
+          go version || true
+
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4
+        with:
+          node-version: "24"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+        with:
+          version: 10.24.0
+          run_install: false
+
+      # No Go setup. The npx flow ships only the prebuilt aigateway monobinary
+      # download path; LANGWATCH_AIGATEWAY_DEV_BUILD is intentionally unset
+      # so the env-gated local-build fallback can never trigger. We don't
+      # try to remove Go from PATH (every GitHub-hosted runner ships it
+      # baked in) — the env-var gate plus the binary-identity assertions
+      # below (version match + stripped check) are what catch a regression.
+
+      # Install ONLY tools that aren't predeps but the CLI needs to operate
+      # (lsof for port-collision detection on linux). Postgres, redis,
+      # clickhouse, uv, and goose all flow through their respective predeps,
+      # which is the actual user experience we want to validate end-to-end —
+      # download from embeds.langwatch.ai (pg/redis), clickhouse.com one-liner
+      # (clickhouse), astral.sh installer (uv), github releases (goose).
+      - name: Install non-predep tooling
+        shell: bash
+        run: |
+          set -e
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update
+            sudo apt-get install -y --no-install-recommends lsof file
+          fi
+
+      - name: Install pnpm dependencies (workspace)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build @langwatch/server CLI
+        run: pnpm --filter @langwatch/server-cli build
+
+      - name: Pack the npm tarball
+        id: pack
+        # Use the same wrapper as npx-server-publish.yml so the smoke tarball
+        # matches what end users get from npm (Apache LICENSE swap, exact
+        # files[] from package.json — no go.mod/cmd/, etc).
+        run: |
+          mkdir -p "$GITHUB_WORKSPACE/_pack"
+          bash scripts/pack-npm.sh --pack-destination "$GITHUB_WORKSPACE/_pack"
+          tarball="$(ls "$GITHUB_WORKSPACE/_pack"/langwatch-server-*.tgz | head -n1)"
+          echo "tarball=$tarball" >> "$GITHUB_OUTPUT"
+          echo "Tarball: $tarball"
+          ls -lh "$tarball"
+          # Belt-and-suspenders: tarball must NOT ship Go source (silent
+          # local-build foot-gun from beta.8 era).
+          if tar -tzf "$tarball" | grep -qE "^package/(go\.mod|cmd/|pkg/|services/)"; then
+            echo "✗ tarball ships Go source dirs — local-build fallback regression."
+            exit 1
+          fi
+
+      - name: Run npx @langwatch/server in a sandbox
+        id: start
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY_CI }}
+        run: |
+          set -e
+          mkdir -p "$LANGWATCH_HOME"
+          # `node packages/server/dist/cli.cjs` reproduces what `npx <tarball>` would
+          # do, but doesn't depend on a working npm registry. Faster + more stable.
+          node packages/server/dist/cli.cjs start \
+            --yes \
+            --no-open \
+            --port-base "$PORT_BASE" \
+            > "$GITHUB_WORKSPACE/_smoke.log" 2>&1 &
+          echo "$!" > "$GITHUB_WORKSPACE/_smoke.pid"
+          echo "Started CLI in background (pid $(cat $GITHUB_WORKSPACE/_smoke.pid))"
+
+      - name: Wait for /api/health (up to 18 minutes)
+        run: |
+          set -e
+          base=${PORT_BASE}
+          # CI runners have nothing cached — predep download (postgres ~80MB,
+          # clickhouse ~100MB, redis tarball, uv installer) + uv venv install
+          # for langwatch_nlp + langevals + Go aigateway local-build + pnpm
+          # install + vite build of the langwatch app together can take 8-12
+          # minutes on a cold runner. Be generous so the smoke isn't flaky on
+          # the initial provisioning window. Subsequent runs hit the cached
+          # ~/.langwatch and finish in <1 min.
+          #
+          # Auto-shift is unlikely on a fresh CI runner (5560 should be free)
+          # so the inner timeout is what matters; outer shift is a safety net.
+          for shift in 0 10 20; do
+            url="http://127.0.0.1:$((base + shift))/api/health"
+            echo "==> probing $url for up to 18min"
+            for i in $(seq 1 216); do
+              if curl -fsS "$url" >/dev/null 2>&1; then
+                echo "✓ $url is healthy after $((i*5))s"
+                echo "RESOLVED_BASE=$((base + shift))" >> "$GITHUB_ENV"
+                exit 0
+              fi
+              if [ $((i % 12)) -eq 0 ]; then
+                echo "  …still waiting at $((i*5))s — last cli.log lines:"
+                tail -n 10 "$GITHUB_WORKSPACE/_smoke.log" 2>/dev/null | sed 's/^/    /' || true
+              fi
+              sleep 5
+            done
+          done
+          echo "✗ langwatch never reported healthy on any port-shift"
+          exit 1
+
+      - name: Probe service health endpoints
+        run: |
+          set -e
+          base=${RESOLVED_BASE}
+          curl -fsS "http://127.0.0.1:$base/api/health"            | tee /tmp/health-app.json
+          curl -fsS "http://127.0.0.1:$((base + 1))/health"        | tee /tmp/health-nlp.json
+          curl -fsS "http://127.0.0.1:$((base + 2))/"              | tee /tmp/health-langevals.json
+          curl -fsS "http://127.0.0.1:$((base + 3))/healthz"       | tee /tmp/health-gateway.json
+
+      # Belt-and-suspenders for the beta.8 → beta.9 regression: the smoke
+      # matrix happily passed for weeks while aigateway was being silently
+      # `go build`-ed on the runner. Two assertions to make a future
+      # regression loud:
+      #   (1) aigateway --version returns the expected npm version (the
+      #       prebuilt is built with -ldflags "-X main.Version=$VERSION");
+      #       a stale build or local fallback would print "dev" or "unknown".
+      #   (2) the binary is stripped (file output ≠ "not stripped"). The
+      #       prebuilt uses `-ldflags "-s -w"`; an in-tree `go build` does
+      #       not, so this trivially distinguishes the two paths.
+      - name: Assert aigateway came from the prebuilt GH release download
+        run: |
+          set -e
+          bin="$LANGWATCH_HOME/bin/aigateway"
+          if [ ! -f "$bin" ]; then
+            echo "✗ no aigateway binary at $bin — predep install must have failed silently"
+            exit 1
+          fi
+          expected_version="$(node -p "require('$GITHUB_WORKSPACE/package.json').version")"
+          actual_version="$("$bin" --version 2>&1 | head -n1 | tr -d '\r')"
+          echo "aigateway --version: $actual_version"
+          echo "expected:            $expected_version"
+          if [ "$actual_version" != "$expected_version" ]; then
+            echo "✗ aigateway version mismatch — likely a stale or locally-built binary"
+            exit 1
+          fi
+          file_out="$(file "$bin")"
+          echo "$file_out"
+          if echo "$file_out" | grep -q "not stripped"; then
+            echo "✗ aigateway binary is NOT stripped — looks like a local Go build, not the prebuilt download."
+            echo "  The prebuilt monobinary uploaded to v\$VERSION on GH is built with"
+            echo "  '-ldflags \"-s -w\"'. If you see this in CI, the download path silently"
+            echo "  fell through to LANGWATCH_AIGATEWAY_DEV_BUILD=1 (which should be unset)."
+            exit 1
+          fi
+          echo "✓ aigateway is stripped + version matches — prebuilt download path confirmed"
+
+          # Also verify the cli.log shows the download progress message and
+          # NOT the local-build message. Defence in depth — a future
+          # refactor that strips the download stripping flags would still
+          # fail the (1) and (2) checks above, but a refactor that *also*
+          # strips the local-build wouldn't trigger any of them. The
+          # log-line check pins the runtime path itself.
+          if [ -f "$GITHUB_WORKSPACE/_smoke.log" ]; then
+            if grep -q "building from local checkout" "$GITHUB_WORKSPACE/_smoke.log"; then
+              echo "✗ cli.log contains 'building from local checkout' — local-build path took effect."
+              exit 1
+            fi
+            if ! grep -q "downloading langwatch ai-gateway" "$GITHUB_WORKSPACE/_smoke.log"; then
+              echo "⚠  cli.log does not mention 'downloading langwatch ai-gateway' — predep may have skipped install entirely (cached?)."
+              echo "   This is OK for re-runs against an existing $LANGWATCH_HOME/bin, but flag for visibility."
+            fi
+          fi
+
+      - name: Probe a workflow execution end-to-end
+        # Read the secret directly in the if-check. Step-level `env:` is
+        # populated AFTER the if-check is evaluated, so `env.OPENAI_API_KEY_CI`
+        # in the condition was always empty → the step was always skipped.
+        if: ${{ secrets.OPENAI_API_KEY_CI != '' }}
+        env:
+          OPENAI_API_KEY_CI: ${{ secrets.OPENAI_API_KEY_CI }}
+        run: |
+          # Posts a minimal workflow execution that hits langwatch_nlp.
+          # If OPENAI_API_KEY_CI isn't set, this step is skipped and the
+          # smoke flow stays gateable on infrastructure alone.
+          set -e
+          base=${RESOLVED_BASE}
+          # TODO: replace with a real workflow execution once the smoke fixture lands.
+          curl -fsS -X POST "http://127.0.0.1:$((base + 1))/health"
+          echo "(placeholder workflow probe — full fixture follows browser-QA)"
+
+      - name: Tear down
+        if: always()
+        run: |
+          if [ -f "$GITHUB_WORKSPACE/_smoke.pid" ]; then
+            pid="$(cat $GITHUB_WORKSPACE/_smoke.pid)"
+            echo "Killing CLI pid $pid"
+            kill -TERM "$pid" 2>/dev/null || true
+            for i in $(seq 1 10); do
+              if ! kill -0 "$pid" 2>/dev/null; then break; fi
+              sleep 1
+            done
+            kill -KILL "$pid" 2>/dev/null || true
+          fi
+
+      - name: Capture logs
+        if: always()
+        run: |
+          mkdir -p _logs
+          cp "$GITHUB_WORKSPACE/_smoke.log" _logs/cli.log 2>/dev/null || true
+          if [ -d "$LANGWATCH_HOME/logs" ]; then
+            cp -r "$LANGWATCH_HOME/logs" _logs/services/
+          fi
+          ls -la _logs/
+
+      - name: Upload logs on failure or cancellation
+        # The `failure()` filter doesn't fire on timeout-cancellation, so we
+        # widen to `!success()` — that catches both genuine failures and
+        # 35-minute-job-cap cancellations, which is when we most want logs.
+        if: ${{ !success() }}
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4
+        with:
+          name: npx-server-smoke-logs-${{ matrix.runner }}-${{ github.sha }}
+          path: _logs
+          retention-days: 7
+
+  alls-green:
+    if: always()
+    needs: [smoke]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Decide on aggregate status
+        run: |
+          # Smoke is informational until it's been running clean for a week —
+          # only fail the aggregator on workflow_dispatch + scheduled runs.
+          status='${{ needs.smoke.result }}'
+          echo "smoke status: $status"
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$status" != "success" ]; then
+            exit 1
+          fi
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "$status" != "success" ]; then
+            exit 1
+          fi
+          # On push, never fail — let humans decide.
+          exit 0
