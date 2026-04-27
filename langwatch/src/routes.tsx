@@ -187,6 +187,10 @@ const routes: RouteObject[] = [
     path: "/settings/routing-policies",
     ...page(() => import("./pages/settings/routing-policies")),
   },
+  {
+    path: "/settings/governance",
+    ...page(() => import("./pages/settings/governance")),
+  },
 
   // Personal-scope governance routes (must precede the /:project catch-all
   // so "me" doesn't get treated as a project slug)
