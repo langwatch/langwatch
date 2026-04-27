@@ -12,13 +12,20 @@ FROM ${LAMBDA_ADAPTER_IMAGE} AS lambda-adapter
 # build pre-flight. Keep the bookworm (debian) base — parity with the
 # python image below — and let CGO_ENABLED=0 produce the static binary.
 FROM golang:1.26.2-bookworm AS nlpgo-build
+# TARGETARCH is auto-populated by BuildKit from the build's --platform flag
+# (eg. linux/arm64 → "arm64", linux/amd64 → "amd64"). Production build uses
+# --platform linux/arm64 to match the Lambda function's arm64 architecture
+# (langwatch_nlp_lambda.tf:246). CI's LWA-readiness smoke test builds the
+# host arch (typically amd64) so it doesn't need QEMU emulation just to
+# verify cold-start budget.
+ARG TARGETARCH
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
 COPY pkg ./pkg
 COPY services ./services
 COPY cmd ./cmd
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=arm64 \
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} \
     go build -ldflags="-s -w" -o /out/service ./cmd/service
 
 FROM python:3.12-slim-bookworm

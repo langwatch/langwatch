@@ -48,6 +48,9 @@ outputs:
   feature-parity:
     description: "'true' if feature-parity-relevant paths changed, or if event is not a PR."
     value: ${{ steps.filter.outputs.feature-parity || steps.force.outputs.feature-parity }}
+  lambda-image:
+    description: "'true' if Lambda-image-relevant paths changed, or if event is not a PR. Used by langwatch-nlp-ci's LWA-readiness job — covers Go-binary source + Dockerfile + entrypoint, which aren't matched by the Python-only `relevant` filter."
+    value: ${{ steps.filter.outputs.lambda-image || steps.force.outputs.lambda-image }}
 
 runs:
   using: composite
@@ -66,3 +69,4 @@ runs:
       run: |
         echo "relevant=true" >> "$GITHUB_OUTPUT"
         echo "feature-parity=true" >> "$GITHUB_OUTPUT"
+        echo "lambda-image=true" >> "$GITHUB_OUTPUT"
