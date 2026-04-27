@@ -236,14 +236,23 @@ The current branch (PR #3524) implements Tier 1 end-to-end:
   + `SourceId` columns (ClickHouse) — the data model for Tier 3
   + Tier 4. Seven `sourceType` values supported on the schema
   side (see Tier 3 above).
+- ✅ **`IngestionSourceService` + REST receivers + tRPC admin
+  router.** `POST /api/ingest/otel/:sourceId` (Tier 4 entry
+  point) and `POST /api/ingest/webhook/:sourceId` (Tier 3 push
+  destination) accept events authenticated by a per-source
+  `Bearer lw_is_*` secret, return 202, flip `lastEventAt` on the
+  source. `api.ingestionSources.{list,get,create,update,
+  rotateSecret,archive}` exposes the management surface to the
+  admin UI; raw secret is returned exactly once on create /
+  rotate, never echoed back afterwards.
 
 In flight on the same branch:
 
-- 🚧 OTel passthrough + generic-webhook receivers (Tier 3 + 4
-  ingest endpoints).
-- 🚧 IngestionSource setup forms (per-source-type, in lane B).
-- 🚧 IngestionSourceService + repository scaffold so the admin
-  oversight dashboard's mocked queries can swap to real data.
+- 🚧 IngestionSource setup forms (per-source-type, in lane B —
+  wires to `api.ingestionSources.create`, surfaces the
+  one-time secret in a "paste this into upstream" modal).
+- 🚧 Dogfood proof: synthetic source row + curl OTel span →
+  202 ack → `lastEventAt` flip → screenshot for the PR.
 - 🚧 Architecture deep-dive doc (the diagram + per-tier internals).
 
 Tier 2 / Tier 5 are deferred; the architecture doesn't preclude them
