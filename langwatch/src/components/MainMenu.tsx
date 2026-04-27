@@ -3,6 +3,7 @@ import type { Project } from "@prisma/client";
 import {
   Activity,
   Anvil,
+  Eye,
   Film,
   Gauge,
   History,
@@ -40,7 +41,7 @@ export const MainMenu = React.memo(function MainMenu({
   isCompact = false,
 }: MainMenuProps) {
   const router = useRouter();
-  const { project, hasPermission, isPublicRoute } =
+  const { organization, project, hasPermission, isPublicRoute } =
     useOrganizationTeamProject();
   const [isHovered, setIsHovered] = useState(false);
 
@@ -57,6 +58,31 @@ export const MainMenu = React.memo(function MainMenu({
     "release_ui_ai_gateway_menu_enabled",
     { projectId: project?.id, enabled: !!project },
   );
+
+  // Governance menu entry is gated on (a) the governance preview flag,
+  // (b) the user's `organization:manage` permission, AND (c) the org
+  // having actual governance state (any of personal VKs / RoutingPolicy
+  // / IngestionSource / AnomalyRule / recent activity). The setup-state
+  // check honours the no-auto-redirect rule: vast-majority current
+  // LLMOps admins → governanceActive=false → entry hidden.
+  const { enabled: governancePreviewEnabled } = useFeatureFlag(
+    "release_ui_ai_governance_enabled",
+    { projectId: project?.id, enabled: !!project },
+  );
+  const setupStateQuery = api.governance.setupState.useQuery(
+    { organizationId: organization?.id ?? "" },
+    {
+      enabled:
+        !!organization &&
+        governancePreviewEnabled &&
+        hasPermission("organization:manage"),
+      refetchOnWindowFocus: false,
+    },
+  );
+  const showGovernanceEntry =
+    governancePreviewEnabled &&
+    hasPermission("organization:manage") &&
+    setupStateQuery.data?.governanceActive === true;
 
   // In compact mode, show expanded view on hover
   const showExpanded = !isCompact || isHovered;
@@ -258,6 +284,48 @@ export const MainMenu = React.memo(function MainMenu({
               isActive={router.pathname.includes("/datasets")}
               showLabel={showExpanded}
             />
+
+            {showGovernanceEntry && (
+              <>
+                <HStack
+                  paddingX={2}
+                  paddingTop={3}
+                  paddingBottom={1}
+                  gap={1}
+                  align="center"
+                >
+                  <Text
+                    fontSize="11px"
+                    fontWeight="medium"
+                    textTransform="uppercase"
+                    color="gray.500"
+                  >
+                    {showExpanded ? "Govern" : <div>&nbsp;</div>}
+                  </Text>
+                  {showExpanded && (
+                    <Badge
+                      colorPalette="purple"
+                      variant="subtle"
+                      fontSize="2xs"
+                      paddingX={1.5}
+                      lineHeight={1.2}
+                    >
+                      Preview
+                    </Badge>
+                  )}
+                </HStack>
+                <SideMenuLink
+                  icon={Eye}
+                  label="Governance"
+                  href="/settings/governance"
+                  isActive={
+                    router.pathname === "/settings/governance" ||
+                    router.pathname.startsWith("/settings/governance/")
+                  }
+                  showLabel={showExpanded}
+                />
+              </>
+            )}
 
             {gatewayMenuEnabled && hasPermission("virtualKeys:view") && project && (
               <>
